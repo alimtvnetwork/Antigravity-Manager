@@ -1370,8 +1370,14 @@ export default function Instances() {
                                             });
 
                                             const sortedProjects = [...instanceProjects].sort((a, b) => {
-                                                const aRunning = Boolean(inst.is_running) && Boolean(a.is_running || a.conversations?.some((c) => Boolean(c.is_running)));
-                                                const bRunning = Boolean(inst.is_running) && Boolean(b.is_running || b.conversations?.some((c) => Boolean(c.is_running)));
+                                                const aRunning =
+                                                    Boolean(inst.is_running) &&
+                                                    (Boolean(a.is_running) ||
+                                                        Boolean(a.conversations?.some((c) => Boolean(c.is_running))));
+                                                const bRunning =
+                                                    Boolean(inst.is_running) &&
+                                                    (Boolean(b.is_running) ||
+                                                        Boolean(b.conversations?.some((c) => Boolean(c.is_running))));
                                                 if (aRunning !== bRunning) return aRunning ? -1 : 1;
                                                 const aLatest = Math.max(0, ...(a.conversations || []).map((c) => new Date(c.last_modified).getTime() || 0));
                                                 const bLatest = Math.max(0, ...(b.conversations || []).map((c) => new Date(c.last_modified).getTime() || 0));
@@ -1397,7 +1403,10 @@ export default function Instances() {
                                                     {displayedProjects.length > 0 ? (
                                                         <div className="space-y-1">
                                                             {displayedProjects.map((proj) => {
-                                                                const isProjRunning = Boolean(inst.is_running) && Boolean(proj.is_running || proj.conversations?.some((c) => Boolean(c.is_running)));
+                                                                const isProjRunning =
+                                                                    Boolean(inst.is_running) &&
+                                                                    (Boolean(proj.is_running) ||
+                                                                        Boolean(proj.conversations?.some((c) => Boolean(c.is_running))));
                                                                 const totalTurns = proj.conversations?.reduce((sum, c) => sum + Math.max(c.step_count || 1, 1), 0) || 0;
 
                                                                 return (

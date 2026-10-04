@@ -519,11 +519,27 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
                                     );
 
                                     let is_project_active = is_instance_active
-                                        && is_prompt_running_for_project(&raw_path, instance_id);
+                                        && is_prompt_running_for_project(&raw_path, target_id);
+
+                                    crate::modules::logger::log_instance_prompt_audit(
+                                        target_id,
+                                        &repo_name,
+                                        &raw_path,
+                                        is_instance_active,
+                                        is_project_active,
+                                        if is_project_active { 1 } else { 0 },
+                                        if is_project_active {
+                                            "Active prompt detected in instance runtime"
+                                        } else if !is_instance_active {
+                                            "Instance OS process is not alive"
+                                        } else {
+                                            "No active prompt found; workspace is idle"
+                                        },
+                                    );
 
                                     projects.push(RunningProject {
                                         id: project_id,
-                                        instance_id: instance_id.to_string(),
+                                        instance_id: target_id.to_string(),
                                         repo_name,
                                         repo_path: raw_path,
                                         workspace_storage_path: Some(
@@ -546,9 +562,17 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
         for p in &projects {
             let running_int = if p.is_running { 1 } else { 0 };
             let _ = conn.execute(
-                "INSERT OR REPLACE INTO running_projects 
+                "INSERT INTO running_projects 
                  (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                 ON CONFLICT(id) DO UPDATE SET
+                    instance_id = excluded.instance_id,
+                    repo_name = excluded.repo_name,
+                    repo_path = excluded.repo_path,
+                    workspace_storage_path = excluded.workspace_storage_path,
+                    is_running = excluded.is_running,
+                    last_detected_at = excluded.last_detected_at,
+                    updated_at = excluded.updated_at",
                 params![
                     &p.id,
                     &p.instance_id,
@@ -560,6 +584,12 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
                     now,
                 ],
             );
+            if !p.is_running {
+                let _ = conn.execute(
+                    "UPDATE running_projects SET is_running = 0, updated_at = ?1 WHERE id = ?2",
+                    params![now, &p.id],
+                );
+            }
         }
 
         // If instance is not active, ensure all projects belonging to this instance are marked is_running = 0
@@ -675,7 +705,7 @@ pub fn resume_task_document(
     })
 }
 
-fn gemini_dirs_for_instance(instance_id: &str) -> Vec<PathBuf> {
+pub fn gemini_dirs_for_instance(instance_id: &str) -> Vec<PathBuf> {
     let named = instance_id != "all"
         && instance_id != "default"
         && !instance_id.is_empty()
@@ -687,7 +717,7 @@ fn gemini_dirs_for_instance(instance_id: &str) -> Vec<PathBuf> {
     };
     let mut dirs = Vec::new();
     if let Some(home) = home {
-        for sub in ["antigravity", "antigravity-cli", "antigravity-ide"] {
+        for sub in ["antigravity", "antigravity-ide"] {
             let path = home.join(".gemini").join(sub);
             if path.exists() {
                 dirs.push(path);
@@ -695,6 +725,41 @@ fn gemini_dirs_for_instance(instance_id: &str) -> Vec<PathBuf> {
         }
     }
     dirs
+}
+
+pub fn gemini_dirs_tagged(instance_id: Option<&str>) -> Vec<(String, PathBuf)> {
+    let mut tagged = Vec::new();
+    let target = instance_id.unwrap_or("all");
+
+    if target != "all" {
+        let norm_id = if target == "__default__" || target.is_empty() {
+            "default"
+        } else {
+            target
+        };
+        for dir in gemini_dirs_for_instance(norm_id) {
+            tagged.push((norm_id.to_string(), dir));
+        }
+        return tagged;
+    }
+
+    // For "all": tag default directories
+    for dir in gemini_dirs_for_instance("default") {
+        tagged.push(("default".to_string(), dir));
+    }
+
+    // Tag each registered secondary instance
+    if let Ok(reg) = crate::modules::instance::load_registry() {
+        for inst in reg.instances {
+            if !inst.is_default && inst.id != "default" {
+                for dir in gemini_dirs_for_instance(&inst.id) {
+                    tagged.push((inst.id.clone(), dir));
+                }
+            }
+        }
+    }
+
+    tagged
 }
 
 struct ConversationSummaryRow {
@@ -1420,20 +1485,21 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
 /// Check if any prompt or task is currently actively executing for a project
 pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> bool {
     let now = Utc::now().timestamp();
+    let norm_inst = if instance_id == "__default__" || instance_id.is_empty() {
+        "default"
+    } else {
+        instance_id
+    };
 
     // 0. Dynamic process activity check: If no Antigravity process is actively running for this instance, prompt cannot be executing
-    let has_active_process = if instance_id.is_empty() || instance_id == "all" {
+    let has_active_process = if norm_inst == "default" {
         crate::modules::process::is_antigravity_running(None)
     } else if let Ok(registry) = crate::modules::instance::load_registry() {
-        if let Some(inst) = registry.instances.iter().find(|i| i.id == instance_id) {
+        if let Some(inst) = registry.instances.iter().find(|i| i.id == norm_inst) {
             crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid)
-        } else if instance_id == "default" || instance_id == "__default__" {
-            crate::modules::process::is_antigravity_running(None)
         } else {
             false
         }
-    } else if instance_id == "default" || instance_id == "__default__" {
-        crate::modules::process::is_antigravity_running(None)
     } else {
         false
     };
@@ -1445,13 +1511,13 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
     // Check if the prompt has already transitioned to a terminal status ('completed' / 'failed')
     let in_memory_terminal = if let Ok(map) = get_memory_prompts_map().lock() {
         map.values().any(|p| {
-            let matches_inst = instance_id.is_empty()
-                || instance_id == "all"
-                || p.instance_id == instance_id
-                || ((instance_id == "default" || instance_id == "__default__")
-                    && (p.instance_id == "default"
-                        || p.instance_id == "__default__"
-                        || p.instance_id.is_empty()));
+            let matches_inst = if norm_inst == "default" {
+                p.instance_id == "default"
+                    || p.instance_id == "__default__"
+                    || p.instance_id.is_empty()
+            } else {
+                p.instance_id == norm_inst
+            };
             matches_inst
                 && (p.project_id == project_id || p.repo_path == project_id)
                 && (p.status == "completed" || p.status == "failed")
@@ -1464,9 +1530,9 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
         conn.query_row(
             "SELECT status FROM active_prompts 
              WHERE (project_id = ?1 OR repo_path = ?1) 
-               AND (?2 = '' OR ?2 = 'all' OR instance_id = ?2 OR ((?2 = 'default' OR ?2 = '__default__') AND (instance_id = 'default' OR instance_id = '__default__' OR instance_id IS NULL OR instance_id = '')))
+               AND (?2 = 'all' OR instance_id = ?2 OR (?2 = 'default' AND (instance_id = 'default' OR instance_id = '__default__' OR instance_id IS NULL OR instance_id = '')))
              ORDER BY updated_at DESC, created_at DESC LIMIT 1",
-            params![project_id, instance_id],
+            params![project_id, norm_inst],
             |r| r.get::<_, String>(0),
         )
         .map(|s| s == "completed" || s == "failed")
@@ -1482,13 +1548,13 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
     if !is_terminal_override {
         if let Ok(map) = get_memory_prompts_map().lock() {
             for p in map.values() {
-                let matches_inst = instance_id.is_empty()
-                    || instance_id == "all"
-                    || p.instance_id == instance_id
-                    || ((instance_id == "default" || instance_id == "__default__")
-                        && (p.instance_id == "default"
-                            || p.instance_id == "__default__"
-                            || p.instance_id.is_empty()));
+                let matches_inst = if norm_inst == "default" {
+                    p.instance_id == "default"
+                        || p.instance_id == "__default__"
+                        || p.instance_id.is_empty()
+                } else {
+                    p.instance_id == norm_inst
+                };
                 let matches_proj = p.project_id == project_id || p.repo_path == project_id;
                 if matches_inst && matches_proj {
                     let has_running_status = p.status == "running";
@@ -1511,24 +1577,15 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
     }
 
     // 2. Check active workers map strictly scoped by instance_id
-    let is_empty_inst = instance_id.is_empty();
-    let is_default_inst = instance_id == "__default__" || instance_id == "default";
-    let target_inst = if is_empty_inst || is_default_inst {
-        "default"
-    } else {
-        instance_id
-    };
-    let expected_prefix = format!("{}:", target_inst);
-    let is_target_all = target_inst == "all";
+    let expected_prefix = format!("{}:", norm_inst);
 
     if let Ok(mut workers) = get_active_agy_workers().lock() {
         let mut dead_keys = Vec::new();
         let mut found_running_worker = false;
         for (key, &pid) in workers.iter() {
             let has_prefix = key.starts_with(&expected_prefix);
-            let has_colon = key.contains(':');
-            let is_default_match = target_inst == "default" && !has_colon;
-            let matches_inst = is_target_all || has_prefix || is_default_match;
+            let is_default_match = norm_inst == "default" && !key.contains(':');
+            let matches_inst = norm_inst == "all" || has_prefix || is_default_match;
             let matches_proj = key.contains(project_id);
             if matches_inst && matches_proj {
                 // Verify OS process liveness for PID
@@ -1572,10 +1629,10 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
             conn.query_row(
                 "SELECT COUNT(*) FROM active_prompts 
                  WHERE (project_id = ?1 OR repo_path = ?1) 
-                   AND (?2 = '' OR ?2 = 'all' OR instance_id = ?2 OR ((?2 = 'default' OR ?2 = '__default__') AND (instance_id = 'default' OR instance_id = '__default__' OR instance_id IS NULL OR instance_id = '')))
+                   AND (?2 = 'all' OR instance_id = ?2 OR (?2 = 'default' AND (instance_id = 'default' OR instance_id = '__default__' OR instance_id IS NULL OR instance_id = '')))
                    AND status = 'running'
                    AND updated_at >= ?3",
-                params![project_id, instance_id, now - 300],
+                params![project_id, norm_inst, now - 300],
                 |r| r.get(0),
             )
             .unwrap_or(0)
@@ -1596,100 +1653,87 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
     }
 
     // 4. Check Antigravity live conversation summaries directly for running sessions in this instance
-    let is_all_or_default = instance_id.is_empty()
-        || instance_id == "all"
-        || instance_id == "default"
-        || instance_id == "__default__";
-    let base_dir = if is_all_or_default {
-        crate::modules::agy_cleaner::get_gemini_base_dir()
-            .or_else(|| dirs::home_dir().map(|h| h.join(".gemini").join("antigravity")))
-    } else {
-        crate::modules::instance::get_instance_home_dir(instance_id)
-            .ok()
-            .map(|h| h.join(".gemini").join("antigravity"))
-    };
-    if let Some(base_dir) = base_dir {
+    let candidate_dirs = gemini_dirs_for_instance(norm_inst);
+    let clean_target = normalize_path_for_compare(project_id);
+
+    for base_dir in candidate_dirs {
         let summaries_db = base_dir.join("conversation_summaries.db");
-        if summaries_db.exists() {
-            let conn_res = Connection::open_with_flags(
-                &summaries_db,
+        if !summaries_db.exists() {
+            continue;
+        }
+
+        let conn_res = Connection::open_with_flags(
+            &summaries_db,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+        )
+        .or_else(|_| {
+            let uri = format!(
+                "file:{}?immutable=1",
+                summaries_db.to_string_lossy().replace('\\', "/")
+            );
+            Connection::open_with_flags(
+                &uri,
                 rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
             )
-            .or_else(|_| {
-                let uri = format!(
-                    "file:{}?immutable=1",
-                    summaries_db.to_string_lossy().replace('\\', "/")
-                );
-                Connection::open_with_flags(
-                    &uri,
-                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
-                        | rusqlite::OpenFlags::SQLITE_OPEN_URI,
-                )
-            });
+        });
 
-            if let Ok(conn) = conn_res {
-                let _ = conn.pragma_update(None, "busy_timeout", 3000);
-                if let Ok(mut stmt) = conn.prepare(
-                    "SELECT status, not_fully_idle, workspace_uris, last_modified_time 
-                     FROM conversation_summaries 
-                     ORDER BY last_modified_time DESC 
-                     LIMIT 30",
-                ) {
-                    let clean_target = normalize_path_for_compare(project_id);
-                    let rows = stmt.query_map([], |row| {
-                        Ok((
-                            row.get::<_, String>(0)?,
-                            row.get::<_, i32>(1)?,
-                            row.get::<_, Option<String>>(2)?,
-                            row.get::<_, String>(3)?,
-                        ))
-                    });
-                    if let Ok(rows) = rows {
-                        for item in rows.flatten() {
-                            let (status, not_fully_idle, ws_uris_opt, _last_time_str) = item;
+        if let Ok(conn) = conn_res {
+            let _ = conn.pragma_update(None, "busy_timeout", 3000);
+            if let Ok(mut stmt) = conn.prepare(
+                "SELECT status, not_fully_idle, workspace_uris, last_modified_time 
+                 FROM conversation_summaries 
+                 ORDER BY last_modified_time DESC 
+                 LIMIT 30",
+            ) {
+                let rows = stmt.query_map([], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, i32>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, String>(3)?,
+                    ))
+                });
+                if let Ok(rows) = rows {
+                    for item in rows.flatten() {
+                        let (status, not_fully_idle, ws_uris_opt, _last_time_str) = item;
 
-                            // Strict idle supremacy rule:
-                            let is_idle_count = not_fully_idle == 0;
-                            let has_idle_status = status.contains("IDLE")
-                                || status.contains("COMPLETED")
-                                || status.contains("FAILED")
-                                || status.contains("CANCELLED");
-                            let is_explicit_idle = is_idle_count || has_idle_status;
+                        // Strict idle supremacy rule:
+                        let is_idle_count = not_fully_idle == 0;
+                        let has_idle_status = status.contains("IDLE")
+                            || status.contains("COMPLETED")
+                            || status.contains("FAILED")
+                            || status.contains("CANCELLED");
+                        let is_explicit_idle = is_idle_count || has_idle_status;
 
-                            let has_active_turns = not_fully_idle > 0;
-                            let has_running_text = status.contains("RUNNING");
-                            let is_active_session = has_active_turns && has_running_text;
+                        let is_conv_running = if is_explicit_idle {
+                            false
+                        } else {
+                            not_fully_idle != 0 || status.contains("RUNNING")
+                        };
 
-                            let is_conv_running = if is_explicit_idle {
-                                false
-                            } else {
-                                is_active_session
-                            };
-
-                            if is_conv_running {
-                                if let Some(ws_uris_raw) = ws_uris_opt {
-                                    let ws_uris: Vec<String> =
-                                        serde_json::from_str(&ws_uris_raw).unwrap_or_default();
-                                    for u in ws_uris {
-                                        let clean_p =
-                                            normalize_path_for_compare(&decode_uri_to_path(&u));
-                                        let has_target = !clean_target.is_empty();
-                                        let matches_path = clean_p == clean_target
-                                            || clean_p.contains(&clean_target)
-                                            || clean_target.contains(&clean_p);
-                                        let is_target_matched = has_target && matches_path;
-                                        if is_target_matched {
-                                            crate::modules::logger::log_instance_prompt_audit(
-                                                instance_id,
-                                                project_id,
-                                                &clean_p,
-                                                true,
-                                                true,
-                                                1,
-                                                "CONVERSATION_SUMMARY_ACTIVE_TURN",
-                                            );
-                                            return true;
-                                        }
+                        if is_conv_running {
+                            if let Some(ws_uris_raw) = ws_uris_opt {
+                                let ws_uris: Vec<String> =
+                                    serde_json::from_str(&ws_uris_raw).unwrap_or_default();
+                                for u in ws_uris {
+                                    let clean_p =
+                                        normalize_path_for_compare(&decode_uri_to_path(&u));
+                                    let has_target = !clean_target.is_empty();
+                                    let matches_path = clean_p == clean_target
+                                        || clean_p.contains(&clean_target)
+                                        || clean_target.contains(&clean_p);
+                                    let is_target_matched = has_target && matches_path;
+                                    if is_target_matched {
+                                        crate::modules::logger::log_instance_prompt_audit(
+                                            instance_id,
+                                            project_id,
+                                            &clean_p,
+                                            true,
+                                            true,
+                                            1,
+                                            "CONVERSATION_SUMMARY_ACTIVE_TURN",
+                                        );
+                                        return true;
                                     }
                                 }
                             }
@@ -2334,24 +2378,6 @@ pub fn is_any_prompt_actively_running() -> bool {
                 if count > 0 {
                     return true;
                 }
-
-                // Check recency within 600s
-                if let Ok(mut stmt) = conn.prepare(
-                    "SELECT last_modified_time FROM conversation_summaries ORDER BY last_modified_time DESC LIMIT 10",
-                ) {
-                    let now = Utc::now();
-                    let rows = stmt.query_map([], |row| row.get::<_, String>(0));
-                    if let Ok(rows) = rows {
-                        for time_str in rows.flatten() {
-                            if let Ok(parsed) = chrono::DateTime::parse_from_rfc3339(&time_str) {
-                                let age = (now - parsed.with_timezone(&Utc)).num_seconds();
-                                if age >= 0 && age < 600 {
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
     }
@@ -2966,17 +2992,23 @@ pub fn auto_resume_recent_prompts(
         .and_then(|i| i.bound_email.clone())
         .unwrap_or_else(|| "unbound".to_string());
 
+    let norm_inst = if instance_id == "__default__" || instance_id.is_empty() {
+        "default"
+    } else {
+        instance_id
+    };
+
     let mut stmt = conn
         .prepare(
             "SELECT id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at 
              FROM running_projects 
-             WHERE instance_id = ? OR ? = ''
+             WHERE (instance_id = ?1 OR (?1 = 'default' AND (instance_id = '__default__' OR instance_id = 'default' OR instance_id = '')))
              ORDER BY last_detected_at DESC",
         )
         .map_err(|e| format!("Failed to prepare query: {}", e))?;
 
     let projects = stmt
-        .query_map([instance_id, instance_id], |row| {
+        .query_map([norm_inst], |row| {
             let running_int: i32 = row.get(5)?;
             Ok(RunningProject {
                 id: row.get(0)?,
@@ -3016,14 +3048,15 @@ pub fn auto_resume_recent_prompts(
             .prepare(
                 "SELECT id, prompt_content, model, image_payload 
                  FROM active_prompts 
-                 WHERE project_id = ?1 OR repo_path = ?2 OR project_id LIKE ?3
+                 WHERE (project_id = ?1 OR repo_path = ?2 OR project_id LIKE ?3)
+                   AND (instance_id = ?4 OR (?4 = 'default' AND (instance_id = '__default__' OR instance_id = 'default' OR instance_id IS NULL OR instance_id = '')))
                  ORDER BY created_at DESC LIMIT 1",
             )
             .map_err(|e| format!("Failed to prepare prompt query: {}", e))?;
 
         let mut maybe_prompt = prompt_stmt
             .query_row(
-                rusqlite::params![&project.id, &project.repo_path, &proj_like],
+                rusqlite::params![&project.id, &project.repo_path, &proj_like, norm_inst],
                 |row| {
                     Ok((
                         row.get::<_, String>(0)?,
@@ -3420,8 +3453,8 @@ pub fn get_project_conversation_tree_cached(
     if !force {
         if let Ok(conn) = connect_db() {
             let cached: Result<(String, i64, i64), _> = conn.query_row(
-                "SELECT tree_json, updated_at, ttl_seconds FROM prompt_tree_cache WHERE cache_key = ?1",
-                params![&cache_key],
+                "SELECT tree_json, updated_at, ttl_seconds FROM prompt_tree_cache WHERE cache_key = ?1 AND instance_id = ?2",
+                params![&cache_key, inst_key],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             );
             if let Ok((tree_json, updated_at, ttl_seconds)) = cached {
@@ -3549,72 +3582,35 @@ fn compute_project_conversation_tree(
 
     let conn_opt = connect_db().ok();
 
-    let mut convs_by_path: std::collections::HashMap<
-        String,
+    let mut convs_by_inst_and_path: std::collections::HashMap<
+        (String, String),
         Vec<(String, String, String, String, bool, usize, String, String)>,
     > = std::collections::HashMap::new();
 
-    let mut active_prompts_by_path: std::collections::HashMap<String, Vec<ActivePrompt>> =
-        std::collections::HashMap::new();
+    let mut active_prompts_by_inst_and_path: std::collections::HashMap<
+        (String, String),
+        Vec<ActivePrompt>,
+    > = std::collections::HashMap::new();
     if let Ok(active_list) = list_all_prompts() {
         for ap in active_list {
             let key = normalize_path_for_compare(&ap.repo_path);
-            active_prompts_by_path.entry(key).or_default().push(ap);
+            let inst = if ap.instance_id == "__default__" || ap.instance_id.is_empty() {
+                "default".to_string()
+            } else {
+                ap.instance_id.clone()
+            };
+            active_prompts_by_inst_and_path
+                .entry((inst, key))
+                .or_default()
+                .push(ap);
         }
     }
 
-    let candidate_dirs: Vec<(PathBuf, String)> = if let Some(target_id) = target {
-        if target_id == "default" || target_id == "__default__" {
-            let mut list = Vec::new();
-            if let Some(home) = dirs::home_dir() {
-                for sub in &["antigravity", "antigravity-ide"] {
-                    let p = home.join(".gemini").join(sub);
-                    if p.exists() {
-                        list.push((p, "default".to_string()));
-                    }
-                }
-            }
-            list
-        } else {
-            let mut list = Vec::new();
-            if let Ok(inst_home) = crate::modules::instance::get_instance_home_dir(target_id) {
-                for sub in &["antigravity", "antigravity-ide"] {
-                    let p = inst_home.join(".gemini").join(sub);
-                    if p.exists() {
-                        list.push((p, target_id.to_string()));
-                    }
-                }
-            }
-            list
-        }
-    } else {
-        let mut list = Vec::new();
-        if let Some(home) = dirs::home_dir() {
-            for sub in &["antigravity", "antigravity-ide"] {
-                let p = home.join(".gemini").join(sub);
-                if p.exists() {
-                    list.push((p, "default".to_string()));
-                }
-            }
-        }
-        for inst in &registry.instances {
-            if !inst.is_default && inst.id != "default" {
-                if let Ok(inst_home) = crate::modules::instance::get_instance_home_dir(&inst.id) {
-                    for sub in &["antigravity", "antigravity-ide"] {
-                        let p = inst_home.join(".gemini").join(sub);
-                        if p.exists() {
-                            list.push((p, inst.id.clone()));
-                        }
-                    }
-                }
-            }
-        }
-        list
-    };
+    let candidate_dirs = gemini_dirs_tagged(target);
 
     let mut seen_tree_cids = std::collections::HashSet::new();
 
-    for (base, owning_inst_id) in &candidate_dirs {
+    for (owning_inst_id, base) in &candidate_dirs {
         let summaries_db = base.join("conversation_summaries.db");
         if summaries_db.exists() {
             let s_conn = Connection::open_with_flags(
@@ -3711,8 +3707,13 @@ fn compute_project_conversation_tree(
                             if assigned_paths.is_empty() {
                                 assigned_paths.push("__unassigned__".to_string());
                             }
+                            let norm_owning_inst = if owning_inst_id == "__default__" || owning_inst_id.is_empty() {
+                                "default".to_string()
+                            } else {
+                                owning_inst_id.clone()
+                            };
                             for p_key in assigned_paths {
-                                convs_by_path.entry(p_key).or_default().push((
+                                convs_by_inst_and_path.entry((norm_owning_inst.clone(), p_key)).or_default().push((
                                     cid.clone(),
                                     title.clone(),
                                     effective_prompt.clone(),
@@ -3775,22 +3776,21 @@ fn compute_project_conversation_tree(
             (tree_nodes.len() as i64) + 1
         };
 
+        let norm_proj_inst = if proj.instance_id == "default"
+            || proj.instance_id == "__default__"
+            || proj.instance_id.is_empty()
+        {
+            "default".to_string()
+        } else {
+            proj.instance_id.clone()
+        };
+
         let mut conv_nodes: Vec<AgmConversationNode> = Vec::new();
-        if let Some(raw_convs) = convs_by_path.get(&norm_path) {
+        if let Some(raw_convs) =
+            convs_by_inst_and_path.get(&(norm_proj_inst.clone(), norm_path.clone()))
+        {
             for (cid, title, raw_prompt, status, is_run, steps, last_mod, conv_inst_id) in raw_convs
             {
-                let matches_inst = if proj.instance_id == "default"
-                    || proj.instance_id == "__default__"
-                    || proj.instance_id.is_empty()
-                {
-                    conv_inst_id == "default" || conv_inst_id == "__default__"
-                } else {
-                    conv_inst_id == &proj.instance_id
-                };
-                if !matches_inst {
-                    continue;
-                }
-
                 let effective_is_run = is_inst_alive && *is_run;
                 if only_running && !effective_is_run {
                     continue;
@@ -3840,22 +3840,10 @@ fn compute_project_conversation_tree(
             }
         }
 
-        if let Some(aps) = active_prompts_by_path.get(&norm_path) {
+        if let Some(aps) =
+            active_prompts_by_inst_and_path.get(&(norm_proj_inst.clone(), norm_path.clone()))
+        {
             for ap in aps {
-                let matches_inst = if proj.instance_id == "default"
-                    || proj.instance_id == "__default__"
-                    || proj.instance_id.is_empty()
-                {
-                    ap.instance_id == "default"
-                        || ap.instance_id == "__default__"
-                        || ap.instance_id.is_empty()
-                } else {
-                    ap.instance_id == proj.instance_id
-                };
-                if !matches_inst {
-                    continue;
-                }
-
                 let cid = ap.session_id.clone().unwrap_or_else(|| ap.id.clone());
                 if conv_nodes.iter().any(|c| c.conversation_id == cid) {
                     continue;
@@ -3902,8 +3890,13 @@ fn compute_project_conversation_tree(
         }
 
         let has_active_conv = conv_nodes.iter().any(|c| c.is_running);
-        let has_active_prompt = is_prompt_running_for_project(&project_key, &proj.instance_id)
-            || is_prompt_running_for_project(&proj.repo_path, &proj.instance_id);
+        let has_active_prompt = if !has_active_conv {
+            is_prompt_running_for_project(&proj.repo_path, &proj.instance_id)
+                || (!project_key.is_empty()
+                    && is_prompt_running_for_project(&project_key, &proj.instance_id))
+        } else {
+            false
+        };
 
         let proj_is_running = is_inst_alive && (has_active_conv || has_active_prompt);
 

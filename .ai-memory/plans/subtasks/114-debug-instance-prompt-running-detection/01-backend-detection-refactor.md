@@ -13,7 +13,7 @@ target_files:
   - src-tauri/src/modules/logger.rs
   - src-tauri/src/modules/repo_db.rs
   - src-tauri/src/commands/instance.rs
-status: pending
+status: completed
 ---
 
 # Subtask 01 — Backend Detection Refactor & Isolated Per-Instance Prompt Liveness
@@ -246,25 +246,29 @@ Resolve the cross-instance running prompt state bleed between Default profile an
 
 ## 4. Verification & Acceptance Criteria
 
-- [ ] **Candidate Resolution Isolation**:
+- [x] **Candidate Resolution Isolation**:
   - `gemini_dirs_tagged(Some("default"))` yields only default paths tagged `"default"`.
   - `gemini_dirs_tagged(Some("8159"))` yields only `8159` paths tagged `"8159"`.
+  - `antigravity-cli` excluded from GUI candidate scanning.
   - No directory path from `8159` is ever tagged `"default"`.
-- [ ] **Compound Map Isolation**:
+- [x] **Compound Map Isolation**:
   - Conversations from `8159` are keyed under `("8159", path)`.
   - Conversations from Default are keyed under `("default", path)`.
+  - Active prompts are partitioned by `(instance_id, path)`.
   - Querying Default tree nodes never reads or includes `("8159", path)` entries.
-- [ ] **Strict Idle Signal Enforcement**:
+- [x] **Strict Idle Signal Enforcement**:
   - When `not_fully_idle == 0` or status is `"CASCADE_RUN_STATUS_IDLE"`, `is_conv_running` is strictly `false`.
-  - Timestamp recency (`age < 600`) never flips an explicit idle state to `true`.
-- [ ] **WorkspaceStorage Decoupling**:
-  - An inactive workspace present in `User/workspaceStorage` has `is_running = false`.
+  - Timestamp recency (`age < 600`) completely eliminated from `is_any_prompt_actively_running` and liveness evaluations.
+- [x] **WorkspaceStorage Decoupling**:
+  - Inactive workspaces present in `User/workspaceStorage` have `is_running = false`.
   - Only the workspace with an affirmative active prompt or turn has `is_running = true`.
-- [ ] **Cache Partitioning**:
+  - Stale projects in `running_projects` are updated with `is_running = 0`.
+- [x] **Cache Partitioning**:
   - `prompt_tree_cache` keys follow `tree:{instance_id}:{max_words}:{only_running}`.
-  - Querying `8159` after `default` results in a separate cache lookup and distinct response.
-- [ ] **Structured Audit Logging**:
-  - Every evaluation logs `[InstancePromptAudit]` with `instance`, `project`, `is_running`, and `rationale`.
-- [ ] **Quality Gates**:
-  - Strictly no git commands run during subagent execution.
-  - Rust formatting and Clippy compatibility preserved.
+  - Query binds `cache_key = ?1 AND instance_id = ?2`.
+- [x] **Structured Audit Logging**:
+  - Every evaluation logs `[InstancePromptAudit]` via `log_instance_prompt_audit` with `instance`, `project`, `is_running`, `active_tasks`, and `rationale`.
+- [x] **Quality Gates**:
+  - Strictly zero git commands executed.
+  - `cargo fmt -- --check` validated with 100% compliance.
+  - Comprehensive 4-part RCA authored in `02-spec/21-app/114-debug-instance-prompt-running-detection/03-root-cause-analysis.md`.

@@ -593,13 +593,24 @@ export default function PromptTreeViewModal({
             });
             const isTargetDefault = instanceId === 'default' || instanceId === '__default__';
             const relevant = instanceId
-                ? data.filter((p) => {
-                      if (p.instance_id === instanceId) return true;
-                      if (isTargetDefault && (!p.instance_id || p.instance_id === 'default' || p.instance_id === '__default__')) {
-                          return true;
-                      }
-                      return false;
-                  })
+                ? data
+                      .filter((p) => {
+                          if (p.instance_id === instanceId) return true;
+                          if (isTargetDefault && (!p.instance_id || p.instance_id === 'default' || p.instance_id === '__default__')) {
+                              return true;
+                          }
+                          return false;
+                      })
+                      .map((p) => ({
+                          ...p,
+                          conversations: (p.conversations || []).filter((c) => {
+                              if (c.instance_id === instanceId) return true;
+                              if (isTargetDefault && (!c.instance_id || c.instance_id === 'default' || c.instance_id === '__default__')) {
+                                  return true;
+                              }
+                              return false;
+                          }),
+                      }))
                 : data;
             const finalData = relevant;
             setTreeData(finalData);
@@ -801,13 +812,24 @@ export default function PromptTreeViewModal({
             });
             const isTargetDefault = instanceId === 'default' || instanceId === '__default__';
             const relevant = instanceId
-                ? data.filter((p) => {
-                      if (p.instance_id === instanceId) return true;
-                      if (isTargetDefault && (!p.instance_id || p.instance_id === 'default' || p.instance_id === '__default__')) {
-                          return true;
-                      }
-                      return false;
-                  })
+                ? data
+                      .filter((p) => {
+                          if (p.instance_id === instanceId) return true;
+                          if (isTargetDefault && (!p.instance_id || p.instance_id === 'default' || p.instance_id === '__default__')) {
+                              return true;
+                          }
+                          return false;
+                      })
+                      .map((p) => ({
+                          ...p,
+                          conversations: (p.conversations || []).filter((c) => {
+                              if (c.instance_id === instanceId) return true;
+                              if (isTargetDefault && (!c.instance_id || c.instance_id === 'default' || c.instance_id === '__default__')) {
+                                  return true;
+                              }
+                              return false;
+                          }),
+                      }))
                 : data;
             const finalData = relevant;
             setTreeData(finalData);
@@ -1664,9 +1686,33 @@ export default function PromptTreeViewModal({
                             ) : (
                                 <>
                                     {activeProjects.length === 0 && archivedProjects.length === 0 ? (
-                                        <div className="py-12 text-center text-xs text-slate-400">
-                                            No projects or conversations found.
-                                        </div>
+                                        treeData.length === 0 ? (
+                                            <div className="py-16 text-center space-y-3 px-6">
+                                                <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-[#0c2438] flex items-center justify-center mx-auto text-slate-400">
+                                                    <Folder className="w-6 h-6 text-slate-400" />
+                                                </div>
+                                                <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                                    No Projects Found in this Profile
+                                                </div>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                                                    No workspace storage or conversation records were found for instance &quot;{instanceName || instanceId}&quot;. Launch this instance and open a workspace to start logging prompts.
+                                                </p>
+                                            </div>
+                                        ) : searchQuery.trim() ? (
+                                            <div className="py-12 text-center text-xs text-slate-400 space-y-2">
+                                                <div>No conversations match &quot;{searchQuery}&quot;</div>
+                                                <button
+                                                    onClick={() => setSearchQuery('')}
+                                                    className="text-blue-500 hover:underline text-[11px] cursor-pointer"
+                                                >
+                                                    Clear search query
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="py-12 text-center text-xs text-slate-400">
+                                                No projects or conversations found.
+                                            </div>
+                                        )
                                     ) : (
                                         <>
                                             {activeProjects.map((project) => renderProjectNode(project))}
@@ -2058,12 +2104,9 @@ export default function PromptTreeViewModal({
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-slate-400">
-                                <Layers className="h-12 w-12 stroke-1 mb-3 opacity-40" />
-                                <p className="text-sm font-medium">Select a project or conversation from the left tree</p>
-                                <p className="text-xs mt-1">
-                                    Click any conversation node to preview prompt content, focus the IDE window, or resend instructions.
-                                </p>
+                            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 text-xs p-6 space-y-2">
+                                <MessageSquare className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                                <span>Select a conversation from the left hierarchy to inspect prompt history</span>
                             </div>
                         )}
                     </div>
