@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.134.0 (2026-10-04)**:
+        -   **[Release CI] Multi-Platform Release Asset Packaging Fix**:
+            -   **Description**: Fixed artifact download pattern in GitHub Actions release workflow to ensure all cross-platform assets (Windows NSIS setup `.exe`, macOS `.dmg`, Linux `.deb` / `.AppImage`) are reliably bundled and published to official GitHub Releases for frictionless one-liner installation. (Thanks to @aukgit)
+
     *   **v4.133.0 (2026-10-04)**:
         -   **[UI & Theming] Accounts Table Borders, Subtle Grouping & VS Code Quota Gradients**:
             -   **Description**: Refined Accounts table styling with clean row borders (`border-b border-slate-200/80 dark:border-slate-800/80`), subtle table container styling, and VS Code dark editor row hover highlight (`hover:bg-slate-50/80 dark:hover:bg-[#0f273d]/60` with `border-l-blue-500/70` accent indicator), eliminating aggressive pitch-black and bright yellow contrasts. Upgraded quota progress bars with professional VS Code teal/cyan/sky gradients (`bg-gradient-to-r from-teal-500 via-cyan-500 to-sky-500`) over dark track backgrounds (`bg-slate-200 dark:bg-slate-800/80`), and softened quota percentage badges to muted cyan (`text-cyan-600 dark:text-cyan-400`). (Thanks to @aukgit)
