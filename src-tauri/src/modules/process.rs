@@ -430,7 +430,7 @@ fn get_self_family_pids(system: &sysinfo::System) -> std::collections::HashSet<u
 }
 
 /// Get PIDs of all Antigravity processes (including main and helper processes)
-fn get_antigravity_pids(target_ide: Option<&str>) -> Vec<u32> {
+pub(crate) fn get_antigravity_pids(target_ide: Option<&str>) -> Vec<u32> {
     let mut system = System::new();
     system.refresh_processes(sysinfo::ProcessesToUpdate::All);
     let ide_exe_paths = get_ide_exe_paths(&system);

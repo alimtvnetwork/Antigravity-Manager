@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.147.0] - 2026-10-04
+
+### Fixed
+- **Rust 后端构建错误全面修复与进程 PID 检索导出 (Full Rust Backend Build Fix & Process PID API Export)**: 修复多实例项目库分析中的编译阻断问题：在 `compute_project_conversation_tree` 顶层统一声明时间戳变量 `now`，消除对话生命周期评估时的 `cannot find value now in this scope`（E0425）；将 `get_antigravity_pids` 函数导出为模块级 `pub(crate)` 并统一调用方传参，消除私有函数访问限制（E0603）与参数缺失错误（E0061），使跨平台构建与 CI 流水线以 100% 成功率通过。 (Thanks to @aukgit)
+
+---
+
 ## [v4.146.0] - 2026-10-04
 
 ### Fixed
@@ -508,6 +515,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.147.0 (2026-10-04)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.146.0 (2026-10-04)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

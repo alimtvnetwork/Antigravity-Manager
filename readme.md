@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.146.0-3B82F6?style=flat-square" alt="Version v4.146.0">
+    <img src="https://img.shields.io/badge/Version-v4.147.0-3B82F6?style=flat-square" alt="Version v4.147.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.146.0)**
+**Bar 2: Version-Based Installation (v4.147.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -544,7 +544,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.146.0**: Fixed Clippy and compilation gates in CI pipelines by adding a non-exhaustive wildcard match arm for `rusqlite::backup::StepResult`, unblocking release compilation on Linux and macOS; includes full rusqlite online hot-cloning backup support, repo DB borrow comparisons fix, and complete macOS 13–15 Gatekeeper deep hardening. (Thanks to @aukgit)
+> Latest version **v4.147.0**: Resolved all Rust backend CI compilation errors identified by `gitmap pe`, including missing `now` timestamp declarations in `repo_db.rs` and `get_antigravity_pids` module visibility and caller argument alignment in `process.rs`; guarantees clean, warning-free full-suite builds across Linux, macOS, and Windows runners. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

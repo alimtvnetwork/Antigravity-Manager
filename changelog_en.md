@@ -3,6 +3,9 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.147.0 (2026-10-04)**:
+        -   **[Build & Compilation Gates] Comprehensive Backend Fixes & PID Visibility**: Resolved all 7 remote compilation errors flagged by `gitmap pe`. Declared timestamp `now` at the top level of `compute_project_conversation_tree` in `src-tauri/src/modules/repo_db.rs`, resolving E0425 scope errors in turn TTL checks. Promoted `get_antigravity_pids` to `pub(crate)` in `src-tauri/src/modules/process.rs` and aligned caller invocations with `Option<&str>` arguments, fixing private function visibility (E0603) and argument count (E0061) compile failures across macOS, Linux, and Windows CI runners. (Thanks to @aukgit)
+
     *   **v4.146.0 (2026-10-04)**:
         -   **[Clippy & Compilation Gate] Rusqlite Non-Exhaustive StepResult Match Arm**: Resolved the remaining E0004 compiler blockage in Linux and macOS CI pipelines caused by `rusqlite::backup::StepResult` being marked `#[non_exhaustive]`. Added a wildcard fallback arm (`Ok(_) => break`) to the online SQLite backup step loop in `src-tauri/src/modules/instance.rs`, ensuring `cargo clippy` and compilation pass with zero warnings across all CI environments. (Thanks to @aukgit)
 

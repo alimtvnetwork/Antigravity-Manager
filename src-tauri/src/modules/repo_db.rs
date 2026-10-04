@@ -1503,7 +1503,7 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
     // 0. Dynamic process activity check: If no Antigravity process is actively running for this instance, prompt cannot be executing
     let (has_active_process, resolved_name, host_pid) = if norm_inst == "default" {
         let is_running = crate::modules::process::is_antigravity_running(None);
-        let pid = crate::modules::process::get_antigravity_pids()
+        let pid = crate::modules::process::get_antigravity_pids(None)
             .first()
             .copied();
         (is_running, "default".to_string(), pid)
@@ -3626,6 +3626,7 @@ fn compute_project_conversation_tree(
 ) -> Vec<AgmProjectTreeNode> {
     let target = target_instance.filter(|t| !t.is_empty() && *t != "all");
     let registry = crate::modules::instance::load_registry().unwrap_or_default();
+    let now = Utc::now().timestamp();
 
     if let Some(target_id) = target {
         if target_id == "default" || target_id == "__default__" {
@@ -4061,7 +4062,7 @@ fn compute_project_conversation_tree(
                 Some(1),
                 "default".to_string(),
                 default_email.clone(),
-                crate::modules::process::get_antigravity_pids()
+                crate::modules::process::get_antigravity_pids(None)
                     .first()
                     .copied(),
             )
