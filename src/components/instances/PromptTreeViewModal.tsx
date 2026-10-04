@@ -104,7 +104,7 @@ function getTruncatedText(text: string, maxWords: number): { displayText: string
 
 // Helper to check if a conversation is stale or empty (immune if actively running)
 export function isStaleOrEmptyConversation(conv: AgmConversationNode): boolean {
-    if (conv.is_running === true || conv.status === 'RUNNING') {
+    if (Boolean(conv.is_running)) {
         return false;
     }
     const title = (conv.title || '').trim().toLowerCase();
@@ -653,7 +653,7 @@ export default function PromptTreeViewModal({
                     setExpandedProjects({ [target.project_id]: true });
                     setSelectedProject(target);
                     if (target.conversations && target.conversations.length > 0) {
-                        const runningConv = target.conversations.find((c) => c.is_running === true || c.status === 'RUNNING');
+                        const runningConv = target.conversations.find((c) => Boolean(c.is_running));
                         if (runningConv) {
                             selectConversation(runningConv, target);
                             if (isStaleOrEmptyConversation(runningConv)) {
@@ -691,8 +691,8 @@ export default function PromptTreeViewModal({
                 const bPinned = currentPinnedIds.includes(b.project_id);
                 if (aPinned !== bPinned) return aPinned ? -1 : 1;
 
-                const aRunning = a.is_running || a.conversations.some((c) => c.is_running || c.status === 'RUNNING');
-                const bRunning = b.is_running || b.conversations.some((c) => c.is_running || c.status === 'RUNNING');
+                const aRunning = Boolean(a.is_running) || a.conversations.some((c) => Boolean(c.is_running));
+                const bRunning = Boolean(b.is_running) || b.conversations.some((c) => Boolean(c.is_running));
                 if (aRunning !== bRunning) return aRunning ? -1 : 1;
 
                 const aLatest = Math.max(0, ...a.conversations.map((c) => new Date(c.last_modified).getTime() || 0));
@@ -711,7 +711,7 @@ export default function PromptTreeViewModal({
             const runningCandidates: RunningCand[] = [];
             for (const proj of prioritized) {
                 for (const conv of proj.conversations) {
-                    if (conv.is_running === true || conv.status === 'RUNNING') {
+                    if (Boolean(conv.is_running)) {
                         runningCandidates.push({
                             conv,
                             proj,
@@ -735,8 +735,8 @@ export default function PromptTreeViewModal({
                 return;
             }
 
-            // 2. If no conversation is running, check if any non-archived project has p.is_running === true
-            const runningProj = prioritized.find((p) => p.is_running === true && p.conversations.length > 0);
+            // 2. If no conversation is running, check if any non-archived project has Boolean(p.is_running)
+            const runningProj = prioritized.find((p) => Boolean(p.is_running) && p.conversations.length > 0);
             if (runningProj) {
                 const sortedConvs = [...runningProj.conversations].sort((a, b) => {
                     const aTime = new Date(a.last_modified).getTime() || 0;
@@ -1155,7 +1155,7 @@ export default function PromptTreeViewModal({
 
         // 2. Filter Pills
         if (activeFilter === 'running') {
-            list = list.filter((p) => p.is_running || p.conversations.some((c) => c.is_running || c.status === 'RUNNING'));
+            list = list.filter((p) => Boolean(p.is_running) || p.conversations.some((c) => Boolean(c.is_running)));
         } else if (activeFilter === 'pinned') {
             list = list.filter((p) => pinnedProjectIds.includes(p.project_id));
         } else if (activeFilter === 'latest_conv') {
@@ -1173,8 +1173,8 @@ export default function PromptTreeViewModal({
             const bPinned = pinnedProjectIds.includes(b.project_id);
             if (aPinned !== bPinned) return aPinned ? -1 : 1;
 
-            const aRunning = a.is_running || a.conversations.some((c) => c.is_running || c.status === 'RUNNING');
-            const bRunning = b.is_running || b.conversations.some((c) => c.is_running || c.status === 'RUNNING');
+            const aRunning = Boolean(a.is_running) || a.conversations.some((c) => Boolean(c.is_running));
+            const bRunning = Boolean(b.is_running) || b.conversations.some((c) => Boolean(c.is_running));
             if (aRunning !== bRunning) return aRunning ? -1 : 1;
 
             const aLatest = Math.max(0, ...a.conversations.map((c) => new Date(c.last_modified).getTime() || 0));
@@ -1205,11 +1205,11 @@ export default function PromptTreeViewModal({
         (convs: AgmConversationNode[]) => {
             let sorted = [...convs];
             if (activeFilter === 'running') {
-                sorted = sorted.filter((c) => c.is_running || c.status === 'RUNNING');
+                sorted = sorted.filter((c) => Boolean(c.is_running));
             }
             return sorted.sort((a, b) => {
-                const aRunning = a.is_running || a.status === 'RUNNING';
-                const bRunning = b.is_running || b.status === 'RUNNING';
+                const aRunning = Boolean(a.is_running);
+                const bRunning = Boolean(b.is_running);
                 if (aRunning !== bRunning) {
                     return aRunning ? -1 : 1;
                 }
@@ -1231,7 +1231,7 @@ export default function PromptTreeViewModal({
 
     const renderConversationNode = (conv: AgmConversationNode, project: AgmProjectTreeNode) => {
         const isConvSelected = selectedConversation?.conversation_id === conv.conversation_id;
-        const isRunning = conv.is_running || conv.status === 'RUNNING';
+        const isRunning = Boolean(conv.is_running);
 
         return (
             <div

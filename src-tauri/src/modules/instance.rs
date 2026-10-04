@@ -1351,9 +1351,109 @@ pub fn copy_instance_with_options(
         purge_recent_project_paths(&new_instance);
     }
 
+    let _ = sanitize_cloned_instance_summaries(&new_instance.id);
     let _ = inject_instance_settings(&new_instance);
 
     Ok(new_instance)
+}
+
+/// Sanitize cloned conversation summaries in the target instance home and data directories.
+/// Resets in-flight session flags (not_fully_idle = 0, status = 'IDLE') so a newly cloned
+/// instance profile never inherits active running conversation states from the source.
+pub fn sanitize_cloned_instance_summaries(target_id: &str) -> Result<(), String> {
+    let mut candidates = Vec::new();
+
+    if let Ok(home) = get_instance_home_dir(target_id) {
+        candidates.push(
+            home.join(".gemini")
+                .join("antigravity")
+                .join("conversation_summaries.db"),
+        );
+        candidates.push(
+            home.join(".gemini")
+                .join("antigravity-ide")
+                .join("conversation_summaries.db"),
+        );
+        candidates.push(
+            home.join(".gemini")
+                .join("antigravity-cli")
+                .join("conversation_summaries.db"),
+        );
+    }
+
+    if let Ok(registry) = load_registry() {
+        if let Some(inst) = registry.instances.iter().find(|i| i.id == target_id) {
+            let data_dir = PathBuf::from(&inst.data_dir);
+            candidates.push(
+                data_dir
+                    .join(".gemini")
+                    .join("antigravity")
+                    .join("conversation_summaries.db"),
+            );
+            candidates.push(
+                data_dir
+                    .join(".gemini")
+                    .join("antigravity-ide")
+                    .join("conversation_summaries.db"),
+            );
+            candidates.push(data_dir.join("conversation_summaries.db"));
+        }
+    }
+
+    if let Ok(instances_dir) = get_instances_dir() {
+        let instance_home_db = instances_dir
+            .join(target_id)
+            .join("home")
+            .join(".gemini")
+            .join("antigravity")
+            .join("conversation_summaries.db");
+        if !candidates.contains(&instance_home_db) {
+            candidates.push(instance_home_db);
+        }
+    }
+
+    for db_path in candidates {
+        if db_path.exists() {
+            if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                let _ = conn.pragma_update(None, "busy_timeout", 3000);
+                let has_table = conn
+                    .query_row(
+                        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='conversation_summaries'",
+                        [],
+                        |_| Ok(()),
+                    )
+                    .is_ok();
+                if has_table {
+                    let update_res = conn.execute(
+                        "UPDATE conversation_summaries 
+                         SET not_fully_idle = 0, status = 'IDLE' 
+                         WHERE not_fully_idle != 0 OR status LIKE '%RUNNING%'",
+                        [],
+                    );
+                    match update_res {
+                        Ok(count) => {
+                            if count > 0 {
+                                crate::modules::logger::log_info(&format!(
+                                    "[Instance] Sanitized {} active conversation summaries in {}",
+                                    count,
+                                    db_path.display()
+                                ));
+                            }
+                        }
+                        Err(e) => {
+                            crate::modules::logger::log_warn(&format!(
+                                "[Instance] Failed to sanitize conversation summaries in {}: {}",
+                                db_path.display(),
+                                e
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Rename an existing instance profile
@@ -2799,13 +2899,62 @@ fn launch_instance_inner_with_extra_workspaces(
     #[cfg(target_os = "macos")]
     {
         let is_app_bundle = exe_str.ends_with(".app") || Path::new(&exe_str).is_dir();
+
+        let mut app_args = Vec::new();
+        let has_custom_data = !is_default;
+        let inst_home_opt = if has_custom_data {
+            app_args.push(format!("--user-data-dir={}", data_dir));
+            app_args.push("--password-store=basic".to_string());
+            app_args.push("--remote-debugging-port=0".to_string());
+            let home_opt = get_instance_home_dir(instance_id).ok();
+            write_keyring_bypass_markers(&target_data_path, home_opt.as_deref());
+            if let Some(ref inst_home) = home_opt {
+                let _ = fs::create_dir_all(inst_home);
+                let gemini_ide_dir = inst_home.join(".gemini").join("antigravity-ide");
+                let gemini_dir = inst_home.join(".gemini").join("antigravity");
+                let _ = fs::create_dir_all(&gemini_ide_dir);
+                let _ = fs::create_dir_all(&gemini_dir);
+
+                // Ensure app_storage.json has ide-install-wizard-shown: true and reflects the bound account
+                let is_tos = resolved_account
+                    .as_ref()
+                    .map(|a| a.token.is_gcp_tos)
+                    .unwrap_or(false);
+                let _ =
+                    update_instance_app_storage(&target_data_path, bound_email.as_deref(), is_tos);
+            } else {
+                let is_tos = resolved_account
+                    .as_ref()
+                    .map(|a| a.token.is_gcp_tos)
+                    .unwrap_or(false);
+                let _ =
+                    update_instance_app_storage(&target_data_path, bound_email.as_deref(), is_tos);
+            }
+            home_opt
+        } else {
+            None
+        };
+
+        if let Some(ref ext_dir) = extensions_dir {
+            app_args.push(format!("--extensions-dir={}", ext_dir));
+        }
+        if !workspace_folders.is_empty() {
+            for folder in &workspace_folders {
+                app_args.push(folder.clone());
+            }
+        }
+
+        let args = if app_args.is_empty() {
+            None
+        } else {
+            Some(app_args)
+        };
+
         let mut cmd = if is_app_bundle {
             let mut c = Command::new("open");
-            // -n flag guarantees a new separate instance is spawned even if another is already running
-            c.arg("-n");
-            c.arg("-a");
-            c.arg(&exe_str);
-            c.arg("--args");
+            let open_args =
+                crate::modules::process::format_macos_open_args(&exe_str, args.as_deref(), true);
+            c.args(&open_args);
             c
         } else {
             use std::os::unix::fs::PermissionsExt;
@@ -2821,39 +2970,18 @@ fn launch_instance_inner_with_extra_workspaces(
             if let Some(parent) = exe_path.parent() {
                 c.current_dir(parent);
             }
+            if let Some(ref arg_list) = args {
+                for arg in arg_list {
+                    c.arg(arg);
+                }
+            }
+            c.arg("--new-window");
             c
         };
 
-        let has_custom_data = !is_default;
         if has_custom_data {
-            cmd.arg(format!("--user-data-dir={}", data_dir));
-            cmd.arg("--password-store=basic");
-            cmd.arg("--remote-debugging-port=0");
-            let inst_home_opt = get_instance_home_dir(instance_id).ok();
-            write_keyring_bypass_markers(&target_data_path, inst_home_opt.as_deref());
             if let Some(ref inst_home) = inst_home_opt {
-                let _ = fs::create_dir_all(inst_home);
-                let gemini_ide_dir = inst_home.join(".gemini").join("antigravity-ide");
-                let gemini_dir = inst_home.join(".gemini").join("antigravity");
-                let _ = fs::create_dir_all(&gemini_ide_dir);
-                let _ = fs::create_dir_all(&gemini_dir);
-
-                // Ensure app_storage.json has ide-install-wizard-shown: true and reflects the bound account
-                let is_tos = resolved_account
-                    .as_ref()
-                    .map(|a| a.token.is_gcp_tos)
-                    .unwrap_or(false);
-                let _ =
-                    update_instance_app_storage(&target_data_path, bound_email.as_deref(), is_tos);
-
                 cmd.env("HOME", inst_home);
-            } else {
-                let is_tos = resolved_account
-                    .as_ref()
-                    .map(|a| a.token.is_gcp_tos)
-                    .unwrap_or(false);
-                let _ =
-                    update_instance_app_storage(&target_data_path, bound_email.as_deref(), is_tos);
             }
             cmd.env("SSH_CONNECTION", "127.0.0.1 50000 127.0.0.1 22");
             cmd.env("SSH_CLIENT", "127.0.0.1 50000 22");
@@ -2862,16 +2990,6 @@ fn launch_instance_inner_with_extra_workspaces(
                 cmd.env("JETSKI_OAUTH_TOKEN", &acc.token.access_token);
                 cmd.env("GEMINI_CLI_OAUTH_TOKEN", &acc.token.access_token);
             }
-        }
-        if let Some(ref ext_dir) = extensions_dir {
-            cmd.arg(format!("--extensions-dir={}", ext_dir));
-        }
-        if !workspace_folders.is_empty() {
-            for folder in &workspace_folders {
-                cmd.arg(folder);
-            }
-        } else {
-            cmd.arg("--new-window");
         }
 
         cmd.stdin(std::process::Stdio::null())
@@ -5157,6 +5275,8 @@ pub fn copy_instance_projects(from_id: &str, to_id: &str) -> Result<usize, Strin
     // 5. Merge recent paths from state.vscdb
     merge_state_vscdb_recent_paths(&from_inst, &to_inst);
 
+    let _ = sanitize_cloned_instance_summaries(&to_inst.id);
+
     crate::modules::logger::log_info(&format!(
         "[Instance] Copied {} workspace projects from '{}' to '{}'",
         copied_count, from_id, to_id
@@ -6749,5 +6869,57 @@ mod clone_tree_tests {
         );
 
         let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_sanitize_cloned_instance_summaries() {
+        let test_inst_id = format!(
+            "test_inst_sanitize_{}",
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+        );
+        let instances_dir = get_instances_dir().expect("get_instances_dir should succeed");
+        let inst_gemini_dir = instances_dir
+            .join(&test_inst_id)
+            .join("home")
+            .join(".gemini")
+            .join("antigravity");
+        fs::create_dir_all(&inst_gemini_dir).expect("create_dir_all should succeed");
+
+        let db_path = inst_gemini_dir.join("conversation_summaries.db");
+        let conn = rusqlite::Connection::open(&db_path).expect("open db should succeed");
+        conn.execute(
+            "CREATE TABLE conversation_summaries (
+                conversation_id TEXT PRIMARY KEY,
+                not_fully_idle INTEGER,
+                status TEXT
+            )",
+            [],
+        )
+        .expect("create table should succeed");
+
+        conn.execute(
+            "INSERT INTO conversation_summaries (conversation_id, not_fully_idle, status)
+             VALUES ('conv-1', 1, 'CASCADE_RUN_STATUS_RUNNING')",
+            [],
+        )
+        .expect("insert row should succeed");
+        drop(conn);
+
+        let res = sanitize_cloned_instance_summaries(&test_inst_id);
+        assert!(res.is_ok());
+
+        let conn2 = rusqlite::Connection::open(&db_path).expect("reopen db should succeed");
+        let (idle, status): (i32, String) = conn2
+            .query_row(
+                "SELECT not_fully_idle, status FROM conversation_summaries WHERE conversation_id = 'conv-1'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .expect("query row should succeed");
+
+        assert_eq!(idle, 0);
+        assert_eq!(status, "IDLE");
+
+        let _ = fs::remove_dir_all(instances_dir.join(&test_inst_id));
     }
 }
