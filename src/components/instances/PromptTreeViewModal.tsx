@@ -118,7 +118,7 @@ function getTruncatedText(text: string, maxWords: number): { displayText: string
         return { displayText: text, isTruncated: false, totalWords: words.length };
     }
     const truncated = words.slice(0, maxWords).join(' ');
-    return { displayText: truncated, isTruncated: true, totalWords: words.length };
+    return { displayText: `${truncated}...`, isTruncated: true, totalWords: words.length };
 }
 
 // Helper to check if a conversation is stale or empty (immune if actively running)
@@ -247,8 +247,14 @@ function parseInlineMarkdown(text: string): React.ReactNode[] {
     return nodes.length > 0 ? nodes : [text];
 }
 
+interface RichMarkdownRendererProps {
+    content: string;
+    showAllWords?: boolean;
+    onToggleExpand?: () => void;
+}
+
 // Rich Markdown renderer component
-function RichMarkdownRenderer({ content }: { content: string }) {
+function RichMarkdownRenderer({ content, showAllWords, onToggleExpand }: RichMarkdownRendererProps) {
     const [copiedBlockIndex, setCopiedBlockIndex] = useState<number | null>(null);
 
     const handleCopyCode = (code: string, index: number) => {
@@ -404,7 +410,7 @@ function RichMarkdownRenderer({ content }: { content: string }) {
         flushList(i);
 
         if (!trimmed) {
-            elements.push(<br key={`br-spacer-${i}`} className="my-2" />);
+            elements.push(<br key={`br-${i}`} className="my-2" />);
             continue;
         }
 
@@ -468,11 +474,31 @@ function RichMarkdownRenderer({ content }: { content: string }) {
         }
 
         // Standard paragraph
-        elements.push(
-            <p key={`p-${i}`} className="text-xs text-slate-800 dark:text-slate-200 my-2 leading-relaxed whitespace-pre-wrap break-words">
-                {parseInlineMarkdown(line)}
-            </p>
-        );
+        const isTrailingEllipsis = trimmed.endsWith('...') || trimmed.endsWith('…');
+        if (isTrailingEllipsis && onToggleExpand) {
+            const cleanLine = line.replace(/(\.{3}|…)\s*$/, '');
+            elements.push(
+                <p key={`p-${i}`} className="text-xs text-slate-800 dark:text-slate-200 my-2 leading-relaxed whitespace-pre-wrap break-words">
+                    {parseInlineMarkdown(cleanLine)}
+                    <span
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleExpand();
+                        }}
+                        title="Click to expand full prompt text"
+                        className="cursor-pointer font-bold text-cyan-600 dark:text-cyan-400 hover:underline px-1 py-0.5 rounded bg-cyan-500/10 hover:bg-cyan-500/20 transition-colors ml-1"
+                    >
+                        {showAllWords ? '... [Collapse]' : '... [Expand Full Text]'}
+                    </span>
+                </p>
+            );
+        } else {
+            elements.push(
+                <p key={`p-${i}`} className="text-xs text-slate-800 dark:text-slate-200 my-2 leading-relaxed whitespace-pre-wrap break-words">
+                    {parseInlineMarkdown(line)}
+                </p>
+            );
+        }
     }
 
     flushList(lines.length);
@@ -626,7 +652,7 @@ export default function PromptTreeViewModal({
         try {
             const data = await invoke<AgmProjectTreeNode[]>('get_project_conversation_tree', {
                 instanceId: instanceId || undefined,
-                maxWords: 300,
+                maxWords: 2000,
                 onlyRunning: false,
                 force: true,
             });
@@ -716,18 +742,21 @@ export default function PromptTreeViewModal({
                         const candidateConvs = target.conversations.filter(
                             (c) => !(c.prompt_word_count === 0 && isStaleOrEmptyConversation(c))
                         );
-                        const pool = candidateConvs.length > 0 ? candidateConvs : target.conversations;
-                        const sortedConvs = [...pool].sort((a, b) => {
-                            const aTime = new Date(a.last_modified).getTime() || 0;
-                            const bTime = new Date(b.last_modified).getTime() || 0;
-                            return bTime - aTime;
-                        });
-                        const winningConv = sortedConvs[0];
-                        selectConversation(winningConv, target);
-                        if (isStaleOrEmptyConversation(winningConv)) {
-                            setExpandedStaleGroups({ [target.project_id]: true });
+                        if (candidateConvs.length > 0) {
+                            const sortedConvs = [...candidateConvs].sort((a, b) => {
+                                const aTime = new Date(a.last_modified).getTime() || 0;
+                                const bTime = new Date(b.last_modified).getTime() || 0;
+                                return bTime - aTime;
+                            });
+                            const winningConv = sortedConvs[0];
+                            selectConversation(winningConv, target);
+                            if (isStaleOrEmptyConversation(winningConv)) {
+                                setExpandedStaleGroups({ [target.project_id]: true });
+                            } else {
+                                setExpandedStaleGroups({});
+                            }
                         } else {
-                            setExpandedStaleGroups({});
+                            setSelectedConversation(null);
                         }
                     } else {
                         setSelectedConversation(null);
@@ -795,21 +824,22 @@ export default function PromptTreeViewModal({
                 const candidateConvs = runningProj.conversations.filter(
                     (c) => !(c.prompt_word_count === 0 && isStaleOrEmptyConversation(c))
                 );
-                const pool = candidateConvs.length > 0 ? candidateConvs : runningProj.conversations;
-                const sortedConvs = [...pool].sort((a, b) => {
-                    const aTime = new Date(a.last_modified).getTime() || 0;
-                    const bTime = new Date(b.last_modified).getTime() || 0;
-                    return bTime - aTime;
-                });
-                const winningConv = sortedConvs[0];
-                setExpandedProjects({ [runningProj.project_id]: true });
-                selectConversation(winningConv, runningProj);
-                if (isStaleOrEmptyConversation(winningConv)) {
-                    setExpandedStaleGroups({ [runningProj.project_id]: true });
-                } else {
-                    setExpandedStaleGroups({});
+                if (candidateConvs.length > 0) {
+                    const sortedConvs = [...candidateConvs].sort((a, b) => {
+                        const aTime = new Date(a.last_modified).getTime() || 0;
+                        const bTime = new Date(b.last_modified).getTime() || 0;
+                        return bTime - aTime;
+                    });
+                    const winningConv = sortedConvs[0];
+                    setExpandedProjects({ [runningProj.project_id]: true });
+                    selectConversation(winningConv, runningProj);
+                    if (isStaleOrEmptyConversation(winningConv)) {
+                        setExpandedStaleGroups({ [runningProj.project_id]: true });
+                    } else {
+                        setExpandedStaleGroups({});
+                    }
+                    return;
                 }
-                return;
             }
 
             // 3. Fallback: Auto-expand the first non-archived project in prioritized order and select its newest conversation
@@ -819,9 +849,8 @@ export default function PromptTreeViewModal({
                 const candidateConvs = firstProj.conversations.filter(
                     (c) => !(c.prompt_word_count === 0 && isStaleOrEmptyConversation(c))
                 );
-                const pool = candidateConvs.length > 0 ? candidateConvs : firstProj.conversations;
-                if (pool.length > 0) {
-                    const sortedConvs = [...pool].sort((a, b) => {
+                if (candidateConvs.length > 0) {
+                    const sortedConvs = [...candidateConvs].sort((a, b) => {
                         const aTime = new Date(a.last_modified).getTime() || 0;
                         const bTime = new Date(b.last_modified).getTime() || 0;
                         return bTime - aTime;
@@ -857,7 +886,7 @@ export default function PromptTreeViewModal({
         try {
             const data = await invoke<AgmProjectTreeNode[]>('get_project_conversation_tree', {
                 instanceId: instanceId || undefined,
-                maxWords: 300,
+                maxWords: 2000,
                 onlyRunning: false,
                 force: isForce,
             });
@@ -1406,7 +1435,7 @@ export default function PromptTreeViewModal({
         const staleConversations: AgmConversationNode[] = [];
 
         sortedConvs.forEach((conv) => {
-            const isEmptyGhost = conv.prompt_word_count === 0 && isStaleOrEmptyConversation(conv);
+            const isEmptyGhost = !conv.is_running && (conv.prompt_word_count === 0 || !conv.prompt_preview_200w || !conv.prompt_preview_200w.trim()) && isStaleOrEmptyConversation(conv);
             if (isEmptyGhost && activeFilter !== 'archived') {
                 return;
             }
@@ -1860,7 +1889,7 @@ export default function PromptTreeViewModal({
                                     <div>
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20">
-                                                #{selectedConversation.gitmap_seq_code || selectedConversation.seq_code || 'P001'}
+                                                #{selectedConversation.seq_code || 'P001'}
                                             </span>
                                             <h3 className="text-base font-bold text-slate-900 dark:text-white">
                                                 {selectedConversation.title || selectedConversation.short_id}
@@ -1897,7 +1926,7 @@ export default function PromptTreeViewModal({
                                                     className="text-[11px] italic text-slate-500 dark:text-slate-400 truncate max-w-sm sm:max-w-md"
                                                     title={`Concluding text: ${tailSnippet}`}
                                                 >
-                                                    “… ending with: &lsquo;{tailSnippet}&rsquo;”
+                                                    “… ending with: '{tailSnippet}'”
                                                 </span>
                                             )}
                                             <button
@@ -2030,7 +2059,7 @@ export default function PromptTreeViewModal({
                                             </label>
                                             {selectedConversation && (
                                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20">
-                                                    #{selectedConversation.gitmap_seq_code || selectedConversation.seq_code || 'P001'}
+                                                    #{selectedConversation.seq_code || 'P001'}
                                                 </span>
                                             )}
                                             <span
@@ -2041,10 +2070,10 @@ export default function PromptTreeViewModal({
                                             </span>
                                             {tailSnippet && (
                                                 <span className="text-[10px] italic text-slate-400 truncate max-w-xs" title={`Ending text: ${tailSnippet}`}>
-                                                    “… ending with: &lsquo;{tailSnippet}&rsquo;”
+                                                    “… ending with: '{tailSnippet}'”
                                                 </span>
                                             )}
-                                            {isTruncated && (
+                                            {(isTruncated || activePromptText.trim().endsWith('...') || activePromptText.trim().endsWith('…') || showAllWords) && (
                                                 <button
                                                     type="button"
                                                     onClick={() => setShowAllWords(!showAllWords)}
@@ -2120,8 +2149,12 @@ export default function PromptTreeViewModal({
                                                 onDoubleClick={() => openInspector(selectedConversation, selectedProject?.repo_path || '')}
                                                 className="rounded-xl border border-slate-200 dark:border-[#15334d] bg-slate-50 dark:bg-[#071a27] p-5 text-xs text-slate-800 dark:text-slate-200 leading-relaxed max-h-[460px] overflow-y-auto cursor-pointer hover:border-blue-400 dark:hover:border-blue-500/50 transition-colors shadow-inner"
                                             >
-                                                <RichMarkdownRenderer content={displayedMarkdown} />
-                                                {isTruncated && (
+                                                <RichMarkdownRenderer
+                                                    content={displayedMarkdown}
+                                                    showAllWords={showAllWords}
+                                                    onToggleExpand={() => setShowAllWords(!showAllWords)}
+                                                />
+                                                {(isTruncated || activePromptText.trim().endsWith('...') || activePromptText.trim().endsWith('…') || showAllWords) && (
                                                     <div className="mt-3 pt-2 border-t border-slate-200/50 dark:border-[#15334d]/50 flex items-center">
                                                         <span
                                                             onClick={(e) => {
@@ -2146,7 +2179,7 @@ export default function PromptTreeViewModal({
                                                 </div>
 
                                                 <div className="flex items-center gap-2">
-                                                    {isTruncated && (
+                                                    {(isTruncated || activePromptText.trim().endsWith('...') || activePromptText.trim().endsWith('…') || showAllWords) && (
                                                         <button
                                                             type="button"
                                                             onClick={() => setShowAllWords(!showAllWords)}
@@ -2156,12 +2189,12 @@ export default function PromptTreeViewModal({
                                                             {showAllWords ? (
                                                                 <>
                                                                     <ChevronUp className="w-3.5 h-3.5" />
-                                                                    <span>Show Less (500w) [Collapse]</span>
+                                                                    <span>Show Less [Collapse]</span>
                                                                 </>
                                                             ) : (
                                                                 <>
                                                                     <ChevronDown className="w-3.5 h-3.5" />
-                                                                    <span>Show All ({totalWords}w) [Expand (Full Text)]</span>
+                                                                    <span>Show All ({totalWords || activeWordCount}w) [Expand (Full Text)]</span>
                                                                 </>
                                                             )}
                                                         </button>

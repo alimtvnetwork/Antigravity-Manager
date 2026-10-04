@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-09-30T23:27:59Z",
+  "updated_at": "2026-10-04T16:50:23Z",
   "files": [
     ".agents/skills/ubuntu-installer-hardening/skill.md",
     ".ai-memory/cicd-index.md",
@@ -22,6 +22,8 @@
     "install.ps1",
     "install.sh",
     "package.json",
+    "scripts/Fix_Damaged.command",
+    "scripts/package_dmg.sh",
     "src-tauri/Cargo.lock",
     "src-tauri/Cargo.toml",
     "src-tauri/build.rs",
@@ -33,10 +35,12 @@
     "src-tauri/src/commands/telegram.rs",
     "src-tauri/src/lib.rs",
     "src-tauri/src/modules/auto_switcher.rs",
+    "src-tauri/src/modules/delegate_updater.rs",
     "src-tauri/src/modules/email_inbound.rs",
     "src-tauri/src/modules/email_sender.rs",
     "src-tauri/src/modules/email_vault_db.rs",
     "src-tauri/src/modules/email_watcher.rs",
+    "src-tauri/src/modules/instance.rs",
     "src-tauri/src/modules/iterative_codec.rs",
     "src-tauri/src/modules/process.rs",
     "src-tauri/src/modules/repo_db.rs",
@@ -84,7 +88,8 @@
     "src/utils/env.ts",
     "src/utils/request.ts",
     "src/utils/windowManager.ts",
-    "version.json"
+    "version.json",
+    "workflows/release.yml"
   ],
   "associated_tests": []
 }

@@ -1,11 +1,12 @@
 #!/bin/bash
 set -euo pipefail
+set -E
 
-# Error stack trace trap
+# Error stack trace trap for maximum transparency and failure diagnostics
 report_error_stack() {
     local exit_code="$?"
     local line_no="${1:-$LINENO}"
-    local cmd="${BASH_COMMAND:-unknown}"
+    local cmd="${2:-${BASH_COMMAND:-unknown}}"
     if [ "$exit_code" -ne 0 ]; then
         echo "❌ [ERROR] Command '$cmd' failed at line $line_no with exit code $exit_code" >&2
         if [ ${#FUNCNAME[@]} -gt 1 ]; then
@@ -19,52 +20,124 @@ report_error_stack() {
         fi
     fi
 }
-trap 'report_error_stack "$LINENO"' ERR
+trap 'report_error_stack "$LINENO" "$BASH_COMMAND"' ERR
 
 # Resolve script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
+# Parse CLI arguments
+ARCH_ARG=""
+TARGET_ARG=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --arch)
+            ARCH_ARG="$2"
+            shift 2
+            ;;
+        --arch=*)
+            ARCH_ARG="${1#*=}"
+            shift
+            ;;
+        --target)
+            TARGET_ARG="$2"
+            shift 2
+            ;;
+        --target=*)
+            TARGET_ARG="${1#*=}"
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+# Architecture resolution
+if [ -z "$ARCH_ARG" ]; then
+    if [[ "$TARGET_ARG" == *"aarch64"* ]]; then
+        ARCH_ARG="aarch64"
+    elif [[ "$TARGET_ARG" == *"x86_64"* ]]; then
+        ARCH_ARG="x64"
+    elif [[ "$TARGET_ARG" == *"universal"* ]]; then
+        ARCH_ARG="universal"
+    else
+        NATIVE_ARCH="$(uname -m 2>/dev/null || echo "unknown")"
+        case "$NATIVE_ARCH" in
+            arm64|aarch64) ARCH_ARG="aarch64" ;;
+            x86_64|amd64) ARCH_ARG="x64" ;;
+            *) ARCH_ARG="universal" ;;
+        esac
+    fi
+fi
+
 # Configuration
 APP_NAME="Antigravity Manager Tools"
 VERSION=$(grep '"version":' package.json | head -n 1 | awk -F: '{ print $2 }' | sed 's/[", ]//g')
-DMG_NAME="Antigravity_Manager_Tools_${VERSION}_ManualFix.dmg"
-SRC_APP_PATH="src-tauri/target/release/bundle/macos/${APP_NAME}.app"
-DIST_DIR="dist_dmg"
+DIST_DIR="dist_dmg_${ARCH_ARG}"
 
 # Staging cleanup trap
 trap 'rm -rf "$DIST_DIR"' EXIT
 
 echo "📦 Starting DMG package build (with quarantine fix script)..."
-echo "Version: $VERSION"
+echo "Version     : $VERSION"
+echo "Architecture: $ARCH_ARG"
 
-# 1. Check if build artifact exists or dynamically discover .app
-if [ ! -d "$SRC_APP_PATH" ]; then
-    DISCOVERED_APP=$(find src-tauri/target/release/bundle -maxdepth 3 -name "*.app" -type d 2>/dev/null | head -n 1)
+# 1. Dynamically discover .app bundle across target directories
+RUST_TARGET=""
+if [[ "$ARCH_ARG" == "aarch64" ]]; then
+    RUST_TARGET="aarch64-apple-darwin"
+elif [[ "$ARCH_ARG" == "x64" || "$ARCH_ARG" == "x86_64" ]]; then
+    RUST_TARGET="x86_64-apple-darwin"
+elif [[ "$ARCH_ARG" == "universal" ]]; then
+    RUST_TARGET="universal-apple-darwin"
+fi
+
+SRC_APP_PATH=""
+SEARCH_PATHS=(
+    "src-tauri/target/${TARGET_ARG}/release/bundle/macos/${APP_NAME}.app"
+    "src-tauri/target/${RUST_TARGET}/release/bundle/macos/${APP_NAME}.app"
+    "src-tauri/target/release/bundle/macos/${APP_NAME}.app"
+    "src-tauri/target/${ARCH_ARG}-apple-darwin/release/bundle/macos/${APP_NAME}.app"
+)
+for sp in "${SEARCH_PATHS[@]}"; do
+    if [ -n "$sp" ] && [ -d "$sp" ]; then
+        SRC_APP_PATH="$sp"
+        break
+    fi
+done
+
+if [ -z "$SRC_APP_PATH" ] || [ ! -d "$SRC_APP_PATH" ]; then
+    DISCOVERED_APP=$(find src-tauri/target -name "${APP_NAME}.app" -type d 2>/dev/null | head -n 1)
+    if [ -z "$DISCOVERED_APP" ]; then
+        DISCOVERED_APP=$(find src-tauri/target -name "*.app" -type d 2>/dev/null | head -n 1)
+    fi
     if [ -n "$DISCOVERED_APP" ] && [ -d "$DISCOVERED_APP" ]; then
         SRC_APP_PATH="$DISCOVERED_APP"
         APP_NAME="$(basename "$SRC_APP_PATH" .app)"
         echo "ℹ️  Discovered application bundle: $SRC_APP_PATH ($APP_NAME)"
     else
-        echo "❌ Error: Built application not found at $SRC_APP_PATH"
+        echo "❌ Error: Built application not found in src-tauri/target"
         echo "Please run first: npm run tauri build"
         exit 1
     fi
 fi
+
+echo "Source app bundle: $SRC_APP_PATH"
 
 # 2. Prepare temporary distribution directory
 rm -rf "$DIST_DIR"
 mkdir -p "$DIST_DIR"
 
 # 3. Copy application bundle
-echo "Checking and copying source app ($APP_NAME)..."
+echo "Copying source app ($APP_NAME) into staging..."
 cp -R "$SRC_APP_PATH" "$DIST_DIR/"
 
 TARGET_BUNDLE="$DIST_DIR/$(basename "$SRC_APP_PATH")"
 
 # Strip quarantine and apply ad-hoc code signature to bundle in staging directory
-echo "Stripping quarantine and applying ad-hoc signature to bundle..."
+echo "Stripping quarantine and applying ad-hoc signature to staging bundle..."
 xattr -cr "$TARGET_BUNDLE" 2>/dev/null || true
 xattr -d com.apple.quarantine "$TARGET_BUNDLE" 2>/dev/null || true
 find "$TARGET_BUNDLE" -exec xattr -d com.apple.quarantine {} + 2>/dev/null || true
@@ -73,26 +146,79 @@ if command -v codesign &>/dev/null; then
 fi
 
 # 4. Copy and configure Fix_Damaged.command
-echo "Including Fix_Damaged.command in DMG..."
+echo "Including Fix_Damaged.command in DMG root..."
 chmod +x "scripts/Fix_Damaged.command"
 cp "scripts/Fix_Damaged.command" "$DIST_DIR/"
 chmod +x "$DIST_DIR/Fix_Damaged.command"
 xattr -cr "$DIST_DIR/Fix_Damaged.command" 2>/dev/null || true
 xattr -d com.apple.quarantine "$DIST_DIR/Fix_Damaged.command" 2>/dev/null || true
 
+# Include quick installation and troubleshooting guide
+cat << 'EOF' > "$DIST_DIR/Install_Guide.txt"
+======================================================================
+  Antigravity Manager Tools - macOS 安装与故障排除指南
+  Antigravity Manager Tools - macOS Installation & Troubleshooting
+======================================================================
+
+【1. 正常安装 / Normal Installation】
+  拖拽 "Antigravity Manager Tools.app" 图标到 "Applications" 文件夹。
+  Drag "Antigravity Manager Tools.app" into the "Applications" folder.
+
+【2. 若提示 "已损坏，移到废纸篓" / If prompted "App is damaged / Move to Trash"】
+  双击本 DMG 中的 "Fix_Damaged.command" 脚本即可一键修复隔离属性与权限。
+  Double-click "Fix_Damaged.command" in this folder to clear Gatekeeper quarantine.
+
+【3. 若提示 "应用在废纸篓中" / If prompted "... because it is in the Trash"】
+  双击 "Fix_Damaged.command"，脚本会自动清理废纸篓冲突副本并刷新 LaunchServices。
+  Double-click "Fix_Damaged.command" to purge trashed duplicates and refresh LaunchServices.
+
+【4. 命令行一键安装 / Terminal One-Line Command】
+  curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash
+======================================================================
+EOF
+
 # 5. Create /Applications symlink for drag-and-drop install
 ln -s /Applications "$DIST_DIR/Applications"
 
 # 6. Build DMG with hdiutil
-echo "Creating DMG image ($DMG_NAME)..."
-rm -f "$DMG_NAME"
-hdiutil create -volname "${APP_NAME}" -srcfolder "$DIST_DIR" -ov -format UDZO "$DMG_NAME"
+PRIMARY_DMG_NAME="Antigravity.Manager.Tools_${VERSION}_${ARCH_ARG}.dmg"
+echo "Creating DMG image ($PRIMARY_DMG_NAME)..."
+rm -f "$PRIMARY_DMG_NAME"
+hdiutil create -volname "${APP_NAME}" -srcfolder "$DIST_DIR" -ov -format UDZO "$PRIMARY_DMG_NAME"
 
 # 7. Strip quarantine from DMG itself
 echo "Stripping quarantine attributes from output DMG..."
-xattr -d com.apple.quarantine "$DMG_NAME" 2>/dev/null || true
-xattr -cr "$DMG_NAME" 2>/dev/null || true
+xattr -d com.apple.quarantine "$PRIMARY_DMG_NAME" 2>/dev/null || true
+xattr -cr "$PRIMARY_DMG_NAME" 2>/dev/null || true
+
+# 8. Place DMG in release bundle directory if present
+BUNDLE_DMG_DIRS=(
+    "src-tauri/target/${TARGET_ARG}/release/bundle/dmg"
+    "src-tauri/target/${RUST_TARGET}/release/bundle/dmg"
+    "src-tauri/target/release/bundle/dmg"
+    "src-tauri/target/${ARCH_ARG}-apple-darwin/release/bundle/dmg"
+)
+for bdd in "${BUNDLE_DMG_DIRS[@]}"; do
+    if [ -n "$bdd" ] && [ -d "$bdd" ]; then
+        echo "Updating release bundle directory: $bdd/$PRIMARY_DMG_NAME"
+        cp "$PRIMARY_DMG_NAME" "$bdd/$PRIMARY_DMG_NAME"
+        xattr -cr "$bdd/$PRIMARY_DMG_NAME" 2>/dev/null || true
+        # Overwrite any unpatched Tauri DMG in the bundle folder
+        for existing_dmg in "$bdd"/*.dmg; do
+            if [ -f "$existing_dmg" ] && [ "$existing_dmg" != "$bdd/$PRIMARY_DMG_NAME" ]; then
+                echo "Replacing unpatched Tauri DMG ($existing_dmg) with patched DMG..."
+                cp "$PRIMARY_DMG_NAME" "$existing_dmg"
+                xattr -cr "$existing_dmg" 2>/dev/null || true
+            fi
+        done
+    fi
+done
+
+# Also generate friendly ManualFix named DMG for direct setup downloads
+MANUAL_DMG_NAME="Antigravity_Manager_Tools_${VERSION}_ManualFix.dmg"
+cp "$PRIMARY_DMG_NAME" "$MANUAL_DMG_NAME"
+xattr -cr "$MANUAL_DMG_NAME" 2>/dev/null || true
 
 echo "✅ DMG Packaging complete!"
-echo "Artifact location: $PWD/$DMG_NAME"
-
+echo "Primary DMG: $PWD/$PRIMARY_DMG_NAME"
+echo "Manual Fix : $PWD/$MANUAL_DMG_NAME"

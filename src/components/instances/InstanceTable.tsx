@@ -19,6 +19,7 @@ import { maskEmail } from '../../utils/maskEmail';
 import type { InstanceStatus } from '../../services/instanceService';
 import { useAccountStore } from '../../stores/useAccountStore';
 import { WaterDrainProgressBar } from '../common/WaterDrainProgressBar';
+import { QuotaProgressBar } from '../accounts/QuotaProgressBar';
 
 export type InstanceActionType = 'launch' | 'stop' | 'switch' | 'fast-forward' | 'wipe' | 'delete' | 'sync' | null;
 
@@ -112,7 +113,7 @@ export default function InstanceTable({
                         <tr className="border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/80 dark:bg-[#071a27] text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                             <th className="px-2.5 py-2.5 w-10 text-center">#</th>
                             <th className="px-3 py-2.5 min-w-[170px]">Profile & Account</th>
-                            <th className="px-3 py-2.5 min-w-[130px]">Model Quota</th>
+                            <th className="px-3 py-2.5 min-w-[180px]">Model & Weekly Quota</th>
                             <th className="px-2.5 py-2.5 min-w-[100px]">Status & PID</th>
                             <th className="px-3 py-2.5 min-w-[150px]">File / Data Path</th>
                             <th className="px-3 py-2.5 text-right min-w-[210px]">Actions</th>
@@ -141,6 +142,30 @@ export default function InstanceTable({
                             const models = quota?.models || [];
                             const mainModel = models.find((m) => m.name.toLowerCase().includes('pro')) || models.find((m) => m.name.toLowerCase().includes('flash')) || models[0] || null;
                             const percentage = mainModel ? Math.round(mainModel.percentage) : null;
+                            const weeklyQuota = (() => {
+                                if (!quota) return null;
+                                const qAny = quota as any;
+                                if (qAny.weekly) {
+                                    return {
+                                        percentage: Math.round(qAny.weekly.percentage ?? (qAny.weekly.remaining_fraction ? qAny.weekly.remaining_fraction * 100 : 0)),
+                                        resetTime: qAny.weekly.reset_time || qAny.weekly.resetTime,
+                                    };
+                                }
+                                const groups = quota.quota_groups || [];
+                                const group = groups.find((item) => {
+                                    const name = (item.display_name || '').toLowerCase();
+                                    return name.includes('gemini') || (!name.includes('claude') && !name.includes('gpt'));
+                                }) || groups[0];
+                                const bucket = (group?.buckets || []).find((item) =>
+                                    (item.window || '').toLowerCase().includes('week')
+                                    || (item.bucket_id || '').toLowerCase().includes('week')
+                                );
+                                if (!bucket) return null;
+                                return {
+                                    percentage: Math.round((bucket.remaining_fraction || 0) * 100),
+                                    resetTime: bucket.reset_time,
+                                };
+                            })();
 
                             const currentAction = actionState?.[inst.config.id] || null;
                             const isBusy = Boolean(currentAction);
@@ -254,19 +279,37 @@ export default function InstanceTable({
                                         </div>
                                     </td>
 
-                                    {/* 3. Model Quota & Glow Progress */}
-                                    <td className="px-3 py-2 whitespace-nowrap min-w-[130px]">
-                                        {percentage !== null ? (
-                                            <div className="space-y-1">
-                                                <div className="flex items-center justify-between text-[10px] font-mono">
-                                                    <span className="truncate max-w-[90px] text-slate-600 dark:text-slate-300">
-                                                        {mainModel?.name || 'Primary Model'}
-                                                    </span>
-                                                    <span className="font-bold text-slate-900 dark:text-slate-100">
-                                                        {percentage}%
-                                                    </span>
-                                                </div>
-                                                <WaterDrainProgressBar percentage={percentage} />
+                                    {/* 3. Model Quota & Weekly Quota */}
+                                    <td className="px-3 py-2 whitespace-nowrap min-w-[180px]">
+                                        {(percentage !== null || weeklyQuota !== null) ? (
+                                            <div className="space-y-1.5 min-w-[160px]">
+                                                {percentage !== null && (
+                                                    <div className="space-y-0.5">
+                                                        <div className="flex items-center justify-between text-[10px] font-mono">
+                                                            <span className="truncate max-w-[95px] text-slate-600 dark:text-slate-300 font-semibold">
+                                                                {mainModel?.name || 'Primary Model'} (4H)
+                                                            </span>
+                                                        </div>
+                                                        <QuotaProgressBar
+                                                            percentage={percentage}
+                                                            resetTime={mainModel?.reset_time}
+                                                        />
+                                                    </div>
+                                                )}
+                                                {weeklyQuota !== null && (
+                                                    <div className={cn("space-y-0.5", percentage !== null && "pt-1 border-t border-slate-200/50 dark:border-slate-800/50")}>
+                                                        <div className="flex items-center justify-between text-[10px] font-mono">
+                                                            <span className="truncate max-w-[95px] text-slate-500 dark:text-slate-400">
+                                                                Weekly Quota
+                                                            </span>
+                                                        </div>
+                                                        <QuotaProgressBar
+                                                            isWeekly
+                                                            percentage={weeklyQuota.percentage}
+                                                            resetTime={weeklyQuota.resetTime}
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
                                         ) : (
                                             <span className="text-slate-400 italic text-[11px]">—</span>

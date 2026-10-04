@@ -45,28 +45,43 @@ MANIFEST_LOADED=0
 info()    { echo -e "${INDENT}${BLUE}[INFO]${NC} $1"; }
 success() { echo -e "${INDENT}${GREEN}[OK]${NC} $1"; }
 warn()    { echo -e "${INDENT}${YELLOW}[WARN]${NC} $1"; }
-error()   { echo -e "${INDENT}${RED}[ERROR]${NC} $1" >&2; exit 1; }
+error()   {
+    local msg="$1"
+    local line_no="${2:-$LINENO}"
+    echo -e "${INDENT}${RED}[ERROR]${NC} ${msg}" >&2
+    report_error_stack "$line_no" "error(\"${msg}\")" 1
+    exit 1
+}
 step()    { echo -e "\n${INDENT}${CYAN}==>${NC} ${BOLD}$1${NC}"; }
 
-# Error stack trace trap
+# Error stack trace trap for maximum transparency and failure diagnostics
 report_error_stack() {
-    local exit_code="$?"
+    local exit_code="${3:-$?}"
+    if [[ "$exit_code" -eq 0 ]]; then
+        exit_code=1
+    fi
     local line_no="${1:-$LINENO}"
     local bash_cmd="${2:-${BASH_COMMAND:-unknown}}"
-    if [[ "$exit_code" -ne 0 ]]; then
-        echo -e "\n${INDENT}${RED}[ERROR] Command: ${bash_cmd} | Exit: ${exit_code} | Line: ${line_no} | Stack: ${FUNCNAME[*]}${NC}" >&2
-        if [[ ${#FUNCNAME[@]} -gt 1 ]]; then
-            echo -e "${INDENT}${YELLOW}[STACK TRACE]${NC}" >&2
-            for ((i = 1; i < ${#FUNCNAME[@]}; i++)); do
-                local fn="${FUNCNAME[$i]}"
-                local src="${BASH_SOURCE[$i]:-install.sh}"
-                local ln="${BASH_LINENO[$((i - 1))]}"
-                echo -e "${INDENT}  -> at ${fn}() in ${src}:${ln}" >&2
-            done
-        fi
+    echo -e "\n${INDENT}${RED}[ERROR] Command: ${bash_cmd} | Exit: ${exit_code} | Line: ${line_no}${NC}" >&2
+    local sys_info
+    sys_info="$(uname -srm 2>/dev/null || echo "unknown")"
+    if command -v sw_vers &>/dev/null; then
+        local mac_ver
+        mac_ver="$(sw_vers -productVersion 2>/dev/null || true)"
+        sys_info="macOS ${mac_ver} (${sys_info})"
+    fi
+    echo -e "${INDENT}${YELLOW}[SYSTEM CONTEXT] OS: ${sys_info} | Shell: ${SHELL:-bash} | Date: $(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)${NC}" >&2
+    if [[ ${#FUNCNAME[@]} -gt 1 ]]; then
+        echo -e "${INDENT}${YELLOW}[STACK TRACE]${NC}" >&2
+        for ((i = 1; i < ${#FUNCNAME[@]}; i++)); do
+            local fn="${FUNCNAME[$i]}"
+            local src="${BASH_SOURCE[$i]:-install.sh}"
+            local ln="${BASH_LINENO[$((i - 1))]}"
+            echo -e "${INDENT}  -> at ${fn}() in ${src}:${ln}" >&2
+        done
     fi
 }
-trap 'report_error_stack "$LINENO"' ERR
+trap 'report_error_stack "$LINENO" "$BASH_COMMAND"' ERR
 
 run() {
     if [[ "${DRY_RUN:-0}" == "1" ]]; then
@@ -1355,19 +1370,60 @@ install_macos() {
         return 0
     fi
 
+    # 0. Clean up any trashed application bundles in ~/.Trash/ that poison LaunchServices
+    info "Inspecting Trash for stale or conflicting application bundles..."
+    local lsregister_bin=""
+    local lsregister_candidates=(
+        "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+        "/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
+        "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
+        "/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister"
+    )
+    for cand in "${lsregister_candidates[@]}"; do
+        if [[ -x "$cand" ]]; then
+            lsregister_bin="$cand"
+            break
+        fi
+    done
+    if [[ -z "$lsregister_bin" ]]; then
+        lsregister_bin=$(find /System/Library/Frameworks/CoreServices.framework -name "lsregister" -type f 2>/dev/null | head -n1 || true)
+    fi
+
+    local trashed_apps=()
+    while IFS= read -r t_app; do
+        if [[ -n "$t_app" && -d "$t_app" ]]; then
+            trashed_apps+=("$t_app")
+        fi
+    done < <(find "${HOME}/.Trash" -maxdepth 2 \( -iname "*antigravity*.app" -o -iname "*agm*.app" \) -type d 2>/dev/null || true)
+
+    if [[ ${#trashed_apps[@]} -gt 0 ]]; then
+        info "Found ${#trashed_apps[@]} stale application bundle(s) in Trash poisoning LaunchServices; purging..."
+        for ta in "${trashed_apps[@]}"; do
+            info "  Purging trashed bundle: $(basename "$ta")"
+            if [[ -n "$lsregister_bin" ]]; then
+                "$lsregister_bin" -u "$ta" 2>/dev/null || true
+            fi
+            chflags -R nouchg "$ta" 2>/dev/null || true
+            rm -rf "$ta" 2>/dev/null || true
+        done
+    fi
+
     # 1. Remove quarantine from downloaded DMG
     info "Clearing quarantine attributes from downloaded package..."
     xattr -cr "$DOWNLOAD_PATH" 2>/dev/null || true
     xattr -r -d com.apple.quarantine "$DOWNLOAD_PATH" 2>/dev/null || true
 
     # 2. Mount DMG cleanly
-    info "Mounting disk image..."
+    info "Mounting disk image ($DOWNLOAD_PATH)..."
     local mount_output mount_point
-    mount_output=$(hdiutil attach "$DOWNLOAD_PATH" -nobrowse -noautoopen 2>&1)
+    mount_output=$(hdiutil attach "$DOWNLOAD_PATH" -nobrowse -noautoopen 2>&1) || {
+        local hdi_exit="$?"
+        error "Failed to mount DMG (exit code: $hdi_exit). Output: $mount_output"
+    }
     mount_point=$(echo "$mount_output" | awk '/\/Volumes\// { for(i=1;i<=NF;i++) if($i ~ /^\/Volumes\//) { print $i; exit } }')
 
     if [[ -z "$mount_point" || ! -d "$mount_point" ]]; then
-        error "Failed to mount DMG. Output: $mount_output"
+        error "Failed to locate mounted volume from DMG. Output: $mount_output"
     fi
 
     # 3. Dynamic discovery of .app bundle inside $mount_point
@@ -1429,16 +1485,20 @@ install_macos() {
         fi
     fi
 
+    chmod -R u+rwX "$target_app" 2>/dev/null || true
+    if [[ -d "$target_app/Contents/MacOS" ]]; then
+        chmod -R +x "$target_app/Contents/MacOS" 2>/dev/null || true
+    fi
+
     # 7. Unmount DMG volume cleanly
     info "Unmounting disk image..."
     hdiutil detach "$mount_point" -force -quiet 2>/dev/null || true
 
     # 8. Strip Gatekeeper quarantine on target app without requiring sudo
     info "Stripping Gatekeeper quarantine attributes from $target_app..."
+    find "$target_app" -exec xattr -d com.apple.quarantine {} + 2>/dev/null || true
     xattr -cr "$target_app" 2>/dev/null || true
     xattr -d com.apple.quarantine "$target_app" 2>/dev/null || true
-    # Recursively remove quarantine from all nested executables and frameworks
-    find "$target_app" -exec xattr -d com.apple.quarantine {} + 2>/dev/null || true
 
     # 9. Register with Gatekeeper assessment subsystem (spctl) on macOS 13+ (Ventura+)
     if [[ "$macos_major" -ge 13 ]] && command -v spctl &>/dev/null; then
@@ -1452,7 +1512,16 @@ install_macos() {
         codesign --force --deep --sign - "$target_app" 2>/dev/null || true
     fi
 
-    # 11. CLI symlink: Check for agm or agm-alim binary inside Contents/MacOS/
+    # 11. Refresh LaunchServices database registration
+    if [[ -n "$lsregister_bin" ]]; then
+        info "Registering application with LaunchServices..."
+        "$lsregister_bin" -f "$target_app" 2>/dev/null || true
+        "$lsregister_bin" -kill -r -domain local -domain system -domain user 2>/dev/null || true
+        killall Finder 2>/dev/null || true
+        killall Dock 2>/dev/null || true
+    fi
+
+    # 12. CLI symlink: Check for agm or agm-alim binary inside Contents/MacOS/
     local macos_bin_dir="${target_app}/Contents/MacOS"
     local cli_bin=""
     if [[ -d "$macos_bin_dir" ]]; then
@@ -1474,6 +1543,7 @@ install_macos() {
     fi
 
     if [[ -n "$cli_bin" && -f "$cli_bin" ]]; then
+        chmod +x "$cli_bin" 2>/dev/null || true
         local user_bin="${HOME}/.local/bin"
         mkdir -p "$user_bin" 2>/dev/null || true
         ln -sf "$cli_bin" "${user_bin}/agm" 2>/dev/null || true
@@ -1503,7 +1573,7 @@ install_macos() {
         fi
     fi
 
-    # 12. Success report with clear next steps
+    # 13. Success report with clear next steps
     success "${APP_NAME} installed to ${target_app}!"
     echo ""
     info "Next steps:"

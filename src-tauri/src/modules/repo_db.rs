@@ -1550,6 +1550,9 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
 
 /// Check if any prompt or task is currently actively executing for a project
 pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> bool {
+    if project_id.trim().is_empty() {
+        return false;
+    }
     let now = Utc::now().timestamp();
     let resolved_inst =
         crate::modules::instance::resolve_instance_id(instance_id).unwrap_or_else(|_| {
@@ -2418,7 +2421,7 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
                             cid.clone()
                         };
 
-                        if is_conv_running {
+                        if is_conv_running && prefix_8.len() >= 6 {
                             active_conv_prefixes.push((norm_inst.clone(), prefix_8, prompt_preview.clone(), conv_time));
                         }
 
@@ -2520,15 +2523,14 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
         if !is_running {
             for (pfx_inst, pfx, snippet, l_time) in &active_conv_prefixes {
                 if pfx.len() >= 6
+                    && (now - *l_time) <= 120
                     && pfx_inst == &norm_inst
                     && (p.id.contains(pfx) || p.repo_path.contains(pfx))
                 {
-                    if now - *l_time <= 120 {
-                        is_running = true;
-                        prompt_snippet = snippet.clone();
-                        last_time = *l_time;
-                        break;
-                    }
+                    is_running = true;
+                    prompt_snippet = snippet.clone();
+                    last_time = *l_time;
+                    break;
                 }
             }
         }
@@ -2553,6 +2555,28 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
     }
 
     results
+}
+
+/// Helper to get live execution status for a specific project
+pub fn get_project_execution_status(
+    project_id: &str,
+    instance_id: &str,
+) -> Option<ProjectExecutionInfo> {
+    if project_id.trim().is_empty() {
+        return None;
+    }
+    let norm_target = normalize_path_for_compare(project_id);
+    let norm_inst = crate::modules::instance::resolve_instance_id(instance_id)
+        .unwrap_or_else(|_| instance_id.to_string())
+        .to_lowercase();
+    let infos = get_live_project_execution_info();
+    infos.into_iter().find(|p| {
+        (p.project_id == project_id
+            || (!norm_target.is_empty() && normalize_path_for_compare(&p.repo_path) == norm_target))
+            && (instance_id == "all"
+                || instance_id.is_empty()
+                || p.project_id.to_lowercase().contains(&norm_inst))
+    })
 }
 
 /// Returns true if ANY project or conversation is currently actively running
@@ -4049,7 +4073,8 @@ fn compute_project_conversation_tree(
 
                             // Ghost conversation filter: skip untitled / empty title with empty prompt
                             let is_untitled_candidate = title.trim().is_empty() || title.to_lowercase().starts_with("untitled");
-                            if is_untitled_candidate && effective_prompt.trim().is_empty() {
+                            let (_, eff_wc) = extract_prompt_words_preview(&effective_prompt, 5);
+                            if is_untitled_candidate && (effective_prompt.trim().is_empty() || eff_wc == 0) {
                                 continue;
                             }
 
@@ -4422,10 +4447,10 @@ fn compute_project_conversation_tree(
             }
         } else {
             // Fallback ONLY when workspace is empty on disk (new project before first turn summary is written)
-            let has_active_prompt =
-                is_prompt_running_for_project(&proj.repo_path, &proj.instance_id)
-                    || (!project_key.is_empty()
-                        && is_prompt_running_for_project(&project_key, &proj.instance_id));
+            let has_active_prompt = (!proj.repo_path.trim().is_empty()
+                && is_prompt_running_for_project(&proj.repo_path, &proj.instance_id))
+                || (!project_key.trim().is_empty()
+                    && is_prompt_running_for_project(&project_key, &proj.instance_id));
             if has_active_prompt {
                 (
                     true,

@@ -7,6 +7,7 @@ import { findQuotaModel } from '../../config/modelConfig';
 import { useInstanceStore } from '../../stores/useInstanceStore';
 import { formatDateTime, formatDateOnly } from '../../utils/date';
 import { QuotaItem } from './QuotaItem';
+import { QuotaProgressBar } from './QuotaProgressBar';
 import { Gemini } from '@lobehub/icons';
 
 
@@ -164,15 +165,14 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* 4H 模型配额 */}
-            <td className="px-2 py-0.5 align-middle">
+            <td className="px-2 py-0.5 align-middle min-w-[200px] w-1/2">
                 {account.quota?.is_forbidden ? (
                     <div className="flex items-center gap-1.5 text-[10px] text-red-500 dark:text-red-400 bg-red-50/50 dark:bg-red-900/10 p-1 rounded-md border border-red-100 dark:border-red-900/30">
                         <Ban className="w-3 h-3 shrink-0" />
                         <span className="truncate">{t('accounts.forbidden_msg')}</span>
                     </div>
                 ) : (
-                    <QuotaItem
-                        label=""
+                    <QuotaProgressBar
                         percentage={geminiProModel?.percentage ?? geminiFlashModel?.percentage ?? 0}
                         resetTime={geminiProModel?.reset_time ?? geminiFlashModel?.reset_time}
                         Icon={Gemini.Color}
@@ -181,12 +181,12 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* Weekly 配额 */}
-            <td className="px-2 py-0.5 align-middle">
+            <td className="px-2 py-0.5 align-middle min-w-[200px] w-1/2">
                 {account.quota?.is_forbidden ? (
                     <span className="text-[10px] text-gray-400 italic">--</span>
                 ) : (
-                    <QuotaItem
-                        label=""
+                    <QuotaProgressBar
+                        isWeekly
                         percentage={(() => {
                             const groups = account.quota?.quota_groups || [];
                             const group = groups.find((item) => {

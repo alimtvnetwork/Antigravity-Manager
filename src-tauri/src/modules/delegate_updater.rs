@@ -121,11 +121,10 @@ pub fn resolve_default_target_exe(
     resolved_install_dir: &Path,
 ) -> PathBuf {
     if let Some(exe) = target_exe {
-        if !exe
-            .to_string_lossy()
-            .to_lowercase()
-            .contains("agm-update-cli")
-            && !exe.to_string_lossy().to_lowercase().contains("agm-updater")
+        let exe_str = exe.to_string_lossy().to_lowercase();
+        if !exe_str.contains("agm-update-cli")
+            && !exe_str.contains("agm-updater")
+            && !exe_str.contains(".trash")
         {
             return exe;
         }
@@ -142,6 +141,34 @@ pub fn resolve_default_target_exe(
     }
     #[cfg(target_os = "macos")]
     {
+        let candidates = [
+            PathBuf::from("/Applications/Antigravity Manager Tools.app"),
+            dirs::home_dir()
+                .map(|h| h.join("Applications/Antigravity Manager Tools.app"))
+                .unwrap_or_default(),
+            PathBuf::from("/Applications/Antigravity Tools.app"),
+            PathBuf::from("/Applications/agm-alim.app"),
+        ];
+        for cand in &candidates {
+            if cand.exists() && cand.is_dir() {
+                let cand_str = cand.to_string_lossy().to_lowercase();
+                if !cand_str.contains(".trash") {
+                    return cand.clone();
+                }
+            }
+        }
+        if let Ok(curr_exe) = env::current_exe() {
+            let mut ancestor = curr_exe.parent();
+            while let Some(parent) = ancestor {
+                if parent.extension().and_then(|s| s.to_str()) == Some("app") {
+                    let parent_str = parent.to_string_lossy().to_lowercase();
+                    if !parent_str.contains(".trash") {
+                        return parent.to_path_buf();
+                    }
+                }
+                ancestor = parent.parent();
+            }
+        }
         PathBuf::from("/Applications/Antigravity Manager Tools.app")
     }
     #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
@@ -689,8 +716,37 @@ pub fn open_ui(args: &[String]) {
 
     #[cfg(target_os = "macos")]
     {
-        let _ = Command::new("open").arg(&exe_to_launch).spawn();
-        println!("[OK] Antigravity Manager UI launched via open.");
+        match Command::new("open").arg(&exe_to_launch).output() {
+            Ok(output) => {
+                if output.status.success() {
+                    println!(
+                        "[OK] Antigravity Manager UI launched via open: {:?}",
+                        exe_to_launch
+                    );
+                } else {
+                    let err = String::from_utf8_lossy(&output.stderr);
+                    eprintln!(
+                        "[ERROR] Failed to launch Antigravity Manager via open (exit: {:?}): {}",
+                        output.status.code(),
+                        err.trim()
+                    );
+                    eprintln!(
+                        "[STACK TRACE] Backtrace:\n{:?}",
+                        std::backtrace::Backtrace::capture()
+                    );
+                }
+            }
+            Err(e) => {
+                eprintln!(
+                    "[ERROR] Failed to execute open command for {:?}: {}",
+                    exe_to_launch, e
+                );
+                eprintln!(
+                    "[STACK TRACE] Backtrace:\n{:?}",
+                    std::backtrace::Backtrace::capture()
+                );
+            }
+        }
     }
 
     #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
@@ -880,6 +936,16 @@ mod tests {
         #[cfg(not(target_os = "macos"))]
         assert!(resolved.to_string_lossy().contains("agm-alim"));
         assert!(!resolved.to_string_lossy().contains("agm-update-cli"));
+    }
+
+    #[test]
+    fn test_resolve_default_target_exe_filters_trash_path() {
+        let install_dir = PathBuf::from("C:\\Users\\Test\\AppData\\Local\\Programs\\agm-alim");
+        let trashed_exe = Some(PathBuf::from(
+            "/Users/test/.Trash/Antigravity Manager Tools 13-20-55-339.app",
+        ));
+        let resolved = resolve_default_target_exe(trashed_exe, &install_dir);
+        assert!(!resolved.to_string_lossy().to_lowercase().contains(".trash"));
     }
 
     #[test]

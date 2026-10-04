@@ -2723,7 +2723,8 @@ fn launch_instance_inner_with_extra_workspaces(
     let exe_path = if !is_default {
         if let Some(ref p) = custom_exe {
             let pb = PathBuf::from(p);
-            if pb.exists() {
+            let p_lower = p.to_lowercase();
+            if pb.exists() && !p_lower.contains(".trash") {
                 pb
             } else if let Ok(cloned) = clone_instance_executable(instance_id) {
                 PathBuf::from(cloned)
@@ -3037,9 +3038,15 @@ fn launch_instance_inner_with_extra_workspaces(
 
         cmd.env("RUST_BACKTRACE", "1");
 
-        cmd.stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null());
+        if is_app_bundle {
+            cmd.stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::piped());
+        } else {
+            cmd.stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null());
+        }
 
         let child = cmd.spawn().map_err(|e| {
             let trace = std::backtrace::Backtrace::capture();
@@ -3061,6 +3068,49 @@ fn launch_instance_inner_with_extra_workspaces(
                 e, trace
             ))
         })?;
+
+        if is_app_bundle {
+            match child.wait_with_output() {
+                Ok(output) => {
+                    if !output.status.success() {
+                        let err_msg = String::from_utf8_lossy(&output.stderr);
+                        let trace = std::backtrace::Backtrace::capture();
+                        let trace_str = format!(
+                            "macOS open exited with code {:?}: {}. Backtrace:\n{:?}",
+                            output.status.code(),
+                            err_msg.trim(),
+                            trace
+                        );
+                        crate::modules::process::append_ide_discovery_log(
+                            false,
+                            Some("FAILED"),
+                            &exe_str,
+                            "open_command_exit",
+                            None,
+                            &trace_str,
+                        );
+                        crate::modules::logger::log_error(&format!(
+                            "[Instance] macOS open command failed (code {:?}): {}. Backtrace:\n{:?}",
+                            output.status.code(),
+                            err_msg.trim(),
+                            trace
+                        ));
+                        return Err(crate::error::AppError::Process(format!(
+                            "Failed to open macOS application bundle (exit code {:?}): {} (trace: {:?})",
+                            output.status.code(),
+                            err_msg.trim(),
+                            trace
+                        )));
+                    }
+                }
+                Err(e) => {
+                    crate::modules::logger::log_warn(&format!(
+                        "[Instance] Failed to wait on macOS open child process: {}",
+                        e
+                    ));
+                }
+            }
+        }
         // /usr/bin/open exits quickly (~20ms).
         // Discover the true Antigravity process PID post-launch to prevent storing transient wrapper PID.
         std::thread::sleep(std::time::Duration::from_millis(500));

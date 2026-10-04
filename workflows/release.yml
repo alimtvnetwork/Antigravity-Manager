@@ -128,6 +128,25 @@ jobs:
             sed -i.bak "s/\.app\.tar\.gz/_${ARCH}.app.tar.gz/g" "$UPDATER_JSON" 2>/dev/null || true
           fi
 
+      # Repack DMG with Fix_Damaged.command and stripped quarantine
+      - name: Repackage macOS DMG with Fix_Damaged utility
+        if: matrix.platform == 'macos-latest'
+        run: |
+          if [[ "${{ matrix.args }}" == *"--target aarch64-apple-darwin"* ]]; then
+            ARCH="aarch64"
+          elif [[ "${{ matrix.args }}" == *"--target x86_64-apple-darwin"* ]]; then
+            ARCH="x64"
+          elif [[ "${{ matrix.args }}" == *"--target universal-apple-darwin"* ]]; then
+            ARCH="universal"
+          else
+            ARCH="unknown"
+          fi
+
+          if [[ "$ARCH" != "universal" && "$ARCH" != "unknown" ]]; then
+            echo "Repackaging DMG for $ARCH with embedded Fix_Damaged.command..."
+            bash scripts/package_dmg.sh --arch "$ARCH"
+          fi
+
       # 1. 上传 updater.json 到 Artifacts (供后续合并使用)
       - name: Upload updater json
         uses: actions/upload-artifact@v4

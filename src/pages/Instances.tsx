@@ -59,6 +59,7 @@ import { isTauri } from '../utils/env';
 import { cn } from '../utils/cn';
 import { showToast } from '../components/common/ToastContainer';
 import { WaterDrainProgressBar } from '../components/common/WaterDrainProgressBar';
+import { QuotaProgressBar } from '../components/accounts/QuotaProgressBar';
 
 function truncatePath(fullPath?: string | null): string {
     if (!fullPath) return '';

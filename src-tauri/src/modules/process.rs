@@ -1447,8 +1447,20 @@ pub fn start_antigravity_with_fallback_path(
                     let open_args = format_macos_open_args(&path_str, args.as_deref(), true);
                     cmd.args(&open_args);
 
-                    cmd.spawn()
-                        .map_err(|e| format!("Startup failed (open): {}", e))?;
+                    let output = cmd.output().map_err(|e| {
+                        let bt = std::backtrace::Backtrace::capture();
+                        format!("Startup failed (open): {} | Stack: {:?}", e, bt)
+                    })?;
+                    if !output.status.success() {
+                        let err_msg = String::from_utf8_lossy(&output.stderr);
+                        let bt = std::backtrace::Backtrace::capture();
+                        return Err(format!(
+                            "Startup failed (open exit code: {:?}): {} | Stack: {:?}",
+                            output.status.code(),
+                            err_msg.trim(),
+                            bt
+                        ));
+                    }
                 } else {
                     let mut cmd = Command::new(&path_str);
                     cmd.env("RUST_BACKTRACE", "1");
@@ -1461,8 +1473,10 @@ pub fn start_antigravity_with_fallback_path(
                     }
                     cmd.arg("--new-window");
 
-                    cmd.spawn()
-                        .map_err(|e| format!("Startup failed (direct): {}", e))?;
+                    cmd.spawn().map_err(|e| {
+                        let bt = std::backtrace::Backtrace::capture();
+                        format!("Startup failed (direct): {} | Stack: {:?}", e, bt)
+                    })?;
                 }
             }
 
@@ -1508,7 +1522,8 @@ pub fn start_antigravity_with_fallback_path(
 
     // 次优：如果切换前捕获到了运行中进程的真实有效路径，优先使用它以防止非标准安装路径丢失
     if let Some(pref_path) = preferred_path {
-        if pref_path.exists() {
+        let pref_str = pref_path.to_string_lossy().to_lowercase();
+        if pref_path.exists() && !pref_str.contains(".trash") {
             crate::modules::logger::log_info(&format!(
                 "Starting with preferred snapshot process path: {:?}",
                 pref_path
@@ -1528,12 +1543,19 @@ pub fn start_antigravity_with_fallback_path(
                 let open_args = format_macos_open_args(app_target, args.as_deref(), false);
                 cmd.args(&open_args);
 
-                let output = cmd
-                    .output()
-                    .map_err(|e| format!("Execute open command failed: {}", e))?;
+                let output = cmd.output().map_err(|e| {
+                    let bt = std::backtrace::Backtrace::capture();
+                    format!("Execute open command failed: {} | Stack: {:?}", e, bt)
+                })?;
                 if !output.status.success() {
                     let err_msg = String::from_utf8_lossy(&output.stderr);
-                    return Err(format!("Startup failed: {}", err_msg.trim()));
+                    let bt = std::backtrace::Backtrace::capture();
+                    return Err(format!(
+                        "Startup failed (open exit code: {:?}): {} | Stack: {:?}",
+                        output.status.code(),
+                        err_msg.trim(),
+                        bt
+                    ));
                 }
                 crate::modules::logger::log_info(
                     "Antigravity startup command sent (macOS open snapshot path)",
@@ -1592,12 +1614,19 @@ pub fn start_antigravity_with_fallback_path(
         let open_args = format_macos_open_args(app_name, args.as_deref(), true);
         cmd.args(&open_args);
 
-        let output = cmd
-            .output()
-            .map_err(|e| format!("Execute open command failed: {}", e))?;
+        let output = cmd.output().map_err(|e| {
+            let bt = std::backtrace::Backtrace::capture();
+            format!("Execute open command failed: {} | Stack: {:?}", e, bt)
+        })?;
         if !output.status.success() {
             let err_msg = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("Startup failed: {}", err_msg.trim()));
+            let bt = std::backtrace::Backtrace::capture();
+            return Err(format!(
+                "Startup failed (open exit code: {:?}): {} | Stack: {:?}",
+                output.status.code(),
+                err_msg.trim(),
+                bt
+            ));
         }
 
         crate::modules::logger::log_info("Antigravity startup command sent (macOS open)");
@@ -1732,7 +1761,10 @@ fn get_process_info(target_ide: Option<&str>) -> (Option<std::path::PathBuf>, Op
 
             // Common helper process exclusion logic (strictly excludes language_server and sub-processes)
             let is_helper = is_helper_process(&name, &args_str, &exe_path);
-            if is_helper || is_non_ide_binary(&name, &exe_path, &args_str) {
+            if is_helper
+                || is_non_ide_binary(&name, &exe_path, &args_str)
+                || exe_path.contains(".trash")
+            {
                 continue;
             }
 
@@ -2217,9 +2249,11 @@ fn audit_standard_locations(target_ide: Option<&str>) -> (Option<std::path::Path
             let candidates = get_macos_candidate_paths(folder_name, home.as_deref());
             for c in candidates {
                 checked.push(c.clone());
-                let p = std::path::PathBuf::from(c);
-                if p.exists() {
-                    return (Some(p), checked);
+                if !c.to_lowercase().contains(".trash") {
+                    let p = std::path::PathBuf::from(c);
+                    if p.exists() {
+                        return (Some(p), checked);
+                    }
                 }
             }
         }
@@ -2237,7 +2271,7 @@ fn audit_standard_locations(target_ide: Option<&str>) -> (Option<std::path::Path
                     let stdout = String::from_utf8_lossy(&output.stdout);
                     for line in stdout.lines() {
                         let trimmed = line.trim();
-                        if !trimmed.is_empty() {
+                        if !trimmed.is_empty() && !trimmed.to_lowercase().contains(".trash") {
                             let p = std::path::PathBuf::from(trimmed);
                             if p.exists() {
                                 return (Some(p), checked);
