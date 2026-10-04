@@ -43,7 +43,7 @@ To eliminate path rigidity, host environment dependency, and data ambiguity acro
          "importCommand": "agm instances import instances.json"
        },
        "variables": {
-         "workDir": "D:\\work",
+         "workDir": "/workspace",
          "repoDir": "${workDir}\\antigravity-manager"
        },
        "data": { ... }
@@ -96,9 +96,9 @@ To eliminate path rigidity, host environment dependency, and data ambiguity acro
 
 ### 2-Pass Chained Resolution
 Chained variables resolve in dependency order:
-- `workDir`: `"D:\\work"`
-- `repoDir`: `"${workDir}\\antigravity-manager"` $\to$ `"D:\\work\\antigravity-manager"`
-- `dataDir`: `"${repoDir}\\instances"` $\to$ `"D:\\work\\antigravity-manager\\instances"`
+- `workDir`: `"/workspace"`
+- `repoDir`: `"${workDir}\\antigravity-manager"` $\to$ `"/workspace/antigravity-manager"`
+- `dataDir`: `"${repoDir}\\instances"` $\to$ `"/workspace/antigravity-manager/instances"`
 
 ### Value Expansion (`expand_variables_in_value`)
 Recursively walks Serde JSON structures:
@@ -111,7 +111,7 @@ Recursively walks Serde JSON structures:
 
 ## 5. Relative Path Enforcement & Resolution
 
-All generated import commands strictly use clean relative paths rather than machine-specific absolute paths (e.g. `agm instances import instances.json` instead of `agm instances import D:\work\instances.json`).
+All generated import commands strictly use clean relative paths rather than machine-specific absolute paths (e.g. `agm instances import instances.json` instead of `agm instances import ./instances.json`).
 
 ### Search Hierarchy (`resolve_relative_json_path`)
 When an import command receives a relative filename:

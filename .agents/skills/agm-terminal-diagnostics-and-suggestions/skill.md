@@ -215,8 +215,8 @@ agm clear
 agm gitignore agm
 
 # Remediate specific directory or repository
-agm gitignore agm D:\work\my-project
-agm ignore D:\work\my-project
+agm gitignore agm ./my-project
+agm ignore ./my-project
 ```
 
 ---

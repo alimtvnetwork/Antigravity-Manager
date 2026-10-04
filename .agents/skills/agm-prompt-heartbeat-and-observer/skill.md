@@ -110,7 +110,7 @@ agm observe default
 ```json
 {
   "instance_id": "test-cli-flow",
-  "data_dir": "C:\\Users\\Administrator\\.antigravity_tools\\instances\\test-cli-flow\\data",
+  "data_dir": "~/.antigravity_tools\\instances\\test-cli-flow\\data",
   "bound_email": "account-a@gmail.com",
   "injected_email": "account-a@gmail.com",
   "credential_drift": false,
@@ -121,7 +121,7 @@ agm observe default
     "is_fresh": true,
     "last_iteration": 42,
     "pid": 14208,
-    "log_path": "d:\\work\\my-project\\.antigravity_goal_prompt.log"
+    "log_path": "./my-project/.antigravity_goal_prompt.log"
   }
 }
 ```

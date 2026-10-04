@@ -152,8 +152,8 @@ python assets/screenshots/generate_instance_screenshot.py \
   --step 1 \
   --output assets/screenshots/instance_step1_initial.png \
   --pid 14232 \
-  --folder "D:\work\Antigravity-Manager\.antigravity_tools\instances\test-cli-flow-1" \
-  --heartbeat-file "D:\work\Antigravity-Manager\.antigravity_goal_prompt.log" \
+  --folder "./.antigravity_tools\instances\test-cli-flow-1" \
+  --heartbeat-file "./.antigravity_goal_prompt.log" \
   --heartbeat-status "Iteration: 1 | Status: RUNNING"
 
 # Run autonomous end-to-end verification with visual evidence output
