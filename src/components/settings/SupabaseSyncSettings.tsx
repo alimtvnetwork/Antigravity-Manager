@@ -703,12 +703,26 @@ Here are my Supabase details:
                 </div>
 
                 {config.endpoints.length === 0 ? (
-                    <div className="p-8 rounded-xl bg-slate-900/40 border border-dashed border-slate-800 text-center text-gray-400">
+                    <div className="p-8 rounded-xl bg-slate-900/40 border border-dashed border-slate-800 text-center text-gray-400 flex flex-col items-center">
                         <Database className="w-8 h-8 mx-auto mb-2 text-slate-600" />
                         <p className="font-medium">No Supabase endpoints configured</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                            Add a Root database endpoint to begin synchronizing nodes and preventing account rotation collisions.
+                        <p className="text-xs text-gray-500 mt-1 max-w-md">
+                            Add a Root database endpoint or auto-discover from local repo-secrets to begin synchronizing nodes and preventing account rotation collisions.
                         </p>
+                        <button
+                            type="button"
+                            onClick={handleAutoDiscover}
+                            disabled={isAutoDiscovering}
+                            className="mt-4 px-3.5 py-1.5 rounded-[5px] bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shadow-xs"
+                            title="Auto-discover Supabase credentials from local repo-secrets and vault"
+                        >
+                            {isAutoDiscovering ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                                <Sparkles className="w-3.5 h-3.5 text-teal-200" />
+                            )}
+                            Auto-Discover from Repo Secrets
+                        </button>
                     </div>
                 ) : (
                     <div className="space-y-2">

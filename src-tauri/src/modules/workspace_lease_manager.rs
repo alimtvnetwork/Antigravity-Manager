@@ -147,21 +147,33 @@ pub async fn acquire_lease_with_details(
                 expires_at: Some(expires),
             });
         } else {
+            let owner_node_id = rpc_resp
+                .get("owner_node_id")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let owner_alias = rpc_resp
+                .get("owner_alias")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let expires_at = rpc_resp.get("expires_at").and_then(|v| v.as_i64());
+            let error_message = rpc_resp
+                .get("error")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .or_else(|| {
+                    let alias = owner_alias.as_deref().unwrap_or("another machine");
+                    let rem = expires_at.map(|e| (e - now).max(0)).unwrap_or(0);
+                    Some(format!(
+                        "Account is currently held by node '{}' (expires in {}s)",
+                        alias, rem
+                    ))
+                });
             return Ok(LeaseResult {
                 is_success: false,
-                error_message: rpc_resp
-                    .get("error")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string()),
-                owner_node_id: rpc_resp
-                    .get("owner_node_id")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string()),
-                owner_alias: rpc_resp
-                    .get("owner_alias")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string()),
-                expires_at: rpc_resp.get("expires_at").and_then(|v| v.as_i64()),
+                error_message,
+                owner_node_id,
+                owner_alias,
+                expires_at,
             });
         }
     }
@@ -190,13 +202,13 @@ pub async fn acquire_lease_with_details(
                     .and_then(|v| v.as_i64())
                     .unwrap_or(0);
 
-                if current_expires > now && current_owner != node_id {
+                if current_expires > now && !current_owner.trim().eq_ignore_ascii_case(node_id.trim()) {
+                    let remaining = (current_expires - now).max(0);
                     return Ok(LeaseResult {
                         is_success: false,
                         error_message: Some(format!(
-                            "Account held by node '{}' (expires in {}s)",
-                            current_alias,
-                            current_expires - now
+                            "Account is currently held by node '{}' (expires in {}s)",
+                            current_alias, remaining
                         )),
                         owner_node_id: Some(current_owner.to_string()),
                         owner_alias: Some(current_alias.to_string()),
@@ -336,13 +348,84 @@ pub fn is_account_or_email_leased_by_other(account_id: &str, email: &str) -> boo
             if is_match
                 && is_locked_or_unexpired
                 && !is_stale_without_ping
-                && lease.node_id != local_node
+                && !lease.node_id.trim().eq_ignore_ascii_case(local_node.trim())
             {
                 return true;
             }
         }
     }
     false
+}
+
+/// If an account or email is leased by another active node, return (node_alias, profile_name, remaining_seconds)
+pub fn get_remote_lease_holder_info(account_id: &str, email: &str) -> Option<(String, String, i64)> {
+    let local_node = supabase_sync::get_local_node_id();
+    let now = Utc::now().timestamp();
+    let app_config = crate::modules::config::load_app_config();
+    let stale_hours = app_config
+        .as_ref()
+        .map(|c| {
+            c.auto_profile_switcher
+                .stale_binding_timeout_hours
+                .clamp(1, 24)
+        })
+        .unwrap_or(6);
+    let cooldown_minutes = app_config
+        .as_ref()
+        .map(|c| {
+            c.auto_profile_switcher
+                .account_cooldown_minutes
+                .max(c.auto_profile_switcher.account_lockout_window_minutes)
+        })
+        .unwrap_or(60);
+    let stale_timeout_secs = (stale_hours as i64) * 3600;
+    let lockout_window_secs = (cooldown_minutes as i64) * 60;
+    let acc_id_clean = account_id.trim();
+    let resolved_email = if !email.trim().is_empty() {
+        email.trim().to_lowercase()
+    } else if !acc_id_clean.is_empty() {
+        crate::modules::account::load_account(acc_id_clean)
+            .map(|a| a.email.trim().to_lowercase())
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+    let email_clean = resolved_email.as_str();
+
+    if let Ok(cache) = ACTIVE_REMOTE_LEASES.read() {
+        for (k, lease) in cache.iter() {
+            let is_match_id = !acc_id_clean.is_empty()
+                && (k.eq_ignore_ascii_case(acc_id_clean)
+                    || lease.account_id.trim().eq_ignore_ascii_case(acc_id_clean)
+                    || lease
+                        .account_email
+                        .trim()
+                        .eq_ignore_ascii_case(acc_id_clean));
+            let is_match_email = !email_clean.is_empty()
+                && (lease.account_email.trim().to_lowercase() == email_clean
+                    || lease.profile_name.trim().to_lowercase() == email_clean
+                    || lease.account_id.trim().to_lowercase() == email_clean);
+            let is_match = is_match_id || is_match_email;
+            let is_stale_without_ping =
+                lease.leased_at > 0 && (now - lease.leased_at) > stale_timeout_secs;
+            let is_locked_or_unexpired = (lease.leased_at > 0
+                && (now - lease.leased_at) < lockout_window_secs)
+                || lease.expires_at > now;
+            if is_match
+                && is_locked_or_unexpired
+                && !is_stale_without_ping
+                && !lease.node_id.trim().eq_ignore_ascii_case(local_node.trim())
+            {
+                let remaining = (lease.expires_at - now).max(0);
+                return Some((
+                    lease.node_alias.clone(),
+                    lease.profile_name.clone(),
+                    remaining,
+                ));
+            }
+        }
+    }
+    None
 }
 
 /// Find any cached workspace lease matching account ID or email (case-insensitive)

@@ -4462,9 +4462,18 @@ pub async fn switch_account_to_instance(
         &account.id,
         &account.email,
     ) {
+        let holder_info = crate::modules::workspace_lease_manager::get_remote_lease_holder_info(
+            &account.id,
+            &account.email,
+        );
+        let detail = if let Some((alias, profile, remaining)) = holder_info {
+            format!("held by remote machine '{}' (Profile: '{}', expires in {}s)", alias, profile, remaining)
+        } else {
+            "currently leased by another active machine in the cluster".to_string()
+        };
         let err = format!(
-            "Cannot switch instance to account '{}': Account is currently leased by another active machine in the cluster",
-            account.email
+            "Cannot switch instance to account '{}': Account is {}",
+            account.email, detail
         );
         crate::modules::logger::log_error(&format!("[INSTANCE_SWITCH:ERROR] {}", err));
         return Err(err);
@@ -4504,6 +4513,24 @@ pub async fn switch_account_to_instance(
             crate::modules::logger::log_error(&format!("[INSTANCE_SWITCH:ERROR] {}", err));
             err
         })?;
+
+    // Sibling Local Running Guard: prevent switching to accounts actively bound to running sibling instances on the same host!
+    let bound_inst = registry
+        .instances
+        .iter()
+        .find(|i| i.bound_account_id.as_deref() == Some(&account.id));
+    if let Some(inst) = bound_inst {
+        if inst.id != target_id
+            && is_instance_running(&inst.id, &inst.data_dir, inst.pid)
+        {
+            let err = format!(
+                "Cannot switch instance to account '{}': Account is actively bound to running sibling instance '{}' on this machine",
+                account.email, inst.name
+            );
+            crate::modules::logger::log_error(&format!("[INSTANCE_SWITCH:ERROR] {}", err));
+            return Err(err);
+        }
+    }
 
     let lease_ttl_secs = crate::modules::workspace_lease_manager::get_default_lease_ttl_secs();
 

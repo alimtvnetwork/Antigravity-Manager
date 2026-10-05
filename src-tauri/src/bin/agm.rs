@@ -6010,23 +6010,23 @@ fn cmd_supabase(args: &[String]) {
             }
         }
         "load-secrets" | "auto-load" | "discover" => {
-            let mut cfg = supabase_sync::load_config().unwrap_or_default();
-            if supabase_sync::auto_seed_from_repo_secrets(&mut cfg) {
-                let _ = supabase_sync::save_config(&cfg);
-                println!(
-                    "✅ Successfully discovered and loaded {} Supabase endpoint(s) from repo-secrets.",
-                    cfg.endpoints.len()
-                );
-            } else if !cfg.endpoints.is_empty() {
-                println!(
-                    "ℹ️ Supabase already has {} configured endpoint(s).",
-                    cfg.endpoints.len()
-                );
-            } else {
-                eprintln!("[WARN] No Supabase credentials found in candidate repo-secrets paths.");
-            }
-            for ep in &cfg.endpoints {
-                println!("   • [{}] {} -> {}", ep.id, ep.name, ep.url);
+            match supabase_sync::auto_discover_supabase_credentials() {
+                Ok(cfg) => {
+                    if !cfg.endpoints.is_empty() {
+                        println!(
+                            "✅ Successfully discovered and loaded {} Supabase endpoint(s) from repo-secrets.",
+                            cfg.endpoints.len()
+                        );
+                        for ep in &cfg.endpoints {
+                            println!("   • [{}] {} -> {}", ep.id, ep.name, ep.url);
+                        }
+                    } else {
+                        eprintln!("[WARN] No Supabase credentials found in candidate repo-secrets paths.");
+                    }
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to auto-discover Supabase credentials: {}", e);
+                }
             }
         }
         "set-prune" => {

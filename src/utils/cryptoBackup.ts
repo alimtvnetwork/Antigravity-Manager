@@ -124,7 +124,7 @@ export async function createBackupEnvelope(
 export function isEncryptedBackup(rawContent: string): boolean {
     try {
         const parsed = JSON.parse(rawContent);
-        return Boolean(parsed && parsed.encrypted === true);
+        return Boolean(parsed && parsed.encrypted);
     } catch {
         return false;
     }
@@ -159,7 +159,7 @@ export async function parseBackupEnvelope(
     }
 
     // Case 3: Encrypted envelope
-    if (parsed.encrypted === true) {
+    if (Boolean(parsed.encrypted)) {
         if (!password || password.trim().length === 0) {
             throw new Error('This backup is password-protected. Please enter your decryption password.');
         }

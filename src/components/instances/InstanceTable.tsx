@@ -52,7 +52,7 @@ function formatShortPath(fullPath: string): string {
     const isWindows = fullPath.includes('\\') || /^[a-zA-Z]:/.test(fullPath);
     const sep = isWindows ? '\\' : '/';
     const parts = fullPath.split(/[\\/]/).filter(Boolean);
-    if (parts.length <= 1) return fullPath;
+    if (parts.length === 0) return fullPath;
     return `...${sep}${parts[parts.length - 1]}`;
 }
 
@@ -132,11 +132,11 @@ export default function InstanceTable({
     };
 
     return (
-        <div className="w-full overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#0c2438] shadow-xs">
+        <div className="w-full overflow-hidden rounded-[5px] border border-slate-200/90 dark:border-slate-800/90 bg-white dark:bg-[#0c2438] shadow-xs">
             <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                     <thead>
-                        <tr className="border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/80 dark:bg-[#071a27] text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        <tr className="border-b border-slate-200/90 dark:border-slate-800/90 bg-slate-50/80 dark:bg-[#071a27] text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                             <th className="px-2 py-1.5 min-w-[150px] max-w-[190px]">Profile & Account</th>
                             <th className="px-2 py-1.5 min-w-[160px] max-w-[200px]">Model & Weekly Quota</th>
                             <th className="px-2 py-1.5 min-w-[90px] max-w-[110px]">Status & PID</th>
@@ -199,7 +199,7 @@ export default function InstanceTable({
                                 <tr
                                     key={inst.config.id}
                                     className={cn(
-                                        "transition-colors duration-150 border-b border-slate-200/80 dark:border-slate-800/80 last:border-b-0",
+                                        "transition-colors duration-150 border-b border-slate-200/90 dark:border-slate-800/90 last:border-b-0",
                                         isBusy && "pointer-events-none select-none opacity-60",
                                         isActive
                                             ? "bg-sky-50/40 dark:bg-[#0a2338] hover:bg-sky-50/70 dark:hover:bg-[#0d2c46]"

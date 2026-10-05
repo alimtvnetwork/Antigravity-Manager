@@ -1,5 +1,22 @@
 # Changelog
 
+## [v4.154.0] - 2026-10-05
+
+### Added
+- **账号表格行边框恢复与中段配额视觉分组 (Accounts Table Row Borders & Quota Section Grouping)**: 恢复账号表格各行底部清晰边框线条（`border-b border-slate-200/90 dark:border-slate-800/90`），并在表头与表体中为中段核心配额列（4H 模型配额与每周配额）赋予微妙背景底色与纵向分隔边框（`bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#15334d]` 与 `border-r border-slate-300 dark:border-[#15334d]`），彻底解决行次模糊与列区混淆问题。 (Thanks to @aukgit)
+- **Supabase 密钥仓库自动探测与一键导入 (Supabase Repo-Secrets Auto-Discovery & 1-Click Sync)**: 在 `supabase_sync.rs` 中全面打通 `repo-secrets` 凭据探测路径（覆盖 `02-antigravity-and-event-manager`、`02-antigravity-manager`、`03-supabase/01-own` 及 `03-supabase/02-lovable`），自动解密与清洗 URL（剔除 `/rest/v1`），在设置界面与端点空白卡片新增“Auto-Discover from Repo Secrets”一键导入按钮及 Tauri IPC 命令，并在 CLI `agm supabase load-secrets` 中保持完全对齐。 (Thanks to @aukgit)
+- **同机运行实例互斥保护与跨机器租约冲突拦截 (Local Sibling Instance Guard & Cross-Machine Lease Collision Prevention)**: 在账号切换执行入口（`switch_account` 与 `switch_account_to_instance`）注入前置互斥门禁，在分发凭据前严格校验目标账号是否正被本地其他运行中实例占用，同时调用 `is_account_or_email_leased_by_other` 与 `get_remote_lease_holder_info` 校验外部机器占用状态，输出明确的远端节点别名与租约过期时间。 (Thanks to @aukgit)
+- **30-60 分钟邮箱冷却期与防死锁智能回退 (Configurable 30–60m Email Cooldown & Two-Tier Pool Fallback)**: 在候选人评分算法中对近期使用过的邮箱建立冷却隔离池（默认 60 分钟，支持 15m/30m/45m/60m/120m 灵活配置），优先选择非冷却健康账号；当所有账号均处于冷却窗口时，自动平滑回退至冷却时间最久的历史账号，彻底杜绝轮换卡死与死锁。 (Thanks to @aukgit)
+- **“Rotate to Next Best”候选人悬浮提示与操作填充 (Rotate to Next Best Candidate Tooltip & Visual Feedback)**: 优化“Rotate to Next Best”按钮内边距（`px-3.5 py-1.5`）与 5–6px 圆角，动态计算智能候选人队列并在悬浮气泡中完整展示目标实例名称、拟切换账号邮箱、订阅层级以及 4H 配额健康百分比，按钮内部直观呈现候选目标邮箱微标，消除盲切困惑。 (Thanks to @aukgit)
+
+### Changed
+- **账号配额与进度条 VS Code 青色/青蓝主题色调重构 (VS Code Cyan/Teal Palette for Accounts Quotas & Progress Bars)**: 废除账号界面中过分刺眼的荧光绿高亮（`#1af18d`、`emerald-500`、`lime-400`），全面重构 `QuotaProgressBar`、`WaterDrainProgressBar` 及审计微标色彩体系，切换为舒适自然的 VS Code 标志性青色/青蓝渐变调（$\ge 75\%$ 采用 `from-teal-500 via-cyan-500 to-[#38bdf8]`，$\ge 50\%$ 采用 `from-teal-600 via-cyan-500 to-sky-400`，100% 节点采用青色光晕），在深浅主题下均保持柔和清晰。 (Thanks to @aukgit)
+- **实例表格紧凑化、合并列、路径截断与提示词动作收纳 (Instances Table Zero-Scroll Compaction, Combined Profile/Account & Action Dropdown)**: 彻底消除实例表格在 1280px+ 视口下的横向滚动条，精简为紧凑布局：将实例配置名称与关联邮箱合二为一显示（首行实例名与运行指示点，次行脱敏邮箱与订阅层级微标）；数据目录路径智能截断仅展示末级文件夹（前缀 `...`，支持悬浮完整路径与一键复制）；将提示词树（Prompts Tree）收纳至操作下拉菜单。 (Thanks to @aukgit)
+- **按钮 5–6px 圆角规范化 (Universal 5–6px Button Radius Normalization)**: 全面重构实例界面、弹窗表单及设置工具栏中过于臃肿的药丸圆角，严格规范所有主操作按钮、模态框交互按钮为 5–6px（`rounded-[5px]`），呈现工业级精致质感。 (Thanks to @aukgit)
+- **实例卡片模式严格 4 列紧凑网格与双行操作按钮布局 (Card Mode Strict 4-Column Grid & Structured 2-Row Action Toolbars)**: 约束卡片视图桌面端最大列数为 4 列（`grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3`），杜绝 5/6 列挤压导致的卡片扭曲；卡片底部按“主操作胶囊（Row 1: 启动/停止/重启、切换、快进、同步 PID）+ 辅助工具胶囊（Row 2: 提示词树、设置、克隆、审计、更多操作）”整齐排列，保持高度一致整洁。 (Thanks to @aukgit)
+
+---
+
 ## [v4.153.0] - 2026-10-05
 
 ### Fixed
@@ -594,6 +611,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.154.0 (2026-10-05)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.153.0 (2026-10-05)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

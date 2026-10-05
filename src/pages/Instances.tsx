@@ -65,7 +65,7 @@ function truncatePath(fullPath?: string | null): string {
     const isWindows = fullPath.includes('\\') || /^[a-zA-Z]:/.test(fullPath);
     const sep = isWindows ? '\\' : '/';
     const parts = fullPath.split(/[\\/]/).filter(Boolean);
-    if (parts.length <= 1) return fullPath;
+    if (parts.length === 0) return fullPath;
     return `...${sep}${parts[parts.length - 1]}`;
 }
 
@@ -841,14 +841,14 @@ export default function Instances() {
 
             {/* Store Error Alert */}
             {error ? (
-                <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
+                <div className="p-3.5 rounded-[5px] bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 shrink-0" />
                         <span>{error}</span>
                     </div>
                     <button
                         onClick={() => fetchInstances()}
-                        className="btn btn-xs btn-outline btn-error gap-1 shrink-0"
+                        className="btn btn-xs btn-outline btn-error gap-1 shrink-0 rounded-[5px]"
                     >
                         <RotateCw className="w-3 h-3" />
                         <span>{t('common.retry', 'Retry')}</span>
@@ -858,7 +858,7 @@ export default function Instances() {
 
             {/* Action Error Alert */}
             {actionError ? (
-                <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
+                <div className="p-3.5 rounded-[5px] bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 shrink-0" />
                         <span>{actionError}</span>
@@ -869,7 +869,7 @@ export default function Instances() {
 
             {/* Auto-Switcher Status Banner */}
             {switcherStatus?.is_running ? (
-                <div className="bg-gradient-to-r from-blue-50/90 via-sky-50/70 to-indigo-50/80 dark:from-blue-950/40 dark:via-[#0c2438]/60 dark:to-indigo-950/40 border border-blue-200/80 dark:border-blue-500/30 rounded-2xl p-4 backdrop-blur-md shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+                <div className="bg-gradient-to-r from-blue-50/90 via-sky-50/70 to-indigo-50/80 dark:from-blue-950/40 dark:via-[#0c2438]/60 dark:to-indigo-950/40 border border-blue-200/80 dark:border-blue-500/30 rounded-[5px] p-4 backdrop-blur-md shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
                     <div className="flex items-center gap-3 min-w-0">
                         <span className="relative flex h-3 w-3 shrink-0">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -880,13 +880,13 @@ export default function Instances() {
                                 <Sparkles className="w-3.5 h-3.5 text-blue-500 dark:text-cyan-400" />
                                 {t('instances.auto_switcher_active', 'Auto Profile Switcher Active')}
                             </span>
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold font-mono bg-blue-500/15 text-blue-700 dark:text-cyan-300 border border-blue-400/30 shadow-2xs">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-[5px] text-[11px] font-semibold font-mono bg-blue-500/15 text-blue-700 dark:text-cyan-300 border border-blue-400/30 shadow-2xs">
                                 Current Active Quota: {switcherStatus.current_quota_percent !== undefined && switcherStatus.current_quota_percent !== null
                                     ? `${switcherStatus.current_quota_percent.toFixed(0)}%`
                                     : '100%'}
                             </span>
                             {switcherStatus.last_switch_reason ? (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gray-500/10 text-gray-600 dark:text-gray-300 border border-gray-400/20 max-w-xs truncate" title={switcherStatus.last_switch_reason}>
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-[5px] text-[11px] font-medium bg-gray-500/10 text-gray-600 dark:text-gray-300 border border-gray-400/20 max-w-xs truncate" title={switcherStatus.last_switch_reason}>
                                     Reason: {switcherStatus.last_switch_reason}
                                 </span>
                             ) : null}
@@ -926,7 +926,7 @@ export default function Instances() {
 
             {/* Search Filter & Quick Action */}
             <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div className="flex items-center gap-2 flex-1 max-w-md bg-white dark:bg-base-200 border border-gray-200 dark:border-base-100 rounded-xl px-3 py-2 shadow-xs">
+                <div className="flex items-center gap-2 flex-1 max-w-md bg-white dark:bg-base-200 border border-gray-200 dark:border-base-100 rounded-[5px] px-3 py-2 shadow-xs">
                     <Search className="w-4 h-4 text-gray-400 shrink-0" />
                     <input
                         type="text"
@@ -950,15 +950,15 @@ export default function Instances() {
 
             {/* Instance Cards Grid or Empty / Loading States */}
             {isLoading && instances.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-base-200 rounded-2xl border border-gray-200/80 dark:border-base-100">
+                <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-base-200 rounded-[5px] border border-gray-200/80 dark:border-base-100">
                     <RotateCw className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin mb-3" />
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                         {t('instances.loading', 'Loading instances and profiles...')}
                     </p>
                 </div>
             ) : instances.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 px-4 text-center bg-white dark:bg-base-200 rounded-2xl border border-dashed border-gray-300 dark:border-base-100">
-                    <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 mb-4">
+                <div className="flex flex-col items-center justify-center py-16 px-4 text-center bg-white dark:bg-base-200 rounded-[5px] border border-dashed border-gray-300 dark:border-base-100">
+                    <div className="p-4 rounded-[5px] bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 mb-4">
                         <Laptop className="w-10 h-10" />
                     </div>
                     <h3 className="text-base font-bold text-gray-900 dark:text-base-content mb-1">
@@ -995,7 +995,7 @@ export default function Instances() {
                     </div>
                 </div>
             ) : filteredInstances.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center bg-white dark:bg-base-200 rounded-2xl border border-gray-200/80 dark:border-base-100">
+                <div className="flex flex-col items-center justify-center py-12 text-center bg-white dark:bg-base-200 rounded-[5px] border border-gray-200/80 dark:border-base-100">
                     <Search className="w-8 h-8 text-gray-400 mb-2" />
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                         {t('instances.no_search_results', 'No profiles match your search')}
@@ -1050,8 +1050,8 @@ export default function Instances() {
 
                 <div className={cn(
                     cardDensity === 'compact'
-                        ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2"
-                        : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"
+                        ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5"
+                        : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"
                 )}>
                     {filteredInstances.map((inst, index) => {
                         const originalIndex = instances.findIndex((i) => i.config.id === inst.config.id);
@@ -1119,7 +1119,7 @@ export default function Instances() {
                                 key={inst.config.id}
                                 ref={isActive ? activeCardRef : undefined}
                                 className={cn(
-                                    "group relative rounded-xl border transition-all duration-200 flex flex-col justify-between bg-white dark:bg-[#0a1e30] overflow-hidden shadow-xs backdrop-blur-xs",
+                                    "group relative rounded-[5px] border transition-all duration-200 flex flex-col justify-between bg-white dark:bg-[#0a1e30] overflow-hidden shadow-xs backdrop-blur-xs",
                                     isActive
                                         ? "border-blue-500 shadow-lg ring-2 ring-blue-500/30 bg-blue-50/15 dark:bg-[#0c2438]"
                                         : "border-gray-200/50 dark:border-[#15334d]/60 hover:border-gray-300/80 dark:hover:border-blue-500/40 hover:bg-slate-50/90 dark:hover:bg-[#061421]"
@@ -1127,7 +1127,7 @@ export default function Instances() {
                             >
                                 {/* Card Mutex Overlay when action is executing */}
                                 {isBusy && (
-                                    <div className="absolute inset-0 bg-white/75 dark:bg-[#071a27]/85 backdrop-blur-[2px] z-30 flex flex-col items-center justify-center gap-2 rounded-xl pointer-events-auto cursor-wait select-none">
+                                    <div className="absolute inset-0 bg-white/75 dark:bg-[#071a27]/85 backdrop-blur-[2px] z-30 flex flex-col items-center justify-center gap-2 rounded-[5px] pointer-events-auto cursor-wait select-none">
                                         <RotateCw className="w-5 h-5 animate-spin text-blue-500 dark:text-cyan-400" />
                                         <span className="text-xs font-bold text-gray-800 dark:text-cyan-200 tracking-wide font-mono">
                                             {getActionLabel(currentAction)}
@@ -1520,15 +1520,15 @@ export default function Instances() {
 
                                     {/* Card Actions Toolbar: 2 clean structured rows with 5-6px radius */}
                                     <div className="pt-2.5 border-t border-gray-100 dark:border-[#15334d]/80 mt-2 space-y-1.5">
-                                        {/* Row 1: Primary Actions (Launch/Stop, Switch Account, Fast-Forward, Sync PID) */}
-                                        <div className="grid grid-cols-4 gap-1 w-full">
+                                        {/* Row 1: Primary Actions Capsule (Launch/Stop, Switch Account, Fast-Forward, Sync PID) */}
+                                        <div className="flex items-center rounded-[5px] overflow-hidden bg-slate-100 dark:bg-[#071a27] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs w-full">
                                             {inst.is_running ? (
-                                                <div className="flex items-center rounded-[5px] border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/40 overflow-hidden divide-x divide-rose-200 dark:divide-rose-900/50">
+                                                <div className="flex-1 flex items-center divide-x divide-slate-200 dark:divide-[#15334d]">
                                                     <button
                                                         type="button"
                                                         disabled={isBusy}
                                                         onClick={() => handleStop(inst.config.id)}
-                                                        className="flex-1 flex items-center justify-center p-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer disabled:opacity-50"
+                                                        className="flex-1 flex items-center justify-center py-1 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-l-[4px] transition-colors cursor-pointer disabled:opacity-50"
                                                         title="Stop Instance"
                                                     >
                                                         {currentAction === 'stop' ? (
@@ -1541,7 +1541,7 @@ export default function Instances() {
                                                         type="button"
                                                         disabled={isBusy}
                                                         onClick={() => handleRestart(inst.config.id)}
-                                                        className="flex-1 flex items-center justify-center p-1.5 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors cursor-pointer disabled:opacity-50"
+                                                        className="flex-1 flex items-center justify-center py-1 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer disabled:opacity-50"
                                                         title="Restart Instance on Current Account"
                                                     >
                                                         {currentAction === 'restart' ? (
@@ -1556,7 +1556,7 @@ export default function Instances() {
                                                     type="button"
                                                     disabled={isBusy}
                                                     onClick={() => handleLaunch(inst.config.id)}
-                                                    className="flex items-center justify-center text-xs p-1.5 rounded-[5px] bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-900/50 hover:bg-teal-100 dark:hover:bg-teal-900/40 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="flex-1 flex items-center justify-center py-1 text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40 rounded-l-[4px] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                     title="Launch Instance"
                                                 >
                                                     {currentAction === 'launch' ? (
@@ -1571,7 +1571,7 @@ export default function Instances() {
                                                 type="button"
                                                 disabled={isBusy}
                                                 onClick={() => setSwitchTargetInstance(inst)}
-                                                className="flex items-center justify-center text-xs p-1.5 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-sky-600 dark:text-sky-400 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex-1 flex items-center justify-center py-1 text-sky-600 dark:text-sky-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Switch Account"
                                             >
                                                 {currentAction === 'switch' ? (
@@ -1585,7 +1585,7 @@ export default function Instances() {
                                                 type="button"
                                                 disabled={isBusy}
                                                 onClick={() => handleFastForward(inst.config.id)}
-                                                className="flex items-center justify-center text-xs p-1.5 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-amber-600 dark:text-amber-400 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex-1 flex items-center justify-center py-1 text-amber-600 dark:text-amber-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Fast Forward to Next Best"
                                             >
                                                 {currentAction === 'fast-forward' ? (
@@ -1599,25 +1599,25 @@ export default function Instances() {
                                                 type="button"
                                                 disabled={isBusy || Boolean(syncingInstanceIds[inst.config.id])}
                                                 onClick={() => handleSync(inst.config.id)}
-                                                className="flex items-center justify-center text-xs p-1.5 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-teal-600 dark:text-teal-400 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex-1 flex items-center justify-center py-1 text-teal-600 dark:text-teal-400 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-r-[4px] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Sync PID and Quota"
                                             >
                                                 <Cpu className={cn("w-3.5 h-3.5 text-teal-500", (currentAction === 'sync' || syncingInstanceIds[inst.config.id]) && "animate-pulse")} />
                                             </button>
                                         </div>
 
-                                        {/* Row 2: Secondary Actions (Prompts, Settings, Clone Profile, Audit, More Popover) */}
-                                        <div className="grid grid-cols-5 gap-1 w-full relative">
-                                            {/* Slot 1: Prompts */}
+                                        {/* Row 2: Secondary Actions Capsule (Prompts Tree, Settings, Clone Profile, Audit, More Popover) */}
+                                        <div className="flex items-center rounded-[5px] overflow-hidden bg-slate-100 dark:bg-[#071a27] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs w-full relative">
+                                            {/* Slot 1: Prompts Tree */}
                                             <button
                                                 type="button"
                                                 disabled={isBusy}
                                                 onClick={() => setPromptTreeInstance({ id: inst.config.id, name: inst.config.name })}
                                                 className={cn(
-                                                    "flex items-center justify-center text-xs p-1.5 rounded-[5px] border transition-colors cursor-pointer relative disabled:opacity-50 disabled:cursor-not-allowed",
+                                                    "flex-1 flex items-center justify-center py-1 transition-colors cursor-pointer relative rounded-l-[4px] disabled:opacity-50 disabled:cursor-not-allowed",
                                                     hasActiveTask
-                                                        ? "bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-300 border-cyan-400/50 hover:bg-cyan-100 dark:hover:bg-cyan-900/50"
-                                                        : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                                        ? "bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-300 hover:bg-cyan-100 dark:hover:bg-cyan-900/50"
+                                                        : "text-slate-600 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 hover:bg-slate-200 dark:hover:bg-[#15334d]"
                                                 )}
                                                 title={hasActiveTask ? "Prompt Tree (Active Task Running)" : "Prompt Tree"}
                                             >
@@ -1635,7 +1635,7 @@ export default function Instances() {
                                                     setSettingsModalTarget(inst);
                                                     setIsSettingsModalOpen(true);
                                                 }}
-                                                className="flex items-center justify-center text-xs p-1.5 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex-1 flex items-center justify-center py-1 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Settings & Sync"
                                             >
                                                 <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -1650,7 +1650,7 @@ export default function Instances() {
                                                     setCopyInstanceName(`${inst.config.name} Copy`);
                                                     setCopyProjects(true);
                                                 }}
-                                                className="flex items-center justify-center text-xs p-1.5 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex-1 flex items-center justify-center py-1 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Clone Profile"
                                             >
                                                 <Copy className="w-3.5 h-3.5" />
@@ -1665,14 +1665,14 @@ export default function Instances() {
                                                     name: inst.config.name,
                                                     sequence_name: inst.config.seq_num ? `Instance #${inst.config.seq_num}` : undefined
                                                 })}
-                                                className="flex items-center justify-center text-xs p-1.5 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-amber-500 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex-1 flex items-center justify-center py-1 text-slate-600 dark:text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Audit Trail"
                                             >
                                                 <History className="w-3.5 h-3.5" />
                                             </button>
 
                                             {/* Slot 5: More Popover Trigger */}
-                                            <div className="relative">
+                                            <div className="flex-1 relative">
                                                 <button
                                                     type="button"
                                                     disabled={isBusy}
@@ -1681,10 +1681,10 @@ export default function Instances() {
                                                         setCardMoreId(cardMoreId === inst.config.id ? null : inst.config.id);
                                                     }}
                                                     className={cn(
-                                                        "w-full h-full flex items-center justify-center text-xs p-1.5 rounded-[5px] border border-slate-300 dark:border-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+                                                        "w-full flex items-center justify-center py-1 rounded-r-[4px] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
                                                         cardMoreId === inst.config.id
                                                             ? "bg-slate-200 dark:bg-[#15334d] text-slate-900 dark:text-white"
-                                                            : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                                            : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-[#15334d]"
                                                     )}
                                                     title="More Actions (Clone Executable, Wipe, Delete)"
                                                 >
@@ -1743,7 +1743,7 @@ export default function Instances() {
                                 </div>
 
                                 {/* Bottom Accent Line with CSS3 Hover Animation */}
-                                <div className="relative w-full h-[3px] overflow-hidden rounded-b-xl">
+                                <div className="relative w-full h-[3px] overflow-hidden rounded-b-[5px]">
                                     <div
                                         className={cn(
                                             "absolute inset-0 bg-gradient-to-r transition-all duration-300 ease-out transform",

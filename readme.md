@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.153.0-3B82F6?style=flat-square" alt="Version v4.153.0">
+    <img src="https://img.shields.io/badge/Version-v4.154.0-3B82F6?style=flat-square" alt="Version v4.154.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.153.0)**
+**Bar 2: Version-Based Installation (v4.154.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -147,7 +147,9 @@ This version pinning matrix allows developers, enterprise deployments, and users
 <!-- STAMP:VERSION_PIN_TABLE_START -->
 | Target Release | Release Date | Quality Gate | Windows PowerShell (One-Liner) | Linux / macOS (Bash) | Git Tag Checkout |
 | :--- | :---: | :---: | :--- | :--- | :--- |
-| **v4.151.0** (Latest) | 2026-10-05 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.151.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.151.0/install.sh \| bash` | `git checkout v4.151.0` |
+| **v4.154.0** (Latest) | 2026-10-05 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.154.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.154.0/install.sh \| bash` | `git checkout v4.154.0` |
+| **v4.153.0** | 2026-10-05 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.153.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.153.0/install.sh \| bash` | `git checkout v4.153.0` |
+| **v4.151.0** | 2026-10-05 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.151.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.151.0/install.sh \| bash` | `git checkout v4.151.0` |
 | **v4.150.0** | 2026-10-05 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.150.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.150.0/install.sh \| bash` | `git checkout v4.150.0` |
 | **v4.142.0** | 2026-10-04 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.142.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.142.0/install.sh \| bash` | `git checkout v4.142.0` |
 | **v4.65.0** | 2026-09-23 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.65.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.65.0/install.sh \| bash` | `git checkout v4.65.0` |
@@ -546,7 +548,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.153.0**: Introduced split restart button capsule (`[Square | RotateCcw]`) for running instances on current account, replaced circular sync icons with distinct semantic icons (`Cpu` and `ArrowLeftRight`), fixed running project & prompt detection root causes in `repo_db.rs`, resolved Rust compiler errors (`AppError`, macOS moved child process) and formatted code across all modules for 100% clean CI/CD preflight gates. (Thanks to @aukgit)
+> Latest version **v4.154.0**: Restored crisp row dividing borders across accounts table, grouped middle quota section (`4H Model Quota` & `Weekly Quota`) with subtle background styling, converted progress bars and audit badges to refined VS Code cyan/teal theme palette, implemented auto-discovery for Supabase credentials across repo-secrets, added local running sibling instance and cross-machine lease conflict guards with 30–60m email cooldown, eliminated horizontal table scrollbar at 1280px+ via combined `Profile & Account` column, truncated path locations (`...\<folder>`), normalized button radii to 5–6px, and compacted Card view to strictly 4 items per row with 2-row action capsules. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

@@ -983,7 +983,7 @@ function Accounts() {
       <div className="flex-1 min-h-0 relative" ref={containerRef}>
         {viewMode === "list" ? (
           <div className="h-full bg-white dark:bg-base-100 rounded-2xl shadow-sm border border-gray-100 dark:border-base-200 flex flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto [&_th:nth-child(3)]:border-x [&_th:nth-child(3)]:border-slate-200/70 dark:[&_th:nth-child(3)]:border-[#15334d]/70 [&_td:nth-child(3)]:border-x [&_td:nth-child(3)]:border-slate-100 dark:[&_td:nth-child(3)]:border-[#15334d]/50 [&_th:nth-child(4)]:w-1/2 [&_th:nth-child(5)]:w-1/2 [&_th:nth-child(4)]:min-w-[220px] [&_th:nth-child(5)]:min-w-[220px] [&_td:nth-child(4)]:min-w-[220px] [&_td:nth-child(5)]:min-w-[220px]">
+            <div className="flex-1 overflow-y-auto [&_th:nth-child(4)]:w-1/2 [&_th:nth-child(5)]:w-1/2 [&_th:nth-child(4)]:min-w-[220px] [&_th:nth-child(5)]:min-w-[220px] [&_td:nth-child(4)]:min-w-[220px] [&_td:nth-child(5)]:min-w-[220px]">
               <AccountTable
                 accounts={paginatedAccounts}
                 selectedIds={selectedIds}

@@ -71,27 +71,84 @@ pub fn candidate_seed_config_paths() -> Vec<PathBuf> {
     let mut candidates = Vec::new();
     if let Ok(dir_str) = std::env::var("REPO_SECRETS_DIR") {
         let p = PathBuf::from(&dir_str);
+        candidates.push(p.join("02-antigravity-and-event-manager/vault/supabase_config.json"));
         candidates.push(p.join("02-antigravity-manager/vault/supabase_config.json"));
+        candidates.push(p.join("03-supabase/01-own/supabase-credentials.json"));
+        candidates.push(p.join("03-supabase/02-lovable/supabase-credentials.json"));
         candidates.push(p.join("vault/supabase_config.json"));
     }
     candidates.push(PathBuf::from(
+        "D:/work/repo-secrets/02-antigravity-and-event-manager/vault/supabase_config.json",
+    ));
+    candidates.push(PathBuf::from(
         "D:/work/repo-secrets/02-antigravity-manager/vault/supabase_config.json",
+    ));
+    candidates.push(PathBuf::from(
+        "D:/work/repo-secrets/03-supabase/01-own/supabase-credentials.json",
+    ));
+    candidates.push(PathBuf::from(
+        "D:/work/repo-secrets/03-supabase/02-lovable/supabase-credentials.json",
     ));
     candidates.push(PathBuf::from(
         "D:/work/repo-secrets/vault/supabase_config.json",
     ));
     candidates.push(PathBuf::from(
+        "C:/work/repo-secrets/02-antigravity-and-event-manager/vault/supabase_config.json",
+    ));
+    candidates.push(PathBuf::from(
         "C:/work/repo-secrets/02-antigravity-manager/vault/supabase_config.json",
+    ));
+    candidates.push(PathBuf::from(
+        "C:/work/repo-secrets/03-supabase/01-own/supabase-credentials.json",
+    ));
+    candidates.push(PathBuf::from(
+        "C:/work/repo-secrets/03-supabase/02-lovable/supabase-credentials.json",
+    ));
+    candidates.push(PathBuf::from(
+        "../repo-secrets/02-antigravity-and-event-manager/vault/supabase_config.json",
     ));
     candidates.push(PathBuf::from(
         "../repo-secrets/02-antigravity-manager/vault/supabase_config.json",
     ));
     candidates.push(PathBuf::from(
+        "../repo-secrets/03-supabase/01-own/supabase-credentials.json",
+    ));
+    candidates.push(PathBuf::from(
+        "../repo-secrets/03-supabase/02-lovable/supabase-credentials.json",
+    ));
+    candidates.push(PathBuf::from(
+        "../../repo-secrets/02-antigravity-and-event-manager/vault/supabase_config.json",
+    ));
+    candidates.push(PathBuf::from(
         "../../repo-secrets/02-antigravity-manager/vault/supabase_config.json",
+    ));
+    candidates.push(PathBuf::from(
+        "../../repo-secrets/03-supabase/01-own/supabase-credentials.json",
+    ));
+    candidates.push(PathBuf::from(
+        "../../repo-secrets/03-supabase/02-lovable/supabase-credentials.json",
+    ));
+    candidates.push(PathBuf::from(
+        "repo-secrets/02-antigravity-and-event-manager/vault/supabase_config.json",
     ));
     candidates.push(PathBuf::from(
         "repo-secrets/02-antigravity-manager/vault/supabase_config.json",
     ));
+    candidates.push(PathBuf::from(
+        "repo-secrets/03-supabase/01-own/supabase-credentials.json",
+    ));
+    candidates.push(PathBuf::from(
+        "repo-secrets/03-supabase/02-lovable/supabase-credentials.json",
+    ));
+    if let Some(home) = dirs::home_dir() {
+        candidates
+            .push(home.join("repo-secrets/02-antigravity-and-event-manager/vault/supabase_config.json"));
+        candidates
+            .push(home.join("repo-secrets/02-antigravity-manager/vault/supabase_config.json"));
+        candidates.push(home.join("repo-secrets/03-supabase/01-own/supabase-credentials.json"));
+        candidates.push(home.join("repo-secrets/03-supabase/02-lovable/supabase-credentials.json"));
+        candidates.push(home.join(".antigravity_tools/repo-secrets/02-antigravity-manager/vault/supabase_config.json"));
+    }
     candidates
 }
 
@@ -104,12 +161,16 @@ pub fn candidate_repo_secrets_paths() -> Vec<PathBuf> {
         if p.is_file() || p.extension().map_or(false, |ext| ext == "json") {
             candidates.push(p.clone());
         }
+        candidates.push(p.join("02-antigravity-and-event-manager/vault/supabase_config.json"));
         candidates.push(p.join("02-antigravity-manager/vault/supabase_config.json"));
         candidates.push(p.join("03-supabase/01-own/supabase-credentials.json"));
         candidates.push(p.join("03-supabase/02-lovable/supabase-credentials.json"));
         candidates.push(p.join("supabase-credentials.json"));
     }
 
+    candidates.push(PathBuf::from(
+        "D:/work/repo-secrets/02-antigravity-and-event-manager/vault/supabase_config.json",
+    ));
     candidates.push(PathBuf::from(
         "D:/work/repo-secrets/02-antigravity-manager/vault/supabase_config.json",
     ));
@@ -118,6 +179,9 @@ pub fn candidate_repo_secrets_paths() -> Vec<PathBuf> {
     ));
     candidates.push(PathBuf::from(
         "D:/work/repo-secrets/03-supabase/02-lovable/supabase-credentials.json",
+    ));
+    candidates.push(PathBuf::from(
+        "C:/work/repo-secrets/02-antigravity-and-event-manager/vault/supabase_config.json",
     ));
     candidates.push(PathBuf::from(
         "C:/work/repo-secrets/02-antigravity-manager/vault/supabase_config.json",
@@ -129,6 +193,9 @@ pub fn candidate_repo_secrets_paths() -> Vec<PathBuf> {
         "C:/work/repo-secrets/03-supabase/02-lovable/supabase-credentials.json",
     ));
     candidates.push(PathBuf::from(
+        "../repo-secrets/02-antigravity-and-event-manager/vault/supabase_config.json",
+    ));
+    candidates.push(PathBuf::from(
         "../repo-secrets/02-antigravity-manager/vault/supabase_config.json",
     ));
     candidates.push(PathBuf::from(
@@ -138,6 +205,9 @@ pub fn candidate_repo_secrets_paths() -> Vec<PathBuf> {
         "../repo-secrets/03-supabase/02-lovable/supabase-credentials.json",
     ));
     candidates.push(PathBuf::from(
+        "../../repo-secrets/02-antigravity-and-event-manager/vault/supabase_config.json",
+    ));
+    candidates.push(PathBuf::from(
         "../../repo-secrets/02-antigravity-manager/vault/supabase_config.json",
     ));
     candidates.push(PathBuf::from(
@@ -145,6 +215,9 @@ pub fn candidate_repo_secrets_paths() -> Vec<PathBuf> {
     ));
     candidates.push(PathBuf::from(
         "../../repo-secrets/03-supabase/02-lovable/supabase-credentials.json",
+    ));
+    candidates.push(PathBuf::from(
+        "repo-secrets/02-antigravity-and-event-manager/vault/supabase_config.json",
     ));
     candidates.push(PathBuf::from(
         "repo-secrets/02-antigravity-manager/vault/supabase_config.json",
@@ -158,9 +231,12 @@ pub fn candidate_repo_secrets_paths() -> Vec<PathBuf> {
 
     if let Some(home) = dirs::home_dir() {
         candidates
+            .push(home.join("repo-secrets/02-antigravity-and-event-manager/vault/supabase_config.json"));
+        candidates
             .push(home.join("repo-secrets/02-antigravity-manager/vault/supabase_config.json"));
         candidates.push(home.join("repo-secrets/03-supabase/01-own/supabase-credentials.json"));
         candidates.push(home.join("repo-secrets/03-supabase/02-lovable/supabase-credentials.json"));
+        candidates.push(home.join(".antigravity_tools/repo-secrets/02-antigravity-manager/vault/supabase_config.json"));
     }
 
     candidates

@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.153.0)
+> Professional AI Account Management & Protocol Proxy System (v4.154.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.153.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.154.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.153.0**: Introduced split restart button capsule (`[Square | RotateCcw]`) for running instances on current account, replaced circular sync icons with distinct semantic icons (`Cpu` and `ArrowLeftRight`), fixed running project & prompt detection root causes in `repo_db.rs`, resolved Rust compiler errors (`AppError`, macOS moved child process) and formatted code across all modules for 100% clean CI/CD preflight gates. (Thanks to @aukgit)
+> Latest version **v4.154.0**: Restored crisp row dividing borders across accounts table, grouped middle quota section (`4H Model Quota` & `Weekly Quota`) with subtle background styling, converted progress bars and audit badges to refined VS Code cyan/teal theme palette, implemented auto-discovery for Supabase credentials across repo-secrets, added local running sibling instance and cross-machine lease conflict guards with 30–60m email cooldown, eliminated horizontal table scrollbar at 1280px+ via combined `Profile & Account` column, truncated path locations (`...\<folder>`), normalized button radii to 5–6px, and compacted Card view to strictly 4 items per row with 2-row action capsules. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

@@ -1557,10 +1557,37 @@ pub async fn switch_account(
         &account.id,
         &account.email,
     ) {
+        let holder_info = crate::modules::workspace_lease_manager::get_remote_lease_holder_info(
+            &account.id,
+            &account.email,
+        );
+        let detail = if let Some((alias, profile, remaining)) = holder_info {
+            format!("held by remote machine '{}' (Profile: '{}', expires in {}s)", alias, profile, remaining)
+        } else {
+            "currently leased by another active machine in the cluster".to_string()
+        };
         return Err(format!(
-            "Cannot switch to account '{}': Account is currently leased by another active machine in the cluster",
-            account.email
+            "Cannot switch to account '{}': Account is {}",
+            account.email, detail
         ));
+    }
+
+    // Sibling Local Running Guard: prevent switching to accounts actively bound to running instances on the same host!
+    if let Ok(registry) = crate::modules::instance::load_registry() {
+        let bound_inst = registry
+            .instances
+            .iter()
+            .find(|i| i.bound_account_id.as_deref() == Some(&account.id));
+        if let Some(inst) = bound_inst {
+            if inst.id != "default"
+                && crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid)
+            {
+                return Err(format!(
+                    "Cannot switch to account '{}': Account is actively bound to running sibling instance '{}' on this machine",
+                    account.email, inst.name
+                ));
+            }
+        }
     }
 
     crate::modules::logger::log_info(&format!(

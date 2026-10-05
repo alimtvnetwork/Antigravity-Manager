@@ -64,9 +64,9 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             id={`account-row-${account.id}`}
             ref={rowRef}
             className={cn(
-            "group transition-all duration-200 border-b border-slate-200/80 dark:border-slate-800/80 border-l-2",
+            "group transition-all duration-200 border-b border-slate-200/90 dark:border-slate-800/90 border-l-2",
             isFocused
-                ? "bg-teal-50/90 dark:bg-[#0e2c44] text-slate-900 dark:text-cyan-300 font-bold border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/80 dark:border-slate-800/80 shadow-md ring-1 ring-cyan-500/30"
+                ? "bg-teal-50/90 dark:bg-[#0e2c44] text-slate-900 dark:text-cyan-300 font-bold border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/90 dark:border-slate-800/90 shadow-md ring-1 ring-cyan-500/30"
                 : isCurrent
                 ? "bg-blue-50/70 dark:bg-[#091b2c] border-l-blue-600 dark:border-l-amber-400 border-blue-200 dark:border-amber-400/40 font-semibold text-blue-900 dark:text-amber-300 shadow-xs ring-1 ring-blue-400/30 dark:ring-amber-400/30 hover:bg-blue-100/60 dark:hover:bg-[#0c2438]"
                 : selected
@@ -162,7 +162,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* 4H 模型配额 */}
-            <td className="px-2.5 py-1 align-middle min-w-[210px] w-1/2 bg-slate-50/40 dark:bg-slate-900/25 border-l border-slate-200/50 dark:border-slate-800/50">
+            <td className="px-2.5 py-1 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#15334d]">
                 {account.quota?.is_forbidden ? (
                     <div className="flex items-center gap-1.5 text-[10px] text-rose-600 dark:text-rose-400 bg-rose-500/10 p-1 rounded-[5px] border border-rose-400/20">
                         <Ban className="w-3 h-3 shrink-0" />
@@ -178,7 +178,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* Weekly 配额 */}
-            <td className="px-2.5 py-1 align-middle min-w-[210px] w-1/2 bg-slate-50/40 dark:bg-slate-900/25">
+            <td className="px-2.5 py-1 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#15334d]">
                 {account.quota?.is_forbidden ? (
                     <span className="text-[10px] text-gray-400 italic">--</span>
                 ) : (

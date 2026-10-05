@@ -109,13 +109,13 @@ export function renderActionBadge(item: TaskRecord) {
     } else if (code === 3 || action.toLowerCase().includes('switch')) {
         badgeClass = 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border-amber-200/50 dark:border-amber-800/50';
     } else if (code === 1 || action.toLowerCase().includes('add')) {
-        badgeClass = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200/50 dark:border-emerald-800/50';
+        badgeClass = 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300 border-cyan-200/50 dark:border-cyan-800/50';
     } else if (code === 2 || action.toLowerCase().includes('update')) {
         badgeClass = 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200/50 dark:border-blue-800/50';
     }
 
     return (
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${badgeClass}`}>
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-[5px] text-xs font-medium border ${badgeClass}`}>
             {label}
         </span>
     );
@@ -194,9 +194,9 @@ export function detailRows(detail: TaskDetail, payload: TaskPayload | null, reve
             {
                 label: 'Action Taken',
                 value: payload?.action_taken ? (
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-[5px] text-xs font-medium border ${
                         isActionPositive
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-300/70 dark:border-emerald-800'
+                            ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300 border-cyan-200/50 dark:border-cyan-800/50'
                             : 'bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300 border-blue-300/70 dark:border-blue-800'
                     }`}>
                         {payload.action_taken}
@@ -210,12 +210,12 @@ export function detailRows(detail: TaskDetail, payload: TaskPayload | null, reve
                 label: 'Idle Check',
                 value: typeof idlePassed === 'boolean' ? (
                     idlePassed ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300/70 dark:border-emerald-800">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[5px] text-xs font-medium bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300 border border-cyan-200/50 dark:border-cyan-800/50">
+                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse"></span>
                             Idle Verified (Passed)
                         </span>
                     ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300/70 dark:border-amber-800">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[5px] text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300/70 dark:border-amber-800">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                             Busy
                         </span>
@@ -653,9 +653,9 @@ export default function Audit() {
 
                                     {/* 3. Status */}
                                     <td className="px-3 py-2 whitespace-nowrap">
-                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-[5px] text-[11px] font-medium border ${
                                             /dispatch|ok|success|complete/i.test(item.status)
-                                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/60'
+                                                ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300 border-cyan-200/50 dark:border-cyan-800/50'
                                                 : /fail|err/i.test(item.status)
                                                 ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border-rose-200/60 dark:border-rose-800/60'
                                                 : 'bg-slate-100 text-slate-700 dark:bg-[#071a27] dark:text-slate-300 border-slate-200 dark:border-[#15334d]'
@@ -687,7 +687,7 @@ export default function Audit() {
                                             type="button"
                                             aria-label="Show audit detail"
                                             title="Detail"
-                                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 dark:border-[#15334d] bg-white dark:bg-[#071a27] text-slate-800 dark:text-gray-200 hover:bg-slate-100 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                                            className="inline-flex h-7 w-7 items-center justify-center rounded-[5px] border border-slate-300 dark:border-[#15334d] bg-white dark:bg-[#071a27] text-slate-800 dark:text-gray-200 hover:bg-slate-100 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 loadDetail(item.id);
