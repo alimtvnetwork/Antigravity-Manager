@@ -1,5 +1,5 @@
-pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 use crate::error::{AppError, AppResult};
+pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 use once_cell::sync::Lazy;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -672,7 +672,8 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
 
         let is_default_candidate = is_default
             && !has_instance_marker
-            && (!has_user_data_arg || (!clean_target.is_empty() && args_str.contains(clean_target)))
+            && (!has_user_data_arg
+                || (!clean_target.is_empty() && args_str.contains(clean_target)))
             && !is_helper
             && !args_str.contains(".antigravity_tools")
             && !args_str.contains("/instances/")
@@ -691,8 +692,16 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
             let exe_path = std::path::Path::new(exe);
             let has_ide_markers = if let Some(parent) = exe_path.parent() {
                 parent.join("resources").join("app.asar").exists()
-                    || parent.join("resources").join("bin").join("language_server.exe").exists()
-                    || parent.join("resources").join("bin").join("language_server").exists()
+                    || parent
+                        .join("resources")
+                        .join("bin")
+                        .join("language_server.exe")
+                        .exists()
+                    || parent
+                        .join("resources")
+                        .join("bin")
+                        .join("language_server")
+                        .exists()
                     || exe.ends_with("antigravity.exe")
                     || exe.ends_with("/antigravity")
                     || name == "antigravity.exe"

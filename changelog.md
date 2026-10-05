@@ -1,5 +1,15 @@
 # Changelog
 
+## [v4.151.0] - 2026-10-05
+
+### Fixed
+- **账号行 JSX 闭合标签对齐与前端构建修复 (AccountRow JSX Closing Tag Mismatch & Frontend Build Fix)**: 修复 `src/components/accounts/AccountRow.tsx` 首列中遗留的冗余闭合 `</div>` 标签，解决 TypeScript TS17002/TS1005 语法报错，恢复跨平台 `npm run build` 前端构建零阻断。 (Thanks to @aukgit)
+- **Rustfmt 代码格式化跨平台门禁对齐 (Rustfmt Formatting Alignment across Modules)**: 规范 `src-tauri/src/modules/instance.rs` 中模块导入字母排序（`crate::error` 与 `crate::models`）以及长条件分支折行格式，确保 Linux 与 Windows CI/CD 流水线代码格式化门禁全面绿灯通过。 (Thanks to @aukgit)
+- **默认实例主题、预设、插件与技能全量镜像同步 (Default Instance Theme, Presets, Plugins & Skills Fleet Parity)**: 在 `instance.rs` 中实现 `sync_instance_ide_parity`，将宿主 Dracula 紫色主题种子（`#BD93F9` / `#19191C`）、Turbo 自动化预设、4 个官方插件及 9 项内置技能深度同步至实例沙箱，消除从默认实例克隆时的配置脱节。 (Thanks to @aukgit)
+- **GitMap 自动化 IDE 部署与跨机器委派 (GitMap Automated IDE Fleet Deployment & Delegation)**: 在 GitMap 体系下打通 `gitmap agy deploy` 命令行套件与 `scripts/deploy-antigravity-ide-fleet.ps1`，支持一键远程向目标节点完整部署 Antigravity IDE 环境与 7 关卡质量验证评分卡。 (Thanks to @aukgit)
+
+---
+
 ## [v4.150.0] - 2026-10-05
 
 ### Added
@@ -552,6 +562,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.151.0 (2026-10-05)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.150.0 (2026-10-05)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

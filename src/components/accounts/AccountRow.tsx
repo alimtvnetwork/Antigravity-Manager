@@ -159,7 +159,6 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                             }
                         })()}
                     </div>
-                </div>
             </td>
 
             {/* 4H 模型配额 */}
