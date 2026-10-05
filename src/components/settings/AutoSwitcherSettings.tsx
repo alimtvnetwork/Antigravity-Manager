@@ -567,7 +567,14 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                                 <div className="relative mt-1">
                                     <select
                                         value={currentConfig.account_cooldown_minutes ?? 60}
-                                        onChange={(e) => onChange({ ...currentConfig, account_cooldown_minutes: Number(e.target.value) })}
+                                        onChange={(e) => {
+                                            const val = Number(e.target.value);
+                                            onChange({
+                                                ...currentConfig,
+                                                account_cooldown_minutes: val,
+                                                account_lockout_window_minutes: val,
+                                            });
+                                        }}
                                         className="w-full appearance-none px-3 py-1.5 pr-8 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-[5px] text-xs font-medium text-slate-800 dark:text-slate-200 shadow-2xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 cursor-pointer"
                                     >
                                         <option value={15}>15 Minutes</option>
@@ -583,7 +590,13 @@ export const AutoSwitcherSettings: React.FC<AutoSwitcherSettingsProps> = ({ conf
                                         <button
                                             key={mins}
                                             type="button"
-                                            onClick={() => onChange({ ...currentConfig, account_cooldown_minutes: mins })}
+                                            onClick={() =>
+                                                onChange({
+                                                    ...currentConfig,
+                                                    account_cooldown_minutes: mins,
+                                                    account_lockout_window_minutes: mins,
+                                                })
+                                            }
                                             className={`px-2 py-0.5 text-[10px] font-mono font-medium rounded-[5px] border transition-all cursor-pointer ${
                                                 (currentConfig.account_cooldown_minutes ?? 60) === mins
                                                     ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border-indigo-300 dark:border-indigo-800 shadow-xs'

@@ -119,3 +119,9 @@ pub async fn get_local_node_info() -> AppResult<LocalNodeInfo> {
         uptime_seconds: supabase_sync::get_uptime_seconds(),
     })
 }
+
+#[tauri::command]
+pub async fn auto_discover_supabase_credentials() -> AppResult<SupabaseConfig> {
+    supabase_sync::auto_discover_supabase_credentials()
+}
+

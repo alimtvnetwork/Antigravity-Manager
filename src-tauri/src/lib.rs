@@ -1146,6 +1146,7 @@ pub fn run() {
             commands::release_account_lease,
             commands::list_active_account_leases,
             commands::get_local_node_info,
+            commands::auto_discover_supabase_credentials,
             // Telegram Inbound Watcher commands
             commands::get_telegram_config,
             commands::save_telegram_config,

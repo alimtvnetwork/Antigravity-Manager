@@ -1552,6 +1552,17 @@ pub async fn switch_account(
         ));
     }
 
+    // Cross-Machine Distributed Lease Collision Guard
+    if crate::modules::workspace_lease_manager::is_account_or_email_leased_by_other(
+        &account.id,
+        &account.email,
+    ) {
+        return Err(format!(
+            "Cannot switch to account '{}': Account is currently leased by another active machine in the cluster",
+            account.email
+        ));
+    }
+
     crate::modules::logger::log_info(&format!(
         "Switching to account: {} (ID: {}) (target_ide: {:?})",
         account.email, account.id, target_ide

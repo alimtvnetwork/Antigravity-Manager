@@ -68,12 +68,31 @@ pub fn get_config_path() -> Result<PathBuf, AppError> {
 
 /// Candidate locations for auto-discovering seed Supabase configuration
 pub fn candidate_seed_config_paths() -> Vec<PathBuf> {
-    vec![
-        PathBuf::from("D:/work/repo-secrets/02-antigravity-manager/vault/supabase_config.json"),
-        PathBuf::from("D:/work/repo-secrets/vault/supabase_config.json"),
-        PathBuf::from("../repo-secrets/02-antigravity-manager/vault/supabase_config.json"),
-        PathBuf::from("../../repo-secrets/02-antigravity-manager/vault/supabase_config.json"),
-    ]
+    let mut candidates = Vec::new();
+    if let Ok(dir_str) = std::env::var("REPO_SECRETS_DIR") {
+        let p = PathBuf::from(&dir_str);
+        candidates.push(p.join("02-antigravity-manager/vault/supabase_config.json"));
+        candidates.push(p.join("vault/supabase_config.json"));
+    }
+    candidates.push(PathBuf::from(
+        "D:/work/repo-secrets/02-antigravity-manager/vault/supabase_config.json",
+    ));
+    candidates.push(PathBuf::from(
+        "D:/work/repo-secrets/vault/supabase_config.json",
+    ));
+    candidates.push(PathBuf::from(
+        "C:/work/repo-secrets/02-antigravity-manager/vault/supabase_config.json",
+    ));
+    candidates.push(PathBuf::from(
+        "../repo-secrets/02-antigravity-manager/vault/supabase_config.json",
+    ));
+    candidates.push(PathBuf::from(
+        "../../repo-secrets/02-antigravity-manager/vault/supabase_config.json",
+    ));
+    candidates.push(PathBuf::from(
+        "repo-secrets/02-antigravity-manager/vault/supabase_config.json",
+    ));
+    candidates
 }
 
 /// Candidate locations for auto-discovering repo-secrets Supabase credentials files
@@ -85,16 +104,23 @@ pub fn candidate_repo_secrets_paths() -> Vec<PathBuf> {
         if p.is_file() || p.extension().map_or(false, |ext| ext == "json") {
             candidates.push(p.clone());
         }
+        candidates.push(p.join("02-antigravity-manager/vault/supabase_config.json"));
         candidates.push(p.join("03-supabase/01-own/supabase-credentials.json"));
         candidates.push(p.join("03-supabase/02-lovable/supabase-credentials.json"));
         candidates.push(p.join("supabase-credentials.json"));
     }
 
     candidates.push(PathBuf::from(
+        "D:/work/repo-secrets/02-antigravity-manager/vault/supabase_config.json",
+    ));
+    candidates.push(PathBuf::from(
         "D:/work/repo-secrets/03-supabase/01-own/supabase-credentials.json",
     ));
     candidates.push(PathBuf::from(
         "D:/work/repo-secrets/03-supabase/02-lovable/supabase-credentials.json",
+    ));
+    candidates.push(PathBuf::from(
+        "C:/work/repo-secrets/02-antigravity-manager/vault/supabase_config.json",
     ));
     candidates.push(PathBuf::from(
         "C:/work/repo-secrets/03-supabase/01-own/supabase-credentials.json",
@@ -103,16 +129,25 @@ pub fn candidate_repo_secrets_paths() -> Vec<PathBuf> {
         "C:/work/repo-secrets/03-supabase/02-lovable/supabase-credentials.json",
     ));
     candidates.push(PathBuf::from(
+        "../repo-secrets/02-antigravity-manager/vault/supabase_config.json",
+    ));
+    candidates.push(PathBuf::from(
         "../repo-secrets/03-supabase/01-own/supabase-credentials.json",
     ));
     candidates.push(PathBuf::from(
         "../repo-secrets/03-supabase/02-lovable/supabase-credentials.json",
     ));
     candidates.push(PathBuf::from(
+        "../../repo-secrets/02-antigravity-manager/vault/supabase_config.json",
+    ));
+    candidates.push(PathBuf::from(
         "../../repo-secrets/03-supabase/01-own/supabase-credentials.json",
     ));
     candidates.push(PathBuf::from(
         "../../repo-secrets/03-supabase/02-lovable/supabase-credentials.json",
+    ));
+    candidates.push(PathBuf::from(
+        "repo-secrets/02-antigravity-manager/vault/supabase_config.json",
     ));
     candidates.push(PathBuf::from(
         "repo-secrets/03-supabase/01-own/supabase-credentials.json",
@@ -122,6 +157,7 @@ pub fn candidate_repo_secrets_paths() -> Vec<PathBuf> {
     ));
 
     if let Some(home) = dirs::home_dir() {
+        candidates.push(home.join("repo-secrets/02-antigravity-manager/vault/supabase_config.json"));
         candidates.push(home.join("repo-secrets/03-supabase/01-own/supabase-credentials.json"));
         candidates.push(home.join("repo-secrets/03-supabase/02-lovable/supabase-credentials.json"));
     }
@@ -396,6 +432,51 @@ pub fn load_config() -> Result<SupabaseConfig, AppError> {
 
     if is_new_config {
         save_config(&config)?;
+    }
+
+    Ok(config)
+}
+
+/// Auto-discover Supabase credentials from repo-secrets, normalize URLs (stripping /rest/v1), enable sync, save, and return updated config.
+pub fn auto_discover_supabase_credentials() -> crate::error::AppResult<SupabaseConfig> {
+    let mut config = load_config().unwrap_or_default();
+    let _ = auto_seed_from_repo_secrets(&mut config);
+
+    for seed_path in candidate_seed_config_paths() {
+        if seed_path.exists() {
+            if let Ok(content) = fs::read_to_string(&seed_path) {
+                let clean = content.trim_start_matches('\u{feff}');
+                let parsed = crate::modules::json_envelope::extract_payload::<SupabaseConfig>(clean)
+                    .map(|(cfg, _)| cfg)
+                    .or_else(|_| {
+                        serde_json::from_str::<SupabaseConfig>(clean).map_err(|e| e.to_string())
+                    });
+                if let Ok(seed_cfg) = parsed {
+                    for ep in seed_cfg.endpoints {
+                        let norm_url = normalize_supabase_url(&ep.url);
+                        let exists = config
+                            .endpoints
+                            .iter()
+                            .any(|e| normalize_supabase_url(&e.url) == norm_url || e.id == ep.id);
+                        if !exists {
+                            config.endpoints.push(ep);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for ep in &mut config.endpoints {
+        ep.url = normalize_supabase_url(&ep.url);
+    }
+    config.endpoints.sort_by_key(|e| e.priority);
+    config.is_sync_enabled = true;
+    save_config(&config)?;
+
+    if !config.endpoints.is_empty() {
+        start_sync_worker();
+        crate::modules::supabase_pruner::start_pruner_worker();
     }
 
     Ok(config)

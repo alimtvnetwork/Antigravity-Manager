@@ -17,8 +17,8 @@ export function WaterDrainProgressBar({
 
     // Map track gradient according to clamped percentage
     const getTrackGradient = (pct: number) => {
-        if (pct >= 75) return 'bg-gradient-to-r from-teal-500 via-cyan-500 to-sky-500';
-        if (pct >= 50) return 'bg-gradient-to-r from-teal-600 via-cyan-500 to-amber-400';
+        if (pct >= 75) return 'bg-gradient-to-r from-teal-500 via-cyan-500 to-[#38bdf8]';
+        if (pct >= 50) return 'bg-gradient-to-r from-teal-600 via-cyan-500 to-sky-400';
         if (pct >= 25) return 'bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500';
         return 'bg-gradient-to-r from-orange-500 via-rose-500 to-rose-600';
     };

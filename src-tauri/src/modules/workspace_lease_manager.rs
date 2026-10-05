@@ -167,17 +167,24 @@ pub async fn acquire_lease_with_details(
     }
 
     // Direct REST fallback check
-    let query = format!("account_id=eq.{}&select=*", account_id);
+    let query = if !email_to_use.is_empty() {
+        format!(
+            "or=(account_id.eq.{},account_email.eq.{})&select=*",
+            account_id, email_to_use
+        )
+    } else {
+        format!("account_id=eq.{}&select=*", account_id)
+    };
     let select_res = client.select("workspace_leases", &query).await;
 
     if let Ok(records) = select_res {
         if let Some(arr) = records.as_array() {
-            if let Some(first) = arr.first() {
+            for first in arr {
                 let current_owner = first.get("node_id").and_then(|v| v.as_str()).unwrap_or("");
                 let current_alias = first
                     .get("node_alias")
                     .and_then(|v| v.as_str())
-                    .unwrap_or("");
+                    .unwrap_or("another node");
                 let current_expires = first
                     .get("expires_at")
                     .and_then(|v| v.as_i64())
@@ -186,7 +193,11 @@ pub async fn acquire_lease_with_details(
                 if current_expires > now && current_owner != node_id {
                     return Ok(LeaseResult {
                         is_success: false,
-                        error_message: Some(format!("Account held by {}", current_alias)),
+                        error_message: Some(format!(
+                            "Account held by node '{}' (expires in {}s)",
+                            current_alias,
+                            current_expires - now
+                        )),
                         owner_node_id: Some(current_owner.to_string()),
                         owner_alias: Some(current_alias.to_string()),
                         expires_at: Some(current_expires),
@@ -291,8 +302,18 @@ pub fn is_account_or_email_leased_by_other(account_id: &str, email: &str) -> boo
         .unwrap_or(60);
     let stale_timeout_secs = (stale_hours as i64) * 3600;
     let lockout_window_secs = (cooldown_minutes as i64) * 60;
-    let email_clean = email.trim().to_lowercase();
     let acc_id_clean = account_id.trim();
+    let resolved_email = if !email.trim().is_empty() {
+        email.trim().to_lowercase()
+    } else if !acc_id_clean.is_empty() {
+        crate::modules::account::load_account(acc_id_clean)
+            .map(|a| a.email.trim().to_lowercase())
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+    let email_clean = resolved_email.as_str();
+
     if let Ok(cache) = ACTIVE_REMOTE_LEASES.read() {
         for (k, lease) in cache.iter() {
             let is_match_id = !acc_id_clean.is_empty()
@@ -326,8 +347,18 @@ pub fn is_account_or_email_leased_by_other(account_id: &str, email: &str) -> boo
 
 /// Find any cached workspace lease matching account ID or email (case-insensitive)
 pub fn find_cached_lease(account_id: &str, email: &str) -> Option<WorkspaceLease> {
-    let email_clean = email.trim().to_lowercase();
     let acc_id_clean = account_id.trim();
+    let resolved_email = if !email.trim().is_empty() {
+        email.trim().to_lowercase()
+    } else if !acc_id_clean.is_empty() {
+        crate::modules::account::load_account(acc_id_clean)
+            .map(|a| a.email.trim().to_lowercase())
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+    let email_clean = resolved_email.as_str();
+
     if let Ok(cache) = ACTIVE_REMOTE_LEASES.read() {
         for (k, lease) in cache.iter() {
             let is_match_id = !acc_id_clean.is_empty()

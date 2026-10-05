@@ -241,8 +241,8 @@ const LogTable: React.FC<LogTableProps> = ({
                                 </span>
                             </td>
                             <td className="font-bold text-gray-900 dark:text-white py-2 px-3 truncate" style={{ width: `${colWidths.method}px`, maxWidth: `${colWidths.method}px` }}>{log.method}</td>
-                            <td 
-                                className="text-sky-600 dark:text-sky-400 font-semibold truncate py-2 px-3" 
+                            <td
+                                className="text-sky-600 dark:text-sky-400 font-semibold truncate py-2 px-3"
                                 style={{ width: `${colWidths.model}px`, maxWidth: `${colWidths.model}px` }}
                                 title={log.mapped_model && log.model !== log.mapped_model ? `${log.model} => ${log.mapped_model}` : (log.model || '')}
                             >

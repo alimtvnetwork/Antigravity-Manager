@@ -425,7 +425,7 @@ export function OpenClawSyncModal({ apiKey, getFormattedProxyUrl, onClose, onSyn
                     <button type="button" className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-base-300 transition-colors" onClick={onClose}>
                         {t('common.cancel', { defaultValue: '取消' })}
                     </button>
-                    
+
                     <div className="flex items-center gap-2">
                         {/* 按钮 1: < 2026.8.1 (v1.0) 同步 */}
                         <button

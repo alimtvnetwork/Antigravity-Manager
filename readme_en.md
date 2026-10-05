@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.149.0)
+> Professional AI Account Management & Protocol Proxy System (v4.150.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.149.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.150.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.148.0**: Fixed an integration test async invocation error (`() is not a future`, E0277) in `tests/per_instance_prompt_liveness_test.rs` identified by `gitmap pe`, ensuring seamless test target compilation and validation across Linux, macOS, and Windows CI gates. (Thanks to @aukgit)
+> Latest version **v4.150.0**: Overhauled Accounts table row borders & quota section visual grouping, migrated quota progress bars and audit badges from neon green to a refined VS Code cyan/teal palette, integrated Supabase repo-secrets auto-discovery, added cross-machine lease collision guards with a configurable 30–60m email cooldown window, compacted Instances table to 5 columns with zero horizontal scroll, normalized button corner radii to 5–6px, enhanced "Rotate to Next Best" with a dynamic candidate tooltip, and enforced a strict 4-column card grid with structured 2-row action toolbars. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

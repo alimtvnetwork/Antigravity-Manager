@@ -278,7 +278,7 @@ function SortableAccountRow({
             )}
         >
             {/* 拖拽手柄 */}
-            <td className="pl-2 py-0.5 w-7 align-middle">
+            <td className="pl-2 py-0.5 w-7 align-middle border-b border-slate-200/80 dark:border-slate-800/80">
                 <div
                     {...(!isDragDisabled ? attributes : {})}
                     {...(!isDragDisabled ? listeners : {})}
@@ -294,7 +294,7 @@ function SortableAccountRow({
                 </div>
             </td>
             {/* 复选框 */}
-            <td className="px-1.5 py-0.5 w-8 align-middle">
+            <td className="px-1.5 py-0.5 w-8 align-middle border-b border-slate-200/80 dark:border-slate-800/80">
                 <input
                     type="checkbox"
                     className="checkbox checkbox-xs rounded border-2 border-gray-400 dark:border-gray-500 checked:border-blue-600 checked:bg-blue-600 [--chkbg:theme(colors.blue.600)] [--chkfg:white]"
@@ -532,7 +532,7 @@ function AccountRowContent({
         <>
             {/* 邮箱列 */}
             <td
-                className="px-2 py-0.5 align-middle"
+                className="px-2 py-0.5 align-middle border-b border-slate-200/80 dark:border-slate-800/80"
                 onMouseLeave={() => setIsHoverUnmasked(false)}
             >
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -716,7 +716,7 @@ function AccountRowContent({
             </td>
 
             {/* 4H 模型配额列 */}
-            <td className="px-2.5 py-1 align-middle min-w-[210px] bg-slate-50/40 dark:bg-slate-900/25 border-l border-slate-200/50 dark:border-slate-800/50">
+            <td className="px-2.5 py-1 align-middle min-w-[210px] bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-200/60 dark:border-[#15334d]/50 border-b border-slate-200/80 dark:border-slate-800/80">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <div className={cn(
                         "flex items-center justify-center gap-1.5 py-0.5 px-2 rounded-md border group/error",
@@ -756,7 +756,7 @@ function AccountRowContent({
             </td>
 
             {/* Weekly 配额列 */}
-            <td className="px-2.5 py-1 align-middle min-w-[210px] bg-slate-50/40 dark:bg-slate-900/25">
+            <td className="px-2.5 py-1 align-middle min-w-[210px] bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-200/60 dark:border-[#15334d]/50 border-b border-slate-200/80 dark:border-slate-800/80">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <span className="text-[10px] text-gray-400 italic">--</span>
                 ) : (
@@ -769,7 +769,7 @@ function AccountRowContent({
             </td>
 
             {/* 最后使用时间列 (紧凑展示，95px) */}
-            <td className="px-2 py-0.5 align-middle whitespace-nowrap w-[95px]">
+            <td className="px-2.5 py-0.5 align-middle whitespace-nowrap w-[95px] border-b border-slate-200/80 dark:border-slate-800/80">
                 <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400 font-mono" title={formatDateTime(account.last_used)}>
                     {formatDateTimeShort(account.last_used)}
                 </span>
@@ -860,7 +860,7 @@ function AccountRowContent({
                     {showMoreMenu && moreMenuPos && createPortal(
                         <div
                             ref={moreMenuRef}
-                            className="fixed z-[10000] min-w-[168px] rounded-lg border border-gray-200 bg-white py-1 text-slate-950 shadow-xl"
+                            className="fixed z-[10000] min-w-[168px] rounded-[5px] border border-gray-200 bg-white py-1 text-slate-950 shadow-xl"
                             style={{ top: moreMenuPos.top, left: moreMenuPos.left, transform: 'translateX(-100%)' }}
                             onClick={(event) => event.stopPropagation()}
                         >
@@ -1145,7 +1145,7 @@ function AccountTable({
                             </th>
                             <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[260px] whitespace-nowrap">{t('accounts.table.email')}</th>
                             {/* Column 1: 4H Quota with Gemini Icon and Model Toggle */}
-                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[220px] whitespace-nowrap">
+                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[220px] whitespace-nowrap bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-200/60 dark:border-[#15334d]/50">
                                 <div className="flex items-center justify-between gap-1 w-full">
                                     <button
                                         type="button"
@@ -1198,7 +1198,7 @@ function AccountTable({
                             </th>
 
                             {/* Column 2: Weekly Quota Column */}
-                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[220px] whitespace-nowrap">
+                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[220px] whitespace-nowrap bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-200/60 dark:border-[#15334d]/50">
                                 <div className="flex items-center gap-1.5">
                                     <Clock className="w-3.5 h-3.5 text-gray-400" />
                                     <span>{t('accounts.table.weekly_quota', 'Weekly Quota')}</span>

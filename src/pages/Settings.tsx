@@ -46,7 +46,7 @@ function Settings() {
     const { config, loadConfig, saveConfig, updateLanguage, updateTheme } = useConfigStore();
     const { enable, disable, isEnabled, open: openDebugModal } = useDebugConsole();
     const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'email' | 'themes' | 'supabase' | 'advanced' | 'debug' | 'about'>('general');
-    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.149.0');
+    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.150.0');
     const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
     const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
     const [formData, setFormData] = useState<AppConfig>({
@@ -1294,9 +1294,15 @@ function Settings() {
                                 <AutoSwitcherSettings
                                     config={formData.auto_profile_switcher}
                                     onChange={async (newConfig) => {
+                                        const mins = newConfig.account_cooldown_minutes ?? newConfig.account_lockout_window_minutes ?? 60;
+                                        const syncedConfig = {
+                                            ...newConfig,
+                                            account_cooldown_minutes: mins,
+                                            account_lockout_window_minutes: mins,
+                                        };
                                         const newFormData = {
                                             ...formData,
-                                            auto_profile_switcher: newConfig
+                                            auto_profile_switcher: syncedConfig
                                         };
                                         setFormData(newFormData);
                                         try {
@@ -1317,33 +1323,73 @@ function Settings() {
                                             {t('settings.auto_switcher.account_lockout_window_desc', 'Duration an account remains temporarily locked out after quota exhaustion or rate limits before re-evaluation.')}
                                         </p>
                                     </div>
-                                    <div className="relative shrink-0">
-                                        <select
-                                            value={(formData.auto_profile_switcher as any)?.account_lockout_window_minutes ?? 60}
-                                            onChange={async (e) => {
-                                                const minutes = Number(e.target.value);
-                                                const newConfig = {
-                                                    ...(formData.auto_profile_switcher || {}),
-                                                    account_lockout_window_minutes: minutes,
-                                                };
-                                                const newFormData = {
-                                                    ...formData,
-                                                    auto_profile_switcher: newConfig as any,
-                                                };
-                                                setFormData(newFormData);
-                                                try {
-                                                    await saveConfig(newFormData);
-                                                } catch (error) {
-                                                    showToast(`${t('common.error')}: ${error}`, 'error');
-                                                }
-                                            }}
-                                            className="appearance-none px-3 py-1.5 pr-8 bg-slate-50 dark:bg-[#0c2438] border border-slate-200 dark:border-[#15334d] rounded-md text-xs font-medium text-slate-800 dark:text-slate-200 shadow-2xs focus:outline-none focus:ring-1 focus:ring-blue-500/40 cursor-pointer"
-                                        >
-                                            <option value={30}>{t('settings.auto_switcher.lockout_30m', '30 minutes')}</option>
-                                            <option value={60}>{t('settings.auto_switcher.lockout_60m', '60 minutes (Default)')}</option>
-                                            <option value={120}>{t('settings.auto_switcher.lockout_120m', '120 minutes')}</option>
-                                        </select>
-                                        <ChevronDown className="w-3.5 h-3.5 text-slate-400 pointer-events-none absolute right-2.5 top-2.5" />
+                                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                        <div className="relative">
+                                            <select
+                                                value={(formData.auto_profile_switcher as any)?.account_cooldown_minutes ?? (formData.auto_profile_switcher as any)?.account_lockout_window_minutes ?? 60}
+                                                onChange={async (e) => {
+                                                    const minutes = Number(e.target.value);
+                                                    const newConfig = {
+                                                        ...(formData.auto_profile_switcher || {}),
+                                                        account_lockout_window_minutes: minutes,
+                                                        account_cooldown_minutes: minutes,
+                                                    };
+                                                    const newFormData = {
+                                                        ...formData,
+                                                        auto_profile_switcher: newConfig as any,
+                                                    };
+                                                    setFormData(newFormData);
+                                                    try {
+                                                        await saveConfig(newFormData);
+                                                    } catch (error) {
+                                                        showToast(`${t('common.error')}: ${error}`, 'error');
+                                                    }
+                                                }}
+                                                className="appearance-none px-3 py-1.5 pr-8 bg-slate-50 dark:bg-[#0c2438] border border-slate-200 dark:border-[#15334d] rounded-[5px] text-xs font-medium text-slate-800 dark:text-slate-200 shadow-2xs focus:outline-none focus:ring-1 focus:ring-blue-500/40 cursor-pointer"
+                                            >
+                                                <option value={15}>{t('settings.auto_switcher.lockout_15m', '15 minutes')}</option>
+                                                <option value={30}>{t('settings.auto_switcher.lockout_30m', '30 minutes')}</option>
+                                                <option value={45}>{t('settings.auto_switcher.lockout_45m', '45 minutes')}</option>
+                                                <option value={60}>{t('settings.auto_switcher.lockout_60m', '60 minutes (Default)')}</option>
+                                                <option value={120}>{t('settings.auto_switcher.lockout_120m', '120 minutes')}</option>
+                                            </select>
+                                            <ChevronDown className="w-3.5 h-3.5 text-slate-400 pointer-events-none absolute right-2.5 top-2.5" />
+                                        </div>
+                                        <div className="flex gap-1 flex-wrap">
+                                            {[15, 30, 45, 60, 120].map((mins) => {
+                                                const currentMins = (formData.auto_profile_switcher as any)?.account_cooldown_minutes ?? (formData.auto_profile_switcher as any)?.account_lockout_window_minutes ?? 60;
+                                                return (
+                                                    <button
+                                                        key={mins}
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            const newConfig = {
+                                                                ...(formData.auto_profile_switcher || {}),
+                                                                account_lockout_window_minutes: mins,
+                                                                account_cooldown_minutes: mins,
+                                                            };
+                                                            const newFormData = {
+                                                                ...formData,
+                                                                auto_profile_switcher: newConfig as any,
+                                                            };
+                                                            setFormData(newFormData);
+                                                            try {
+                                                                await saveConfig(newFormData);
+                                                            } catch (error) {
+                                                                showToast(`${t('common.error')}: ${error}`, 'error');
+                                                            }
+                                                        }}
+                                                        className={`px-1.5 py-0.5 text-[10px] font-mono font-medium rounded-[5px] border transition-all cursor-pointer ${
+                                                            currentMins === mins
+                                                                ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border-indigo-300 dark:border-indigo-800 shadow-xs'
+                                                                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                                                        }`}
+                                                    >
+                                                        {mins}m
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 </div>
                             </div>

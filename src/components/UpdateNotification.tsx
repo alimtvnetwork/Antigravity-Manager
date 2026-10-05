@@ -341,4 +341,3 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
     </div>
   );
 };
-

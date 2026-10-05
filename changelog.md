@@ -1,5 +1,21 @@
 # Changelog
 
+## [v4.150.0] - 2026-10-05
+
+### Added
+- **账号表格行边框恢复与中段配额视觉分组 (Accounts Table Row Borders & Quota Section Grouping)**: 恢复账号表格各行底部清晰边框线条（`border-b border-slate-200/80 dark:border-slate-800/80`），并在表头与表体中为中段核心配额列（4H 模型配额与每周配额）赋予微妙背景底色与纵向分隔边框（`bg-slate-50/50 dark:bg-slate-900/40 border-x border-slate-200/60 dark:border-[#15334d]/50`），使账号数据行次分明、配额区域聚合聚焦。 (Thanks to @aukgit)
+- **Supabase 密钥仓库自动探测与一键导入 (Supabase Repo-Secrets Auto-Discovery & 1-Click Sync)**: 在 `supabase_sync.rs` 中全面打通 `repo-secrets` 凭据探测路径（优先检索 `D:/work/repo-secrets/02-antigravity-manager/vault/supabase_config.json` 与 `03-supabase/` 凭据封套），自动解密与清洗 URL，并在设置界面新增“Auto-Discover from Repo Secrets”一键导入按钮与 Tauri IPC 命令，免除用户手动输入凭据繁琐流程。 (Thanks to @aukgit)
+- **跨机器/跨实例账号租约冲突拦截与 30-60 分钟冷却期 (Cross-Machine Lease Collision Guard & 30–60m Cooldown Window)**: 在账号切换执行入口（`switch_account` 与 `switch_account_to_instance`）注入前置互斥门禁，在分发凭据前调用 `is_account_or_email_leased_by_other` 严格校验目标账号是否正被其他实例或外部机器占用；在候选人评分算法中对近期 30–60 分钟内使用过的邮箱建立冷却隔离池，优先选择非冷却健康账号并在全冷却时平滑回退，设置项与快速胶囊同步联动。 (Thanks to @aukgit)
+- **“Rotate to Next Best”候选人悬浮提示与操作填充 (Rotate to Next Best Candidate Tooltip & Visual Feedback)**: 优化“Rotate to Next Best”按钮内边距（`px-3.5 py-1.5`），动态计算智能候选人队列并在悬浮气泡中完整展示目标实例名称、拟切换账号邮箱、订阅层级以及 4H 配额健康百分比，按钮内部直观呈现候选目标微标，消除盲切困惑。 (Thanks to @aukgit)
+
+### Changed
+- **账号配额与进度条 VS Code 青色/青绿色调重构 (VS Code Cyan/Teal Palette for Accounts Quotas & Progress Bars)**: 废除账号界面中过分刺眼的荧光绿高亮，全面重构 `QuotaProgressBar`、`WaterDrainProgressBar` 及审计微标色彩体系，切换为舒适自然的 VS Code 标志性青色/青蓝渐变调（$\ge 75\%$ 采用 `from-teal-500 via-cyan-500 to-[#38bdf8]`，$\ge 50\%$ 采用 `from-teal-600 via-cyan-500 to-sky-400`，100% 节点采用青色光晕），降低视觉疲劳。 (Thanks to @aukgit)
+- **实例表格紧凑化、合并列、路径截断与提示词动作收纳 (Instances Table Zero-Scroll Compaction, Combined Profile/Email & Action Dropdown)**: 彻底消除实例表格横向滚动条，精简为 5 列标准视口布局：将实例配置名称与关联邮箱合二为一显示，数据目录路径智能截断仅展示末级文件夹（前缀 `...`，支持悬浮完整路径与一键复制）；将线性铺开的 9 按钮动作条精简为 3 个主生命周期操作，提示词树（Prompts Tree）、审计流水、目录同步等收纳至“More”悬浮气泡。 (Thanks to @aukgit)
+- **按钮 5–6px 圆角规范化 (Universal 5–6px Button Radius Normalization)**: 全面重构实例界面、弹窗表单及设置工具栏中过于臃肿的药丸圆角，严格规范所有主操作按钮、模态框交互按钮为 5–6px（`rounded-[5px]`），呈现工业级精致质感。 (Thanks to @aukgit)
+- **实例卡片模式严格 4 列紧凑网格与双行操作按钮布局 (Card Mode Strict 4-Column Grid & Structured 2-Row Action Toolbars)**: 约束卡片视图桌面端最大列数为 4 列（`xl:grid-cols-4`），杜绝 5/6 列挤压导致的卡片扭曲；卡片底部按“主操作胶囊（Row 1）+ 辅助工具胶囊（Row 2）”整齐排列，紧凑密度下自动折叠冗长项目列表，保持卡片高度统一整洁。 (Thanks to @aukgit)
+
+---
+
 ## [v4.149.0] - 2026-10-05
 
 ### Added
@@ -536,6 +552,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.150.0 (2026-10-05)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.149.0 (2026-10-05)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
     Laptop,
     Play,
@@ -33,6 +33,7 @@ import {
     Check,
     FolderSync,
     Sliders,
+    MoreHorizontal,
 } from 'lucide-react';
 import { Gemini } from '@lobehub/icons';
 import { useTranslation } from 'react-i18next';
@@ -45,6 +46,7 @@ import {
     setInstanceCardDensity,
     getAutoSwitcherDaemonStatus,
     type AutoSwitcherDaemonStatus,
+    rankSmartCandidates,
 } from '../services/instanceService';
 import { invoke } from '@tauri-apps/api/core';
 import { InstanceSettingsModal } from '../components/instances/InstanceSettingsModal';
@@ -60,11 +62,11 @@ import { QuotaProgressBar } from '../components/accounts/QuotaProgressBar';
 
 function truncatePath(fullPath?: string | null): string {
     if (!fullPath) return '';
-    const isWindows = fullPath.includes('\\') || !fullPath.includes('/');
-    const parts = fullPath.split(/[\\/]/).filter(Boolean);
-    if (parts.length <= 2) return fullPath;
+    const isWindows = fullPath.includes('\\') || /^[a-zA-Z]:/.test(fullPath);
     const sep = isWindows ? '\\' : '/';
-    return `...${sep}${parts.slice(-2).join(sep)}`;
+    const parts = fullPath.split(/[\\/]/).filter(Boolean);
+    if (parts.length <= 1) return fullPath;
+    return `...${sep}${parts[parts.length - 1]}`;
 }
 
 function getActionLabel(action: InstanceActionType): string {
@@ -369,6 +371,13 @@ export default function Instances() {
     });
     const [cardDensity, setCardDensity] = useState<'normal' | 'compact'>(() => getInstanceCardDensity());
     const [promptTreeInstance, setPromptTreeInstance] = useState<{ id: string; name: string; projectId?: string } | null>(null);
+    const [cardMoreId, setCardMoreId] = useState<string | null>(null);
+
+    useEffect(() => {
+        const handleClickOutside = () => setCardMoreId(null);
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const handleSetViewMode = (mode: 'card' | 'list') => {
         setViewMode(mode);
@@ -869,7 +878,10 @@ export default function Instances() {
                     </div>
                     {(() => {
                         const activeInstance = instances.find(i => i.config.id === (activeInstanceId || 'default')) || instances.find(i => i.config.is_default) || instances[0];
-                        const rotateTooltip = `Rotates active instance (${activeInstance?.config.name || 'current'}) to the highest health candidate`;
+                        const inUseAccountIds = instances.map(i => i.config.bound_account_id).filter(Boolean) as string[];
+                        const rankedCandidates = rankSmartCandidates(accounts, inUseAccountIds, activeInstance?.config.bound_account_id);
+                        const nextBestCandidate = rankedCandidates[0]?.account || null;
+                        const rotateTooltip = `Target: ${activeInstance?.config.name || 'Current'} → Next Best: ${nextBestCandidate ? `${nextBestCandidate.email} (${nextBestCandidate.quota?.subscription_tier || 'PRO'} · 4H: ${nextBestCandidate.quota?.models?.[0]?.percentage ?? 100}%)` : 'No idle candidate available'}`;
                         return (
                             <button
                                 onClick={async () => {
@@ -880,11 +892,16 @@ export default function Instances() {
                                         setActionError(e?.toString() || 'Rotation failed');
                                     }
                                 }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-[5px] bg-blue-600 hover:bg-blue-500 text-white shadow-xs cursor-pointer transition-colors active:scale-95 shrink-0"
+                                className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-[5px] bg-blue-600 hover:bg-blue-500 text-white shadow-xs cursor-pointer transition-colors active:scale-95 shrink-0"
                                 title={rotateTooltip}
                             >
                                 <RotateCcw className="w-3.5 h-3.5" />
                                 <span>{t('instances.rotate_next_best', 'Rotate to Next Best')}</span>
+                                {nextBestCandidate && (
+                                    <span className="px-1.5 py-0.5 rounded-[4px] bg-blue-500/30 text-[10px] font-mono font-normal max-w-[110px] truncate">
+                                        {nextBestCandidate.email.split('@')[0]}
+                                    </span>
+                                )}
                             </button>
                         );
                     })()}
@@ -1016,7 +1033,7 @@ export default function Instances() {
 
                 <div className={cn(
                     cardDensity === 'compact'
-                        ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2"
+                        ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2"
                         : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"
                 )}>
                     {filteredInstances.map((inst, index) => {
@@ -1402,8 +1419,8 @@ export default function Instances() {
                                             ) : null}
                                         </div>
 
-                                        {/* Active / Recent Projects Section */}
-                                        {(() => {
+                                        {/* Active / Recent Projects Section (hidden in compact density) */}
+                                        {cardDensity !== 'compact' && (() => {
                                             const instanceProjects = projectTreeNodes.filter((node) => isNodeOwnedByInstance(node, inst.config));
 
                                             const sortedProjects = [...instanceProjects].sort((a, b) => {
@@ -1486,20 +1503,20 @@ export default function Instances() {
 
                                     {/* Card Actions Toolbar: 2 clean structured rows with 5-6px radius */}
                                     <div className="pt-2.5 border-t border-gray-100 dark:border-[#15334d]/80 mt-2 space-y-1.5">
-                                        {/* Row 1: Stop/Launch, Switch, Fast-Forward, Audit, Sync */}
-                                        <div className="flex items-center gap-1 w-full">
+                                        {/* Row 1: Primary Actions (Launch/Stop, Switch Account, Fast-Forward, Sync PID) */}
+                                        <div className="grid grid-cols-4 gap-1 w-full">
                                             {inst.is_running ? (
                                                 <button
                                                     type="button"
                                                     disabled={isBusy}
                                                     onClick={() => handleStop(inst.config.id)}
-                                                    className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="flex items-center justify-center text-xs p-1.5 rounded-[5px] bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                     title="Stop Instance"
                                                 >
                                                     {currentAction === 'stop' ? (
-                                                        <RotateCw className="w-3 h-3 animate-spin text-rose-500" />
+                                                        <RotateCw className="w-3.5 h-3.5 animate-spin text-rose-500" />
                                                     ) : (
-                                                        <Square className="w-3 h-3 fill-current" />
+                                                        <Square className="w-3.5 h-3.5 fill-current" />
                                                     )}
                                                 </button>
                                             ) : (
@@ -1507,13 +1524,13 @@ export default function Instances() {
                                                     type="button"
                                                     disabled={isBusy}
                                                     onClick={() => handleLaunch(inst.config.id)}
-                                                    className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="flex items-center justify-center text-xs p-1.5 rounded-[5px] bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-900/50 hover:bg-teal-100 dark:hover:bg-teal-900/40 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                     title="Launch Instance"
                                                 >
                                                     {currentAction === 'launch' ? (
-                                                        <RotateCw className="w-3 h-3 animate-spin text-emerald-500" />
+                                                        <RotateCw className="w-3.5 h-3.5 animate-spin text-teal-500" />
                                                     ) : (
-                                                        <Play className="w-3 h-3 fill-current" />
+                                                        <Play className="w-3.5 h-3.5 fill-current" />
                                                     )}
                                                 </button>
                                             )}
@@ -1522,13 +1539,13 @@ export default function Instances() {
                                                 type="button"
                                                 disabled={isBusy}
                                                 onClick={() => setSwitchTargetInstance(inst)}
-                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex items-center justify-center text-xs p-1.5 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-sky-600 dark:text-sky-400 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Switch Account"
                                             >
                                                 {currentAction === 'switch' ? (
-                                                    <RotateCw className="w-3 h-3 animate-spin text-slate-500" />
+                                                    <RotateCw className="w-3.5 h-3.5 animate-spin text-sky-500" />
                                                 ) : (
-                                                    <ArrowRightLeft className="w-3 h-3" />
+                                                    <ArrowRightLeft className="w-3.5 h-3.5" />
                                                 )}
                                             </button>
 
@@ -1536,58 +1553,43 @@ export default function Instances() {
                                                 type="button"
                                                 disabled={isBusy}
                                                 onClick={() => handleFastForward(inst.config.id)}
-                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex items-center justify-center text-xs p-1.5 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-amber-600 dark:text-amber-400 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Fast Forward to Next Best"
                                             >
                                                 {currentAction === 'fast-forward' ? (
-                                                    <RotateCw className="w-3 h-3 animate-spin text-slate-500" />
+                                                    <RotateCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
                                                 ) : (
-                                                    <FastForward className="w-3 h-3" />
+                                                    <FastForward className="w-3.5 h-3.5" />
                                                 )}
-                                            </button>
-
-                                            {/* Softened Audit Button (VS Code slate theme) */}
-                                            <button
-                                                type="button"
-                                                disabled={isBusy}
-                                                onClick={() => setAuditModalInstance({
-                                                    id: inst.config.id,
-                                                    name: inst.config.name,
-                                                    sequence_name: inst.config.seq_num ? `Instance #${inst.config.seq_num}` : undefined
-                                                })}
-                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                                title="Audit Trail"
-                                            >
-                                                <History className="w-3 h-3" />
                                             </button>
 
                                             <button
                                                 type="button"
                                                 disabled={isBusy || Boolean(syncingInstanceIds[inst.config.id])}
                                                 onClick={() => handleSync(inst.config.id)}
-                                                className="flex-1 flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-teal-600 dark:text-teal-400 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex items-center justify-center text-xs p-1.5 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-teal-600 dark:text-teal-400 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Sync PID and Quota"
                                             >
-                                                <RotateCw className={cn("w-3 h-3 text-teal-500", (currentAction === 'sync' || syncingInstanceIds[inst.config.id]) && "animate-spin")} />
+                                                <RotateCw className={cn("w-3.5 h-3.5 text-teal-500", (currentAction === 'sync' || syncingInstanceIds[inst.config.id]) && "animate-spin")} />
                                             </button>
                                         </div>
 
-                                        {/* Row 2: Prompts, Settings, Clone, Executable, Wipe, Delete */}
-                                        <div className="grid grid-cols-6 gap-1 w-full">
+                                        {/* Row 2: Secondary Actions (Prompts, Settings, Clone Profile, Audit, More Popover) */}
+                                        <div className="grid grid-cols-5 gap-1 w-full relative">
                                             {/* Slot 1: Prompts */}
                                             <button
                                                 type="button"
                                                 disabled={isBusy}
                                                 onClick={() => setPromptTreeInstance({ id: inst.config.id, name: inst.config.name })}
                                                 className={cn(
-                                                    "w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] border transition-colors cursor-pointer relative disabled:opacity-50 disabled:cursor-not-allowed",
+                                                    "flex items-center justify-center text-xs p-1.5 rounded-[5px] border transition-colors cursor-pointer relative disabled:opacity-50 disabled:cursor-not-allowed",
                                                     hasActiveTask
                                                         ? "bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-300 border-cyan-400/50 hover:bg-cyan-100 dark:hover:bg-cyan-900/50"
                                                         : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700"
                                                 )}
                                                 title={hasActiveTask ? "Prompt Tree (Active Task Running)" : "Prompt Tree"}
                                             >
-                                                <Layers className="w-3 h-3" />
+                                                <Layers className="w-3.5 h-3.5" />
                                                 {hasActiveTask && (
                                                     <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
                                                 )}
@@ -1601,10 +1603,10 @@ export default function Instances() {
                                                     setSettingsModalTarget(inst);
                                                     setIsSettingsModalOpen(true);
                                                 }}
-                                                className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex items-center justify-center text-xs p-1.5 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Settings & Sync"
                                             >
-                                                <SlidersHorizontal className="w-3 h-3" />
+                                                <SlidersHorizontal className="w-3.5 h-3.5" />
                                             </button>
 
                                             {/* Slot 3: Clone Profile */}
@@ -1616,56 +1618,94 @@ export default function Instances() {
                                                     setCopyInstanceName(`${inst.config.name} Copy`);
                                                     setCopyProjects(true);
                                                 }}
-                                                className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex items-center justify-center text-xs p-1.5 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Clone Profile"
                                             >
-                                                <Copy className="w-3 h-3" />
+                                                <Copy className="w-3.5 h-3.5" />
                                             </button>
 
-                                            {/* Slot 4: Clone Binary / Executable */}
+                                            {/* Slot 4: Audit Trail */}
                                             <button
                                                 type="button"
                                                 disabled={isBusy}
-                                                onClick={() => handleCloneExecutable(inst.config.id)}
-                                                className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                                title="Clone Binary / Executable"
+                                                onClick={() => setAuditModalInstance({
+                                                    id: inst.config.id,
+                                                    name: inst.config.name,
+                                                    sequence_name: inst.config.seq_num ? `Instance #${inst.config.seq_num}` : undefined
+                                                })}
+                                                className="flex items-center justify-center text-xs p-1.5 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-amber-500 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                title="Audit Trail"
                                             >
-                                                <Cpu className="w-3 h-3" />
+                                                <History className="w-3.5 h-3.5" />
                                             </button>
 
-                                            {/* Slot 5: Wipe Credentials */}
-                                            <button
-                                                type="button"
-                                                onClick={() => handleWipeSession(inst.config.id)}
-                                                disabled={inst.is_running || isBusy}
-                                                className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                                                title="Wipe Credentials"
-                                            >
-                                                {currentAction === 'wipe' ? (
-                                                    <RotateCw className="w-3 h-3 animate-spin text-amber-500" />
-                                                ) : (
-                                                    <RotateCcw className="w-3 h-3" />
-                                                )}
-                                            </button>
-
-                                            {/* Slot 6: Delete Profile (or invisible placeholder for default) */}
-                                            {!inst.config.is_default ? (
+                                            {/* Slot 5: More Popover Trigger */}
+                                            <div className="relative">
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleDelete(inst.config.id)}
-                                                    disabled={inst.is_running || isBusy || deletingId === inst.config.id}
-                                                    className="w-full flex items-center justify-center text-xs px-2 py-1 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                                                    title="Delete Profile"
-                                                >
-                                                    {currentAction === 'delete' ? (
-                                                        <RotateCw className="w-3 h-3 animate-spin text-rose-500" />
-                                                    ) : (
-                                                        <Trash2 className="w-3 h-3" />
+                                                    disabled={isBusy}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setCardMoreId(cardMoreId === inst.config.id ? null : inst.config.id);
+                                                    }}
+                                                    className={cn(
+                                                        "w-full h-full flex items-center justify-center text-xs p-1.5 rounded-[5px] border border-slate-300 dark:border-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+                                                        cardMoreId === inst.config.id
+                                                            ? "bg-slate-200 dark:bg-[#15334d] text-slate-900 dark:text-white"
+                                                            : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
                                                     )}
+                                                    title="More Actions (Clone Executable, Wipe, Delete)"
+                                                >
+                                                    <MoreHorizontal className="w-3.5 h-3.5" />
                                                 </button>
-                                            ) : (
-                                                <div className="w-full invisible" aria-hidden="true" />
-                                            )}
+
+                                                {/* More Popover Dropdown */}
+                                                {cardMoreId === inst.config.id && (
+                                                    <div
+                                                        className="absolute right-0 bottom-full mb-1 z-30 min-w-[170px] rounded-[5px] border border-slate-200 dark:border-[#15334d] bg-white dark:bg-[#0c2438] py-1 text-slate-800 dark:text-slate-200 shadow-xl text-xs"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            disabled={isBusy}
+                                                            onClick={() => {
+                                                                setCardMoreId(null);
+                                                                handleCloneExecutable(inst.config.id);
+                                                            }}
+                                                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#15334d] text-purple-600 dark:text-purple-400 cursor-pointer disabled:opacity-50"
+                                                        >
+                                                            <Cpu className="w-3.5 h-3.5" />
+                                                            <span>Clone Executable</span>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            disabled={inst.is_running || isBusy}
+                                                            onClick={() => {
+                                                                setCardMoreId(null);
+                                                                handleWipeSession(inst.config.id);
+                                                            }}
+                                                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#15334d] text-amber-600 dark:text-amber-400 cursor-pointer disabled:opacity-40"
+                                                        >
+                                                            <RotateCcw className="w-3.5 h-3.5" />
+                                                            <span>Wipe Credentials</span>
+                                                        </button>
+                                                        {!inst.config.is_default && (
+                                                            <button
+                                                                type="button"
+                                                                disabled={inst.is_running || isBusy || deletingId === inst.config.id}
+                                                                onClick={() => {
+                                                                    setCardMoreId(null);
+                                                                    handleDelete(inst.config.id);
+                                                                }}
+                                                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 cursor-pointer disabled:opacity-40"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                                <span>Delete Profile</span>
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1795,14 +1835,14 @@ export default function Instances() {
                                     setNewInstanceFromInstance('');
                                     setNewInstanceLaunchImmediately(false);
                                 }}
-                                className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400"
+                                className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400 rounded-[5px]"
                             >
                                 {t('common.cancel', 'Cancel')}
                             </button>
                             <button
                                 onClick={handleCreate}
                                 disabled={!newInstanceName.trim()}
-                                className="btn btn-primary btn-sm"
+                                className="btn btn-primary btn-sm rounded-[5px]"
                             >
                                 {t('common.create', 'Create Profile')}
                             </button>
@@ -1935,7 +1975,7 @@ export default function Instances() {
                                                     }
                                                 }}
                                                 className={cn(
-                                                    "btn btn-xs",
+                                                    "btn btn-xs rounded-[5px]",
                                                     isCurrent ? "btn-disabled opacity-50" : "btn-primary"
                                                 )}
                                             >
@@ -1958,7 +1998,7 @@ export default function Instances() {
                                     setSwitchTargetInstance(null);
                                     setAccountSearchQuery('');
                                 }}
-                                className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400"
+                                className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400 rounded-[5px]"
                             >
                                 {t('common.close', 'Close')}
                             </button>
@@ -2140,7 +2180,7 @@ export default function Instances() {
                                     setCopyTargetId(null);
                                     setCopyInstanceName('');
                                 }}
-                                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-[#153a54] hover:bg-gray-100 dark:hover:bg-[#102a40] transition-all duration-200 active:scale-95 cursor-pointer"
+                                className="px-4 py-2.5 rounded-[5px] text-xs font-semibold text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-[#153a54] hover:bg-gray-100 dark:hover:bg-[#102a40] transition-all duration-200 active:scale-95 cursor-pointer"
                             >
                                 {t('common.cancel', 'Cancel')}
                             </button>
@@ -2148,7 +2188,7 @@ export default function Instances() {
                                 type="button"
                                 onClick={handleCopy}
                                 disabled={!copyInstanceName.trim()}
-                                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:via-indigo-500 hover:to-cyan-400 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-500/25 dark:shadow-cyan-500/20 hover:shadow-cyan-500/40 transition-all duration-200 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
+                                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:via-indigo-500 hover:to-cyan-400 text-white font-bold text-xs rounded-[5px] shadow-lg shadow-blue-500/25 dark:shadow-cyan-500/20 hover:shadow-cyan-500/40 transition-all duration-200 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
                             >
                                 <Copy className="w-3.5 h-3.5" />
                                 <span>{t('instances.duplicate', 'Duplicate')}</span>
@@ -2205,14 +2245,14 @@ export default function Instances() {
                         <div className="flex justify-end gap-2.5">
                             <button
                                 onClick={() => setEditTargetId(null)}
-                                className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400"
+                                className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400 rounded-[5px]"
                             >
                                 {t('common.cancel', 'Cancel')}
                             </button>
                             <button
                                 onClick={handleEdit}
                                 disabled={!editInstanceName.trim()}
-                                className="btn btn-primary btn-sm"
+                                className="btn btn-primary btn-sm rounded-[5px]"
                             >
                                 {t('common.save', 'Save')}
                             </button>

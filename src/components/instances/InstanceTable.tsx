@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
     Play,
     Square,
@@ -12,7 +13,8 @@ import {
     Trash2,
     Folder,
     Layers,
-    Mail
+    Mail,
+    MoreHorizontal
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { maskEmail } from '../../utils/maskEmail';
@@ -47,8 +49,8 @@ function formatShortPath(fullPath: string): string {
     const isWindows = fullPath.includes('\\') || /^[a-zA-Z]:/.test(fullPath);
     const sep = isWindows ? '\\' : '/';
     const parts = fullPath.split(/[\\/]/).filter(Boolean);
-    if (parts.length <= 2) return fullPath;
-    return `...${sep}${parts.slice(-2).join(sep)}`;
+    if (parts.length <= 1) return fullPath;
+    return `...${sep}${parts[parts.length - 1]}`;
 }
 
 function getActionLabel(action: InstanceActionType): string {
@@ -93,6 +95,26 @@ export default function InstanceTable({
     const { accounts, currentAccount } = useAccountStore();
     const [revealedEmails, setRevealedEmails] = useState<Record<string, boolean>>({});
     const [copiedPathId, setCopiedPathId] = useState<string | null>(null);
+    const [openMoreId, setOpenMoreId] = useState<string | null>(null);
+    const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+    const moreMenuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+                setOpenMoreId(null);
+            }
+        };
+        const handleScroll = () => {
+            setOpenMoreId(null);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        window.addEventListener('scroll', handleScroll, true);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            window.removeEventListener('scroll', handleScroll, true);
+        };
+    }, []);
 
     const toggleEmail = (id: string) => {
         setRevealedEmails((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -110,12 +132,11 @@ export default function InstanceTable({
                 <table className="w-full text-left text-xs">
                     <thead>
                         <tr className="border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/80 dark:bg-[#071a27] text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            <th className="px-1 py-1.5 w-8 text-center">#</th>
-                            <th className="px-2 py-1.5 min-w-[140px] max-w-[180px]">Profile & Account</th>
+                            <th className="px-2 py-1.5 min-w-[150px] max-w-[190px]">Profile & Account</th>
                             <th className="px-2 py-1.5 min-w-[160px] max-w-[200px]">Model & Weekly Quota</th>
-                            <th className="px-2 py-1.5 min-w-[90px] max-w-[120px]">Status & PID</th>
-                            <th className="px-2 py-1.5 min-w-[120px] max-w-[140px]">File / Data Path</th>
-                            <th className="px-2 py-1.5 text-right min-w-[180px]">Actions</th>
+                            <th className="px-2 py-1.5 min-w-[90px] max-w-[110px]">Status & PID</th>
+                            <th className="px-2 py-1.5 min-w-[110px] max-w-[130px]">File / Data Path</th>
+                            <th className="px-2 py-1.5 text-right w-[130px]">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="font-medium">
@@ -180,19 +201,22 @@ export default function InstanceTable({
                                             : "hover:bg-slate-50/80 dark:hover:bg-[#0d253a]/70"
                                     )}
                                 >
-                                    {/* 1. Sequence */}
-                                    <td className="px-1 py-1.5 text-center font-mono text-[11px] text-slate-500 dark:text-slate-400">
-                                        <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-[5px] bg-slate-100 dark:bg-[#071a27] border border-slate-200 dark:border-[#15334d]">
-                                            #{seq}
-                                        </span>
-                                    </td>
-
-                                    {/* 2. Merged Profile & Account */}
-                                    <td className="px-2 py-1.5 whitespace-nowrap min-w-[140px] max-w-[180px]">
+                                    {/* 1. Merged Profile & Account */}
+                                    <td className="px-2 py-1.5 min-w-[150px] max-w-[190px]">
                                         <div className="flex items-center gap-1.5 flex-wrap">
-                                            <span className="font-semibold text-slate-800 dark:text-slate-100 text-xs truncate max-w-[130px]">
+                                            <span className="px-1.5 py-0.5 rounded-[5px] text-[10px] font-mono font-bold bg-slate-100 dark:bg-[#071a27] text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-[#15334d]">
+                                                #{seq}
+                                            </span>
+                                            <span className="font-bold text-slate-800 dark:text-slate-100 text-xs truncate max-w-[120px]" title={inst.config.name}>
                                                 {inst.config.name}
                                             </span>
+                                            <span
+                                                className={cn(
+                                                    "w-2 h-2 rounded-full shrink-0",
+                                                    inst.is_running ? "bg-teal-500 animate-pulse" : "bg-slate-300 dark:bg-slate-600"
+                                                )}
+                                                title={inst.is_running ? "Running" : "Idle"}
+                                            />
                                             {isDefault ? (
                                                 <span className="px-1.5 py-0.5 rounded-[5px] text-[9px] font-bold bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-300/40">
                                                     DEFAULT
@@ -202,7 +226,7 @@ export default function InstanceTable({
                                                     type="button"
                                                     disabled={isBusy}
                                                     onClick={() => onSetDefault(inst.config.id)}
-                                                    className="px-1.5 py-0.5 rounded-[5px] text-[10px] text-slate-400 hover:text-amber-500 hover:bg-amber-500/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    className="px-1 py-0.5 rounded-[5px] text-[9px] text-slate-400 hover:text-amber-500 hover:bg-amber-500/10 transition-colors cursor-pointer disabled:opacity-40"
                                                     title="Set as default profile"
                                                 >
                                                     Set Default
@@ -217,50 +241,19 @@ export default function InstanceTable({
                                                     type="button"
                                                     disabled={isBusy}
                                                     onClick={() => onSetActive(inst.config.id)}
-                                                    className="px-1.5 py-0.5 rounded-[5px] text-[10px] text-slate-400 hover:text-sky-500 hover:bg-sky-500/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    className="px-1 py-0.5 rounded-[5px] text-[9px] text-slate-400 hover:text-sky-500 hover:bg-sky-500/10 transition-colors cursor-pointer disabled:opacity-40"
                                                     title="Set as active target for account rotations"
                                                 >
                                                     Set Active
                                                 </button>
                                             )}
-                                            {tier.includes('ultra') && (
-                                                <span className="px-1.5 py-0.5 rounded-[5px] text-[9px] font-bold bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-300/40">
-                                                    ULTRA
-                                                </span>
-                                            )}
-                                            {tier.includes('pro') && (
-                                                <span className="px-1.5 py-0.5 rounded-[5px] text-[9px] font-bold bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-300/40">
-                                                    PRO
-                                                </span>
-                                            )}
                                         </div>
-                                        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-                                            <span
-                                                className={cn(
-                                                    "w-1.5 h-1.5 rounded-full shrink-0",
-                                                    !boundEmail
-                                                        ? "bg-slate-300 dark:bg-slate-600"
-                                                        : boundAccount?.disabled
-                                                        ? "bg-rose-500"
-                                                        : boundAccount?.proxy_disabled
-                                                        ? "bg-amber-500"
-                                                        : "bg-teal-500 dark:bg-cyan-400"
-                                                )}
-                                                title={
-                                                    !boundEmail
-                                                        ? "Unassigned"
-                                                        : boundAccount?.disabled
-                                                        ? "Account disabled"
-                                                        : boundAccount?.proxy_disabled
-                                                        ? "Proxy disabled"
-                                                        : "Account active"
-                                                }
-                                            />
+                                        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5 flex-wrap">
                                             <Mail className="w-3 h-3 text-slate-400 shrink-0" />
                                             {boundEmail ? (
                                                 <span
                                                     onClick={() => toggleEmail(inst.config.id)}
-                                                    className="cursor-pointer hover:underline text-slate-600 dark:text-slate-300 truncate max-w-[170px]"
+                                                    className="cursor-pointer hover:underline text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[150px]"
                                                     title={isEmailRevealed ? boundEmail : 'Click to unmask email'}
                                                 >
                                                     {displayedEmail}
@@ -268,6 +261,16 @@ export default function InstanceTable({
                                             ) : (
                                                 <span className="text-slate-400 dark:text-slate-500 italic text-[11px]" title={`ID: ${inst.config.id}`}>
                                                     Unassigned
+                                                </span>
+                                            )}
+                                            {tier.includes('ultra') && (
+                                                <span className="px-1.5 py-0.2 rounded-[5px] text-[9px] font-bold bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-300/40">
+                                                    ULTRA
+                                                </span>
+                                            )}
+                                            {tier.includes('pro') && (
+                                                <span className="px-1.5 py-0.2 rounded-[5px] text-[9px] font-bold bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-300/40">
+                                                    PRO
                                                 </span>
                                             )}
                                             {boundAccount?.disabled ? (
@@ -278,10 +281,10 @@ export default function InstanceTable({
                                         </div>
                                     </td>
 
-                                    {/* 3. Model Quota & Weekly Quota */}
-                                    <td className="px-3 py-2 whitespace-nowrap min-w-[180px]">
+                                    {/* 2. Model Quota & Weekly Quota */}
+                                    <td className="px-2 py-1.5 whitespace-nowrap min-w-[160px] max-w-[200px]">
                                         {(percentage !== null || weeklyQuota !== null) ? (
-                                            <div className="space-y-1.5 min-w-[160px]">
+                                            <div className="space-y-1.5 min-w-[150px]">
                                                 {percentage !== null && (
                                                     <div className="space-y-0.5">
                                                         <div className="flex items-center justify-between text-[10px] font-mono">
@@ -315,8 +318,8 @@ export default function InstanceTable({
                                         )}
                                     </td>
 
-                                    {/* 4. Status & PID */}
-                                    <td className="px-2.5 py-2 whitespace-nowrap min-w-[100px]">
+                                    {/* 3. Status & PID */}
+                                    <td className="px-2 py-1.5 whitespace-nowrap min-w-[90px] max-w-[110px]">
                                         {isBusy ? (
                                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[5px] text-[11px] font-bold bg-blue-50 text-blue-700 dark:bg-cyan-950/60 dark:text-cyan-300 border border-blue-300/60 dark:border-cyan-500/40 animate-pulse shadow-2xs">
                                                 <RotateCw className="w-3 h-3 animate-spin text-blue-500 dark:text-cyan-400 shrink-0" />
@@ -334,9 +337,9 @@ export default function InstanceTable({
                                         )}
                                     </td>
 
-                                    {/* 5. Executable / Data Path (Truncated ending path with copy button) */}
+                                    {/* 4. Executable / Data Path */}
                                     <td
-                                        className="px-3 py-2 whitespace-nowrap min-w-[150px] max-w-[190px]"
+                                        className="px-2 py-1.5 whitespace-nowrap min-w-[110px] max-w-[130px]"
                                         title={(inst as any).data_dir || inst.config.data_dir || inst.config.executable_path}
                                     >
                                         {(() => {
@@ -365,9 +368,10 @@ export default function InstanceTable({
                                         })()}
                                     </td>
 
-                                    {/* 6. Actions (Segmented capsule with 5-6px rounded buttons) */}
-                                    <td className="px-3 py-2 text-right whitespace-nowrap min-w-[210px]">
+                                    {/* 5. Actions: 3 Primary + More Dropdown */}
+                                    <td className="px-2 py-1.5 text-right whitespace-nowrap w-[130px]">
                                         <div className="inline-flex items-center rounded-[5px] overflow-hidden bg-slate-100 dark:bg-[#071a27] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+                                            {/* Primary 1: Launch / Stop */}
                                             {inst.is_running ? (
                                                 <button
                                                     type="button"
@@ -391,13 +395,14 @@ export default function InstanceTable({
                                                     title="Launch Instance"
                                                 >
                                                     {currentAction === 'launch' ? (
-                                                        <RotateCw className="w-3 h-3 animate-spin text-emerald-500" />
+                                                        <RotateCw className="w-3 h-3 animate-spin text-teal-500" />
                                                     ) : (
                                                         <Play className="w-3 h-3 fill-current" />
                                                     )}
                                                 </button>
                                             )}
 
+                                            {/* Primary 2: Switch Account */}
                                             <button
                                                 type="button"
                                                 disabled={isBusy}
@@ -412,6 +417,7 @@ export default function InstanceTable({
                                                 )}
                                             </button>
 
+                                            {/* Primary 3: Fast Forward */}
                                             <button
                                                 type="button"
                                                 disabled={isBusy}
@@ -426,75 +432,28 @@ export default function InstanceTable({
                                                 )}
                                             </button>
 
+                                            {/* Primary 4: More Dropdown Button */}
                                             <button
                                                 type="button"
                                                 disabled={isBusy}
-                                                onClick={() => onOpenPromptTree(inst.config.id)}
-                                                className="px-2 py-1 text-slate-600 dark:text-slate-300 hover:text-cyan-600 dark:hover:text-cyan-300 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50"
-                                                title="Prompts & Conversations"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (openMoreId === inst.config.id) {
+                                                        setOpenMoreId(null);
+                                                    } else {
+                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                        setMenuPos({ top: rect.bottom + 4, left: rect.right });
+                                                        setOpenMoreId(inst.config.id);
+                                                    }
+                                                }}
+                                                className={cn(
+                                                    "px-2 py-1 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-r-[5px] transition-colors cursor-pointer",
+                                                    openMoreId === inst.config.id && "bg-slate-200 dark:bg-[#15334d]"
+                                                )}
+                                                title="More Actions (Prompts, Audit, Sync, Settings, Clone, Delete)"
                                             >
-                                                <Layers className="w-3 h-3" />
+                                                <MoreHorizontal className="w-3 h-3" />
                                             </button>
-
-                                            {onAudit && (
-                                                <button
-                                                    type="button"
-                                                    disabled={isBusy}
-                                                    onClick={() => onAudit(inst.config.id, inst.config.name)}
-                                                    className="px-2 py-1 text-slate-500 hover:text-amber-500 dark:text-slate-400 dark:hover:text-amber-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50"
-                                                    title="Audit Trail"
-                                                >
-                                                    <History className="w-3 h-3" />
-                                                </button>
-                                            )}
-
-                                            {onSync && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => onSync(inst.config.id)}
-                                                    disabled={isBusy || Boolean(syncingInstanceIds?.[inst.config.id])}
-                                                    className="px-2 py-1 text-teal-600 dark:text-teal-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50"
-                                                    title="Sync PID and Quota"
-                                                >
-                                                    <RotateCw className={cn("w-3 h-3 text-teal-500", (currentAction === 'sync' || syncingInstanceIds?.[inst.config.id]) && "animate-spin")} />
-                                                </button>
-                                            )}
-
-                                            <button
-                                                type="button"
-                                                disabled={isBusy}
-                                                onClick={() => onSettings(inst.config.id)}
-                                                className="px-2 py-1 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50"
-                                                title="Settings & Sync"
-                                            >
-                                                <SlidersHorizontal className="w-3 h-3" />
-                                            </button>
-
-                                            <button
-                                                type="button"
-                                                disabled={isBusy}
-                                                onClick={() => onClone(inst.config.id, inst.config.name)}
-                                                className="px-2 py-1 text-indigo-600 dark:text-indigo-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50"
-                                                title="Clone / Duplicate Profile"
-                                            >
-                                                <Copy className="w-3 h-3" />
-                                            </button>
-
-                                            {!isDefault && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => onDelete(inst.config.id)}
-                                                    disabled={inst.is_running || isBusy}
-                                                    className="px-2 py-1 text-rose-600 dark:text-rose-400 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-r-[5px] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                                                    title="Delete Profile"
-                                                >
-                                                    {currentAction === 'delete' ? (
-                                                        <RotateCw className="w-3 h-3 animate-spin text-rose-500" />
-                                                    ) : (
-                                                        <Trash2 className="w-3 h-3" />
-                                                    )}
-                                                </button>
-                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -503,6 +462,80 @@ export default function InstanceTable({
                     </tbody>
                 </table>
             </div>
+
+            {/* More Menu Dropdown Portal */}
+            {openMoreId && menuPos && createPortal(
+                (() => {
+                    const inst = instances.find((i) => i.config.id === openMoreId);
+                    if (!inst) return null;
+                    const isDefault = inst.config.is_default || inst.config.id === 'default';
+                    return (
+                        <div
+                            ref={moreMenuRef}
+                            className="fixed z-[10000] min-w-[180px] rounded-[5px] border border-slate-200 dark:border-[#15334d] bg-white dark:bg-[#0c2438] py-1 text-slate-800 dark:text-slate-200 shadow-xl text-xs"
+                            style={{ top: menuPos.top, left: menuPos.left, transform: 'translateX(-100%)' }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <button
+                                type="button"
+                                onClick={() => { setOpenMoreId(null); onOpenPromptTree(inst.config.id); }}
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#15334d] text-slate-700 dark:text-slate-200 cursor-pointer"
+                            >
+                                <Layers className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                                <span>Prompts & History</span>
+                            </button>
+                            {onAudit && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setOpenMoreId(null); onAudit(inst.config.id, inst.config.name); }}
+                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#15334d] text-slate-700 dark:text-slate-200 cursor-pointer"
+                                >
+                                    <History className="w-3.5 h-3.5 text-amber-500" />
+                                    <span>Audit Trail</span>
+                                </button>
+                            )}
+                            {onSync && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setOpenMoreId(null); onSync(inst.config.id); }}
+                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#15334d] text-teal-600 dark:text-teal-400 cursor-pointer"
+                                >
+                                    <RotateCw className="w-3.5 h-3.5 text-teal-500" />
+                                    <span>Sync PID & Quota</span>
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => { setOpenMoreId(null); onSettings(inst.config.id); }}
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#15334d] text-slate-700 dark:text-slate-200 cursor-pointer"
+                            >
+                                <SlidersHorizontal className="w-3.5 h-3.5 text-blue-500" />
+                                <span>Settings & Sync</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => { setOpenMoreId(null); onClone(inst.config.id, inst.config.name); }}
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#15334d] text-indigo-600 dark:text-indigo-400 cursor-pointer"
+                            >
+                                <Copy className="w-3.5 h-3.5 text-indigo-500" />
+                                <span>Clone Profile</span>
+                            </button>
+                            {!isDefault && (
+                                <button
+                                    type="button"
+                                    disabled={inst.is_running}
+                                    onClick={() => { setOpenMoreId(null); onDelete(inst.config.id); }}
+                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 disabled:opacity-40 cursor-pointer"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Delete Profile</span>
+                                </button>
+                            )}
+                        </div>
+                    );
+                })(),
+                document.body
+            )}
         </div>
     );
 }

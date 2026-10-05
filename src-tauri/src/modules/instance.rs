@@ -4067,6 +4067,19 @@ pub async fn switch_account_to_instance(
 ) -> Result<(), String> {
     let mut account = crate::modules::account::load_account(account_id)?;
 
+    // Cross-Machine Distributed Lease Collision Guard
+    if crate::modules::workspace_lease_manager::is_account_or_email_leased_by_other(
+        &account.id,
+        &account.email,
+    ) {
+        let err = format!(
+            "Cannot switch instance to account '{}': Account is currently leased by another active machine in the cluster",
+            account.email
+        );
+        crate::modules::logger::log_error(&format!("[INSTANCE_SWITCH:ERROR] {}", err));
+        return Err(err);
+    }
+
     let fresh_token = crate::modules::oauth::ensure_fresh_token(&account.token, Some(&account.id))
         .await
         .map_err(|e| format!("Failed to refresh token: {}", e))?;

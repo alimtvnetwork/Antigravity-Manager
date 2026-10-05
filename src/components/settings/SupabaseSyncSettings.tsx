@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import {
     Database,
     Server,
@@ -48,6 +49,7 @@ export default function SupabaseSyncSettings() {
     const [testResults, setTestResults] = useState<Record<string, { isSuccess: boolean; msg: string }>>({});
     const [verifyingEndpointId, setVerifyingEndpointId] = useState<string | null>(null);
     const [tableVerification, setTableVerification] = useState<Record<string, TableVerificationResult>>({});
+    const [isAutoDiscovering, setIsAutoDiscovering] = useState(false);
 
     // Modals
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -196,6 +198,23 @@ export default function SupabaseSyncSettings() {
             showToast(`Table verification failed: ${String(e)}`, 'error');
         } finally {
             setVerifyingEndpointId(null);
+        }
+    };
+
+    const handleAutoDiscover = async () => {
+        setIsAutoDiscovering(true);
+        try {
+            const updatedConfig = await invoke<SupabaseConfig>('auto_discover_supabase_credentials');
+            setConfig(updatedConfig);
+            showToast(
+                `Auto-discovered ${updatedConfig.endpoints.length} Supabase endpoint(s) from repo-secrets!`,
+                'success'
+            );
+            fetchLeases();
+        } catch (e) {
+            showToast(`Auto-discovery failed: ${String(e)}`, 'error');
+        } finally {
+            setIsAutoDiscovering(false);
         }
     };
 
@@ -468,14 +487,30 @@ Here are my Supabase details:
                             {config.endpoints[0]?.url ? ` ${config.endpoints[0].url}` : ' No endpoint saved yet.'}
                         </p>
                     </div>
-                    <button
-                        type="button"
-                        className="rounded-lg bg-[#070b10] px-3 py-1.5 text-xs font-semibold text-[#f5d76e] disabled:opacity-40"
-                        disabled={!config.endpoints[0] || testingEndpointId === config.endpoints[0]?.id}
-                        onClick={() => config.endpoints[0] && handleTestEndpoint(config.endpoints[0])}
-                    >
-                        Test
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            className="rounded-[5px] bg-teal-600 hover:bg-teal-500 px-3 py-1.5 text-xs font-semibold text-white shadow-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer transition-colors"
+                            disabled={isAutoDiscovering}
+                            onClick={handleAutoDiscover}
+                            title="Auto-discover Supabase credentials from local repo-secrets and vault"
+                        >
+                            {isAutoDiscovering ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                                <Sparkles className="w-3.5 h-3.5 text-teal-200" />
+                            )}
+                            Auto-Discover from Repo Secrets
+                        </button>
+                        <button
+                            type="button"
+                            className="rounded-[5px] bg-[#070b10] px-3 py-1.5 text-xs font-semibold text-[#f5d76e] disabled:opacity-40 cursor-pointer"
+                            disabled={!config.endpoints[0] || testingEndpointId === config.endpoints[0]?.id}
+                            onClick={() => config.endpoints[0] && handleTestEndpoint(config.endpoints[0])}
+                        >
+                            Test
+                        </button>
+                    </div>
                 </div>
             </section>
             {/* Header & Local Node Banner */}
@@ -506,10 +541,23 @@ Here are my Supabase details:
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                        onClick={handleAutoDiscover}
+                        disabled={isAutoDiscovering}
+                        className="px-3 py-1.5 rounded-[5px] bg-teal-600/20 hover:bg-teal-600/30 text-teal-300 border border-teal-500/30 flex items-center gap-1.5 transition text-xs font-medium cursor-pointer disabled:opacity-50"
+                        title="Auto-discover Supabase credentials from local repo-secrets and vault"
+                    >
+                        {isAutoDiscovering ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                            <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+                        )}
+                        Auto-Discover Secrets
+                    </button>
                     <button
                         onClick={handleOpenMigrateModal}
-                        className="px-3 py-1.5 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 flex items-center gap-1.5 transition text-xs font-medium"
+                        className="px-3 py-1.5 rounded-[5px] bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 flex items-center gap-1.5 transition text-xs font-medium"
                         title="Migrate recent state from damaged/old Supabase to another"
                     >
                         <ArrowRightLeft className="w-3.5 h-3.5" />

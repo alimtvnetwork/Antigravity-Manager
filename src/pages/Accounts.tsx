@@ -831,7 +831,7 @@ function Accounts() {
                 <span className="hidden xl:inline">{t("accounts.disable_proxy_selected", { count: selectedIds.size })}</span>
               </button>
               <button
-                className="px-2.5 py-1 text-emerald-600 dark:text-emerald-400 text-xs font-semibold rounded-r-md hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-2.5 py-1 text-cyan-600 dark:text-cyan-400 text-xs font-semibold rounded-r-md hover:bg-cyan-50 dark:hover:bg-cyan-950/30 transition-colors flex items-center gap-1.5 cursor-pointer"
                 onClick={() => handleBatchToggleProxy(true)}
                 title={t("accounts.enable_proxy_selected", { count: selectedIds.size })}
               >
@@ -959,7 +959,7 @@ function Accounts() {
                   }}
                   className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-300 cursor-pointer"
                 >
-                  <Upload className="w-3.5 h-3.5 text-emerald-500" />
+                  <Upload className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
                   <span>{t("accounts.import_json")}</span>
                 </button>
                 <button
