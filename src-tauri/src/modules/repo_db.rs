@@ -2004,11 +2004,11 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                                         .and_then(|n| n.to_str())
                                         .unwrap_or("")
                                         .to_lowercase();
-                                    let has_target = !clean_target.is_empty();
                                     let is_target_matched = has_target
                                         && (clean_p == clean_target
                                             || folder_name == clean_target
-                                            || clean_target.starts_with(&format!("{}-", folder_name)));
+                                            || clean_target
+                                                .starts_with(&format!("{}-", folder_name)));
                                     if is_target_matched {
                                         crate::modules::logger::log_instance_prompt_audit(
                                             norm_inst,
@@ -4186,7 +4186,11 @@ fn compute_project_conversation_tree(
                 let is_owning_inst_alive =
                     if owning_inst_id == "default" || owning_inst_id == "__default__" {
                         let def_dir = crate::modules::instance::get_default_antigravity_data_dir();
-                        !crate::modules::instance::find_pids_for_data_dir(&def_dir.to_string_lossy(), true).is_empty()
+                        !crate::modules::instance::find_pids_for_data_dir(
+                            &def_dir.to_string_lossy(),
+                            true,
+                        )
+                        .is_empty()
                     } else if let Some(inst) = registry
                         .instances
                         .iter()
@@ -4511,7 +4515,8 @@ fn compute_project_conversation_tree(
                     continue;
                 }
 
-                let is_run = is_inst_alive && ap.status == "running" && (now - ap.updated_at <= 600);
+                let is_run =
+                    is_inst_alive && ap.status == "running" && (now - ap.updated_at <= 600);
                 if only_running && !is_run {
                     continue;
                 }
