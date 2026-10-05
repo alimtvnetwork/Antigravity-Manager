@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.157.2)
+> Professional AI Account Management & Protocol Proxy System (v4.158.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.157.2-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.158.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.157.2**: Implemented the two-phase candidate account selection and hours-remaining weekly scoring algorithm: accounts with less than 100% 4-hour quota evaluate to 0.0 in primary selection; when no 100% accounts exist, system seamlessly falls back to linear 4-hour percentage scaling `(q_4h / 100.0) * base_weekly_score`; weekly quota scoring uses refill countdown `(168 - hours_remaining)` distance; accounts with less than 8% weekly quota strictly evaluate to 0.0; pools sorted descending by highest integer score. (Thanks to @aukgit)
+> Latest version **v4.158.0**: Resolved CI pipeline delimiter collision in `auto_switcher.rs` test module diagnosed via `gitmap pe`, unblocking cross-platform compilation and `cargo fmt` gates; established two-phase 4-hour quota candidate selection with strict 100% primary gate and linear proportional fallback scaling, alongside inverted weekly refill countdown `(168 - hours_remaining)` distance weighting and 8% weekly quota floor. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.157.2-3B82F6?style=flat-square" alt="Version v4.157.2">
+    <img src="https://img.shields.io/badge/Version-v4.158.0-3B82F6?style=flat-square" alt="Version v4.158.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.157.2)**
+**Bar 2: Version-Based Installation (v4.158.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -550,7 +550,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.157.2**: Implemented the two-phase candidate account selection and hours-remaining weekly scoring algorithm: accounts with less than 100% 4-hour quota evaluate to 0.0 in primary selection; when no 100% accounts exist, system seamlessly falls back to linear 4-hour percentage scaling `(q_4h / 100.0) * base_weekly_score`; weekly quota scoring uses refill countdown `(168 - hours_remaining)` distance; accounts with less than 8% weekly quota strictly evaluate to 0.0; pools sorted descending by highest integer score. (Thanks to @aukgit)
+> Latest version **v4.158.0**: Resolved CI pipeline delimiter collision in `auto_switcher.rs` test module diagnosed via `gitmap pe`, unblocking cross-platform compilation and `cargo fmt` gates; established two-phase 4-hour quota candidate selection with strict 100% primary gate and linear proportional fallback scaling, alongside inverted weekly refill countdown `(168 - hours_remaining)` distance weighting and 8% weekly quota floor. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

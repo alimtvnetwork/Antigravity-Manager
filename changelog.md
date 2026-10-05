@@ -1,5 +1,18 @@
 # Changelog
 
+## [v4.158.0] - 2026-10-05
+
+### Fixed
+- **CI/CD 构建与格式化门禁修复 (GitMap Pipeline CI Gate & auto_switcher Delimiter Fix)**: 针对 `gitmap pe` 诊断发现的 `auto_switcher.rs:3137:1` 单元测试闭合界定符冲突（`unexpected closing delimiter: '}'`），彻底修复测试块内部缺失的 `test_instance_binding_stale_or_exhausted` 函数签名，恢复花括号平衡（Open: 521, Close: 521, Diff: 0），彻底解除 Release 与 CI 管道中跨平台 Rust 编译与格式化（`cargo fmt -- --check`）阻断。 (Thanks to @aukgit)
+
+### Changed
+- **两阶段 4 小时配额与周配额重置倒计时加权候选评分模型 (Two-Phase 4-Hour Gate & Hours-Remaining Weekly Quota Model)**:
+  - **主候选池 100% 门禁**：常规候选扫描中，4 小时配额低于 100% 且未到期的账号评分严格归零，杜绝不健康配额账号抢占资源。
+  - **全量耗尽无缝降级**：当全部可用账号均不足 100% 时，触发降级计算，以 `(q_4h / 100.0) * base_weekly_score` 按 4 小时配额比例平滑折算候选得分。
+  - **周配额重置倒计时加权**：基于 `(168 - hours_remaining)` 计算本周已消耗有效时长，优先激活临近重置周期的账号；8% 周配额底线硬淘汰；全量降序排列。 (Thanks to @aukgit)
+
+---
+
 ## [v4.157.2] - 2026-10-05
 
 ### Fixed
@@ -685,14 +698,20 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.158.0 (2026-10-05)**:
+        -   **[Pipeline CI Fix & Two-Phase 4H / Weekly Hours-Remaining Quota Model]**:
+            -   **Description**: Resolved unexpected closing delimiter in `auto_switcher.rs` test module reported by `gitmap pe`, restoring `cargo fmt` and compilation gate across macOS, Linux, and Windows CI; formalized two-phase 4-hour quota candidate selection with strict 100% primary gate and graceful proportional degradation fallback, powered by hours-remaining inverted weekly quota distance weighting. (Thanks to @aukgit)
+
+
     *   **v4.157.2 (2026-10-05)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+        -   **[Two-Phase 4-Hour Quota Gate & Hours-Remaining Weekly Scoring]**:
+            -   **Description**: Implemented two-phase 4-hour quota selection gate and weekly quota refill countdown distance weighting with 8% floor and descending rank ordering. (Thanks to @aukgit)
 
 
     *   **v4.157.1 (2026-10-05)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+        -   **[Weekly Scoring DESC Sort & Compact Integer Output]**:
+            -   **Description**: Corrected weekly candidate scoring to descending sort order and compact integer floor output for SQLite persistence. (Thanks to @aukgit)
+
 
 
     *   **v4.157.0 (2026-10-05)**:

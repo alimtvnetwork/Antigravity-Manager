@@ -3,6 +3,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.158.0 (2026-10-05)**:
+        -   **[CI Gate Syntax Resolution & Two-Phase Quota Selection Protocol]**:
+            -   **CI Gate Fix**: Fixed closing delimiter mismatch in `src-tauri/src/modules/auto_switcher.rs` detected via `gitmap pe`, restoring `cargo fmt` formatting and compilation gates across all CI workflows. (Thanks to @aukgit)
+            -   **Candidate Quota Selection**: Enforced primary strict 100% 4-hour quota gate with linear fallback scaling when all accounts are exhausted, coupled with hours-remaining inverted weekly quota prioritization and 8% floor. (Thanks to @aukgit)
+
     *   **v4.157.2 (2026-10-05)**:
         -   **[Two-Phase 4-Hour Quota Gate & Hours-Remaining Weekly Scoring Algorithm]**:
             -   **Phase 1 (Primary Selection)**: Candidate accounts with less than 100% 4-hour quota (and whose reset period has not finished) strictly evaluate to `0.0`. Only accounts with full 100% 4h quota or elapsed cycles receive the base weekly score `base_weekly_score.floor()`. (Thanks to @aukgit)
@@ -12,8 +17,9 @@
             -   **Descending Sort**: Candidate pools sorted descending (highest integer score selected first). Claude/3p buckets preserved with `TODO(claude)` ambiguity marker. (Thanks to @aukgit)
 
     *   **v4.157.1 (2026-10-05)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+        -   **[Weekly Candidate Scoring DESC Order & Compact Integer Output]**:
+            -   **Sort & Integer Output**: Standardized candidate scoring to descending sort order with integer output for SQLite persistence. (Thanks to @aukgit)
+
 
     *   **v4.157.0 (2026-10-05)**:
         -   **[Empty Prompt Tree Fix, Neon Green Progress Bar Restore, Hours-Elapsed Weekly Scoring, Modal Header Identity]**:
