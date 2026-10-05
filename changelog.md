@@ -650,6 +650,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.157.0 (2026-10-05)**:
+        -   **[Weekly Quota Scoring Algorithm & Progress Bar Glow]**:
+            -   **Description**: Restored neon green progress bar glow in accounts table and compact progress bar styling; applied hours-elapsed weekly quota scoring algorithm in `score_candidate_account()` prioritizing accounts with lowest elapsed score since reset. (Thanks to @aukgit)
+
+
     *   **v4.156.0 (2026-10-05)**:
         -   **[Instance Restart Split Capsule & Deep Repo DB Fixes]**:
             -   **Description**: Added dedicated instance restart split button capsule on current account in Table and Card modes; preserved Switch button strictly for account selection; disambiguated synchronization icons reserving RotateCcw exclusively for restart; fixed host vs sandbox user home collision via `get_canonical_host_home()`, Gate 4 dual path/folder matching, disjoint sandbox tagging, 10-minute thinking window for reasoning models without premature 60s cutoff, unblocked email watcher, and enforced lifecycle cache invalidation. (Thanks to @aukgit)

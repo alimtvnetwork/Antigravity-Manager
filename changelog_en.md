@@ -3,6 +3,9 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.157.0 (2026-10-05)**:
+        -   **[Weekly Quota Scoring Algorithm & Progress Bar Glow]**: Restored neon green progress bar glow in accounts table and compact progress bar styling; applied hours-elapsed weekly quota scoring algorithm in `score_candidate_account()` prioritizing accounts with lowest elapsed score since reset. (Thanks to @aukgit)
+
     *   **v4.156.0 (2026-10-05)**:
         -   **[Instance Restart Split Button Capsule on Current Account]**: In both Table view (`InstanceTable.tsx`) and Card view (`Instances.tsx`) modes, converted the primary action for active instances into a seamless segmented split capsule (`rounded-[5px]`, dark-glass hairline divider). The left segment provides an immediate Stop (`<Square>`), while the right segment provides Restart (`<RotateCcw>`, tooltip "Restart Instance on Current Account") to cleanly terminate the process tree, poll for process exit and lock release (<1,500ms), purge the prompt tree cache, and relaunch on the currently bound account. The global busy overlay accurately reflects "Restarting...". (Thanks to @aukgit)
         -   **[Strict Account Selection Semantics for Switch Button]**: Strictly preserved the Switch button invariant: dedicated solely to opening the Switch Account modal (`setSwitchTargetInstance`) with zero restart side-effects. (Thanks to @aukgit)
