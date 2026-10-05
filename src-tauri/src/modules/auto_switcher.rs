@@ -661,10 +661,26 @@ pub struct ProfileCandidate {
     pub score: f64,
 }
 
-/// Normalized candidate scoring algorithm (divided by 1000.0 for compact 0.000..0.500 range):
+/// Compute hours elapsed since the weekly quota cycle started for a given bucket.
+/// Returns hours elapsed (0.0..=168.0), or `168.0` as fallback if reset_time is unparseable.
+fn compute_weekly_hours_elapsed(bucket: &crate::models::quota::QuotaBucket, now_sec: i64) -> f64 {
+    const TOTAL_WEEK_HOURS: f64 = 168.0;
+    let reset_ts = match parse_reset_time_to_unix(&bucket.reset_time) {
+        Some(ts) => ts,
+        None => return TOTAL_WEEK_HOURS, // fallback: assume full week elapsed
+    };
+    let remaining_secs = reset_ts.saturating_sub(now_sec).max(0);
+    let remaining_hours = remaining_secs as f64 / 3600.0;
+    (TOTAL_WEEK_HOURS - remaining_hours).max(0.0).min(TOTAL_WEEK_HOURS)
+}
+
+/// Hours-elapsed-weighted weekly quota scoring algorithm:
 /// - Any candidate with < 100% 4-hour quota (and period not finished) evaluates to `0.0`.
-/// - Otherwise: `Score = (S_active * M_tier * Q_weekly) / 1000.0`
-///   where S_active = 1.0, M_tier = {Ultra: 5.0, Pro: 3.0, Free: 1.0}, Q_weekly = 0.0..100.0.
+/// - Otherwise: `Score = (S_active * M_tier * (weekly_quota_pct × hours_elapsed)) / 16800.0`
+///   where S_active = 1.0, M_tier = {Ultra: 5.0, Pro: 3.0, Free: 1.0}.
+/// - Sorting direction: ASCENDING (lowest score = account just reset = selected first).
+/// - Weekly quota < 8% treated as 0 (below viable threshold for Gemini).
+/// - Claude/3p buckets are excluded (TODO: define Claude weekly scoring algorithm).
 pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
     let period_stat = evaluate_account_period_status(acc, target_model, 20.0, now_sec);
     let is_period_finished = period_stat
@@ -698,43 +714,70 @@ pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) 
         1.0
     };
 
-    // 2. Weekly quota percentage from quota_groups or fallback to models
-    let mut weekly_quota_percent = 100.0;
+    // 2. Weekly quota: hours-elapsed-weighted scoring (Gemini buckets only)
+    // Algorithm: weekly_effective_score = weekly_quota_pct × hours_elapsed_this_week
+    // "Whoever has the shortest time goes first" → sort ASCENDING → lower score = prioritized.
+    // Weekly quota < 8% is treated as 0 (below viable threshold for Gemini).
+    // TODO(claude): Claude/3p weekly scoring algorithm undefined — 3p buckets excluded.
+    const TOTAL_WEEK_HOURS: f64 = 168.0;
+    const WEEKLY_ZERO_THRESHOLD: f64 = 8.0;
+    const SCORE_NORMALIZER: f64 = 16800.0; // TOTAL_WEEK_HOURS × 100
+
+    let mut weekly_effective_score = TOTAL_WEEK_HOURS * 100.0; // Default worst-case (sorted last)
+
     if let Some(quota_data) = acc.quota.as_ref() {
-        let mut weekly_values: Vec<f64> = Vec::new();
+        let mut gemini_weekly_scores: Vec<f64> = Vec::new();
+
         if let Some(ref groups) = quota_data.quota_groups {
             for g in groups {
                 for b in &g.buckets {
                     let win = b.window.to_lowercase();
                     let bid = b.bucket_id.to_lowercase();
-                    let is_weekly = win.contains("week") || bid.contains("week");
-                    if is_weekly {
-                        weekly_values.push((b.remaining_fraction * 100.0).round());
+                    // Gemini-only: skip 3p/claude buckets (Claude TODO)
+                    let is_gemini_weekly = (win.contains("week") || bid.contains("week"))
+                        && !bid.contains("3p")
+                        && !bid.contains("claude");
+                    if is_gemini_weekly && (0.0..=1.0).contains(&b.remaining_fraction) {
+                        let pct = (b.remaining_fraction * 100.0).round();
+                        let eff_pct = if pct < WEEKLY_ZERO_THRESHOLD { 0.0 } else { pct };
+                        let hours_elapsed = compute_weekly_hours_elapsed(b, now_sec);
+                        gemini_weekly_scores.push(eff_pct * hours_elapsed);
                     }
                 }
             }
         }
 
-        if !weekly_values.is_empty() {
-            // Take minimum bottleneck across weekly quota groups
-            weekly_quota_percent = weekly_values.into_iter().fold(100.0, f64::min);
+        if !gemini_weekly_scores.is_empty() {
+            // Use minimum bottleneck across multiple Gemini weekly buckets
+            weekly_effective_score = gemini_weekly_scores
+                .into_iter()
+                .fold(f64::INFINITY, f64::min);
         } else {
-            let valid_models: Vec<_> = quota_data.models.iter().collect();
-
+            // Fallback: legacy model percentage × half-week elapsed (assume mid-cycle)
+            let valid_models: Vec<_> = quota_data
+                .models
+                .iter()
+                .filter(|m| {
+                    let n = m.name.to_lowercase();
+                    !n.contains("claude") && !n.contains("3p")
+                })
+                .collect();
             if !valid_models.is_empty() {
                 let sum: i32 = valid_models.iter().map(|m| m.percentage).sum();
-                weekly_quota_percent = (sum as f64 / valid_models.len() as f64).round();
+                let avg_pct = (sum as f64 / valid_models.len() as f64).round();
+                let eff_pct = if avg_pct < WEEKLY_ZERO_THRESHOLD { 0.0 } else { avg_pct };
+                weekly_effective_score = eff_pct * (TOTAL_WEEK_HOURS / 2.0);
             }
         }
     }
 
-    // 3. Reset boundary check: if period has finished, provider will refresh credits to 100%
+    // 3. Reset boundary: if period has finished, credits refresh → assign best priority (score = 0)
     if is_period_finished {
-        weekly_quota_percent = 100.0;
+        weekly_effective_score = 0.0;
     }
 
     let active_factor = 1.0;
-    (active_factor * tier_multiplier * weekly_quota_percent) / 1000.0
+    (active_factor * tier_multiplier * weekly_effective_score) / SCORE_NORMALIZER
 }
 
 /// Specifically evaluate the 4-hour / 5-hour immediate rolling window quota (0-100%)

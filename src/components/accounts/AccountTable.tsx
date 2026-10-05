@@ -1131,7 +1131,7 @@ function AccountTable({
             <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#071724] shadow-xs">
                 <table className="w-full">
                     <thead>
-                        <tr className="border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/90 dark:bg-slate-900/90">
+                        <tr className="border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/90 dark:bg-[#061220]">
                             <th className="pl-2 py-1 text-left w-7">
                                 <span className="sr-only">{t('accounts.drag_to_reorder')}</span>
                             </th>

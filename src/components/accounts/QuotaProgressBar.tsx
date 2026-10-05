@@ -94,10 +94,10 @@ export function QuotaProgressBar({
 
             {/* Optional Icon / Label on Left */}
             {(Icon || label) && (
-                <div className="flex items-center gap-1 shrink-0 text-slate-700 dark:text-slate-300">
+                <div className="flex items-center gap-1 shrink-0 max-w-[18%] min-w-0 text-slate-700 dark:text-slate-300">
                     {Icon && <Icon size={13} className="shrink-0" />}
                     {label && (
-                        <span className="text-[11px] font-semibold truncate max-w-[80px]" title={label}>
+                        <span className="text-[11px] font-semibold truncate" title={label}>
                             {label}
                         </span>
                     )}
@@ -159,7 +159,7 @@ export function QuotaProgressBar({
             </div>
 
             {/* Single Column for Remaining Time and Percentage */}
-            <div className="flex flex-col items-end shrink-0 leading-tight min-w-[36px]">
+            <div className="flex flex-col items-end shrink-0 leading-tight w-[18%] max-w-[18%]">
                 {resetTime ? (
                     <span
                         className={cn(
