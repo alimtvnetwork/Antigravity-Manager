@@ -1906,7 +1906,8 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                 });
                 if let Ok(rows) = rows {
                     for item in rows.flatten() {
-                        let (status, not_fully_idle, ws_uris_opt, _last_time_str, title, preview) = item;
+                        let (status, not_fully_idle, ws_uris_opt, _last_time_str, title, preview) =
+                            item;
 
                         // Ghost conversation filter: Inspect title and preview. If empty title / "Untitled Conversation"
                         // and 0 prompt content or 0 words, skip it (do not consider it running).
@@ -1915,7 +1916,9 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                             || title.to_lowercase() == "new conversation";
                         let (_, eff_wc) = extract_prompt_words_preview(&preview, 5);
                         let is_empty_prompt = preview.trim().is_empty() || eff_wc == 0;
-                        if (is_untitled && is_empty_prompt) || (title.trim().is_empty() && preview.trim().is_empty()) {
+                        if (is_untitled && is_empty_prompt)
+                            || (title.trim().is_empty() && preview.trim().is_empty())
+                        {
                             continue;
                         }
 
