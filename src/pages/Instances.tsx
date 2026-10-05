@@ -1626,7 +1626,7 @@ export default function Instances() {
                                             <button
                                                 type="button"
                                                 disabled={isBusy}
-                                                onClick={() => setPromptTreeInstance({ id: inst.config.id, name: inst.config.name })}
+                                                onClick={() => setPromptTreeInstance({ id: inst.config.id, name: inst.config.name, seqNum: inst.config.seq_num, executablePath: inst.config.executable_path })}
                                                 className={cn(
                                                     "flex-1 flex items-center justify-center py-1 transition-colors cursor-pointer relative rounded-l-[4px] disabled:opacity-50 disabled:cursor-not-allowed",
                                                     hasActiveTask
@@ -2328,6 +2328,8 @@ export default function Instances() {
                 }}
                 instanceId={promptTreeInstance?.id || ''}
                 instanceName={promptTreeInstance?.name || ''}
+                sequenceNumber={promptTreeInstance?.seqNum}
+                executablePath={promptTreeInstance?.executablePath}
                 initialSelectedProjectId={promptTreeInstance?.projectId}
             />
 
