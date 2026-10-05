@@ -30,6 +30,8 @@
 
 | `129` | [129-antigravity-ide-full-deploy-and-gitmap-delegation.md](./completed/129-antigravity-ide-full-deploy-and-gitmap-delegation.md) | `DONE` | Full Antigravity IDE fleet deployment via `deploy-antigravity-ide-fleet.ps1` in repo-secrets, GitMap remote delegation (`gitmap-delegate-deploy.ps1`), 4-pillar parity engine (`instance.rs`), and 7-gate verification scorecard. |
 | `130` | [130-accounts-ui-supabase-sync-instance-compact-and-release.md](./completed/130-accounts-ui-supabase-sync-instance-compact-and-release.md) | `DONE` | Modernize accounts table row borders & VS Code cyan/teal progress bar, compact instance table (single profile+email column, ending path, integrated prompts capsule), card mode 4-per-row grid with 2-row buttons & 5px radius, Supabase repo-secrets auto-discovery, cross-machine multi-instance email cooldown exclusivity, and minor release v4.150.0. |
+| `131` | [131-antigravity-ide-full-deploy-fleet-and-gitmap-delegation.md](./completed/131-antigravity-ide-full-deploy-fleet-and-gitmap-delegation.md) | `DONE` | Default instance theme seeds (#BD93F9/#19191C), Turbo presets, 4 plugins and 9 skills parity engine in instance.rs, standalone fleet deployment script in repo-secrets and scripts, global GitMap delegation (gitmap agy deploy & gitmap-delegate-deploy.ps1), and 7-gate verification scorecard. |
+
 
 ## Pending Plans (`pending/`)
 | # | Plan File | Status | Summary |
