@@ -32,6 +32,7 @@ interface InstanceState {
     setInstanceExecutable: (instanceId: string, executablePath?: string) => Promise<void>;
     closeInstance: (instanceId: string) => Promise<void>;
     stopInstance: (instanceId: string) => Promise<void>;
+    restartInstance: (instanceId: string) => Promise<InstanceStatus>;
     fastForwardInstance: (instanceId: string) => Promise<string>;
     toggleAutoSwitcher: () => Promise<void>;
     setActiveInstance: (instanceId: string) => Promise<void>;
@@ -267,6 +268,20 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to stop instance' });
             useErrorStore.getState().captureError(err, { source: 'useInstanceStore.stopInstance' });
+            throw err;
+        }
+    },
+
+    restartInstance: async (instanceId: string) => {
+        set({ isLoading: true, error: null });
+        try {
+            const status = await instanceService.restartInstance(instanceId);
+            await get().fetchInstances(true);
+            set({ isLoading: false });
+            return status;
+        } catch (err: any) {
+            set({ isLoading: false, error: err?.toString() || 'Failed to restart instance' });
+            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.restartInstance' });
             throw err;
         }
     },

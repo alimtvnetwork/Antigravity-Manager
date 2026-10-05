@@ -258,6 +258,19 @@ export async function stopInstance(instanceId: string): Promise<void> {
     return await invoke('stop_instance', { instanceId });
 }
 
+export async function restartInstance(instanceId: string): Promise<InstanceStatus> {
+    try {
+        return await invoke('restart_instance', { instanceId });
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'instanceService.restartInstance',
+            endpoint: 'restart_instance',
+            triggerAction: 'restart_instance',
+        });
+        throw e;
+    }
+}
+
 export async function fastForwardInstance(instanceId: string): Promise<string> {
     return await invoke('fast_forward_instance', { instanceId });
 }

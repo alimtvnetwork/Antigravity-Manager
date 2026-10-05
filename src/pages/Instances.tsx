@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     Laptop,
     Play,
@@ -198,6 +198,7 @@ export default function Instances() {
         launchInstance,
         cloneInstanceExecutable,
         stopInstance,
+        restartInstance,
         fastForwardInstance,
         toggleAutoSwitcher,
         setActiveInstance,
@@ -537,6 +538,21 @@ export default function Instances() {
             await stopInstance(id);
         } catch (e: any) {
             setActionError(e?.toString() || 'Failed to stop instance');
+        } finally {
+            setActionState((prev) => ({ ...prev, [id]: null }));
+        }
+    };
+
+    const handleRestart = async (id: string) => {
+        if (actionState[id]) return;
+        setActionState((prev) => ({ ...prev, [id]: 'restart' }));
+        setActionError(null);
+        try {
+            await restartInstance(id);
+            showToast('Instance restarted successfully on current account', 'success');
+        } catch (e: any) {
+            setActionError(e?.toString() || 'Failed to restart instance');
+            showToast(e?.toString() || 'Failed to restart instance', 'error');
         } finally {
             setActionState((prev) => ({ ...prev, [id]: null }));
         }
@@ -996,6 +1012,7 @@ export default function Instances() {
                     actionState={actionState}
                     onLaunch={handleLaunch}
                     onStop={handleStop}
+                    onRestart={handleRestart}
                     onSwitch={(id) => {
                         const target = instances.find((i) => i.config.id === id);
                         if (target) setSwitchTargetInstance(target);
@@ -1506,19 +1523,34 @@ export default function Instances() {
                                         {/* Row 1: Primary Actions (Launch/Stop, Switch Account, Fast-Forward, Sync PID) */}
                                         <div className="grid grid-cols-4 gap-1 w-full">
                                             {inst.is_running ? (
-                                                <button
-                                                    type="button"
-                                                    disabled={isBusy}
-                                                    onClick={() => handleStop(inst.config.id)}
-                                                    className="flex items-center justify-center text-xs p-1.5 rounded-[5px] bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    title="Stop Instance"
-                                                >
-                                                    {currentAction === 'stop' ? (
-                                                        <RotateCw className="w-3.5 h-3.5 animate-spin text-rose-500" />
-                                                    ) : (
-                                                        <Square className="w-3.5 h-3.5 fill-current" />
-                                                    )}
-                                                </button>
+                                                <div className="flex items-center rounded-[5px] border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/40 overflow-hidden divide-x divide-rose-200 dark:divide-rose-900/50">
+                                                    <button
+                                                        type="button"
+                                                        disabled={isBusy}
+                                                        onClick={() => handleStop(inst.config.id)}
+                                                        className="flex-1 flex items-center justify-center p-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer disabled:opacity-50"
+                                                        title="Stop Instance"
+                                                    >
+                                                        {currentAction === 'stop' ? (
+                                                            <RotateCw className="w-3.5 h-3.5 animate-spin text-rose-500" />
+                                                        ) : (
+                                                            <Square className="w-3.5 h-3.5 fill-current" />
+                                                        )}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        disabled={isBusy}
+                                                        onClick={() => handleRestart(inst.config.id)}
+                                                        className="flex-1 flex items-center justify-center p-1.5 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors cursor-pointer disabled:opacity-50"
+                                                        title="Restart Instance on Current Account"
+                                                    >
+                                                        {currentAction === 'restart' ? (
+                                                            <RotateCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                                                        ) : (
+                                                            <RotateCcw className="w-3.5 h-3.5" />
+                                                        )}
+                                                    </button>
+                                                </div>
                                             ) : (
                                                 <button
                                                     type="button"
@@ -1570,7 +1602,7 @@ export default function Instances() {
                                                 className="flex items-center justify-center text-xs p-1.5 rounded-[5px] bg-slate-100 dark:bg-slate-800/80 text-teal-600 dark:text-teal-400 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Sync PID and Quota"
                                             >
-                                                <RotateCw className={cn("w-3.5 h-3.5 text-teal-500", (currentAction === 'sync' || syncingInstanceIds[inst.config.id]) && "animate-spin")} />
+                                                <Cpu className={cn("w-3.5 h-3.5 text-teal-500", (currentAction === 'sync' || syncingInstanceIds[inst.config.id]) && "animate-pulse")} />
                                             </button>
                                         </div>
 

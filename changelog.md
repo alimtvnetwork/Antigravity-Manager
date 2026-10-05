@@ -1,5 +1,21 @@
 # Changelog
 
+## [v4.152.0] - 2026-10-05
+
+### Added
+- **实例重启分段胶囊按钮 (Instance Restart Split Button Capsule on Current Account)**: 在实例列表表格视图与卡片视图中，当实例处于运行状态时，将原有的停止按钮重构为紧凑无缝的分段胶囊（`rounded-[5px]` 边框与暗色玻璃分隔线），左侧为红色停止按钮（`Square`），右侧为琥珀色重启按钮（`RotateCcw`，悬浮提示“Restart Instance on Current Account”）；点击可在保持当前绑定账号不变的前提下，安全终止进程、释放文件锁并立即自动重新启动实例。 (Thanks to @aukgit)
+- **后端原子化实例重启 IPC 命令 (Atomic Backend `restart_instance` IPC Command)**: 在 `src-tauri/src/modules/instance.rs` 中实现 `restart_instance` 并在 `commands/instance.rs` 与 `lib.rs` 中注册 Tauri 命令，优雅关闭对应实例的所有子进程与窗口，轮询等待进程终止（至多 1.5 秒）并自动清除提示词树缓存后，通过 `launch_instance` 重新启动，返回最新的实例状态。 (Thanks to @aukgit)
+
+### Changed
+- **同步图标防混淆语义规范 (Distinct Semantic Icons for Sync Operations vs Restart)**: 彻底消除“同步 PID/配额”操作与“重启实例”之间的图标混淆。将表格操作下拉菜单及卡片视图中原本采用旋转箭头的同步按钮图标重构为专用的处理器微标（`<Cpu className="w-3.5 h-3.5 text-teal-500" />`），将账号切换按钮图标重构为标准切换微标（`<ArrowLeftRight className="w-3 h-3" />`），旋转逆时针箭头（`RotateCcw`）严格专用于重启操作。 (Thanks to @aukgit)
+
+### Fixed
+- **运行中项目与会话提示词状态判定根因修复 (Running Projects & Prompts Detection Root-Cause Fix)**: 在 `src-tauri/src/modules/repo_db.rs` 中将 `prompt_tree_cache` 缓存生存时间从 60 秒缩短为 5 秒，实例启停及重启时即时失效缓存；彻底消除 `default` 实例匹配到孤立空实例项目（`instance_id IS NULL` 或 `""`）导致的误报；严格过滤标题为 Untitled 且词数为 0 的空白幽灵会话，并要求会话活动必须满足实例进程存活且时间戳在 120 秒内，彻底解决默认实例虚假显示项目运行的问题。 (Thanks to @aukgit)
+- **TypeScript 接口字段对齐与未声明变量清理 (TypeScript Interface Alignment & CI/CD Compilation Fix)**: 在 `src/types/config.ts` 的 `AutoProfileSwitcherConfig` 中补齐 `account_lockout_window_minutes?: number` 可选字段，解决 `AutoSwitcherSettings.tsx` 与 `Settings.tsx` 中的类型缺失错误；清理 `InstanceTable.tsx` 与 `Instances.tsx` 中的未读取变量与导入（`syncingInstanceIds` 与 `useMemo`），确保 `npm run build` 跨平台前端构建 100% 零阻断。 (Thanks to @aukgit)
+- **Rustfmt 跨平台代码格式化规范对齐 (Rustfmt Alignment in instance.rs)**: 对齐 `src-tauri/src/modules/instance.rs` 中 `target_skills_dir` 链式调用的代码换行格式，确保 `cargo fmt -- --check` 跨平台门禁全面绿灯通过。 (Thanks to @aukgit)
+
+---
+
 ## [v4.151.0] - 2026-10-05
 
 ### Fixed
@@ -562,6 +578,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.152.0 (2026-10-05)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.151.0 (2026-10-05)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

@@ -1086,6 +1086,7 @@ pub fn run() {
             commands::set_instance_executable,
             commands::close_instance,
             commands::stop_instance,
+            commands::restart_instance,
             commands::fast_forward_instance,
             commands::get_active_instance,
             commands::set_active_instance,

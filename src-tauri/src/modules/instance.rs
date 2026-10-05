@@ -1069,6 +1069,54 @@ pub fn stop_instance(instance_id: &str) -> Result<(), String> {
     close_instance(instance_id)
 }
 
+/// Restart an instance on its current profile and bound account
+pub fn restart_instance(instance_id: &str) -> AppResult<InstanceStatus> {
+    let resolved_id =
+        resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
+    crate::modules::logger::log_info(&format!(
+        "[Instance] Restarting instance '{}' (resolved: '{}')",
+        instance_id, resolved_id
+    ));
+
+    // 1. Terminate current running process(es)
+    let _ = stop_instance(&resolved_id);
+
+    // 2. Poll up to 1500ms for process cleanup and lockfile release
+    let start_wait = std::time::Instant::now();
+    if let Ok(registry) = load_registry() {
+        if let Some(config) = registry.instances.iter().find(|i| i.id == resolved_id) {
+            let is_default = config.is_default || resolved_id == "default";
+            while start_wait.elapsed() < std::time::Duration::from_millis(1500) {
+                let pids = find_pids_for_data_dir(&config.data_dir, is_default);
+                if pids.is_empty() {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(80));
+            }
+        }
+    }
+
+    // 3. Invalidate prompt tree cache so running status reflects fresh state
+    crate::modules::repo_db::invalidate_prompt_tree_cache(Some(&resolved_id));
+
+    // 4. Launch instance with its existing bound account and workspaces
+    launch_instance(&resolved_id)?;
+
+    // 5. Return updated InstanceStatus
+    let statuses = list_instances().map_err(AppError::Other)?;
+    let updated = statuses
+        .into_iter()
+        .find(|s| s.config.id == resolved_id || s.config.name == resolved_id)
+        .ok_or_else(|| {
+            AppError::Other(format!(
+                "Instance '{}' not found in registry after restart",
+                resolved_id
+            ))
+        })?;
+
+    Ok(updated)
+}
+
 /// Copy/clone an existing profile (full directory copy by default, or profile only)
 pub fn copy_instance(
     source_id: &str,
@@ -2021,7 +2069,10 @@ pub fn sync_instance_ide_parity(target_instance_id: &str) -> AppResult<()> {
     }
 
     // 3. Synchronize .gemini/antigravity/builtin/skills/
-    let target_skills_dir = target_gemini.join("antigravity").join("builtin").join("skills");
+    let target_skills_dir = target_gemini
+        .join("antigravity")
+        .join("builtin")
+        .join("skills");
     let source_skills_dir = candidate_sources
         .iter()
         .map(|p| p.join("antigravity").join("builtin").join("skills"))

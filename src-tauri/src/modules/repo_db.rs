@@ -3898,7 +3898,7 @@ pub fn get_project_conversation_tree_cached(
         if let Ok(conn) = connect_db() {
             let _ = conn.execute(
                 "INSERT INTO prompt_tree_cache (cache_key, instance_id, tree_json, project_count, conversation_count, updated_at, ttl_seconds)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, 60)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, 5)
                  ON CONFLICT(cache_key) DO UPDATE SET
                     instance_id = excluded.instance_id,
                     tree_json = excluded.tree_json,

@@ -14,7 +14,9 @@ import {
     Folder,
     Layers,
     Mail,
-    MoreHorizontal
+    MoreHorizontal,
+    Cpu,
+    ArrowLeftRight
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { maskEmail } from '../../utils/maskEmail';
@@ -22,7 +24,7 @@ import type { InstanceStatus } from '../../services/instanceService';
 import { useAccountStore } from '../../stores/useAccountStore';
 import { QuotaProgressBar } from '../accounts/QuotaProgressBar';
 
-export type InstanceActionType = 'launch' | 'stop' | 'switch' | 'fast-forward' | 'wipe' | 'delete' | 'sync' | null;
+export type InstanceActionType = 'launch' | 'stop' | 'restart' | 'switch' | 'fast-forward' | 'wipe' | 'delete' | 'sync' | null;
 
 interface InstanceTableProps {
     instances: InstanceStatus[];
@@ -31,6 +33,7 @@ interface InstanceTableProps {
     actionState?: Record<string, InstanceActionType>;
     onLaunch: (id: string) => void;
     onStop: (id: string) => void;
+    onRestart: (id: string) => void;
     onSwitch: (id: string) => void;
     onFastForward: (id: string) => void;
     onAudit?: (id: string, name: string) => void;
@@ -59,6 +62,8 @@ function getActionLabel(action: InstanceActionType): string {
             return 'Launching...';
         case 'stop':
             return 'Stopping...';
+        case 'restart':
+            return 'Restarting...';
         case 'switch':
             return 'Switching...';
         case 'fast-forward':
@@ -80,11 +85,11 @@ export default function InstanceTable({
     actionState,
     onLaunch,
     onStop,
+    onRestart,
     onSwitch,
     onFastForward,
     onAudit,
     onSync,
-    syncingInstanceIds,
     onSettings,
     onClone,
     onDelete,
@@ -372,20 +377,37 @@ export default function InstanceTable({
                                     <td className="px-2 py-1.5 text-right whitespace-nowrap w-[130px]">
                                         <div className="inline-flex items-center rounded-[5px] overflow-hidden bg-slate-100 dark:bg-[#071a27] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
                                             {/* Primary 1: Launch / Stop */}
+                                            {/* Primary 1: Split Stop / Restart when running, or Launch when stopped */}
                                             {inst.is_running ? (
-                                                <button
-                                                    type="button"
-                                                    disabled={isBusy}
-                                                    onClick={() => onStop(inst.config.id)}
-                                                    className="px-2 py-1 text-rose-600 dark:text-rose-400 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-l-[5px] transition-colors cursor-pointer disabled:opacity-50"
-                                                    title="Stop Instance"
-                                                >
-                                                    {currentAction === 'stop' ? (
-                                                        <RotateCw className="w-3 h-3 animate-spin text-rose-500" />
-                                                    ) : (
-                                                        <Square className="w-3 h-3 fill-current" />
-                                                    )}
-                                                </button>
+                                                <div className="inline-flex items-center rounded-l-[5px] overflow-hidden">
+                                                    <button
+                                                        type="button"
+                                                        disabled={isBusy}
+                                                        onClick={() => onStop(inst.config.id)}
+                                                        className="px-2 py-1 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer disabled:opacity-50"
+                                                        title="Stop Instance"
+                                                    >
+                                                        {currentAction === 'stop' ? (
+                                                            <RotateCw className="w-3 h-3 animate-spin text-rose-500" />
+                                                        ) : (
+                                                            <Square className="w-3 h-3 fill-current" />
+                                                        )}
+                                                    </button>
+                                                    <div className="w-px h-3.5 bg-slate-300 dark:bg-slate-700/80 my-auto" />
+                                                    <button
+                                                        type="button"
+                                                        disabled={isBusy}
+                                                        onClick={() => onRestart(inst.config.id)}
+                                                        className="px-2 py-1 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer disabled:opacity-50"
+                                                        title="Restart Instance on Current Account"
+                                                    >
+                                                        {currentAction === 'restart' ? (
+                                                            <RotateCw className="w-3 h-3 animate-spin text-amber-500" />
+                                                        ) : (
+                                                            <RotateCcw className="w-3 h-3" />
+                                                        )}
+                                                    </button>
+                                                </div>
                                             ) : (
                                                 <button
                                                     type="button"
@@ -413,7 +435,7 @@ export default function InstanceTable({
                                                 {currentAction === 'switch' ? (
                                                     <RotateCw className="w-3 h-3 animate-spin text-sky-500" />
                                                 ) : (
-                                                    <RotateCcw className="w-3 h-3" />
+                                                    <ArrowLeftRight className="w-3 h-3" />
                                                 )}
                                             </button>
 
@@ -500,8 +522,18 @@ export default function InstanceTable({
                                     onClick={() => { setOpenMoreId(null); onSync(inst.config.id); }}
                                     className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#15334d] text-teal-600 dark:text-teal-400 cursor-pointer"
                                 >
-                                    <RotateCw className="w-3.5 h-3.5 text-teal-500" />
+                                    <Cpu className="w-3.5 h-3.5 text-teal-500" />
                                     <span>Sync PID & Quota</span>
+                                </button>
+                            )}
+                            {inst.is_running && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setOpenMoreId(null); onRestart(inst.config.id); }}
+                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#15334d] text-amber-600 dark:text-amber-400 cursor-pointer"
+                                >
+                                    <RotateCcw className="w-3.5 h-3.5 text-amber-500" />
+                                    <span>Restart Instance</span>
                                 </button>
                             )}
                             <button

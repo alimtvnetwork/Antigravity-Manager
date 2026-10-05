@@ -41,6 +41,12 @@ pub fn stop_instance(instance_id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub async fn restart_instance(instance_id: String) -> Result<InstanceStatus, String> {
+    let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
+    instance::restart_instance(&resolved_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn fast_forward_instance(instance_id: String) -> Result<String, String> {
     crate::modules::auto_switcher::trigger_manual_rotation_for_instance(Some(&instance_id)).await
 }

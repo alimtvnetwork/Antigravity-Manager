@@ -235,6 +235,7 @@ export interface AutoProfileSwitcherConfig {
     prompt_recency_threshold_seconds?: number;
     fast_forward_shortcut?: string;
     account_cooldown_minutes?: number;
+    account_lockout_window_minutes?: number;
 }
 
 // ============================================================================
