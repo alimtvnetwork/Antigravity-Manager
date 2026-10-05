@@ -729,7 +729,11 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
                         && !bid.contains("claude");
                     if is_gemini_weekly && (0.0..=1.0).contains(&b.remaining_fraction) {
                         let pct = (b.remaining_fraction * 100.0).round();
-                        let eff_pct = if pct < WEEKLY_ZERO_THRESHOLD { 0.0 } else { pct };
+                        let eff_pct = if pct < WEEKLY_ZERO_THRESHOLD {
+                            0.0
+                        } else {
+                            pct
+                        };
                         // hours_elapsed = 168 − hours_remaining (compute_weekly_hours_elapsed returns this distance)
                         let hours_elapsed = compute_weekly_hours_elapsed(b, now_sec);
                         gemini_weekly_scores.push(eff_pct * hours_elapsed);
@@ -756,7 +760,11 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
             if !valid_models.is_empty() {
                 let sum: i32 = valid_models.iter().map(|m| m.percentage).sum();
                 let avg_pct = (sum as f64 / valid_models.len() as f64).round();
-                let eff_pct = if avg_pct < WEEKLY_ZERO_THRESHOLD { 0.0 } else { avg_pct };
+                let eff_pct = if avg_pct < WEEKLY_ZERO_THRESHOLD {
+                    0.0
+                } else {
+                    avg_pct
+                };
                 weekly_effective_score = eff_pct * (TOTAL_WEEK_HOURS / 2.0);
             }
         }
@@ -2823,13 +2831,28 @@ mod tests {
     fn test_score_candidate_account_fallback_partial_4h() {
         let now_sec = 1790090000;
         let past_time = "2026-09-22T14:30:00Z";
-        let mut acc = make_test_account("acc-part", "part@domain.com", "gemini-pro", 50, past_time);
+        let mut acc = make_test_account(
+            "acc-part",
+            "part@domain.com",
+            "gemini-pro",
+            50,
+            past_time,
+        );
         acc.last_used = now_sec - 3600;
 
         // In primary scoring mode, an account with partial 4h quota (< 100%) and future reset scores 0.0
         let future_time = "2026-09-22T20:00:00Z";
-        let acc_unrefilled = make_test_account("acc-unrefilled", "unrefilled@domain.com", "gemini-pro", 50, future_time);
-        assert_eq!(score_candidate_account(&acc_unrefilled, "gemini-pro", now_sec), 0.0);
+        let acc_unrefilled = make_test_account(
+            "acc-unrefilled",
+            "unrefilled@domain.com",
+            "gemini-pro",
+            50,
+            future_time,
+        );
+        assert_eq!(
+            score_candidate_account(&acc_unrefilled, "gemini-pro", now_sec),
+            0.0
+        );
 
         // In fallback mode, partial 4h quota (50%) scales the base score:
         // For past_time (period finished): base_score = 504.0
@@ -2842,7 +2865,13 @@ mod tests {
     fn test_weekly_quota_sub_8_percent_zero() {
         let now_sec = 1790090000;
         let future_time = "2026-09-30T14:30:00Z";
-        let mut acc = make_test_account("acc-low", "low@domain.com", "gemini-pro", 100, future_time);
+        let mut acc = make_test_account(
+            "acc-low",
+            "low@domain.com",
+            "gemini-pro",
+            100,
+            future_time,
+        );
         if let Some(ref mut q) = acc.quota {
             q.quota_groups = Some(vec![crate::models::quota::QuotaGroup {
                 display_name: "Gemini Models".to_string(),

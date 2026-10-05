@@ -4125,7 +4125,8 @@ fn compute_project_conversation_tree(
                        WHERE workspace_uris IS NOT NULL AND workspace_uris != '[]' \
                        ORDER BY last_modified_time DESC \
                        LIMIT 200";
-            if let Ok(mut stmt) = s_conn.prepare(sql) {
+            let mut stmt_opt = s_conn.prepare(sql).ok();
+            if let Some(ref mut stmt) = stmt_opt {
                 if let Ok(rows) = stmt.query_map([], |row| {
                     Ok((
                         row.get::<_, String>(0)?,
@@ -4142,12 +4143,13 @@ fn compute_project_conversation_tree(
                             if raw_path.len() < 4 {
                                 continue;
                             }
-                            let norm_inst = if owning_inst_id == "__default__" || owning_inst_id.is_empty() {
-                                "default".to_string()
-                            } else {
-                                crate::modules::instance::resolve_instance_id(owning_inst_id)
-                                    .unwrap_or_else(|_| owning_inst_id.clone())
-                            };
+                            let norm_inst =
+                                if owning_inst_id == "__default__" || owning_inst_id.is_empty() {
+                                    "default".to_string()
+                                } else {
+                                    crate::modules::instance::resolve_instance_id(owning_inst_id)
+                                        .unwrap_or_else(|_| owning_inst_id.clone())
+                                };
                             let repo_name = Path::new(&raw_path)
                                 .file_name()
                                 .map(|n| n.to_string_lossy().to_string())
@@ -4170,6 +4172,7 @@ fn compute_project_conversation_tree(
                     }
                 }
             }
+            drop(stmt_opt);
         }
     }
     // ===== End Fallback =====
