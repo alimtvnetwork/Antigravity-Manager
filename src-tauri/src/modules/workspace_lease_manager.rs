@@ -358,7 +358,10 @@ pub fn is_account_or_email_leased_by_other(account_id: &str, email: &str) -> boo
 }
 
 /// If an account or email is leased by another active node, return (node_alias, profile_name, remaining_seconds)
-pub fn get_remote_lease_holder_info(account_id: &str, email: &str) -> Option<(String, String, i64)> {
+pub fn get_remote_lease_holder_info(
+    account_id: &str,
+    email: &str,
+) -> Option<(String, String, i64)> {
     let local_node = supabase_sync::get_local_node_id();
     let now = Utc::now().timestamp();
     let app_config = crate::modules::config::load_app_config();

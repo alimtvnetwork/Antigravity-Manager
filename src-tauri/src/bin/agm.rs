@@ -6021,11 +6021,16 @@ fn cmd_supabase(args: &[String]) {
                             println!("   • [{}] {} -> {}", ep.id, ep.name, ep.url);
                         }
                     } else {
-                        eprintln!("[WARN] No Supabase credentials found in candidate repo-secrets paths.");
+                        eprintln!(
+                            "[WARN] No Supabase credentials found in candidate repo-secrets paths."
+                        );
                     }
                 }
                 Err(e) => {
-                    eprintln!("[ERROR] Failed to auto-discover Supabase credentials: {}", e);
+                    eprintln!(
+                        "[ERROR] Failed to auto-discover Supabase credentials: {}",
+                        e
+                    );
                 }
             }
         }

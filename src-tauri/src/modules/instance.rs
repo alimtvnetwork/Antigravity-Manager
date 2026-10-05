@@ -4467,7 +4467,10 @@ pub async fn switch_account_to_instance(
             &account.email,
         );
         let detail = if let Some((alias, profile, remaining)) = holder_info {
-            format!("held by remote machine '{}' (Profile: '{}', expires in {}s)", alias, profile, remaining)
+            format!(
+                "held by remote machine '{}' (Profile: '{}', expires in {}s)",
+                alias, profile, remaining
+            )
         } else {
             "currently leased by another active machine in the cluster".to_string()
         };
@@ -4525,7 +4528,8 @@ pub async fn switch_account_to_instance(
         {
             let err = format!(
                 "Cannot switch instance to account '{}': Account is actively bound to running sibling instance '{}' on this machine",
-                account.email, inst.name
+                account.email,
+                inst.name
             );
             crate::modules::logger::log_error(&format!("[INSTANCE_SWITCH:ERROR] {}", err));
             return Err(err);

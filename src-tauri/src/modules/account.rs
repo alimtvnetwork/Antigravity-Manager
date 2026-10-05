@@ -1562,7 +1562,10 @@ pub async fn switch_account(
             &account.email,
         );
         let detail = if let Some((alias, profile, remaining)) = holder_info {
-            format!("held by remote machine '{}' (Profile: '{}', expires in {}s)", alias, profile, remaining)
+            format!(
+                "held by remote machine '{}' (Profile: '{}', expires in {}s)",
+                alias, profile, remaining
+            )
         } else {
             "currently leased by another active machine in the cluster".to_string()
         };
@@ -1580,7 +1583,11 @@ pub async fn switch_account(
             .find(|i| i.bound_account_id.as_deref() == Some(&account.id));
         if let Some(inst) = bound_inst {
             if inst.id != "default"
-                && crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid)
+                && crate::modules::instance::is_instance_running(
+                    &inst.id,
+                    &inst.data_dir,
+                    inst.pid,
+                )
             {
                 return Err(format!(
                     "Cannot switch to account '{}': Account is actively bound to running sibling instance '{}' on this machine",

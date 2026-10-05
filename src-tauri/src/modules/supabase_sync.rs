@@ -141,13 +141,18 @@ pub fn candidate_seed_config_paths() -> Vec<PathBuf> {
         "repo-secrets/03-supabase/02-lovable/supabase-credentials.json",
     ));
     if let Some(home) = dirs::home_dir() {
-        candidates
-            .push(home.join("repo-secrets/02-antigravity-and-event-manager/vault/supabase_config.json"));
+        candidates.push(
+            home.join("repo-secrets/02-antigravity-and-event-manager/vault/supabase_config.json"),
+        );
         candidates
             .push(home.join("repo-secrets/02-antigravity-manager/vault/supabase_config.json"));
         candidates.push(home.join("repo-secrets/03-supabase/01-own/supabase-credentials.json"));
         candidates.push(home.join("repo-secrets/03-supabase/02-lovable/supabase-credentials.json"));
-        candidates.push(home.join(".antigravity_tools/repo-secrets/02-antigravity-manager/vault/supabase_config.json"));
+        candidates.push(
+            home.join(
+                ".antigravity_tools/repo-secrets/02-antigravity-manager/vault/supabase_config.json",
+            ),
+        );
     }
     candidates
 }
@@ -230,13 +235,18 @@ pub fn candidate_repo_secrets_paths() -> Vec<PathBuf> {
     ));
 
     if let Some(home) = dirs::home_dir() {
-        candidates
-            .push(home.join("repo-secrets/02-antigravity-and-event-manager/vault/supabase_config.json"));
+        candidates.push(
+            home.join("repo-secrets/02-antigravity-and-event-manager/vault/supabase_config.json"),
+        );
         candidates
             .push(home.join("repo-secrets/02-antigravity-manager/vault/supabase_config.json"));
         candidates.push(home.join("repo-secrets/03-supabase/01-own/supabase-credentials.json"));
         candidates.push(home.join("repo-secrets/03-supabase/02-lovable/supabase-credentials.json"));
-        candidates.push(home.join(".antigravity_tools/repo-secrets/02-antigravity-manager/vault/supabase_config.json"));
+        candidates.push(
+            home.join(
+                ".antigravity_tools/repo-secrets/02-antigravity-manager/vault/supabase_config.json",
+            ),
+        );
     }
 
     candidates
