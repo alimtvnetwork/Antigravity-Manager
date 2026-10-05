@@ -1,45 +1,58 @@
-# Subtask 02: Semantic Sync Icons Disambiguation & Anti-Confusion Invariant
-
-- **Subtask Identifier**: `02-sync-icons-disambiguation`
-- **Parent Task**: `135-instance-restart-button-sync-icons-and-running-projects-fix`
-- **Specification References**:
-  - Architecture Spec: [`02-spec/21-app/135-instance-restart-button-sync-icons-and-running-projects-fix/01-architecture-spec.md`](file:///d:/work/Antigravity-Manager/02-spec/21-app/135-instance-restart-button-sync-icons-and-running-projects-fix/01-architecture-spec.md)
-  - Component Spec: [`02-spec/21-app/135-instance-restart-button-sync-icons-and-running-projects-fix/02-component-spec.md`](file:///d:/work/Antigravity-Manager/02-spec/21-app/135-instance-restart-button-sync-icons-and-running-projects-fix/02-component-spec.md)
-- **Status**: Ready for Execution
-
 ---
+plan: 135-instance-restart-button-sync-icons-and-running-projects-fix
+subtask: "02"
+title: Semantic Sync Icons Disambiguation & Anti-Confusion Invariant
+domain: frontend-react-ui-icons
+depends_on:
+  - 02-spec/21-app/135-instance-restart-button-sync-icons-and-running-projects-fix/01-architecture-spec.md
+  - 02-spec/21-app/135-instance-restart-button-sync-icons-and-running-projects-fix/02-component-spec.md
+  - 02-spec/21-app/135-instance-restart-button-sync-icons-and-running-projects-fix/03-root-cause-analysis.md
+citations:
+  architecture_spec: 02-spec/21-app/135-instance-restart-button-sync-icons-and-running-projects-fix/01-architecture-spec.md
+  component_spec: 02-spec/21-app/135-instance-restart-button-sync-icons-and-running-projects-fix/02-component-spec.md
+  root_cause_analysis: 02-spec/21-app/135-instance-restart-button-sync-icons-and-running-projects-fix/03-root-cause-analysis.md
+  coding_guidelines: 02-spec/02-coding-guidelines/readme.md
+target_files:
+  - src/pages/Instances.tsx
+  - src/components/instances/InstanceTable.tsx
+  - src/components/instances/PromptTreeViewModal.tsx
+status: pending
+---
+
+# Subtask 02: Semantic Sync Icons Disambiguation & Anti-Confusion Invariant
 
 ## 1. Objectives & User Requirements
 
-The user specified:
+### User Prompt Verbatim:
 > "And there are a couple of sync buttons, sync icons, feels like restart. Try to have a different sync icon, I believe, that would be making more sense."
 
 ### The Anti-Confusion Invariant:
-- Circular rotation arrows (`RotateCw`, `RefreshCw`, `RotateCcw`) universally denote "Restart" or "Reload".
-- When read-only or background metadata sync buttons use circular rotation icons, users believe their active Antigravity IDE instances will be rebooted or closed.
-- **Rule**: `RotateCcw` is **strictly and exclusively reserved** for Restart operations.
-- All synchronization, quota evaluation, credential maintenance, and setting synchronization actions must use dedicated, semantically clear domain icons.
+- In desktop operating systems and web applications, circular rotation arrows (`RotateCw`, `RefreshCw`, `RotateCcw`) universally symbolize "Restart", "Reboot", or "Reload".
+- When read-only or background metadata synchronization buttons use circular rotating glyphs, users mistakenly believe the application is restarting their active IDE instances and terminate running workflows out of caution.
+- **Strict Invariant**: `RotateCcw` is **strictly and exclusively reserved** for Instance Restart operations.
+- All background synchronizations, quota evaluations, credential purges, and configuration syncs must use dedicated, semantically unmistakable domain icons.
 
 ---
 
 ## 2. Icon Transformation Matrix
 
-| Action / Button | Current Confusing Icon | New Distinct Semantic Icon | Target Component / Location | Rationale |
+| Action / Button | Old Ambiguous Icon | New Distinct Semantic Icon | Target Component / Location | Rationale |
 |---|---|---|---|---|
-| **Sync All** | `RotateCw` (circular arrow) | `FolderSync` | [`src/pages/Instances.tsx`](file:///d:/work/Antigravity-Manager/src/pages/Instances.tsx#L657) (Top Toolbar) | Distinguishes full multi-workspace / profile synchronization from instance restarts. |
-| **Eval Quota** | `RotateCw` (circular arrow) | `Sparkles` | [`src/pages/Instances.tsx`](file:///d:/work/Antigravity-Manager/src/pages/Instances.tsx#L741) (Top Toolbar) | Represents intelligent AI quota evaluation and smart auto-rotation candidate selection. |
-| **Wipe Credentials** | `RotateCcw` (restart arrow) | `KeyRound` | [`src/pages/Instances.tsx`](file:///d:/work/Antigravity-Manager/src/pages/Instances.tsx#L1721) (Card Dropdown) | Cleans auth tokens and session keys; `RotateCcw` falsely implied profile reboot. |
-| **Sync PID & Quota** | `Cpu` (already hardened) | `Cpu` | [`src/components/instances/InstanceTable.tsx`](file:///d:/work/Antigravity-Manager/src/components/instances/InstanceTable.tsx#L525) & Card Actions | Microprocessor icon accurately reflects reading OS process table PIDs. |
-| **Account Switch** | `ArrowLeftRight` | `ArrowLeftRight` | Primary Action Pill in Table and Card views | Bidirectional arrows clearly represent switching between accounts. |
-| **Instance Restart** | Missing | `RotateCcw` (**Exclusively Reserved**) | Primary Split Capsule `[Square \| RotateCcw]` | Counter-clockwise circular arrow is the unambiguous desktop symbol for restart. |
+| **Instance Restart** | N/A (Missing) | `RotateCcw` (**Exclusively Reserved**) | Primary Split Capsule `[Square \| RotateCcw]` | Counter-clockwise circular arrow is the standard desktop glyph for restarting an instance on its bound account. |
+| **Sync All** | `RotateCw` (circular arrow) | `FolderSync` | [`src/pages/Instances.tsx`](file:///d:/work/Antigravity-Manager/src/pages/Instances.tsx#L657) (Top Toolbar) | Folder-synchronization glyph accurately represents refreshing workspaces, process PIDs, and quota caches without rebooting. |
+| **Eval Quota** | `RotateCw` (circular arrow) | `Sparkles` | [`src/pages/Instances.tsx`](file:///d:/work/Antigravity-Manager/src/pages/Instances.tsx#L741) (Top Toolbar) | Sparkles glyph communicates intelligent AI quota evaluation and auto-rotation analysis. |
+| **Sync PID & Quota** | `RotateCw` / `RefreshCw` | `Cpu` | [`src/components/instances/InstanceTable.tsx`](file:///d:/work/Antigravity-Manager/src/components/instances/InstanceTable.tsx#L525) & Card Actions | Microprocessor glyph accurately reflects querying OS process table PIDs. |
+| **Wipe Credentials** | `RotateCcw` (restart arrow) | `KeyRound` | [`src/pages/Instances.tsx`](file:///d:/work/Antigravity-Manager/src/pages/Instances.tsx#L1721) (Card Dropdown) | Key glyph clearly conveys purging authentication credentials, eliminating any false implication of an instance restart. |
+| **Account Switch** | `ArrowLeftRight` | `ArrowLeftRight` | Primary Action Pill in Table and Card views | Bidirectional arrows clearly represent account selection and switching. |
+| **Settings & Sync** | `SlidersHorizontal` | `SlidersHorizontal` | Dropdown Menus | Sliders indicate profile configuration and synchronization options. |
 
 ---
 
-## 3. File Locations & Detailed Changes
+## 3. Granular Implementation Steps
 
 ### 3.1 `src/pages/Instances.tsx`
-1. **Import Verification**:
-   - Ensure `FolderSync`, `Sparkles`, `KeyRound`, `Cpu`, `ArrowLeftRight`, `RotateCcw` are imported from `'lucide-react'`:
+1. **Verify Lucide-React Imports**:
+   - Ensure `FolderSync`, `Sparkles`, `KeyRound`, `Cpu`, `ArrowLeftRight`, and `RotateCcw` are imported:
      ```typescript
      import {
          // ...
@@ -58,14 +71,14 @@ The user specified:
      ```tsx
      <FolderSync className={cn("w-3.5 h-3.5 text-cyan-500", isSyncingAll && "animate-pulse")} />
      ```
-     *(Note: `FolderSync` with pulse gives clear visual activity without mimicking a rotating reboot).*
+   - *Design rationale*: `animate-pulse` signifies active background I/O without spinning an asymmetrical folder glyph off-axis.
 3. **"Eval Quota" Button in Toolbar** (around line 741):
    - Replace `<RotateCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />`
    - With:
      ```tsx
      <Sparkles className={cn("w-3.5 h-3.5 text-amber-500", isLoading && "animate-pulse")} />
      ```
-4. **"Wipe Credentials" Button in Card More Dropdown** (around line 1721):
+4. **"Wipe Credentials" Button in Card More Options Dropdown** (around line 1721):
    - Replace `<RotateCcw className="w-3.5 h-3.5" />`
    - With:
      ```tsx
@@ -78,28 +91,38 @@ The user specified:
    - "Restart Instance": `<RotateCcw className="w-3.5 h-3.5 text-amber-500" />`
    - "Settings & Sync": `<SlidersHorizontal className="w-3.5 h-3.5 text-blue-500" />`
    - "Clone Profile": `<Copy className="w-3.5 h-3.5 text-indigo-500" />`
+2. **Verify Primary Action Split Capsule**:
+   - Left button: Stop (`Square`)
+   - Right button: Restart (`RotateCcw`)
+   - Adjacent button: Switch (`ArrowLeftRight`)
+
+### 3.3 `src/components/instances/PromptTreeViewModal.tsx`
+1. Ensure tree refresh button uses either `FolderSync` or `RefreshCw` paired with an explicit text label *"Refresh Tree"* to prevent ambiguity with instance lifecycle operations.
 
 ---
 
-## 4. Visual Aesthetics & Styling Constraints
+## 4. Visual Aesthetics, Styling & Accessibility
 
-1. **Light & Dark Mode Consistency**:
-   - Ensure text and icon colors maintain high contrast in both Tailwind light (`bg-white`, `text-slate-700`) and dark glass (`dark:bg-[#071a27]`, `dark:text-slate-200`) environments.
+1. **Dark Glass & High-Contrast Support**:
+   - Ensure all replaced icons maintain high contrast across light backgrounds (`text-slate-700 hover:text-slate-900`) and dark glass themes (`text-slate-300 hover:text-white`).
 2. **Micro-Interactions**:
-   - For in-flight background operations, prefer `animate-pulse` or a dedicated spinning ring rather than spinning a non-circular icon like `FolderSync` or `KeyRound` out of its axis.
-3. **Tooltip Clarity**:
-   - Keep tooltips descriptive:
-     - "Sync All": *"Synchronize process PIDs and account quotas across all instances"*
-     - "Eval Quota": *"Evaluate rolling quota across all monitored instances and auto-rotate any low quota accounts"*
-     - "Wipe Credentials": *"Clear saved tokens, authentication state, and session keys"*
+   - Background sync operations utilize `animate-pulse` rather than `animate-spin` when using non-circular icons (`FolderSync`, `Sparkles`, `KeyRound`).
+   - Only truly circular glyphs (e.g. `RotateCw` used as a transient loading spinner inside a button) may spin.
+3. **Descriptive Accessible Tooltips**:
+   - "Sync All": `title="Synchronize process PIDs and account quotas across all instances"`
+   - "Eval Quota": `title="Evaluate rolling quota across all monitored instances and auto-rotate low quota accounts"`
+   - "Wipe Credentials": `title="Clear saved tokens, authentication state, and session keys"`
+   - "Restart Instance": `title="Restart Instance on Current Account"`
 
 ---
 
 ## 5. Verification & Acceptance Criteria
 
 - [ ] Audit every occurrence of `RotateCcw` across `src/pages/` and `src/components/instances/` to confirm it is used ONLY for Restart actions.
-- [ ] In `Instances.tsx` toolbar, "Sync All" displays `FolderSync` icon.
-- [ ] In `Instances.tsx` toolbar, "Eval Quota" displays `Sparkles` icon.
-- [ ] In `Instances.tsx` card dropdown, "Wipe Credentials" displays `KeyRound` icon.
-- [ ] In `InstanceTable.tsx` dropdown, "Sync PID & Quota" displays `Cpu` icon.
-- [ ] Icons render crisply with proper colors and contrast in both light and dark modes.
+- [ ] In `Instances.tsx` toolbar, "Sync All" renders `FolderSync` icon.
+- [ ] In `Instances.tsx` toolbar, "Eval Quota" renders `Sparkles` icon.
+- [ ] In `Instances.tsx` card dropdown, "Wipe Credentials" renders `KeyRound` icon.
+- [ ] In `InstanceTable.tsx` dropdown, "Sync PID & Quota" renders `Cpu` icon.
+- [ ] In both Table and Card modes, "Restart Instance" renders `RotateCcw` icon.
+- [ ] In both Table and Card modes, "Switch Account" renders `ArrowLeftRight` icon.
+- [ ] Icons render crisply with high contrast in both light and dark themes.

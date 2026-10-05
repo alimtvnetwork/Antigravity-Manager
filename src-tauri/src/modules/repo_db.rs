@@ -802,22 +802,62 @@ pub fn resume_task_document(
     })
 }
 
+pub fn get_canonical_host_home() -> Option<PathBuf> {
+    if let Some(home) = dirs::home_dir() {
+        let home_str = home.to_string_lossy();
+        if home_str.contains(".antigravity_tools") {
+            let mut curr = home.as_path();
+            while let Some(parent) = curr.parent() {
+                if let Some(name) = curr.file_name().and_then(|n| n.to_str()) {
+                    if name.eq_ignore_ascii_case(".antigravity_tools") {
+                        return Some(parent.to_path_buf());
+                    }
+                }
+                curr = parent;
+            }
+        }
+        return Some(home);
+    }
+    None
+}
+
 pub fn gemini_dirs_for_instance(instance_id: &str) -> Vec<PathBuf> {
     let named = instance_id != "all"
         && instance_id != "default"
         && !instance_id.is_empty()
         && instance_id != "__default__";
-    let home = if named {
-        crate::modules::instance::get_instance_home_dir(instance_id).ok()
-    } else {
-        dirs::home_dir()
-    };
+
     let mut dirs = Vec::new();
-    if let Some(home) = home {
-        for sub in ["antigravity", "antigravity-ide", "antigravity-cli"] {
-            let path = home.join(".gemini").join(sub);
-            if path.exists() {
-                dirs.push(path);
+
+    if named {
+        if let Ok(home) = crate::modules::instance::get_instance_home_dir(instance_id) {
+            for sub in ["antigravity", "antigravity-ide", "antigravity-cli"] {
+                let path = home.join(".gemini").join(sub);
+                if path.exists() {
+                    dirs.push(path);
+                }
+            }
+        }
+    } else {
+        // 1. Host canonical default home
+        if let Some(host_home) = get_canonical_host_home() {
+            for sub in ["antigravity", "antigravity-ide", "antigravity-cli"] {
+                let path = host_home.join(".gemini").join(sub);
+                if path.exists() && !dirs.contains(&path) {
+                    dirs.push(path);
+                }
+            }
+        }
+        // 2. Sandboxed default instance home (if present)
+        if let Ok(instances_dir) = crate::modules::instance::get_instances_dir() {
+            let default_sandbox = instances_dir.join("default").join("home");
+            if default_sandbox.exists() {
+                for sub in ["antigravity", "antigravity-ide", "antigravity-cli"] {
+                    let path = default_sandbox.join(".gemini").join(sub);
+                    if path.exists() && !dirs.contains(&path) {
+                        dirs.push(path);
+                    }
+                }
             }
         }
     }
@@ -840,19 +880,24 @@ pub fn gemini_dirs_tagged(instance_id: Option<&str>) -> Vec<(String, PathBuf)> {
         return tagged;
     }
 
-    // For "all": tag default directories
-    for dir in gemini_dirs_for_instance("default") {
-        tagged.push(("default".to_string(), dir));
-    }
-
-    // Tag each registered secondary instance
+    // When target is "all":
+    // 1. Collect all secondary instance directories first
+    let mut secondary_dirs = std::collections::HashSet::new();
     if let Ok(reg) = crate::modules::instance::load_registry() {
-        for inst in reg.instances {
+        for inst in &reg.instances {
             if !inst.is_default && inst.id != "default" {
                 for dir in gemini_dirs_for_instance(&inst.id) {
+                    secondary_dirs.insert(dir.clone());
                     tagged.push((inst.id.clone(), dir));
                 }
             }
+        }
+    }
+
+    // 2. Add default directories, strictly excluding any secondary sandbox paths
+    for dir in gemini_dirs_for_instance("default") {
+        if !secondary_dirs.contains(&dir) {
+            tagged.push(("default".to_string(), dir));
         }
     }
 
@@ -1752,7 +1797,7 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                 let matches_proj = p.project_id == project_id || p.repo_path == project_id;
                 if matches_inst && matches_proj {
                     let has_running_status = p.status == "running";
-                    let is_fresh = (now - p.updated_at) <= 120;
+                    let is_fresh = (now - p.updated_at) <= 600;
                     if has_running_status && is_fresh {
                         crate::modules::logger::log_instance_prompt_audit(
                             norm_inst,
@@ -1840,7 +1885,7 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                    AND (?2 = 'all' OR instance_id = ?2 OR (?2 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))
                    AND status = 'running'
                    AND updated_at >= ?3",
-                params![project_id, norm_inst, now - 120],
+                params![project_id, norm_inst, now - 600],
                 |r| r.get(0),
             )
             .unwrap_or(0)
@@ -1954,8 +1999,16 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                                 for u in ws_uris {
                                     let clean_p =
                                         normalize_path_for_compare(&decode_uri_to_path(&u));
+                                    let folder_name = Path::new(&clean_p)
+                                        .file_name()
+                                        .and_then(|n| n.to_str())
+                                        .unwrap_or("")
+                                        .to_lowercase();
                                     let has_target = !clean_target.is_empty();
-                                    let is_target_matched = has_target && clean_p == clean_target;
+                                    let is_target_matched = has_target
+                                        && (clean_p == clean_target
+                                            || folder_name == clean_target
+                                            || clean_target.starts_with(&format!("{}-", folder_name)));
                                     if is_target_matched {
                                         crate::modules::logger::log_instance_prompt_audit(
                                             norm_inst,
@@ -2571,7 +2624,7 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
                         .or_insert((false, None, now));
 
                     let is_running_status = status == "running";
-                    let is_fresh = (now - updated_at) <= 120;
+                    let is_fresh = (now - updated_at) <= 600;
                     if is_running_status && is_fresh {
                         entry.0 = true;
                     }
@@ -2714,14 +2767,6 @@ pub fn is_any_prompt_actively_running() -> bool {
         if count > 0 {
             return true;
         }
-    }
-
-    // 3. Process check: if Antigravity process is running
-    let default_dir = crate::modules::instance::get_default_antigravity_data_dir();
-    let pids =
-        crate::modules::instance::find_pids_for_data_dir(&default_dir.to_string_lossy(), true);
-    if !pids.is_empty() {
-        return true;
     }
 
     false
@@ -4140,7 +4185,8 @@ fn compute_project_conversation_tree(
             if let Ok(s_conn) = s_conn {
                 let is_owning_inst_alive =
                     if owning_inst_id == "default" || owning_inst_id == "__default__" {
-                        crate::modules::process::is_antigravity_running(None)
+                        let def_dir = crate::modules::instance::get_default_antigravity_data_dir();
+                        !crate::modules::instance::find_pids_for_data_dir(&def_dir.to_string_lossy(), true).is_empty()
                     } else if let Some(inst) = registry
                         .instances
                         .iter()
@@ -4465,7 +4511,7 @@ fn compute_project_conversation_tree(
                     continue;
                 }
 
-                let is_run = is_inst_alive && ap.status == "running" && (now - ap.updated_at <= 60);
+                let is_run = is_inst_alive && ap.status == "running" && (now - ap.updated_at <= 600);
                 if only_running && !is_run {
                     continue;
                 }
@@ -4633,7 +4679,7 @@ fn compute_project_conversation_tree(
                             matches_inst
                                 && matches_proj
                                 && p.status == "running"
-                                && (now - p.updated_at <= 60)
+                                && (now - p.updated_at <= 600)
                         })
                     } else {
                         false

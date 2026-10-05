@@ -15,6 +15,7 @@ citations:
 target_files:
   - src-tauri/src/modules/repo_db.rs
   - src-tauri/src/modules/instance.rs
+  - src-tauri/src/modules/email_watcher.rs
   - src/pages/Instances.tsx
   - src/components/instances/PromptTreeViewModal.tsx
 status: pending
@@ -24,102 +25,148 @@ status: pending
 
 ## 1. Context & Objectives
 
-Users identified recurrent bugs where projects falsely showed as running when the IDE process was dead or crashed, or falsely flipped to idle while modern thinking models were generating reasoning chains for several minutes. Additionally, cross-instance project bleed and zombie flags lingering from previous application sessions compromised UI accuracy.
+Users identified recurring anomalies where projects falsely showed as running when the IDE process was dead or crashed, or falsely flipped to idle while modern thinking models were generating reasoning chains for several minutes. Additionally, cross-instance project bleed, idle sensor notification suppression, and 5-second TTL cache lag compromised operational reliability.
 
-This subtask delivers an exhaustive, multi-layer root-cause resolution across Rust backend modules (`repo_db.rs`, `instance.rs`) and React components (`Instances.tsx`, `PromptTreeViewModal.tsx`):
-1. **Host Process PID Liveness Enforcement (Gate 0)**: In `detect_running_projects` and `is_instance_running`, strictly verify that the target instance has living OS processes before permitting any project to be marked active.
-2. **Adaptive 10-Minute Thinking Window**: Replace the rigid 60s/120s timeout in Gate 4 with an adaptive 600s window to support extended reasoning models (o1, o3-mini, Claude 3.7 Thinking, Gemini 2.5 Flash Thinking), while respecting explicit idle indicators.
-3. **Multi-Format Fractional Timestamp Parser**: Support ISO 8601 with fractional seconds, RFC 3339, and space-delimited SQLite datetime formats to prevent parser fallback to timestamp `0`.
-4. **Ghost Conversation Pruning**: Exclude 0-word untitled scratch sessions spawned by the IDE from inflating running counts.
-5. **Exact Instance ID Matching**: In `isNodeOwnedByInstance` in `Instances.tsx`, eliminate loose suffix matching (`instConfig.id.endsWith(node.instance_id)`) that caused cross-instance node bleed.
-6. **Startup Zombie Flag Reset**: In `purge_corrupted_running_projects`, execute `UPDATE running_projects SET is_running = 0` on initialization to clear lingering active states from ungraceful shutdowns.
+This subtask delivers an exhaustive, multi-tier root-cause resolution across Rust backend modules (`repo_db.rs`, `instance.rs`, `email_watcher.rs`) and React components (`Instances.tsx`, `PromptTreeViewModal.tsx`) addressing all 6 structural defects:
+
+1. **Defect 1 (Sandbox Home Collision in `gemini_dirs_for_instance`)**: Prevent named profiles from falling back to the user home directory (`dirs::home_dir()`), maintaining strict sandbox path isolation.
+2. **Defect 2 (String Mismatch in Gate 4)**: Implement two-tier path and repository basename/ID matching so that absolute workspace paths in `conversation_summaries.db` match repository names, workspace hashes, and composite keys.
+3. **Defect 3 (Double-Tagging and False Alive via `is_antigravity_running(None)`)**: Replace global OS process checks with strict per-instance PID verification (`find_pids_for_data_dir`) across Gate 0, Gate 4, and `compute_project_conversation_tree`.
+4. **Defect 4 (Adaptive 10-Minute Thinking Window & Fractional Parser)**: Expand the Gate 4 recency cutoff from 120s to 600s (10 minutes) for active reasoning models, support ISO 8601 microseconds and SQL datetimes, and strictly enforce idle supremacy.
+5. **Defect 5 (False Positive in `is_any_prompt_actively_running` Blocking `email_watcher.rs`)**: Remove the blind IDE process check that conflated open editors with active prompts, restoring idle sensor telemetry alerts.
+6. **Defect 6 (Cache Invalidation Contract on Lifecycle Transitions)**: Call `invalidate_prompt_tree_cache` in `close_instance`, `launch_instance`, and `save_or_requeue_prompt`, update frontend `fetchRunningTasks` to pass `{ force: true }`, and reset zombie database flags (`UPDATE running_projects SET is_running = 0`) on startup.
 
 ---
 
 ## 2. Target Files & Symbol Breakdown
 
 ### 2.1 `src-tauri/src/modules/repo_db.rs`
-- [`detect_running_projects`](file:///d:/work/Antigravity-Manager/src-tauri/src/modules/repo_db.rs#L510-L650):
-  - Pre-flight verify instance process liveness (`find_pids_for_data_dir`).
-  - If process table returns empty, set `is_project_active = false` and log `INSTANCE_PROCESS_DEAD`.
-- [`is_prompt_running_for_project`](file:///d:/work/Antigravity-Manager/src-tauri/src/modules/repo_db.rs#L1594-L1930):
-  - Enforce Gate 0 host process liveness.
-  - Upgrade Gate 4 timestamp parsing to handle fractional seconds (`%Y-%m-%dT%H:%M:%S%.f`, `%Y-%m-%d %H:%M:%S%.f`).
-  - Expand thinking window from 120s to 600s (`now - conv_time <= 600`).
-  - Maintain strict idle supremacy (`not_fully_idle == 0` or status contains `IDLE`, `COMPLETED`, `FAILED`, `CANCELLED`).
-  - Filter 0-word untitled ghost sessions.
-- [`compute_project_conversation_tree`](file:///d:/work/Antigravity-Manager/src-tauri/src/modules/repo_db.rs#L3949-L4030):
-  - Require target instance process liveness before tree computation.
-  - Partition cache strictly by instance ID (`tree:{instance_id}:{max_words}:{only_running}`).
-- [`purge_corrupted_running_projects`](file:///d:/work/Antigravity-Manager/src-tauri/src/modules/repo_db.rs#L310-L328):
-  - Add `UPDATE running_projects SET is_running = 0` to reset zombie records on startup.
-  - Wipe `prompt_tree_cache`.
+- [`gemini_dirs_for_instance`](file:///d:/work/Antigravity-Manager/src-tauri/src/modules/repo_db.rs#L805-L825):
+  - Strictly resolve named profiles via `get_instance_home_dir(instance_id)`. If unresolvable, return an empty vector rather than falling back to `dirs::home_dir()`.
+- [`gemini_dirs_tagged`](file:///d:/work/Antigravity-Manager/src-tauri/src/modules/repo_db.rs#L827-L860):
+  - Ensure candidate directories are uniquely tagged and never double-scanned.
+- [`is_prompt_running_for_project`](file:///d:/work/Antigravity-Manager/src-tauri/src/modules/repo_db.rs#L1654-L1995):
+  - Gate 0: Validate instance-specific PID liveness; if dead, return `false` and log `INSTANCE_PROCESS_DEAD`.
+  - Gate 4: Implement two-tier path matching (`clean_p == clean_target || path_basename == target_basename || is_prefix`).
+  - Gate 4: Use `parse_flexible_timestamp` to handle microseconds and ISO formats.
+  - Gate 4: Expand thinking window to 600s (`now - conv_time <= 600`) when `not_fully_idle > 0` and status is `RUNNING`.
+  - Gate 4: Enforce strict idle supremacy (`not_fully_idle == 0` or terminal status).
+  - Gate 4: Prune 0-word untitled ghost sessions.
+- [`compute_project_conversation_tree`](file:///d:/work/Antigravity-Manager/src-tauri/src/modules/repo_db.rs#L3995-L4350):
+  - Replace `is_antigravity_running(None)` calls with `find_pids_for_data_dir(&default_dir, true)`.
+- [`is_any_prompt_actively_running`](file:///d:/work/Antigravity-Manager/src-tauri/src/modules/repo_db.rs#L2660-L2728):
+  - Remove blind IDE process check (`find_pids_for_data_dir`) that erroneously blocked `email_watcher.rs`.
+- [`save_or_requeue_prompt`](file:///d:/work/Antigravity-Manager/src-tauri/src/modules/repo_db.rs#L2731-L2830):
+  - Call `invalidate_prompt_tree_cache(Some(&canonical_inst))` on prompt write.
+- [`purge_corrupted_running_projects`](file:///d:/work/Antigravity-Manager/src-tauri/src/modules/repo_db.rs#L310-L330):
+  - Add `UPDATE running_projects SET is_running = 0` and `DELETE FROM prompt_tree_cache` on startup.
 
 ### 2.2 `src-tauri/src/modules/instance.rs`
-- [`is_instance_running`](file:///d:/work/Antigravity-Manager/src-tauri/src/modules/instance.rs#L2584-L2605):
-  - Validate saved PID against OS process table via `sysinfo`.
-  - Enforce `process_identity_matches` verification on executable path and name.
-  - Fall back to scanning process command lines for `--user-data-dir` matching `data_dir`.
+- [`close_instance`](file:///d:/work/Antigravity-Manager/src-tauri/src/modules/instance.rs#L3920-L4190):
+  - Invoke `crate::modules::repo_db::invalidate_prompt_tree_cache(Some(instance_id))` upon process termination.
+- [`launch_instance_inner_with_extra_workspaces`](file:///d:/work/Antigravity-Manager/src-tauri/src/modules/instance.rs#L3127-L3683):
+  - Invoke `crate::modules::repo_db::invalidate_prompt_tree_cache(Some(instance_id))` upon successful launch.
 
-### 2.3 `src/pages/Instances.tsx`
-- [`isNodeOwnedByInstance`](file:///d:/work/Antigravity-Manager/src/pages/Instances.tsx#L102-L128):
-  - Enforce exact instance ID matching (`node.instance_id === instConfig.id`).
-  - Remove loose suffix matching (`instConfig.id.endsWith(node.instance_id)`).
+### 2.3 `src-tauri/src/modules/email_watcher.rs`
+- Line 393: Audit `is_any_prompt_actively_running()` call site to ensure idle telemetry alerts fire correctly when all projects are idle.
 
-### 2.4 `src/components/instances/PromptTreeViewModal.tsx`
-- [`useEffect` (modal open)](file:///d:/work/Antigravity-Manager/src/components/instances/PromptTreeViewModal.tsx#L1060-L1074):
-  - Guarantee `loadTree(true, true)` on mount to bypass both client memory and SQLite cache.
-- [`handleRestore`](file:///d:/work/Antigravity-Manager/src/components/instances/PromptTreeViewModal.tsx#L1117-L1132):
-  - Guarantee `loadTree(true, true)` on post-restoration refresh instead of parameter-less `loadTree()`.
+### 2.4 `src/pages/Instances.tsx`
+- [`fetchRunningTasks`](file:///d:/work/Antigravity-Manager/src/pages/Instances.tsx#L279-L296):
+  - Support `options: { force?: boolean }`, passing `force: isForce` across IPC to bypass `prompt_tree_cache`.
+  - Pass `{ force: true }` in `handleLaunch`, `handleStop`, and `handleRestart`.
+- [`isNodeOwnedByInstance`](file:///d:/work/Antigravity-Manager/src/pages/Instances.tsx#L102-L130):
+  - Enforce exact instance ID matching (`node.instance_id === instConfig.id`), eliminating loose suffix matching (`instConfig.id.endsWith(...)`).
+
+### 2.5 `src/components/instances/PromptTreeViewModal.tsx`
+- Ensure modal mount and `handleRestore` invoke `loadTree(true, true)` to force fresh data from SQLite.
 
 ---
 
 ## 3. Granular Step-by-Step Implementation
 
-### Step 3.1: Host Process Liveness Gate (Gate 0) in `repo_db.rs`
-1. In `detect_running_projects(instance_id: &str)`:
-   - Call `crate::modules::instance::find_pids_for_data_dir(&instance.data_dir, instance.is_default)`.
-   - Compute `let is_instance_active = !pids.is_empty();`.
-   - If `!is_instance_active`:
-     - Every project in `workspaceStorage` must have `is_running = false`.
-     - Log `INSTANCE_PROCESS_DEAD` via `log_instance_prompt_audit`.
-2. In `is_prompt_running_for_project(project_id: &str, instance_id: &str)`:
-   - Verify `has_active_process` at Gate 0 before inspecting in-memory maps or SQLite records.
-   - If `!has_active_process`, immediately return `false`.
-
-### Step 3.2: Multi-Format Robust Timestamp Parsing in Gate 4
-1. In Gate 4 of `is_prompt_running_for_project`:
-   - Parse `last_modified_time` using cascading parser:
-     ```rust
-     let raw_time = _last_time_str.trim();
-     let norm_time = raw_time.replacen(' ', "T", 1);
-     let conv_time = chrono::DateTime::parse_from_rfc3339(&norm_time)
-         .map(|dt| dt.timestamp())
-         .or_else(|_| {
-             chrono::NaiveDateTime::parse_from_str(&norm_time, "%Y-%m-%dT%H:%M:%S%.f")
-                 .map(|dt| dt.and_utc().timestamp())
-         })
-         .or_else(|_| {
-             chrono::NaiveDateTime::parse_from_str(raw_time, "%Y-%m-%d %H:%M:%S%.f")
-                 .map(|dt| dt.and_utc().timestamp())
-         })
-         .or_else(|_| {
-             chrono::NaiveDateTime::parse_from_str(&norm_time, "%Y-%m-%dT%H:%M:%S")
-                 .map(|dt| dt.and_utc().timestamp())
-         })
-         .or_else(|_| {
-             chrono::NaiveDateTime::parse_from_str(raw_time, "%Y-%m-%d %H:%M:%S")
-                 .map(|dt| dt.and_utc().timestamp())
-         })
-         .unwrap_or(0);
-     ```
-2. Replace rigid 120s TTL with adaptive 600s thinking window:
+### Step 3.1: Fix Defect 1 (Sandbox Home Collision) in `repo_db.rs`
+1. Locate `gemini_dirs_for_instance(instance_id: &str)`:
    ```rust
-   let is_recent = conv_time > 0 && (now - conv_time <= 600);
+   pub fn gemini_dirs_for_instance(instance_id: &str) -> Vec<PathBuf> {
+       let named = instance_id != "all"
+           && instance_id != "default"
+           && !instance_id.is_empty()
+           && instance_id != "__default__";
+
+       let home = if named {
+           crate::modules::instance::get_instance_home_dir(instance_id).ok()
+       } else {
+           dirs::home_dir()
+       };
+
+       let mut dirs = Vec::new();
+       if let Some(home) = home {
+           for sub in ["antigravity", "antigravity-ide", "antigravity-cli"] {
+               let path = home.join(".gemini").join(sub);
+               if path.exists() {
+                   dirs.push(path);
+               }
+           }
+       }
+       dirs
+   }
+   ```
+2. Ensure named instances never fall back to `dirs::home_dir()`. If `get_instance_home_dir` fails, `home` remains `None`, returning `Vec::new()`.
+
+### Step 3.2: Fix Defect 2 (Two-Tier Path & Basename Matching) in Gate 4
+1. In `is_prompt_running_for_project`:
+   ```rust
+   let clean_target = normalize_path_for_compare(project_id);
+   let target_basename = Path::new(project_id)
+       .file_name()
+       .map(|n| n.to_string_lossy().to_lowercase())
+       .unwrap_or_else(|| {
+           project_id
+               .split("__")
+               .next()
+               .unwrap_or(project_id)
+               .to_lowercase()
+       });
+   ```
+2. In Gate 4 workspace evaluation:
+   ```rust
+   let clean_p = normalize_path_for_compare(&decode_uri_to_path(&u));
+   let path_basename = Path::new(&clean_p)
+       .file_name()
+       .map(|n| n.to_string_lossy().to_lowercase())
+       .unwrap_or_default();
+
+   let is_direct_match = !clean_target.is_empty() && clean_p == clean_target;
+   let is_basename_match = !target_basename.is_empty() && path_basename == target_basename;
+   let is_subpath_match = clean_target.starts_with(&clean_p) || clean_p.starts_with(&clean_target);
+
+   if is_direct_match || is_basename_match || is_subpath_match {
+       // Confirmed active turn for target project!
+       return true;
+   }
    ```
 
-### Step 3.3: Ghost Conversation & Idle Supremacy Filter
-1. Preserve explicit idle override:
+### Step 3.3: Fix Defect 3 (Eliminate `is_antigravity_running(None)`)
+1. In `compute_project_conversation_tree` (lines 4059, 4143, 4281):
+   - Replace `crate::modules::process::is_antigravity_running(None)` with:
+     ```rust
+     let is_default_alive = {
+         let default_dir = crate::modules::instance::get_default_antigravity_data_dir();
+         let pids = crate::modules::instance::find_pids_for_data_dir(&default_dir.to_string_lossy(), true);
+         !pids.is_empty()
+     };
+     ```
+   - This ensures the default instance is only reported alive if an Antigravity process with the default user data directory is actively running.
+
+### Step 3.4: Fix Defect 4 (Adaptive 10-Minute Thinking Window & Fractional Parser)
+1. In `repo_db.rs`, implement `parse_flexible_timestamp(raw: &str) -> i64`:
+   - Supports `%Y-%m-%dT%H:%M:%S%.f%:z`, RFC 3339, `%Y-%m-%d %H:%M:%S%.f`, `%Y-%m-%d %H:%M:%S`, and epoch integers.
+2. In Gate 4:
+   ```rust
+   let conv_time = parse_flexible_timestamp(&_last_time_str);
+   let is_recent = conv_time > 0 && (now - conv_time <= 600); // 10-minute adaptive window
+   ```
+3. Enforce strict idle supremacy:
    ```rust
    let is_idle_count = not_fully_idle == 0;
    let has_idle_status = status.contains("IDLE")
@@ -127,76 +174,49 @@ This subtask delivers an exhaustive, multi-layer root-cause resolution across Ru
        || status.contains("FAILED")
        || status.contains("CANCELLED");
    let is_explicit_idle = is_idle_count || has_idle_status;
-   let is_conv_running = !is_explicit_idle && not_fully_idle > 0 && status.contains("RUNNING");
+   if is_explicit_idle {
+       continue;
+   }
    ```
-2. In `compute_project_conversation_tree`, filter out conversation records where:
-   - `prompt_word_count == 0` AND title begins with "untitled" or is empty.
 
-### Step 3.4: Exact Instance ID Ownership in `Instances.tsx`
-1. In `src/pages/Instances.tsx`:
-   - Update `isNodeOwnedByInstance`:
-     ```typescript
-     export const isNodeOwnedByInstance = (
-         node: AgmProjectTreeNode,
-         instConfig: { id: string; is_default?: boolean; seq_num?: number }
-     ): boolean => {
-         if (!node.instance_id || node.instance_id.trim() === '') {
-             return false;
-         }
-         if (instConfig.is_default) {
-             return isDefaultOwned(node.instance_id, instConfig.id);
-         }
-         if (node.instance_id === 'default' || node.instance_id === '__default__') {
-             return false;
-         }
-         if (node.instance_id === instConfig.id) {
-             return true;
-         }
-         const hasSeqNum = typeof instConfig.seq_num === 'number' && instConfig.seq_num > 1;
-         if (hasSeqNum && node.instance_seq_num === instConfig.seq_num) {
-             return true;
-         }
-         return false;
-     };
-     ```
+### Step 3.5: Fix Defect 5 (Unblock `email_watcher.rs` in `is_any_prompt_actively_running`)
+1. In `is_any_prompt_actively_running()` in `repo_db.rs`:
+   - Delete lines 2719–2726 (the blind `find_pids_for_data_dir` process check).
+   - Only return `true` if `conversation_summaries.db` has non-idle running rows or `active_prompts` has running/queued rows.
+2. Verify that when all conversations and queues are idle, `is_any_prompt_actively_running()` returns `false`, allowing `email_watcher.rs` to send idle alerts.
 
-### Step 3.5: Startup Zombie Flag Reset in `purge_corrupted_running_projects`
-1. In `src-tauri/src/modules/repo_db.rs`:
-   - Enhance `purge_corrupted_running_projects(conn: &Connection)`:
+### Step 3.6: Fix Defect 6 (Cache Invalidation Contract & Startup Purge)
+1. In `src-tauri/src/modules/instance.rs`:
+   - At the end of `close_instance(instance_id)`:
      ```rust
-     pub fn purge_corrupted_running_projects(conn: &Connection) -> Result<(usize, usize), String> {
-         let deleted_projects = conn
-             .execute(
-                 "DELETE FROM running_projects 
-                  WHERE workspace_storage_path IS NULL 
-                     OR trim(workspace_storage_path) = '' 
-                     OR instr(id, '__') = 0 
-                     OR trim(instance_id) = ''",
-                 [],
-             )
-             .map_err(|e| format!("Failed to purge corrupted running_projects: {}", e))?;
-
-         let _ = conn.execute("UPDATE running_projects SET is_running = 0", []);
-
-         let deleted_cache = conn
-             .execute("DELETE FROM prompt_tree_cache", [])
-             .map_err(|e| format!("Failed to wipe prompt_tree_cache: {}", e))?;
-
-         Ok((deleted_projects, deleted_cache))
-     }
+     crate::modules::repo_db::invalidate_prompt_tree_cache(Some(instance_id));
      ```
-
-### Step 3.6: Cache Invalidation in `PromptTreeViewModal.tsx`
-1. Ensure modal mount calls `loadTree(true, true, latestArchived, latestPinned)`.
-2. Update `handleRestore` to invoke `loadTree(true, true)` upon successful restoration dispatch.
+   - At the end of `launch_instance_inner_with_extra_workspaces`:
+     ```rust
+     crate::modules::repo_db::invalidate_prompt_tree_cache(Some(instance_id));
+     ```
+2. In `src-tauri/src/modules/repo_db.rs`:
+   - In `save_or_requeue_prompt`:
+     ```rust
+     invalidate_prompt_tree_cache(Some(&canonical_inst));
+     ```
+   - In `purge_corrupted_running_projects`:
+     ```rust
+     let _ = conn.execute("UPDATE running_projects SET is_running = 0", []);
+     let _ = conn.execute("DELETE FROM prompt_tree_cache", []);
+     ```
+3. In `src/pages/Instances.tsx`:
+   - Update `fetchRunningTasks` signature: `const fetchRunningTasks = async (options: { force?: boolean } = {}) => { ... }`.
+   - Pass `options.force ?? false` to `get_project_conversation_tree`.
+   - Call `fetchRunningTasks({ force: true })` inside `handleLaunch`, `handleStop`, `handleRestart`, and on window focus.
 
 ---
 
-## 4. Verification & Testing Checklist
+## 4. Verification Checklist
 
-- [ ] **PID Dead Gating**: Kill Antigravity process; verify `detect_running_projects` sets `is_running: false` for all projects.
-- [ ] **Extended Thinking Window**: Verify prompts with turn age between 120s and 600s continue reporting `is_running: true` when status is `RUNNING`.
-- [ ] **Fractional Timestamp Test**: Verify timestamps formatted with microseconds parse to correct Unix timestamps.
-- [ ] **Ghost Pruning**: Verify 0-word untitled conversations are not counted as running.
-- [ ] **Cross-Instance Isolation**: Verify instances with matching ID suffixes do not claim each other's project nodes.
-- [ ] **Startup Purge**: Verify `UPDATE running_projects SET is_running = 0` runs cleanly without database lock errors.
+- [ ] **Defect 1**: Calling `gemini_dirs_for_instance` on named instances never returns paths in user home `~/.gemini`.
+- [ ] **Defect 2**: `is_prompt_running_for_project` matches projects whether passed an absolute path, repo basename, or workspace hash.
+- [ ] **Defect 3**: Closing the default instance while a secondary instance is running results in default instance reporting dead (`is_alive = false`).
+- [ ] **Defect 4**: Prompts generating reasoning chains for >120s retain `is_running: true` up to 600s as long as idle status is not set; fractional timestamps parse correctly.
+- [ ] **Defect 5**: An open but idle IDE does not prevent `email_watcher.rs` from detecting idleness.
+- [ ] **Defect 6**: Stopping or launching an instance immediately clears the prompt tree cache; frontend reflects the new state without 5-second lag; startup resets zombie `is_running = 1` rows to 0.

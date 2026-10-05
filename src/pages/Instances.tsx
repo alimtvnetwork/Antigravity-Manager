@@ -912,7 +912,7 @@ export default function Instances() {
                                 className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-[5px] bg-blue-600 hover:bg-blue-500 text-white shadow-xs cursor-pointer transition-colors active:scale-95 shrink-0"
                                 title={rotateTooltip}
                             >
-                                <RotateCcw className="w-3.5 h-3.5" />
+                                <FastForward className="w-3.5 h-3.5" />
                                 <span>{t('instances.rotate_next_best', 'Rotate to Next Best')}</span>
                                 {nextBestCandidate && (
                                     <span className="px-1.5 py-0.5 rounded-[4px] bg-blue-500/30 text-[10px] font-mono font-normal max-w-[110px] truncate">

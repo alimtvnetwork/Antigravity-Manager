@@ -3574,6 +3574,7 @@ fn launch_instance_inner_with_extra_workspaces(
             let _ = crate::modules::repo_db::dispatch_running_prompts(instance_id);
             let _ = crate::modules::repo_db::ensure_prompt_goals_running_for_instance(instance_id);
         }
+        crate::modules::repo_db::invalidate_prompt_tree_cache(Some(instance_id));
         return Ok(());
     }
 
@@ -3678,6 +3679,7 @@ fn launch_instance_inner_with_extra_workspaces(
             let _ = crate::modules::repo_db::dispatch_running_prompts(instance_id);
             let _ = crate::modules::repo_db::ensure_prompt_goals_running_for_instance(instance_id);
         }
+        crate::modules::repo_db::invalidate_prompt_tree_cache(Some(instance_id));
         Ok(())
     }
 }
@@ -4182,6 +4184,7 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     }
 
     let _ = mark_instance_stopped(instance_id);
+    crate::modules::repo_db::invalidate_prompt_tree_cache(Some(instance_id));
 
     // Small settle delay to ensure OS flushes file handles and SQLite locks
     std::thread::sleep(std::time::Duration::from_millis(150));
