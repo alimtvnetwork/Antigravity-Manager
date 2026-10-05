@@ -3,6 +3,14 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.157.2 (2026-10-05)**:
+        -   **[Two-Phase 4-Hour Quota Gate & Hours-Remaining Weekly Scoring Algorithm]**:
+            -   **Phase 1 (Primary Selection)**: Candidate accounts with less than 100% 4-hour quota (and whose reset period has not finished) strictly evaluate to `0.0`. Only accounts with full 100% 4h quota or elapsed cycles receive the base weekly score `base_weekly_score.floor()`. (Thanks to @aukgit)
+            -   **Phase 2 (Graceful Degradation)**: When no account has 100% 4h quota (`available_pool` and `cooldown_pool` both empty), fallback evaluates partial 4h accounts via `((q_4h / 100.0) * base_weekly_score).floor()`, scaling linearly by available 4h percentage. (Thanks to @aukgit)
+            -   **Hours-Remaining Inversion**: Uses weekly refill countdown `hours_remaining` to calculate elapsed cycle distance `(168 - hours_remaining)` so accounts nearest to their weekly refill receive highest weight: `(tier_multiplier * effective_weekly_pct * (168 - hours_remaining)) / 100.0`. (Thanks to @aukgit)
+            -   **8% Weekly Elimination Floor**: Accounts with weekly quota below 8% strictly evaluate to `0.0`. (Thanks to @aukgit)
+            -   **Descending Sort**: Candidate pools sorted descending (highest integer score selected first). Claude/3p buckets preserved with `TODO(claude)` ambiguity marker. (Thanks to @aukgit)
+
     *   **v4.157.1 (2026-10-05)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

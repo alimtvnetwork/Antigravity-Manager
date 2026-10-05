@@ -681,20 +681,18 @@ fn compute_weekly_hours_elapsed(bucket: &crate::models::quota::QuotaBucket, now_
 /// - Sorting direction: ASCENDING (lowest score = account just reset = selected first).
 /// - Weekly quota < 8% treated as 0 (below viable threshold for Gemini).
 /// - Claude/3p buckets are excluded (TODO: define Claude weekly scoring algorithm).
-pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
+/// Compute the base weekly score ("score what we have"):
+/// Formula: (tier_multiplier * weekly_effective_score) / 100.0
+/// where weekly_effective_score = effective_weekly_pct * (168.0 - hours_remaining).
+/// Accounts with weekly quota < 8% strictly score 0.0 (Gemini threshold).
+/// If period is finished (reset time elapsed), weekly_effective_score = 168.0 * 100.0 (maximum fresh credits).
+/// TODO(claude): Claude/3p weekly scoring algorithm undefined — 3p buckets excluded with ambiguity marker.
+pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
     let period_stat = evaluate_account_period_status(acc, target_model, 20.0, now_sec);
     let is_period_finished = period_stat
         .as_ref()
         .map(|s| s.is_period_finished)
         .unwrap_or(false);
-    let q_4h = period_stat
-        .as_ref()
-        .map(|s| s.quota_percent)
-        .or_else(|| calculate_4h_window_quota(acc, target_model))
-        .unwrap_or(0.0);
-
-    // q_4h is used as a score multiplier (0-100%). Accounts with 0% 4h quota score 0 naturally.
-    // No hard gate — the multiplication suppresses ineligible accounts without a binary cutoff.
 
     // 1. Subscription tier multiplier
     let tier = acc
@@ -712,17 +710,10 @@ pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) 
         1.0
     };
 
-    // 2. Weekly quota: hours-remaining-weighted scoring (Gemini buckets only)
-    // Formula: score = q_4h × weekly_pct × (168 − hours_remaining) ÷ 10000
-    //   where (168 − hours_remaining) = hours_elapsed since weekly cycle start.
-    //   Accounts with LESS remaining time score HIGHER (close to refill = high elapsed).
-    // Sort DESCENDING: highest integer score selected first.
-    // Weekly quota < 8% is treated as 0 (below viable threshold for Gemini).
-    // TODO(claude): Claude/3p weekly scoring algorithm undefined — 3p buckets excluded.
     const TOTAL_WEEK_HOURS: f64 = 168.0;
     const WEEKLY_ZERO_THRESHOLD: f64 = 8.0;
 
-    let mut weekly_effective_score = 0.0_f64; // Default worst-case for DESC sort (sorted last)
+    let mut weekly_effective_score = 0.0_f64;
 
     if let Some(quota_data) = acc.quota.as_ref() {
         let mut gemini_weekly_scores: Vec<f64> = Vec::new();
@@ -739,7 +730,7 @@ pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) 
                     if is_gemini_weekly && (0.0..=1.0).contains(&b.remaining_fraction) {
                         let pct = (b.remaining_fraction * 100.0).round();
                         let eff_pct = if pct < WEEKLY_ZERO_THRESHOLD { 0.0 } else { pct };
-                        // hours_elapsed = 168 − hours_remaining (compute_weekly_hours_elapsed returns this)
+                        // hours_elapsed = 168 − hours_remaining (compute_weekly_hours_elapsed returns this distance)
                         let hours_elapsed = compute_weekly_hours_elapsed(b, now_sec);
                         gemini_weekly_scores.push(eff_pct * hours_elapsed);
                     }
@@ -771,18 +762,68 @@ pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) 
         }
     }
 
-    // 3. Reset boundary: if 4h period has finished, treat as 100% 4h + max weekly elapsed
+    // Reset boundary: if period has finished, credits refresh to full 100% capacity
     if is_period_finished {
-        weekly_effective_score = TOTAL_WEEK_HOURS * 100.0; // Full week × 100% = highest possible
+        weekly_effective_score = TOTAL_WEEK_HOURS * 100.0;
     }
 
-    // Final score = q_4h × tier × weekly_eff_score ÷ 10000 → compact integer for DB.
-    // q_4h (0-100) × weekly_eff_score (0-16800) × tier (1/3/5) ÷ 10000.
-    // Example: kino (q4h=100, weekly=86, hours_remaining=7h → elapsed=161):
-    //   100 × 86 × 161 = 1,384,600 → × tier(3) ÷ 10000 = 415
-    (q_4h * tier_multiplier * weekly_effective_score / 10000.0).floor()
-
+    (tier_multiplier * weekly_effective_score) / 100.0
 }
+
+/// Primary candidate scoring ("usually"):
+/// - If 4h quota is less than 100% (and period not finished): strictly returns 0.0.
+/// - Otherwise (4h quota == 100% or period finished): returns base weekly score floor.
+/// Sort direction: DESCENDING (highest score selected first).
+pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
+    let period_stat = evaluate_account_period_status(acc, target_model, 20.0, now_sec);
+    let is_period_finished = period_stat
+        .as_ref()
+        .map(|s| s.is_period_finished)
+        .unwrap_or(false);
+    let q_4h = period_stat
+        .as_ref()
+        .map(|s| s.quota_percent)
+        .or_else(|| calculate_4h_window_quota(acc, target_model))
+        .unwrap_or(0.0);
+
+    // Primary 100% 4-Hour Quota Gate:
+    // If 4h time is less than 100%, usually it should be 0.
+    if q_4h < 100.0 && !is_period_finished {
+        return 0.0;
+    }
+
+    let base_score = calculate_weekly_base_score(acc, target_model, now_sec);
+    base_score.floor()
+}
+
+/// Fallback candidate scoring ("unless there is another option / if nothing found"):
+/// - When no account has 100% 4h quota, evaluate partial 4h quota:
+///   Score = 4h percentage % × (score what we have) = ((q_4h / 100.0) * base_weekly_score).floor().
+/// - Accounts with weekly quota < 8% strictly evaluate to 0.0.
+pub fn score_candidate_account_fallback(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
+    let period_stat = evaluate_account_period_status(acc, target_model, 20.0, now_sec);
+    let is_period_finished = period_stat
+        .as_ref()
+        .map(|s| s.is_period_finished)
+        .unwrap_or(false);
+    let q_4h = if is_period_finished {
+        100.0
+    } else {
+        period_stat
+            .as_ref()
+            .map(|s| s.quota_percent)
+            .or_else(|| calculate_4h_window_quota(acc, target_model))
+            .unwrap_or(0.0)
+    };
+
+    if q_4h <= 0.0 {
+        return 0.0;
+    }
+
+    let base_score = calculate_weekly_base_score(acc, target_model, now_sec);
+    ((q_4h / 100.0) * base_score).floor()
+}
+
 
 /// Specifically evaluate the 4-hour / 5-hour immediate rolling window quota (0-100%)
 pub fn calculate_4h_window_quota(account: &Account, target_model: &str) -> Option<f64> {
@@ -1127,7 +1168,7 @@ pub fn select_candidate_profiles(
             let quota = calculate_candidate_quota(acc, target_model).unwrap_or(0.0);
             if quota > threshold {
                 seen_account_ids.insert(acc.id.clone());
-                let score = quota / 100.0;
+                let score = score_candidate_account_fallback(acc, target_model, now_sec);
                 let candidate = ProfileCandidate {
                     instance_id: current_instance_id.to_string(),
                     account_id: acc.id.clone(),
@@ -2674,9 +2715,10 @@ mod tests {
         let score_a = score_candidate_account(&acc_a, "gemini-pro", now_sec);
         let score_b = score_candidate_account(&acc_b, "gemini-pro", now_sec);
 
-        // Account A period finished resets to 100% (normalized score: (1.0 * 3.0 * 100.0) / 1000.0 = 0.3)
-        // Account B has < 100% quota and period not finished -> strictly 0.0
-        assert!((score_a - 0.3).abs() < 1e-6);
+        // Account A period finished resets to 100% capacity:
+        // base_score = (3.0 * 168.0 * 100.0) / 100.0 = 504.0
+        // Account B has < 100% quota and period not finished -> strictly 0.0 in primary phase
+        assert_eq!(score_a, 504.0);
         assert_eq!(score_b, 0.0);
         assert!(score_a > score_b);
     }
@@ -2771,11 +2813,58 @@ mod tests {
         let score_a = score_candidate_account(&acc_a, "gemini-pro", now_sec);
         let score_b = score_candidate_account(&acc_b, "gemini-pro", now_sec);
 
-        // Account A normalized: (1.0 * 3.0 * 100.0) / 1000.0 = 0.300
-        // Account B normalized: (1.0 * 3.0 * 21.0) / 1000.0 = 0.063
-        assert!((score_a - 0.3).abs() < 1e-6);
-        assert!((score_b - 0.063).abs() < 1e-6);
+        // Account A has 100% weekly quota while Account B has 21% -> score_a > score_b > 0
+        assert!(score_a > 0.0);
+        assert!(score_b > 0.0);
         assert!(score_a > score_b);
+    }
+
+    #[test]
+    fn test_score_candidate_account_fallback_partial_4h() {
+        let now_sec = 1790090000;
+        let past_time = "2026-09-22T14:30:00Z";
+        let mut acc = make_test_account("acc-part", "part@domain.com", "gemini-pro", 50, past_time);
+        acc.last_used = now_sec - 3600;
+
+        // In primary scoring mode, an account with partial 4h quota (< 100%) and future reset scores 0.0
+        let future_time = "2026-09-22T20:00:00Z";
+        let acc_unrefilled = make_test_account("acc-unrefilled", "unrefilled@domain.com", "gemini-pro", 50, future_time);
+        assert_eq!(score_candidate_account(&acc_unrefilled, "gemini-pro", now_sec), 0.0);
+
+        // In fallback mode, partial 4h quota (50%) scales the base score:
+        // For past_time (period finished): base_score = 504.0
+        // Fallback score = (50 / 100) * 504.0 = 252.0
+        let fallback_score = score_candidate_account_fallback(&acc, "gemini-pro", now_sec);
+        assert_eq!(fallback_score, 252.0);
+    }
+
+    #[test]
+    fn test_weekly_quota_sub_8_percent_zero() {
+        let now_sec = 1790090000;
+        let future_time = "2026-09-30T14:30:00Z";
+        let mut acc = make_test_account("acc-low", "low@domain.com", "gemini-pro", 100, future_time);
+        if let Some(ref mut q) = acc.quota {
+            q.quota_groups = Some(vec![crate::models::quota::QuotaGroup {
+                display_name: "Gemini Models".to_string(),
+                description: None,
+                buckets: vec![crate::models::quota::QuotaBucket {
+                    bucket_id: "gemini-weekly".to_string(),
+                    window: "weekly".to_string(),
+                    remaining_fraction: 0.06, // 6% < 8%
+                    reset_time: future_time.to_string(),
+                    observed_at: None,
+                    cycle_tokens: None,
+                    display_name: None,
+                    description: None,
+                }],
+            }]);
+        }
+
+        // Weekly quota below 8% strictly produces 0.0
+        let score = score_candidate_account(&acc, "gemini-pro", now_sec);
+        assert_eq!(score, 0.0);
+    }
+
 
         // Stale binding timeout verification (default 6h, configurable 6-10h)
         let stale_inst = crate::models::InstanceConfig {

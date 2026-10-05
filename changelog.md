@@ -1,5 +1,17 @@
 # Changelog
 
+## [v4.157.2] - 2026-10-05
+
+### Fixed
+- **候选账号两阶段 4 小时配额门禁与周配额倒计时加权评分算法 (Two-Phase 4-Hour Quota Gate & Hours-Remaining Weekly Scoring)**:
+  - **阶段一（主候选池标准打分）**：若 4 小时配额小于 100%（且配额周期未结束），候选账号评分严格归零（通常情况下为 0），仅在 4 小时配额满额（100%）或周期重置完成时赋予周配额基准分 `base_weekly_score.floor()`。
+  - **阶段二（无满额账号平滑降级）**：当所有可用候选账号 4 小时配额均不足 100%（主候选池与冷却池为空）时，触发第二阶段降级评估，按 `(q_4h / 100.0) * base_weekly_score` 计算得分，实现按 4 小时可用比例线性折算。
+  - **周重置倒计时加权计算**：以周重置剩余小时数 `hours_remaining` 计算本周已消耗有效时长 `(168 - hours_remaining)`，距离重置越近（剩余小时越少、已消耗时长越大）权重越高；公式为 `(tier_multiplier * effective_weekly_pct * (168 - hours_remaining)) / 100.0`。
+  - **8% 周配额硬淘汰底线**：周配额小于 8% 的账号一律按 0 处理，杜绝濒临耗尽的周配额账号误入候选池。
+  - **降序排列与紧凑整数**：排序规则统一为降序（最高分优先），得分取整输出，优化 SQLite 存储效率；Claude/3p 桶保持 `TODO(claude)` 标记。 (Thanks to @aukgit)
+
+---
+
 ## [v4.157.1] - 2026-10-05
 
 ### Fixed
@@ -673,6 +685,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.157.2 (2026-10-05)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.157.1 (2026-10-05)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

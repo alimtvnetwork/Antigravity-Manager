@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.157.1)
+> Professional AI Account Management & Protocol Proxy System (v4.157.2)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.157.1-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.157.2-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.157.0**: Fixed empty prompt tree view by adding a fallback in `compute_project_conversation_tree()` that synthesizes project entries directly from `workspace_uris` in each instance's `conversation_summaries.db` when `workspaceStorage` is empty; restored neon glowing green `#1af18d` progress bars with `shadow-[0_0_10px_rgba(26,241,141,0.75)]` glow effect and compact 18% side-column widths; added three-part identity header (`#seq` + profile name + `...\Antigravity.exe`) to Prompt Tree View modal; replaced weekly quota scoring with an hours-elapsed-weighted algorithm (`weekly_effective_score = weekly_pct × hours_elapsed`, ascending sort, <8% treated as zero). (Thanks to @aukgit)
+> Latest version **v4.157.2**: Implemented the two-phase candidate account selection and hours-remaining weekly scoring algorithm: accounts with less than 100% 4-hour quota evaluate to 0.0 in primary selection; when no 100% accounts exist, system seamlessly falls back to linear 4-hour percentage scaling `(q_4h / 100.0) * base_weekly_score`; weekly quota scoring uses refill countdown `(168 - hours_remaining)` distance; accounts with less than 8% weekly quota strictly evaluate to 0.0; pools sorted descending by highest integer score. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

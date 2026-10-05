@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.157.1-3B82F6?style=flat-square" alt="Version v4.157.1">
+    <img src="https://img.shields.io/badge/Version-v4.157.2-3B82F6?style=flat-square" alt="Version v4.157.2">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.157.1)**
+**Bar 2: Version-Based Installation (v4.157.2)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -550,7 +550,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.157.0**: Fixed empty prompt tree view by adding a fallback in `compute_project_conversation_tree()` that synthesizes project entries directly from `workspace_uris` in each instance's `conversation_summaries.db` when `workspaceStorage` is empty; restored neon glowing green `#1af18d` progress bars with `shadow-[0_0_10px_rgba(26,241,141,0.75)]` glow effect and compact 18% side-column widths; added three-part identity header (`#seq` + profile name + `...\Antigravity.exe`) to Prompt Tree View modal; replaced weekly quota scoring with an hours-elapsed-weighted algorithm (`weekly_effective_score = weekly_pct × hours_elapsed`, ascending sort, <8% treated as zero). (Thanks to @aukgit)
+> Latest version **v4.157.2**: Implemented the two-phase candidate account selection and hours-remaining weekly scoring algorithm: accounts with less than 100% 4-hour quota evaluate to 0.0 in primary selection; when no 100% accounts exist, system seamlessly falls back to linear 4-hour percentage scaling `(q_4h / 100.0) * base_weekly_score`; weekly quota scoring uses refill countdown `(168 - hours_remaining)` distance; accounts with less than 8% weekly quota strictly evaluate to 0.0; pools sorted descending by highest integer score. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 
