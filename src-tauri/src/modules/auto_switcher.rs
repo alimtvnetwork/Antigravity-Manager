@@ -671,7 +671,9 @@ fn compute_weekly_hours_elapsed(bucket: &crate::models::quota::QuotaBucket, now_
     };
     let remaining_secs = reset_ts.saturating_sub(now_sec).max(0);
     let remaining_hours = remaining_secs as f64 / 3600.0;
-    (TOTAL_WEEK_HOURS - remaining_hours).max(0.0).min(TOTAL_WEEK_HOURS)
+    (TOTAL_WEEK_HOURS - remaining_hours)
+        .max(0.0)
+        .min(TOTAL_WEEK_HOURS)
 }
 
 /// Hours-elapsed-weighted weekly quota scoring algorithm:
@@ -831,7 +833,6 @@ pub fn score_candidate_account_fallback(acc: &Account, target_model: &str, now_s
     let base_score = calculate_weekly_base_score(acc, target_model, now_sec);
     ((q_4h / 100.0) * base_score).floor()
 }
-
 
 /// Specifically evaluate the 4-hour / 5-hour immediate rolling window quota (0-100%)
 pub fn calculate_4h_window_quota(account: &Account, target_model: &str) -> Option<f64> {
