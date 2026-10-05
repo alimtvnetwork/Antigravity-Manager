@@ -2832,13 +2832,7 @@ mod tests {
     fn test_score_candidate_account_fallback_partial_4h() {
         let now_sec = 1790090000;
         let past_time = "2026-09-22T14:30:00Z";
-        let mut acc = make_test_account(
-            "acc-part",
-            "part@domain.com",
-            "gemini-pro",
-            50,
-            past_time,
-        );
+        let mut acc = make_test_account("acc-part", "part@domain.com", "gemini-pro", 50, past_time);
         acc.last_used = now_sec - 3600;
 
         // In primary scoring mode, an account with partial 4h quota (< 100%) and future reset scores 0.0
@@ -2866,13 +2860,8 @@ mod tests {
     fn test_weekly_quota_sub_8_percent_zero() {
         let now_sec = 1790090000;
         let future_time = "2026-09-30T14:30:00Z";
-        let mut acc = make_test_account(
-            "acc-low",
-            "low@domain.com",
-            "gemini-pro",
-            100,
-            future_time,
-        );
+        let mut acc =
+            make_test_account("acc-low", "low@domain.com", "gemini-pro", 100, future_time);
         if let Some(ref mut q) = acc.quota {
             q.quota_groups = Some(vec![crate::models::quota::QuotaGroup {
                 display_name: "Gemini Models".to_string(),

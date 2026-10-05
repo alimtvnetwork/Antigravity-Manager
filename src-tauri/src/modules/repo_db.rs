@@ -4105,7 +4105,8 @@ fn compute_project_conversation_tree(
     if projects.is_empty() {
         let now_fb = Utc::now().timestamp();
         let candidate_dirs_fb = gemini_dirs_tagged(target);
-        let mut seen_fb: std::collections::HashSet<(String, String)> = std::collections::HashSet::new();
+        let mut seen_fb: std::collections::HashSet<(String, String)> =
+            std::collections::HashSet::new();
         for (owning_inst_id, base) in &candidate_dirs_fb {
             let summaries_db = base.join("conversation_summaries.db");
             if !summaries_db.exists() {
@@ -4137,7 +4138,8 @@ fn compute_project_conversation_tree(
                 }) {
                     for item in rows.flatten() {
                         let (ws_uris_raw, _last_time, status, not_fully_idle) = item;
-                        let uris: Vec<String> = serde_json::from_str(&ws_uris_raw).unwrap_or_default();
+                        let uris: Vec<String> =
+                            serde_json::from_str(&ws_uris_raw).unwrap_or_default();
                         for uri in uris {
                             let raw_path = decode_uri_to_path(&uri);
                             if raw_path.len() < 4 {
@@ -4154,7 +4156,8 @@ fn compute_project_conversation_tree(
                                 .file_name()
                                 .map(|n| n.to_string_lossy().to_string())
                                 .unwrap_or_else(|| "unnamed".to_string());
-                            let project_key = format!("{}__{}", repo_name.to_lowercase(), norm_inst);
+                            let project_key =
+                                format!("{}__{}", repo_name.to_lowercase(), norm_inst);
                             if !seen_fb.insert((norm_inst.clone(), raw_path.clone())) {
                                 continue;
                             }
