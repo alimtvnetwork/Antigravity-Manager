@@ -2865,7 +2865,9 @@ mod tests {
         assert_eq!(score, 0.0);
     }
 
-
+    #[test]
+    fn test_instance_binding_stale_or_exhausted() {
+        let now_sec = 1790090000;
         // Stale binding timeout verification (default 6h, configurable 6-10h)
         let stale_inst = crate::models::InstanceConfig {
             id: "inst-stale".to_string(),
