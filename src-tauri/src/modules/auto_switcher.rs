@@ -693,10 +693,8 @@ pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) 
         .or_else(|| calculate_4h_window_quota(acc, target_model))
         .unwrap_or(0.0);
 
-    // Anyone who has less than 100% 4h quota (and reset period not finished) gets 0.0
-    if q_4h < 100.0 && !is_period_finished {
-        return 0.0;
-    }
+    // q_4h is used as a score multiplier (0-100%). Accounts with 0% 4h quota score 0 naturally.
+    // No hard gate — the multiplication suppresses ineligible accounts without a binary cutoff.
 
     // 1. Subscription tier multiplier
     let tier = acc
@@ -714,9 +712,11 @@ pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) 
         1.0
     };
 
-    // 2. Weekly quota: hours-elapsed-weighted scoring (Gemini buckets only)
-    // Algorithm: weekly_effective_score = weekly_quota_pct × hours_elapsed_this_week
-    // Sort DESCENDING: highest score = most quota × most hours elapsed = selected first.
+    // 2. Weekly quota: hours-remaining-weighted scoring (Gemini buckets only)
+    // Formula: score = q_4h × weekly_pct × (168 − hours_remaining) ÷ 10000
+    //   where (168 − hours_remaining) = hours_elapsed since weekly cycle start.
+    //   Accounts with LESS remaining time score HIGHER (close to refill = high elapsed).
+    // Sort DESCENDING: highest integer score selected first.
     // Weekly quota < 8% is treated as 0 (below viable threshold for Gemini).
     // TODO(claude): Claude/3p weekly scoring algorithm undefined — 3p buckets excluded.
     const TOTAL_WEEK_HOURS: f64 = 168.0;
@@ -739,6 +739,7 @@ pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) 
                     if is_gemini_weekly && (0.0..=1.0).contains(&b.remaining_fraction) {
                         let pct = (b.remaining_fraction * 100.0).round();
                         let eff_pct = if pct < WEEKLY_ZERO_THRESHOLD { 0.0 } else { pct };
+                        // hours_elapsed = 168 − hours_remaining (compute_weekly_hours_elapsed returns this)
                         let hours_elapsed = compute_weekly_hours_elapsed(b, now_sec);
                         gemini_weekly_scores.push(eff_pct * hours_elapsed);
                     }
@@ -770,15 +771,17 @@ pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) 
         }
     }
 
-    // 3. Reset boundary: if period has finished, credits refresh → best priority (max score)
+    // 3. Reset boundary: if 4h period has finished, treat as 100% 4h + max weekly elapsed
     if is_period_finished {
         weekly_effective_score = TOTAL_WEEK_HOURS * 100.0; // Full week × 100% = highest possible
     }
 
-    // Divide by 100 and floor to compact integer-like value for DB storage.
-    // DESC sort: highest integer = most hours elapsed × most quota remaining = selected first.
-    let active_factor = 1.0;
-    ((active_factor * tier_multiplier * weekly_effective_score) / 100.0).floor()
+    // Final score = q_4h × tier × weekly_eff_score ÷ 10000 → compact integer for DB.
+    // q_4h (0-100) × weekly_eff_score (0-16800) × tier (1/3/5) ÷ 10000.
+    // Example: kino (q4h=100, weekly=86, hours_remaining=7h → elapsed=161):
+    //   100 × 86 × 161 = 1,384,600 → × tier(3) ÷ 10000 = 415
+    (q_4h * tier_multiplier * weekly_effective_score / 10000.0).floor()
+
 }
 
 /// Specifically evaluate the 4-hour / 5-hour immediate rolling window quota (0-100%)
