@@ -320,6 +320,8 @@ pub fn purge_corrupted_running_projects(conn: &Connection) -> Result<(usize, usi
         )
         .map_err(|e| format!("Failed to purge corrupted running_projects: {}", e))?;
 
+    let _ = conn.execute("UPDATE running_projects SET is_running = 0", []);
+
     let deleted_cache = conn
         .execute("DELETE FROM prompt_tree_cache", [])
         .map_err(|e| format!("Failed to wipe prompt_tree_cache: {}", e))?;
@@ -531,7 +533,11 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
 
     let pids =
         crate::modules::instance::find_pids_for_data_dir(&instance.data_dir, instance.is_default);
-    let is_instance_active = !pids.is_empty();
+    let is_instance_active = crate::modules::instance::is_instance_running(
+        &instance.id,
+        &instance.data_dir,
+        instance.pid,
+    ) && !pids.is_empty();
 
     let storage_dir = PathBuf::from(&instance.data_dir)
         .join("User")
@@ -682,6 +688,12 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
                 "UPDATE running_projects SET is_running = 0, updated_at = ?1 WHERE instance_id = ?2",
                 params![now, target_id],
             );
+        }
+    }
+
+    if !is_instance_active {
+        for p in &mut projects {
+            p.is_running = false;
         }
     }
 
@@ -1590,6 +1602,55 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
     Ok(dispatched_count)
 }
 
+/// Robust multi-format timestamp parsing handling RFC3339/ISO8601 with fractional seconds,
+/// timezones, ISO8601 without timezone, space-delimited with fractional seconds, standard seconds,
+/// and epoch integer timestamps.
+pub fn parse_flexible_timestamp(time_str: &str) -> i64 {
+    let trimmed = time_str.trim();
+    if trimmed.is_empty() {
+        return 0;
+    }
+
+    // Standard epoch seconds or milliseconds
+    if let Ok(ts) = trimmed.parse::<i64>() {
+        return if ts > 1_000_000_000_000 {
+            ts / 1000
+        } else {
+            ts
+        };
+    }
+
+    let norm_time = trimmed.replacen(' ', "T", 1);
+
+    // 1) RFC3339 / ISO8601 with fractional seconds and timezone
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&norm_time) {
+        return dt.timestamp();
+    }
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(trimmed) {
+        return dt.timestamp();
+    }
+
+    // 2) ISO8601 without timezone (%Y-%m-%dT%H:%M:%S%.f and %Y-%m-%dT%H:%M:%S)
+    if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(&norm_time, "%Y-%m-%dT%H:%M:%S%.f") {
+        return dt.and_utc().timestamp();
+    }
+    if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(&norm_time, "%Y-%m-%dT%H:%M:%S") {
+        return dt.and_utc().timestamp();
+    }
+
+    // 3) Space-delimited with fractional seconds (%Y-%m-%d %H:%M:%S%.f)
+    if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%d %H:%M:%S%.f") {
+        return dt.and_utc().timestamp();
+    }
+
+    // 4) Standard seconds format (%Y-%m-%d %H:%M:%S)
+    if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%d %H:%M:%S") {
+        return dt.and_utc().timestamp();
+    }
+
+    0
+}
+
 /// Check if any prompt or task is currently actively executing for a project
 pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> bool {
     if project_id.trim().is_empty() {
@@ -1828,7 +1889,7 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
         if let Ok(conn) = conn_res {
             let _ = conn.pragma_update(None, "busy_timeout", 3000);
             if let Ok(mut stmt) = conn.prepare(
-                "SELECT status, not_fully_idle, workspace_uris, last_modified_time 
+                "SELECT status, not_fully_idle, workspace_uris, last_modified_time, title, preview 
                  FROM conversation_summaries 
                  ORDER BY last_modified_time DESC 
                  LIMIT 30",
@@ -1839,39 +1900,27 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                         row.get::<_, i32>(1)?,
                         row.get::<_, Option<String>>(2)?,
                         row.get::<_, String>(3)?,
+                        row.get::<_, Option<String>>(4)?.unwrap_or_default(),
+                        row.get::<_, Option<String>>(5)?.unwrap_or_default(),
                     ))
                 });
                 if let Ok(rows) = rows {
                     for item in rows.flatten() {
-                        let (status, not_fully_idle, ws_uris_opt, _last_time_str) = item;
+                        let (status, not_fully_idle, ws_uris_opt, _last_time_str, title, preview) = item;
 
-                        // 120-Second TTL: Parse _last_time_str or check turn age. If older than 120 seconds, treat as stale
-                        let norm_time = _last_time_str.trim().replacen(' ', "T", 1);
-                        let conv_time = chrono::DateTime::parse_from_rfc3339(&norm_time)
-                            .map(|dt| dt.timestamp())
-                            .or_else(|_| {
-                                chrono::NaiveDateTime::parse_from_str(
-                                    &norm_time,
-                                    "%Y-%m-%dT%H:%M:%S",
-                                )
-                                .map(|dt| dt.and_utc().timestamp())
-                            })
-                            .or_else(|_| {
-                                chrono::NaiveDateTime::parse_from_str(
-                                    &_last_time_str,
-                                    "%Y-%m-%d %H:%M:%S",
-                                )
-                                .map(|dt| dt.and_utc().timestamp())
-                            })
-                            .unwrap_or(0);
-
-                        let is_recent = conv_time > 0 && (now - conv_time <= 120);
-
-                        if !is_recent {
+                        // Ghost conversation filter: Inspect title and preview. If empty title / "Untitled Conversation"
+                        // and 0 prompt content or 0 words, skip it (do not consider it running).
+                        let is_untitled = title.trim().is_empty()
+                            || title.to_lowercase().starts_with("untitled")
+                            || title.to_lowercase() == "new conversation";
+                        let (_, eff_wc) = extract_prompt_words_preview(&preview, 5);
+                        let is_empty_prompt = preview.trim().is_empty() || eff_wc == 0;
+                        if (is_untitled && is_empty_prompt) || (title.trim().is_empty() && preview.trim().is_empty()) {
                             continue;
                         }
 
                         // Strict idle supremacy rule:
+                        // if not_fully_idle == 0 or status contains "IDLE", "COMPLETED", "FAILED", "CANCELLED", it is unconditionally IDLE.
                         let is_idle_count = not_fully_idle == 0;
                         let has_idle_status = status.contains("IDLE")
                             || status.contains("COMPLETED")
@@ -1879,8 +1928,21 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                             || status.contains("CANCELLED");
                         let is_explicit_idle = is_idle_count || has_idle_status;
 
-                        let is_conv_running =
-                            !is_explicit_idle && not_fully_idle > 0 && status.contains("RUNNING");
+                        if is_explicit_idle {
+                            continue;
+                        }
+
+                        // Adaptive 10-Minute Thinking Window: Expand the timestamp cutoff from rigid 120s to 600s (10 minutes)
+                        // for active turns with not_fully_idle > 0 && status.contains("RUNNING"), ensuring reasoning/thinking models
+                        // (Claude 3.7 Thinking, Gemini 2.5 Pro) are not prematurely flipped to IDLE mid-generation!
+                        let conv_time = parse_flexible_timestamp(&_last_time_str);
+                        let is_recent = conv_time > 0 && (now - conv_time <= 600);
+
+                        if !is_recent {
+                            continue;
+                        }
+
+                        let is_conv_running = not_fully_idle > 0 && status.contains("RUNNING");
 
                         if is_conv_running {
                             if let Some(ws_uris_raw) = ws_uris_opt {
@@ -2420,27 +2482,9 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
                     for item in rows.flatten() {
                         let (cid, _title, preview, status, not_fully_idle, ws_uris_opt, _last_time_str) = item;
 
-                        // 120-Second TTL: Parse _last_time_str or check turn age. If older than 120 seconds, treat as stale
-                        let norm_time = _last_time_str.trim().replacen(' ', "T", 1);
-                        let conv_time = chrono::DateTime::parse_from_rfc3339(&norm_time)
-                            .map(|dt| dt.timestamp())
-                            .or_else(|_| {
-                                chrono::NaiveDateTime::parse_from_str(
-                                    &norm_time,
-                                    "%Y-%m-%dT%H:%M:%S",
-                                )
-                                .map(|dt| dt.and_utc().timestamp())
-                            })
-                            .or_else(|_| {
-                                chrono::NaiveDateTime::parse_from_str(
-                                    &_last_time_str,
-                                    "%Y-%m-%d %H:%M:%S",
-                                )
-                                .map(|dt| dt.and_utc().timestamp())
-                            })
-                            .unwrap_or(0);
-
-                        let is_recent = conv_time > 0 && (now - conv_time <= 120);
+                        // Adaptive 10-Minute Thinking Window: Parse timestamp and allow up to 600s for active reasoning
+                        let conv_time = parse_flexible_timestamp(&_last_time_str);
+                        let is_recent = conv_time > 0 && (now - conv_time <= 600);
 
                         let is_idle_count = not_fully_idle == 0;
                         let has_idle_status = status.contains("IDLE")
@@ -4138,20 +4182,8 @@ fn compute_project_conversation_tree(
                                 continue;
                             }
 
-                            let norm_time = last_time_str.trim().replacen(' ', "T", 1);
-                            let conv_ts = chrono::DateTime::parse_from_rfc3339(&norm_time)
-                                .map(|dt| dt.timestamp())
-                                .or_else(|_| {
-                                    chrono::NaiveDateTime::parse_from_str(&norm_time, "%Y-%m-%dT%H:%M:%S")
-                                        .map(|dt| dt.and_utc().timestamp())
-                                })
-                                .or_else(|_| {
-                                    chrono::NaiveDateTime::parse_from_str(&last_time_str, "%Y-%m-%d %H:%M:%S")
-                                        .map(|dt| dt.and_utc().timestamp())
-                                })
-                                .unwrap_or(0);
-
-                            let is_recent = conv_ts > 0 && (now - conv_ts <= 60);
+                            let conv_ts = parse_flexible_timestamp(&last_time_str);
+                            let is_recent = conv_ts > 0 && (now - conv_ts <= 600);
 
                             let is_idle_count = not_fully_idle == 0;
                             let has_idle_status = status.contains("IDLE")
@@ -4511,20 +4543,8 @@ fn compute_project_conversation_tree(
             if !c.is_running {
                 return false;
             }
-            let norm_time = c.last_modified.trim().replacen(' ', "T", 1);
-            let conv_ts = chrono::DateTime::parse_from_rfc3339(&norm_time)
-                .map(|dt| dt.timestamp())
-                .or_else(|_| {
-                    chrono::NaiveDateTime::parse_from_str(&norm_time, "%Y-%m-%dT%H:%M:%S")
-                        .map(|dt| dt.and_utc().timestamp())
-                })
-                .or_else(|_| {
-                    chrono::NaiveDateTime::parse_from_str(&c.last_modified, "%Y-%m-%d %H:%M:%S")
-                        .map(|dt| dt.and_utc().timestamp())
-                })
-                .or_else(|_| c.last_modified.parse::<i64>())
-                .unwrap_or(0);
-            conv_ts > 0 && (now - conv_ts <= 60)
+            let conv_ts = parse_flexible_timestamp(&c.last_modified);
+            conv_ts > 0 && (now - conv_ts <= 600)
         });
         let has_conv_nodes = !conv_nodes.is_empty();
 

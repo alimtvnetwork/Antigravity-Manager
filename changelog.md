@@ -1,5 +1,25 @@
 # Changelog
 
+## [v4.155.0] - 2026-10-05
+
+### Added
+- **实例当前账号重启分段胶囊按钮 (Instance Restart Split Button Capsule on Current Account)**: 在实例列表表格视图（`InstanceTable.tsx`）与卡片视图（`Instances.tsx`）中，当实例处于运行状态时，将原有单一动作重构为紧凑无缝的分段胶囊（`rounded-[5px]` 边框与暗色玻璃细分界线），左半部分为红色停止按钮（`<Square>`），右半部分为琥珀色重启按钮（`<RotateCcw>`，悬浮提示“Restart Instance on Current Account”）；点击可在保持当前绑定账号不变的前提下，安全终止进程、释放文件锁并立即自动重新启动实例，全局操作反馈精确显示“Restarting...”。 (Thanks to @aukgit)
+
+### Changed
+- **账号切换按钮纯净选择语义守护 (Strict Account Selection Semantics for Switch Button)**: 严格守护 Switch 按钮行为，仅用于调出选择切换账号弹窗（`setSwitchTargetInstance`），绝不混淆或夹带无意重启副作用。 (Thanks to @aukgit)
+- **同步图标防混淆语义规范 (Semantic Icon Disambiguation: Reserve RotateCcw Strictly for Restart)**: 彻底消除旋转箭头造成的“重启/同步”混淆。全局严格遵循防混淆不变量：`<RotateCcw>`（逆时针旋转）专属于实例重启操作；头部批量同步按钮（Sync All）采用 `<FolderSync className="text-cyan-500" />`，头部配额评估按钮（Eval Quota）采用 `<Sparkles className="text-amber-500" />`，卡片端配额同步按钮（Sync Quota）采用 `<ArrowLeftRight className="text-blue-500" />`，卡片更多菜单中的凭证擦除按钮（Wipe Credentials）由原混淆的 `RotateCcw` 替换为 `<KeyRound className="text-amber-500" />`；表格模式快进按钮对齐为 `<FastForward>`，与卡片视图保持完全一致。 (Thanks to @aukgit)
+
+### Fixed
+- **运行中项目与会话提示词状态判定六大根因修复 (Running Projects & Prompts Deep Detection Root-Cause Resolution)**:
+  - **进程 PID 存活硬门禁 (Gate 0 Host Process PID Liveness Gate)**：在 `detect_running_projects` 与 `is_instance_running` 中重构 PID 校验逻辑，自定义实例除检查进程名外必须通过 `find_pids_for_data_dir` 严格匹配数据目录对应 PID；当实例未处于活动运行状态时，无条件将该实例名下所有项目重置为 `is_running = 0`，根除进程关闭后虚假绿点常驻的假阳性缺陷。 (Thanks to @aukgit)
+  - **启动期僵尸运行标志清空 (Startup State Sanitization)**：在 `purge_corrupted_running_projects` 中新增 `UPDATE running_projects SET is_running = 0`，确保因 IDE 异常崩溃或宿主重启遗留的历史残余状态在开机即刻彻底重置。 (Thanks to @aukgit)
+  - **大模型长推理思考期 10 分钟自适应保护窗口 (Adaptive 10-Minute Window for Deep Thinking Models)**：废除 Gate 4 与提示词树生成器中生硬的 60/120 秒硬超时限制，对处于运行态（`status = CASCADE_RUN_STATUS_RUNNING` 且 `not_fully_idle > 0`）的模型会话提供长达 10 分钟（600 秒）的自适应保护，避免 Claude 3.7 Thinking、Gemini 2.5 Pro 等深度思考生成中途突变离线，同时严格遵循 Idle 判定最高优先级原则。 (Thanks to @aukgit)
+  - **多格式毫秒级时间戳解析鲁棒性强化 (Robust Multi-Format Timestamp Parsing)**：新增 `parse_flexible_timestamp`，全面兼容 RFC3339、含毫秒/微秒小数部分的 ISO-8601（`%Y-%m-%dT%H:%M:%S%.f`）、空格分隔格式以及 Epoch 毫秒时间戳，杜绝因格式差异静默降级为 0 导致有效会话丢失。 (Thanks to @aukgit)
+  - **跨实例归属精确比对与幽灵会话过滤 (Exact Instance Matching & Ghost Conversation Pruning)**：在 `isNodeOwnedByInstance` 中以严格相等（`node.instance_id === instConfig.id`）替代模糊后缀匹配，彻底解决前缀重叠实例的归属泄露；在 Gate 4 中主动拦截 Untitled 且词数为 0 的空白幽灵会话。 (Thanks to @aukgit)
+  - **提示词树模态框实时真值加载 (Modal Ground Truth Cache Bypass)**：在 `PromptTreeViewModal.tsx` 打开、刷新与恢复流程中强制指定 `loadTree(true, true)`，无条件绕过本地 TTL 缓存，直读实时底层最新状态。 (Thanks to @aukgit)
+
+---
+
 ## [v4.154.0] - 2026-10-05
 
 ### Added
@@ -611,6 +631,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.155.0 (2026-10-05)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.154.0 (2026-10-05)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

@@ -6,7 +6,7 @@ import {
     RotateCcw,
     RotateCw,
     History,
-    Zap,
+    FastForward,
     SlidersHorizontal,
     Copy,
     Check,
@@ -450,7 +450,7 @@ export default function InstanceTable({
                                                 {currentAction === 'fast-forward' ? (
                                                     <RotateCw className="w-3 h-3 animate-spin text-amber-500" />
                                                 ) : (
-                                                    <Zap className="w-3 h-3 fill-current" />
+                                                    <FastForward className="w-3 h-3 fill-current" />
                                                 )}
                                             </button>
 

@@ -2586,12 +2586,8 @@ pub fn is_instance_running(instance_id: &str, data_dir: &str, config_pid: Option
     let saved = config_pid.or_else(|| get_instance_saved_pid(instance_id));
     if let Some(pid) = saved {
         if saved_pid_matches(pid) {
-            if is_default {
-                let pids = find_pids_for_data_dir(data_dir, true);
-                if pids.contains(&pid) {
-                    return true;
-                }
-            } else {
+            let pids = find_pids_for_data_dir(data_dir, is_default);
+            if pids.contains(&pid) {
                 return true;
             }
         }

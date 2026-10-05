@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.154.0-3B82F6?style=flat-square" alt="Version v4.154.0">
+    <img src="https://img.shields.io/badge/Version-v4.155.0-3B82F6?style=flat-square" alt="Version v4.155.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.154.0)**
+**Bar 2: Version-Based Installation (v4.155.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -147,7 +147,8 @@ This version pinning matrix allows developers, enterprise deployments, and users
 <!-- STAMP:VERSION_PIN_TABLE_START -->
 | Target Release | Release Date | Quality Gate | Windows PowerShell (One-Liner) | Linux / macOS (Bash) | Git Tag Checkout |
 | :--- | :---: | :---: | :--- | :--- | :--- |
-| **v4.154.0** (Latest) | 2026-10-05 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.154.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.154.0/install.sh \| bash` | `git checkout v4.154.0` |
+| **v4.155.0** (Latest) | 2026-10-05 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.155.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.155.0/install.sh \| bash` | `git checkout v4.155.0` |
+| **v4.154.0** | 2026-10-05 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.154.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.154.0/install.sh \| bash` | `git checkout v4.154.0` |
 | **v4.153.0** | 2026-10-05 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.153.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.153.0/install.sh \| bash` | `git checkout v4.153.0` |
 | **v4.151.0** | 2026-10-05 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.151.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.151.0/install.sh \| bash` | `git checkout v4.151.0` |
 | **v4.150.0** | 2026-10-05 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.150.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.150.0/install.sh \| bash` | `git checkout v4.150.0` |
@@ -548,7 +549,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.154.0**: Restored crisp row dividing borders across accounts table, grouped middle quota section (`4H Model Quota` & `Weekly Quota`) with subtle background styling, converted progress bars and audit badges to refined VS Code cyan/teal theme palette, implemented auto-discovery for Supabase credentials across repo-secrets, added local running sibling instance and cross-machine lease conflict guards with 30–60m email cooldown, eliminated horizontal table scrollbar at 1280px+ via combined `Profile & Account` column, truncated path locations (`...\<folder>`), normalized button radii to 5–6px, and compacted Card view to strictly 4 items per row with 2-row action capsules. (Thanks to @aukgit)
+> Latest version **v4.155.0**: Added dedicated instance restart split button capsule (`[Stop | Restart]`, `rounded-[5px]`, dark-glass hairline divider) in both Table and Card views to cleanly terminate and reboot instances on the currently bound account with accurate "Restarting..." feedback; preserved Switch button strictly for account selection; disambiguated synchronization icons by reserving `RotateCcw` exclusively for Restart (using `FolderSync` for Sync All, `Sparkles` for Eval Quota, `ArrowLeftRight` for Sync Quota, `KeyRound` for Wipe Credentials, and `FastForward` for table fast-forward); and completely resolved running projects & prompts detection bugs across 6 structural root causes (Gate 0 process PID liveness verification against data directories, startup zombie flag reset `is_running = 0`, adaptive 10-minute thinking window for reasoning models without premature 60s cutoff, robust fractional-second timestamp parsing, exact instance ID matching `node.instance_id === instConfig.id`, and modal ground truth cache bypass). (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

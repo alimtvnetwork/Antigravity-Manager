@@ -972,7 +972,7 @@ export default function PromptTreeViewModal({
 
     const loadTree = async (
         isInitialLoad: boolean = true,
-        isForce: boolean = false,
+        isForce: boolean = true,
         overrideArchivedIds?: string[],
         overridePinnedIds?: string[]
     ) => {
@@ -1124,7 +1124,7 @@ export default function PromptTreeViewModal({
             setActionMsg('Prompts restoration dispatched!');
             setTimeout(() => {
                 setActionMsg(null);
-                loadTree();
+                loadTree(true, true);
             }, 3000);
         } catch (err: any) {
             setError(err?.toString() || 'Failed to restore prompts');
