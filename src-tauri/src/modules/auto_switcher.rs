@@ -716,14 +716,13 @@ pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) 
 
     // 2. Weekly quota: hours-elapsed-weighted scoring (Gemini buckets only)
     // Algorithm: weekly_effective_score = weekly_quota_pct × hours_elapsed_this_week
-    // "Whoever has the shortest time goes first" → sort ASCENDING → lower score = prioritized.
+    // Sort DESCENDING: highest score = most quota × most hours elapsed = selected first.
     // Weekly quota < 8% is treated as 0 (below viable threshold for Gemini).
     // TODO(claude): Claude/3p weekly scoring algorithm undefined — 3p buckets excluded.
     const TOTAL_WEEK_HOURS: f64 = 168.0;
     const WEEKLY_ZERO_THRESHOLD: f64 = 8.0;
-    const SCORE_NORMALIZER: f64 = 16800.0; // TOTAL_WEEK_HOURS × 100
 
-    let mut weekly_effective_score = TOTAL_WEEK_HOURS * 100.0; // Default worst-case (sorted last)
+    let mut weekly_effective_score = 0.0_f64; // Default worst-case for DESC sort (sorted last)
 
     if let Some(quota_data) = acc.quota.as_ref() {
         let mut gemini_weekly_scores: Vec<f64> = Vec::new();
@@ -771,13 +770,15 @@ pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) 
         }
     }
 
-    // 3. Reset boundary: if period has finished, credits refresh → assign best priority (score = 0)
+    // 3. Reset boundary: if period has finished, credits refresh → best priority (max score)
     if is_period_finished {
-        weekly_effective_score = 0.0;
+        weekly_effective_score = TOTAL_WEEK_HOURS * 100.0; // Full week × 100% = highest possible
     }
 
+    // Divide by 100 and floor to compact integer-like value for DB storage.
+    // DESC sort: highest integer = most hours elapsed × most quota remaining = selected first.
     let active_factor = 1.0;
-    (active_factor * tier_multiplier * weekly_effective_score) / SCORE_NORMALIZER
+    ((active_factor * tier_multiplier * weekly_effective_score) / 100.0).floor()
 }
 
 /// Specifically evaluate the 4-hour / 5-hour immediate rolling window quota (0-100%)
