@@ -83,6 +83,8 @@ interface PromptTreeViewModalProps {
     onClose: () => void;
     instanceId: string;
     instanceName: string;
+    sequenceNumber?: number;
+    executablePath?: string;
     initialSelectedProjectId?: string;
 }
 
@@ -613,6 +615,8 @@ export default function PromptTreeViewModal({
     onClose,
     instanceId,
     instanceName,
+    sequenceNumber,
+    executablePath,
     initialSelectedProjectId,
 }: PromptTreeViewModalProps) {
     const { instances } = useInstanceStore();
@@ -1780,9 +1784,28 @@ export default function PromptTreeViewModal({
                                 <h2 className="text-base font-bold text-slate-900 dark:text-white">
                                     Project & Prompt Tree View
                                 </h2>
-                                <span className="rounded-[5px] bg-blue-100 px-2.5 py-0.5 text-[11px] font-semibold text-blue-800 dark:bg-blue-950/60 dark:text-cyan-300 border border-blue-300/40">
-                                    {instanceName || instanceId || 'All Instances'}
+                            </div>
+                            {/* Header Identity: [#seq] [Profile Name] [...\executable.exe] */}
+                            <div className="flex items-center gap-2 flex-wrap min-w-0 mt-0.5">
+                                {sequenceNumber != null && sequenceNumber > 0 && (
+                                    <span className="shrink-0 rounded-[5px] bg-slate-100 dark:bg-[#0c2438] px-2 py-0.5 text-[11px] font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#15334d]">
+                                        #{sequenceNumber}
+                                    </span>
+                                )}
+                                <span className="font-bold text-slate-900 dark:text-white text-sm truncate max-w-[160px]" title={instanceName}>
+                                    {instanceName}
                                 </span>
+                                {executablePath && (() => {
+                                    const trailing = executablePath.replace(/^.*[\\/]/, '');
+                                    return (
+                                        <span
+                                            className="shrink-0 rounded-[5px] bg-slate-100 dark:bg-[#0c2438] px-2 py-0.5 text-[10px] font-mono text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-[#15334d] max-w-[180px] truncate"
+                                            title={executablePath}
+                                        >
+                                            ...\{trailing}
+                                        </span>
+                                    );
+                                })()}
                             </div>
                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                                 Inspect 3-layer project, conversation & prompt hierarchies, preview markdown, and dispatch tasks

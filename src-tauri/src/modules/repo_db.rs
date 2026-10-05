@@ -4072,10 +4072,11 @@ fn compute_project_conversation_tree(
         .unwrap_or_default()
         .into_iter()
         .filter(|p| {
-            p.workspace_storage_path
-                .as_deref()
-                .map(|path| Path::new(path).exists())
-                .unwrap_or(false)
+            // Allow entries with no workspace_storage_path (conversation_summaries.db fallback)
+            match p.workspace_storage_path.as_deref() {
+                Some(path) => Path::new(path).exists(),
+                None => true,
+            }
         })
         .collect();
     let projects: Vec<RunningProject> = if let Some(target_id) = target {
@@ -4096,6 +4097,82 @@ fn compute_project_conversation_tree(
             .filter(|p| !p.instance_id.trim().is_empty())
             .collect()
     };
+
+    // ===== Fallback: Build synthetic projects from conversation_summaries.db =====
+    // When workspaceStorage is empty (common on managed Windows deployments), supplement
+    // projects list from workspace_uris in conversation_summaries.db.
+    let mut projects: Vec<RunningProject> = projects; // shadow as mutable
+    if projects.is_empty() {
+        let now_fb = Utc::now().timestamp();
+        let candidate_dirs_fb = gemini_dirs_tagged(target);
+        let mut seen_fb: std::collections::HashSet<(String, String)> = std::collections::HashSet::new();
+        for (owning_inst_id, base) in &candidate_dirs_fb {
+            let summaries_db = base.join("conversation_summaries.db");
+            if !summaries_db.exists() {
+                continue;
+            }
+            let s_conn_res = Connection::open_with_flags(
+                &summaries_db,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+            );
+            let s_conn = match s_conn_res {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            let _ = s_conn.pragma_update(None, "busy_timeout", 3000);
+            let sql = "SELECT workspace_uris, last_modified_time, status, not_fully_idle \
+                       FROM conversation_summaries \
+                       WHERE workspace_uris IS NOT NULL AND workspace_uris != '[]' \
+                       ORDER BY last_modified_time DESC \
+                       LIMIT 200";
+            if let Ok(mut stmt) = s_conn.prepare(sql) {
+                if let Ok(rows) = stmt.query_map([], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, i32>(3)?,
+                    ))
+                }) {
+                    for item in rows.flatten() {
+                        let (ws_uris_raw, _last_time, status, not_fully_idle) = item;
+                        let uris: Vec<String> = serde_json::from_str(&ws_uris_raw).unwrap_or_default();
+                        for uri in uris {
+                            let raw_path = decode_uri_to_path(&uri);
+                            if raw_path.len() < 4 {
+                                continue;
+                            }
+                            let norm_inst = if owning_inst_id == "__default__" || owning_inst_id.is_empty() {
+                                "default".to_string()
+                            } else {
+                                crate::modules::instance::resolve_instance_id(owning_inst_id)
+                                    .unwrap_or_else(|_| owning_inst_id.clone())
+                            };
+                            let repo_name = Path::new(&raw_path)
+                                .file_name()
+                                .map(|n| n.to_string_lossy().to_string())
+                                .unwrap_or_else(|| "unnamed".to_string());
+                            let project_key = format!("{}__{}", repo_name.to_lowercase(), norm_inst);
+                            if !seen_fb.insert((norm_inst.clone(), raw_path.clone())) {
+                                continue;
+                            }
+                            let is_running = status.contains("RUNNING") && not_fully_idle > 0;
+                            projects.push(RunningProject {
+                                id: project_key,
+                                instance_id: norm_inst,
+                                repo_name,
+                                repo_path: raw_path,
+                                workspace_storage_path: None,
+                                is_running,
+                                last_detected_at: now_fb,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // ===== End Fallback =====
 
     // Telemetry probe logging for instance liveness
     if let Some(target_id) = target {

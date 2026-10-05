@@ -372,7 +372,13 @@ export default function Instances() {
         return (localStorage.getItem('agm_instance_view_mode') as 'card' | 'list') || 'card';
     });
     const [cardDensity, setCardDensity] = useState<'normal' | 'compact'>(() => getInstanceCardDensity());
-    const [promptTreeInstance, setPromptTreeInstance] = useState<{ id: string; name: string; projectId?: string } | null>(null);
+    const [promptTreeInstance, setPromptTreeInstance] = useState<{
+        id: string;
+        name: string;
+        projectId?: string;
+        seqNum?: number;
+        executablePath?: string;
+    } | null>(null);
     const [cardMoreId, setCardMoreId] = useState<string | null>(null);
 
     useEffect(() => {
@@ -1042,7 +1048,12 @@ export default function Instances() {
                     onDelete={handleDelete}
                     onOpenPromptTree={(id) => {
                         const target = instances.find((i) => i.config.id === id);
-                        setPromptTreeInstance({ id, name: target?.config.name || id });
+                        setPromptTreeInstance({
+                            id,
+                            name: target?.config.name || id,
+                            seqNum: target?.config.seq_num,
+                            executablePath: target?.config.executable_path,
+                        });
                     }}
                     onSetActive={setActiveInstance}
                     onSetDefault={setDefaultInstance}
@@ -1159,7 +1170,7 @@ export default function Instances() {
                                                 {hasActiveTask && (
                                                     <button
                                                         type="button"
-                                                        onClick={() => setPromptTreeInstance({ id: inst.config.id, name: inst.config.name })}
+                                                        onClick={() => setPromptTreeInstance({ id: inst.config.id, name: inst.config.name, seqNum: inst.config.seq_num, executablePath: inst.config.executable_path })}
                                                         className="inline-flex items-center gap-1 px-1.5 h-5 rounded-[5px] text-[9px] font-bold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30 shrink-0 cursor-pointer transition-colors shadow-2xs"
                                                         title="Active prompt/task running - Click to open Prompt Tree"
                                                     >
@@ -1483,7 +1494,9 @@ export default function Instances() {
                                                                         onDoubleClick={() => setPromptTreeInstance({
                                                                             id: inst.config.id,
                                                                             name: inst.config.name,
-                                                                            projectId: proj.project_id
+                                                                            projectId: proj.project_id,
+                                                                            seqNum: inst.config.seq_num,
+                                                                            executablePath: inst.config.executable_path,
                                                                         })}
                                                                         className="flex items-center justify-between gap-1.5 px-1.5 py-1 rounded-[5px] bg-white dark:bg-[#081a2b] hover:bg-blue-50 dark:hover:bg-[#15334d] border border-gray-200/50 dark:border-[#15334d]/60 transition-colors cursor-pointer group/proj"
                                                                         title="Double-click to open in Prompt Tree"

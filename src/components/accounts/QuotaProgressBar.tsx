@@ -33,20 +33,21 @@ export function QuotaProgressBar({
 }: QuotaProgressBarProps) {
     const clamped = Math.min(100, Math.max(0, Number.isFinite(percentage) ? percentage : 0));
 
-    // VS Code teal/cyan/sky palette:
-    // >= 75%: Teal to cyan to sky
-    // >= 50%: Teal to cyan to amber
-    // >= 25%: Warm amber to orange
-    // < 25%: Orange to rose
+    // Tier thresholds: Critical(red) → Warning(orange) → Healthy(green) → Excellent(neon green)
     const getTrackGradient = (pct: number) => {
-        if (pct >= 75) return 'bg-gradient-to-r from-teal-500 via-cyan-500 to-[#38bdf8]';
-        if (pct >= 50) return 'bg-gradient-to-r from-teal-600 via-cyan-500 to-sky-400';
+        if (pct >= 75) return 'bg-gradient-to-r from-emerald-400 to-[#1af18d]';
+        if (pct >= 50) return 'bg-gradient-to-r from-emerald-500 to-[#1af18d]';
         if (pct >= 25) return 'bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500';
         return 'bg-gradient-to-r from-orange-500 via-rose-500 to-rose-600';
     };
 
+    const getTrackGlow = (pct: number) => {
+        if (pct >= 50) return 'shadow-[0_0_10px_rgba(26,241,141,0.75)]';
+        return '';
+    };
+
     const getPercentColorClass = (pct: number) => {
-        if (pct >= 50) return 'text-teal-700 dark:text-cyan-400';
+        if (pct >= 50) return 'text-emerald-700 dark:text-[#1af18d]';
         if (pct >= 25) return 'text-amber-700 dark:text-amber-400';
         return 'text-rose-600 dark:text-rose-400';
     };
@@ -55,28 +56,28 @@ export function QuotaProgressBar({
         if (!time) return 'text-gray-400 dark:text-gray-500';
         const color = getTimeRemainingColor(time);
         switch (color) {
-            case 'success': return 'text-teal-700 dark:text-cyan-400';
+            case 'success': return 'text-emerald-700 dark:text-[#1af18d]';
             case 'warning': return 'text-amber-700 dark:text-amber-400';
             default: return 'text-blue-700 dark:text-blue-400';
         }
     };
 
-    // Milestone bubble styling
+    // Milestone bubble styling — neon green glow on top 2 nodes
     const getNodeStyle = (idx: number, isFilled: boolean) => {
         if (!isFilled) {
-            return "bg-slate-200/50 dark:bg-[#0c2438] border border-slate-300 dark:border-[#15334d]/60 shadow-none";
+            return 'bg-slate-200/50 dark:bg-[#0c2438] border border-slate-300 dark:border-[#15334d]/60 shadow-none';
         }
         switch (idx) {
-            case 0:
-                return "bg-cyan-400 dark:bg-cyan-500 border-[1.5px] border-cyan-300 dark:border-cyan-400 shadow-[0_0_6px_rgba(6,182,212,0.4)]";
-            case 1:
-                return "bg-teal-500 border-[1.5px] border-teal-400 shadow-none";
-            case 2:
-                return "bg-amber-400 dark:bg-amber-500 border-[1.5px] border-amber-300 dark:border-amber-400 shadow-none";
-            case 3:
-                return "bg-orange-500 border-[1.5px] border-orange-400 shadow-none";
+            case 0: // 100% node
+                return 'bg-[#1af18d] border-[1.5px] border-emerald-300 shadow-[0_0_8px_rgba(26,241,141,0.85)]';
+            case 1: // 75% node
+                return 'bg-emerald-400 border-[1.5px] border-emerald-300 shadow-[0_0_6px_rgba(26,241,141,0.6)]';
+            case 2: // 50% node
+                return 'bg-amber-400 dark:bg-amber-500 border-[1.5px] border-amber-300 dark:border-amber-400 shadow-none';
+            case 3: // 25% node
+                return 'bg-orange-500 border-[1.5px] border-orange-400 shadow-none';
             default:
-                return "bg-rose-500 border-[1.5px] border-rose-400 shadow-none";
+                return 'bg-rose-500 border-[1.5px] border-rose-400 shadow-none';
         }
     };
 
@@ -113,7 +114,8 @@ export function QuotaProgressBar({
                     <div
                         className={cn(
                             "h-full rounded-full relative overflow-hidden transition-all duration-500 ease-out",
-                            getTrackGradient(clamped)
+                            getTrackGradient(clamped),
+                            getTrackGlow(clamped)
                         )}
                         style={{ width: `${clamped}%` }}
                     >
