@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.157.1 (2026-10-05)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
     *   **v4.157.0 (2026-10-05)**:
         -   **[Empty Prompt Tree Fix, Neon Green Progress Bar Restore, Hours-Elapsed Weekly Scoring, Modal Header Identity]**:
             -   **Fixed**: Prompt tree was completely empty because `detect_running_projects()` relied on `workspaceStorage/*/workspace.json` which is empty on managed Windows deployments. Added fallback in `compute_project_conversation_tree()` to synthesize `RunningProject` entries directly from `workspace_uris` in each instance's `conversation_summaries.db`, ensuring up to 200 recent conversations are always shown. Also fixed `workspace_storage_path: None` entries being incorrectly dropped by the filter. (Thanks to @aukgit)

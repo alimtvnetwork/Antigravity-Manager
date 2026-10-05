@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.157.1] - 2026-10-05
+
+### Fixed
+- **候选账号评分升降序修正与整数压缩 (Weekly Scoring: DESC Sort & Divide-by-100 Integer)**: 修正 `score_candidate_account()` 排序方向：由升序（最低分优先）改为**降序（最高分优先）**，即周配额剩余比例 × 本周已消耗小时数乘积最大者优先候选；同步将最终评分除以 100 并取整（`.floor()`），输出紧凑整数以降低 SQLite 存储冗余；并修正 `is_period_finished`（配额周期已重置）分支赋值：由原来的 `0.0`（在降序语义下意为最低优先）修正为 `TOTAL_WEEK_HOURS × 100.0 = 16800`（最高分，优先使用刚重置满额账号）。 (Thanks to @aukgit)
+
+---
+
 ## [v4.157.0] - 2026-10-05
 
 ### Added
@@ -666,6 +673,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.157.1 (2026-10-05)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.157.0 (2026-10-05)**:
         -   **[Weekly Quota Scoring Algorithm & Progress Bar Glow]**:
             -   **Description**: Restored neon green progress bar glow in accounts table and compact progress bar styling; applied hours-elapsed weekly quota scoring algorithm in `score_candidate_account()` prioritizing accounts with lowest elapsed score since reset. (Thanks to @aukgit)
