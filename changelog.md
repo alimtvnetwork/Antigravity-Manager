@@ -1,5 +1,24 @@
 # Changelog
 
+## [v4.156.0] - 2026-10-05
+
+### Added
+- **实例当前账号重启分段胶囊按钮 (Instance Restart Split Button Capsule on Current Account)**: 在实例列表表格视图（`InstanceTable.tsx`）与卡片视图（`Instances.tsx`）中，当实例处于运行状态时，将原有单一动作重构为紧凑无缝的分段胶囊（`rounded-[5px]` 边框与暗色玻璃细分界线），左半部分为红色停止按钮（`<Square>`），右半部分为琥珀色重启按钮（`<RotateCcw>`，悬浮提示“Restart Instance on Current Account”）；点击可在保持当前绑定账号不变的前提下，安全终止进程、释放文件锁并立即自动重新启动实例，全局操作反馈精确显示“Restarting...”。 (Thanks to @aukgit)
+
+### Changed
+- **账号切换按钮纯净选择语义守护 (Strict Account Selection Semantics for Switch Button)**: 严格守护 Switch 按钮行为，仅用于调出选择切换账号弹窗（`setSwitchTargetInstance`），绝不混淆或夹带无意重启副作用。 (Thanks to @aukgit)
+- **同步图标防混淆语义规范 (Semantic Icon Disambiguation: Reserve RotateCcw Strictly for Restart)**: 彻底消除旋转箭头造成的“重启/同步”混淆。全局严格遵循防混淆不变量：`<RotateCcw>`（逆时针旋转）专属于实例重启操作；头部批量同步按钮（Sync All）采用 `<FolderSync className="text-cyan-500" />`，头部配额评估按钮（Eval Quota）采用 `<Sparkles className="text-amber-500" />`，卡片端配额同步按钮（Sync Quota）采用 `<ArrowLeftRight className="text-blue-500" />`，卡片更多菜单中的凭证擦除按钮（Wipe Credentials）由原混淆的 `RotateCcw` 替换为 `<KeyRound className="text-amber-500" />`；头部“Rotate to Next Best”快进按钮对齐为 `<FastForward>`，与卡片视图保持完全一致。 (Thanks to @aukgit)
+
+### Fixed
+- **宿主与沙箱用户主目录碰撞根因修复 (Host vs Sandbox Home Directory Resolution Fix)**：新增 `get_canonical_host_home()`，在沙箱环境（`.antigravity_tools/instances/<id>/home`）下自动回溯并穿透获取宿主真实用户主目录（`C:\Users\Administrator`），确保默认实例能够准确读取宿主底层真实的 `.gemini/antigravity` 会话数据库。 (Thanks to @aukgit)
+- **Gate 4 路径匹配双轨制与复合键识别 (Dual Path, Folder Name & Composite ID Matching in Gate 4)**：彻底解决解码后绝对工作区路径与传入的项目名称/Slug 之间的字符串不匹配缺陷，全面支持完整路径、文件夹名称及复合键前缀三种匹配模式。 (Thanks to @aukgit)
+- **全局进程存活误判拦截与沙箱目录隔离 (Disjoint Sandbox Tagging & Targeted Default Process Check)**：在 `gemini_dirs_tagged` 中实施严格互斥映射，杜绝副实例沙箱路径被误打上 `default` 标签；在提示词树生成器中废除全局 `is_antigravity_running(None)` 检查，精准定向至默认数据目录 PID 列表，杜绝其他实例运行导致默认实例会话串染。 (Thanks to @aukgit)
+- **大模型长推理思考期 10 分钟自适应保护窗口 (Adaptive 10-Minute Window for Deep Thinking Models)**：全面废除 Gate 1、Gate 3、Gate 4 及提示词树生成器中生硬的 60/120 秒硬超时限制，对处于运行态的模型会话提供长达 10 分钟（600 秒）的自适应保护，避免 Claude 3.7 Thinking、Gemini 2.5 Pro 等深度思考生成中途突变离线，同时严格遵循 Idle 判定最高优先级原则。 (Thanks to @aukgit)
+- **邮件巡检常驻阻断根因移除 (Unblock Email Watcher Process Check)**：从 `is_any_prompt_actively_running` 中移除单纯 IDE 进程存活检查，仅以真实活动会话与提示词判定运行状态，彻底解除 `email_watcher.rs` 的误锁阻断。 (Thanks to @aukgit)
+- **生命周期缓存实时失效契约 (Instance Lifecycle Cache Invalidation Contract)**：在 `close_instance`、`launch_instance` 以及 `restart_instance` 执行完成后，主动触发 `invalidate_prompt_tree_cache` 清空旧缓存，保证前端轮询立即获取最新真值。 (Thanks to @aukgit)
+
+---
+
 ## [v4.155.0] - 2026-10-05
 
 ### Added
@@ -631,6 +650,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.156.0 (2026-10-05)**:
+        -   **[Instance Restart Split Capsule & Deep Repo DB Fixes]**:
+            -   **Description**: Added dedicated instance restart split button capsule on current account in Table and Card modes; preserved Switch button strictly for account selection; disambiguated synchronization icons reserving RotateCcw exclusively for restart; fixed host vs sandbox user home collision via `get_canonical_host_home()`, Gate 4 dual path/folder matching, disjoint sandbox tagging, 10-minute thinking window for reasoning models without premature 60s cutoff, unblocked email watcher, and enforced lifecycle cache invalidation. (Thanks to @aukgit)
+
+
     *   **v4.155.0 (2026-10-05)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

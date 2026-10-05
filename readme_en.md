@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.155.0)
+> Professional AI Account Management & Protocol Proxy System (v4.156.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.155.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.156.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.155.0**: Added dedicated instance restart split button capsule (`[Stop | Restart]`, `rounded-[5px]`, dark-glass hairline divider) in both Table and Card views to cleanly terminate and reboot instances on the currently bound account with accurate "Restarting..." feedback; preserved Switch button strictly for account selection; disambiguated synchronization icons by reserving `RotateCcw` exclusively for Restart (using `FolderSync` for Sync All, `Sparkles` for Eval Quota, `ArrowLeftRight` for Sync Quota, `KeyRound` for Wipe Credentials, and `FastForward` for table fast-forward); and completely resolved running projects & prompts detection bugs across 6 structural root causes (Gate 0 process PID liveness verification against data directories, startup zombie flag reset `is_running = 0`, adaptive 10-minute thinking window for reasoning models without premature 60s cutoff, robust fractional-second timestamp parsing, exact instance ID matching `node.instance_id === instConfig.id`, and modal ground truth cache bypass). (Thanks to @aukgit)
+> Latest version **v4.156.0**: Added dedicated instance restart split button capsule (`[Stop | Restart]`, `rounded-[5px]`, dark-glass hairline divider) in both Table and Card views to cleanly terminate and reboot instances on the currently bound account with accurate "Restarting..." feedback; preserved Switch button strictly for account selection; disambiguated synchronization icons by reserving `RotateCcw` exclusively for Restart (using `FolderSync` for Sync All, `Sparkles` for Eval Quota, `ArrowLeftRight` for Sync Quota, `KeyRound` for Wipe Credentials, and `FastForward` for table fast-forward); and completely resolved running projects & prompts detection bugs across 6 structural root causes (host vs sandbox home resolution via `get_canonical_host_home()`, Gate 4 dual path & folder matching, disjoint sandbox tagging, adaptive 10-minute thinking window for reasoning models without premature 60s cutoff, unblocking email watcher, and lifecycle cache invalidation). (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 
