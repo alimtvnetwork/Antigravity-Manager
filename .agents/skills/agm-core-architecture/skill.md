@@ -1,6 +1,6 @@
 ---
 name: agm-core-architecture
-description: Master architectural guide, subsystem index, and invariant directory for Antigravity-Manager. Use this skill as the primary gateway to navigate the 33 specialized AGM skills, core system invariants, directory-to-skill mappings, and end-to-end data flows.
+description: Master architectural guide, subsystem index, and invariant directory for Antigravity-Manager. Use this skill as the primary gateway to navigate the 41 specialized AGM skills, core system invariants, directory-to-skill mappings, and end-to-end data flows.
 ---
 
 # AGM Core Architecture & Subsystem Skill Directory
@@ -95,6 +95,14 @@ When modifying any component in the repository, refer to the corresponding skill
 | `src-tauri/src/bin/agm.rs`, `repo_db.rs` | Terminal self-healing suggestions, failed commands telemetry, session clearing, gitignore hygiene | [`agm-terminal-diagnostics-and-suggestions`](.agents/skills/agm-terminal-diagnostics-and-suggestions/skill.md) |
 | `.github/workflows/`, `03-ai-scripts/06-cicd-local-runner.py` | Pre-flight quality gates, Zero-CI quarantine standards, GitHub Actions pipelines | [`agm-cicd-and-preflight-gates`](.agents/skills/agm-cicd-and-preflight-gates/skill.md) |
 | `src-tauri/src/proxy/*sync.rs`, `cli_sync.rs` | External AI assistant sync (OpenCode, Hermes, OpenClaw, Droid) & CLI path discovery | [`agm-assistant-cli-sync`](.agents/skills/agm-assistant-cli-sync/skill.md) |
+| `src-tauri/src/proxy/audio/`, `video/` | Whisper transcription endpoint, MIME normalization, 15MB/20MB limits, audio/video streaming | [`agm-multimodal-audio-video`](.agents/skills/agm-multimodal-audio-video/skill.md) |
+| `src-tauri/src/proxy/zai_vision_mcp.rs`, `zai_vision_tools.rs` | Model Context Protocol (MCP) server endpoints, ZAI vision tools, and session lifecycles | [`agm-zai-vision-mcp`](.agents/skills/agm-zai-vision-mcp/skill.md) |
+| `src-tauri/src/proxy/proxy_pool.rs`, `commands/proxy_pool.rs` | SOCKS5/HTTP outbound egress proxy pool, latency scoring, strategy selection, account bindings | [`agm-proxy-pool-and-egress`](.agents/skills/agm-proxy-pool-and-egress/skill.md) |
+| `src-tauri/src/modules/tray.rs`, `lightweight.rs` | Desktop tray menus, lightweight mode memory unloading, Linux Wayland graphics policy, Win32 COM shell healer | [`agm-desktop-tray-and-lifecycle`](.agents/skills/agm-desktop-tray-and-lifecycle/skill.md) |
+| `src-tauri/src/modules/cloudflared.rs`, `commands/cloudflared.rs` | Cloudflared Zero Trust tunnels, Quick/Auth tunnel modes, automated binary acquisition, headless web access | [`agm-cloudflared-tunnel`](.agents/skills/agm-cloudflared-tunnel/skill.md) |
+| `src-tauri/src/modules/task_history_db.rs`, `audit_action.rs` | 500-row auto-rotation split DBs (`task_index.db`, `history-*.db`), `AuditAction` codes, audit UI/CLI views | [`agm-task-history-and-audit`](.agents/skills/agm-task-history-and-audit/skill.md) |
+| `src-tauri/src/modules/training_api.rs` | Machine training vault (`training_vault.db`), node telemetry endpoints, dynamic routing adjustments | [`agm-training-vault-and-learning`](.agents/skills/agm-training-vault-and-learning/skill.md) |
+
 
 
 ---
