@@ -1071,8 +1071,7 @@ pub fn stop_instance(instance_id: &str) -> Result<(), String> {
 
 /// Restart an instance on its current profile and bound account
 pub fn restart_instance(instance_id: &str) -> AppResult<InstanceStatus> {
-    let resolved_id =
-        resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
+    let resolved_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
     crate::modules::logger::log_info(&format!(
         "[Instance] Restarting instance '{}' (resolved: '{}')",
         instance_id, resolved_id
@@ -1103,12 +1102,12 @@ pub fn restart_instance(instance_id: &str) -> AppResult<InstanceStatus> {
     launch_instance(&resolved_id)?;
 
     // 5. Return updated InstanceStatus
-    let statuses = list_instances().map_err(AppError::Other)?;
+    let statuses = list_instances().map_err(AppError::Unknown)?;
     let updated = statuses
         .into_iter()
         .find(|s| s.config.id == resolved_id || s.config.name == resolved_id)
         .ok_or_else(|| {
-            AppError::Other(format!(
+            AppError::Process(format!(
                 "Instance '{}' not found in registry after restart",
                 resolved_id
             ))
@@ -2127,9 +2126,12 @@ pub fn sync_instance_ide_parity(target_instance_id: &str) -> AppResult<()> {
             .join("Antigravity")
             .join("User")
             .join("settings.json");
-        let host_appdata_settings = std::env::var("APPDATA")
-            .ok()
-            .map(|a| PathBuf::from(a).join("Antigravity").join("User").join("settings.json"));
+        let host_appdata_settings = std::env::var("APPDATA").ok().map(|a| {
+            PathBuf::from(a)
+                .join("Antigravity")
+                .join("User")
+                .join("settings.json")
+        });
 
         let candidate_settings = [Some(default_appdata_settings), host_appdata_settings];
         for cand in candidate_settings.into_iter().flatten() {
@@ -3512,6 +3514,7 @@ fn launch_instance_inner_with_extra_workspaces(
                 e, trace
             ))
         })?;
+        let child_pid = child.id();
 
         if is_app_bundle {
             match child.wait_with_output() {
@@ -3559,7 +3562,7 @@ fn launch_instance_inner_with_extra_workspaces(
         // Discover the true Antigravity process PID post-launch to prevent storing transient wrapper PID.
         std::thread::sleep(std::time::Duration::from_millis(500));
         let real_pids = find_pids_for_data_dir(&data_dir, is_default);
-        let actual_pid = real_pids.first().copied().unwrap_or(child.id());
+        let actual_pid = real_pids.first().copied().unwrap_or(child_pid);
         let _ = record_instance_pid(instance_id, actual_pid, &data_dir);
         if reinject_prompts {
             wait_for_instance_prompt_channel(instance_id);

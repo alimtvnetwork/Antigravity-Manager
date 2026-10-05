@@ -124,4 +124,3 @@ pub async fn get_local_node_info() -> AppResult<LocalNodeInfo> {
 pub async fn auto_discover_supabase_credentials() -> AppResult<SupabaseConfig> {
     supabase_sync::auto_discover_supabase_credentials()
 }
-

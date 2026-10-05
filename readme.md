@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.152.0-3B82F6?style=flat-square" alt="Version v4.152.0">
+    <img src="https://img.shields.io/badge/Version-v4.153.0-3B82F6?style=flat-square" alt="Version v4.153.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.152.0)**
+**Bar 2: Version-Based Installation (v4.153.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -546,7 +546,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.150.0**: Overhauled Accounts table row borders & quota section visual grouping, migrated quota progress bars and audit badges from neon green to a refined VS Code cyan/teal palette, integrated Supabase repo-secrets auto-discovery, added cross-machine lease collision guards with a configurable 30–60m email cooldown window, compacted Instances table to 5 columns with zero horizontal scroll, normalized button corner radii to 5–6px, enhanced "Rotate to Next Best" with a dynamic candidate tooltip, and enforced a strict 4-column card grid with structured 2-row action toolbars. (Thanks to @aukgit)
+> Latest version **v4.153.0**: Introduced split restart button capsule (`[Square | RotateCcw]`) for running instances on current account, replaced circular sync icons with distinct semantic icons (`Cpu` and `ArrowLeftRight`), fixed running project & prompt detection root causes in `repo_db.rs`, resolved Rust compiler errors (`AppError`, macOS moved child process) and formatted code across all modules for 100% clean CI/CD preflight gates. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
 

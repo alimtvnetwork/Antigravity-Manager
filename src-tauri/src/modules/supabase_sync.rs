@@ -157,7 +157,8 @@ pub fn candidate_repo_secrets_paths() -> Vec<PathBuf> {
     ));
 
     if let Some(home) = dirs::home_dir() {
-        candidates.push(home.join("repo-secrets/02-antigravity-manager/vault/supabase_config.json"));
+        candidates
+            .push(home.join("repo-secrets/02-antigravity-manager/vault/supabase_config.json"));
         candidates.push(home.join("repo-secrets/03-supabase/01-own/supabase-credentials.json"));
         candidates.push(home.join("repo-secrets/03-supabase/02-lovable/supabase-credentials.json"));
     }
@@ -446,11 +447,12 @@ pub fn auto_discover_supabase_credentials() -> crate::error::AppResult<SupabaseC
         if seed_path.exists() {
             if let Ok(content) = fs::read_to_string(&seed_path) {
                 let clean = content.trim_start_matches('\u{feff}');
-                let parsed = crate::modules::json_envelope::extract_payload::<SupabaseConfig>(clean)
-                    .map(|(cfg, _)| cfg)
-                    .or_else(|_| {
-                        serde_json::from_str::<SupabaseConfig>(clean).map_err(|e| e.to_string())
-                    });
+                let parsed =
+                    crate::modules::json_envelope::extract_payload::<SupabaseConfig>(clean)
+                        .map(|(cfg, _)| cfg)
+                        .or_else(|_| {
+                            serde_json::from_str::<SupabaseConfig>(clean).map_err(|e| e.to_string())
+                        });
                 if let Ok(seed_cfg) = parsed {
                     for ep in seed_cfg.endpoints {
                         let norm_url = normalize_supabase_url(&ep.url);
