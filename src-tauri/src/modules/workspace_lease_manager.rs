@@ -202,7 +202,9 @@ pub async fn acquire_lease_with_details(
                     .and_then(|v| v.as_i64())
                     .unwrap_or(0);
 
-                if current_expires > now && !current_owner.trim().eq_ignore_ascii_case(node_id.trim()) {
+                if current_expires > now
+                    && !current_owner.trim().eq_ignore_ascii_case(node_id.trim())
+                {
                     let remaining = (current_expires - now).max(0);
                     return Ok(LeaseResult {
                         is_success: false,

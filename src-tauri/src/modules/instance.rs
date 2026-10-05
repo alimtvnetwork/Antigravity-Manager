@@ -4523,9 +4523,7 @@ pub async fn switch_account_to_instance(
         .iter()
         .find(|i| i.bound_account_id.as_deref() == Some(&account.id));
     if let Some(inst) = bound_inst {
-        if inst.id != target_id
-            && is_instance_running(&inst.id, &inst.data_dir, inst.pid)
-        {
+        if inst.id != target_id && is_instance_running(&inst.id, &inst.data_dir, inst.pid) {
             let err = format!(
                 "Cannot switch instance to account '{}': Account is actively bound to running sibling instance '{}' on this machine",
                 account.email,
