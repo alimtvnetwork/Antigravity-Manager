@@ -506,9 +506,10 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.156.0**: Added dedicated instance restart split button capsule (`[Stop | Restart]`, `rounded-[5px]`, dark-glass hairline divider) in both Table and Card views to cleanly terminate and reboot instances on the currently bound account with accurate "Restarting..." feedback; preserved Switch button strictly for account selection; disambiguated synchronization icons by reserving `RotateCcw` exclusively for Restart (using `FolderSync` for Sync All, `Sparkles` for Eval Quota, `ArrowLeftRight` for Sync Quota, `KeyRound` for Wipe Credentials, and `FastForward` for table fast-forward); and completely resolved running projects & prompts detection bugs across 6 structural root causes (host vs sandbox home resolution via `get_canonical_host_home()`, Gate 4 dual path & folder matching, disjoint sandbox tagging, adaptive 10-minute thinking window for reasoning models without premature 60s cutoff, unblocking email watcher, and lifecycle cache invalidation). (Thanks to @aukgit)
+> Latest version **v4.157.0**: Fixed empty prompt tree view by adding a fallback in `compute_project_conversation_tree()` that synthesizes project entries directly from `workspace_uris` in each instance's `conversation_summaries.db` when `workspaceStorage` is empty; restored neon glowing green `#1af18d` progress bars with `shadow-[0_0_10px_rgba(26,241,141,0.75)]` glow effect and compact 18% side-column widths; added three-part identity header (`#seq` + profile name + `...\Antigravity.exe`) to Prompt Tree View modal; replaced weekly quota scoring with an hours-elapsed-weighted algorithm (`weekly_effective_score = weekly_pct × hours_elapsed`, ascending sort, <8% treated as zero). (Thanks to @aukgit)
 
 👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
+
 
 <details open>
 <summary><b>👥 Contributors & Maintainer</b></summary>

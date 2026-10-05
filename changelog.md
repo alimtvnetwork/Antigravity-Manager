@@ -1,5 +1,21 @@
 # Changelog
 
+## [v4.157.0] - 2026-10-05
+
+### Added
+- **提示词树视图模态框三元标识头 (Prompt Tree Modal Header: Seq + Profile Name + Executable Path)**: 在 `PromptTreeViewModal.tsx` 模态框标题栏新增三段式身份标识区：序号徽章 `#N`（`PromptTreeViewModalProps.sequenceNumber`）、实例配置名（`instanceName`）、以及可执行文件末段路径（`executablePath` → `...\Antigravity.exe`）；`Instances.tsx` 全局统一透传 `seq_num` 与 `executable_path` 至所有 `setPromptTreeInstance` 调用点。 (Thanks to @aukgit)
+
+### Changed
+- **账号模式霓虹绿进度条辉光复原 (Restore Neon Glowing Green Progress Bar `#1af18d`)**: 撤销任务 134 引入的 VS Code 青色/蓝绿调色盘，将 `QuotaProgressBar.tsx` 与 `WaterDrainProgressBar.tsx` 全面恢复为用户确认接受的霓虹翠绿方案：`≥75%` → `from-emerald-400 to-[#1af18d]`，`≥50%` → `from-emerald-500 to-[#1af18d]` 并追加辉光阴影 `shadow-[0_0_10px_rgba(26,241,141,0.75)]`，`25–50%` → 琥珀/橙渐变，`<25%` → 玫瑰/红渐变；里程碑节点分级辉光：100% 节点 `shadow-[0_0_8px_rgba(26,241,141,0.85)]`，75% 节点 `shadow-[0_0_6px_rgba(26,241,141,0.6)]`。 (Thanks to @aukgit)
+- **进度条两端宽度压缩至 18% (Progress Bar Label & Time Columns Compact to 18%)**: 将 `QuotaProgressBar.tsx` 左侧图标/标签区限制为 `max-w-[18%]`，右侧时间/百分比区固定为 `w-[18%] max-w-[18%]`，令中央进度轨道获得更大展示空间。 (Thanks to @aukgit)
+- **账号表格表头深色背景精化 (Accounts Table Header Deeper Navy Background)**: 将 `AccountTable.tsx` 中表头行背景由 `dark:bg-slate-900/90` 更新为 `dark:bg-[#061220]`，与账号区整体深海军蓝主题高度一致。 (Thanks to @aukgit)
+- **每周配额时间消耗加权候选评分算法 (Hours-Elapsed Weighted Weekly Quota Scoring)**: 重构 `score_candidate_account()` 中的每周配额评分逻辑：引入 `compute_weekly_hours_elapsed()` 帮助函数，依据桶的 `reset_time`（RFC3339）实时计算本周已消耗小时数（`hours_elapsed = 168 - hours_remaining`）；新评分公式 `weekly_effective_score = effective_weekly_pct × hours_elapsed`，再乘以订阅档位系数后除以 16800 归一化；每周配额 <8% 视为零，从候选池中实质性排除；排序方向调整为**升序**（最低分 = 本周最新重置账号 = 优先候选）。仅作用于 Gemini 桶（`gemini-weekly`），Claude/3p 桶由 `TODO(claude)` 注释占位，待后续独立适配。 (Thanks to @aukgit)
+
+### Fixed
+- **提示词树空视图根因修复：workspaceStorage 为空时退化至 conversation_summaries.db (Empty Prompt Tree Root Fix)**: `detect_running_projects()` 依赖 `workspaceStorage/*/workspace.json` 文件扫描，但该目录在 Windows 托管部署下普遍为空；`compute_project_conversation_tree()` 在从 `running_projects` 表获取零条目后不再提前退出，而是新增降级分支：遍历 `gemini_dirs_tagged(target)` 发现各实例的 `conversation_summaries.db`，从 `workspace_uris` 列解析工作区路径并合成 `RunningProject` 虚拟条目，确保所有实例的提示词树至少展示最近 200 条有效会话；同步修正 `workspace_storage_path` 为 `None` 的条目在过滤步骤中被错误丢弃的问题（`unwrap_or(false)` → 显式 `match` 允许 `None` 通过）。 (Thanks to @aukgit)
+
+---
+
 ## [v4.156.0] - 2026-10-05
 
 ### Added
