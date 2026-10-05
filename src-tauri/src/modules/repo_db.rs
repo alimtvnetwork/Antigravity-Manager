@@ -4347,37 +4347,37 @@ fn compute_project_conversation_tree(
                 let tail_snippet = extract_prompt_tail_snippet(raw_prompt, 12);
 
                 let (c_inst_seq, c_inst_name, c_inst_exe) = if conv_inst_id == &proj.instance_id {
-                        (
-                            instance_seq_num,
-                            instance_name.clone(),
-                            instance_exe_name.clone(),
-                        )
-                    } else if conv_inst_id == "default" || conv_inst_id == "__default__" {
-                        (
-                            Some(1),
-                            "default".to_string(),
-                            crate::modules::instance::resolve_instance_exe_name("default", None),
-                        )
-                    } else if let Some(inst) = registry
-                        .instances
-                        .iter()
-                        .find(|i| i.id == *conv_inst_id || i.name == *conv_inst_id)
-                    {
-                        (
-                            inst.seq_num,
-                            inst.name.clone(),
-                            crate::modules::instance::resolve_instance_exe_name(
-                                &inst.id,
-                                inst.executable_path.as_deref(),
-                            ),
-                        )
-                    } else {
-                        (
-                            None,
-                            conv_inst_id.clone(),
-                            crate::modules::instance::resolve_instance_exe_name(conv_inst_id, None),
-                        )
-                    };
+                    (
+                        instance_seq_num,
+                        instance_name.clone(),
+                        instance_exe_name.clone(),
+                    )
+                } else if conv_inst_id == "default" || conv_inst_id == "__default__" {
+                    (
+                        Some(1),
+                        "default".to_string(),
+                        crate::modules::instance::resolve_instance_exe_name("default", None),
+                    )
+                } else if let Some(inst) = registry
+                    .instances
+                    .iter()
+                    .find(|i| i.id == *conv_inst_id || i.name == *conv_inst_id)
+                {
+                    (
+                        inst.seq_num,
+                        inst.name.clone(),
+                        crate::modules::instance::resolve_instance_exe_name(
+                            &inst.id,
+                            inst.executable_path.as_deref(),
+                        ),
+                    )
+                } else {
+                    (
+                        None,
+                        conv_inst_id.clone(),
+                        crate::modules::instance::resolve_instance_exe_name(conv_inst_id, None),
+                    )
+                };
 
                 conv_nodes.push(AgmConversationNode {
                     seq_id: c_seq,
