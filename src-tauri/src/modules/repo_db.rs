@@ -2004,6 +2004,7 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                                         .and_then(|n| n.to_str())
                                         .unwrap_or("")
                                         .to_lowercase();
+                                    let has_target = !clean_target.is_empty();
                                     let is_target_matched = has_target
                                         && (clean_p == clean_target
                                             || folder_name == clean_target
