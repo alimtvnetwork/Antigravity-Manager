@@ -1,3 +1,5 @@
+export const DEFAULT_ACCOUNT_PRIORITY = 50;
+
 export interface Account {
     id: string;
     email: string;

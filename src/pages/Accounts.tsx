@@ -29,7 +29,9 @@ import { showToast } from "../components/common/ToastContainer";
 import { exportAccounts } from "../services/accountService";
 import { useAccountStore } from "../stores/useAccountStore";
 import { useConfigStore } from "../stores/useConfigStore";
+import { useInstanceStore } from "../stores/useInstanceStore";
 import { useUpdateStore } from "../stores/use-update-store";
+import { resolveFocusTarget } from "../lib/resolve-focus-target";
 import { Account } from "../types/account";
 import { cn } from "../utils/cn";
 import { isTauri } from "../utils/env";
@@ -65,6 +67,27 @@ function Accounts() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const { instances, activeInstanceId } = useInstanceStore();
+
+  const boundInstanceAccountId = useMemo(() => {
+    const selectedInstance = instances.find((inst) => inst.id === activeInstanceId);
+    if (!selectedInstance) return null;
+    return (
+      selectedInstance.config.bound_account_id ||
+      accounts.find((a) => a.email === selectedInstance.config.bound_email)?.id ||
+      null
+    );
+  }, [instances, activeInstanceId, accounts]);
+
+  const activeFocusTargetId = useMemo(() => {
+    return resolveFocusTarget(boundInstanceAccountId, currentAccount?.id || null);
+  }, [boundInstanceAccountId, currentAccount?.id]);
+
+  const activeFocusTargetAccount = useMemo(() => {
+    if (!activeFocusTargetId) return null;
+    return accounts.find((a) => a.id === activeFocusTargetId) || null;
+  }, [accounts, activeFocusTargetId]);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -184,30 +207,30 @@ function Accounts() {
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Pagination State
-  const [currentPage, setCurrentPage] = useState(1);
-
-  // Auto-scroll and high-contrast highlight watcher for focused account
+  // Single auto-scroll and highlight pulse effect for focused account
   useEffect(() => {
     if (!focusedAccountId) return;
-    let attempts = 0;
-    const maxAttempts = 40;
-    const interval = setInterval(() => {
-      attempts++;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const scrollTarget = () => {
       const cardEl = document.getElementById(`account-card-${focusedAccountId}`);
       const rowEl = document.getElementById(`account-row-${focusedAccountId}`);
       const targetEl = cardEl || rowEl;
       if (targetEl) {
-        clearInterval(interval);
         targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
-        return;
+        timer = setTimeout(() => {
+          setFocusedAccountId(null);
+        }, 2000);
       }
-      if (attempts >= maxAttempts) {
-        clearInterval(interval);
+    };
+
+    const rafId = requestAnimationFrame(scrollTarget);
+    return () => {
+      cancelAnimationFrame(rafId);
+      if (timer) {
+        clearTimeout(timer);
       }
-    }, 100);
-    return () => clearInterval(interval);
-  }, [focusedAccountId, currentPage, filter, searchQuery]);
+    };
+  }, [focusedAccountId, currentPage, filter, searchQuery, paginatedAccounts]);
   const [localPageSize, setLocalPageSize] = useState<number | null>(() => {
     const saved = localStorage.getItem("accounts_page_size");
     const parsed = saved ? parseInt(saved, 10) : 150;
@@ -599,12 +622,19 @@ function Accounts() {
     }
   };
 
-  // Focus onto the currently active or picked account in the scroll view
+  // Focus onto the active instance's bound account (falling back to currentAccount)
   const handleFocusActiveAccount = () => {
-    // 1. Identify target account: prioritized active currentAccount, or first of selectedIds
-    const targetAccount =
-      currentAccount ||
-      (selectedIds.size > 0 ? accounts.find((a) => selectedIds.has(a.id)) : null);
+    // 1. Identify target account ID: prioritized selected instance bound account, falling back to currentAccount
+    const targetAccountId = activeFocusTargetId;
+    if (!targetAccountId) {
+      showToast(
+        t("accounts.no_active_to_focus", "No active account found to focus"),
+        "info"
+      );
+      return;
+    }
+
+    const targetAccount = accounts.find((a) => a.id === targetAccountId);
     if (!targetAccount) {
       showToast(
         t("accounts.no_active_to_focus", "No active account found to focus"),
@@ -613,20 +643,14 @@ function Accounts() {
       return;
     }
 
-    // 2. Clear filters if targetAccount is hidden by active filter
-    const isVisibleInFilter = filteredAccounts.some(
-      (a) => a.id === targetAccount.id
-    );
-    if (!isVisibleInFilter) {
+    // 2. Clear filters if targetAccount is hidden by active filter or search query
+    if (filter !== "all" || searchQuery.trim().length > 0) {
       setFilter("all");
       setSearchQuery("");
     }
 
-    // 3. Calculate target page number
-    const targetList = isVisibleInFilter ? filteredAccounts : accounts;
-    const targetIndex = targetList.findIndex(
-      (a) => a.id === targetAccount.id
-    );
+    // 3. Calculate target page number and navigate if necessary
+    const targetIndex = accounts.findIndex((a) => a.id === targetAccountId);
     if (targetIndex >= 0) {
       const targetPage = Math.floor(targetIndex / ITEMS_PER_PAGE) + 1;
       if (targetPage !== currentPage) {
@@ -635,7 +659,7 @@ function Accounts() {
     }
 
     // 4. Trigger state-based auto-scroll and luminous high-contrast highlight
-    setFocusedAccountId(targetAccount.id);
+    setFocusedAccountId(targetAccountId);
   };
 
   const exportAccountsToJson = async (accountsToExport: Account[]) => {
@@ -859,7 +883,9 @@ function Accounts() {
               className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-l-md text-amber-700 dark:text-amber-300 hover:bg-amber-100/70 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
               onClick={handleFocusActiveAccount}
               title={
-                currentAccount
+                activeFocusTargetAccount
+                  ? `Focus onto active account: ${activeFocusTargetAccount.email}`
+                  : currentAccount
                   ? `Focus onto active account: ${currentAccount.email}`
                   : "Focus active/picked account"
               }
@@ -1000,8 +1026,8 @@ function Accounts() {
                 refreshingIds={refreshingIds}
                 onToggleSelect={handleToggleSelect}
                 onToggleAll={handleToggleAll}
-                currentAccountId={currentAccount?.id || null}
-                currentAccountEmail={currentAccount?.email || null}
+                currentAccountId={activeFocusTargetId || currentAccount?.id || null}
+                currentAccountEmail={activeFocusTargetAccount?.email || currentAccount?.email || null}
                 switchingAccountId={switchingAccountId}
                 onSwitch={handleSwitch}
                 onRefresh={handleRefresh}
@@ -1032,8 +1058,8 @@ function Accounts() {
               selectedIds={selectedIds}
               refreshingIds={refreshingIds}
               onToggleSelect={handleToggleSelect}
-              currentAccountId={currentAccount?.id || null}
-              currentAccountEmail={currentAccount?.email || null}
+              currentAccountId={activeFocusTargetId || currentAccount?.id || null}
+              currentAccountEmail={activeFocusTargetAccount?.email || currentAccount?.email || null}
               switchingAccountId={switchingAccountId}
               focusedAccountId={focusedAccountId}
               onSwitch={handleSwitch}
@@ -1050,6 +1076,7 @@ function Accounts() {
               }
               onWarmup={handleWarmup}
               onUpdateLabel={handleUpdateLabel}
+              onUpdatePriority={updateAccountPriority}
               onViewError={(id: string) => setErrorAccountId(id)}
             />
           </div>

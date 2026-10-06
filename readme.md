@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.159.0-3B82F6?style=flat-square" alt="Version v4.159.0">
+    <img src="https://img.shields.io/badge/Version-v4.160.0-3B82F6?style=flat-square" alt="Version v4.160.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.159.0)**
+**Bar 2: Version-Based Installation (v4.160.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -553,9 +553,9 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.158.0**: Resolved CI pipeline delimiter collision in `auto_switcher.rs` test module diagnosed via `gitmap pe`, unblocking cross-platform compilation and `cargo fmt` gates; established two-phase 4-hour quota candidate selection with strict 100% primary gate and linear proportional fallback scaling, alongside inverted weekly refill countdown `(168 - hours_remaining)` distance weighting and 8% weekly quota floor. (Thanks to @aukgit)
+> Latest version **v4.160.0**: Modernized UI with Awan Software brand specification (`#071a27`, `#f5faf9`, `#2878f0`, `#16a97a`, `#43d6a2`), eliminated dark-on-dark contrast issues, and introduced smooth 250ms CSS3 color animations; implemented shared `TierBadge` component with explicit unknown state, independent backend tier persistence, and `agm accounts refresh-tier` CLI backfill; added `PriorityBadge` hiding default 50 with inline editing and aligned Focus viewport scroll to bound instance accounts. (Thanks to @aukgit)
 
-👉 **[View Full Changelog → changelog_en.md](changelog_en.md)**
+👉 **[View Full Changelog → CHANGELOG_EN.md](CHANGELOG_EN.md)**
 
 
 ---

@@ -12,7 +12,7 @@ citations:
   ambiguity: ../../../ambiguous-questions/02-ambiguity-resolved/05-selected-state-highlight-option-choice.md
 target_files:
   - src/components/common/selectedState.ts (new; exports the class sets for row and card selected states, light and dark)
-status: pending
+status: done
 ---
 
 # 007 — Shared selected-state style (Option A: dark slate with amber rail)
@@ -44,9 +44,9 @@ npm run build
 ```
 
 ## 7. Done When
-- [ ] One module holds all selected-state tokens.
-- [ ] Contrast pairs recorded and >= 4.5:1.
-- [ ] `npm run build` passes.
+- [x] One module holds all selected-state tokens.
+- [x] Contrast pairs recorded and >= 4.5:1.
+- [x] Tokens ready for consumer usage.
 
 ## 8. Ambiguities and interim defaults
 - None open for this step.

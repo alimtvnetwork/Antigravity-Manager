@@ -13,7 +13,7 @@ citations:
 target_files:
   - src-tauri/src/bin/agm.rs — accounts subcommand router and help text
   - src-tauri/src/modules/account.rs — a `refresh_missing_tiers` function reused by CLI and startup
-status: pending
+status: done
 ---
 
 # 005 — CLI command and startup backfill for tier
@@ -50,8 +50,8 @@ cd src-tauri && cargo run --bin agm -- accounts refresh-tier --json
 ```
 
 ## 7. Done When
-- [ ] The command prints counts and exits 0 when no failure occurs.
-- [ ] Startup backfill is non-blocking.
+- [x] The command prints counts and exits 0 when no failure occurs.
+- [x] Startup backfill is non-blocking.
 
 ## 8. Ambiguities and interim defaults
 - None open for this step.

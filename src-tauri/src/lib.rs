@@ -822,6 +822,21 @@ pub fn run() {
             // [PHASE 1] Integrated into main Axum port (8045), port 19527 no longer started separately
             info!("Management API integrated into main proxy server (port 8045)");
 
+            // Non-blocking background startup backfill for accounts with missing subscription tier
+            tauri::async_runtime::spawn(async {
+                tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+                let should_backfill = crate::modules::config::load_app_config()
+                    .map(|c| c.auto_refresh_missing_tiers)
+                    .unwrap_or(true);
+                if should_backfill {
+                    crate::modules::logger::log_info(
+                        "Starting background startup backfill for accounts with missing subscription tier...",
+                    );
+                    let _ = crate::modules::account::refresh_missing_tiers(Some(2)).await;
+                }
+            });
+            info!("Account subscription tier startup backfill task spawned.");
+
             Ok(())
         })
         .on_window_event(|window, event| {

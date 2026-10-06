@@ -48,6 +48,8 @@ pub struct AppConfig {
     pub training_api_enabled: bool, // [NEW] Enable /api/v1/training REST API endpoints
     #[serde(default = "default_true")]
     pub remote_control_api_enabled: bool, // [NEW] Enable /api/v1/remote/control REST API endpoints
+    #[serde(default = "default_true")]
+    pub auto_refresh_missing_tiers: bool, // [NEW] Startup backfill for accounts with missing subscription tier
     #[serde(default)]
     pub suggestion_delete_thinking_store: Option<bool>, // [NEW] 建议删除历史思考块缓存开关
     #[serde(default)]
@@ -247,6 +249,7 @@ impl AppConfig {
             lightweight_mode: false,
             training_api_enabled: true,
             remote_control_api_enabled: true,
+            auto_refresh_missing_tiers: true,
             suggestion_delete_thinking_store: None,
             thinking_cleanup_dismissed: None,
             dismissed_thinking_cleanup_version: None,

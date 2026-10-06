@@ -1,810 +1,151 @@
-# Changelog
-
-## [v4.159.0] - 2026-10-06
-
-### Added
-- **Fleet Accounts Deployment via GitMap (集群账号同步与一键分发)**: 在 `UnifiedBackupModal` 弹窗中新增“Deploy to Fleet via GitMap”集群账号一键同步功能；通过后端 Tauri IPC 接口 (`deploy_accounts_to_fleet` / `check_gitmap_available`) 调用本地 `gitmap nodes deploy agm-accounts` 命令，将本地 AGM 账号配置与认证令牌（`accounts.json`, `accounts/`, `user_tokens.db`）安全加密流式传输并解压分发至所有在线的集群节点（u1, w1 等），支持 `--include-main` 选项且默认排除中央控制节点以确保安全。 (Thanks to @aukgit)
-
----
-
-## [v4.158.0] - 2026-10-05
-
-### Fixed
-- **CI/CD 构建与格式化门禁修复 (GitMap Pipeline CI Gate & auto_switcher Delimiter Fix)**: 针对 `gitmap pe` 诊断发现的 `auto_switcher.rs:3137:1` 单元测试闭合界定符冲突（`unexpected closing delimiter: '}'`），彻底修复测试块内部缺失的 `test_instance_binding_stale_or_exhausted` 函数签名，恢复花括号平衡（Open: 521, Close: 521, Diff: 0），彻底解除 Release 与 CI 管道中跨平台 Rust 编译与格式化（`cargo fmt -- --check`）阻断。 (Thanks to @aukgit)
-
-### Changed
-- **两阶段 4 小时配额与周配额重置倒计时加权候选评分模型 (Two-Phase 4-Hour Gate & Hours-Remaining Weekly Quota Model)**:
-  - **主候选池 100% 门禁**：常规候选扫描中，4 小时配额低于 100% 且未到期的账号评分严格归零，杜绝不健康配额账号抢占资源。
-  - **全量耗尽无缝降级**：当全部可用账号均不足 100% 时，触发降级计算，以 `(q_4h / 100.0) * base_weekly_score` 按 4 小时配额比例平滑折算候选得分。
-  - **周配额重置倒计时加权**：基于 `(168 - hours_remaining)` 计算本周已消耗有效时长，优先激活临近重置周期的账号；8% 周配额底线硬淘汰；全量降序排列。 (Thanks to @aukgit)
-
----
-
-## [v4.157.2] - 2026-10-05
-
-### Fixed
-- **候选账号两阶段 4 小时配额门禁与周配额倒计时加权评分算法 (Two-Phase 4-Hour Quota Gate & Hours-Remaining Weekly Scoring)**:
-  - **阶段一（主候选池标准打分）**：若 4 小时配额小于 100%（且配额周期未结束），候选账号评分严格归零（通常情况下为 0），仅在 4 小时配额满额（100%）或周期重置完成时赋予周配额基准分 `base_weekly_score.floor()`。
-  - **阶段二（无满额账号平滑降级）**：当所有可用候选账号 4 小时配额均不足 100%（主候选池与冷却池为空）时，触发第二阶段降级评估，按 `(q_4h / 100.0) * base_weekly_score` 计算得分，实现按 4 小时可用比例线性折算。
-  - **周重置倒计时加权计算**：以周重置剩余小时数 `hours_remaining` 计算本周已消耗有效时长 `(168 - hours_remaining)`，距离重置越近（剩余小时越少、已消耗时长越大）权重越高；公式为 `(tier_multiplier * effective_weekly_pct * (168 - hours_remaining)) / 100.0`。
-  - **8% 周配额硬淘汰底线**：周配额小于 8% 的账号一律按 0 处理，杜绝濒临耗尽的周配额账号误入候选池。
-  - **降序排列与紧凑整数**：排序规则统一为降序（最高分优先），得分取整输出，优化 SQLite 存储效率；Claude/3p 桶保持 `TODO(claude)` 标记。 (Thanks to @aukgit)
-
----
-
-## [v4.157.1] - 2026-10-05
-
-### Fixed
-- **候选账号评分升降序修正与整数压缩 (Weekly Scoring: DESC Sort & Divide-by-100 Integer)**: 修正 `score_candidate_account()` 排序方向：由升序（最低分优先）改为**降序（最高分优先）**，即周配额剩余比例 × 本周已消耗小时数乘积最大者优先候选；同步将最终评分除以 100 并取整（`.floor()`），输出紧凑整数以降低 SQLite 存储冗余；并修正 `is_period_finished`（配额周期已重置）分支赋值：由原来的 `0.0`（在降序语义下意为最低优先）修正为 `TOTAL_WEEK_HOURS × 100.0 = 16800`（最高分，优先使用刚重置满额账号）。 (Thanks to @aukgit)
-
----
-
-## [v4.157.0] - 2026-10-05
-
-### Added
-- **提示词树视图模态框三元标识头 (Prompt Tree Modal Header: Seq + Profile Name + Executable Path)**: 在 `PromptTreeViewModal.tsx` 模态框标题栏新增三段式身份标识区：序号徽章 `#N`（`PromptTreeViewModalProps.sequenceNumber`）、实例配置名（`instanceName`）、以及可执行文件末段路径（`executablePath` → `...\Antigravity.exe`）；`Instances.tsx` 全局统一透传 `seq_num` 与 `executable_path` 至所有 `setPromptTreeInstance` 调用点。 (Thanks to @aukgit)
-
-### Changed
-- **账号模式霓虹绿进度条辉光复原 (Restore Neon Glowing Green Progress Bar `#1af18d`)**: 撤销任务 134 引入的 VS Code 青色/蓝绿调色盘，将 `QuotaProgressBar.tsx` 与 `WaterDrainProgressBar.tsx` 全面恢复为用户确认接受的霓虹翠绿方案：`≥75%` → `from-emerald-400 to-[#1af18d]`，`≥50%` → `from-emerald-500 to-[#1af18d]` 并追加辉光阴影 `shadow-[0_0_10px_rgba(26,241,141,0.75)]`，`25–50%` → 琥珀/橙渐变，`<25%` → 玫瑰/红渐变；里程碑节点分级辉光：100% 节点 `shadow-[0_0_8px_rgba(26,241,141,0.85)]`，75% 节点 `shadow-[0_0_6px_rgba(26,241,141,0.6)]`。 (Thanks to @aukgit)
-- **进度条两端宽度压缩至 18% (Progress Bar Label & Time Columns Compact to 18%)**: 将 `QuotaProgressBar.tsx` 左侧图标/标签区限制为 `max-w-[18%]`，右侧时间/百分比区固定为 `w-[18%] max-w-[18%]`，令中央进度轨道获得更大展示空间。 (Thanks to @aukgit)
-- **账号表格表头深色背景精化 (Accounts Table Header Deeper Navy Background)**: 将 `AccountTable.tsx` 中表头行背景由 `dark:bg-slate-900/90` 更新为 `dark:bg-[#061220]`，与账号区整体深海军蓝主题高度一致。 (Thanks to @aukgit)
-- **每周配额时间消耗加权候选评分算法 (Hours-Elapsed Weighted Weekly Quota Scoring)**: 重构 `score_candidate_account()` 中的每周配额评分逻辑：引入 `compute_weekly_hours_elapsed()` 帮助函数，依据桶的 `reset_time`（RFC3339）实时计算本周已消耗小时数（`hours_elapsed = 168 - hours_remaining`）；新评分公式 `weekly_effective_score = effective_weekly_pct × hours_elapsed`，再乘以订阅档位系数后除以 16800 归一化；每周配额 <8% 视为零，从候选池中实质性排除；排序方向调整为**升序**（最低分 = 本周最新重置账号 = 优先候选）。仅作用于 Gemini 桶（`gemini-weekly`），Claude/3p 桶由 `TODO(claude)` 注释占位，待后续独立适配。 (Thanks to @aukgit)
-
-### Fixed
-- **提示词树空视图根因修复：workspaceStorage 为空时退化至 conversation_summaries.db (Empty Prompt Tree Root Fix)**: `detect_running_projects()` 依赖 `workspaceStorage/*/workspace.json` 文件扫描，但该目录在 Windows 托管部署下普遍为空；`compute_project_conversation_tree()` 在从 `running_projects` 表获取零条目后不再提前退出，而是新增降级分支：遍历 `gemini_dirs_tagged(target)` 发现各实例的 `conversation_summaries.db`，从 `workspace_uris` 列解析工作区路径并合成 `RunningProject` 虚拟条目，确保所有实例的提示词树至少展示最近 200 条有效会话；同步修正 `workspace_storage_path` 为 `None` 的条目在过滤步骤中被错误丢弃的问题（`unwrap_or(false)` → 显式 `match` 允许 `None` 通过）。 (Thanks to @aukgit)
-
----
-
-## [v4.156.0] - 2026-10-05
-
-### Added
-- **实例当前账号重启分段胶囊按钮 (Instance Restart Split Button Capsule on Current Account)**: 在实例列表表格视图（`InstanceTable.tsx`）与卡片视图（`Instances.tsx`）中，当实例处于运行状态时，将原有单一动作重构为紧凑无缝的分段胶囊（`rounded-[5px]` 边框与暗色玻璃细分界线），左半部分为红色停止按钮（`<Square>`），右半部分为琥珀色重启按钮（`<RotateCcw>`，悬浮提示“Restart Instance on Current Account”）；点击可在保持当前绑定账号不变的前提下，安全终止进程、释放文件锁并立即自动重新启动实例，全局操作反馈精确显示“Restarting...”。 (Thanks to @aukgit)
-
-### Changed
-- **账号切换按钮纯净选择语义守护 (Strict Account Selection Semantics for Switch Button)**: 严格守护 Switch 按钮行为，仅用于调出选择切换账号弹窗（`setSwitchTargetInstance`），绝不混淆或夹带无意重启副作用。 (Thanks to @aukgit)
-- **同步图标防混淆语义规范 (Semantic Icon Disambiguation: Reserve RotateCcw Strictly for Restart)**: 彻底消除旋转箭头造成的“重启/同步”混淆。全局严格遵循防混淆不变量：`<RotateCcw>`（逆时针旋转）专属于实例重启操作；头部批量同步按钮（Sync All）采用 `<FolderSync className="text-cyan-500" />`，头部配额评估按钮（Eval Quota）采用 `<Sparkles className="text-amber-500" />`，卡片端配额同步按钮（Sync Quota）采用 `<ArrowLeftRight className="text-blue-500" />`，卡片更多菜单中的凭证擦除按钮（Wipe Credentials）由原混淆的 `RotateCcw` 替换为 `<KeyRound className="text-amber-500" />`；头部“Rotate to Next Best”快进按钮对齐为 `<FastForward>`，与卡片视图保持完全一致。 (Thanks to @aukgit)
-
-### Fixed
-- **宿主与沙箱用户主目录碰撞根因修复 (Host vs Sandbox Home Directory Resolution Fix)**：新增 `get_canonical_host_home()`，在沙箱环境（`.antigravity_tools/instances/<id>/home`）下自动回溯并穿透获取宿主真实用户主目录（`C:\Users\Administrator`），确保默认实例能够准确读取宿主底层真实的 `.gemini/antigravity` 会话数据库。 (Thanks to @aukgit)
-- **Gate 4 路径匹配双轨制与复合键识别 (Dual Path, Folder Name & Composite ID Matching in Gate 4)**：彻底解决解码后绝对工作区路径与传入的项目名称/Slug 之间的字符串不匹配缺陷，全面支持完整路径、文件夹名称及复合键前缀三种匹配模式。 (Thanks to @aukgit)
-- **全局进程存活误判拦截与沙箱目录隔离 (Disjoint Sandbox Tagging & Targeted Default Process Check)**：在 `gemini_dirs_tagged` 中实施严格互斥映射，杜绝副实例沙箱路径被误打上 `default` 标签；在提示词树生成器中废除全局 `is_antigravity_running(None)` 检查，精准定向至默认数据目录 PID 列表，杜绝其他实例运行导致默认实例会话串染。 (Thanks to @aukgit)
-- **大模型长推理思考期 10 分钟自适应保护窗口 (Adaptive 10-Minute Window for Deep Thinking Models)**：全面废除 Gate 1、Gate 3、Gate 4 及提示词树生成器中生硬的 60/120 秒硬超时限制，对处于运行态的模型会话提供长达 10 分钟（600 秒）的自适应保护，避免 Claude 3.7 Thinking、Gemini 2.5 Pro 等深度思考生成中途突变离线，同时严格遵循 Idle 判定最高优先级原则。 (Thanks to @aukgit)
-- **邮件巡检常驻阻断根因移除 (Unblock Email Watcher Process Check)**：从 `is_any_prompt_actively_running` 中移除单纯 IDE 进程存活检查，仅以真实活动会话与提示词判定运行状态，彻底解除 `email_watcher.rs` 的误锁阻断。 (Thanks to @aukgit)
-- **生命周期缓存实时失效契约 (Instance Lifecycle Cache Invalidation Contract)**：在 `close_instance`、`launch_instance` 以及 `restart_instance` 执行完成后，主动触发 `invalidate_prompt_tree_cache` 清空旧缓存，保证前端轮询立即获取最新真值。 (Thanks to @aukgit)
-
----
-
-## [v4.155.0] - 2026-10-05
-
-### Added
-- **实例当前账号重启分段胶囊按钮 (Instance Restart Split Button Capsule on Current Account)**: 在实例列表表格视图（`InstanceTable.tsx`）与卡片视图（`Instances.tsx`）中，当实例处于运行状态时，将原有单一动作重构为紧凑无缝的分段胶囊（`rounded-[5px]` 边框与暗色玻璃细分界线），左半部分为红色停止按钮（`<Square>`），右半部分为琥珀色重启按钮（`<RotateCcw>`，悬浮提示“Restart Instance on Current Account”）；点击可在保持当前绑定账号不变的前提下，安全终止进程、释放文件锁并立即自动重新启动实例，全局操作反馈精确显示“Restarting...”。 (Thanks to @aukgit)
-
-### Changed
-- **账号切换按钮纯净选择语义守护 (Strict Account Selection Semantics for Switch Button)**: 严格守护 Switch 按钮行为，仅用于调出选择切换账号弹窗（`setSwitchTargetInstance`），绝不混淆或夹带无意重启副作用。 (Thanks to @aukgit)
-- **同步图标防混淆语义规范 (Semantic Icon Disambiguation: Reserve RotateCcw Strictly for Restart)**: 彻底消除旋转箭头造成的“重启/同步”混淆。全局严格遵循防混淆不变量：`<RotateCcw>`（逆时针旋转）专属于实例重启操作；头部批量同步按钮（Sync All）采用 `<FolderSync className="text-cyan-500" />`，头部配额评估按钮（Eval Quota）采用 `<Sparkles className="text-amber-500" />`，卡片端配额同步按钮（Sync Quota）采用 `<ArrowLeftRight className="text-blue-500" />`，卡片更多菜单中的凭证擦除按钮（Wipe Credentials）由原混淆的 `RotateCcw` 替换为 `<KeyRound className="text-amber-500" />`；表格模式快进按钮对齐为 `<FastForward>`，与卡片视图保持完全一致。 (Thanks to @aukgit)
-
-### Fixed
-- **运行中项目与会话提示词状态判定六大根因修复 (Running Projects & Prompts Deep Detection Root-Cause Resolution)**:
-  - **进程 PID 存活硬门禁 (Gate 0 Host Process PID Liveness Gate)**：在 `detect_running_projects` 与 `is_instance_running` 中重构 PID 校验逻辑，自定义实例除检查进程名外必须通过 `find_pids_for_data_dir` 严格匹配数据目录对应 PID；当实例未处于活动运行状态时，无条件将该实例名下所有项目重置为 `is_running = 0`，根除进程关闭后虚假绿点常驻的假阳性缺陷。 (Thanks to @aukgit)
-  - **启动期僵尸运行标志清空 (Startup State Sanitization)**：在 `purge_corrupted_running_projects` 中新增 `UPDATE running_projects SET is_running = 0`，确保因 IDE 异常崩溃或宿主重启遗留的历史残余状态在开机即刻彻底重置。 (Thanks to @aukgit)
-  - **大模型长推理思考期 10 分钟自适应保护窗口 (Adaptive 10-Minute Window for Deep Thinking Models)**：废除 Gate 4 与提示词树生成器中生硬的 60/120 秒硬超时限制，对处于运行态（`status = CASCADE_RUN_STATUS_RUNNING` 且 `not_fully_idle > 0`）的模型会话提供长达 10 分钟（600 秒）的自适应保护，避免 Claude 3.7 Thinking、Gemini 2.5 Pro 等深度思考生成中途突变离线，同时严格遵循 Idle 判定最高优先级原则。 (Thanks to @aukgit)
-  - **多格式毫秒级时间戳解析鲁棒性强化 (Robust Multi-Format Timestamp Parsing)**：新增 `parse_flexible_timestamp`，全面兼容 RFC3339、含毫秒/微秒小数部分的 ISO-8601（`%Y-%m-%dT%H:%M:%S%.f`）、空格分隔格式以及 Epoch 毫秒时间戳，杜绝因格式差异静默降级为 0 导致有效会话丢失。 (Thanks to @aukgit)
-  - **跨实例归属精确比对与幽灵会话过滤 (Exact Instance Matching & Ghost Conversation Pruning)**：在 `isNodeOwnedByInstance` 中以严格相等（`node.instance_id === instConfig.id`）替代模糊后缀匹配，彻底解决前缀重叠实例的归属泄露；在 Gate 4 中主动拦截 Untitled 且词数为 0 的空白幽灵会话。 (Thanks to @aukgit)
-  - **提示词树模态框实时真值加载 (Modal Ground Truth Cache Bypass)**：在 `PromptTreeViewModal.tsx` 打开、刷新与恢复流程中强制指定 `loadTree(true, true)`，无条件绕过本地 TTL 缓存，直读实时底层最新状态。 (Thanks to @aukgit)
-
----
-
-## [v4.154.0] - 2026-10-05
-
-### Added
-- **账号表格行边框恢复与中段配额视觉分组 (Accounts Table Row Borders & Quota Section Grouping)**: 恢复账号表格各行底部清晰边框线条（`border-b border-slate-200/90 dark:border-slate-800/90`），并在表头与表体中为中段核心配额列（4H 模型配额与每周配额）赋予微妙背景底色与纵向分隔边框（`bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#15334d]` 与 `border-r border-slate-300 dark:border-[#15334d]`），彻底解决行次模糊与列区混淆问题。 (Thanks to @aukgit)
-- **Supabase 密钥仓库自动探测与一键导入 (Supabase Repo-Secrets Auto-Discovery & 1-Click Sync)**: 在 `supabase_sync.rs` 中全面打通 `repo-secrets` 凭据探测路径（覆盖 `02-antigravity-and-event-manager`、`02-antigravity-manager`、`03-supabase/01-own` 及 `03-supabase/02-lovable`），自动解密与清洗 URL（剔除 `/rest/v1`），在设置界面与端点空白卡片新增“Auto-Discover from Repo Secrets”一键导入按钮及 Tauri IPC 命令，并在 CLI `agm supabase load-secrets` 中保持完全对齐。 (Thanks to @aukgit)
-- **同机运行实例互斥保护与跨机器租约冲突拦截 (Local Sibling Instance Guard & Cross-Machine Lease Collision Prevention)**: 在账号切换执行入口（`switch_account` 与 `switch_account_to_instance`）注入前置互斥门禁，在分发凭据前严格校验目标账号是否正被本地其他运行中实例占用，同时调用 `is_account_or_email_leased_by_other` 与 `get_remote_lease_holder_info` 校验外部机器占用状态，输出明确的远端节点别名与租约过期时间。 (Thanks to @aukgit)
-- **30-60 分钟邮箱冷却期与防死锁智能回退 (Configurable 30–60m Email Cooldown & Two-Tier Pool Fallback)**: 在候选人评分算法中对近期使用过的邮箱建立冷却隔离池（默认 60 分钟，支持 15m/30m/45m/60m/120m 灵活配置），优先选择非冷却健康账号；当所有账号均处于冷却窗口时，自动平滑回退至冷却时间最久的历史账号，彻底杜绝轮换卡死与死锁。 (Thanks to @aukgit)
-- **“Rotate to Next Best”候选人悬浮提示与操作填充 (Rotate to Next Best Candidate Tooltip & Visual Feedback)**: 优化“Rotate to Next Best”按钮内边距（`px-3.5 py-1.5`）与 5–6px 圆角，动态计算智能候选人队列并在悬浮气泡中完整展示目标实例名称、拟切换账号邮箱、订阅层级以及 4H 配额健康百分比，按钮内部直观呈现候选目标邮箱微标，消除盲切困惑。 (Thanks to @aukgit)
-
-### Changed
-- **账号配额与进度条 VS Code 青色/青蓝主题色调重构 (VS Code Cyan/Teal Palette for Accounts Quotas & Progress Bars)**: 废除账号界面中过分刺眼的荧光绿高亮（`#1af18d`、`emerald-500`、`lime-400`），全面重构 `QuotaProgressBar`、`WaterDrainProgressBar` 及审计微标色彩体系，切换为舒适自然的 VS Code 标志性青色/青蓝渐变调（$\ge 75\%$ 采用 `from-teal-500 via-cyan-500 to-[#38bdf8]`，$\ge 50\%$ 采用 `from-teal-600 via-cyan-500 to-sky-400`，100% 节点采用青色光晕），在深浅主题下均保持柔和清晰。 (Thanks to @aukgit)
-- **实例表格紧凑化、合并列、路径截断与提示词动作收纳 (Instances Table Zero-Scroll Compaction, Combined Profile/Account & Action Dropdown)**: 彻底消除实例表格在 1280px+ 视口下的横向滚动条，精简为紧凑布局：将实例配置名称与关联邮箱合二为一显示（首行实例名与运行指示点，次行脱敏邮箱与订阅层级微标）；数据目录路径智能截断仅展示末级文件夹（前缀 `...`，支持悬浮完整路径与一键复制）；将提示词树（Prompts Tree）收纳至操作下拉菜单。 (Thanks to @aukgit)
-- **按钮 5–6px 圆角规范化 (Universal 5–6px Button Radius Normalization)**: 全面重构实例界面、弹窗表单及设置工具栏中过于臃肿的药丸圆角，严格规范所有主操作按钮、模态框交互按钮为 5–6px（`rounded-[5px]`），呈现工业级精致质感。 (Thanks to @aukgit)
-- **实例卡片模式严格 4 列紧凑网格与双行操作按钮布局 (Card Mode Strict 4-Column Grid & Structured 2-Row Action Toolbars)**: 约束卡片视图桌面端最大列数为 4 列（`grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3`），杜绝 5/6 列挤压导致的卡片扭曲；卡片底部按“主操作胶囊（Row 1: 启动/停止/重启、切换、快进、同步 PID）+ 辅助工具胶囊（Row 2: 提示词树、设置、克隆、审计、更多操作）”整齐排列，保持高度一致整洁。 (Thanks to @aukgit)
-
----
-
-## [v4.153.0] - 2026-10-05
-
-### Fixed
-- **Rust 编译与跨平台构建根因修复 (Rust Compiler & Cross-Platform Tauri Build Root-Cause Fix)**: 修复 `src-tauri/src/modules/instance.rs` 中 `AppError::Other` 不存在导致的编译报错，统一采用 `AppError::Unknown` 与 `AppError::Process`；修复 macOS 平台因 `child.wait_with_output()` 所有权转移后借用 `child.id()` 导致的编译错误，在派生子进程后立即缓存 `child_pid`；修复 `src-tauri/src/modules/repo_db.rs` 中 `or_else` 链式调用返回类型不匹配问题（去除多余的 `.ok()`，对齐 `Result<i64, _>`）。 (Thanks to @aukgit)
-- **Rustfmt 跨平台代码格式化门禁全量对齐 (Rustfmt Formatting Alignment across Modules)**: 全面对齐 `commands/supabase.rs`、`modules/instance.rs`、`modules/repo_db.rs`、`modules/supabase_sync.rs` 的尾随空行、长条件换行与缩进规范，确保 Linux、macOS 与 Windows 门禁 100% 绿灯无阻断。 (Thanks to @aukgit)
-
-### Added
-- **实例重启分段胶囊按钮 (Instance Restart Split Button Capsule on Current Account)**: 在实例列表表格视图与卡片视图中，当实例处于运行状态时，将原有的停止按钮重构为紧凑无缝的分段胶囊（`rounded-[5px]` 边框与暗色玻璃分隔线），左侧为红色停止按钮（`Square`），右侧为琥珀色重启按钮（`RotateCcw`，悬浮提示“Restart Instance on Current Account”）；点击可在保持当前绑定账号不变的前提下，安全终止进程、释放文件锁并立即自动重新启动实例。 (Thanks to @aukgit)
-- **后端原子化实例重启 IPC 命令 (Atomic Backend `restart_instance` IPC Command)**: 在 `src-tauri/src/modules/instance.rs` 中实现 `restart_instance` 并在 `commands/instance.rs` 与 `lib.rs` 中注册 Tauri 命令，优雅关闭对应实例的所有子进程与窗口，轮询等待进程终止（至多 1.5 秒）并自动清除提示词树缓存后，通过 `launch_instance` 重新启动，返回最新的实例状态。 (Thanks to @aukgit)
-
-### Changed
-- **同步图标防混淆语义规范 (Distinct Semantic Icons for Sync Operations vs Restart)**: 彻底消除“同步 PID/配额”操作与“重启实例”之间的图标混淆。将表格操作下拉菜单及卡片视图中原本采用旋转箭头的同步按钮图标重构为专用的处理器微标（`<Cpu className="w-3.5 h-3.5 text-teal-500" />`），将账号切换按钮图标重构为标准切换微标（`<ArrowLeftRight className="w-3 h-3" />`），旋转逆时针箭头（`RotateCcw`）严格专用于重启操作。 (Thanks to @aukgit)
-- **运行中项目与会话提示词状态判定根因修复 (Running Projects & Prompts Detection Root-Cause Fix)**: 在 `src-tauri/src/modules/repo_db.rs` 中将 `prompt_tree_cache` 缓存生存时间从 60 秒缩短为 5 秒，实例启停及重启时即时失效缓存；彻底消除 `default` 实例匹配到孤立空实例项目（`instance_id IS NULL` 或 `""`）导致的误报；严格过滤标题为 Untitled 且词数为 0 的空白幽灵会话，并要求会话活动必须满足实例进程存活且时间戳在 120 秒内，彻底解决默认实例虚假显示项目运行的问题。 (Thanks to @aukgit)
-
----
-
-## [v4.152.0] - 2026-10-05
-
-### Added
-- **实例重启分段胶囊按钮 (Instance Restart Split Button Capsule on Current Account)**: 在实例列表表格视图与卡片视图中，当实例处于运行状态时，将原有的停止按钮重构为紧凑无缝的分段胶囊（`rounded-[5px]` 边框与暗色玻璃分隔线），左侧为红色停止按钮（`Square`），右侧为琥珀色重启按钮（`RotateCcw`，悬浮提示“Restart Instance on Current Account”）；点击可在保持当前绑定账号不变的前提下，安全终止进程、释放文件锁并立即自动重新启动实例。 (Thanks to @aukgit)
-- **后端原子化实例重启 IPC 命令 (Atomic Backend `restart_instance` IPC Command)**: 在 `src-tauri/src/modules/instance.rs` 中实现 `restart_instance` 并在 `commands/instance.rs` 与 `lib.rs` 中注册 Tauri 命令，优雅关闭对应实例的所有子进程与窗口，轮询等待进程终止（至多 1.5 秒）并自动清除提示词树缓存后，通过 `launch_instance` 重新启动，返回最新的实例状态。 (Thanks to @aukgit)
-
-### Changed
-- **同步图标防混淆语义规范 (Distinct Semantic Icons for Sync Operations vs Restart)**: 彻底消除“同步 PID/配额”操作与“重启实例”之间的图标混淆。将表格操作下拉菜单及卡片视图中原本采用旋转箭头的同步按钮图标重构为专用的处理器微标（`<Cpu className="w-3.5 h-3.5 text-teal-500" />`），将账号切换按钮图标重构为标准切换微标（`<ArrowLeftRight className="w-3 h-3" />`），旋转逆时针箭头（`RotateCcw`）严格专用于重启操作。 (Thanks to @aukgit)
-
-### Fixed
-- **运行中项目与会话提示词状态判定根因修复 (Running Projects & Prompts Detection Root-Cause Fix)**: 在 `src-tauri/src/modules/repo_db.rs` 中将 `prompt_tree_cache` 缓存生存时间从 60 秒缩短为 5 秒，实例启停及重启时即时失效缓存；彻底消除 `default` 实例匹配到孤立空实例项目（`instance_id IS NULL` 或 `""`）导致的误报；严格过滤标题为 Untitled 且词数为 0 的空白幽灵会话，并要求会话活动必须满足实例进程存活且时间戳在 120 秒内，彻底解决默认实例虚假显示项目运行的问题。 (Thanks to @aukgit)
-- **TypeScript 接口字段对齐与未声明变量清理 (TypeScript Interface Alignment & CI/CD Compilation Fix)**: 在 `src/types/config.ts` 的 `AutoProfileSwitcherConfig` 中补齐 `account_lockout_window_minutes?: number` 可选字段，解决 `AutoSwitcherSettings.tsx` 与 `Settings.tsx` 中的类型缺失错误；清理 `InstanceTable.tsx` 与 `Instances.tsx` 中的未读取变量与导入（`syncingInstanceIds` 与 `useMemo`），确保 `npm run build` 跨平台前端构建 100% 零阻断。 (Thanks to @aukgit)
-- **Rustfmt 跨平台代码格式化规范对齐 (Rustfmt Alignment in instance.rs)**: 对齐 `src-tauri/src/modules/instance.rs` 中 `target_skills_dir` 链式调用的代码换行格式，确保 `cargo fmt -- --check` 跨平台门禁全面绿灯通过。 (Thanks to @aukgit)
-
----
-
-## [v4.151.0] - 2026-10-05
-
-### Fixed
-- **账号行 JSX 闭合标签对齐与前端构建修复 (AccountRow JSX Closing Tag Mismatch & Frontend Build Fix)**: 修复 `src/components/accounts/AccountRow.tsx` 首列中遗留的冗余闭合 `</div>` 标签，解决 TypeScript TS17002/TS1005 语法报错，恢复跨平台 `npm run build` 前端构建零阻断。 (Thanks to @aukgit)
-- **Rustfmt 代码格式化跨平台门禁对齐 (Rustfmt Formatting Alignment across Modules)**: 规范 `src-tauri/src/modules/instance.rs` 中模块导入字母排序（`crate::error` 与 `crate::models`）以及长条件分支折行格式，确保 Linux 与 Windows CI/CD 流水线代码格式化门禁全面绿灯通过。 (Thanks to @aukgit)
-- **默认实例主题、预设、插件与技能全量镜像同步 (Default Instance Theme, Presets, Plugins & Skills Fleet Parity)**: 在 `instance.rs` 中实现 `sync_instance_ide_parity`，将宿主 Dracula 紫色主题种子（`#BD93F9` / `#19191C`）、Turbo 自动化预设、4 个官方插件及 9 项内置技能深度同步至实例沙箱，消除从默认实例克隆时的配置脱节。 (Thanks to @aukgit)
-- **GitMap 自动化 IDE 部署与跨机器委派 (GitMap Automated IDE Fleet Deployment & Delegation)**: 在 GitMap 体系下打通 `gitmap agy deploy` 命令行套件与 `scripts/deploy-antigravity-ide-fleet.ps1`，支持一键远程向目标节点完整部署 Antigravity IDE 环境与 7 关卡质量验证评分卡。 (Thanks to @aukgit)
-
----
-
-## [v4.150.0] - 2026-10-05
-
-### Added
-- **账号表格行边框恢复与中段配额视觉分组 (Accounts Table Row Borders & Quota Section Grouping)**: 恢复账号表格各行底部清晰边框线条（`border-b border-slate-200/80 dark:border-slate-800/80`），并在表头与表体中为中段核心配额列（4H 模型配额与每周配额）赋予微妙背景底色与纵向分隔边框（`bg-slate-50/50 dark:bg-slate-900/40 border-x border-slate-200/60 dark:border-[#15334d]/50`），使账号数据行次分明、配额区域聚合聚焦。 (Thanks to @aukgit)
-- **Supabase 密钥仓库自动探测与一键导入 (Supabase Repo-Secrets Auto-Discovery & 1-Click Sync)**: 在 `supabase_sync.rs` 中全面打通 `repo-secrets` 凭据探测路径（优先检索 `D:/work/repo-secrets/02-antigravity-manager/vault/supabase_config.json` 与 `03-supabase/` 凭据封套），自动解密与清洗 URL，并在设置界面新增“Auto-Discover from Repo Secrets”一键导入按钮与 Tauri IPC 命令，免除用户手动输入凭据繁琐流程。 (Thanks to @aukgit)
-- **跨机器/跨实例账号租约冲突拦截与 30-60 分钟冷却期 (Cross-Machine Lease Collision Guard & 30–60m Cooldown Window)**: 在账号切换执行入口（`switch_account` 与 `switch_account_to_instance`）注入前置互斥门禁，在分发凭据前调用 `is_account_or_email_leased_by_other` 严格校验目标账号是否正被其他实例或外部机器占用；在候选人评分算法中对近期 30–60 分钟内使用过的邮箱建立冷却隔离池，优先选择非冷却健康账号并在全冷却时平滑回退，设置项与快速胶囊同步联动。 (Thanks to @aukgit)
-- **“Rotate to Next Best”候选人悬浮提示与操作填充 (Rotate to Next Best Candidate Tooltip & Visual Feedback)**: 优化“Rotate to Next Best”按钮内边距（`px-3.5 py-1.5`），动态计算智能候选人队列并在悬浮气泡中完整展示目标实例名称、拟切换账号邮箱、订阅层级以及 4H 配额健康百分比，按钮内部直观呈现候选目标微标，消除盲切困惑。 (Thanks to @aukgit)
-
-### Changed
-- **账号配额与进度条 VS Code 青色/青绿色调重构 (VS Code Cyan/Teal Palette for Accounts Quotas & Progress Bars)**: 废除账号界面中过分刺眼的荧光绿高亮，全面重构 `QuotaProgressBar`、`WaterDrainProgressBar` 及审计微标色彩体系，切换为舒适自然的 VS Code 标志性青色/青蓝渐变调（$\ge 75\%$ 采用 `from-teal-500 via-cyan-500 to-[#38bdf8]`，$\ge 50\%$ 采用 `from-teal-600 via-cyan-500 to-sky-400`，100% 节点采用青色光晕），降低视觉疲劳。 (Thanks to @aukgit)
-- **实例表格紧凑化、合并列、路径截断与提示词动作收纳 (Instances Table Zero-Scroll Compaction, Combined Profile/Email & Action Dropdown)**: 彻底消除实例表格横向滚动条，精简为 5 列标准视口布局：将实例配置名称与关联邮箱合二为一显示，数据目录路径智能截断仅展示末级文件夹（前缀 `...`，支持悬浮完整路径与一键复制）；将线性铺开的 9 按钮动作条精简为 3 个主生命周期操作，提示词树（Prompts Tree）、审计流水、目录同步等收纳至“More”悬浮气泡。 (Thanks to @aukgit)
-- **按钮 5–6px 圆角规范化 (Universal 5–6px Button Radius Normalization)**: 全面重构实例界面、弹窗表单及设置工具栏中过于臃肿的药丸圆角，严格规范所有主操作按钮、模态框交互按钮为 5–6px（`rounded-[5px]`），呈现工业级精致质感。 (Thanks to @aukgit)
-- **实例卡片模式严格 4 列紧凑网格与双行操作按钮布局 (Card Mode Strict 4-Column Grid & Structured 2-Row Action Toolbars)**: 约束卡片视图桌面端最大列数为 4 列（`xl:grid-cols-4`），杜绝 5/6 列挤压导致的卡片扭曲；卡片底部按“主操作胶囊（Row 1）+ 辅助工具胶囊（Row 2）”整齐排列，紧凑密度下自动折叠冗长项目列表，保持卡片高度统一整洁。 (Thanks to @aukgit)
-
----
-
-## [v4.149.0] - 2026-10-05
-
-### Added
-- **提示词树换行格式化与 `<br />` 标签垂直间距 (Prompt Tree Vertical Line Gaps via `<br />` Tags & Markdown Formatting)**: 彻底解决提示词预览与原始内容视图中段落挤压粘连、缺少空行垂直间距的问题。在 `RichMarkdownRenderer` 中将空行显式渲染为 `<br className="my-2" />` 标签，为段落设置 `my-2` 垂直留白；在 `parseInlineMarkdown` 中把文本内换行符统一转换为 `<br className="my-1" />` 元素；在原始代码文本（Raw View）中废除单块字符串展示，按行切分并以 `<br className="my-1.5" />` 显式折行隔离，使长文本提示词排版规整清晰。 (Thanks to @aukgit)
-- **省略号 "..." 点击全文展开与工具栏展开收起切换 (Click-to-Expand "..." Ellipsis & Full Text Toggle)**: 为截断提示词末尾的省略号 "..." 赋予交互响应能力，点击省略号即可直接展开全文或折叠；在提示词指令工具栏词数旁新增一键 `[Expand (Full Text)]` / `[Collapse]` 显式切换按钮，彻底解决过去点击省略号无任何响应的操作痛点。 (Thanks to @aukgit)
-- **全局快捷键 'N' 与即时发送分发 (Hotkey 'N' & Live Send Now Dispatch)**: 在提示词树弹窗挂载模态级全局键盘监听，在非输入框焦点状态下按下 `N` 或 `n` 键即可即时触发提示词向 IDE 工作区注入（生成 `.antigravity_resume_task.json` 并调用 `resume_recent_project_prompts`）；“Send Now”按钮同步绑定 `<kbd>N</kbd>` 快捷键标识并在分发成功时弹出即时操作反馈。 (Thanks to @aukgit)
-- **提示词视图头部三元组与结尾摘要胶囊 (Header Metadata Trio & Concluding Tail Snippet)**: 在提示词检查器顶栏与指令卡片中新增深色玻璃分段胶囊，实时展示提示词全局序号（`#P001`）、实例标识三元组（`[#实例序号 · 可执行文件名 · 实例名]`，如 `[#1 · Antigravity.exe · default]`），以及结尾 10-15 词尾部摘要（`“… ending with: '...'”`），极大增强多提示词定位与实例归属辨识度。 (Thanks to @aukgit)
-
-### Fixed
-- **运行中项目状态误报与严格时效门禁 (`white-presentation-v1` False Positive Liveness Fix)**: 彻底修复默认实例下在仅运行 Antigravity 时、未活跃项目（如 `white-presentation-v1`）被永久误报为 `RUNNING` 的深层缺陷。在 `src-tauri/src/modules/repo_db.rs` 中重构项目与会话活跃度判断机制：存活检测要求必须同时满足实例进程存活，且会话摘要（`conversation_summaries.db`）或活动提示词的更新时间戳必须在近 120 秒以内；消除前缀子串模糊匹配中的短前缀误匹配，彻底终结历史陈旧记录导致的虚假运行状态。 (Thanks to @aukgit)
-- **空标题无内容会话智能过滤 (Empty 0-Word Untitled Conversation Filtering)**: 在前后端双层过滤掉标题以 `Untitled` 开头且提示词内容为空（0 词数）的幽灵会话节点，避免 IDE 初始未命名空对话污染项目提示词树视图。 (Thanks to @aukgit)
-
----
-
-## [v4.148.0] - 2026-10-04
-
-### Fixed
-- **集成测试异步调用类型对齐与 CI 门禁通过 (Integration Test Async Invocation Fix & CI Test Target Gate Pass)**: 修复 `src-tauri/tests/per_instance_prompt_liveness_test.rs` 中 `test_case_antigravity_cli_discovery` 对已被 `#[tokio::test]` 包装的返回单元值 `()` 错误使用 `.await` 导致的 `() is not a future`（E0277）构建中断问题；规范测试调用形式，确保跨平台 CI 测试目标编译与执行零阻断。 (Thanks to @aukgit)
-
----
-
-## [v4.147.0] - 2026-10-04
-
-### Fixed
-- **Rust 后端构建错误全面修复与进程 PID 检索导出 (Full Rust Backend Build Fix & Process PID API Export)**: 修复多实例项目库分析中的编译阻断问题：在 `compute_project_conversation_tree` 顶层统一声明时间戳变量 `now`，消除对话生命周期评估时的 `cannot find value now in this scope`（E0425）；将 `get_antigravity_pids` 函数导出为模块级 `pub(crate)` 并统一调用方传参，消除私有函数访问限制（E0603）与参数缺失错误（E0061），使跨平台构建与 CI 流水线以 100% 成功率通过。 (Thanks to @aukgit)
-
----
-
-## [v4.146.0] - 2026-10-04
-
-### Fixed
-- **Rusqlite 非穷尽枚举匹配修复与 Clippy 门禁通过 (Rusqlite Non-Exhaustive StepResult Match Arm & Clippy Pass)**: 修复在 Linux 与 macOS 持续集成流水线中因 `rusqlite::backup::StepResult` 属于 `#[non_exhaustive]` 枚举类型导致 `pattern Ok(_) not covered` (E0004) 的编译阻断问题；在 `src-tauri/src/modules/instance.rs` 的在线热备份事件循环中补充 `Ok(_) => break` 兜底匹配分支，使全平台 Clippy 检查与集成构建均能以零警告、零错误顺利通过。 (Thanks to @aukgit)
-
----
-
-## [v4.145.0] - 2026-10-04
-
-### Fixed
-- **Rust 后端编译与 Rusqlite Backup 特性支持 (Rust Compilation & Rusqlite Backup Feature Activation)**: 彻底修复 CI/CD 编译流程中 `rusqlite::backup` 因底层库未开启 feature 门控导致的 `cannot find backup in rusqlite` 编译中断问题；在 `src-tauri/Cargo.toml` 中显式为 rusqlite 开启 `features = ["bundled", "backup"]`，确保在线 SQLite 零停机热备份引擎在 Linux、macOS 与 Windows 全平台顺利编译运行。 (Thanks to @aukgit)
-- **多实例项目库 ID 借用类型一致性修复 (Repo DB Instance ID Dereference Fix)**: 修复 `src-tauri/src/modules/repo_db.rs` 中在过滤多实例活跃会话时，`owning_inst_id`（`&String`）与实例结构体字段（`String`）因缺少解引用导致的 `can't compare String with &String`（E0277）编译错误。 (Thanks to @aukgit)
-
-### Added
-- **macOS 全系统版本 Gatekeeper 深度加固正式版 (Full macOS 13-15 Gatekeeper Hardening Release)**: 正式交付适用于 macOS 13 (Ventura)、14 (Sonoma) 与 15 (Sequoia) 的防“已损坏移到废纸篓”安装与运行加固补丁，包含 `awk` 确定性卷宗解析、全层级递归隔离属性清除、`spctl --add` Gatekeeper 评估登记、安装阶段实时 IDE 探测回显，以及 `$HOME/Applications/` 用户自定义目录与磁盘级堆栈日志完整支持。 (Thanks to @aukgit)
-
----
-
-## [v4.144.0] - 2026-10-04
-
-### Added
-- **macOS Gatekeeper 深度加固与递归隔离属性清除 (Deep macOS Gatekeeper Hardening & Recursive Quarantine Purge)**: 彻底攻克 macOS 13 (Ventura)、14 (Sonoma) 与 15 (Sequoia) 系统下安装运行报“已损坏，移到废纸篓”的深层根因。`install.sh` 重构镜像挂载输出解析，由易受格式污染的正则提取升级为确定性 `awk` 字段分词；引入 `sw_vers -productVersion` 动态获取 macOS 主版本；采用 `find "$target_app" -exec xattr -d com.apple.quarantine {} +` 递归清除应用包内所有嵌套二进制与框架的隔离属性；在 macOS 13+ 系统上自动调用 `spctl --add "$target_app"` 将应用主动登记至 Gatekeeper 白名单。针对 macOS 15+ 严格校验环境，精准绕开被 AMFI 拦截的自签名指令，全面确保跨 macOS 版本的原生可执行性。 (Thanks to @aukgit)
-- **首次安装 Antigravity IDE 探测与回显 (First-Time Installation IDE Discovery & Echo)**: 在 `install.sh` 脚本执行完成阶段新增 `detect_ide_path()` 探测逻辑，通过 Spotlight `mdfind`（匹配 Bundle Identifier）及 `/Applications/` 与 `$HOME/Applications/` 标准路径，即时检索并回显当前系统中 Antigravity IDE 的安装路径；若未发现则给出清晰的首启自动探测提示。 (Thanks to @aukgit)
-- **跨平台用户应用目录支持与磁盘调用栈日志 (User-Level Applications Path Parity & Disk Backtrace Log)**: 在 `src-tauri/src/modules/process.rs` 与 `src-tauri/src/modules/instance.rs` 中全面扩充 macOS 候选查找与启动路径，覆盖 `$HOME/Applications/` 用户自定义应用程序目录；在探测失败或多实例启动异常路径中，自动将捕获的完整 `std::backtrace::Backtrace` 与排查路径序列化为 JSON 写入 `~/.local/share/antigravity/ide-discovery.log` 本地磁盘日志，彻底满足排错与技术支持对调用堆栈留痕的严格诉求。 (Thanks to @aukgit)
-- **DMG 修复工具与打包脚本递归加固 (Bilingual Fix Utility & DMG Packaging Hardening)**: 同步重构 `scripts/Fix_Damaged.command`，引入 macOS 版本探测、`find ... xattr -d` 递归清除以及 `spctl --add` 登记指令；更新 `scripts/package_dmg.sh` 确保修复脚本赋予可执行权限并在打包前后清除镜像本身的隔离属性。 (Thanks to @aukgit)
-
----
-
-## [v4.143.0] - 2026-10-04
-
-### Added
-- **跨实例运行提示词隔离与进程精确存活检测 (Per-Instance Prompt Liveness Isolation & Process-Gated Running Detection)**: 彻底修复多实例管理页面中提示词运行状态跨实例污染问题——某实例正在运行 Coding Guideline，却错误在 Default 实例卡片上显示"RUNNING"徽章。重构 `get_project_conversation_tree`（`src-tauri/src/commands/instance.rs`）支持 `instance_id: Option<String>` 参数；在 `src-tauri/src/modules/repo_db.rs` 中按实例分区缓存键（`tree:{instance_id}:...`），并引入严格进程存活门控：若目标实例 OS 进程已终止，其所有项目与对话的 `is_running` 强制设为 `false`，彻底消除 10 分钟盲目近期性假设导致的"死实例被误报为运行中"缺陷；输出结构化 `[PROMPT_LIVENESS_PROBE]` 审计日志，完整记录 instance_id、PID、工作区目录及判定依据。 (Thanks to @aukgit)
-- **前端实例卡片运行状态严格按实例隔离 (Frontend Per-Instance Card Running State Scoping)**: 在 `src/pages/Instances.tsx` 与 `src/components/instances/PromptTreeViewModal.tsx` 中消除全局项目树泄漏——实例卡片不再使用宽松 `node.instance_name === inst.config.name` 字符串匹配，改为严格 `node.instance_id === inst.config.id` 精确绑定；`isProjRunning` 与 `hasActiveTask` 计算强制先判断 `inst.is_running`，确保已停止实例的所有项目绝无"运行中"状态；`PromptTreeViewModal` 移除全局树兜底逻辑，实例无项目时显示空状态，绝不泄漏其他实例项目。 (Thanks to @aukgit)
-- **深度实例克隆引擎：完整设置、主题与安全预设同步 (Deep Instance Clone Engine: Full Settings, Themes & Security Presets Copy)**: 彻底重构克隆流程，解决克隆出的实例缺失用户设置、主题配置、安全预设及项目工作区的严重问题。扩展 `REQUIRED_IDE_REL_PATHS` 覆盖 `User/settings.json`、`User/keybindings.json`、`User/security_presets.json`、`User/antigravity_policies.json`、`User/snippets`、`User/globalStorage`、`User/workspaceStorage`；扩展 `GEMINI_CLONE_DIRS` 覆盖 `antigravity`、`antigravity-ide`、`antigravity-cli`、`policies`、`config`；引入 `safe_clone_sqlite_db` 安全复制 SQLite 数据库（含 WAL 锁文件重试与 Backup API），并在 CLI/工具链克隆入口统一注入 `resolve_instance_id` 与 `copy_instance_settings` 深度合并。 (Thanks to @aukgit)
-- **实例操作卡片互斥进度遮罩与行级锁定 (Instance Card Mutex Glass Overlay & Row-Level Action Locking)**: 在 `src/pages/Instances.tsx` 与 `src/components/instances/InstanceTable.tsx` 中实现卡片与表格行级操作互斥——当启动、停止、切换或删除等异步操作进行中时，为对应实例卡片叠加半透明玻璃遮罩并禁用所有交互按钮；操作按钮显示内联旋转动画（`animate-spin`）与进度颜色反馈，防止重复点击并给予清晰的操作进度感知。 (Thanks to @aukgit)
-- **应用内删除确认弹窗替换系统原生对话框 (In-App Delete Confirmation Modal Replaces Native Window.confirm)**: 删除与清空会话操作不再弹出 Windows 系统原生 `confirm` 对话框，改为风格统一的深色玻璃 React 模态弹窗，展示实例名称、序号与破坏性操作警告图标，并提供取消与确认按钮。 (Thanks to @aukgit)
-
-### Fixed
-- **实例设置模态弹窗图标胶囊化与横向溢出修复 (Instance Settings Modal Icon Capsule Redesign & Overflow Fix)**: 重构 `src/components/instances/InstanceSettingsModal.tsx`，将冗长文字说明转换为 Lucide 图标胶囊（`Copy`, `FolderSync`, `Layers`, `Sliders` 等），消除"Copy Now"与"Copy Folders"按钮与下拉菜单重叠问题；滚动容器添加 `overflow-x-hidden`，`<select>` 组件强制 `min-w-0 flex-1 truncate` 防止超长实例名撑破布局，全面提升设置模态可用性。 (Thanks to @aukgit)
-- **跨实例运行提示词状态污染根因修复 (Root Cause Fix: Cross-Instance Running Prompt State Bleed)**: 修复 `src-tauri/src/modules/repo_db.rs` 中 `compute_project_conversation_tree` 全局扫描无 `instance_id` 过滤、`is_running` 仅依赖 `last_modified` 近期性（`age < 600`）而不检测进程存活的双重根因缺陷；新增隔离集成测试 `src-tauri/tests/per_instance_prompt_liveness_test.rs`（标注 `#[ignore]`）验证两个不同数据目录的实例返回完全独立的项目集合。 (Thanks to @aukgit)
-
----
-
-## [v4.142.0] - 2026-10-04
-
-### Added
-- **macOS 安装器与隔离属性清除 (macOS Installer & Gatekeeper Quarantine Bypass)**: 彻底解决 macOS 系统下安装报错“Antigravity Manager Tools 已损坏，您应该将它移到废纸篓”的致命问题。安装脚本 `install.sh` 在挂载 DMG 镜像前后均执行隔离属性清除（`xattr -cr` 与 `xattr -r -d com.apple.quarantine`）；支持在挂载卷中动态检索 `.app` 包；当系统 `/Applications` 不可写时无缝降级安装至用户目录 `$HOME/Applications/`，杜绝管道执行时因无 TTY 导致 `sudo` 静默失败；自动调用 `codesign --force --deep --sign -` 施加本地 ad-hoc 签名以满足 macOS 12–15+ AMFI 完整性校验；自动创建 `agm` 与 `agm-alim` 命令行软链接至 `$HOME/.local/bin/`。 (Thanks to @aukgit)
-- **POSIX 错误调用栈追踪捕获 (POSIX Error Stack Trace Trap & Diagnostics)**: 在 `install.sh` 脚本中引入系统级 `ERR` 信号拦截处理函数（`report_error_stack`），在任意命令异常退出时精准捕获触发命令、退出码、行号及函数调用堆栈，为自动化运维与排错提供完整透明的日志追踪。 (Thanks to @aukgit)
-- **首次启动 IDE 探测与持久化配置 (First-Time Startup IDE Discovery & Auto-Persistence)**: 新增 `discover_and_persist_initial_ide_info()` 探测逻辑并在后台线程异步执行，在首次启动或配置缺失时，通过进程表、标准目录、用户应用程序及 Spotlight `mdfind` 检索 Antigravity IDE 可执行文件，自动持久化至 `gui_config.json`；若未检索到则捕获 `std::backtrace::Backtrace` 并输出详尽的路径排查清单与调用栈。 (Thanks to @aukgit)
-- **DMG 修复脚本集成与双语输出 (Repair Utility & DMG Packaging Overhaul)**: 重构 `scripts/Fix_Damaged.command`，提供中英双语界面，支持动态定位本地及系统安装的应用程序包，优先以当前用户权限清除隔离属性，并提供自签名与 AppleScript 通知。更新 `scripts/package_dmg.sh` 将修复脚本直接打包进 DMG 镜像。 (Thanks to @aukgit)
-- **克隆配置模态弹窗高对比度深色调与图标视觉重构 (Clone Dialog Mode High-Contrast UI & Color Overhaul)**: 重构多实例管理页面 (`src/pages/Instances.tsx`) 与顶栏实例选择器 (`src/components/navbar/InstanceSelector.tsx`) 中的“复制 / 克隆配置”模态对话框。彻底消除暗色模式下发灰发暗的 `bg-base-100/50` 背景，升级为 Deep Orbit 沉浸式高对比度深蓝调配色（背景 `#081a29`，激活项 `#0c283f` 配合青色 `border-cyan-400`，未激活项 `#061724` 配合边框 `#14344d`）；引入 Lucide 语义化图标（`Layers`, `Sliders`, `FolderSync`, `Check`）替换冗余标签；优化复选框动效与圆角交互，全面提升克隆模式与项目复制选项的可读性与视觉质感。 (Thanks to @aukgit)
-
-### Fixed
-- **macOS 启动参数与窗口指令顺序修复 (Fix macOS open Argument Ordering & Missing --args)**: 彻底修复 `src-tauri/src/modules/process.rs` 中使用 `/usr/bin/open` 启动 Antigravity 时，因 `--new-window` 未紧随 `--args` 导致 `open: unrecognized option '--new-window'` 启动失败的缺陷；抽离 `format_macos_open_args` 统一构造参数列表，确保所有用户自定义参数与窗口控制指令严格置于 `--args` 之后；扩充 macOS 候选查找路径覆盖 `Contents/MacOS/` 真实二进制并集成 Spotlight `mdfind` 兜底。 (Thanks to @aukgit)
-- **macOS 实例切换与独立脚本执行对齐 (macOS Instance Switching & Launcher Script Parity)**: 在 `src-tauri/src/modules/instance.rs` 中重构多实例启动逻辑，精准识别 `.app` 应用包目录（通过 `open -n -a`）与克隆实例启动脚本/二进制（直接通过 `Command::new` 并赋予 `0o755` 权限），彻底消除 `open -a` 拒绝执行 shell 脚本的致命缺陷；在 macOS 平台上完整补齐 `.gemini/antigravity-ide`、`.gemini/antigravity` 初始化及 `app_storage.json`（注入 `ide-install-wizard-shown: true` 及绑定账号）同步逻辑，实现与 Windows/Linux 平台 100% 行为对齐，并在异常路径捕获并记录 Rust `Backtrace`。 (Thanks to @aukgit)
-
----
-
-## [v4.141.0] - 2026-10-04
-
-### Added
-- **macOS 安装器与隔离属性清除 (macOS Installer & Gatekeeper Quarantine Bypass)**: 彻底解决 macOS 系统下安装报错“Antigravity Manager Tools 已损坏，您应该将它移到废纸篓”的致命问题。安装脚本 `install.sh` 在挂载 DMG 镜像前后均执行隔离属性清除（`xattr -cr` 与 `xattr -r -d com.apple.quarantine`）；支持在挂载卷中动态检索 `.app` 包；当系统 `/Applications` 不可写时无缝降级安装至用户目录 `$HOME/Applications/`，杜绝管道执行时因无 TTY 导致 `sudo` 静默失败；自动调用 `codesign --force --deep --sign -` 施加本地 ad-hoc 签名以满足 macOS 12–15+ AMFI 完整性校验；自动创建 `agm` 与 `agm-alim` 命令行软链接至 `$HOME/.local/bin/`。 (Thanks to @aukgit)
-- **POSIX 错误调用栈追踪捕获 (POSIX Error Stack Trace Trap & Diagnostics)**: 在 `install.sh` 脚本中引入系统级 `ERR` 信号拦截处理函数（`report_error_stack`），在任意命令异常退出时精准捕获触发命令、退出码、行号及函数调用堆栈，为自动化运维与排错提供完整透明的日志追踪。 (Thanks to @aukgit)
-- **首次启动 IDE 探测与持久化配置 (First-Time Startup IDE Discovery & Auto-Persistence)**: 新增 `discover_and_persist_initial_ide_info()` 探测逻辑并注入 Tauri `setup()` 生命周期，在首次启动或配置缺失时，通过进程表、标准目录、用户应用程序及 Spotlight `mdfind` 检索 Antigravity IDE 可执行文件，自动持久化至 `gui_config.json`；若未检索到则输出详尽的路径排查清单与调用栈。安装脚本也在安装阶段同步探测并回显检测到的 IDE 路径。 (Thanks to @aukgit)
-- **DMG 修复脚本集成与双语输出 (Repair Utility & DMG Packaging Overhaul)**: 重构 `scripts/Fix_Damaged.command`，提供中英双语界面，支持动态定位本地及系统安装的应用程序包，优先以当前用户权限清除隔离属性，并提供自签名与 AppleScript 通知。更新 `scripts/package_dmg.sh` 将修复脚本直接打包进 DMG 镜像。 (Thanks to @aukgit)
-
-### Fixed
-- **macOS 启动参数与窗口指令顺序修复 (Fix macOS open Argument Ordering & Missing --args)**: 彻底修复 `src-tauri/src/modules/process.rs` 中使用 `/usr/bin/open` 启动 Antigravity 时，因 `--new-window` 未紧随 `--args` 导致 `open: unrecognized option '--new-window'` 启动失败的缺陷；抽离 `format_macos_open_args` 统一构造参数列表，确保所有用户自定义参数与窗口控制指令严格置于 `--args` 之后；扩充 macOS 候选查找路径覆盖 `Contents/MacOS/` 真实二进制并集成 Spotlight `mdfind` 兜底。 (Thanks to @aukgit)
-- **macOS 实例切换与独立脚本执行对齐 (macOS Instance Switching & Launcher Script Parity)**: 在 `src-tauri/src/modules/instance.rs` 中重构多实例启动逻辑，精准识别 `.app` 应用包目录（通过 `open -n -a`）与克隆实例启动脚本/二进制（直接通过 `Command::new` 并赋予 `0o755` 权限），彻底消除 `open -a` 拒绝执行 shell 脚本的致命缺陷；在 macOS 平台上完整补齐 `.gemini/antigravity-ide`、`.gemini/antigravity` 初始化及 `app_storage.json`（注入 `ide-install-wizard-shown: true` 及绑定账号）同步逻辑，实现与 Windows/Linux 平台 100% 行为对齐，并在异常路径捕获并记录 Rust `Backtrace`。 (Thanks to @aukgit)
-
----
-
-## [v4.140.0] - 2026-10-04
-
-### Added
-- **多实例自动轮换低配额精准热切 (Multi-Instance Low-Quota Failover & Candidate Isolation)**: 重构多实例配额监控机制，新增候选账户配额独立评估体系（`calculate_candidate_quota`），杜绝候选账户因历史不相关模型配额耗尽而被误淘汰；强制将候选轮换实例绑定为当前待轮换实例，实现就地平滑热切；在多实例轮换循环中动态维护已分配候选账户集合，杜绝并发竞争下重复分配同一账号。 (Thanks to @aukgit)
-- **后台守护进程启动加速与秒级倒计时遥测 (Daemon Startup Acceleration & Live Telemetry Ticker)**: 将后台自动切换守护进程启动静默期由 60 秒缩短至 3 秒，就绪后即刻对低配额活跃实例执行主动检查；将心跳遥测发射频率提升至 5 秒一次，确保前端 `[⏱ {countdown}s Next Check]` 倒计时与状态遥测绝对平滑同步。 (Thanks to @aukgit)
-- **隔离式本地端到端测试用例扩充 (Isolated Local E2E Test Suite Extension)**: 在 `src-tauri/tests/auto_switcher_e2e_test.rs` 中新增配额周期边界状态与候选隔离测试用例（`test_e2e_candidate_quota_not_disqualified_by_other_depleted_models`、`test_e2e_period_finished_does_not_suppress_low_quota_rotation`），严格添加 `#[ignore]` 属性，保障本地可按需测试而绝不污染 CI/CD 流程。 (Thanks to @aukgit)
-
-### Fixed
-- **低配额周期结束错误跳过轮换修复 (Fix False Skip on Period Finished During Low Quota)**: 彻底消除 `check_and_rotate_with_options` 中因 `is_period_finished`（重置时间已过）导致低配额账户（如 `Gemini 3.1 Pro (High)` 跌至 6%）被误判为“等待重置”并直接 `continue` 跳过轮换的致命缺陷；确保只要账户配额低于配置阈值（`<= threshold_percent`），必定无条件执行轮换。 (Thanks to @aukgit)
-- **全局 5 秒后台异步延迟提示词恢复与通道注入 (Async 5-Second Post-Launch Prompt Restore Across All Routes)**: 在 `integration.rs`（`on_account_switch`）、`auto_switcher.rs`（`execute_profile_rotation_with_context`）与 `instance.rs`（`switch_account_to_instance`）所有账号切换与实例启动路径中，彻底消除导致主线程卡顿的同步阻塞等待；启动独立的 Tokio 异步后台任务，在 IDE 启动后严格延时 5 秒触发 `.antigravity_resume_task.json` 提示词自动恢复、重新分发与通道注入，保障极致运行时性能与无感切换体验。 (Thanks to @aukgit)
-
----
-
-## [v4.139.0] - 2026-10-04
-
-### Added
-- **自动轮换阈值评估修复与模型封禁解除 (Auto-Switcher Threshold Evaluation Fix & Unbanned Models)**: 彻底移除 `auto_switcher.rs` 中针对 `3.0` 与 `3.1` 模型的硬编码封禁过滤，恢复 `Gemini 3.1 Pro (High)` 的配额评估与候选评分资格；重构 `evaluate_account_period_status` 逻辑，在评估目标模型之余计算所有活跃消耗模型中的最低剩余配额瓶颈，当 `Gemini 3.1 Pro` 跌至 6% 时立即精准触发轮换；下调谷歌配额检查下限至 10s，确保谨慎与紧急检查频率不被过度钳位。 (Thanks to @aukgit)
-- **守护进程下一次检查倒计时与实时遥测 (Daemon Next-Check Countdown & Telemetry)**: 在 `AutoSwitcherRuntimeState` 中持久化 `next_check_timestamp`、`check_interval_seconds` 与 `current_stage`，新增 `get_auto_switcher_daemon_status` Tauri 命令与前端轮询/事件联动；在实例页面顶栏与设置页常驻展示秒级实时倒计时胶囊（`[⏱ {countdown}s Next Check]`）及阶段状态。 (Thanks to @aukgit)
-- **实例卡片最近/运行中项目展示与双击直达 (Instance Card Recent Projects with Double-Click Deep Link)**: 在实例卡片数据目录与路径下方展示 1–3 个活跃或最近运行的项目芯片（支持在设置中配置上限 1–3，默认 3），并标明 `RUNNING` 徽章与提示词轮次计数；双击项目芯片直接呼出提示词树弹窗（`PromptTreeViewModal`）并自动聚焦展开该项目。 (Thanks to @aukgit)
-- **卡片显示密度切换 (Card Density Toggle)**: 在实例页面视图切换胶囊旁新增卡片密度选项（`[Normal Cards]` 与 `[Compact Cards]`），紧凑模式下自适应 5–6 列排版与紧凑内边距，方便一屏监控多套运行实例。 (Thanks to @aukgit)
-- **本地端到端测试套件 (Isolated Local E2E Test Suite)**: 在 `src-tauri/tests/auto_switcher_e2e_test.rs` 中编写完整的端到端自动化测试，涵盖低配额轮换触发、提示词备份快照与 5 秒异步注入验证，配置 `#[ignore]` 严格与 CI/CD 隔离。 (Thanks to @aukgit)
-
-### Fixed
-- **异步 5 秒启动延迟提示词自动恢复与作用域修复 (Async 5-Second Post-Launch Prompt Restore & Scope Fix)**: 彻底移除账号切换时原本 14 秒的同步阻塞等待，改为在 IDE 进程启动后由后台异步任务严格延时 5 秒触发提示词恢复与注入；修复提示词快照计数与重注入标志变量作用域，确保跨平台编译与 Clippy 检查通过。 (Thanks to @aukgit)
-
----
-
-## [v4.138.0] - 2026-10-04
-
-### Added
-- **运行中实例与会话精准自动选中与展开 (Running Instance & Active Conversation Targeted Auto-Selection)**: 打开提示词树（`PromptTreeViewModal`）时，自动探测当前实例正在运行的项目与会话，仅精准展开目标项目与会话节点并高亮选中其运行轮次；若无正在运行任务，则自动展开首个有效项目并选中其最新会话；彻底废除盲目展开所有 29+ 项目的旧逻辑，确保右侧检查器第一时间呈现当前工作区上下文。 (Thanks to @aukgit)
-- **可配置后台自动同步轮询机制与 15s 安全下限 (Configurable Background Auto-Sync Interval with 15s Floor)**: 在弹窗顶栏分段药丸胶囊内集成同步间隔选择器（支持 `15s`、`30s`、`1m`、`2m`、`Off`，默认 30s），严格锁定最低 15 秒安全频率下限；轮询时通过 `force: true` 穿透 SQLite 磁盘缓存，静默刷新会话树而不触发全局遮罩，保持当前会话匹配与用户滚动位置，杜绝覆盖未保存的文本框编辑。 (Thanks to @aukgit)
-- **陈旧与空会话置底隔离与折叠归档 (Stale / Empty Prompts Demotion to Bottom)**: 优化空会话与无内容提示词判定逻辑（正在运行会话享受豁免免疫），将各项目下的陈旧空会话自动下沉至树形底部并归拢为折叠群组（`📁 Archived / Stale Prompts ({count})`），让高价值活跃会话始终稳居顶部。 (Thanks to @aukgit)
-- **实例维度项目归档/移入底栏机制 (Per-Instance Project Archive / Less Favorite Toggle)**: 在项目列表项操作区新增实例维度的归档按钮（`Archive` / `ArchiveRestore` 图标），支持将非关注项目标记为低优先级；归档状态按实例隔离持久化至 `localStorage`（`agm_archived_projects_{instanceId}`）并自动取消图钉置顶；归档项目收拢至列表底部折叠群组（`📁 Archived Projects ({count})`）且不影响文件系统或其他实例；搜索栏下方同步新增 `[Archived ({count})]` 快速筛选胶囊。 (Thanks to @aukgit)
-- **实例卡片活跃提示词联动徽章 (Instance Card Active Prompt Badge)**: 在实例卡片头部新增与提示词树联动的 `Prompt Active` 青色呼吸徽章，实时检测正在执行的后台提示词，点击可直接穿透呼出提示词树弹窗；保持第二行 6 列操作网格对称统一。 (Thanks to @aukgit)
-
----
-
-## [v4.137.0] - 2026-10-04
-
-### Added
-- **原生操作系统实例窗口标题标准化 (OS Instance Window Title Formatting)**: 实现 `compute_ide_ending_sequence` 与 `compute_instance_window_title`，将原生操作系统窗口标题、任务栏标签及缩略图预览严格标准化为 `#{sequence} {instance_name} - {ide_ending_sequence}`（如 `#1 Default - Antigravity`、`#2 8136 - antigravity-8136`），并在实例创建、克隆、重命名、启动及注册表启动同步等完整生命周期内自动注入 `<data_dir>/User/settings.json`，彻底解决多实例在任务栏中标题混淆的问题。 (Thanks to @aukgit)
-- **实例卡片 6 列操作网格标准化与底部 CSS3 悬浮动效 (Instance Card 6-Column Grid & Hover Animation)**: 将卡片操作按钮重构为严格的 6 列对称网格（`grid grid-cols-6 gap-1 w-full`），并在 `#1 Default` 卡片的第 6 槽位放置占位空间，确保克隆（`Clone`）与二进制克隆（`Executable`）在所有卡片中的水平列位置绝对统一；移除顶部生硬的彩色横条，转移至卡片底边并引入平滑的 CSS3 悬浮渐变缩放发光动效（`group-hover:scale-x-100 group-hover:opacity-100`），大幅提升界面专业度。 (Thanks to @aukgit)
-- **提示词树 Portal 挂载、全屏模式与顶部遮挡修复 (Prompt Tree Portal Mounting & Fullscreen Mode)**: 通过 React `createPortal` 将 `PromptTreeViewModal` 直接挂载至 `document.body` 并设置 `z-[300]`，彻底消除被固定顶栏遮挡问题并废除生硬的外边距补丁；新增全屏模式切换按钮（`[Full]` / `[Exit]`），支持全屏无缝沉浸式检查与编辑。 (Thanks to @aukgit)
-- **项目级即时刷新与本地置顶图钉机制 (Project-Level Refresh & Pinning)**: 在提示词树项目列表行内新增刷新图标（`RotateCw`，强制穿透 SQLite 磁盘缓存）与图钉置顶切换按钮（`Pin`），置顶状态按实例维度持久化至 `localStorage`（`agm_pinned_projects_{instance_id}`）。 (Thanks to @aukgit)
-- **多阶提示词排序分流与搜索筛选胶囊 (Prompt Layering Prioritization & Filter Pills)**: 实现多阶智能排序管线（置顶项目首位 $\rightarrow$ 正在运行项目居中 $\rightarrow$ 最近修改时间 $\rightarrow$ 首字母顺序；会话层正在运行会话绝对置顶）；搜索栏下方新增 `[All]`、`[Running]`、`[Latest Conv]`、`[Latest Prompt]`、`[Pinned]` 5 组快速筛选胶囊。 (Thanks to @aukgit)
-- **提示词多模式复制、图片本地导出与确认后缀下拉 (Prompt Resend, Image Actions & Confirmation Suffix)**: 新增“纯文本复制”、“含图完整复制”及“提取并导出本地图片”操作；新增重发确认后缀下拉选择器（`Is it done?`、`Is it released?`、`Are you sure about it?` 等预设），选中后自动将指令附加于提示词末尾触发重发；将会话运行指示器升级为呼吸动效徽章，并在头部常驻展示实时运行耗时计时器与匹配的进程 PID。 (Thanks to @aukgit)
-
----
-
-## [v4.136.0] - 2026-10-04
-
-### Added
-- **水流泄压进度条与里程碑节点 (Fluid Water-Drain Progress Bar)**: 实现了受水流泄压灵感启发的全新紧凑型进度条组件（`WaterDrainProgressBar`），采用 `#1af18d` 前驱色至 `#12b27d` 峰值色的平滑双阶渐变与流光动画，内嵌 `[25, 50, 75, 100]` 里程碑检查点徽标；总高度精准压缩至 18px，全面接入账号配额项（`QuotaItem`）、实例卡片及列表视图（`InstanceTable`），兼具轻量视觉与直观进度反馈。 (Thanks to @aukgit)
-- **顶栏导航与偏好设置三段式胶囊重构 (Navbar & Capsule Reorganization)**: 将偏好设置重构为一体化三段式药丸胶囊（`[快速清理] | [主题切换] | [语言选择]`），彻底移除导航栏中间松散的主题按钮；中心导航区直列暴露 `Accounts`（账号）、`Instances`（实例）、`Settings`（设置）三大核心路由快捷图标，其余页面收拢至紧凑汉堡菜单且严格避免重复展示。 (Thanks to @aukgit)
-- **多实例配置与工作区深度复制/剪贴板持久化 (Instance Deep Replication & Buffer)**: 实例设置弹窗中新增“Copy Both (Settings & Workspaces)”一键深度复制与“Paste Both / Paste Settings Only / Paste Workspaces Only”拆分粘贴能力；引入 `localStorage` 持久化复制缓冲区（`agm_instance_clipboard_buffer`），彻底解决切换目标或切换页面时数据丢失问题；目标实例下拉列表标准化展示序号、名称与 `antigravity-{id}` 后缀。 (Thanks to @aukgit)
-- **提示词三层树形视图重构与 Markdown 多模式预览 (Prompt Tree View Overhaul)**: 修复弹窗标题栏被顶栏遮挡问题（升阶至 `z-[200]` 并优化上边距）；实现“项目 → 会话 → 提示词”三层折叠树，并将无标题/空会话智能归拢为折叠计数节点（`Untitled Conversations ({count})`）；新增 Markdown 富文本预览（默认 500 词截断并支持全文展开）、Raw 纯文本及直接编辑模式；增加一键 Resend 重发与 Enqueue 入队调度动作。 (Thanks to @aukgit)
-- **提示词树 SQLite 分库分表缓存 (Split-DB Prompt Tree Caching)**: 在 `repo_prompts.db` 中建立 `prompt_tree_cache` 缓存表与 60 秒 TTL 机制，避免反复解析磁盘 LevelDB 与 SQLite 原始文件，极大提升树形视图交互性能与系统响应速度。 (Thanks to @aukgit)
-- **CLI 命令行能力扩展 (CLI Parity)**: 新增 `agm theme set <theme-id> [--instance <id>|--all]` 终端主题设置命令与 `agm instance sync-settings <src> <target>` 跨实例配置同步命令。 (Thanks to @aukgit)
-
-### Fixed
-- **提示词队列 FIFO 顺序保障与多任务防丢失 (Prompt Queue FIFO & Invariant Safeguard)**: 在 `repo_db.rs` 的 `check_and_dispatch_enqueued_prompts` 中强制执行严格 FIFO 调度（`ORDER BY created_at ASC LIMIT 1`）；在 `resend_running_commands_for_instance` 中彻底修复多提示词工作区只恢复首个并丢弃后续任务的漏洞，确保后续任务持续保留在 `queued` 状态等待调度；在 `is_prompt_running_for_project` 中增加进程实时活跃检测与终端状态旁路，彻底消除 120 秒假死冷却锁。 (Thanks to @aukgit)
-
----
-
-## [v4.135.0] - 2026-10-04
-
-### Added
-- **WP-Exam 主题与调色板深度接入 (WP-Exam Themes & Colors Ingestion)**: 从 WP-Exam 引入 8 套高品质现代主题并扩充至 `THEME_PALETTES`（总计 18 套主题），涵盖 Green Choice（生态奢华浅色）、Green Choice Dark（绿色植物暗色）、Clean Wide（宽屏靛蓝浅色）、Riseup Gold（海军蓝金暗色）、Antigravity Dracula（德古拉暗夜紫）、Letterly Purple（极光电紫）、Obsidian Cyan（黑曜石青蓝）与 Navy Gold（海军暗金）。 (Thanks to @aukgit)
-- **顶栏常驻即时主题切换器 (Top Header On-The-Fly Theme Switcher)**: 在顶部导航栏路线下拉菜单（`NavMenu`）旁直接集成常驻的药丸胶囊主题切换器（`ThemeSwitcherDropdown`），支持实时双色渐变色块指示、活跃主题名称、18 套主题悬浮选择卡片与 `agm:dropdown-open` 全局事件联动，无需进入设置页即可在任意界面实现全局主题毫秒级即时切换与持久化存储。 (Thanks to @aukgit)
-
-### Improved
-- **全局 CSS 调色板映射与设置页平铺展示**: 在 `src/App.css` 中添加 `html[class*="palette-"]` 通用选择器规则与各主题变量绑定，确保 `--bg`、`--surface`、`--primary`、`--fg` 及深色表面类无缝覆盖；升级设置页 `ThemePicker.tsx` 网格布局至 6 列平铺响应式排版，所有主题卡片均遵循 5–6px（`rounded-[5px]`）标准圆角几何。 (Thanks to @aukgit)
-
----
-
-## [v4.134.0] - 2026-10-04
-
-### Fixed
-- **Release CI Asset Packaging**: Fixed artifact globbing pattern in GitHub Actions release workflow (`.github/workflows/release.yml`), ensuring all platform installer bundles (Windows NSIS setup `.exe`, macOS `.dmg`, Linux `.deb` / `.AppImage`) are reliably downloaded and uploaded to official GitHub Releases for frictionless installation. (Thanks to @aukgit)
-
-### Added
-- **Supabase 密钥自动探测与加载 (Repo-Secrets Auto-Discovery)**: 实现了多路径密钥自动探测机制（`candidate_repo_secrets_paths()`），支持自动读取并解析 `repo-secrets/03-supabase/` 凭据，自动进行 Base64 解码与服务端点规范化，实现免配置自动同步。 (Thanks to @aukgit)
-- **多实例/跨机器账号租约互斥与冷却保护 (Account Lease Lock & Cooldown)**: 借助 Supabase 分布式租约锁（`workspace_leases`，TTL 1800s-3600s）彻底杜绝多实例或多机并发争抢同一账号；新增可配置的账号复用冷却期（`account_cooldown_minutes: u32`，默认 60 分钟），并在所有账号均处于冷却时提供智能回退保底机制。 (Thanks to @aukgit)
-- **Supabase CLI 命令行能力对齐**: 新增 `agm supabase set-config` 命令行支持（支持 `--cooldown`、`--interval` 等参数配置），并在 `modules/cli.rs` 中完整打通 `supabase status/sync/list-leases/test` 命令。 (Thanks to @aukgit)
-
-### Improved
-- **账号列表分组与视觉边框升级**: 重构 Accounts 页面表格样式，增加柔和的行分割边框（`border-b border-slate-200/80 dark:border-slate-800/80`）与 VS Code 暗色悬浮蓝条高亮（`hover:bg-slate-50/80 dark:hover:bg-[#0f273d]/60` 与 `border-l-blue-500/70`），去除过深生硬的明黄与纯黑底色。 (Thanks to @aukgit)
-- **配额进度条 VS Code 渐变配色升级**: 彻底替换刺眼的纯绿荧光色，采用 VS Code 风格的蓝绿/青蓝渐变条（`bg-gradient-to-r from-teal-500 via-cyan-500 to-sky-500`）搭配深色背景底轨，配额百分比徽章同步软化为青色。 (Thanks to @aukgit)
-- **实例表格紧凑化与横向滚动消除**: 合并“配置名称”与“绑定账号”为单一紧凑的“Profile & Account”列；将数据目录路径截断为尾部路径（`...\<parent>\<leaf>`），支持悬停完整提示与点击复制；将提示词（Prompts）按钮整合至操作下拉菜单/药丸胶囊内，彻底消除 1280px 分辨率下的横向滚动条。 (Thanks to @aukgit)
-- **卡片视图 4 列紧凑布局与按钮标准圆角**: 卡片网格升级为每行 4 列紧凑排列（`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3`）；重构操作按钮为专业紧凑的双行工具栏；全局按钮圆角统一规范为 5–6px（`rounded-[5px]`）；修复“轮换至最佳候选”按钮内边距并增加当前目标实例悬停提示；软化 Audit 审计按钮为 VS Code 岩板灰质感配色。 (Thanks to @aukgit)
-
----
-
-## [v4.133.0] - 2026-10-04
-
-### Added
-- **Supabase 密钥自动探测与加载 (Repo-Secrets Auto-Discovery)**: 实现了多路径密钥自动探测机制（`candidate_repo_secrets_paths()`），支持自动读取并解析 `repo-secrets/03-supabase/` 凭据，自动进行 Base64 解码与服务端点规范化，实现免配置自动同步。 (Thanks to @aukgit)
-- **多实例/跨机器账号租约互斥与冷却保护 (Account Lease Lock & Cooldown)**: 借助 Supabase 分布式租约锁（`workspace_leases`，TTL 1800s-3600s）彻底杜绝多实例或多机并发争抢同一账号；新增可配置的账号复用冷却期（`account_cooldown_minutes: u32`，默认 60 分钟），并在所有账号均处于冷却时提供智能回退保底机制。 (Thanks to @aukgit)
-- **Supabase CLI 命令行能力对齐**: 新增 `agm supabase set-config` 命令行支持（支持 `--cooldown`、`--interval` 等参数配置），并在 `modules/cli.rs` 中完整打通 `supabase status/sync/list-leases/test` 命令。 (Thanks to @aukgit)
-
-### Improved
-- **账号列表分组与视觉边框升级**: 重构 Accounts 页面表格样式，增加柔和的行分割边框（`border-b border-slate-200/80 dark:border-slate-800/80`）与 VS Code 暗色悬浮蓝条高亮（`hover:bg-slate-50/80 dark:hover:bg-[#0f273d]/60` 与 `border-l-blue-500/70`），去除过深生硬的明黄与纯黑底色。 (Thanks to @aukgit)
-- **配额进度条 VS Code 渐变配色升级**: 彻底替换刺眼的纯绿荧光色，采用 VS Code 风格的蓝绿/青蓝渐变条（`bg-gradient-to-r from-teal-500 via-cyan-500 to-sky-500`）搭配深色背景底轨，配额百分比徽章同步软化为青色。 (Thanks to @aukgit)
-- **实例表格紧凑化与横向滚动消除**: 合并“配置名称”与“绑定账号”为单一紧凑的“Profile & Account”列；将数据目录路径截断为尾部路径（`...\<parent>\<leaf>`），支持悬停完整提示与点击复制；将提示词（Prompts）按钮整合至操作下拉菜单/药丸胶囊内，彻底消除 1280px 分辨率下的横向滚动条。 (Thanks to @aukgit)
-- **卡片视图 4 列紧凑布局与按钮标准圆角**: 卡片网格升级为每行 4 列紧凑排列（`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3`）；重构操作按钮为专业紧凑的双行工具栏；全局按钮圆角统一规范为 5–6px（`rounded-[5px]`）；修复“轮换至最佳候选”按钮内边距并增加当前目标实例悬停提示；软化 Audit 审计按钮为 VS Code 岩板灰质感配色。 (Thanks to @aukgit)
-
----
-
-## [v4.132.0] - 2026-10-04
-
-### Added
-- **Supabase 密钥自动探测与加载 (Repo-Secrets Auto-Discovery)**: 实现了多路径密钥自动探测机制（`candidate_repo_secrets_paths()`），支持自动读取并解析 `repo-secrets/03-supabase/` 凭据，自动进行 Base64 解码与服务端点规范化，实现免配置自动同步。 (Thanks to @aukgit)
-- **多实例/跨机器账号租约互斥与冷却保护 (Account Lease Lock & Cooldown)**: 借助 Supabase 分布式租约锁（`workspace_leases`，TTL 1800s-3600s）彻底杜绝多实例或多机并发争抢同一账号；新增可配置的账号复用冷却期（`account_cooldown_minutes: u32`，默认 60 分钟），并在所有账号均处于冷却时提供智能回退保底机制。 (Thanks to @aukgit)
-- **Supabase CLI 命令行能力对齐**: 新增 `agm supabase set-config` 命令行支持（支持 `--cooldown`、`--interval` 等参数配置），并在 `modules/cli.rs` 中完整打通 `supabase status/sync/list-leases/test` 命令。 (Thanks to @aukgit)
-
-### Improved
-- **账号列表分组与视觉边框升级**: 重构 Accounts 页面表格样式，增加柔和的行分割边框（`border-b border-slate-200/80 dark:border-slate-800/80`）与 VS Code 暗色悬浮蓝条高亮（`hover:bg-slate-50/80 dark:hover:bg-[#0f273d]/60` 与 `border-l-blue-500/70`），去除过深生硬的明黄与纯黑底色。 (Thanks to @aukgit)
-- **配额进度条 VS Code 渐变配色升级**: 彻底替换刺眼的纯绿荧光色，采用 VS Code 风格的蓝绿/青蓝渐变条（`bg-gradient-to-r from-teal-500 via-cyan-500 to-sky-500`）搭配深色背景底轨，配额百分比徽章同步软化为青色。 (Thanks to @aukgit)
-- **实例表格紧凑化与横向滚动消除**: 合并“配置名称”与“绑定账号”为单一紧凑的“Profile & Account”列；将数据目录路径截断为尾部路径（`...\<parent>\<leaf>`），支持悬停完整提示与点击复制；将提示词（Prompts）按钮整合至操作下拉菜单/药丸胶囊内，彻底消除 1280px 分辨率下的横向滚动条。 (Thanks to @aukgit)
-- **卡片视图 4 列紧凑布局与按钮标准圆角**: 卡片网格升级为每行 4 列紧凑排列（`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3`）；重构操作按钮为专业紧凑的双行工具栏；全局按钮圆角统一规范为 5–6px（`rounded-[5px]`）；修复“轮换至最佳候选”按钮内边距并增加当前目标实例悬停提示；软化 Audit 审计按钮为 VS Code 岩板灰质感配色。 (Thanks to @aukgit)
-
----
-
-## [v4.130.0] - 2026-10-04
-
-### Fixed
-- **Startup Crash & White Screen Resolution**: Fixed an immediate process termination (`0xc0000409` / `STATUS_FAIL_FAST_EXCEPTION`) caused by invoking `tokio::spawn` synchronously inside Tauri's `.setup()` hook on a non-Tokio worker thread during application launch. Migrated background prompt queue and instance PID quota scheduler daemons to `tauri::async_runtime::spawn`, and blocking repository queries to `tauri::async_runtime::spawn_blocking`, ensuring the GUI window initializes and renders reliably on launch without hanging or crashing. (Thanks to @aukgit)
-- **Asynchronous Command Safety**: Replaced ad-hoc `tokio::runtime::Runtime::new()` and `tokio::spawn` calls in instance management commands with `tauri::async_runtime::block_on` and `tauri::async_runtime::spawn` to guarantee execution safety across both GUI and CLI contexts. (Thanks to @aukgit)
-
----
-
-## [v4.129.0] - 2026-10-03
-
-### Added
-- **Instance Action Toolbar Audit Option**: Added a dedicated `Audit` button to the bottom action row on instance cards and table view pill capsules, opening the new `InstanceAuditTrailModal`. (Thanks to @aukgit)
-- **Interactive Instance Switch History Modal**: Displays total switch counts, the last 2–3 account transitions (`From Account` → `To Account` with click-to-unmask toggle), duration, trigger reasons, and raw fact payloads. (Thanks to @aukgit)
-- **Multi-Step Switch Lifecycle Tracking**: Instrumented account rotation and instance switching to track 4 explicit verified steps in SQLite:
-  1. *Prompts Backup*: Active workspace projects captured, prompt counts, and backup batch IDs.
-  2. *Account Reset*: Safe process termination (PIDs), lock cleanup, and authentication credential injection.
-  3. *Prompts Restore*: Resume task generation (`.antigravity_resume_task.json`), channel stabilization, and prompt re-injection.
-  4. *Post-Restore Verification*: Verification check confirming prompt files and active session restoration succeeded. (Thanks to @aukgit)
-- **Live PID Detection & Quota Synchronization Engine**: Added user-initiated `Sync` button on instance cards and top toolbar to detect running Antigravity PIDs, read authenticated accounts from `state.vscdb`, reconcile bindings, and refresh real-time Gemini credits and quotas. (Thanks to @aukgit)
-- **10-Minute Periodic Quota Sync Scheduler**: Implemented a background scheduler (`start_instance_pid_quota_scheduler`) running every 600s to keep running instance PIDs and credit balances fresh automatically. (Thanks to @aukgit)
-
-### Fixed
-- Fixed default instance switch audit tracking to prevent uncompleted `AuditTask` drops and ensure the canonical `"default"` instance ID is recorded across split history databases and `hot_tasks_cache`. (Thanks to @aukgit)
-
----
-
-## [v4.128.1] - 2026-10-03
-
-### Fixed
-- Fixed Rust compilation errors in `instance.rs` and `account.rs` by properly converting `get_antigravity_executable_path` `PathBuf` to `String`. (Thanks to @aukgit)
-- Fixed `cannot move out of type AuditTask` compiler errors in `task_history_db.rs` by cloning `task.id`. (Thanks to @aukgit)
-- Enhanced `scripts/e2e-instance-commands-test.ps1` to unwrap `agm instance ls --json` response payloads seamlessly. (Thanks to @aukgit)
-
-### Added
-- Added Workspace Lease & Cluster Lock table to the Supabase top-level settings view with real-time multi-node status and click-to-unmask email toggle. (Thanks to @aukgit)
-- Modernized Accounts top toolbar into uniform segmented pill capsules (`rounded-full`, shared border, dark-glass backdrop) grouping Focus, +, Refresh, Warm, and Show All Quotas. (Thanks to @aukgit)
-
----
-
-## [v4.128.0] - 2026-10-03
-
-### Added
-- Audit pagination with 100/200 items per page and two-tier SQLite caching (`hot_tasks_cache` in `task_index.db` for instant load, split cold DBs for older pages). (Thanks to @aukgit)
-- Enriched account switch details: transition array (`From → To`), instance ID, IDE type, machine alias, IDE path, and switch reason. (Thanks to @aukgit)
-- First-class Supabase top-level navigation tab alongside Email & Alerts and Audit, providing multi-endpoint cluster governance, health telemetry, workspace leases, and cross-DB migration. (Thanks to @aukgit)
-- Card View and List View toggle for Instances, featuring the new `InstanceTable` component matching Accounts layout. (Thanks to @aukgit)
-- Project & Prompt Tree View modal (`PromptTreeViewModal`) displaying projects and conversations hierarchy, queued prompts, and full-screen prompt inspector with image gallery and attachments. (Thanks to @aukgit)
-- Modernized Accounts view: uniform pill button capsule toolbar (Focus, +, Refresh, Warm, Show All Quotas), hover/double-click email unmasking with automatic re-mask on mouse leave, and vibrant glowing multi-stop gradient progress bars. (Thanks to @aukgit)
-- Post-rotation prompt stabilization delay (7.0s) guaranteeing IDE extension host and DevTools channels are fully ready before re-injecting prompts. (Thanks to @aukgit)
-- Proxy routing & URL filtering settings: default path rewrite toggle, enable all URLs toggle, and excluded URLs list. (Thanks to @aukgit)
-- Full backup & restore enhancement: added option to include or exclude audit records and task history. (Thanks to @aukgit)
-- CLI parity enhancements: structured JSON output across `agm instance ls --json` and `agm instance count --json`, PID display, sequence names, and local-only E2E test script (`scripts/e2e-instance-commands-test.ps1`). (Thanks to @aukgit)
-
-### Fixed
-- Fixed cramped text box padding in Duplicate/Clone modals (`px-4 py-3`, rounded-xl). (Thanks to @aukgit)
-- Redesigned Instances top toolbar into cohesive segmented pill capsules (`rounded-full`, shared border, dark-glass backdrop). (Thanks to @aukgit)
-
----
-
-## [v4.127.2] - 2026-10-03
-
-### Added
-- Synchronize prompts, skills, AI scripts, and coding guidelines
-
----
-
-## [v4.127.0] - 2026-10-03
-
-### Added
-- Unified instance settings synchronization and deep copy via CLI (`agm instance copy-settings`) and UI modal (`InstanceSettingsModal`) covering themes, turbo mode, browser policy, and file permissions. (Thanks to @aukgit)
-- Open projects and workspace folder copy parity (`workspaceStorage`, `state.vscdb`) during duplication in CLI (`agm instance duplicate --copy-projects`, `agm instance copy-projects`) and UI clone modal. (Thanks to @aukgit)
-- Default baseline settings enforcement and fast toggles for turbo mode and plan review across single or all instances (`agm instance settings enforce-defaults`, `set-turbo`, `set-plan-review`). (Thanks to @aukgit)
-- Instance settings JSON export/import and UI clipboard Copy/Paste with undo/redo snapshot history. (Thanks to @aukgit)
-- Instance count and status reporting CLI command (`agm instance count`). (Thanks to @aukgit)
-
-### Changed
-- Combined navbar header buttons into seamless, unified segmented pill control capsules for Quick Clean + Preferences and Window Controls (Minimize, Maximize, Close). (Thanks to @aukgit)
-
----
-
-## [v4.126.1] - 2026-10-03
-
-### Fixed
-- Fixed auto-profile switcher failing to reopen when the default instance reaches zero credits by preserving candidate instance IDs during evaluation and executing full cross-instance launch lifecycle. (Thanks to @aukgit)
-- Fixed default instance account switch short-circuit leaving the IDE in an Idle state after process termination. (Thanks to @aukgit)
-- Purged stale lockfiles (`lockfile`, `code.lock`, `DevToolsActivePort`) before restarting to prevent silent Electron launch aborts on Windows. (Thanks to @aukgit)
-
-### Changed
-- Modernized Instances & Profiles UI with sleek dark glass styling, eliminating jarring light-gray capsules on dark theme. (Thanks to @aukgit)
-- Upgraded Auto Profile Switcher banner to a modern glassmorphism card with glowing active pulse indicators, structured quota badges, and streamlined actions. (Thanks to @aukgit)
-- Modernized instance card footer into a compact status and path badge layout with one-click clipboard copying. (Thanks to @aukgit)
-
----
-
-## [v4.126.0] - 2026-10-03
-
-### Added
-- Duplicate instance deep-copies settings, themes, keybindings, snippets, and clones project rows. (Thanks to @aukgit)
-- Instance duplicate dialog with scope preview cards and CSS3 animated buttons. (Thanks to @aukgit)
-- Email view includes IMAP/SMTP connection badges, daemon telemetry, and vault health. (Thanks to @aukgit)
-
-### Changed
-- Active account row uses dark blackish slate, amber border, yellow text, and golden CURRENT badge. (Thanks to @aukgit)
-- Settings About tab redesigned into a compact, unified layout adhering to UI/UX principles. (Thanks to @aukgit)
-
-### Fixed
-- Audit page respects dark theme across cards, tables, headers, and detail modal. (Thanks to @aukgit)
-
----
-
-## [v4.125.0] - 2026-10-02
-
-### Fixed
-- Switching one instance no longer closes another instance's process. (Thanks to @aukgit)
-
-### Changed
-- Instance cards keep the account, profile path, and actions readable instead of clipping them together. (Thanks to @aukgit)
-
----
-
-## [v4.124.0] - 2026-10-02
-
-### Fixed
-- Switch and fast-forward keep the running prompt and open the same conversation again. The audit row records that prompt and conversation. (Thanks to @aukgit)
-
-### Changed
-- Audit detail is an info button. It opens a scrollable table with Copy and Cancel, and loads that row only when opened. (Thanks to @aukgit)
-- Google quota checks wait at least 2 minutes. The saved process id is trusted. A full process scan runs on the 10-minute cache refresh, or when credit is under the threshold and that process no longer matches. (Thanks to @aukgit)
-
----
-
-## [v4.123.0] - 2026-10-02
-
-### Changed
-- Audit shows a masked from-account to to-account. The domain stays hidden. Detail is a table, loaded only when that button is clicked, with the reason, how the switch ran, the prompt, and whether it was injected again. (Thanks to @aukgit)
-
----
-
-## [v4.122.0] - 2026-10-02
-
-### Fixed
-- Account switch no longer waits on a Google quota fetch, a mailbox poll, or email delivery. The prompt-channel wait runs only when a prompt was backed up. (Thanks to @aukgit)
-
-### Changed
-- Pinned quota models are a filter and compact chips, with pinned models first. (Thanks to @aukgit)
-
----
-
-## [v4.121.0] - 2026-10-02
-
-### Added
-- A duplicate instance copies the source IDE settings, workspace databases, `.gemini` trees, and repo rows. (Thanks to @aukgit)
-- Settings has a Themes tab for the catalogue palettes, and About is a compact row with the update controls. (Thanks to @aukgit)
-
-### Changed
-- The accounts footer no longer prints the entry count. Per page sits on the left and defaults to 150. (Thanks to @aukgit)
-
----
-
-## [v4.120.0] - 2026-10-02
-
-### Added
-- Accounts uses one tier dropdown. Refresh is the first row button, then Switch. IDE and CLI switch sit in More, with cycle tokens. (Thanks to @aukgit)
-- Audit Detail loads one split-database row and shows the prompt that was running on a switch. Actions are numeric enums shown as title case. (Thanks to @aukgit)
-- `agm update` writes the installer zip, and the bump script refuses to finish when the version manifests disagree. (Thanks to @aukgit)
-
-### Fixed
-- A quota refresh calls loadCodeAssist even when a project id is already cached, so a Pro account can receive a Pro badge. (Thanks to @aukgit)
-
----
-
-## [v4.119.3] - 2026-10-02
-
-### Added
-- Synchronize prompts, skills, AI scripts, and coding guidelines
-
----
-
-## [v4.119.2] - 2026-10-02
-
-### Added
-- Synchronize prompts, skills, AI scripts, and coding guidelines
-
----
-
-## [v4.119.1] - 2026-10-02
-
-### Added
-- Synchronize prompts, skills, AI scripts, and coding guidelines
-
----
-
-## [v4.119.0] - 2026-10-02
-
-### Added
-- Accounts table shows one model at a time: 4-hour quota on the left and weekly quota on the right, for Gemini or Claude
-- Refresh, details, fingerprint, and export sit in one menu that stays above the sticky actions column
-- Priority stays hidden when every visible account shares it, and a double-click edits it in place
-- Audit page and `agm history` list account adds and switches from split SQLite files indexed by `task_index.db` (Thanks to @aukgit)
-
-### Fixed
-- A switch re-pushes the prompt that was running after the instance process is up, instead of marking the backup restored during launch (Thanks to @aukgit)
-- Paid tier ids that contain pro, premium, or advanced are stored as PRO so the badge can show (Thanks to @aukgit)
-
----
-
-## [v4.118.0] - 2026-10-02
-
-### Added
-- Stabilized universal Awan Software design system, luminance hierarchy, and surface contrast across all components
-- Enhanced UI/UX color semantics with accessible WCAG AAA contrast ratios for active instances, accounts, and quotas
-- Universal CSS3 color switching transitions and ambient glow pulse keyframe animations across the complete interface
-- Full English documentation standardization with zero Chinese character policy across all distribution channels
-
----
-
-## [v4.117.0] - 2026-10-02
-
-### Added
-- Harmonized elevation hierarchy and surface luminance according to Awan Software design system
-- Resolved dark-on-dark contrast bottlenecks across InstanceSelector modals, search inputs, and active selection states
-- High-contrast typography and color semantics across QuotaItem, AccountCard, AccountRow, and AccountTable
-- Universal CSS3 color switching transitions and ambient glow pulse animations
-- 100% pure English documentation and changelogs across all distribution channels
-
----
-
-## [v4.116.0] - 2026-10-02
-
-### Added
-- Comprehensive dark mode contrast overhaul eliminating dark-on-dark text illegibility across InstanceSelector and account tables
-- Full Awan Software brand specification alignment with Deep Orbit canvas and Zero-G Cyan accents
-- High-contrast typography and semantic color hierarchy across InstanceSelector, AccountTable, AccountRow, and AccountCard
-- Universal CSS3 color switching transitions and smooth glow pulse animations
-- 100% pure English documentation and changelogs across all distribution channels
-
----
-
-## [v4.115.0] - 2026-10-02
-
-### Added
-- Comprehensive dark mode contrast overhaul eliminating dark-on-dark text illegibility
-- Complete Awan Software brand specification alignment with Deep Orbit canvas and Zero-G Cyan accents
-- High-contrast typography and semantic color hierarchy across InstanceSelector, AccountTable, AccountRow, and AccountCard
-- Universal CSS3 color switching transitions and smooth glow pulse animations
-
----
-
-## [v4.114.0] - 2026-10-02
-
-### Added
-- Complete elimination of Chinese text from CHANGELOG and Docker README documentation
-- Comprehensive English alignment across all release notes and repository documentation
-- InstanceSelector active state and typography contrast enhancements for dark mode
-
----
-
-## [v4.113.1] - 2026-10-01
-
-### Added
-- Synchronize prompts, skills, AI scripts, and coding guidelines
-
----
-
-## [v4.113.0] - 2026-10-02
-
-### Added
-- Modern Awan brand color scale and DaisyUI palette overhaul in `tailwind.config.js`
-- Complete removal of Chinese text from `README.md` and alignment of English changelogs
-
----
-
-## [v4.110.1] - 2026-10-01
-
-### Added
-- Synchronize V6 prompts, SQLite task manager, skills, and coding guidelines
-
----
-
-## [v4.108.0] - 2026-09-30
-
-### Added
-- exact rustfmt compliance and env!(CARGO_PKG_VERSION) fix for gitignore agm and telemetry
-
----
-
-## [v4.107.0] - 2026-09-30
-
-### Added
-- exact rustfmt compliance and gitignore agm command
-
----
-
-## [v4.106.0] - 2026-09-30
-
-### Added
-- add gitignore agm command and fix rustfmt formatting
-
----
-
-## [v4.105.0] - 2026-09-30
-
-### Added
-- add failed_commands logging, suggestions, clear-terminal, and rich ssh/clean optimization suggestions
-
----
-
 # 📝 Changelog
 
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
-    *   **v4.159.0 (2026-10-06)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+    *   **v4.160.0 (2026-10-06)**:
+        -   **[Awan Cloud Design Modernization, UI/UX Contrast & Global CSS3 Transitions]**:
+            -   **Design & Contrast Modernization**: Harmonized entire UI with official Awan Software specifications (`Deep Orbit #071a27`, `Cloud Field #f5faf9`, `Lift Blue #2878f0`, `Vector Green #16a97a`, `Plasma Mint #43d6a2`); resolved dark-on-dark contrast issues in instance selection, account cards, and table headers; enabled universal 250ms CSS3 transition and `.awan-glow-pulse` animations; unified Option A selected highlight with 6px amber-400 rail and high-contrast amber active pills. (Thanks to @aukgit)
+        -   **[Account Tier Badge & Startup Backfill Engine]**:
+            -   **Subscription Tier Persistence**: Added shared `TierBadge` component with explicit unknown state pill and tooltip; decoupled tier fetching from project ID; added CLI suite `agm accounts refresh-tier [--all]` with automatic background startup backfill. (Thanks to @aukgit)
+        -   **[Priority Inline Editing & Focus Viewport Target]**:
+            -   **Priority & Focus**: Added `PriorityBadge` component hiding default priority 50 with double-click inline editing; aligned Focus button to scroll directly to the selected instance's bound account under a single animation frame. (Thanks to @aukgit)
 
+    *   **v4.159.0 (2026-10-06)**:
+        -   **[Fleet Accounts Deployment via GitMap Integration]**:
+            -   **Fleet Synchronization**: Integrated 1-click fleet account deployment in `UnifiedBackupModal`, communicating via Tauri IPC (`deploy_accounts_to_fleet`) to run `gitmap nodes deploy agm-accounts`, safely synchronizing local account configurations and auth tokens to all reachable fleet nodes with default central node isolation. (Thanks to @aukgit)
 
     *   **v4.158.0 (2026-10-05)**:
-        -   **[Pipeline CI Fix & Two-Phase 4H / Weekly Hours-Remaining Quota Model]**:
-            -   **Description**: Resolved unexpected closing delimiter in `auto_switcher.rs` test module reported by `gitmap pe`, restoring `cargo fmt` and compilation gate across macOS, Linux, and Windows CI; formalized two-phase 4-hour quota candidate selection with strict 100% primary gate and graceful proportional degradation fallback, powered by hours-remaining inverted weekly quota distance weighting. (Thanks to @aukgit)
-
+        -   **[CI Gate Syntax Resolution & Two-Phase Quota Selection Protocol]**:
+            -   **CI Gate Fix**: Fixed closing delimiter mismatch in `src-tauri/src/modules/auto_switcher.rs` detected via `gitmap pe`, restoring `cargo fmt` formatting and compilation gates across all CI workflows. (Thanks to @aukgit)
+            -   **Candidate Quota Selection**: Enforced primary strict 100% 4-hour quota gate with linear fallback scaling when all accounts are exhausted, coupled with hours-remaining inverted weekly quota prioritization and 8% floor. (Thanks to @aukgit)
 
     *   **v4.157.2 (2026-10-05)**:
-        -   **[Two-Phase 4-Hour Quota Gate & Hours-Remaining Weekly Scoring]**:
-            -   **Description**: Implemented two-phase 4-hour quota selection gate and weekly quota refill countdown distance weighting with 8% floor and descending rank ordering. (Thanks to @aukgit)
-
+        -   **[Two-Phase 4-Hour Quota Gate & Hours-Remaining Weekly Scoring Algorithm]**:
+            -   **Phase 1 (Primary Selection)**: Candidate accounts with less than 100% 4-hour quota (and whose reset period has not finished) strictly evaluate to `0.0`. Only accounts with full 100% 4h quota or elapsed cycles receive the base weekly score `base_weekly_score.floor()`. (Thanks to @aukgit)
+            -   **Phase 2 (Graceful Degradation)**: When no account has 100% 4h quota (`available_pool` and `cooldown_pool` both empty), fallback evaluates partial 4h accounts via `((q_4h / 100.0) * base_weekly_score).floor()`, scaling linearly by available 4h percentage. (Thanks to @aukgit)
+            -   **Hours-Remaining Inversion**: Uses weekly refill countdown `hours_remaining` to calculate elapsed cycle distance `(168 - hours_remaining)` so accounts nearest to their weekly refill receive highest weight: `(tier_multiplier * effective_weekly_pct * (168 - hours_remaining)) / 100.0`. (Thanks to @aukgit)
+            -   **8% Weekly Elimination Floor**: Accounts with weekly quota below 8% strictly evaluate to `0.0`. (Thanks to @aukgit)
+            -   **Descending Sort**: Candidate pools sorted descending (highest integer score selected first). Claude/3p buckets preserved with `TODO(claude)` ambiguity marker. (Thanks to @aukgit)
 
     *   **v4.157.1 (2026-10-05)**:
-        -   **[Weekly Scoring DESC Sort & Compact Integer Output]**:
-            -   **Description**: Corrected weekly candidate scoring to descending sort order and compact integer floor output for SQLite persistence. (Thanks to @aukgit)
-
+        -   **[Weekly Candidate Scoring DESC Order & Compact Integer Output]**:
+            -   **Sort & Integer Output**: Standardized candidate scoring to descending sort order with integer output for SQLite persistence. (Thanks to @aukgit)
 
 
     *   **v4.157.0 (2026-10-05)**:
-        -   **[Weekly Quota Scoring Algorithm & Progress Bar Glow]**:
-            -   **Description**: Restored neon green progress bar glow in accounts table and compact progress bar styling; applied hours-elapsed weekly quota scoring algorithm in `score_candidate_account()` prioritizing accounts with lowest elapsed score since reset. (Thanks to @aukgit)
+        -   **[Empty Prompt Tree Fix, Neon Green Progress Bar Restore, Hours-Elapsed Weekly Scoring, Modal Header Identity]**:
+            -   **Fixed**: Prompt tree was completely empty because `detect_running_projects()` relied on `workspaceStorage/*/workspace.json` which is empty on managed Windows deployments. Added fallback in `compute_project_conversation_tree()` to synthesize `RunningProject` entries directly from `workspace_uris` in each instance's `conversation_summaries.db`, ensuring up to 200 recent conversations are always shown. Also fixed `workspace_storage_path: None` entries being incorrectly dropped by the filter. (Thanks to @aukgit)
+            -   **Changed**: Restored neon glowing green `#1af18d` progress bars in `QuotaProgressBar.tsx` and `WaterDrainProgressBar.tsx`, reverting the VS Code cyan/teal palette introduced in v4.154.0. Color tiers: `≥75%` emerald-to-neon-green with glow `shadow-[0_0_10px_rgba(26,241,141,0.75)]`, `25–50%` amber/orange, `<25%` rose/red. Milestone nodes: 100% node glow `shadow-[0_0_8px_rgba(26,241,141,0.85)]`, 75% node `shadow-[0_0_6px_rgba(26,241,141,0.6)]`. (Thanks to @aukgit)
+            -   **Changed**: Compact progress bar — label/icon column capped at `max-w-[18%]`, time/percent column fixed at `w-[18%]` giving the track more horizontal space. (Thanks to @aukgit)
+            -   **Changed**: Accounts table header background updated from `dark:bg-slate-900/90` to `dark:bg-[#061220]` for a deeper navy alignment. (Thanks to @aukgit)
+            -   **Added**: Prompt Tree Modal header now shows three identity badges: `#seq`, profile name, and `...\Antigravity.exe` trailing path. Props `sequenceNumber?` and `executablePath?` added to `PromptTreeViewModalProps`; all `setPromptTreeInstance` call sites in `Instances.tsx` now pass `seq_num` and `executable_path`. (Thanks to @aukgit)
+            -   **Changed**: Replaced weekly quota scoring in `score_candidate_account()` with hours-elapsed-weighted formula: `hours_elapsed = 168 - hours_remaining_until_reset`, `weekly_effective_score = weekly_pct × hours_elapsed`, normalized by dividing by 16800. Weekly quota <8% is treated as zero. Sort direction is now ascending — accounts with the least hours elapsed (most recently reset) are prioritized first. Gemini-only (`gemini-weekly` buckets); Claude/3p buckets excluded with `TODO(claude)` stub. (Thanks to @aukgit)
 
 
     *   **v4.156.0 (2026-10-05)**:
-        -   **[Instance Restart Split Capsule & Deep Repo DB Fixes]**:
-            -   **Description**: Added dedicated instance restart split button capsule on current account in Table and Card modes; preserved Switch button strictly for account selection; disambiguated synchronization icons reserving RotateCcw exclusively for restart; fixed host vs sandbox user home collision via `get_canonical_host_home()`, Gate 4 dual path/folder matching, disjoint sandbox tagging, 10-minute thinking window for reasoning models without premature 60s cutoff, unblocked email watcher, and enforced lifecycle cache invalidation. (Thanks to @aukgit)
-
+        -   **[Instance Restart Split Button Capsule on Current Account]**: In both Table view (`InstanceTable.tsx`) and Card view (`Instances.tsx`) modes, converted the primary action for active instances into a seamless segmented split capsule (`rounded-[5px]`, dark-glass hairline divider). The left segment provides an immediate Stop (`<Square>`), while the right segment provides Restart (`<RotateCcw>`, tooltip "Restart Instance on Current Account") to cleanly terminate the process tree, poll for process exit and lock release (<1,500ms), purge the prompt tree cache, and relaunch on the currently bound account. The global busy overlay accurately reflects "Restarting...". (Thanks to @aukgit)
+        -   **[Strict Account Selection Semantics for Switch Button]**: Strictly preserved the Switch button invariant: dedicated solely to opening the Switch Account modal (`setSwitchTargetInstance`) with zero restart side-effects. (Thanks to @aukgit)
+        -   **[Semantic Icon Disambiguation: Reserve RotateCcw Strictly for Restart]**: Eliminated user confusion between sync and restart actions. Enforced an application-wide anti-confusion invariant reserving `<RotateCcw>` exclusively for instance restart. Replaced circular rotating arrows on "Sync All" with `<FolderSync className="text-cyan-500" />`, "Eval Quota" with `<Sparkles className="text-amber-500" />`, "Sync Quota" with `<ArrowLeftRight className="text-blue-500" />`, and "Wipe Credentials" in the More popover with `<KeyRound className="text-amber-500" />`. Standardized Fast-Forward in Table mode to `<FastForward>` to match Card mode. (Thanks to @aukgit)
+        -   **[Host vs Sandbox Home Directory Resolution Fix]**: Added `get_canonical_host_home()` to escape sandboxed user profiles (`.antigravity_tools/instances/<id>/home`) and access the host user home (`C:\Users\Administrator`), ensuring the default instance accurately reads host `.gemini/antigravity` conversation summaries. (Thanks to @aukgit)
+        -   **[Dual Path, Folder Name & Composite ID Matching in Gate 4]**: Resolved string mismatches between decoded workspace paths and project identifiers in Gate 4 by supporting full paths, workspace folder names, and composite prefix patterns. (Thanks to @aukgit)
+        -   **[Disjoint Sandbox Tagging & Targeted Default Process Check]**: Enforced disjoint candidate directory mapping in `gemini_dirs_tagged` to prevent secondary instance sandboxes from being misattributed to default. Replaced global `is_antigravity_running(None)` with targeted default PID verification in `compute_project_conversation_tree`. (Thanks to @aukgit)
+        -   **[Adaptive 10-Minute Window for Deep Thinking Models]**: Unified all conversation and prompt freshness cutoffs across Gate 1, Gate 3, Gate 4, and tree generation to an adaptive 600s (10-minute) window, preventing reasoning models (Claude 3.7 Thinking, Gemini 2.5 Pro) from dropping to IDLE mid-generation while strictly upholding idle supremacy. (Thanks to @aukgit)
+        -   **[Unblock Email Watcher Process Check]**: Purged the redundant IDE process existence check from `is_any_prompt_actively_running`, relying strictly on active prompts and unblocking `email_watcher.rs`. (Thanks to @aukgit)
+        -   **[Instance Lifecycle Cache Invalidation Contract]**: Actively triggered `invalidate_prompt_tree_cache` upon completion of `close_instance`, `launch_instance`, and `restart_instance` to guarantee immediate UI consistency. (Thanks to @aukgit)
 
     *   **v4.155.0 (2026-10-05)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[Instance Restart Split Button Capsule on Current Account]**: In both Table view (`InstanceTable.tsx`) and Card view (`Instances.tsx`) modes, converted the primary action for active instances into a seamless segmented split capsule (`rounded-[5px]`, dark-glass hairline divider). The left segment provides an immediate Stop (`<Square>`), while the right segment provides Restart (`<RotateCcw>`, tooltip "Restart Instance on Current Account") to cleanly terminate the process tree, poll for process exit and lock release (<1,500ms), purge the prompt tree cache, and relaunch on the currently bound account. The global busy overlay accurately reflects "Restarting...". (Thanks to @aukgit)
+        -   **[Strict Account Selection Semantics for Switch Button]**: Strictly preserved the Switch button invariant: dedicated solely to opening the Switch Account modal (`setSwitchTargetInstance`) with zero restart side-effects. (Thanks to @aukgit)
+        -   **[Semantic Icon Disambiguation: Reserve RotateCcw Strictly for Restart]**: Eliminated user confusion between sync and restart actions. Enforced an application-wide anti-confusion invariant reserving `<RotateCcw>` exclusively for instance restart. Replaced circular rotating arrows on "Sync All" with `<FolderSync className="text-cyan-500" />`, "Eval Quota" with `<Sparkles className="text-amber-500" />`, "Sync Quota" with `<ArrowLeftRight className="text-blue-500" />`, and "Wipe Credentials" in the More popover with `<KeyRound className="text-amber-500" />`. Standardized Fast-Forward in Table mode to `<FastForward>` to match Card mode. (Thanks to @aukgit)
+        -   **[Running Projects & Prompts Deep Detection Root-Cause Resolution]**:
+            -   **Host Process PID Liveness Gate (Gate 0)**: In `detect_running_projects` and `is_instance_running`, enforced strict PID matching against instance data directories via `find_pids_for_data_dir`. When an instance is stopped or dead, all associated projects are unconditionally updated to `is_running = 0` in SQLite, eliminating sticky false positive running dots. (Thanks to @aukgit)
+            -   **Startup State Sanitization**: In `purge_corrupted_running_projects`, added `UPDATE running_projects SET is_running = 0` on AGM launch to wipe zombie running flags left by ungraceful IDE termination or host restarts. (Thanks to @aukgit)
+            -   **Adaptive 10-Minute Window for Deep Thinking Models**: Replaced the rigid 60s/120s timeout in Gate 4 and conversation tree generation with an adaptive 600s (10 minutes) window for active sessions (`CASCADE_RUN_STATUS_RUNNING` with `not_fully_idle > 0`), preventing reasoning models (Claude 3.7 Thinking, Gemini 2.5 Pro) from prematurely dropping to IDLE mid-generation while maintaining strict idle supremacy. (Thanks to @aukgit)
+            -   **Robust Multi-Format Timestamp Parsing**: Introduced `parse_flexible_timestamp` to parse RFC3339, fractional-second ISO-8601 (`%Y-%m-%dT%H:%M:%S%.f`), space-delimited formats, and epoch timestamps without silently collapsing to 0. (Thanks to @aukgit)
+            -   **Exact Instance ID Matching & Ghost Conversation Pruning**: Replaced loose suffix matching in `isNodeOwnedByInstance` with exact equality (`node.instance_id === instConfig.id`), eliminating cross-instance bleed. Pruned 0-word untitled conversations in Gate 4. (Thanks to @aukgit)
+            -   **Modal Ground Truth Cache Bypass**: Updated `PromptTreeViewModal.tsx` to force cache bypass (`loadTree(true, true)`) on open, refresh, and prompt restore, ensuring users always see live ground truth. (Thanks to @aukgit)
 
     *   **v4.154.0 (2026-10-05)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[Accounts Table Row Borders & Middle Quota Grouping]**: Restored explicit horizontal row dividing borders (`border-b border-slate-200/90 dark:border-slate-800/90`) across all accounts in the table. Added distinctive visual grouping for the middle quota section (`4H MODEL QUOTA` and `WEEKLY QUOTA`) with subtle background shading (`bg-slate-50/50 dark:bg-slate-900/40`) and demarcated outer column borders (`border-l border-slate-300 dark:border-[#15334d]` on Col 4 and `border-r border-slate-300 dark:border-[#15334d]` on Col 5), removing broken nth-child CSS selectors. (Thanks to @aukgit)
+        -   **[VS Code Cyan/Teal Palette for Quotas & Audit Badges]**: Eliminated harsh neon green indicators (`#1af18d`, `emerald-500`, `lime-400`). Re-engineered `QuotaProgressBar`, `WaterDrainProgressBar`, and audit status badges to use a refined VS Code cyan/teal theme gradient (`from-teal-500 via-cyan-500 to-[#38bdf8]` for $\ge 75\%$, `from-teal-600 via-cyan-500 to-sky-400` for $\ge 50\%$) with cyan milestone glow checkpoints and normalized `rounded-[5px]` tags. (Thanks to @aukgit)
+        -   **[Supabase Repo-Secrets Auto-Discovery & 1-Click Sync]**: Expanded discovery across candidate secrets paths in `D:/work/repo-secrets/` (`02-antigravity-and-event-manager/vault/supabase_config.json`, `02-antigravity-manager/vault/supabase_config.json`, `03-supabase/01-own/`, `03-supabase/02-lovable/`) with URL normalization (stripping `/rest/v1`). Added 1-click "Auto-Discover from Repo Secrets" buttons in the settings header and empty endpoints view, with CLI parity in `agm supabase load-secrets`. (Thanks to @aukgit)
+        -   **[Local Sibling Instance Guard & Cross-Machine Lease Collision Prevention]**: Added pre-switch lease conflict validation calling `is_account_or_email_leased_by_other` and `get_remote_lease_holder_info`, providing explicit remote machine alias and lease expiration diagnostics. Added a local running sibling instance check in `switch_account` and `switch_account_to_instance` preventing local sibling instances from binding to the same account while running. (Thanks to @aukgit)
+        -   **[Configurable 30–60m Email Cooldown & Deadlock-Free Fallback]**: Added a configurable 30–60m email cooldown window in candidate selection scoring (default 60m, with 15m/30m/45m/60m/120m quick pills in `AutoSwitcherSettings.tsx`). Implemented a two-tier pool fallback that selects the oldest used account when all accounts are in cooldown, preventing rotation deadlocks. (Thanks to @aukgit)
+        -   **[Instances Table Zero-Scroll Compaction & Actions Dropdown]**: Merged `Profile Name` and `Email` into a single compact `Profile & Account` column (Row 1: sequence + bold profile name + running pulse; Row 2: masked email with reveal toggle + tier badge). Truncated location paths to display only the trailing folder name (`...\<folder>`) with full path tooltip and 1-click clipboard copy, and integrated `Prompts` into the Actions dropdown, eliminating table horizontal scrollbars at 1280px+. (Thanks to @aukgit)
+        -   **[Button Corner Radius Normalization (5–6px) & Rotate Tooltip]**: Standardized button corner radii to `rounded-[5px]` across toolbars, dialogs, modals, and instance cards. Enhanced the "Rotate to Next Best" toolbar button with `px-3.5 py-1.5` padding, candidate email badge, and rich hover tooltip showing target instance, candidate email, subscription tier, and 4H quota percentage. (Thanks to @aukgit)
+        -   **[Compact 4-Column Card Grid & Structured 2-Row Action Toolbars]**: Enforced a strict 4-column maximum grid layout `grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3` (compact: `gap-2.5`). Restructured instance card footer buttons into two segmented dark-glass capsules (`rounded-[5px]`, `divide-x`): Row 1 Primary Lifecycle (Launch/Stop/Restart, Switch, Fast-Forward, Sync PID); Row 2 Secondary Actions (Prompts Tree, Settings, Clone, Audit, More popover). (Thanks to @aukgit)
 
     *   **v4.153.0 (2026-10-05)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[Rust Compiler & macOS Move Fix]**: Resolved compile errors in `src-tauri/src/modules/instance.rs` by replacing `AppError::Other` with `AppError::Unknown` and `AppError::Process`. Stored `child_pid = child.id()` immediately after process spawn to resolve the borrow-after-move error caused by `child.wait_with_output()` on macOS. (Thanks to @aukgit)
+        -   **[Repo DB Type Mismatch Fix]**: Fixed mismatched types error in `src-tauri/src/modules/repo_db.rs` line 4522 by unwrapping `Result<i64, _>` properly in `or_else` rather than wrapping in `Option<i64>`. (Thanks to @aukgit)
+        -   **[Rustfmt Code Formatting Alignment]**: Cleaned up trailing newlines and formatted long lines across `commands/supabase.rs`, `modules/instance.rs`, `modules/repo_db.rs`, and `modules/supabase_sync.rs` to pass `cargo fmt -- --check` unconditionally across Linux, macOS, and Windows CI gates. (Thanks to @aukgit)
+        -   **[Instance Restart Split Button Capsule on Current Account]**: In both Table and Card views on the Instances page, when an instance is actively running, the primary Stop button is converted into a seamless segmented pill capsule (`rounded-[5px]` with dark-glass divider). The left segment provides an immediate Stop (`Square`), while the right segment provides Restart (`RotateCcw`, tooltip "Restart Instance on Current Account") to close the instance, wait for lock release, and instantly reboot on the same bound account. (Thanks to @aukgit)
+        -   **[Distinct Semantic Icons for Sync Operations vs Restart]**: Eliminated confusing circular rotation icons for synchronization tasks. Replaced `RotateCw` for "Sync PID & Quota" with a dedicated CPU microchip icon (`<Cpu className="w-3.5 h-3.5 text-teal-500" />`), and replaced account switch buttons with `<ArrowLeftRight className="w-3 h-3" />`, strictly reserving `RotateCcw` for restart operations. (Thanks to @aukgit)
+        -   **[Running Projects & Prompts Detection Root-Cause Fix]**: Reduced `prompt_tree_cache` TTL in `src-tauri/src/modules/repo_db.rs` from 60s to 5s, with instant invalidation upon lifecycle events. Eliminated orphan project leakage into the default instance (`instance_id IS NULL` / `""`), filtered out 0-word untitled scratch sessions, and enforced strict 120s recency and process PID alive checks, eradicating false positive running project statuses. (Thanks to @aukgit)
 
     *   **v4.152.0 (2026-10-05)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[Instance Restart Split Button Capsule on Current Account]**: In both Table and Card views on the Instances page, when an instance is actively running, the primary Stop button is converted into a seamless segmented pill capsule (`rounded-[5px]` with dark-glass divider). The left segment provides an immediate Stop (`Square`), while the right segment provides Restart (`RotateCcw`, tooltip "Restart Instance on Current Account") to close the instance, wait for lock release, and instantly reboot on the same bound account. (Thanks to @aukgit)
+        -   **[Atomic Backend `restart_instance` IPC Command]**: Implemented `restart_instance` in `src-tauri/src/modules/instance.rs` and registered in `commands/instance.rs` and `lib.rs`. Gracefully terminates running processes, verifies process exit and socket release (<1.5s), invalidates the prompt tree cache, and relaunches the profile via `launch_instance`. (Thanks to @aukgit)
+        -   **[Distinct Semantic Icons for Sync Operations vs Restart]**: Eliminated confusing circular rotation icons for synchronization tasks. Replaced `RotateCw` for "Sync PID & Quota" with a dedicated CPU microchip icon (`<Cpu className="w-3.5 h-3.5 text-teal-500" />`), and replaced account switch buttons with `<ArrowLeftRight className="w-3 h-3" />`, strictly reserving `RotateCcw` for restart operations. (Thanks to @aukgit)
+        -   **[Running Projects & Prompts Detection Root-Cause Fix]**: Reduced `prompt_tree_cache` TTL in `src-tauri/src/modules/repo_db.rs` from 60s to 5s, with instant invalidation upon lifecycle events. Eliminated orphan project leakage into the default instance (`instance_id IS NULL` / `""`), filtered out 0-word untitled scratch sessions, and enforced strict 120s recency and process PID alive checks, eradicating false positive running project statuses. (Thanks to @aukgit)
+        -   **[TypeScript Interface Alignment & CI/CD Compilation Fix]**: Added `account_lockout_window_minutes?: number` to `AutoProfileSwitcherConfig` in `src/types/config.ts`, resolving TS2561/TS2551 errors in `AutoSwitcherSettings.tsx` and `Settings.tsx`. Cleaned up unused `syncingInstanceIds` and `useMemo` imports, ensuring 100% green `npm run build` preflight checks. (Thanks to @aukgit)
+        -   **[Rustfmt Alignment in instance.rs]**: Aligned chained method calls for `target_skills_dir` in `src-tauri/src/modules/instance.rs` to conform to `cargo fmt -- --check` standards across Linux, macOS, and Windows CI gates. (Thanks to @aukgit)
 
     *   **v4.151.0 (2026-10-05)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[AccountRow JSX Closing Tag Mismatch & Frontend Build Fix]**: Eliminated the redundant closing `</div>` tag in `src/components/accounts/AccountRow.tsx`, resolving TS17002/TS1005 compile errors and restoring clean cross-platform `npm run build` execution. (Thanks to @aukgit)
+        -   **[Rustfmt Code Formatting Alignment]**: Aligned import ordering and multi-line conditional breaks in `src-tauri/src/modules/instance.rs`, ensuring `cargo fmt -- --check` passes cleanly across all CI/CD runner environments. (Thanks to @aukgit)
+        -   **[Default Instance Theme, Presets, Plugins & Skills Fleet Parity]**: Implemented `sync_instance_ide_parity` in `instance.rs` to replicate Dracula theme seeds (`#BD93F9`/`#19191C`), Turbo mode presets, 4 official Gemini plugins, and 9 builtin skills across all secondary instances and default profile sandboxes. (Thanks to @aukgit)
+        -   **[GitMap Automated IDE Fleet Deployment & Delegation]**: Enabled 1-command deployment via `gitmap agy deploy` and `scripts/deploy-antigravity-ide-fleet.ps1`, supporting automated remote machine provisioning with 7-Gate Scorecard telemetry. (Thanks to @aukgit)
 
     *   **v4.150.0 (2026-10-05)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[Accounts Table Styling & VS Code Palette] Row Borders, Grouping & Cyan Progress Bars**: Restored crisp row border lines (`border-b border-slate-200/80 dark:border-slate-800/80`) across the Accounts table, and visually grouped the core middle quota columns (4H Model Quota and Weekly Quota) with subtle background shading and vertical dividing borders (`bg-slate-50/50 dark:bg-slate-900/40 border-x border-slate-200/60 dark:border-[#15334d]/50`). Replaced glaring neon green progress bars and audit badges with a refined VS Code cyan/teal palette (`from-teal-500 via-cyan-500 to-[#38bdf8]` for >= 75%, `from-teal-600 via-cyan-500 to-sky-400` for >= 50%, and cyan milestone glow nodes), reducing visual fatigue. (Thanks to @aukgit)
+        -   **[Supabase Repo-Secrets Auto-Discovery & 1-Click Sync]**: Enhanced `supabase_sync.rs` to automatically discover and ingest Supabase credentials directly from `D:/work/repo-secrets/02-antigravity-manager/vault/supabase_config.json` and `03-supabase/` credential envelopes. Added a dedicated "Auto-Discover from Repo Secrets" button with `Sparkles` icon in Settings and Tauri IPC command `auto_discover_supabase_credentials`, eliminating manual credentials configuration. (Thanks to @aukgit)
+        -   **[Distributed Lease Collision Guard & 30–60m Cooldown]**: Injected pre-switch mutual exclusion checks in `account.rs` (`switch_account`) and `instance.rs` (`switch_account_to_instance`), verifying with `is_account_or_email_leased_by_other` before token refresh or IDE launch to prevent multi-instance and cross-machine concurrent account collisions. Implemented a configurable 30–60m email cooldown window in candidate ranking with graceful fallback to the oldest used account when all healthy accounts are cooling down. (Thanks to @aukgit)
+        -   **[Instances Table Zero-Scroll Compaction & Short Path Truncation]**: Eliminated horizontal scrollbars in the Instances table by compacting the layout to 5 standard columns. Merged Profile Name and Email into a single stacked column with sequence badges, status dots, and masked email unmask toggles. Truncated location paths to display only the single trailing folder name prefixed by `...` (with 1-click clipboard copy). Streamlined the 9-button linear action strip into 3 primary lifecycle buttons plus a "More" dropdown portal for Prompts Tree, Audit Trail, and Settings. (Thanks to @aukgit)
+        -   **[Universal 5–6px Button Radius Normalization & Rotate Tooltip]**: Replaced oversized pill buttons across header toolbars, instance cards, and modal forms with an industrial-grade 5–6px radius (`rounded-[5px]`). Enhanced the "Rotate to Next Best" button with `px-3.5 py-1.5` padding, candidate email subtext badge, and a dynamic tooltip computing and previewing the target instance, candidate email, tier, and 4H quota percentage. (Thanks to @aukgit)
+        -   **[Card Mode Strict 4-Column Grid & 2-Row Action Toolbars]**: Constrained instance card grid layout to strictly 4 columns (`xl:grid-cols-4`), eliminating squished 5- and 6-column distortions on ultra-wide displays. Structured card footers into clean Row 1 (Primary Lifecycle) and Row 2 (Utilities + More Popover) capsules, and collapsed verbose recent project lists in compact density for uniform card heights. (Thanks to @aukgit)
 
     *   **v4.149.0 (2026-10-05)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
 
-
     *   **v4.148.0 (2026-10-04)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[CI Test Targets Gate] Integration Test Async Invocation Correction**: Resolved the remaining E0277 compiler error in test target compilation reported by `gitmap pe` on CI runners. Corrected `test_case_antigravity_cli_discovery` in `src-tauri/tests/per_instance_prompt_liveness_test.rs` which was erroneously calling `.await` on a non-future return type `()`, ensuring clean integration test target compilation across all platforms. (Thanks to @aukgit)
 
     *   **v4.147.0 (2026-10-04)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[Build & Compilation Gates] Comprehensive Backend Fixes & PID Visibility**: Resolved all 7 remote compilation errors flagged by `gitmap pe`. Declared timestamp `now` at the top level of `compute_project_conversation_tree` in `src-tauri/src/modules/repo_db.rs`, resolving E0425 scope errors in turn TTL checks. Promoted `get_antigravity_pids` to `pub(crate)` in `src-tauri/src/modules/process.rs` and aligned caller invocations with `Option<&str>` arguments, fixing private function visibility (E0603) and argument count (E0061) compile failures across macOS, Linux, and Windows CI runners. (Thanks to @aukgit)
 
     *   **v4.146.0 (2026-10-04)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[Clippy & Compilation Gate] Rusqlite Non-Exhaustive StepResult Match Arm**: Resolved the remaining E0004 compiler blockage in Linux and macOS CI pipelines caused by `rusqlite::backup::StepResult` being marked `#[non_exhaustive]`. Added a wildcard fallback arm (`Ok(_) => break`) to the online SQLite backup step loop in `src-tauri/src/modules/instance.rs`, ensuring `cargo clippy` and compilation pass with zero warnings across all CI environments. (Thanks to @aukgit)
 
     *   **v4.145.0 (2026-10-04)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[Rust Compilation & CI Gate] Rusqlite Backup Feature & Borrow Type Alignment**: Resolved all 7 CI/CD build breakages on Linux and macOS runners. Enabled the required `"backup"` feature for `rusqlite` in `src-tauri/Cargo.toml` (`features = ["bundled", "backup"]`), activating the `rusqlite::backup::Backup` online SQLite zero-downtime hot-cloning API. Fixed E0277 borrow type mismatch in `src-tauri/src/modules/repo_db.rs` where `owning_inst_id` (`&String`) was compared directly against struct `String` values. (Thanks to @aukgit)
+        -   **[macOS Deep Gatekeeper Hardening Release]**: Formal production release for macOS 13 (Ventura), 14 (Sonoma), and 15 (Sequoia) addressing the "damaged, move to Trash" error via deterministic `awk` DMG volume parsing, recursive `xattr -d com.apple.quarantine` removal across all internal frameworks, Gatekeeper assessment registration with `spctl --add`, real-time installer IDE discovery echo, `$HOME/Applications/` path search expansion, and disk-persisted backtrace diagnostic logging. (Thanks to @aukgit)
 
     *   **v4.144.0 (2026-10-04)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[macOS Deep Gatekeeper Hardening & Quarantine Purge]**: Completely resolved the root causes of the macOS "Antigravity Manager Tools is damaged, you should move it to the Trash" error across macOS 13 (Ventura), 14 (Sonoma), and 15 (Sequoia). Refactored DMG mount point extraction in `install.sh` to use deterministic `awk` field tokenization instead of fragile regex parsing. Integrated dynamic `sw_vers -productVersion` major version detection. Replaced shallow quarantine clearing with recursive `find "$target_app" -exec xattr -d com.apple.quarantine {} +` across all nested executables, dylibs, and frameworks. Added automatic `spctl --add "$target_app"` Gatekeeper assessment registration on macOS 13+, and gracefully skipped ad-hoc self-signing on macOS 15+ where AMFI rejects self-signed binaries. (Thanks to @aukgit)
+        -   **[First-Time IDE Discovery & Immediate Echo]**: Added `detect_ide_path()` in `install.sh`, performing real-time Spotlight `mdfind` bundle ID queries and filesystem checks across `/Applications/` and `$HOME/Applications/` during installer execution, immediately echoing detected IDE locations or providing clear first-run guidance. (Thanks to @aukgit)
+        -   **[User-Level Applications Parity & Persistent Backtrace Logging]**: Expanded candidate IDE discovery and instance launch search paths in `src-tauri/src/modules/process.rs` and `src-tauri/src/modules/instance.rs` to include `$HOME/Applications/`. Implemented persistent disk logging for diagnostic backtraces: whenever IDE discovery or process launch encounters an error, the full `std::backtrace::Backtrace` and diagnostic context are serialized to `~/.local/share/antigravity/ide-discovery.log` for transparent technical troubleshooting. (Thanks to @aukgit)
+        -   **[Repair Utility & Packaging Hardening]**: Overhauled `scripts/Fix_Damaged.command` with macOS version detection, recursive `find ... xattr -d` quarantine purging, and `spctl --add` registration. Updated `scripts/package_dmg.sh` to guarantee executable permissions and clean quarantine state on bundled repair tools. (Thanks to @aukgit)
 
     *   **v4.143.0 (2026-10-04)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[Per-Instance Prompt Isolation] Cross-Instance Running Prompt State Bleed — Root Cause Fix**: Completely resolved a critical bug where a prompt running in one instance (e.g. Coding Guidelines on instance 8159) incorrectly appeared as `RUNNING` on another instance card (e.g. Default). Refactored `get_project_conversation_tree` in `src-tauri/src/commands/instance.rs` to accept `instance_id: Option<String>`. Updated `compute_project_conversation_tree` in `src-tauri/src/modules/repo_db.rs` to partition cache by instance (`tree:{instance_id}:...`), enforce strict OS process liveness gating (dead instance → `is_running: false` for all its projects, eliminating the blind 10-minute recency assumption), and emit structured `[PROMPT_LIVENESS_PROBE]` audit logs with instance_id, PID, workspace directories, and evaluation rationale. (Thanks to @aukgit)
+        -   **[Frontend Instance Cards] Strict Per-Instance Project & Running State Scoping**: Eliminated global project tree leakage in `src/pages/Instances.tsx` and `src/components/instances/PromptTreeViewModal.tsx`. Instance cards now use strict `node.instance_id === inst.config.id` matching, removing the leaky `node.instance_name === inst.config.name` string comparison. `isProjRunning` and `hasActiveTask` are gated on `inst.is_running`, ensuring stopped instances never display running projects. `PromptTreeViewModal` no longer falls back to the global tree when a filtered result is empty — zero projects renders an empty state, never leaking another instance's project list. (Thanks to @aukgit)
+        -   **[Deep Clone Engine] Complete Settings, Themes & Security Presets Copy**: Overhauled the instance cloning pipeline to resolve cloned instances missing user settings, themes, security presets, and project workspaces. Expanded `REQUIRED_IDE_REL_PATHS` to cover `User/settings.json`, `User/keybindings.json`, `User/security_presets.json`, `User/antigravity_policies.json`, `User/snippets`, `User/globalStorage`, and `User/workspaceStorage`. Expanded `GEMINI_CLONE_DIRS` to include `antigravity`, `antigravity-ide`, `antigravity-cli`, `policies`, and `config`. Introduced `safe_clone_sqlite_db` for safe SQLite cloning with WAL-locked retry backoff and Backup API. Unified CLI/tooling clone entry points to call `resolve_instance_id` and `copy_instance_settings` deep-merge for consistent full cloning across all invocation paths. (Thanks to @aukgit)
+        -   **[Card & Table Mutex UI] Glass Overlay Progress Feedback & Row-Level Action Locking**: Implemented card and table row-level action mutex in `src/pages/Instances.tsx` and `src/components/instances/InstanceTable.tsx`. While any async action (launch, stop, switch, delete) is in progress, a translucent glass overlay is applied to the instance card and all interactive buttons are disabled; the active action button renders an inline animated spinner (`animate-spin`) with color-coded progress feedback to prevent double-clicks and communicate clearly that an operation is underway. (Thanks to @aukgit)
+        -   **[In-App Delete Dialog] Replace Native Window.confirm with Custom Modal**: Delete and wipe-session operations no longer trigger the Windows/OS native `confirm` dialog. A dark-glass React modal with destructive styling (warning icon, instance name, sequence number, Cancel and Confirm buttons) replaces the native prompt for a consistent in-app experience. (Thanks to @aukgit)
+        -   **[Instance Settings Modal] Icon Capsule Redesign & Horizontal Overflow Fix**: Redesigned `src/components/instances/InstanceSettingsModal.tsx`, converting verbose text into compact Lucide icon capsules (`Copy`, `FolderSync`, `Layers`, `Sliders`). Fixed "Copy Now" / "Copy Folders" button overlap with select dropdowns by adding `overflow-x-hidden` to scroll containers and enforcing `min-w-0 flex-1 truncate` on `<select>` elements to prevent long instance names from breaking layout. (Thanks to @aukgit)
+        -   **[Integration Test] Per-Instance Prompt Liveness Isolation Test**: Added isolated integration test `src-tauri/tests/per_instance_prompt_liveness_test.rs` annotated with `#[ignore]` verifying that two distinct mock instances with different data directories and workspaces return completely isolated project sets with correct process-gated liveness evaluation. (Thanks to @aukgit)
 
     *   **v4.142.0 (2026-10-04)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[macOS Installation & Gatekeeper Bypass]**: Completely resolved macOS installation failures where downloaded packages trigger Gatekeeper "Antigravity Manager Tools is damaged and can't be opened. You should move it to the Trash". Piped shell installer `install.sh` strips quarantine attributes before and after mounting (`xattr -cr`, `xattr -rd com.apple.quarantine`), dynamically discovers `.app` bundles inside DMG volumes, gracefully falls back to user `$HOME/Applications/` without requiring `sudo`, applies local ad-hoc Mach-O code-signing (`codesign --force --deep --sign -`) to satisfy AMFI validation, symlinks `agm` and `agm-alim` to `$HOME/.local/bin/`, and automatically reports detected Antigravity IDE information. (Thanks to @aukgit)
+        -   **[POSIX Stack Trace Trap & Diagnostics]**: Added a system-level POSIX `ERR` trap handler to `install.sh` and `package_dmg.sh` that captures command name, exit code, line number, and function call stack traces upon any failure. (Thanks to @aukgit)
+        -   **[macOS Process Execution & Argument Ordering]**: Fixed argument ordering in `src-tauri/src/modules/process.rs` where `--new-window` was previously passed to `/usr/bin/open` before `--args`, triggering `open: unrecognized option '--new-window'`. Centralized arguments via `format_macos_open_args`, ensuring application parameters and window options strictly follow `--args`. Enhanced discovery to probe `Contents/MacOS/` binaries and integrated macOS Spotlight `mdfind` query fallback. (Thanks to @aukgit)
+        -   **[macOS Instance Switching & Launcher Parity]**: Enhanced `launch_instance_inner_with_extra_workspaces` in `src-tauri/src/modules/instance.rs` to distinguish between `.app` application bundles and launcher shell scripts (`Command::new`), ensuring cloned instances launch reliably without `open -a` rejection. Achieved full parity with Windows/Linux by initializing `.gemini` home folders, writing keyring bypass markers, and pre-seeding `app_storage.json` (`ide-install-wizard-shown: true` and account binding) on macOS, while logging backtraces on process failures. (Thanks to @aukgit)
+        -   **[First-Time IDE Discovery & Background Integration]**: Implemented `discover_and_persist_initial_ide_info()` and integrated it on a background thread during application startup in `src-tauri/src/lib.rs`, proactively detecting Antigravity IDE across running processes, standard paths, user applications, and Spotlight on first startup, persisting the verified path to `gui_config.json` with rich diagnostic logging and stack traces. (Thanks to @aukgit)
+        -   **[Repair Utility & DMG Packaging]**: Overhauled `scripts/Fix_Damaged.command` with bilingual output, dynamic bundle discovery across local and system paths, user-level quarantine stripping with graceful `sudo` fallback, and ad-hoc codesigning. Updated `scripts/package_dmg.sh` to package the repair utility directly inside distributable DMGs. (Thanks to @aukgit)
+        -   **[Clone Dialog Mode High-Contrast UI & Color Overhaul]**: Redesigned the "Duplicate / Clone Profile" modal in both `src/pages/Instances.tsx` and `src/components/navbar/InstanceSelector.tsx`. Replaced washed-out, muddy `bg-base-100/50` gray backgrounds in dark mode with high-contrast Deep Orbit navy styling (`#081a29` modal background, `#0c283f` with `border-cyan-400` for active selection, and `#061724` with `#14344d` border for unselected options). Replaced verbose text with Lucide icons (`Layers`, `Sliders`, `FolderSync`, `Check`), polished checkbox indicators, and optimized typography for superior readability and aesthetic consistency. (Thanks to @aukgit)
 
     *   **v4.141.0 (2026-10-04)**:
         -   **[macOS Installer & Gatekeeper Quarantine]**: Resolved macOS installation failure where downloaded packages or apps were blocked by Gatekeeper with "Antigravity Manager Tools is damaged and can't be opened. You should move it to the Trash". Piped shell installer `install.sh` now clears quarantine attributes before and after mounting (`xattr -cr`), dynamically discovers `.app` bundles inside DMG volumes, falls back to user-writable `$HOME/Applications/` without requiring `sudo`, applies local ad-hoc Mach-O code-signing (`codesign --force --deep --sign -`) to satisfy AMFI validation, symlinks `agm` and `agm-alim` to `$HOME/.local/bin/`, and automatically reports detected Antigravity IDE information during first-time installation. (Thanks to @aukgit)
@@ -814,104 +155,171 @@
         -   **[First-Time IDE Discovery & Startup Integration]**: Implemented `discover_and_persist_initial_ide_info()` and integrated it into the application `setup()` hook in `src-tauri/src/lib.rs`, proactively detecting Antigravity IDE across running processes, standard paths, user applications, and Spotlight on first startup, persisting the verified path to `gui_config.json` with rich diagnostic logging and stack traces. (Thanks to @aukgit)
         -   **[Repair Utility & DMG Packaging]**: Overhauled `scripts/Fix_Damaged.command` with bilingual output, dynamic bundle discovery across local and system paths, user-level quarantine stripping with graceful `sudo` fallback, and ad-hoc codesigning. Updated `scripts/package_dmg.sh` to package the repair utility directly inside distributable DMGs. (Thanks to @aukgit)
 
-
     *   **v4.140.0 (2026-10-04)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[Auto-Switcher] Multi-Instance Low-Quota Failover & Candidate Isolation**:
+            -   **Description**: Completely eliminated a critical flaw in `check_and_rotate_with_options` where accounts with depleted quotas (such as `Gemini 3.1 Pro (High)` sitting at 6%) were erroneously skipped with `continue` when their quota reset boundary had passed (`is_period_finished`). Guaranteed that low-quota conditions (`<= threshold_percent`) unconditionally trigger failover rotation regardless of reset timestamps. Isolated candidate account evaluations via dedicated `calculate_candidate_quota` to prevent false disqualifications from unrelated depleted models, locked candidate `instance_id` to the depleted instance for smooth in-place rotation, and dynamically tracked allocated candidate accounts across multi-instance iteration to prevent duplicate bindings. (Thanks to @aukgit)
+        -   **[Prompt Continuity] Universal Async 5-Second Post-Launch Prompt Restoration**:
+            -   **Description**: Eliminated all lingering synchronous blocking waits (`wait_for_instance_prompt_channel`, `sleep(7s)`) across `integration.rs`, `auto_switcher.rs`, and `instance.rs`. Prompt re-injection, backup dispatch, and channel restoration now spawn as a detached Tokio background task executing after an exact 5-second post-launch delay, delivering instant responsiveness without UI or command latency. (Thanks to @aukgit)
+        -   **[Daemon Engine] 3-Second Startup Acceleration & 5-Second Telemetry Ticker**:
+            -   **Description**: Reduced the auto-switcher startup stabilization delay from 60 seconds to 3 seconds, enabling immediate proactive checks for active instances upon application launch. Accelerated daemon status tick events from 30 seconds to 5 seconds for smooth, real-time frontend countdown synchronizations (`[⏱ {countdown}s Next Check]`). (Thanks to @aukgit)
+        -   **[Testing & Quality] Extended Isolated Local End-to-End Test Suite**:
+            -   **Description**: Extended `src-tauri/tests/auto_switcher_e2e_test.rs` with test cases verifying that period-finished boundaries do not suppress low-quota rotations and that candidate accounts with secondary depleted models are not falsely disqualified, strictly protected with `#[ignore]` attributes to run only on demand and never in CI/CD. (Thanks to @aukgit)
 
     *   **v4.139.0 (2026-10-04)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[Auto-Switcher] Quota Threshold Evaluation Fix & Unbanned Models**:
+            -   **Description**: Removed outdated hardcoded filters banning models containing `3.0` and `3.1` in `auto_switcher.rs`, restoring `Gemini 3.1 Pro (High)` for quota monitoring and candidate selection. Updated `evaluate_account_period_status` to evaluate the lowest remaining quota bottleneck across all actively consumed models (<100%), immediately triggering account rotation when `Gemini 3.1 Pro` drops to 6%. Lowered Google quota interval floor to 10s so configured caution (60s) and critical (40s) intervals are properly honored. (Thanks to @aukgit)
+        -   **[Telemetry & Daemon] Daemon Next-Check Countdown & Real-Time Status**:
+            -   **Description**: Persisted `next_check_timestamp`, `check_interval_seconds`, and `current_stage` in `AutoSwitcherRuntimeState`, exposed `get_auto_switcher_daemon_status` Tauri command, and integrated a live ticking countdown pill (`[⏱ {countdown}s Next Check]`) with stage status badges in the Instances page toolbar and Auto Switcher settings card. (Thanks to @aukgit)
+        -   **[Instance Dashboard] Recent & Running Projects with Double-Click Deep Link**:
+            -   **Description**: Rendered active and recent project chips on instance cards below the executable path (configurable 1–3 projects, default 3) with `RUNNING` indicators and turn counts. Double-clicking any project chip immediately opens `PromptTreeViewModal` auto-focused and expanded on that project. (Thanks to @aukgit)
+        -   **[Card Density] Normal vs Compact Card Density Sizing Options**:
+            -   **Description**: Added a card density toggle (`[Normal Cards]` vs `[Compact Cards]`) in the toolbar with adaptive 5–6 column grid layouts and compact card padding (`p-2.5`) to monitor more running instances simultaneously. (Thanks to @aukgit)
+        -   **[Prompt Continuity] Async 5-Second Post-Launch Prompt Restoration & Scope Fix**:
+            -   **Description**: Replaced the previous 14-second synchronous blocking freeze with an asynchronous 5-second post-launch prompt restoration task, cleanly preserving variables scope and passing Clippy and cargo compilation. (Thanks to @aukgit)
+        -   **[Testing & Quality] Isolated Local End-to-End Test Suite**:
+            -   **Description**: Added `src-tauri/tests/auto_switcher_e2e_test.rs` covering threshold failover triggers, prompt snapshotting, and 5-second post-launch restoration, strictly isolated with `#[ignore]` so it never runs during CI/CD. (Thanks to @aukgit)
 
     *   **v4.138.0 (2026-10-04)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[Prompt Inspector] Running Instance & Conversation Targeted Auto-Selection**:
+            -   **Description**: When opening `PromptTreeViewModal` on an instance, the modal automatically detects active running projects and conversations, expanding solely the targeted project and conversation nodes and selecting the running prompt turn in the inspection pane. If no prompt is currently running, it auto-expands the primary active project and selects its latest conversation, completely eliminating blind mass-expansion of all 29+ projects. (Thanks to @aukgit)
+        -   **[Auto-Sync Engine] Configurable Background Auto-Sync Interval with 15s Safety Floor**:
+            -   **Description**: Added a configurable Sync Interval dropdown (`15s`, `30s`, `1m`, `2m`, `Off`) within the header segmented toolbar capsule beside `[Refresh]`, with a strict safety floor of 15 seconds. Background polling queries `get_project_conversation_tree` with `force: true` to bypass SQLite 60-second disk caching, silently updating the tree without full-screen loading spinners, disrupting scroll position, or discarding dirty prompt textarea input. (Thanks to @aukgit)
+        -   **[Tree Organization] Stale & Empty Prompts Demotion to Bottom Group**:
+            -   **Description**: Implemented intelligent stale/empty conversation detection (`isStaleOrEmptyConversation`), demoting old or untitled empty prompt turns to the bottom of each project tree under a collapsible `📁 Archived / Stale Prompts ({count})` group, while keeping active running prompts strictly immune and anchored at the top. (Thanks to @aukgit)
+        -   **[Project Archive] Per-Instance Project Archive / Less Favorite (Thumbs Down) Toggle**:
+            -   **Description**: Added an instance-scoped Archive / Less Favorite toggle button (`Archive` / `ArchiveRestore` icon) on project rows. Archiving persists in `localStorage` under `agm_archived_projects_{instanceId}` and automatically unpins the project, collapsing archived projects into a bottom `📁 Archived Projects ({count})` section without modifying filesystem folders or affecting other instances. Added an `[Archived ({count})]` filter pill for quick access and unarchiving. (Thanks to @aukgit)
+        -   **[Instance Dashboard] Real-Time Active Prompt Indicator & Action Grid Symmetry**:
+            -   **Description**: Added an active `Prompt Active` badge in the instance card header linking directly to `PromptTreeViewModal` when background prompts are running, while preserving full alignment across the 6-column action grid in Row 2. (Thanks to @aukgit)
 
     *   **v4.137.0 (2026-10-04)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[Backend & OS Window Title] Standardized Instance Window Title Formatting**:
+            -   **Description**: Implemented `compute_ide_ending_sequence` and `compute_instance_window_title` in `src-tauri/src/modules/instance.rs`. Enforced strict window title formatting starting with `#{sequence} {instance_name} - {ide_ending_sequence}` (e.g. `#1 Default - Antigravity`, `#2 8136 - antigravity-8136`) across Windows, macOS, and Linux. Automatically injected into `<data_dir>/User/settings.json` across instance creation, duplication, renaming, launching, and startup registry synchronization. (Thanks to @aukgit)
+        -   **[Instances UI] 6-Column Card Action Grid & Bottom CSS3 Hover Glow Animation**:
+            -   **Description**: Standardized instance card Row 2 action buttons into a rigid 6-column grid (`grid grid-cols-6 gap-1 w-full`) with an invisible placeholder for `#1 Default`'s non-deletable slot, ensuring `[Clone]` and `[Executable]` maintain identical horizontal positions across all cards. Removed the heavy top color bar and relocated the accent indicator to a sleek bottom line with smooth CSS3 hover expansion and ambient glow animation (`group-hover:scale-x-100 group-hover:opacity-100`). (Thanks to @aukgit)
+        -   **[Prompt Inspector] Portal Body Stacking, Fullscreen Mode & Header Fix**:
+            -   **Description**: Mounted `PromptTreeViewModal` directly to `document.body` via React `createPortal` with elevated `z-[300]` stacking, resolving header clipping from the sticky navbar and removing ad-hoc margin hacks. Added a dedicated `[Full]` / `[Exit]` toggle button for immersive edge-to-edge full-screen inspection and editing. (Thanks to @aukgit)
+        -   **[Project Tree] Inline Single-Project Refresh & Pinning Mechanism**:
+            -   **Description**: Added inline `RotateCw` (instant cache-bypass refresh) and `Pin` (pin to top) buttons beside each project row in the tree view. Persisted pinned project IDs per instance in `localStorage` (`agm_pinned_projects_{instance_id}`). (Thanks to @aukgit)
+        -   **[Prompt Layering] Multi-Tier Prioritization & Search Filter Pills**:
+            -   **Description**: Implemented intelligent multi-tier sorting: Pinned projects first -> Actively running projects -> Recent activity timestamp -> Alphabetical name, with running conversations anchored to the top of each project tree. Added 5 quick filter pills under the search bar: `[All]`, `[Running]`, `[Latest Conv]`, `[Latest Prompt]`, and `[Pinned]`. (Thanks to @aukgit)
+        -   **[Prompt Actions] Multi-Mode Copy, Image Export & Confirmation Suffix Dropdown**:
+            -   **Description**: Added "Copy Text" (clean text only), "Copy With Images" (verbatim prompt), and "Save Images" (downloads extracted images to disk). Added a Confirmation Suffix dropdown with presets (`Is it done?`, `Is it released?`, `Are you sure about it?`, etc.) appended on resend. Upgraded running indicator to an animated pulse badge with real-time elapsed ticker and matched instance PID. (Thanks to @aukgit)
 
     *   **v4.136.0 (2026-10-04)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[UI & Components] Fluid Water-Drain Progress Bar & Milestone Checkpoints**:
+            -   **Description**: Implemented an aesthetic, fluid water-drain styled progress bar component (`WaterDrainProgressBar`) featuring dual-stop gradient tones (`#1af18d` leading hue to `#12b27d` peak hue), inline milestone checkmark nodes (`[25, 50, 75, 100]`), smooth fluid shimmer, and a compact 18px height footprint without bloated padding. Integrated across account quota badges (`QuotaItem`), instance cards, and list tables (`InstanceTable`). (Thanks to @aukgit)
+        -   **[Top Header & Navigation] Navbar Preferences Segmented Capsule & 3 Direct Icons**:
+            -   **Description**: Reorganized `NavSettings` preferences into a single 3-segment pill capsule (`[Quick Clean] | [Theme Switcher] | [Language]`), eliminating disjointed floating buttons. Restructured `NavMenu` into 3 direct route icon buttons side-by-side (`Accounts`, `Instances`, `Settings`) followed by a compact hamburger dropdown containing remaining navigation paths without duplicating the 3 direct routes. (Thanks to @aukgit)
+        -   **[Instance Management] Deep Settings & Workspace Replication with Buffer Persistence**:
+            -   **Description**: Added a single combined "Copy Both (Settings & Workspaces)" action button and a split "Paste Both / Paste Settings Only / Paste Workspaces Only" dropdown button to `InstanceSettingsModal`. Persisted clipboard copy buffer (`agm_instance_clipboard_buffer`) into `localStorage` across project views. Formatted Target Profile dropdown with sequence numbers, profile names, and `antigravity-{id}` suffixes. (Thanks to @aukgit)
+        -   **[Prompt Inspector] Prompt Tree View 3-Layer Hierarchy, Markdown Preview & SQLite Caching**:
+            -   **Description**: Resolved modal heading overlap bug (`z-[200]` and top margin offset). Built a 3-layer collapsible tree view (`Project -> Conversation -> Prompt`) with intelligent grouping of untitled/empty conversations (`Untitled Conversations ({count})`). Added Markdown Preview (500-word truncation with "Show All" toggle), Raw View, and direct Textarea Edit mode. Renamed inspector action button to "Full" with tooltip, added direct "Resend" and "Enqueue" actions, and integrated high-speed SQLite split-DB caching (`prompt_tree_cache`) in `repo_prompts.db` with 60s TTL. (Thanks to @aukgit)
+        -   **[Prompt Engine & Lifecycle] FIFO Ordering & Multi-Task Queue Safeguard**:
+            -   **Description**: Enforced strict FIFO ordering (`ORDER BY created_at ASC LIMIT 1`) in `check_and_dispatch_enqueued_prompts`. Fixed prompt drop bug in `resend_running_commands_for_instance` when workspaces have multiple queued prompts by retaining subsequent prompts in `queued` status. Added dynamic process detection and terminal state bypass in `is_prompt_running_for_project` to eliminate false 120-second cooldown blocks. (Thanks to @aukgit)
+        -   **[CLI & Parity] Theme Setting & Instance Settings Sync Commands**:
+            -   **Description**: Added `agm theme set <theme-id> [--instance <id>|--all]` and `agm instance sync-settings <src> <target>` in `agm.rs` for parity across GUI and CLI binaries. (Thanks to @aukgit)
 
     *   **v4.135.0 (2026-10-04)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[Theming & Visual Design] WP-Exam Themes & Colors Ingestion (18 Themes Total)**:
+            -   **Description**: Ingested 8 rich, production-grade themes from WP-Exam into `THEME_PALETTES` (bringing total catalogue themes to 18): `Green Choice` (Emerald eco-luxury light), `Green Choice Dark` (botanical dark), `Clean Wide` (vivid indigo and deep slate light), `Riseup Gold` (warm gold and midnight navy dark), `Antigravity Dracula` (neon green & deep purple dark), `Letterly Purple` (electric indigo & violet dark), `Obsidian Cyan` (VS Code obsidian slate & cyan neon dark), and `Navy Gold` (dark navy gold). (Thanks to @aukgit)
+        -   **[Top Header UI] On-The-Fly Theme Switcher beside Menu Dropdown**:
+            -   **Description**: Implemented a sleek, non-intrusive on-the-fly theme switcher (`ThemeSwitcherDropdown`) mounted directly beside the central route menu (`NavMenu`) in `Navbar.tsx`. Features a rounded pill trigger with active dual-gradient preview swatch, palette name, chevron indicator, and an interactive popover card with 18 clickable themes adhering strictly to 5–6px (`rounded-[5px]`) corner radii and coordinated via `agm:dropdown-open` event bus. Enables millisecond-level instant theme switching across all views without requiring settings navigation or reloads. (Thanks to @aukgit)
+        -   **[CSS & Settings] Universal Palette Custom Properties & ThemePicker Scaling**:
+            -   **Description**: Added `html[class*="palette-"]` wildcard styles to `src/App.css` and mapped variables (`--bg`, `--surface`, `--primary`, `--fg`) to guarantee seamless dark/light surface overrides. Scaled the Settings `ThemePicker.tsx` grid to a 6-column layout with 5–6px corner radii. (Thanks to @aukgit)
 
     *   **v4.134.0 (2026-10-04)**:
-        -   **[Release CI] 跨平台发布包完整性修复**:
-            -   **Description**: 修复 GitHub Actions 发布流程中的产物匹配模式，确保 Windows 安装包（`agm-alim-setup.exe`）、macOS（`.dmg`）及 Linux（`.deb` / `.AppImage`）在发布流程中完整下载并上传至 GitHub Releases。 (Thanks to @aukgit)
-
+        -   **[Release CI] Multi-Platform Release Asset Packaging Fix**:
+            -   **Description**: Fixed artifact download pattern in GitHub Actions release workflow to ensure all cross-platform assets (Windows NSIS setup `.exe`, macOS `.dmg`, Linux `.deb` / `.AppImage`) are reliably bundled and published to official GitHub Releases for frictionless one-liner installation. (Thanks to @aukgit)
 
     *   **v4.133.0 (2026-10-04)**:
-        -   **[UI & Theming] 账号列表边框分组、VS Code 渐变色与 5-6px 圆角规范**:
-            -   **Description**: 重构 Accounts 页面表格样式，增加行间分割边框（`border-b border-slate-200/80 dark:border-slate-800/80`）与 VS Code 暗色高亮行，将配额进度条升级为 VS Code 蓝绿青渐变（`bg-gradient-to-r from-teal-500 via-cyan-500 to-sky-500`），全局按钮圆角统一规范为 5-6px。 (Thanks to @aukgit)
-        -   **[Backend & Secrets] Supabase 密钥目录自动探测与加载**:
-            -   **Description**: 支持自动扫描 `repo-secrets/03-supabase/` 凭据并自动完成 Base64 解码与服务端点注入，实现免配置即用。 (Thanks to @aukgit)
-        -   **[Account Isolation] 分布式租约锁与账号使用冷却期**:
-            -   **Description**: 基于 Supabase 分布式租约锁（1800s-3600s TTL）防止多实例或跨机器并发争抢同一账号，并在设置中提供可配置的账号复用冷却时间（默认 60 分钟），智能过滤近期使用账号并在全冷却时安全回退。 (Thanks to @aukgit)
-        -   **[Instances UI] 实例表格合并紧凑化与卡片 4 列布局**:
-            -   **Description**: 合并配置名称与邮箱列，截断长路径显示，提示词按钮归入操作栏，消除横向滚动；卡片模式重构为每行 4 列紧凑排列与双行工具栏，修复轮换最佳按钮提示与内边距，并将 Audit 按钮软化为 VS Code 岩板灰质感配色。 (Thanks to @aukgit)
-        -   **[CLI & Parity] Supabase 命令行完整对齐**:
-            -   **Description**: 提供 `agm supabase set-config` 以及 `antigravity-manager supabase [status|sync|list-leases|test]` 完整命令行管理支持。 (Thanks to @aukgit)
-
+        -   **[UI & Theming] Accounts Table Borders, Subtle Grouping & VS Code Quota Gradients**:
+            -   **Description**: Refined Accounts table styling with clean row borders (`border-b border-slate-200/80 dark:border-slate-800/80`), subtle table container styling, and VS Code dark editor row hover highlight (`hover:bg-slate-50/80 dark:hover:bg-[#0f273d]/60` with `border-l-blue-500/70` accent indicator), eliminating aggressive pitch-black and bright yellow contrasts. Upgraded quota progress bars with professional VS Code teal/cyan/sky gradients (`bg-gradient-to-r from-teal-500 via-cyan-500 to-sky-500`) over dark track backgrounds (`bg-slate-200 dark:bg-slate-800/80`), and softened quota percentage badges to muted cyan (`text-cyan-600 dark:text-cyan-400`). (Thanks to @aukgit)
+        -   **[Backend & Secrets] Supabase Repo-Secrets Auto-Discovery Ladder**:
+            -   **Description**: Implemented an automatic discovery ladder (`candidate_repo_secrets_paths()`) probing `D:/work/repo-secrets/03-supabase/01-own/supabase-credentials.json` and `02-lovable/` (along with `REPO_SECRETS_DIR` and cross-platform relative paths). Automatically decodes Base64 payloads, normalizes endpoint URLs, assigns role priorities, and auto-seeds into `supabase_config.json` upon launch or CLI invocation without requiring manual setup. (Thanks to @aukgit)
+        -   **[Account Isolation] Distributed Lease Locking & Configurable Email Cooldown Window**:
+            -   **Description**: Enforced distributed lease locks across instances and remote cluster machines via Supabase `workspace_leases` with extended protective TTLs (1800s–3600s). Added configurable account reuse cooldown (`account_cooldown_minutes: u32`, default: 60 minutes) to `AutoProfileSwitcherConfig` with UI selector in Settings. Partitioned candidate accounts into non-cooldown and cooldown pools in `auto_switcher.rs`, gracefully falling back to the oldest cooldown account only when all eligible accounts are cooling down to prevent multi-instance contention and system deadlocks. (Thanks to @aukgit)
+        -   **[Instances UI] Table Consolidation & Horizontal Scroll Elimination**:
+            -   **Description**: Merged separate "Profile Name" and "Bound Account" table columns into a single unified `Profile & Account` column displaying profile badge and bound email with status dot indicator. Truncated location paths to ending segments (`...\<parent>\<leaf>`) with hover tooltips and clipboard copy actions. Moved the standalone Prompts button into the table Actions segmented capsule to eliminate horizontal scrolling at standard desktop resolutions (1280px+). (Thanks to @aukgit)
+        -   **[Card Mode & Buttons] Compact 4-per-Row Grid & 5–6px Button Radius Standard**:
+            -   **Description**: Upgraded Card Mode layout to render 4 compact cards per row on large viewports (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3`). Reorganized card action buttons into 2 clean structured toolbar rows (Row 1: Stop/Launch, Switch, FF, Audit, Sync; Row 2: Prompts, Settings, Clone, Executable, Wipe, Delete). Standardized all button corner radii across Accounts and Instances to 5–6px (`rounded-[5px]`). Fixed "Rotate to Next Best" header button with balanced padding (`px-3 py-1.5`) and contextual tooltip showing active instance target. Softened Audit button colors to neutral VS Code slate theme (`bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300`). (Thanks to @aukgit)
+        -   **[CLI & Parity] Headless Supabase Configuration & Status Parity**:
+            -   **Description**: Added `agm supabase set-config [--cooldown <minutes>] [--interval <seconds>] [--alias <alias>]` to configure cooldown and heartbeat settings from terminal. Added `antigravity-manager supabase [status|sync|list-leases|test]` subcommand routing in `modules/cli.rs` for full parity across GUI and CLI binaries. (Thanks to @aukgit)
 
     *   **v4.132.0 (2026-10-04)**:
-        -   **[UI & Theming] 账号列表边框分组、VS Code 渐变色与 5-6px 圆角规范**:
-            -   **Description**: 重构 Accounts 页面表格样式，增加行间分割边框（`border-b border-slate-200/80 dark:border-slate-800/80`）与 VS Code 暗色高亮行，将配额进度条升级为 VS Code 蓝绿青渐变（`bg-gradient-to-r from-teal-500 via-cyan-500 to-sky-500`），全局按钮圆角统一规范为 5-6px。 (Thanks to @aukgit)
-        -   **[Backend & Secrets] Supabase 密钥目录自动探测与加载**:
-            -   **Description**: 支持自动扫描 `repo-secrets/03-supabase/` 凭据并自动完成 Base64 解码与服务端点注入，实现免配置即用。 (Thanks to @aukgit)
-        -   **[Account Isolation] 分布式租约锁与账号使用冷却期**:
-            -   **Description**: 基于 Supabase 分布式租约锁（1800s-3600s TTL）防止多实例或跨机器并发争抢同一账号，并在设置中提供可配置的账号复用冷却时间（默认 60 分钟），智能过滤近期使用账号并在全冷却时安全回退。 (Thanks to @aukgit)
-        -   **[Instances UI] 实例表格合并紧凑化与卡片 4 列布局**:
-            -   **Description**: 合并配置名称与邮箱列，截断长路径显示，提示词按钮归入操作栏，消除横向滚动；卡片模式重构为每行 4 列紧凑排列与双行工具栏，修复轮换最佳按钮提示与内边距，并将 Audit 按钮软化为 VS Code 岩板灰质感配色。 (Thanks to @aukgit)
-        -   **[CLI & Parity] Supabase 命令行完整对齐**:
-            -   **Description**: 提供 `agm supabase set-config` 以及 `antigravity-manager supabase [status|sync|list-leases|test]` 完整命令行管理支持。 (Thanks to @aukgit)
-
-
-    *   **v4.131.0 (2026-10-04)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[UI & Theming] Accounts Table Borders, Subtle Grouping & VS Code Quota Gradients**:
+            -   **Description**: Refined Accounts table styling with clean row borders (`border-b border-slate-200/80 dark:border-slate-800/80`), subtle table container styling, and VS Code dark editor row hover highlight (`hover:bg-slate-50/80 dark:hover:bg-[#0f273d]/60` with `border-l-blue-500/70` accent indicator), eliminating aggressive pitch-black and bright yellow contrasts. Upgraded quota progress bars with professional VS Code teal/cyan/sky gradients (`bg-gradient-to-r from-teal-500 via-cyan-500 to-sky-500`) over dark track backgrounds (`bg-slate-200 dark:bg-slate-800/80`), and softened quota percentage badges to muted cyan (`text-cyan-600 dark:text-cyan-400`). (Thanks to @aukgit)
+        -   **[Backend & Secrets] Supabase Repo-Secrets Auto-Discovery Ladder**:
+            -   **Description**: Implemented an automatic discovery ladder (`candidate_repo_secrets_paths()`) probing `D:/work/repo-secrets/03-supabase/01-own/supabase-credentials.json` and `02-lovable/` (along with `REPO_SECRETS_DIR` and cross-platform relative paths). Automatically decodes Base64 payloads, normalizes endpoint URLs, assigns role priorities, and auto-seeds into `supabase_config.json` upon launch or CLI invocation without requiring manual setup. (Thanks to @aukgit)
+        -   **[Account Isolation] Distributed Lease Locking & Configurable Email Cooldown Window**:
+            -   **Description**: Enforced distributed lease locks across instances and remote cluster machines via Supabase `workspace_leases` with extended protective TTLs (1800s–3600s). Added configurable account reuse cooldown (`account_cooldown_minutes: u32`, default: 60 minutes) to `AutoProfileSwitcherConfig` with UI selector in Settings. Partitioned candidate accounts into non-cooldown and cooldown pools in `auto_switcher.rs`, gracefully falling back to the oldest cooldown account only when all eligible accounts are cooling down to prevent multi-instance contention and system deadlocks. (Thanks to @aukgit)
+        -   **[Instances UI] Table Consolidation & Horizontal Scroll Elimination**:
+            -   **Description**: Merged separate "Profile Name" and "Bound Account" table columns into a single unified `Profile & Account` column displaying profile badge and bound email with status dot indicator. Truncated location paths to ending segments (`...\<parent>\<leaf>`) with hover tooltips and clipboard copy actions. Moved the standalone Prompts button into the table Actions segmented capsule to eliminate horizontal scrolling at standard desktop resolutions (1280px+). (Thanks to @aukgit)
+        -   **[Card Mode & Buttons] Compact 4-per-Row Grid & 5–6px Button Radius Standard**:
+            -   **Description**: Upgraded Card Mode layout to render 4 compact cards per row on large viewports (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3`). Reorganized card action buttons into 2 clean structured toolbar rows (Row 1: Stop/Launch, Switch, FF, Audit, Sync; Row 2: Prompts, Settings, Clone, Executable, Wipe, Delete). Standardized all button corner radii across Accounts and Instances to 5–6px (`rounded-[5px]`). Fixed "Rotate to Next Best" header button with balanced padding (`px-3 py-1.5`) and contextual tooltip showing active instance target. Softened Audit button colors to neutral VS Code slate theme (`bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300`). (Thanks to @aukgit)
+        -   **[CLI & Parity] Headless Supabase Configuration & Status Parity**:
+            -   **Description**: Added `agm supabase set-config [--cooldown <minutes>] [--interval <seconds>] [--alias <alias>]` to configure cooldown and heartbeat settings from terminal. Added `antigravity-manager supabase [status|sync|list-leases|test]` subcommand routing in `modules/cli.rs` for full parity across GUI and CLI binaries. (Thanks to @aukgit)
 
     *   **v4.130.0 (2026-10-04)**:
-        -   **[Stability] Startup Crash & White Screen Resolution (PR #499)**:
+        -   **[Stability] Startup Crash & White Screen Resolution**:
             -   **Description**: Resolved an immediate startup crash (`0xc0000409`) where synchronous `tokio::spawn` calls in Tauri's `.setup()` hook panicked on non-Tokio worker threads. Migrated background prompt queue and instance PID quota scheduler daemons to `tauri::async_runtime::spawn`, and blocking queries to `tauri::async_runtime::spawn_blocking`, ensuring the GUI window initializes and renders reliably on launch without hanging or crashing. (Thanks to @aukgit)
-
+        -   **[Core & Commands] Asynchronous Command Safety**:
+            -   **Description**: Replaced ad-hoc `tokio::runtime::Runtime::new()` and `tokio::spawn` calls in instance management commands with `tauri::async_runtime::block_on` and `tauri::async_runtime::spawn` to guarantee execution safety across both GUI and CLI contexts. (Thanks to @aukgit)
 
     *   **v4.129.0 (2026-10-03)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[Audit & History] Instance Action Toolbar Audit Option & Switch History Modal**:
+            -   **Description**: Added a dedicated `Audit` button to instance card action toolbars and list view pill capsules opening the new `InstanceAuditTrailModal` to display total switch counts, the last 2–3 account transitions (`From Account` → `To Account`), reasons, timestamps, and full payloads. (Thanks to @aukgit)
+        -   **[Core & Lifecycle] Multi-Step Switch Lifecycle Tracking**:
+            -   **Description**: Instrumented instance rotation with 4 explicit verified steps in SQLite: 1) Prompts backup (projects captured, prompt count), 2) Process reset (terminated PIDs, lock cleanup, auth swap), 3) Prompts restore (resume task generation, channel stabilization), 4) Post-restore verification confirming active session restoration succeeded. (Thanks to @aukgit)
+        -   **[Sync & Quotas] Live PID Detection & 10-Minute Quota Sync Engine**:
+            -   **Description**: Added user-facing `Sync` button on instance cards and top toolbar to detect live running Antigravity PIDs, read authenticated accounts from `state.vscdb`, update bindings, and fetch fresh Gemini quotas, complemented by an automatic 10-minute background scheduler daemon. (Thanks to @aukgit)
+        -   **[Fix] Default Instance Switch Audit Invariants**:
+            -   **Description**: Resolved early drop bug during default instance rotation to ensure audit tasks complete cleanly with canonical `"default"` instance ID recorded in history. (Thanks to @aukgit)
 
     *   **v4.128.1 (2026-10-03)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[Build & Core] Rust Compilation Fixes & Type Alignment**:
+            -   **Description**: Fixed Rust compilation errors in `instance.rs` and `account.rs` by properly converting `get_antigravity_executable_path` `PathBuf` to `String`, resolved `cannot move out of type AuditTask` in `task_history_db.rs` by cloning `task.id`, and enhanced CLI E2E test parsing. (Thanks to @aukgit)
+        -   **[Supabase] Workspace Lease & Conflict Prevention Table**:
+            -   **Description**: Added real-time Workspace Lease and Cluster Lock table to the Supabase tab with live node status, profile name, expiration countdown, and click-to-unmask email toggle. (Thanks to @aukgit)
+        -   **[Accounts] Uniform Segmented Pill Capsule Toolbar**:
+            -   **Description**: Grouped Focus, +, Refresh, Warm, and Show All Quotas into contiguous segmented pill capsules (`rounded-full`, dark glass styling) matching Instances aesthetic. (Thanks to @aukgit)
 
     *   **v4.128.0 (2026-10-03)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
+        -   **[Audit] Pagination & Two-Tier SQLite Acceleration**:
+            -   **Description**: Added 100/200 item page size selection backed by a two-tier SQLite cache (`hot_tasks_cache` in `task_index.db`) for instant render, and enriched account switch rows with `From → To` transition arrays, instance ID, IDE type, machine alias, IDE path, and switch reason. (Thanks to @aukgit)
+        -   **[Navigation] First-Class Supabase Top-Level Tab**:
+            -   **Description**: Promoted Supabase sync and cluster governance to a top-level tab alongside Email and Audit, offering dual endpoints, workspace leases, and cross-DB migration. (Thanks to @aukgit)
+        -   **[Instances] Card & List View Toggle with Prompt Tree Inspector**:
+            -   **Description**: Implemented Card vs. List view modes with `InstanceTable`, expanded search across name, email, PID, and status, and introduced `PromptTreeViewModal` for project/conversation inspection and prompt backup/restore. (Thanks to @aukgit)
+        -   **[Accounts & UI] Modernized Toolbar, Unmasking & Glowing Progress**:
+            -   **Description**: Added cohesive pill button capsule toolbar (Focus, +, Refresh, Warm, Show All Quotas), hover/double-click email unmasking with automatic re-mask on mouse leave, and vibrant glowing multi-stop progress gradients. (Thanks to @aukgit)
+        -   **[Proxy & Backup] URL Filtering & Audit Backup Selection**:
+            -   **Description**: Added Proxy default path rewrite toggle, enable all URLs toggle, comma-separated excluded URLs input, and full backup modal option to include or exclude audit records and task history. (Thanks to @aukgit)
+        -   **[Core & CLI] Prompt Stabilization Delay & CLI Parity**:
+            -   **Description**: Added 7.0s post-rotation prompt stabilization delay before resume task injection, structured JSON output across `agm instance ls --json` and `agm instance count --json`, and local-only E2E test suite. (Thanks to @aukgit)
 
     *   **v4.127.1 (2026-10-03)**:
         -   **[Instances & CLI] Command Formatter Helpers & Segmented Pill Invariants**:
             -   **Description**: Polished CLI instance command helpers, refined tabular formatting, and codified UI segmented pill encapsulation and headless duplication parity into project architectural invariants. (Thanks to @aukgit)
 
     *   **v4.127.0 (2026-10-03)**:
-        -   **[Instances] Unified Settings Sync, Duplication Parity & Combined Navbar Controls**:
-            -   **Description**: Duplicating an instance from UI or CLI routes through identical underlying service logic (`copy_instance_with_options`), replicating `workspaceStorage`, `state.vscdb`, `storage.json`, and database project mappings. Consolidated Quick Clean, Theme/Language preferences, and Window Controls into seamless segmented pill capsules, and introduced JSON import/export with snapshot undo/redo in Instance Settings modal. (Thanks to @aukgit)
+        -   **[Instances] Deep Settings Synchronization & Executable Auto-Discovery**:
+            -   **Description**: Added comprehensive CLI commands (`agm instance copy-settings`) and UI modal (`InstanceSettingsModal`) to synchronize theme colors, turbo mode, browser execution policy, code review, readable file, and writable folder permissions across instances with executable path auto-discovery (`--exe`). (Thanks to @aukgit)
+        -   **[Instances] Open Projects & Folder Copy Parity**:
+            -   **Description**: Added full support for copying included open workspace projects and recent folders (`workspaceStorage`, `state.vscdb`, `storage.json`) during instance duplication both via CLI (`agm instance duplicate --copy-projects`, `agm instance copy-projects`) and the UI clone modal. (Thanks to @aukgit)
+        -   **[Instances] Baseline Defaults Enforcement & Fast Toggles**:
+            -   **Description**: Added commands and fast toggles to enforce reference baseline settings (turbo mode ON, plan review always proceed) across single or all instances (`agm instance settings enforce-defaults`, `set-turbo`, `set-plan-review`). (Thanks to @aukgit)
+        -   **[UI] Header Action Button Consolidation**:
+            -   **Description**: Combined disjoint action buttons into cohesive, unified segmented pill control capsules: joined Quick Clean (`↺`) & Preferences dropdown (`🌙 EN ⌵`), and joined Window Controls (Minimize `—`, Maximize `🗗`, Close `✕`) with dark-glass styling and smooth hover highlights. (Thanks to @aukgit)
+        -   **[CLI] Instance Count & JSON Import/Export with Undo/Redo**:
+            -   **Description**: Added `agm instance count` and settings JSON export/import with UI clipboard Copy/Paste and in-memory snapshot Undo/Redo history. (Thanks to @aukgit)
 
     *   **v4.126.1 (2026-10-03)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+        -   **[Instances] Auto-Switch Instance Reopen & Rotation Lifecycle**:
+            -   **Description**: Fixed auto-profile switcher failing to reopen when the default instance reaches zero credits by preserving candidate instance IDs during evaluation and executing full cross-instance launch lifecycle. (Thanks to @aukgit)
+        -   **[Instances] Reliable Process Relaunch & Lockfile Purge**:
+            -   **Description**: Fixed default instance account switch short-circuit leaving the IDE in an Idle state after process termination. Stale lockfiles (`lockfile`, `code.lock`, `DevToolsActivePort`) are purged before restarting to prevent silent Electron launch aborts on Windows. (Thanks to @aukgit)
+        -   **[UI] Modernized Instances & Profiles Styling**:
+            -   **Description**: Redesigned Instances view with sleek dark glass styling, eliminating jarring light-gray capsules on dark theme. Upgraded Auto Profile Switcher banner to a glassmorphism card with glowing active pulse indicators, structured quota badges, and compact badge footer layout. (Thanks to @aukgit)
 
     *   **v4.126.0 (2026-10-03)**:
         -   **[Instances] Deep Clone of Settings, Themes & Projects**:
@@ -1306,12 +714,14 @@
             -   **Frontend Diagnostic Modal Suppression (`src/services/accountService.ts`)**: Added `{ _suppressGlobalModal: true }` to `syncAccountFromDb()` Tauri IPC invocation, preventing speculative background account synchronization tasks from ever triggering intrusive full-screen red error modals in the UI.
             -   **Migration Logging & Observability (`src-tauri/src/modules/migration.rs`)**: Enhanced logging in `import_all_local_accounts` to provide clear warnings when candidate Keyring or SQLite DB OAuth tokens fail refresh due to expiration or revocation.
 
+
     *   **v4.91.0 (2026-09-28)**:
         -   **[Release v4.91.0: Pure JSON Email Telemetry, Strict 100% Quota Gating & Live Google API Probes, Telegram Project Deduplication, and Resilient Installer] Zero-HTML JSON email bodies with normalized schema, strict 100% 4-hour window quota enforcement with live Google API pre-switch probes and depleted bounce prevention, Telegram `/projects` deduplicated by workspace path with worker routing `<node-alias>:<cmd>` and `/prompts` catalog, and fixed `install.ps1` exit code leakage for seamless GitMap updates (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
             -   **Pure JSON Email Telemetry & Schema Normalization (`src-tauri/src/modules/notification_hub.rs`, `src-tauri/src/modules/email_sender.rs`)**: Enforced 100% pure JSON payload bodies when email subjects contain `[JSON]`, stripping all HTML, CSS `<style>` blocks, and markdown fences. Normalized telemetry fields to `previous_email`, `predicted_email`, `selected_email`, `quota_percent`, `threshold_activated`, `machine_name`, `node_alias`, `local_ip`, `running_prompts_count`, and `timestamp`, eliminating duplicated fields (`old_email`, `new_email`, `target_email`).
             -   **Strict 100% Quota Gating & Live Google API Probing (`src-tauri/src/modules/auto_switcher.rs`, `src-tauri/src/modules/account.rs`, `src/services/instanceService.ts`, `src/stores/useInstanceStore.ts`)**: Overhauled quota evaluation to compute the strict minimum across all short buckets and non-banned models (preventing Pro 20% from being masked by Flash 100%). Candidates under 100% quota are treated as 0.0% exhausted and excluded. Mandatory live Google API quota probes (`fetch_quota_with_retry`) verify fresh capacity prior to committing switches, strictly rejecting depleted or disabled profiles without unwanted fallback loops.
             -   **Telegram Project Deduplication & Fleet Routing (`src-tauri/src/modules/telegram_inbound.rs`)**: Deduplicated Telegram `/projects` output by canonical repository path, grouping multiple conversations under single project entries with active/total conversation counts. Added `<node-alias>:<command>` and `<ip>:<command>` selector syntax to dispatch commands to specific fleet nodes, introduced `/prompts` command with slugs and ~200-word preview snippets, and enabled prompt prefix/suffix/voice concatenation.
             -   **Installer Resilience & Exit Code Fix (`install.ps1`)**: Resolved Go `cmd.Run()` failure (`exit status 1`) in GitMap updater by adding explicit `$global:LASTEXITCODE = 0; exit 0` at script termination. Added graceful fallback to retain existing verified installations if remote binary downloads fail, ensuring reliable updates across all nodes.
+
 
     *   **v4.90.0 (2026-09-28)**:
         -   **[Release v4.90.0: Account Switch 98% Simulation E2E, Parallel Prompt Backup & Restoration, Multi-VM Collision Shielding & Sandbox Lifecycle Verification] Validated end-to-end 98% simulated failover, pre-switch live API quota refresh stability probe, multi-workspace parallel prompt snapshot to split SQLite with human names & image payloads, fast-forward button delegation, automatic prompt resumption & emergency alerts, Supabase lease & IMAP collision avoidance, sandbox instance lifecycle verification, comprehensive CLI help polish, and 15.0% production standard alignment (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
@@ -1413,6 +823,7 @@
             -   **GitMap-Style Compile & Runtime Telemetry Parity (`src-tauri/src/modules/git_info.rs`, `build.rs`, `agm.rs`, `email_sender.rs`)**: Achieved 1:1 telemetry parity with GitMap. Injected `AGM_GIT_HASH`, `AGM_GIT_BRANCH`, and `AGM_LAST_RELEASE` during compilation in `build.rs` with runtime fallback in `git_info.rs`. Standardized terminal banners, `agm version`, `agm status`, and all outgoing email headers to embed exact Git metadata.
             -   **Enlarged Typography, Ubuntu Font Stack & High-Contrast White Links (`src-tauri/src/modules/email_sender.rs`)**: Overhauled HTML email styling with 28px titles, 16px body, 14-15px tables/code, and an explicit Ubuntu / Segoe UI / system-ui font stack. Styled all interactive action and target links with pure `#ffffff` text on pill badges, ensuring effortless readability across email clients.
             -   **Commands Cheat Sheet, Live Workspaces Table & Prompt Queue in CLI & Email (`src-tauri/src/bin/agm.rs`, `src-tauri/src/modules/email_sender.rs`, `repo_db.rs`)**: Integrated three comprehensive tables across both the `agm` CLI default output and idle alert emails: (1) categorized command reference with syntax examples; (2) discovered workspaces with live status, paths, and copy-pasteable email reply targets (`sub: <NODE> | proj-<id>`); (3) recent prompt tasks and in-flight queue inventory.
+
 
     *   **v4.78.0 (2026-09-27)**:
         -   **[Release v4.78.0: Multi-Channel System Update Notifications (Default Enabled), Email Remote Syntax Manual Upgrade, Zero-Loss Prompt Resumption Across Profile Switches, and Active-Only Low Credit Alerts] Automated Update Receipts via Email & Telegram, Ubuntu High-Contrast Typography, Resumption Without Reinjection Loops, and Targeted Quota Alerts**:

@@ -3,6 +3,14 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.160.0 (2026-10-06)**:
+        -   **[Awan Cloud Design Modernization, UI/UX Contrast & Global CSS3 Transitions]**:
+            -   **Design & Contrast Modernization**: Harmonized entire UI with official Awan Software specifications (`Deep Orbit #071a27`, `Cloud Field #f5faf9`, `Lift Blue #2878f0`, `Vector Green #16a97a`, `Plasma Mint #43d6a2`); resolved dark-on-dark contrast issues in instance selection, account cards, and table headers; enabled universal 250ms CSS3 transition and `.awan-glow-pulse` animations; unified Option A selected highlight with 6px amber-400 rail and high-contrast amber active pills. (Thanks to @aukgit)
+        -   **[Account Tier Badge & Startup Backfill Engine]**:
+            -   **Subscription Tier Persistence**: Added shared `TierBadge` component with explicit unknown state pill and tooltip; decoupled tier fetching from project ID; added CLI suite `agm accounts refresh-tier [--all]` with automatic background startup backfill. (Thanks to @aukgit)
+        -   **[Priority Inline Editing & Focus Viewport Target]**:
+            -   **Priority & Focus**: Added `PriorityBadge` component hiding default priority 50 with double-click inline editing; aligned Focus button to scroll directly to the selected instance's bound account under a single animation frame. (Thanks to @aukgit)
+
     *   **v4.159.0 (2026-10-06)**:
         -   **[Fleet Accounts Deployment via GitMap Integration]**:
             -   **Fleet Synchronization**: Integrated 1-click fleet account deployment in `UnifiedBackupModal`, communicating via Tauri IPC (`deploy_accounts_to_fleet`) to run `gitmap nodes deploy agm-accounts`, safely synchronizing local account configurations and auth tokens to all reachable fleet nodes with default central node isolation. (Thanks to @aukgit)

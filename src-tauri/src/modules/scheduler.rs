@@ -139,15 +139,14 @@ pub fn start_scheduler(
                     continue;
                 };
 
-                let Ok((fresh_quota, _)) =
-                    quota::fetch_quota_with_cache(
-                        &token,
-                        &acc.email,
-                        Some(&pid),
-                        Some(&acc.id),
-                        acc.quota.as_ref(),
-                    )
-                    .await
+                let Ok((fresh_quota, _)) = quota::fetch_quota_with_cache(
+                    &token,
+                    &acc.email,
+                    Some(&pid),
+                    Some(&acc.id),
+                    acc.quota.as_ref(),
+                )
+                .await
                 else {
                     continue;
                 };
@@ -315,15 +314,14 @@ pub async fn trigger_warmup_for_account(account: &Account) {
         return;
     };
 
-    let Ok((fresh_quota, _)) =
-        quota::fetch_quota_with_cache(
-            &token,
-            &account.email,
-            Some(&pid),
-            Some(&account.id),
-            account.quota.as_ref(),
-        )
-        .await
+    let Ok((fresh_quota, _)) = quota::fetch_quota_with_cache(
+        &token,
+        &account.email,
+        Some(&pid),
+        Some(&account.id),
+        account.quota.as_ref(),
+    )
+    .await
     else {
         return;
     };

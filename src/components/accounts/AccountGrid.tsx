@@ -19,12 +19,13 @@ interface AccountGridProps {
     onToggleProxy: (accountId: string) => void;
     onWarmup?: (accountId: string) => void;
     onUpdateLabel?: (accountId: string, label: string) => void;
+    onUpdatePriority?: (accountId: string, priority: number) => Promise<void> | void;
     onViewError: (accountId: string) => void;
     focusedAccountId?: string | null;
 }
 
 
-function AccountGrid({ accounts, selectedIds, refreshingIds, onToggleSelect, currentAccountId, currentAccountEmail, switchingAccountId, focusedAccountId, onSwitch, onRefresh, onViewDetails, onExport, onDelete, onToggleProxy, onViewDevice, onWarmup, onUpdateLabel, onViewError }: AccountGridProps) {
+function AccountGrid({ accounts, selectedIds, refreshingIds, onToggleSelect, currentAccountId, currentAccountEmail, switchingAccountId, focusedAccountId, onSwitch, onRefresh, onViewDetails, onExport, onDelete, onToggleProxy, onViewDevice, onWarmup, onUpdateLabel, onUpdatePriority, onViewError }: AccountGridProps) {
     const { t } = useTranslation();
 
     const isAccountCurrent = (acc: Account) => {
@@ -71,6 +72,7 @@ function AccountGrid({ accounts, selectedIds, refreshingIds, onToggleSelect, cur
                     onToggleProxy={() => onToggleProxy(account.id)}
                     onWarmup={onWarmup ? () => onWarmup(account.id) : undefined}
                     onUpdateLabel={onUpdateLabel ? (label: string) => onUpdateLabel(account.id, label) : undefined}
+                    onUpdatePriority={onUpdatePriority ? (priority: number) => onUpdatePriority(account.id, priority) : undefined}
                     onViewError={() => onViewError(account.id)}
                 />
             ))}

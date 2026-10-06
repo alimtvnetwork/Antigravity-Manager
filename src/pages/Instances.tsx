@@ -39,6 +39,8 @@ import {
 } from 'lucide-react';
 import { Gemini } from '@lobehub/icons';
 import { useTranslation } from 'react-i18next';
+import { TierBadge } from '../components/common/TierBadge';
+import { SELECTED_CARD_CLASSES, ACTIVE_PILL_CLASSES } from '../components/common/selectedState';
 import { useInstanceStore } from '../stores/useInstanceStore';
 import { useAccountStore } from '../stores/useAccountStore';
 import { useConfigStore } from '../stores/useConfigStore';
@@ -1131,10 +1133,10 @@ export default function Instances() {
                                 key={inst.config.id}
                                 ref={isActive ? activeCardRef : undefined}
                                 className={cn(
-                                    "group relative rounded-[5px] border transition-all duration-200 flex flex-col justify-between bg-white dark:bg-[#0a1e30] overflow-hidden shadow-xs backdrop-blur-xs",
+                                    "group relative rounded-[5px] border transition-all duration-200 flex flex-col justify-between overflow-hidden backdrop-blur-xs",
                                     isActive
-                                        ? "border-blue-500 shadow-lg ring-2 ring-blue-500/30 bg-blue-50/15 dark:bg-[#0c2438]"
-                                        : "border-gray-200/50 dark:border-[#15334d]/60 hover:border-gray-300/80 dark:hover:border-blue-500/40 hover:bg-slate-50/90 dark:hover:bg-[#061421]"
+                                        ? cn(SELECTED_CARD_CLASSES, "border-amber-400/50 shadow-md")
+                                        : "bg-white dark:bg-[#0a1e30] border-gray-200/50 dark:border-[#15334d]/60 hover:border-gray-300/80 dark:hover:border-blue-500/40 hover:bg-slate-50/90 dark:hover:bg-[#061421] shadow-xs"
                                 )}
                             >
                                 {/* Card Mutex Overlay when action is executing */}
@@ -1203,7 +1205,7 @@ export default function Instances() {
                                             </div>
                                             <div className="shrink-0 flex items-center gap-1">
                                                 {isActive ? (
-                                                    <span className="px-1.5 py-0.5 rounded-[5px] text-[9px] font-bold bg-blue-600 text-white shadow-xs tracking-wider">
+                                                    <span className={cn(ACTIVE_PILL_CLASSES, "text-[9px] px-1.5 py-0.2 tracking-wider")}>
                                                         Active
                                                     </span>
                                                 ) : (
@@ -1284,31 +1286,13 @@ export default function Instances() {
                                                     </span>
                                                 )}
                                             </div>
-                                            {boundAccount?.quota?.subscription_tier ? (() => {
-                                                const tier = boundAccount.quota.subscription_tier.toLowerCase();
-                                                if (tier.includes('ultra')) {
-                                                    return (
-                                                        <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[9px] font-bold shadow-xs shrink-0">
-                                                            <Gem className="w-2.5 h-2.5 fill-current" />
-                                                            ULTRA
-                                                        </span>
-                                                    );
-                                                }
-                                                if (tier.includes('pro')) {
-                                                    return (
-                                                        <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[9px] font-bold shadow-xs shrink-0">
-                                                            <Diamond className="w-2.5 h-2.5 fill-current" />
-                                                            PRO
-                                                        </span>
-                                                    );
-                                                }
-                                                return (
-                                                    <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-[#15334d] text-gray-600 dark:text-slate-300 text-[9px] font-bold shadow-xs border border-gray-200 dark:border-[#15334d] shrink-0">
-                                                        <Circle className="w-2.5 h-2.5" />
-                                                        FREE
-                                                    </span>
-                                                );
-                                            })() : null}
+                                            {boundAccount && (
+                                                <TierBadge
+                                                    tier={boundAccount.quota?.subscription_tier}
+                                                    size="xs"
+                                                    className="shrink-0"
+                                                />
+                                            )}
                                         </div>
 
                                         {/* Colorful Gemini Quota & Weekly Progress Bar */}

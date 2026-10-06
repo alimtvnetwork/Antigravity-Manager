@@ -10,9 +10,7 @@ pub struct FleetDeployResult {
 
 #[tauri::command]
 pub async fn check_gitmap_available() -> AppResult<bool> {
-    let res = std::process::Command::new("gitmap")
-        .arg("version")
-        .output();
+    let res = std::process::Command::new("gitmap").arg("version").output();
     Ok(res.map(|o| o.status.success()).unwrap_or(false))
 }
 

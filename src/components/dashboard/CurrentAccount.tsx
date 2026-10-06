@@ -1,14 +1,14 @@
-import { CheckCircle, Mail, Diamond, Gem, Circle, Tag, Lock, Clock } from 'lucide-react';
+import { CheckCircle, Mail, Tag, Lock, Clock } from 'lucide-react';
 import { Account } from '../../types/account';
 import { formatTimeRemaining } from '../../utils/format';
 import { findQuotaModel, getModelProtectionKey, getModelDisplayName, findImageQuotaModel } from '../../config/modelConfig';
+import { useTranslation } from 'react-i18next';
+import { TierBadge } from '../common/TierBadge';
 
 interface CurrentAccountProps {
     account: Account | null;
     onSwitch?: () => void;
 }
-
-import { useTranslation } from 'react-i18next';
 
 function CurrentAccount({ account, onSwitch }: CurrentAccountProps) {
     const { t } = useTranslation();
@@ -53,31 +53,7 @@ function CurrentAccount({ account, onSwitch }: CurrentAccountProps) {
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">{account.email}</span>
                     </div>
                     {/* Subscription tier */}
-                    {account.quota?.subscription_tier && (() => {
-                        const tier = account.quota.subscription_tier.toLowerCase();
-                        if (tier.includes('ultra')) {
-                            return (
-                                <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] font-bold shadow-sm shrink-0">
-                                    <Gem className="w-2.5 h-2.5 fill-current" />
-                                    ULTRA
-                                </span>
-                            );
-                        } else if (tier.includes('pro')) {
-                            return (
-                                <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[10px] font-bold shadow-sm shrink-0">
-                                    <Diamond className="w-2.5 h-2.5 fill-current" />
-                                    PRO
-                                </span>
-                            );
-                        } else {
-                            return (
-                                <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400 text-[10px] font-bold shadow-sm border border-gray-200 dark:border-white/10 shrink-0">
-                                    <Circle className="w-2.5 h-2.5" />
-                                    FREE
-                                </span>
-                            );
-                        }
-                    })()}
+                    <TierBadge tier={account.quota?.subscription_tier} size="md" className="shrink-0" />
                     {/* Custom label */}
                     {account.custom_label && (
                         <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 text-[10px] font-bold shadow-sm shrink-0">

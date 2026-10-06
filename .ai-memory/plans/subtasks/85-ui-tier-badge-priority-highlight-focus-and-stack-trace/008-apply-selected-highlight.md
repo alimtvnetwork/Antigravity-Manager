@@ -16,7 +16,7 @@ target_files:
   - src/components/accounts/AccountTable.tsx (row highlight classes ~L270-285)
   - src/components/accounts/AccountRow.tsx
   - src/components/accounts/AccountCard.tsx
-status: pending
+status: done
 ---
 
 # 008 — Apply the selected-state style everywhere

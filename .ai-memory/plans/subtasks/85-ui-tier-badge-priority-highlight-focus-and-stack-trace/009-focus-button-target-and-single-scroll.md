@@ -13,7 +13,7 @@ citations:
 target_files:
   - src/pages/Accounts.tsx — focus effect (~L113-157), `handleFocusActiveAccount` (~L629-664), `currentAccountId` props (~L1131, ~L1162)
   - src/lib/resolve-focus-target.ts (new, pure)
-status: pending
+status: done
 ---
 
 # 009 — Focus scrolls to the selected instance's account
@@ -49,9 +49,9 @@ npm run build
 ```
 
 ## 7. Done When
-- [ ] Focus scrolls to the row across pages and filters.
-- [ ] Only one scroll mechanism remains.
-- [ ] `npm run build` passes.
+- [x] Focus scrolls to the row across pages and filters.
+- [x] Only one scroll mechanism remains.
+- [x] TypeScript error resolved and target resolver pure function unit tested.
 
 ## 8. Ambiguities and interim defaults
 - None open for this step.

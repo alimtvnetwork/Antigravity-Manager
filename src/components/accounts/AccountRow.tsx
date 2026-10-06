@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ArrowRightLeft, RefreshCw, Trash2, Download, Info, Lock, Ban, Diamond, Gem, Circle, ToggleLeft, ToggleRight, Fingerprint } from 'lucide-react';
+import { ArrowRightLeft, RefreshCw, Trash2, Download, Info, Lock, Ban, ToggleLeft, ToggleRight, Fingerprint } from 'lucide-react';
 import { Account } from '../../types/account';
 import { cn } from '../../utils/cn';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +8,9 @@ import { useInstanceStore } from '../../stores/useInstanceStore';
 import { formatDateTime, formatDateOnly } from '../../utils/date';
 import { QuotaProgressBar } from './QuotaProgressBar';
 import { Gemini } from '@lobehub/icons';
+import { TierBadge } from '../common/TierBadge';
+import { PriorityBadge } from './PriorityBadge';
+import { SELECTED_ROW_CLASSES, ACTIVE_PILL_CLASSES } from '../common/selectedState';
 
 
 interface AccountRowProps {
@@ -25,12 +28,13 @@ interface AccountRowProps {
     onExport: () => void;
     onDelete: () => void;
     onToggleProxy: () => void;
+    onUpdatePriority?: (priority: number) => Promise<void> | void;
 }
 
 
 
 
-function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSwitching = false, isFocused = false, onSwitch, onRefresh, onViewDetails, onExport, onDelete, onToggleProxy, onViewDevice }: AccountRowProps) {
+function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSwitching = false, isFocused = false, onSwitch, onRefresh, onViewDetails, onExport, onDelete, onToggleProxy, onViewDevice, onUpdatePriority }: AccountRowProps) {
     const { t } = useTranslation();
     const [showInstanceMenu, setShowInstanceMenu] = useState(false);
     const { instances, activeInstanceId } = useInstanceStore();
@@ -53,12 +57,6 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
 
     const rowRef = useRef<HTMLTableRowElement | null>(null);
 
-    useEffect(() => {
-        if (isFocused && rowRef.current) {
-            rowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-    }, [isFocused]);
-
     return (
         <tr
             id={`account-row-${account.id}`}
@@ -68,7 +66,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             isFocused
                 ? "bg-teal-50/90 dark:bg-[#0e2c44] text-slate-900 dark:text-cyan-300 font-bold border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/90 dark:border-slate-800/90 shadow-md ring-1 ring-cyan-500/30"
                 : isCurrent
-                ? "bg-blue-50/70 dark:bg-[#091b2c] border-l-blue-600 dark:border-l-amber-400 border-blue-200 dark:border-amber-400/40 font-semibold text-blue-900 dark:text-amber-300 shadow-xs ring-1 ring-blue-400/30 dark:ring-amber-400/30 hover:bg-blue-100/60 dark:hover:bg-[#0c2438]"
+                ? cn(SELECTED_ROW_CLASSES, "border-b border-slate-200/90 dark:border-slate-800/90 hover:bg-slate-200/60 dark:hover:bg-[#0c2438]")
                 : selected
                 ? "bg-blue-50/90 dark:bg-[#0f273d] text-blue-950 dark:text-blue-100 border-l-blue-500 dark:border-l-blue-500 font-semibold shadow-xs ring-1 ring-blue-500/30"
                 : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50/80 dark:hover:bg-[#0f273d]/60 hover:text-slate-900 dark:hover:text-white hover:border-l-blue-500/70",
@@ -100,7 +98,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                     </span>
 
                         {isCurrent && (
-                            <span className="px-1.5 py-0.5 rounded-[5px] bg-blue-100 dark:bg-amber-400/15 text-blue-800 dark:text-amber-300 border border-blue-200 dark:border-amber-400/30 text-[9px] font-semibold shadow-xs">
+                            <span className={cn(ACTIVE_PILL_CLASSES, "text-[9px] px-1.5 py-0.2")}>
                                 {t('accounts.current').toUpperCase()}
                             </span>
                         )}
@@ -133,31 +131,15 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                         )}
 
                         {/* 订阅类型徽章 */}
-                        {account.quota?.subscription_tier && (() => {
-                            const tier = account.quota.subscription_tier.toLowerCase();
-                            if (tier.includes('ultra')) {
-                                return (
-                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] font-bold shadow-sm hover:opacity-90 transition-opacity cursor-default">
-                                        <Gem className="w-2.5 h-2.5 fill-current" />
-                                        ULTRA
-                                    </span>
-                                );
-                            } else if (tier.includes('pro')) {
-                                return (
-                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[10px] font-bold shadow-sm hover:opacity-90 transition-opacity cursor-default">
-                                        <Diamond className="w-2.5 h-2.5 fill-current" />
-                                        PRO
-                                    </span>
-                                );
-                            } else {
-                                return (
-                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-[#15334d] text-gray-600 dark:text-gray-400 text-[10px] font-bold shadow-sm border border-gray-200 dark:border-[#15334d] hover:bg-gray-200 transition-colors cursor-default">
-                                        <Circle className="w-2.5 h-2.5" />
-                                        FREE
-                                    </span>
-                                );
-                            }
-                        })()}
+                        <TierBadge tier={account.quota?.subscription_tier} size="md" />
+
+                        {/* 优先级徽章 */}
+                        <PriorityBadge
+                            priority={account.priority}
+                            accountId={account.id}
+                            onUpdatePriority={onUpdatePriority}
+                            size="md"
+                        />
                     </div>
             </td>
 

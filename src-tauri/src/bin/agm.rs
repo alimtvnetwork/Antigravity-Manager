@@ -108,6 +108,7 @@ fn main() {
         }
         "doctor" | "check" => cmd_doctor(&cmd_args),
         "accounts" | "account" | "acc" => cmd_accounts(&cmd_args),
+        "refresh-tier" | "refresh_tier" => cmd_accounts_refresh_tier(&cmd_args),
         "history" | "audit" => cmd_history(&cmd_args),
         "switch" | "switch-account" | "switch_account" | "account-switch" | "swtich"
         | "swtich-account" | "swtich_account" | "account-swtich" => {
@@ -332,6 +333,7 @@ fn print_help_json() {
                     { "name": "switch-if-low-credit", "aliases": ["swlc", "sfc"], "flags": ["-t <pct>", "--json", "-f [file]", "--force"], "description": "Check live quota & rotate if quota <= threshold" },
                     { "name": "is-low-credit-for-switch", "aliases": ["ilc"], "flags": ["-t <pct>", "--json", "-f [file]"], "description": "Check if active quota <= threshold" },
                     { "name": "accounts", "aliases": ["acc"], "flags": ["--active", "--json"], "description": "List registered accounts, tiers, and quotas" },
+                    { "name": "accounts refresh-tier", "aliases": ["refresh-tier"], "flags": ["--all", "--json"], "description": "Fetch and update subscription tiers (PRO / ULTRA / FREE) for accounts" },
                     { "name": "history", "aliases": ["audit"], "flags": ["--page <n>", "--json"], "description": "List the task history audit from the split SQLite files" },
                     { "name": "switch", "aliases": [], "flags": ["<email|prefix|id>"], "description": "Switch active profile directly without GUI" }
                 ]
@@ -431,6 +433,8 @@ fn print_help() {
     println!("        Check if active quota <= threshold (outputs true/false or JSON)");
     println!("    accounts, acc [--active] [--json]");
     println!("        List registered accounts, tiers, and remaining quotas");
+    println!("    accounts refresh-tier [--all] [--json]");
+    println!("        Fetch and persist subscription tiers (PRO / ULTRA / FREE)");
     println!("    history, audit [--page <n>] [--json]");
     println!(
         "        Show the last 100 task-history rows and where each split database file lives"
@@ -1006,6 +1010,89 @@ fn check_is_in_path() -> bool {
     false
 }
 
+fn cmd_accounts_refresh_tier(args: &[String]) {
+    let refresh_all = args.iter().any(|a| a == "--all");
+    let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("AGM Accounts Refresh Tier CLI:");
+        println!("  agm accounts refresh-tier [--all] [--json]");
+        println!("\nDescription:");
+        println!("  Fetches and updates subscription tiers (FREE / PRO / ULTRA) from Google");
+        println!("  for registered accounts in the credential vault.");
+        println!("  By default, only refreshes accounts with missing or unknown tiers.");
+        println!("\nOptions:");
+        println!("  --all       Force-refresh all accounts, including those with known tiers");
+        println!("  --json, -j  Output results wrapped in standard JSON envelope");
+        println!("\nExamples:");
+        println!("  agm accounts refresh-tier");
+        println!("  agm accounts refresh-tier --all");
+        println!("  agm accounts refresh-tier --json");
+        return;
+    }
+
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("[ERROR] Failed to start async runtime: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    let result = rt.block_on(account::refresh_missing_tiers_with_options(
+        refresh_all,
+        None,
+    ));
+
+    match result {
+        Ok(stats) => {
+            if is_json {
+                let envelope =
+                    json_envelope::JsonEnvelope::new("agm/accounts-refresh-tier", &stats);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&envelope).unwrap_or_default()
+                );
+            } else {
+                println!("\nAccount subscription tier refresh completed:");
+                println!("  Targeted accounts: {}", stats.total);
+                println!("  Updated:           {}", stats.updated);
+                println!("  Still unknown:     {}", stats.still_unknown);
+                println!("  Failed:            {}", stats.failed);
+                if !stats.details.is_empty() {
+                    println!("\nDetails:");
+                    for detail in &stats.details {
+                        println!("  - {}", detail);
+                    }
+                }
+            }
+            if stats.failed > 0 && stats.updated == 0 && stats.total > 0 {
+                std::process::exit(1);
+            }
+        }
+        Err(e) => {
+            if is_json {
+                let err_obj = serde_json::json!({
+                    "error": e,
+                    "success": false,
+                });
+                let envelope =
+                    json_envelope::JsonEnvelope::new("agm/accounts-refresh-tier", err_obj);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&envelope).unwrap_or_default()
+                );
+            } else {
+                eprintln!("[ERROR] Tier refresh failed: {}", e);
+            }
+            std::process::exit(1);
+        }
+    }
+}
+
 fn cmd_accounts_export(args: &[String]) {
     match account::export_accounts_envelope() {
         Ok(json_str) => {
@@ -1176,12 +1263,26 @@ fn cmd_accounts(args: &[String]) {
         return;
     }
 
+    if non_flag_args
+        .first()
+        .map(|s| {
+            s.eq_ignore_ascii_case("refresh-tier")
+                || s.eq_ignore_ascii_case("refresh_tier")
+                || s.eq_ignore_ascii_case("refreshtier")
+        })
+        .unwrap_or(false)
+    {
+        cmd_accounts_refresh_tier(args);
+        return;
+    }
+
     if args
         .iter()
         .any(|a| a == "--help" || a == "-h" || a == "help")
     {
         println!("AGM Accounts & Quota CLI:");
         println!("  agm accounts [ls] [--active] [--json]");
+        println!("  agm accounts refresh-tier [--all] [--json]");
         println!("  agm accounts export [--file <path>]");
         println!("  agm accounts import <path>");
         println!("  agm account switch <email|prefix|id|#seq> [--instance <id|alias>]");
@@ -1195,14 +1296,23 @@ fn cmd_accounts(args: &[String]) {
         println!("\nAliases: agm accounts, agm account, agm acc");
         println!("\nSubcommands & Actions:");
         println!("  ls, list            Display table of all configured accounts (default)");
+        println!("  refresh-tier        Fetch and persist subscription tiers (PRO / ULTRA / FREE)");
         println!("  export [--file]     Export accounts wrapped in standard JSON envelope");
         println!("  import <path>       Import accounts from standard JSON envelope file");
         println!("  switch, use <query> Switch active account (or instance account) directly");
         println!("\nOptions:");
+        println!("    --all             (refresh-tier) Force-refresh all accounts, including known tiers");
         println!("    --active          Show only the currently active account profile");
         println!("    --json, -j        Output account list in structured JSON format");
         println!("\nExamples:");
         println!("  agm accounts                                # Display table of all configured accounts");
+        println!(
+            "  agm accounts refresh-tier                   # Refresh missing subscription tiers"
+        );
+        println!(
+            "  agm accounts refresh-tier --all             # Force-refresh all subscription tiers"
+        );
+        println!("  agm accounts refresh-tier --json            # Output tier refresh statistics as JSON");
         println!(
             "  agm accounts export --file accounts.json    # Export accounts envelope to file"
         );
