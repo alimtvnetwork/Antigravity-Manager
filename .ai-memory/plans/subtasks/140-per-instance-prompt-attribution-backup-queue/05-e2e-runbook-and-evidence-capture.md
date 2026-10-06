@@ -1,5 +1,7 @@
 # Subtask 05: E2E runbook and evidence capture
 
+> **Overrides:** DR-1 to DR-9 in `06-blind-executor/00-start-here.md` and step 22 win over this runbook; ignore per-instance hand-off file checks; use the library test filters listed in step 22.
+
 Status: pending
 
 | Field | Value |

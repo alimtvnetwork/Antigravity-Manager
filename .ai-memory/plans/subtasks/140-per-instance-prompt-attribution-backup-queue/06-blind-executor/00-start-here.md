@@ -35,6 +35,8 @@ The spec lists open questions. They are settled here so you never have to guess.
 | DR-4 | Change the saved-PID fast path in `is_instance_running`? | **No.** Do not edit `is_instance_running` at all. Ambiguity `.ai-memory/ambiguous-questions/01-new-ambiguity/02-is-instance-running-saved-pid-fast-path.md` is still open. | Out of scope. |
 | DR-5 | Is `USERPROFILE` honoured by Antigravity for named instances? | Assumed yes (the launcher sets it). Proven only by E2E-01 (step 22). If E2E-01 shows a named instance writing into the default `.gemini`, stop and report; do not work around it. | Feasibility gate. |
 | DR-6 | macOS | Code must compile on all platforms (`cfg` blocks unchanged). Live macOS verification is out of scope. | No macOS machine in the loop. |
+| DR-8 | Live-turn window for "is this prompt running" | **600 seconds**, one constant `LIVE_TURN_TTL_SECS` (step 14). The spec's 120 s is overridden. The 120 s `dispatching` timeout (step 10) is a different thing and stays. | `src-tauri/src/modules/repo_db.rs` (comment near `Adaptive 10-Minute Thinking Window`) already widened 120 s to 600 s on purpose for thinking models; 120 s would reintroduce that bug. |
+| DR-9 | `scan_conversations_for` from the spec | Not built. Steps use a small per-instance summaries reader instead (step 15) and must not change `agy_cleaner::scan_conversations`, which has heavy side effects. | No step implements it; inventing it per step would diverge. |
 | DR-7 | Legacy rows whose owner cannot be proven | Mark `status = 'orphaned'`, keep `instance_id = ''`, never auto-dispatch them. | Never guess an owner. |
 
 ## 4. How every step file is laid out
@@ -95,7 +97,8 @@ Stop and write a short report (step number, what you expected, what you found, t
 
 **Process**
 
-- Search only with GitMap: `gitmap aum search`, `gitmap lf`, `gitmap cat`. A backslash in a pattern is interpreted, and a pattern starting with `-` is read as a flag; use a plain literal or a regex such as `node.{3,12}-n`.
+- Search only with GitMap: `gitmap aum search`, `gitmap lf`, `gitmap cat`. A backslash in a pattern is interpreted, and a pattern starting with `-` is read as a flag. Treat patterns as plain literals; `|` alternation (`a|b`) works, but do not rely on other regex syntax such as `.{2}` or `\(`. To find `foo(`, search the literal `foo(`.
+- GitMap blind spot: `gitmap aum search "<x>" src-tauri/src --ext .rs` does NOT search `src-tauri/src/bin/agm.rs` or `src-tauri/tests/*.rs`. Every "find all callers / all initializers" search must be run three times: on `src-tauri/src`, on the file `src-tauri/src/bin/agm.rs`, and on each file in `src-tauri/tests/` (`auto_switcher_e2e_test.rs`, `instance_cloning_and_sync_test.rs`, `per_instance_prompt_liveness_test.rs`). `cargo clippy --all-targets` compiles all three, so a missed caller there breaks the gate.
 - Relative paths only in docs, logs and commit messages.
 - One step, one commit. Never combine steps.
 - Never disable a CI check. Never commit secrets, caches, or files outside the step's list.
@@ -135,6 +138,8 @@ Stop and write a short report (step number, what you expected, what you found, t
 | 20 | `20-ipc-wrappers-and-registration.md` | new Tauri commands, `lib.rs` registration | 17 |
 | 21 | `21-ui-instance-aware-actions.md` | `PromptTreeViewModal.tsx`, `Instances.tsx`; `npm run build` | 20 |
 | 22 | `22-live-e2e-and-evidence.md` | run `05-e2e-runbook-and-evidence-capture.md` in full | 21 |
+
+Every step leaves the whole workspace compiling (lib, `agm` binary, `src-tauri/tests`). Known runtime-only gap: between step 11 and step 19, `agm queue-scheduler <display name>` returns an error because the scheduler now needs a canonical id; pass the instance id until step 19 lands. Do not "fix" it early.
 
 Before step 01, run E2E-00 and E2E-01 from `../05-e2e-runbook-and-evidence-capture.md` once to record the baseline. If E2E-01 fails, stop (DR-5).
 
