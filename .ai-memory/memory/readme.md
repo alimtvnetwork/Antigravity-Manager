@@ -32,6 +32,7 @@
 | 22 | [learned/22-cicd-gates-auto-commit-workflow-and-e2e-lessons.md](./learned/22-cicd-gates-auto-commit-workflow-and-e2e-lessons.md) | CI gates and auto-commit |
 | 23 | [learned/23-switch-audit-default-key-and-wrapper-pid-recovery.md](./learned/23-switch-audit-default-key-and-wrapper-pid-recovery.md) | 2026-10-02 session: audit snapshot by instance id, wrapper PID recovery, other-instance PID sparing, verbatim directives, pending plan 139 |
 | 24 | [learned/24-code-failure-decoding-and-fast-codebase-learning-skill.md](./learned/24-code-failure-decoding-and-fast-codebase-learning-skill.md) | MANDATORY instruction skill: ten-minute codebase orientation, failure taxonomy (classes A to K) with commit evidence, learn-from-failure loop, syntax-writing rules, local gate. Pointer skill `.agents/skills/agm-code-failure-decoding/skill.md` |
+| 25 | [learned/25-per-instance-prompt-attribution-and-e2e-testing.md](./learned/25-per-instance-prompt-attribution-and-e2e-testing.md) | Everything coded and learned on prompts and instances, per-instance identity root cause, feasibility, best practices, keep-code-from-breaking rules, every E2E test discussed; plan 140, spec 140, RCA 34 |
 
 Note: `.ai-memory/learned/23-28` (outside this folder) are a separate older series; see `01-index.md`.
 

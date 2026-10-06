@@ -167,7 +167,7 @@ Four releases (v4.145.0 to v4.148.0) were burned on classes F and G, one compile
 
 ## Part 5 - Local gate before every push (not after CI fails)
 
-Rust edits (from `src-tauri`, with `$env:CARGO_TARGET_DIR="D:\work\antigravity-manager\src-tauri\target"; $env:CARGO_BUILD_JOBS="1"` on this host):
+Rust edits (from `src-tauri`, with `CARGO_TARGET_DIR` set to the repo's `src-tauri/target` and `CARGO_BUILD_JOBS=1` on this host; from the repo root in PowerShell: `$env:CARGO_TARGET_DIR="$PWD\src-tauri\target"; $env:CARGO_BUILD_JOBS="1"`):
 
 1. `cargo fmt` then `cargo fmt -- --check`
 2. `cargo clippy --all-targets --all-features` with zero errors. Check that new warnings are not on your lines.

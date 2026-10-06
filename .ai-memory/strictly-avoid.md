@@ -501,3 +501,39 @@ Allowed work:
 
 **Why:** 12 of the last 30 commits were fmt or compile fixes, and four release versions were burned on errors a local clippy run would have shown in one pass.
 
+---
+
+## Re-deriving a Prompt's Instance After Capture - TOTAL BAN
+
+Added 2026-10-06. Source: `02-spec/22-app-issues/34-per-instance-prompt-identity-lost-rca.md`, plan `.ai-memory/plans/140-per-instance-prompt-attribution-backup-queue.md`.
+
+Forbidden:
+- Deriving a prompt's instance id a second time after capture, or falling back to the active instance inside storage code (`resolve_instance_id` empty-input branch).
+- `UPDATE ... SET instance_id = ...` on an existing prompt or backup row (`backup_prompts_db.rs:353`, `:371`).
+- Treating an empty `instance_id` as a match for every instance.
+- Joining prompts to projects with `LIKE %repo_name%`, substring `contains`, or folder-name prefix matching.
+- Letting the queue scheduler consume `backed_up` rows, or marking a row `dispatched` when the send failed.
+- Writing a new caller of the per-repo `.antigravity_resume_task.json` without `instance_id`, `session_id`, and `conversation_id`.
+- Turning a `"default"` target into "all instances" (`auto_switcher.rs:1691`).
+- Calling a UI IPC command that does not exist in Rust (`enqueue_prompt` at `PromptTreeViewModal.tsx:1335`). Grep `#[tauri::command]` before adding an `invoke(`.
+- Using `agm prompt -n` to target an instance (`-n` is `--node`, remote SSH).
+
+**Why:** Prompts from one instance were backed up, queued, or restored into another, and the UI enqueue never reached the database.
+
+---
+
+## Running Bulk Instance Cleanup Commands During E2E - TOTAL BAN
+
+Added 2026-10-06. Source: `.ai-memory/plans/subtasks/140-per-instance-prompt-attribution-backup-queue/05-e2e-runbook-and-evidence-capture.md`.
+
+Forbidden:
+- `agm tif` / `agm test-instance-flow`: its cleanup deletes every `test-cli-flow*` instance, including the protected sandbox `test-cli-flow-1743`.
+- `agm instances rm-all`: removes every sandbox.
+- Running `rrp`, `rrc`, `qs`, or an account switch live before plan 140 subtasks 01 and 02 ship; they can dispatch other instances' prompts, including default. Use `ABV_DATA_DIR` sandbox mode on a data copy instead.
+- Assuming a test instance id equals its display name; `agm instances create` appends a timestamp suffix. Read the id from `--json`.
+
+Allowed work:
+- Delete test instances one by one by the exact id this run created and recorded.
+
+**Why:** The protected sandboxes `cli-switch-proof-6857`, `test-cli-flow-1743`, `clone-from-default-4424`, and `new-empty-instance-4425` must survive every test run.
+

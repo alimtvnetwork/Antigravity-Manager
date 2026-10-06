@@ -59,7 +59,11 @@ Each implementation subtask ends with: `cargo fmt -- --check`, `cargo clippy --a
 
 ## 4. How the AI knows which prompt belongs to which instance (rules for every step)
 
-1. Test instances are created only with prefix `test-cli-flow-a-<rand4>`, `test-cli-flow-b-<rand4>`, and the clone `test-cli-flow-c-<rand4>` (spec 94 law L8).
+1. Test instances are created only with prefix `test-cli-flow-a-<rand4>`, `test-cli-flow-b-<rand4>`, and the clone `test-cli-flow-c-<rand4>` (spec 94 law L8). `agm instances create` appends a 4-digit timestamp (`src-tauri/src/modules/instance.rs:838`), so the real registry id is `test-cli-flow-a-<rand4>-<ts4>`: always read the id from `--json` output, never assume it.
+   - Scratch repos used by tests must have no `.git` folder, because `agm prompt` runs `git pull` when the current folder has one.
+   - Commands that dispatch prompts (`rrp`, `rrc`, `qs`, account switch) can send other instances' prompts, including default, until subtasks 01 and 02 ship. Run them today only in sandbox mode: `ABV_DATA_DIR` pointed at a copy of the data folder (`src-tauri/src/modules/account.rs:836`).
+   - Today's `brp` pulls empty-`instance_id` rows into the target; run it live only after confirming the live databases have no such rows.
+   - On a build that contains subtask 01, the first live command migrates the real databases, so E2E-14 (migration on a copy) runs right after E2E-00.
 2. Every test prompt embeds a marker `E2E140-<runid>-<instance>-<case>`, so it can be found in any store by text.
 3. Evidence is read with read-only SQLite (`file:<path>?mode=ro`) from `repo_prompts.db`, the backup DB, and each instance's `conversation_summaries.db`, always with `instance_id` in the `WHERE` clause. The exact queries are in the e2e spec section 4.
 4. Every CLI call that acts on prompts passes `-i <instance>`. Never rely on the active instance.
@@ -79,7 +83,8 @@ E2E-00 safety snapshot; E2E-01 feasibility gate (per-instance profile honoured);
 ## 7. Safety rules (non-negotiable, every step)
 
 - Never kill Cursor or `agm-alim`; never switch or close the default instance; never delete `cli-switch-proof-6857`, `test-cli-flow-1743`, `clone-from-default-4424`, `new-empty-instance-4425`.
-- Create test instances only with the prefixes in section 4; delete only instances this run created.
+- Create test instances only with the prefixes in section 4; delete only instances this run created, by exact id.
+- BANNED commands: `agm tif` / `agm test-instance-flow` (its cleanup deletes every `test-cli-flow*` instance, including the protected `test-cli-flow-1743`) and `agm instances rm-all` (removes all sandboxes). Also banned: any command that acts on all instances or on default without `-i`. Full list in subtask 05.
 - Do not click the Google data-collection checkbox; do not launch a replacement AGM GUI.
 - Never print emails or tokens in full. Never claim a live reinject was watched unless it was.
 - Relative repo paths only in every file, commit message, changelog, and release note.

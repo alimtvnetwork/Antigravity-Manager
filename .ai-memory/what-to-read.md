@@ -1,10 +1,11 @@
 # What to Read
 
 > Canonical map of what the AI must read before working on this project.
-> Last updated: 2026-10-06T01:55:00Z
+> Last updated: 2026-10-06T02:30:00Z
 
 ## Changelog
 
+- 2026-10-06T02:30:00Z, Plan 140 (AI instruction, no code yet): per-instance prompt attribution for running, backup, queue, and restore. Root cause: no canonical instance key is captured once and carried to dispatch, and `.antigravity_resume_task.json` is per repo. Read `.ai-memory/plans/140-per-instance-prompt-attribution-backup-queue.md` (ordered steps, feasibility, CLI and UI reuse, E2E-00..E2E-19, safety rules), spec `02-spec/21-app/140-per-instance-prompt-attribution-backup-queue/` (33 bug sites B01..B33, AC-01..AC-32, E2E catalog), RCA `02-spec/22-app-issues/34-per-instance-prompt-identity-lost-rca.md`, and memory `.ai-memory/memory/learned/25-per-instance-prompt-attribution-and-e2e-testing.md` (everything coded and learned, best practices, every E2E discussed). Feasible for named instances via the per-instance HOME override; E2E-01 must prove it live first. UI calls IPC `enqueue_prompt`, which does not exist. `agm prompt -n` is `--node`, not instance.
 - 2026-10-06T01:55:00Z, MANDATORY instruction skill added: `.ai-memory/memory/learned/24-code-failure-decoding-and-fast-codebase-learning-skill.md` (pointer `.agents/skills/agm-code-failure-decoding/skill.md`). Read it before any code edit. It covers the ten-minute orientation protocol, failure classes A to K with commit evidence (edit-tool delimiter breakage `01b48a06`, deleted variable `4c28ecf8`, PathBuf vs String and Drop move RCA 43, rusqlite borrow `5bb32c51`, non-exhaustive enum `f549e559`, tauri async runtime `2bbcba13`, 12 of 30 commits fmt-only fixes, wrong key issue 62), the learn-from-failure loop, syntax rules, and the local gate.
 - 2026-10-06T01:45:00Z, Memory write for the 2026-10-02 switch session. `366d84e5` (shipped v4.126.0): the default switch audit reads prompts by instance id `"default"`, not by `target_ide`; `is_instance_running` recovers the real PID when the saved macOS `open` wrapper PID is gone. Read `.ai-memory/memory/learned/23-switch-audit-default-key-and-wrapper-pid-recovery.md` (verbatim directives, safety constraints, last-30-commit audit) and `.ai-memory/issues/62-switch-audit-wrong-key-and-macos-wrapper-pid-rca.md`. Open ambiguity `02-is-instance-running-saved-pid-fast-path.md`: v4.155.0 scans on every call even when the saved PID matches; do not change it before the user answers. Pending plan 139. Last 20 tasks: `.ai-memory/plans/readme.md` "Recent Completed Tasks Register". New index `.ai-memory/memory/readme.md`.
 - 2026-10-04T01:31:00Z, Release v4.130.0 resolved startup white screen crash by replacing `tokio::runtime::Runtime::new()` and raw `tokio::spawn` calls in Tauri async commands (instance creation, auto-switcher save) and background schedulers (warmup, prompt queue, PID quota sync) with `tauri::async_runtime::block_on` and `tauri::async_runtime::spawn`.
@@ -59,7 +60,7 @@
 - `git log -n 10 --stat`, why: inspect the last 10 commits to understand recent file changes, what code/docs were touched, and the latest repository state before starting any task
 - `.ai-memory/what-to-read.md`, why: authoritative prioritized reading sequence that must be read and followed before touching any files
 - `version.json`, why: single source of truth for the repository version, backend/frontend sections, and sub-package version tracks. All codebases must import this file for version information.
-- `.ai-memory/memory/readme.md`, why: master memory index (learned 01 to 24) that points to the full historical `01-index.md`
+- `.ai-memory/memory/readme.md`, why: master memory index (learned 01 to 25) that points to the full historical `01-index.md`
 - `.ai-memory/plans/readme.md`, why: plan index and the "Recent Completed Tasks Register" (last 20 tasks, newest first)
 - `.ai-memory/memory/01-index.md`, why: core memory index
 - `.ai-memory/memory/learned/01-project-context-and-guidelines.md`, why: canonical learned memory of repo identity, CODE RED rules, coding guidelines, error philosophy, and active plans
@@ -85,6 +86,11 @@
 - .ai-memory/learned/26-cli-prompt-scheduler-and-ide-reconnect.md, why: background 10-minute prompt queue scheduler, direct inspection of conversation_summaries.db to avoid false-busy locks, and 5-8s IDE settle delay
 - .ai-memory/learned/27-auto-switch-instance-reopen-fix.md, why: multi-instance candidate instance ID preservation in auto-switcher, cross-instance window launching, and stale lockfile cleanup
 - .ai-memory/learned/28-navbar-pill-grouping-and-instance-settings-parity.md, why: UI navbar contiguous segmented pill grouping (rounded-full, shared border, dark-glass) and CLI/UI instance duplication parity via copy_instance_with_options
+- .ai-memory/memory/learned/25-per-instance-prompt-attribution-and-e2e-testing.md, why: everything coded and learned about prompts and instances, root causes, best practices, how to keep code from breaking, and every E2E test discussed (E2E-00..E2E-19, spec 92/93/94 laws)
+- .ai-memory/plans/140-per-instance-prompt-attribution-backup-queue.md, why: AI instruction for per-instance prompt attribution (running, backup, queue, restore), CLI and UI reuse, multi-instance E2E runbook order and safety rules
+- 02-spec/21-app/140-per-instance-prompt-attribution-backup-queue/01-architecture-spec.md, why: verbatim request, feasibility, 33 bug sites, target design, AC-01..AC-32
+- 02-spec/21-app/140-per-instance-prompt-attribution-backup-queue/02-component-and-e2e-spec.md, why: component contracts, CLI/UI parity table, evidence SQL, full E2E catalog and coverage matrix
+- 02-spec/22-app-issues/34-per-instance-prompt-identity-lost-rca.md, why: RCA for prompt identity lost across instances (open, fix in plan 140)
 - .ai-memory/memory/learned/23-switch-audit-default-key-and-wrapper-pid-recovery.md, why: 2026-10-02 switch session verbatim directives, safety constraints, instance id vs IDE flavor key, wrapper PID recovery, other-instance PID sparing, last-30-commit audit
 - .ai-memory/issues/62-switch-audit-wrong-key-and-macos-wrapper-pid-rca.md, why: RCA for the empty default switch audit row and the macOS wrapper PID false stop
 - .ai-memory/ambiguous-questions/01-new-ambiguity/02-is-instance-running-saved-pid-fast-path.md, why: open decision on the saved-PID fast path; blocks changes to `is_instance_running`

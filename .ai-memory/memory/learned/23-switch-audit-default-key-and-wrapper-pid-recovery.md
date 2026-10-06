@@ -48,7 +48,7 @@ Verification for `366d84e5`: `cargo fmt -- --check` clean; `cargo clippy --all-t
 - Instance identity and IDE flavor are different keys. `target_ide` names the IDE flavor; per-instance data (prompts, PIDs, leases) is keyed by instance id (`"default"` or the instance uuid).
 - A saved PID is a hint, not proof. Keep the cheap identity check first, and keep an explicit fallback search that rewrites the saved PID. This follows the AGENTS.md rule "Keep an explicit fallback to the verified path whenever you replace it".
 - Same-conversation resume depends on `session_id` and `conversation_id` in `.antigravity_resume_task.json`. `agy -p` starts a new CLI prompt and does not resume a conversation.
-- Cargo builds on this host: `$env:CARGO_TARGET_DIR="D:\work\antigravity-manager\src-tauri\target"; $env:CARGO_BUILD_JOBS="1"`, run `cargo fmt` from `src-tauri`.
+- Cargo builds on this host: set `CARGO_TARGET_DIR` to the repo's `src-tauri/target` and `CARGO_BUILD_JOBS=1` (from the repo root in PowerShell: `$env:CARGO_TARGET_DIR="$PWD\src-tauri\target"; $env:CARGO_BUILD_JOBS="1"`), run `cargo fmt` from `src-tauri`.
 
 ## 6. State observed on 2026-10-06 (git audit of last 30 commits)
 
