@@ -286,3 +286,19 @@
 - Priority: High
 - Description: Update `walkthrough.md` and other artifacts to use standalone repo-relative paths instead of `file:///`.
 - Added: 2026-08-09
+
+### Pre-push rustfmt and clippy gate for Rust feature commits
+
+- Status: Pending
+- Priority: High
+- Description: 12 of the last 30 commits (v4.151.0 to v4.158.0) were rustfmt or compile fixes pushed after a feature commit failed CI. Make `.githooks/pre-commit` (or a pre-push hook) run `cargo fmt -- --check` on staged Rust files, and document `cargo clippy --all-targets --all-features` as the local gate before every push. Never disable the CI gate.
+- Source: git audit 2026-10-06, `.ai-memory/memory/learned/23-switch-audit-default-key-and-wrapper-pid-recovery.md` section 6.
+- Added: 2026-10-06
+
+### Regression test that separates instance id from IDE flavor
+
+- Status: Pending
+- Priority: Medium
+- Description: Add a `switch_account` audit test where `target_ide` is `"ide"` and prompts are stored under `"default"`, asserting the audit payload has the prompt and conversation id. Prevents issue 62 from returning.
+- Source: `.ai-memory/issues/62-switch-audit-wrong-key-and-macos-wrapper-pid-rca.md`.
+- Added: 2026-10-06

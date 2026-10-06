@@ -1,10 +1,11 @@
 # What to Read
 
 > Canonical map of what the AI must read before working on this project.
-> Last updated: 2026-10-04T01:31:00Z
+> Last updated: 2026-10-06T01:45:00Z
 
 ## Changelog
 
+- 2026-10-06T01:45:00Z, Memory write for the 2026-10-02 switch session. `366d84e5` (shipped v4.126.0): the default switch audit reads prompts by instance id `"default"`, not by `target_ide`; `is_instance_running` recovers the real PID when the saved macOS `open` wrapper PID is gone. Read `.ai-memory/memory/learned/23-switch-audit-default-key-and-wrapper-pid-recovery.md` (verbatim directives, safety constraints, last-30-commit audit) and `.ai-memory/issues/62-switch-audit-wrong-key-and-macos-wrapper-pid-rca.md`. Open ambiguity `02-is-instance-running-saved-pid-fast-path.md`: v4.155.0 scans on every call even when the saved PID matches; do not change it before the user answers. Pending plan 139. Last 20 tasks: `.ai-memory/plans/readme.md` "Recent Completed Tasks Register". New index `.ai-memory/memory/readme.md`.
 - 2026-10-04T01:31:00Z, Release v4.130.0 resolved startup white screen crash by replacing `tokio::runtime::Runtime::new()` and raw `tokio::spawn` calls in Tauri async commands (instance creation, auto-switcher save) and background schedulers (warmup, prompt queue, PID quota sync) with `tauri::async_runtime::block_on` and `tauri::async_runtime::spawn`.
 - 2026-10-03T23:30:00Z, Fixed account `SwitchFacts` struct initializer in `src-tauri/src/modules/account.rs` by supplying missing `steps: None` field.
 - 2026-10-03T23:16:00Z, Release v4.129.0 added Instance Audit Trail Modal (`InstanceAuditTrailModal.tsx`), multi-step switch lifecycle tracking (`backup_prompts` -> `reset_process` -> `restore_prompts` -> `verify_restored`) with prominent display of the last 2-3 account switches, and 10-minute periodic + on-demand PID quota synchronization (`start_instance_pid_quota_scheduler`, `syncInstancePidAndQuota`).
@@ -57,6 +58,8 @@
 - `git log -n 10 --stat`, why: inspect the last 10 commits to understand recent file changes, what code/docs were touched, and the latest repository state before starting any task
 - `.ai-memory/what-to-read.md`, why: authoritative prioritized reading sequence that must be read and followed before touching any files
 - `version.json`, why: single source of truth for the repository version, backend/frontend sections, and sub-package version tracks. All codebases must import this file for version information.
+- `.ai-memory/memory/readme.md`, why: master memory index (learned 01 to 23) that points to the full historical `01-index.md`
+- `.ai-memory/plans/readme.md`, why: plan index and the "Recent Completed Tasks Register" (last 20 tasks, newest first)
 - `.ai-memory/memory/01-index.md`, why: core memory index
 - `.ai-memory/memory/learned/01-project-context-and-guidelines.md`, why: canonical learned memory of repo identity, CODE RED rules, coding guidelines, error philosophy, and active plans
 - `.ai-memory/memory/learned/03-parallel-cicd-runner-and-log-filtering.md`, why: parallel local runner concurrency, duration tracking, and log suppression standard
@@ -81,6 +84,10 @@
 - .ai-memory/learned/26-cli-prompt-scheduler-and-ide-reconnect.md, why: background 10-minute prompt queue scheduler, direct inspection of conversation_summaries.db to avoid false-busy locks, and 5-8s IDE settle delay
 - .ai-memory/learned/27-auto-switch-instance-reopen-fix.md, why: multi-instance candidate instance ID preservation in auto-switcher, cross-instance window launching, and stale lockfile cleanup
 - .ai-memory/learned/28-navbar-pill-grouping-and-instance-settings-parity.md, why: UI navbar contiguous segmented pill grouping (rounded-full, shared border, dark-glass) and CLI/UI instance duplication parity via copy_instance_with_options
+- .ai-memory/memory/learned/23-switch-audit-default-key-and-wrapper-pid-recovery.md, why: 2026-10-02 switch session verbatim directives, safety constraints, instance id vs IDE flavor key, wrapper PID recovery, other-instance PID sparing, last-30-commit audit
+- .ai-memory/issues/62-switch-audit-wrong-key-and-macos-wrapper-pid-rca.md, why: RCA for the empty default switch audit row and the macOS wrapper PID false stop
+- .ai-memory/ambiguous-questions/01-new-ambiguity/02-is-instance-running-saved-pid-fast-path.md, why: open decision on the saved-PID fast path; blocks changes to `is_instance_running`
+- .ai-memory/plans/pending/139-switch-followups-pid-refresh-parity-and-live-e2e.md, why: pending switch follow-ups (pid_refresh_seconds UI and CLI parity, agy session resume, live sandbox e2e)
 - .ai-memory/issues/61-running-prompt-resumption-and-conversation-continuity-rca.md, why: preview fallback in live prompt text, schema resilience for conversation summaries, session_id/conversation_id preservation in .antigravity_resume_task.json, and 120s PID quota check floor
 - .ai-memory/cicd-issues/43-rust-mismatched-types-and-move-errors-v4-128-0-rca.md, why: get_antigravity_executable_path PathBuf-to-String mapping and task.id clone for Drop trait types
 - `02-spec/21-app/104-instance-audit-trail-and-pid-quota-sync.md`, why: instance audit trail modal, 4-step lifecycle tracking, and 10-minute PID quota synchronization specification

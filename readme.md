@@ -265,6 +265,9 @@ AI coding agents and autonomous workflows operating within this repository can f
 | **Error Management Spec** | `02-spec/03-error-manage/` | Error codes, envelopes, and modal standards |
 | **README Conventions** | `02-spec/01-spec-authoring-guide/13-root-readme-conventions.md` | Non-negotiable README structure and styling |
 | **Active Plans** | `.ai-memory/plans/` | Plan index, active subtasks, and completion logs |
+| **Canonical Read List** | `.ai-memory/what-to-read.md` | Ordered list of files an AI must read before any task (kept in sync with this table) |
+| **Memory Index** | `.ai-memory/memory/readme.md` | Learned memory, session directives, and the pointer to the full `01-index.md` |
+| **Strict Avoid List** | `.ai-memory/strictly-avoid.md` | Banned patterns and past mistakes (append only) |
 
 ---
 

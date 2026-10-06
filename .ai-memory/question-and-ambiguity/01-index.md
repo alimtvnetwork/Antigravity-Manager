@@ -71,5 +71,14 @@ the end.
 
 ---
 
+## Open ambiguities in `../ambiguous-questions/01-new-ambiguity/`
+
+| File | Question | Status |
+|---|---|---|
+| [01-pluggable-logger-backend-and-uber-zap-migration.md](../ambiguous-questions/01-new-ambiguity/01-pluggable-logger-backend-and-uber-zap-migration.md) | Logger hot-swap and Uber Zap migration design | open |
+| [02-is-instance-running-saved-pid-fast-path.md](../ambiguous-questions/01-new-ambiguity/02-is-instance-running-saved-pid-fast-path.md) | Keep the per-call process scan added in v4.155.0, or restore the trusted saved-PID fast path (recommended: marker check on the saved PID) | open (raised 2026-10-06) |
+
+Resolved entries live in `../ambiguous-questions/02-ambiguity-resolved/` (02 to 07).
+
 The user will review entries at the end of the 40-task run and either
 confirm the inferred choice or request a follow-up adjustment.

@@ -33,6 +33,33 @@
 | `131` | [131-antigravity-ide-full-deploy-fleet-and-gitmap-delegation.md](./completed/131-antigravity-ide-full-deploy-fleet-and-gitmap-delegation.md) | `DONE` | Default instance theme seeds (#BD93F9/#19191C), Turbo presets, 4 plugins and 9 skills parity engine in instance.rs, standalone fleet deployment script in repo-secrets and scripts, global GitMap delegation (gitmap agy deploy & gitmap-delegate-deploy.ps1), and 7-gate verification scorecard. |
 
 
+## Recent Completed Tasks Register (last 20, newest first)
+
+Updated 2026-10-06T01:45:00Z from `git log` (HEAD `ccf336b1`). Referenced by `.ai-memory/what-to-read.md`.
+
+| # | Date | Commit | Task | Plan |
+|---|---|---|---|---|
+| 1 | 2026-10-05 | `b7e5744c`, `ccf336b1` | v4.158.0 two-phase 4 hour quota gate and hours-remaining weekly scoring, delimiter and rustfmt fixes | 138 |
+| 2 | 2026-10-05 | `7de81159` | v4.157.1 weekly scoring DESC sort and divide-by-100 integer score | 137 |
+| 3 | 2026-10-05 | `babb0b18` | v4.157.0 neon green progress bar, hours-elapsed weekly scoring, prompt tree modal header, empty tree fix | 136, 137 |
+| 4 | 2026-10-05 | `7952d8dd` | v4.156.0 prompt tree discovery from summaries DB | 136 |
+| 5 | 2026-10-05 | `2289730e`, `3581207d` | v4.155.0 running projects detection and restart split button | 132, 135 |
+| 6 | 2026-10-05 | `fbd5e819` | v4.154.0 accounts borders, VS Code cyan, email cooldown | 134 |
+| 7 | 2026-10-05 | `2274f100` | Seven specialized AGM skills | - |
+| 8 | 2026-10-05 | `2a5cd064` | v4.152.0 split restart button with distinct sync icons | 132 |
+| 9 | 2026-10-05 | `8ce647c7` | v4.151.0 AccountRow JSX fix and instance.rs rustfmt | - |
+| 10 | 2026-10-05 | `6d41d931` | Instance fleet deploy, default theme presets, plugins and skills parity, GitMap delegation | 131 |
+| 11 | 2026-10-05 | `b499eb5f` | v4.150.0 accounts table cyan palette and compact instances table | 130 |
+| 12 | 2026-10-05 | `24daa320` | v4.149.0 prompt tree line gaps, liveness scoping, N key dispatch | 128 |
+| 13 | 2026-10-04 | `319d2f36` to `d77ebe3b` | v4.145.0 to v4.148.0 rusqlite and compile fixes | - |
+| 14 | 2026-10-04 | `a03b68f3` | v4.143.0 per-instance prompt isolation, deep cloning, card mutex UI, macOS gatekeeper | 119, 120, 123 |
+| 15 | 2026-10-04 | `2b799681`, `7194a6e8` | v4.141.0 and v4.142.0 macOS installation and IDE switching | 116, 119 |
+| 16 | 2026-10-04 | `e1045a9d` | v4.140.0 multi-instance low-quota failover and async 5s prompt restore | 111 |
+| 17 | 2026-10-04 | `92bb0296`, `f357f5dd` | v4.133.0 and v4.134.0 release artifact packaging fix | - |
+| 18 | 2026-10-04 | `2bbcba13` | v4.130.0 startup white screen crash (tauri async runtime) | - |
+| 19 | 2026-10-03 | `2570ec30`, `1f0cf651` | v4.128.0 and v4.128.1 audit pagination, Supabase tab, instance view modes | 105 |
+| 20 | 2026-10-02 | `366d84e5` | Switch audit reads prompts by instance id; `is_instance_running` recovers wrapper PID (shipped v4.126.0). Memory: `memory/learned/23-switch-audit-default-key-and-wrapper-pid-recovery.md`, issue 62 | 100 |
+
 ## Pending Plans (`pending/`)
 | # | Plan File | Status | Summary |
 | :--- | :--- | :--- | :--- |
@@ -43,5 +70,6 @@
 | `88` | [88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts.md](./pending/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts.md) | `PENDING` | Notification email dedupe (no re-adding), `agm supabase push-settings`, removal of committed keys, and a verified one-liner PowerShell file that imports keys through the AGM CLI. |
 | `91` | [91-cicd-workflow-deadlines-and-release-ci-gate.md](./pending/91-cicd-workflow-deadlines-and-release-ci-gate.md) | `PENDING` | Pin `ubuntu-24.04` before the 2026-10-19 Ubuntu 26 switch, Node 24 action majors, release refuses tags whose CI is not `success`, no CI cancellation on `main`, untrack the per-run cache. |
 | `92` | [92-cli-instance-switch-e2e.md](./pending/92-cli-instance-switch-e2e.md) | `IN PROGRESS` | CLI instance switch on a copy only. Restore keeps queued prompts queued and re-sends the running prompt. UI, email, and Telegram gaps wait on the second discovery pass. |
+| `139` | [139-switch-followups-pid-refresh-parity-and-live-e2e.md](./pending/139-switch-followups-pid-refresh-parity-and-live-e2e.md) | `PENDING` | `pid_refresh_seconds` Settings UI and CLI parity, `agy` session resume check, live sandbox switch e2e, and the saved-PID fast path decision (ambiguity 02). Created 2026-10-06. |
 | `93` | [93-e2e-cli-commands-ai-instruction.md](./pending/93-e2e-cli-commands-ai-instruction.md) | `PENDING` | Canonical operational manual and generic AI instruction prompt for executing multi-instance lifecycle testing, profile isolation, account switching, running prompt backup/restoration, conversation retention pruning, and developer tool cache hygiene via native CLI commands and utility scripts without writing code. |
 

@@ -464,3 +464,22 @@ Allowed work:
 
 **Why:** Releases `v4.109.2`, `v4.109.3`, and `v4.109.4` were published with macOS-only assets. Installers that guessed Windows `.exe` URLs or enqueued asset-less releases triggered immediate 404 download errors and `aria2c` crash dumps on Attempt 1 (see `.ai-memory/cicd-issues/42-installer-unverified-asset-urls-and-partial-release-rca.md`).
 
+---
+
+## Keying Per-Instance Data by IDE Flavor, or Trusting a Launcher Wrapper PID Alone - TOTAL BAN
+
+Added 2026-10-06. Source: `.ai-memory/issues/62-switch-audit-wrong-key-and-macos-wrapper-pid-rca.md`, memory `.ai-memory/memory/learned/23-switch-audit-default-key-and-wrapper-pid-recovery.md`.
+
+Forbidden:
+- Passing `target_ide` (IDE flavor such as `"ide"` or `"agy"`) where an instance id is expected (`switch_prompt_snapshot`, PID registry, leases, backups). The default instance id is `"default"`.
+- Treating a saved launch PID as the only proof that an instance is running. On macOS it is the `open` wrapper PID and exits right after launch.
+- Replacing the fallback process search with a silent `false`.
+- Closing another instance's PID during a single-instance account switch, or calling `close_antigravity(None)` from that path. Use `close_instance(id)` with `should_spare_pid`.
+- Reverting the v4.155.0 per-call scan in `is_instance_running` before ambiguity `02-is-instance-running-saved-pid-fast-path.md` is answered.
+
+Allowed work:
+- Check the saved PID first, then run one bounded `find_pids_for_data_dir` search and rewrite the saved PID with `record_instance_pid`.
+- Add a test with the instance id and the IDE flavor set to different values, so a key mix-up fails.
+
+**Why:** The default switch audit row was empty because the snapshot was read by IDE flavor, and macOS instances showed stopped because the wrapper PID had exited (fixed in `366d84e5`, shipped v4.126.0).
+

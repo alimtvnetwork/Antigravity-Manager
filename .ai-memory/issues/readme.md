@@ -13,6 +13,8 @@ This directory contains active issue tracking and bug reports.
 - [54-focus-button-dual-scroll-mechanism-rca.md](./54-focus-button-dual-scroll-mechanism-rca.md)
 
 ## Fixed in v4.124.0
+- [62-switch-audit-wrong-key-and-macos-wrapper-pid-rca.md](./62-switch-audit-wrong-key-and-macos-wrapper-pid-rca.md) (solved in `366d84e5`, shipped v4.126.0: default switch audit reads prompts by instance id `"default"`; `is_instance_running` recovers the real PID when the saved macOS `open` wrapper PID is gone)
+- [61-running-prompt-resumption-and-conversation-continuity-rca.md](./61-running-prompt-resumption-and-conversation-continuity-rca.md) (preview fallback, schema fallback, `session_id` kept, 120s quota floor)
 - [60-switch-drops-live-conversation-rca.md](./60-switch-drops-live-conversation-rca.md) (preview and conversation id kept; resume file no longer drops `session_id`; quota floor 2 minutes; saved PID trusted)
 
 ## Fixed in v4.122.0
