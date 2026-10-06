@@ -52,7 +52,7 @@ then:
 | :--- | :--- | :--- | :--- |
 | `001` | [001-stack-frame-parser-regex.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/001-stack-frame-parser-regex.md) | Fix stack frame parsing for URL-only frames | `done` |
 | `002` | [002-stack-frame-parser-tests.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/002-stack-frame-parser-tests.md) | Add regression tests for the stack frame parser | `done` |
-| `003` | [003-tier-fetch-backend-and-persistence.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/003-tier-fetch-backend-and-persistence.md) | Fetch and persist subscription tier independent of project id | `pending` |
+| `003` | [003-tier-fetch-backend-and-persistence.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/003-tier-fetch-backend-and-persistence.md) | Fetch and persist subscription tier independent of project id | `done` |
 | `004` | [004-shared-tier-badge-component.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/004-shared-tier-badge-component.md) | Shared TierBadge with an explicit unknown state | `pending` |
 | `005` | [005-agm-accounts-refresh-tier-cli.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/005-agm-accounts-refresh-tier-cli.md) | CLI command and startup backfill for tier | `pending` |
 | `006` | [006-priority-badge-hide-default-and-inline-edit.md](../subtasks/85-ui-tier-badge-priority-highlight-focus-and-stack-trace/006-priority-badge-hide-default-and-inline-edit.md) | Hide Priority at 50 and edit on double-click | `pending` |

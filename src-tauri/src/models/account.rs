@@ -176,11 +176,7 @@ impl Account {
                 }
             }
         }
-        if quota.subscription_tier.is_none() {
-            if let Some(ref existing) = self.quota {
-                quota.subscription_tier = existing.subscription_tier.clone();
-            }
-        }
+        crate::models::quota::merge_stored_subscription_tier(self.quota.as_ref(), &mut quota);
         self.quota = Some(quota);
     }
 }
