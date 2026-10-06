@@ -287,7 +287,7 @@ pub async fn fetch_quota(
     email: &str,
     account_id: Option<&str>,
 ) -> crate::error::AppResult<(QuotaData, Option<String>)> {
-    fetch_quota_with_cache(access_token, email, None, account_id).await
+    fetch_quota_with_cache(access_token, email, None, account_id, None).await
 }
 
 /// Fetch quota with cache support
@@ -296,14 +296,34 @@ pub async fn fetch_quota_with_cache(
     email: &str,
     cached_project_id: Option<&str>,
     account_id: Option<&str>,
+    existing_quota: Option<&QuotaData>,
 ) -> crate::error::AppResult<(QuotaData, Option<String>)> {
     use crate::error::AppError;
+    use crate::models::quota::{
+        is_subscription_tier_fetch_needed, resolve_fetched_subscription_tier,
+    };
 
-    let fetched = fetch_project_id(access_token, email, account_id).await;
+    let now = chrono::Utc::now().timestamp();
+    let needs_tier_fetch = is_subscription_tier_fetch_needed(existing_quota, now);
+    let needs_project_fetch = cached_project_id.is_none();
+    let load_assist_needed = needs_tier_fetch || needs_project_fetch;
+
+    let fetched = if load_assist_needed {
+        fetch_project_id(access_token, email, account_id).await
+    } else {
+        (None, None)
+    };
+
     let project_id = fetched
         .0
         .or_else(|| cached_project_id.map(|pid| pid.to_string()));
-    let subscription_tier = fetched.1;
+    let fetched_tier = fetched.1.clone();
+    let subscription_tier = resolve_fetched_subscription_tier(
+        existing_quota,
+        fetched.1,
+        load_assist_needed,
+    );
+    let tier_from_network = load_assist_needed && fetched_tier.is_some();
 
     // We keep project_id to store in the DB, but we NO LONGER force inject it into payload if it's absent
 
@@ -356,6 +376,12 @@ pub async fn fetch_quota_with_cache(
                             let mut q = QuotaData::new();
                             q.is_forbidden = true;
                             q.subscription_tier = subscription_tier.clone();
+                            if tier_from_network {
+                                q.subscription_tier_fetched_at = Some(now);
+                            } else if let Some(existing) = existing_quota {
+                                q.subscription_tier_fetched_at =
+                                    existing.subscription_tier_fetched_at;
+                            }
                             return Ok((q, project_id.clone()));
                         }
 
@@ -443,6 +469,12 @@ pub async fn fetch_quota_with_cache(
 
                     // Set subscription tier
                     quota_data.subscription_tier = subscription_tier.clone();
+                    if tier_from_network {
+                        quota_data.subscription_tier_fetched_at = Some(now);
+                    } else if let Some(existing) = existing_quota {
+                        quota_data.subscription_tier_fetched_at =
+                            existing.subscription_tier_fetched_at;
+                    }
 
                     // Best-effort: fetch grouped quota summary (weekly + 5h windows).
                     // Failure here must not block the primary quota result.
@@ -642,7 +674,7 @@ pub async fn fetch_quota_inner(
     access_token: &str,
     email: &str,
 ) -> crate::error::AppResult<(QuotaData, Option<String>)> {
-    fetch_quota_with_cache(access_token, email, None, None).await
+    fetch_quota_with_cache(access_token, email, None, None, None).await
 }
 
 /// Batch fetch all account quotas (backup functionality)
@@ -800,6 +832,7 @@ pub async fn warm_up_all_accounts() -> Result<String, String> {
                         &account.email,
                         Some(&pid),
                         Some(&account.id),
+                        account.quota.as_ref(),
                     )
                     .await
                     .ok();
@@ -971,8 +1004,14 @@ pub async fn warm_up_account(account_id: &str) -> Result<String, String> {
     let email = account_owned.email.clone();
     let (token, pid) = get_valid_token_for_warmup(&account_owned).await?;
     let (fresh_quota, _) =
-        fetch_quota_with_cache(&token, &email, Some(&pid), Some(&account_owned.id))
-            .await
+        fetch_quota_with_cache(
+            &token,
+            &email,
+            Some(&pid),
+            Some(&account_owned.id),
+            account_owned.quota.as_ref(),
+        )
+        .await
             .map_err(|e| format!("Failed to fetch quota: {}", e))?;
 
     // [FIX] Use mark_account_forbidden on 403 during warmup to keep account and index files in sync and notify frontend

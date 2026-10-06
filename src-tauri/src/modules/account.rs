@@ -2419,6 +2419,7 @@ pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppR
             &account.email,
             account.token.project_id.as_deref(),
             Some(&account.id),
+            account.quota.as_ref(),
         )
         .await;
 
@@ -2515,6 +2516,7 @@ pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppR
                         &account.email,
                         account.token.project_id.as_deref(),
                         Some(&account.id),
+                        account.quota.as_ref(),
                     )
                     .await;
 

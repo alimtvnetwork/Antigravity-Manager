@@ -14,7 +14,7 @@ target_files:
   - src-tauri/src/modules/quota.rs — the branch that skips `fetch_project_id` when `cached_project_id` exists (~L293-297)
   - src-tauri/src/models/account.rs — `update_quota` (~L140-184)
   - src-tauri/src/models/quota.rs — `ensure_subscription_tier`, `normalize_subscription_tier`, `resolve_subscription_tier`, `tier_priority`
-status: pending
+status: done
 ---
 
 # 003 — Fetch and persist subscription tier independent of project id
@@ -54,8 +54,8 @@ cd src-tauri && cargo test modules::quota
 ```
 
 ## 7. Done When
-- [ ] A refresh with a cached project id yields a tier.
-- [ ] Tests above pass and fmt/clippy are clean.
+- [x] A refresh with a cached project id yields a tier.
+- [x] Tests above pass and fmt/clippy are clean.
 
 ## 8. Ambiguities and interim defaults
 - None open for this step.
