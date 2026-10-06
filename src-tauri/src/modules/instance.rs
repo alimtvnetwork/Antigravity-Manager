@@ -2241,25 +2241,39 @@ pub fn safe_clone_sqlite_db(src_db: &Path, dst_db: &Path) -> Result<(), String> 
     // Attempt 1: Online SQLite Backup API via read-only connection in immutable URI mode
     let try_backup = || -> Result<(), String> {
         let clean_src = src_db.to_string_lossy().replace('\\', "/");
-        let uri_primary = format!(
+        let uri_primary_ro = format!("file:///{}?mode=ro", clean_src.trim_start_matches('/'));
+        let uri_alt_ro = format!("file:{}?mode=ro", clean_src);
+        let uri_primary_imm = format!(
             "file:///{}?mode=ro&immutable=1",
             clean_src.trim_start_matches('/')
         );
-        let uri_alt = format!("file:{}?mode=ro&immutable=1", clean_src);
+        let uri_alt_imm = format!("file:{}?mode=ro&immutable=1", clean_src);
 
         let src_conn = rusqlite::Connection::open_with_flags(
-            &uri_primary,
+            &uri_primary_ro,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
         )
         .or_else(|_| {
             rusqlite::Connection::open_with_flags(
-                &uri_alt,
+                &uri_alt_ro,
                 rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
             )
         })
         .or_else(|_| {
             rusqlite::Connection::open_with_flags(
                 src_db,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+            )
+        })
+        .or_else(|_| {
+            rusqlite::Connection::open_with_flags(
+                &uri_primary_imm,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+            )
+        })
+        .or_else(|_| {
+            rusqlite::Connection::open_with_flags(
+                &uri_alt_imm,
                 rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
             )
         })
