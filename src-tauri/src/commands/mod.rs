@@ -31,6 +31,9 @@ pub use supabase::*;
 // 导出 telegram 命令
 pub mod telegram;
 pub use telegram::*;
+// 导出 fleet 命令 (GitMap Fleet Sync)
+pub mod fleet;
+pub use fleet::*;
 
 /// 列出所有账号
 #[tauri::command]

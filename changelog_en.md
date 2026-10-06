@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.159.0 (2026-10-06)**:
+        -   **[Fleet Accounts Deployment via GitMap Integration]**:
+            -   **Fleet Synchronization**: Integrated 1-click fleet account deployment in `UnifiedBackupModal`, communicating via Tauri IPC (`deploy_accounts_to_fleet`) to run `gitmap nodes deploy agm-accounts`, safely synchronizing local account configurations and auth tokens to all reachable fleet nodes with default central node isolation. (Thanks to @aukgit)
+
     *   **v4.158.0 (2026-10-05)**:
         -   **[CI Gate Syntax Resolution & Two-Phase Quota Selection Protocol]**:
             -   **CI Gate Fix**: Fixed closing delimiter mismatch in `src-tauri/src/modules/auto_switcher.rs` detected via `gitmap pe`, restoring `cargo fmt` formatting and compilation gates across all CI workflows. (Thanks to @aukgit)

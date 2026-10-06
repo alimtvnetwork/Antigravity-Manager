@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     ShieldCheck,
@@ -14,11 +14,18 @@ import {
     X,
     Eye,
     EyeOff,
+    Radio,
 } from 'lucide-react';
 import { request as invoke } from '../../utils/request';
 import { isTauri } from '../../utils/env';
 import { showToast } from '../common/ToastContainer';
-import { exportAccounts, addAccount } from '../../services/accountService';
+import {
+    exportAccounts,
+    addAccount,
+    deployAccountsToFleet,
+    checkGitmapAvailable,
+    type FleetDeployResult,
+} from '../../services/accountService';
 import { useAccountStore } from '../../stores/useAccountStore';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useInstanceStore } from '../../stores/useInstanceStore';
@@ -47,6 +54,12 @@ export function UnifiedBackupModal({ isOpen, onClose, initialTab = 'export' }: U
     const [showPassword, setShowPassword] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
 
+    // Fleet Deployment State
+    const [includeMainNode, setIncludeMainNode] = useState(false);
+    const [isDeployingFleet, setIsDeployingFleet] = useState(false);
+    const [gitmapAvailable, setGitmapAvailable] = useState<boolean | null>(null);
+    const [fleetDeployResult, setFleetDeployResult] = useState<FleetDeployResult | null>(null);
+
     // Import State
     const [importFileContent, setImportFileContent] = useState<string | null>(null);
     const [importFileName, setImportFileName] = useState<string | null>(null);
@@ -66,6 +79,14 @@ export function UnifiedBackupModal({ isOpen, onClose, initialTab = 'export' }: U
     const { accounts, fetchAccounts } = useAccountStore();
     const { config, loadConfig } = useConfigStore();
     const { instances, fetchInstances } = useInstanceStore();
+
+    useEffect(() => {
+        if (isOpen) {
+            checkGitmapAvailable()
+                .then((avail) => setGitmapAvailable(avail))
+                .catch(() => setGitmapAvailable(false));
+        }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
@@ -213,6 +234,37 @@ export function UnifiedBackupModal({ isOpen, onClose, initialTab = 'export' }: U
             showToast(`${t('common.error', 'Error')}: ${err?.message || err}`, 'error');
         } finally {
             setIsExporting(false);
+        }
+    };
+
+    const handleDeployToFleet = async () => {
+        setIsDeployingFleet(true);
+        setFleetDeployResult(null);
+        try {
+            const result = await deployAccountsToFleet(includeMainNode);
+            setFleetDeployResult(result);
+            if (result.success) {
+                showToast(
+                    result.message || t('backup.fleet_deploy_success', 'Fleet accounts deployed successfully!'),
+                    'success'
+                );
+            } else {
+                showToast(
+                    result.message || t('backup.fleet_deploy_failed', 'Fleet deployment failed.'),
+                    'error'
+                );
+            }
+        } catch (err: any) {
+            const errMsg = err?.message || String(err);
+            const failResult: FleetDeployResult = {
+                success: false,
+                message: errMsg,
+                raw_output: errMsg,
+            };
+            setFleetDeployResult(failResult);
+            showToast(`${t('common.error', 'Error')}: ${errMsg}`, 'error');
+        } finally {
+            setIsDeployingFleet(false);
         }
     };
 
@@ -577,6 +629,110 @@ export function UnifiedBackupModal({ isOpen, onClose, initialTab = 'export' }: U
                                         </div>
                                     </div>
                                 )}
+                            </div>
+
+                            {/* Fleet Deployment Card via GitMap */}
+                            <div className="p-4 bg-gradient-to-br from-indigo-50/70 via-purple-50/40 to-blue-50/50 dark:from-indigo-950/25 dark:via-purple-950/20 dark:to-slate-800/60 rounded-xl border border-indigo-200/80 dark:border-indigo-800/50 space-y-3.5 shadow-2xs">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-start gap-2.5">
+                                        <div className="p-2 rounded-lg bg-indigo-100/80 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 mt-0.5 shrink-0">
+                                            <Radio className="w-4 h-4 animate-pulse" />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
+                                                    {t('backup.fleet_deploy_title', 'Deploy to Fleet via GitMap')}
+                                                </span>
+                                                {gitmapAvailable !== null && (
+                                                    <span
+                                                        className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                                                            gitmapAvailable
+                                                                ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                                                                : 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
+                                                        }`}
+                                                    >
+                                                        {gitmapAvailable ? 'GitMap Ready' : 'GitMap CLI Missing'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                                                {t(
+                                                    'backup.fleet_deploy_subtitle',
+                                                    'Synchronize local AGM accounts and tokens across all open cluster nodes (u1, w1...) automatically via peer-to-peer encrypted SSH.'
+                                                )}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Toggle: Include 'main' node */}
+                                <div className="pt-2 border-t border-indigo-100 dark:border-indigo-900/40">
+                                    <label className="flex items-start justify-between gap-3 cursor-pointer">
+                                        <div>
+                                            <span className="text-xs font-medium text-gray-800 dark:text-gray-200">
+                                                {t('backup.fleet_include_main', "Include 'main' node")}
+                                            </span>
+                                            <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5 leading-tight">
+                                                {t(
+                                                    'backup.fleet_main_warning',
+                                                    "By default, the central orchestrator 'main' node is excluded to prevent accidental override."
+                                                )}
+                                            </p>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={includeMainNode}
+                                            onChange={(e) => setIncludeMainNode(e.target.checked)}
+                                            disabled={isDeployingFleet}
+                                            className="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                                        />
+                                    </label>
+                                </div>
+
+                                {/* Deploy Action & Status */}
+                                <div className="space-y-2 pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={handleDeployToFleet}
+                                        disabled={isDeployingFleet}
+                                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-50 rounded-xl shadow-xs transition-all cursor-pointer"
+                                    >
+                                        {isDeployingFleet ? (
+                                            <>
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                <span>{t('backup.fleet_deploying', 'Deploying to Fleet...')}</span>
+                                            </>
+                                        ) : (
+                                            <span>🚀 Deploy to Fleet</span>
+                                        )}
+                                    </button>
+
+                                    {fleetDeployResult && (
+                                        <div
+                                            className={`p-3 rounded-lg border text-xs animate-in fade-in space-y-1 ${
+                                                fleetDeployResult.success
+                                                    ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-300'
+                                                    : 'bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/40 text-rose-900 dark:text-rose-300'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-1.5 font-semibold">
+                                                {fleetDeployResult.success ? (
+                                                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                                ) : (
+                                                    <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                                                )}
+                                                <span>{fleetDeployResult.message}</span>
+                                            </div>
+                                            {fleetDeployResult.raw_output &&
+                                                fleetDeployResult.raw_output.trim() !== '' &&
+                                                fleetDeployResult.raw_output !== 'null' && (
+                                                    <pre className="text-[10px] mt-1 p-2 bg-black/5 dark:bg-black/30 rounded overflow-x-auto font-mono max-h-24 whitespace-pre-wrap">
+                                                        {fleetDeployResult.raw_output}
+                                                    </pre>
+                                                )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </>
                     ) : (

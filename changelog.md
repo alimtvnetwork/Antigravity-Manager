@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.159.0] - 2026-10-06
+
+### Added
+- **Fleet Accounts Deployment via GitMap (集群账号同步与一键分发)**: 在 `UnifiedBackupModal` 弹窗中新增“Deploy to Fleet via GitMap”集群账号一键同步功能；通过后端 Tauri IPC 接口 (`deploy_accounts_to_fleet` / `check_gitmap_available`) 调用本地 `gitmap nodes deploy agm-accounts` 命令，将本地 AGM 账号配置与认证令牌（`accounts.json`, `accounts/`, `user_tokens.db`）安全加密流式传输并解压分发至所有在线的集群节点（u1, w1 等），支持 `--include-main` 选项且默认排除中央控制节点以确保安全。 (Thanks to @aukgit)
+
+---
+
 ## [v4.158.0] - 2026-10-05
 
 ### Fixed
@@ -698,6 +705,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.159.0 (2026-10-06)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.158.0 (2026-10-05)**:
         -   **[Pipeline CI Fix & Two-Phase 4H / Weekly Hours-Remaining Quota Model]**:
             -   **Description**: Resolved unexpected closing delimiter in `auto_switcher.rs` test module reported by `gitmap pe`, restoring `cargo fmt` and compilation gate across macOS, Linux, and Windows CI; formalized two-phase 4-hour quota candidate selection with strict 100% primary gate and graceful proportional degradation fallback, powered by hours-remaining inverted weekly quota distance weighting. (Thanks to @aukgit)

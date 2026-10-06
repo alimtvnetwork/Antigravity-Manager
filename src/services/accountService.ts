@@ -227,3 +227,22 @@ export async function exportAccounts(accountIds: string[]): Promise<ExportAccoun
 export async function updateAccountLabel(accountId: string, label: string): Promise<void> {
     return await invoke('update_account_label', { accountId, label });
 }
+
+// Fleet Deployment via GitMap
+export interface FleetDeployResult {
+    success: boolean;
+    message: string;
+    raw_output: string;
+    rawOutput?: string;
+}
+
+export async function checkGitmapAvailable(): Promise<boolean> {
+    return await invoke('check_gitmap_available');
+}
+
+export async function deployAccountsToFleet(
+    includeMain?: boolean,
+    exceptNodes?: string[]
+): Promise<FleetDeployResult> {
+    return await invoke('deploy_accounts_to_fleet', { includeMain, exceptNodes });
+}

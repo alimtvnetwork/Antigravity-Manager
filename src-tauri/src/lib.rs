@@ -1162,6 +1162,10 @@ pub fn run() {
             commands::close_window,
             commands::is_window_maximized,
             commands::set_window_theme,
+            // GitMap Fleet Deployment commands
+            commands::check_gitmap_available,
+            commands::check_gitmap_installed,
+            commands::deploy_accounts_to_fleet,
         ])
 
 
