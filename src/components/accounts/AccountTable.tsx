@@ -36,9 +36,6 @@ import {
     Info,
     Lock,
     Ban,
-    Diamond,
-    Gem,
-    Circle,
     ToggleLeft,
     ToggleRight,
     Sparkles,
@@ -592,14 +589,16 @@ function AccountRowContent({
                             </span>
                         )}
                         {/* 优先级徽章 */}
-                        <PriorityBadge
-                            priority={account.priority}
-                            accountId={account.id}
-                            onUpdatePriority={onUpdatePriority}
-                            isEditing={editingPriority}
-                            onEditChange={setEditingPriority}
-                            size="xs"
-                        />
+                        {showPriority && (
+                            <PriorityBadge
+                                priority={account.priority}
+                                accountId={account.id}
+                                onUpdatePriority={onUpdatePriority}
+                                isEditing={editingPriority}
+                                onEditChange={setEditingPriority}
+                                size="xs"
+                            />
+                        )}
                         {/* 远程节点租赁徽章 */}
                         {leaseInfo && (
                             <span

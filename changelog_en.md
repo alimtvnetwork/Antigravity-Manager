@@ -3,6 +3,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.161.0 (2026-10-06)**:
+        -   **[E2E Testing for Account Switch, IDE Detection, Prompt Tracking & Release Gates]**:
+            -   **Compilation & Build Gates**: Resolved Rust logging macro compile error in `src-tauri/src/modules/account.rs` (`tracing::info!`); fixed TypeScript build errors across `src/pages/Accounts.tsx`, `src/pages/Instances.tsx`, `src/components/accounts/AccountCard.tsx`, and `AccountTable.tsx`; verified clean Vite and Cargo builds. (Thanks to @aukgit)
+            -   **End-to-End Account Switch & Prompt Continuity**: Verified multi-instance profile isolation, conscious PID matching, running IDE discovery, running and queued prompt lifecycle tracking, project last conversation extraction, and split SQLite audit logging across CLI, IPC, and UI. (Thanks to @aukgit)
+
     *   **v4.160.0 (2026-10-06)**:
         -   **[Awan Cloud Design Modernization, UI/UX Contrast & Global CSS3 Transitions]**:
             -   **Design & Contrast Modernization**: Harmonized entire UI with official Awan Software specifications (`Deep Orbit #071a27`, `Cloud Field #f5faf9`, `Lift Blue #2878f0`, `Vector Green #16a97a`, `Plasma Mint #43d6a2`); resolved dark-on-dark contrast issues in instance selection, account cards, and table headers; enabled universal 250ms CSS3 transition and `.awan-glow-pulse` animations; unified Option A selected highlight with 6px amber-400 rail and high-contrast amber active pills. (Thanks to @aukgit)
