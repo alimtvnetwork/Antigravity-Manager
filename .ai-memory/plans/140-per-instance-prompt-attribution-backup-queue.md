@@ -6,6 +6,7 @@ Owner: any AI agent (this file is the instruction; follow it in order)
 Spec: `02-spec/21-app/140-per-instance-prompt-attribution-backup-queue/01-architecture-spec.md` and `02-spec/21-app/140-per-instance-prompt-attribution-backup-queue/02-component-and-e2e-spec.md`
 RCA: `02-spec/22-app-issues/34-per-instance-prompt-identity-lost-rca.md`
 Subtasks: `.ai-memory/plans/subtasks/140-per-instance-prompt-attribution-backup-queue/` (index: `index.md`)
+Implementers start here: `.ai-memory/plans/subtasks/140-per-instance-prompt-attribution-backup-queue/06-blind-executor/00-start-here.md` (steps 01 to 22, decisions DR-1 to DR-7 settled)
 Memory: `.ai-memory/memory/learned/25-per-instance-prompt-attribution-and-e2e-testing.md`
 Read first: `.ai-memory/what-to-read.md`, `.ai-memory/memory/learned/24-code-failure-decoding-and-fast-codebase-learning-skill.md`, `.ai-memory/strictly-avoid.md`
 
