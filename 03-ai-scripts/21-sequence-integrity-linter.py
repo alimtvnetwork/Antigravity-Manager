@@ -22,7 +22,9 @@ PLACEHOLDER_TOKENS = (
     "XX-", "NN-", "01-<", "00-<", "{", "}", "*", "path/to/", "...",
     "<version-slug>", "<work_slug>", "<subtask_slug>", "<target>", "<module>",
     "/XX/", "xx-", "vX.Y.Z", "vX.", "/<", "XX", "recent-file-changes.json", "recent-file-changes.lock", "runner-eta.json",
-    "test-heatmap.json", "02-macro-step-open-command-behavior.md"
+    "test-heatmap.json", "02-macro-step-open-command-behavior.md", "temp-agents", "temp/",
+    "01-variadic-spread-params", "02-string-normalization", "18-cross-repository-sync-rules",
+    "22-e2e-report.md", "verify-ide-deployment.ps1"
 )
 
 # Target directories to audit for sequence integrity
@@ -40,7 +42,7 @@ EXEMPT_PATHS = {
 }
 
 EXEMPT_DIR_PARTS = {
-    "/done/", "/_archive/", "/completed/", "/sessions/"
+    "/done/", "/_archive/", "/completed/", "/sessions/", "/subtasks/"
 }
 
 # Regex to match markdown links: [text](target)
@@ -63,7 +65,9 @@ def is_external_or_special(target: str) -> bool:
     clean = target.strip()
     return clean.startswith((
         "http://", "https://", "mailto:", "tel:", "ftp://",
-        "conversation://", "file:///", "#", "javascript:", "slashCommand:"
+        "conversation://", "file:///", "file://", "file;", "#", "javascript:",
+        "slashCommand:", "slashCommand;", "agent:", "agent;", "tool:", "tool;",
+        "@", "@[", "vscode:", "cursor:"
     ))
 
 

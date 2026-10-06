@@ -5,7 +5,7 @@ Raised: 2026-09-30
 Problem class (one PR scope): Multi-instance switching and auto-switch
 Spec: [02-spec/21-app/85-instance-switch-update-integrity-ui-fixes-and-supabase-vault.md](../../../02-spec/21-app/85-instance-switch-update-integrity-ui-fixes-and-supabase-vault.md)
 Subtasks: [index](../subtasks/87-instance-switch-prompt-continuity-and-auto-switch-cli-scheduler/index.md)
-Related: [85](./85-ui-tier-badge-priority-highlight-focus-and-stack-trace.md), [86](./86-update-integrity-asset-verification-and-release-gates.md), [88](./88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts.md); pending plan [75](./75-multi-instance-switching-prompt-backup-and-hygiene.md) overlaps on prompt backup and E2E
+Related: [85](../completed/85-ui-tier-badge-priority-highlight-focus-and-stack-trace.md), [86](./86-update-integrity-asset-verification-and-release-gates.md), [88](./88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts.md); pending plan [75](./75-multi-instance-switching-prompt-backup-and-hygiene.md) overlaps on prompt backup and E2E
 
 ## Context
 

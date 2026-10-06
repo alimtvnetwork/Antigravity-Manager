@@ -7,7 +7,7 @@ use antigravity_tools_lib::models::quota::{ModelQuota, QuotaData};
 use antigravity_tools_lib::models::token::TokenData;
 use antigravity_tools_lib::modules::auto_switcher::{
     calculate_4h_window_quota, calculate_account_quota, calculate_next_interval_seconds,
-    calculate_weekly_window_quota, evaluate_account_period_status, get_daemon_status,
+    evaluate_account_period_status, get_daemon_status,
 };
 use antigravity_tools_lib::modules::instance::{
     get_instance_workspace_paths, restore_and_inject_prompts_for_instance,

@@ -5,7 +5,7 @@ Raised: 2026-09-30
 Problem class (one PR scope): Update and release integrity
 Spec: [02-spec/21-app/85-instance-switch-update-integrity-ui-fixes-and-supabase-vault.md](../../../02-spec/21-app/85-instance-switch-update-integrity-ui-fixes-and-supabase-vault.md)
 Subtasks: [index](../subtasks/86-update-integrity-asset-verification-and-release-gates/index.md)
-Related: [85](./85-ui-tier-badge-priority-highlight-focus-and-stack-trace.md), [87](./87-instance-switch-prompt-continuity-and-auto-switch-cli-scheduler.md), [88](./88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts.md); CI/CD issue [39](../../cicd-issues/39-release-published-with-missing-artifacts-rca.md); spec [22-app-issues/20](../../../02-spec/22-app-issues/20-installer-upstream-fork-inversion-rca.md)
+Related: [85](../completed/85-ui-tier-badge-priority-highlight-focus-and-stack-trace.md), [87](./87-instance-switch-prompt-continuity-and-auto-switch-cli-scheduler.md), [88](./88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts.md); CI/CD issue [39](../../cicd-issues/39-release-published-with-missing-artifacts-rca.md); spec [22-app-issues/20](../../../02-spec/22-app-issues/20-installer-upstream-fork-inversion-rca.md)
 
 ## Context
 

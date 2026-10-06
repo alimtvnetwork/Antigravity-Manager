@@ -5,7 +5,7 @@ Raised: 2026-09-30
 Problem class (one PR scope): Data hygiene (email) and Supabase/vault tooling
 Spec: [02-spec/21-app/85-instance-switch-update-integrity-ui-fixes-and-supabase-vault.md](../../../02-spec/21-app/85-instance-switch-update-integrity-ui-fixes-and-supabase-vault.md)
 Subtasks: [index](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/index.md)
-Related: [85](./85-ui-tier-badge-priority-highlight-focus-and-stack-trace.md), [86](./86-update-integrity-asset-verification-and-release-gates.md), [87](./87-instance-switch-prompt-continuity-and-auto-switch-cli-scheduler.md); completed plans [71](../completed/71-supabase-multi-machine-hierarchy-and-cli-e2e.md), [74](../completed/74-ui-email-telegram-fixes-revisit.md)
+Related: [85](../completed/85-ui-tier-badge-priority-highlight-focus-and-stack-trace.md), [86](./86-update-integrity-asset-verification-and-release-gates.md), [87](./87-instance-switch-prompt-continuity-and-auto-switch-cli-scheduler.md); completed plans [71](../completed/71-supabase-multi-machine-hierarchy-and-cli-e2e.md), [74](../completed/74-ui-email-telegram-fixes-revisit.md)
 
 ## Context
 
