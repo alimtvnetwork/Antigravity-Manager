@@ -1,10 +1,11 @@
 # What to Read
 
 > Canonical map of what the AI must read before working on this project.
-> Last updated: 2026-10-06T01:45:00Z
+> Last updated: 2026-10-06T01:55:00Z
 
 ## Changelog
 
+- 2026-10-06T01:55:00Z, MANDATORY instruction skill added: `.ai-memory/memory/learned/24-code-failure-decoding-and-fast-codebase-learning-skill.md` (pointer `.agents/skills/agm-code-failure-decoding/skill.md`). Read it before any code edit. It covers the ten-minute orientation protocol, failure classes A to K with commit evidence (edit-tool delimiter breakage `01b48a06`, deleted variable `4c28ecf8`, PathBuf vs String and Drop move RCA 43, rusqlite borrow `5bb32c51`, non-exhaustive enum `f549e559`, tauri async runtime `2bbcba13`, 12 of 30 commits fmt-only fixes, wrong key issue 62), the learn-from-failure loop, syntax rules, and the local gate.
 - 2026-10-06T01:45:00Z, Memory write for the 2026-10-02 switch session. `366d84e5` (shipped v4.126.0): the default switch audit reads prompts by instance id `"default"`, not by `target_ide`; `is_instance_running` recovers the real PID when the saved macOS `open` wrapper PID is gone. Read `.ai-memory/memory/learned/23-switch-audit-default-key-and-wrapper-pid-recovery.md` (verbatim directives, safety constraints, last-30-commit audit) and `.ai-memory/issues/62-switch-audit-wrong-key-and-macos-wrapper-pid-rca.md`. Open ambiguity `02-is-instance-running-saved-pid-fast-path.md`: v4.155.0 scans on every call even when the saved PID matches; do not change it before the user answers. Pending plan 139. Last 20 tasks: `.ai-memory/plans/readme.md` "Recent Completed Tasks Register". New index `.ai-memory/memory/readme.md`.
 - 2026-10-04T01:31:00Z, Release v4.130.0 resolved startup white screen crash by replacing `tokio::runtime::Runtime::new()` and raw `tokio::spawn` calls in Tauri async commands (instance creation, auto-switcher save) and background schedulers (warmup, prompt queue, PID quota sync) with `tauri::async_runtime::block_on` and `tauri::async_runtime::spawn`.
 - 2026-10-03T23:30:00Z, Fixed account `SwitchFacts` struct initializer in `src-tauri/src/modules/account.rs` by supplying missing `steps: None` field.
@@ -58,7 +59,7 @@
 - `git log -n 10 --stat`, why: inspect the last 10 commits to understand recent file changes, what code/docs were touched, and the latest repository state before starting any task
 - `.ai-memory/what-to-read.md`, why: authoritative prioritized reading sequence that must be read and followed before touching any files
 - `version.json`, why: single source of truth for the repository version, backend/frontend sections, and sub-package version tracks. All codebases must import this file for version information.
-- `.ai-memory/memory/readme.md`, why: master memory index (learned 01 to 23) that points to the full historical `01-index.md`
+- `.ai-memory/memory/readme.md`, why: master memory index (learned 01 to 24) that points to the full historical `01-index.md`
 - `.ai-memory/plans/readme.md`, why: plan index and the "Recent Completed Tasks Register" (last 20 tasks, newest first)
 - `.ai-memory/memory/01-index.md`, why: core memory index
 - `.ai-memory/memory/learned/01-project-context-and-guidelines.md`, why: canonical learned memory of repo identity, CODE RED rules, coding guidelines, error philosophy, and active plans
@@ -102,6 +103,8 @@
 - `03-ai-scripts/01-index.md`, why: inventory and usage guidelines for automation tools and local CI runners
 
 ## Before writing code
+
+- `.ai-memory/memory/learned/24-code-failure-decoding-and-fast-codebase-learning-skill.md`, why: MANDATORY. How code fails here (classes A to K), how to learn from a failure, syntax-writing rules, and the fmt/clippy/test/build gate
 
 - `02-spec/21-app/16-email-dispatch-mailbox-remote-management-and-split-security-db.md`, why: authoritative specification for email dispatch, split security passwords vault, and remote execution bridge
 - `02-spec/21-app/17-email-intelligence-acknowledgment-and-universal-import-export.md`, why: authoritative specification for inbound email command intelligence, fuzzy typo matching, immediate acknowledgment receipts, and universal settings import/export with reversible multi-pass Base64 obfuscation

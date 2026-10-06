@@ -483,3 +483,21 @@ Allowed work:
 
 **Why:** The default switch audit row was empty because the snapshot was read by IDE flavor, and macOS instances showed stopped because the wrapper PID had exited (fixed in `366d84e5`, shipped v4.126.0).
 
+---
+
+## Partial-Block Edits and One-Compile-Error-Per-Release Pushes - TOTAL BAN
+
+Added 2026-10-06. Source: `.ai-memory/memory/learned/24-code-failure-decoding-and-fast-codebase-learning-skill.md` Parts 2 and 4.
+
+Forbidden:
+- Replacing or patching a code range (StrReplace, `gitmap pe`, scripted patch) that starts or ends in the middle of a block without re-reading the whole enclosing function afterwards (`01b48a06` dropped a `#[test] fn` header; a 2026-10-02 edit duplicated one `#[test]` and dropped another).
+- Deleting or moving a `let` without grepping its other uses (`4c28ecf8`).
+- Adding a struct field without updating every `StructName {` initializer, including tests (`SwitchFacts.steps`, 2026-10-03).
+- Assuming a return type instead of reading the signature (RCA 43, `PathBuf` vs `String`).
+- Pushing a Rust fix before `cargo fmt -- --check` and `cargo clippy --all-targets --all-features` pass locally. v4.145.0 to v4.148.0 each shipped one compile fix because the next error was only found by CI.
+
+Allowed work:
+- Anchor edits on a unique line such as the `fn` signature, read the edited region back, then run the full local gate in learned 24 Part 5.
+
+**Why:** 12 of the last 30 commits were fmt or compile fixes, and four release versions were burned on errors a local clippy run would have shown in one pass.
+
