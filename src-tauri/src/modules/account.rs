@@ -1417,16 +1417,18 @@ pub fn delete_account(account_id: &str) -> Result<(), String> {
     let original_len = index.accounts.len();
     index.accounts.retain(|s| s.id != account_id);
 
-    if index.accounts.len() == original_len {
-        return Err(format!("Account ID not found: {}", account_id));
+    // If account was present in index, update current account and persist index
+    if index.accounts.len() != original_len {
+        if index.current_account_id.as_deref() == Some(account_id) {
+            index.current_account_id = index.accounts.first().map(|s| s.id.clone());
+        }
+        save_account_index(&index)?;
+    } else {
+        log::info!(
+            "[delete_account] Account ID {} already absent from index; proceeding with idempotent cleanup",
+            account_id
+        );
     }
-
-    // Clear current account if it's being deleted
-    if index.current_account_id.as_deref() == Some(account_id) {
-        index.current_account_id = index.accounts.first().map(|s| s.id.clone());
-    }
-
-    save_account_index(&index)?;
 
     // Delete account file
     let accounts_dir = get_accounts_dir()?;

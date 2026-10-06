@@ -87,6 +87,7 @@ function Accounts() {
   const [detailsAccount, setDetailsAccount] = useState<Account | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isBatchDelete, setIsBatchDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [toggleProxyConfirm, setToggleProxyConfirm] = useState<{
     accountId: string;
     enable: boolean;
@@ -435,7 +436,9 @@ function Accounts() {
   };
 
   const executeBatchDelete = async () => {
-    setIsBatchDelete(false);
+    if (selectedIds.size === 0 || isDeleting) return;
+
+    setIsDeleting(true);
     try {
       const ids = Array.from(selectedIds);
       console.log("[Accounts] Batch deleting:", ids);
@@ -443,30 +446,37 @@ function Accounts() {
       setSelectedIds(new Set());
       console.log("[Accounts] Batch delete success");
       showToast(t("common.success"), "success");
+      setIsBatchDelete(false);
     } catch (error) {
       console.error("[Accounts] Batch delete failed:", error);
       showToast(`${t("common.error")}: ${error}`, "error");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   const handleDelete = (accountId: string) => {
+    if (isDeleting) return;
     console.log("[Accounts] Request to delete:", accountId);
     setDeleteConfirmId(accountId);
   };
 
   const executeDelete = async () => {
-    if (!deleteConfirmId) return;
+    if (!deleteConfirmId || isDeleting) return;
 
+    setIsDeleting(true);
+    const idToDelete = deleteConfirmId;
     try {
-      console.log("[Accounts] Executing delete for:", deleteConfirmId);
-      await deleteAccount(deleteConfirmId);
+      console.log("[Accounts] Executing delete for:", idToDelete);
+      await deleteAccount(idToDelete);
       console.log("[Accounts] Delete success");
       showToast(t("common.success"), "success");
+      setDeleteConfirmId(null);
     } catch (error) {
       console.error("[Accounts] Delete failed:", error);
       showToast(`${t("common.error")}: ${error}`, "error");
     } finally {
-      setDeleteConfirmId(null);
+      setIsDeleting(false);
     }
   };
 
@@ -1113,8 +1123,10 @@ function Accounts() {
         type="confirm"
         confirmText={t("common.delete")}
         isDestructive={true}
+        isLoading={isDeleting}
         onConfirm={isBatchDelete ? executeBatchDelete : executeDelete}
         onCancel={() => {
+          if (isDeleting) return;
           setDeleteConfirmId(null);
           setIsBatchDelete(false);
         }}
