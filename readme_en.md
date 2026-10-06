@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.161.0)
+> Professional AI Account Management & Protocol Proxy System (v4.162.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.161.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.162.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.161.0**: Resolved paused interactive rebase state and aligned working tree cleanly with remote; hardened compiler quality gates by resolving Rust logging macro in `account.rs` (`tracing::info!`) and fixing 12 TypeScript compiler diagnostics across account cards, tables, and instances; verified end-to-end multi-instance account switching, conscious PID detection, running and queued prompt discovery, project conversation tracking, and 5-second prompt heartbeat continuity across CLI, IPC, and UI. (Thanks to @aukgit)
+> Latest version **v4.162.0**: Hardened local CI/CD runner test inventory parsing (`06-cicd-local-runner.py`) supporting both list and dictionary schemas; expanded sequence integrity linter exemptions (`21-sequence-integrity-linter.py`); purged unused imports in `auto_switcher_e2e_test.rs`; synchronized AI memory pending plan roadmaps and index documentation; verified 100% clean pre-flight quality gates across Rust clippy, fmt, and Vite frontend builds. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → CHANGELOG_EN.md](CHANGELOG_EN.md)**
 

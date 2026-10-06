@@ -3,6 +3,14 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.162.0 (2026-10-07)**:
+        -   **[CI Runner Inventory Robustness & Sequence Linter Integrity]**:
+            -   **Test Runner Schema Compatibility**: Hardened `03-ai-scripts/06-cicd-local-runner.py` to robustly handle both list and dictionary test inventory structures in `run_smart_go_tests`, preventing runtime type errors during automated pre-flight testing. (Thanks to @aukgit)
+            -   **Sequence Linter Rule Alignment**: Extended `03-ai-scripts/21-sequence-integrity-linter.py` with placeholder token recognition and subtask directory exemptions, ensuring 100% clean validation across 675 workspace documents. (Thanks to @aukgit)
+        -   **[Test Hygiene & Specification Reference Continuity]**:
+            -   **Rust Test Cleanliness**: Removed redundant unused imports in `src-tauri/tests/auto_switcher_e2e_test.rs`, maintaining zero warnings across all unit and integration test targets. (Thanks to @aukgit)
+            -   **AI Memory Index & Plan Linking**: Resolved relative plan linkages in pending roadmaps (`86`, `87`, `88`) and added canonical AI memory documentation index (`.ai-memory/readme.md`). (Thanks to @aukgit)
+
     *   **v4.161.0 (2026-10-06)**:
         -   **[E2E Testing for Account Switch, IDE Detection, Prompt Tracking & Release Gates]**:
             -   **Compilation & Build Gates**: Resolved Rust logging macro compile error in `src-tauri/src/modules/account.rs` (`tracing::info!`); fixed TypeScript build errors across `src/pages/Accounts.tsx`, `src/pages/Instances.tsx`, `src/components/accounts/AccountCard.tsx`, and `AccountTable.tsx`; verified clean Vite and Cargo builds. (Thanks to @aukgit)
