@@ -26,19 +26,16 @@ export function QuotaProgressBar({
     isWeekly = false,
     isWeeklyConstrained = false,
     className,
-    heightClassName = "h-2.5",
-    checkpoints = [100, 75, 50, 25],
+    heightClassName = "h-3.5",
+    checkpoints = [100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0],
     showCheckpoints = true,
     Icon,
 }: QuotaProgressBarProps) {
     const clamped = Math.min(100, Math.max(0, Number.isFinite(percentage) ? percentage : 0));
 
-    // Tier thresholds: Critical(red) → Warning(orange) → Healthy(green) → Excellent(neon green)
-    const getTrackGradient = (pct: number) => {
-        if (pct >= 75) return 'bg-gradient-to-r from-emerald-400 to-[#1af18d]';
-        if (pct >= 50) return 'bg-gradient-to-r from-emerald-500 to-[#1af18d]';
-        if (pct >= 25) return 'bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500';
-        return 'bg-gradient-to-r from-orange-500 via-rose-500 to-rose-600';
+    // Continuous left-to-right color blend from warning red to prominent vibrant green
+    const getTrackGradient = (_pct?: number) => {
+        return 'bg-gradient-to-r from-rose-500 via-amber-400 via-emerald-400 to-[#1af18d]';
     };
 
     const getTrackGlow = (pct: number) => {
@@ -62,29 +59,30 @@ export function QuotaProgressBar({
         }
     };
 
-    // Milestone bubble styling — neon green glow on top 2 nodes
-    const getNodeStyle = (idx: number, isFilled: boolean) => {
+    // Milestone bubble styling based on percentage value
+    const getNodeStyle = (checkpoint: number, isFilled: boolean) => {
         if (!isFilled) {
             return 'bg-slate-200/50 dark:bg-[#0c2438] border border-slate-300 dark:border-[#15334d]/60 shadow-none';
         }
-        switch (idx) {
-            case 0: // 100% node
-                return 'bg-[#1af18d] border-[1.5px] border-emerald-300 shadow-[0_0_8px_rgba(26,241,141,0.85)]';
-            case 1: // 75% node
-                return 'bg-emerald-400 border-[1.5px] border-emerald-300 shadow-[0_0_6px_rgba(26,241,141,0.6)]';
-            case 2: // 50% node
-                return 'bg-amber-400 dark:bg-amber-500 border-[1.5px] border-amber-300 dark:border-amber-400 shadow-none';
-            case 3: // 25% node
-                return 'bg-orange-500 border-[1.5px] border-orange-400 shadow-none';
-            default:
-                return 'bg-rose-500 border-[1.5px] border-rose-400 shadow-none';
+        if (checkpoint >= 80) {
+            return 'bg-[#1af18d] border-[1.5px] border-emerald-300 shadow-[0_0_8px_rgba(26,241,141,0.85)]';
         }
+        if (checkpoint >= 60) {
+            return 'bg-emerald-400 border-[1.5px] border-emerald-300 shadow-none';
+        }
+        if (checkpoint >= 40) {
+            return 'bg-amber-400 dark:bg-amber-500 border-[1.5px] border-amber-300 dark:border-amber-400 shadow-none';
+        }
+        if (checkpoint >= 20) {
+            return 'bg-orange-500 border-[1.5px] border-orange-400 shadow-none';
+        }
+        return 'bg-rose-500 border-[1.5px] border-rose-400 shadow-none';
     };
 
     const sortedCheckpoints = [...checkpoints].sort((a, b) => b - a);
 
     return (
-        <div className={cn("w-full flex items-center gap-2", className)}>
+        <div className={cn("w-[82%] max-w-[82%] flex items-center gap-2", className)}>
             <style>{`
                 @keyframes agm-water-shimmer {
                     0% { transform: translateX(-100%); }
@@ -127,7 +125,7 @@ export function QuotaProgressBar({
                 </div>
 
                 {/* Milestone Checkpoint Nodes */}
-                {showCheckpoints && sortedCheckpoints.map((cp, idx) => {
+                {showCheckpoints && sortedCheckpoints.map((cp) => {
                     const isFilled = clamped >= cp;
                     const leftPos = cp >= 100 ? '100%' : cp <= 0 ? '0%' : `${cp}%`;
                     const transform = cp >= 100 ? 'translate(-100%, -50%)' : cp <= 0 ? 'translate(0, -50%)' : 'translate(-50%, -50%)';
@@ -136,15 +134,15 @@ export function QuotaProgressBar({
                         <div
                             key={cp}
                             className={cn(
-                                "absolute top-1/2 w-3 h-3 rounded-full flex items-center justify-center transition-all duration-300 z-10 pointer-events-none",
-                                getNodeStyle(idx, isFilled)
+                                "absolute top-1/2 w-3.5 h-3.5 rounded-full flex items-center justify-center transition-all duration-300 z-10 pointer-events-none",
+                                getNodeStyle(cp, isFilled)
                             )}
                             style={{ left: leftPos, transform }}
                             title={`Checkpoint ${cp}%`}
                         >
                             <svg
                                 className={cn(
-                                    "w-1.5 h-1.5 fill-none stroke-current transition-colors",
+                                    "w-2 h-2 fill-none stroke-current transition-colors",
                                     isFilled ? "text-white stroke-[2.5]" : "text-gray-400/50 dark:text-white/30 stroke-[2.2]"
                                 )}
                                 viewBox="0 0 12 12"

@@ -90,6 +90,13 @@ interface PromptTreeViewModalProps {
 
 type ViewMode = 'preview' | 'raw' | 'edit';
 
+// Helper to format GitMap dual sequence badge [AGM:P001 | GM:#1] or [AGM:C001 | GM:<cid>]
+function formatDualBadge(agmCode: string | undefined, defaultAgm: string, gmCode: string | undefined, defaultGm: string): string {
+    const agm = agmCode ? (agmCode.startsWith('AGM:') ? agmCode : `AGM:${agmCode}`) : `AGM:${defaultAgm}`;
+    const gm = gmCode ? (gmCode.startsWith('GM:') ? gmCode : `GM:${gmCode}`) : `GM:${defaultGm}`;
+    return `[${agm} | ${gm}]`;
+}
+
 // Helper to count words
 function countWords(str: string): number {
     const trimmed = str.trim();
@@ -1570,6 +1577,17 @@ export default function PromptTreeViewModal({
             >
                 <div className="flex items-center gap-1.5 min-w-0">
                     <MessageSquare className={cn('h-3.5 w-3.5 shrink-0', isConvSelected ? 'text-white' : 'text-blue-500 opacity-70')} />
+                    <span
+                        className={cn(
+                            'text-[9px] font-mono px-1 py-0.2 rounded-[3px] shrink-0 font-medium whitespace-nowrap',
+                            isConvSelected
+                                ? 'bg-blue-700/80 text-white'
+                                : 'bg-slate-200/90 dark:bg-[#15334d] text-slate-600 dark:text-cyan-300'
+                        )}
+                        title="GitMap Dual Sequence Badge"
+                    >
+                        {formatDualBadge(conv.seq_code, 'C001', conv.gitmap_seq_code, conv.short_id || conv.conversation_id.slice(0, 8))}
+                    </span>
                     <span className="truncate text-[11px]">
                         {conv.title || conv.short_id || conv.conversation_id.slice(0, 8)}
                     </span>
@@ -1656,6 +1674,17 @@ export default function PromptTreeViewModal({
                             <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                         )}
                         <Folder className="h-4 w-4 text-amber-500 shrink-0" />
+                        <span
+                            className={cn(
+                                'text-[9px] font-mono px-1 py-0.2 rounded-[3px] shrink-0 font-medium whitespace-nowrap',
+                                isProjectSelected
+                                    ? 'bg-blue-600/20 text-blue-700 dark:text-cyan-300 border border-blue-500/30'
+                                    : 'bg-slate-200 dark:bg-[#15334d] text-slate-600 dark:text-cyan-400'
+                            )}
+                            title="GitMap Dual Sequence Badge"
+                        >
+                            {formatDualBadge(project.seq_code, 'P001', project.gitmap_seq_code, `#${project.seq_id || 1}`)}
+                        </span>
                         <span className="truncate">{project.repo_name}</span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
@@ -1815,11 +1844,11 @@ export default function PromptTreeViewModal({
 
                     {/* Toolbar Capsule */}
                     <div className="flex items-center gap-2">
-                        <div className="flex items-center rounded-[5px] bg-slate-100 dark:bg-[#0c2438] border border-slate-200 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+                        <div className="flex items-center rounded-[4px] bg-slate-100 dark:bg-[#0c2438] border border-slate-200 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
                             <button
                                 type="button"
                                 onClick={handleBackup}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-[5px] transition-colors cursor-pointer"
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-l-[4px] rounded-r-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title="Backup Prompts to JSON"
                             >
                                 <Download className="w-3.5 h-3.5 text-indigo-500" />
@@ -1828,7 +1857,7 @@ export default function PromptTreeViewModal({
                             <button
                                 type="button"
                                 onClick={handleRestore}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-[5px] transition-colors cursor-pointer"
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title="Restore Running Prompts (7s stabilization delay)"
                             >
                                 <Upload className="w-3.5 h-3.5 text-emerald-500" />
@@ -1838,13 +1867,13 @@ export default function PromptTreeViewModal({
                                 type="button"
                                 onClick={() => loadTree(true, true)}
                                 disabled={isLoading}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-[5px] transition-colors cursor-pointer"
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title="Refresh Tree"
                             >
                                 <RefreshCw className={cn('w-3.5 h-3.5 text-blue-500', isLoading && 'animate-spin')} />
                                 <span>Refresh</span>
                             </button>
-                            <div className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 rounded-none">
                                 <Clock className={cn("w-3.5 h-3.5 text-cyan-500", isAutoSyncing && "animate-spin")} />
                                 <span className="text-[11px] text-slate-500 dark:text-slate-400">Sync:</span>
                                 <select
@@ -1854,7 +1883,7 @@ export default function PromptTreeViewModal({
                                         setSyncInterval(val);
                                         setPromptTreeSyncInterval(val);
                                     }}
-                                    className="rounded-[5px] bg-white dark:bg-[#071a27] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] text-xs px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-cyan-500 cursor-pointer"
+                                    className="rounded-[4px] bg-white dark:bg-[#071a27] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] text-xs px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-cyan-500 cursor-pointer"
                                     title="Auto-sync interval"
                                 >
                                     <option value="15s">15s</option>
@@ -1867,7 +1896,7 @@ export default function PromptTreeViewModal({
                             <button
                                 type="button"
                                 onClick={() => setIsFullscreen(!isFullscreen)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-[5px] transition-colors cursor-pointer"
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-r-[4px] rounded-l-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title={isFullscreen ? 'Exit Full Screen' : 'Full Screen Mode'}
                             >
                                 {isFullscreen ? (
@@ -1887,7 +1916,7 @@ export default function PromptTreeViewModal({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="rounded-[5px] p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-[#15334d] dark:hover:text-slate-200 transition-colors cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-[#15334d]"
+                            className="rounded-[4px] p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-[#15334d] dark:hover:text-slate-200 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-[#15334d]"
                             title="Close"
                         >
                             <X className="h-5 w-5" />

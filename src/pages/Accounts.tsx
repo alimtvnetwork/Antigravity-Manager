@@ -917,13 +917,13 @@ function Accounts() {
               </span>
             </button>
 
-            {/* Show All Quotas */}
+            {/* Show All Emails */}
             <label
               className="flex items-center gap-2 cursor-pointer select-none px-3 py-1 rounded-r-md text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors"
-              title={t("accounts.show_all_quotas")}
+              title={t("accounts.show_all_emails")}
             >
               <span className="text-xs font-semibold hidden xl:inline">
-                {t("accounts.show_all_quotas")}
+                {t("accounts.show_all_emails")}
               </span>
               <input
                 type="checkbox"

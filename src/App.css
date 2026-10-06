@@ -40,6 +40,18 @@ h1, h2, h3, h4, .font-heading {
   --awan-light: #f5faf9;
 }
 
+:root {
+  --surface-hover: color-mix(in srgb, var(--surface, #ffffff) 88%, white);
+  --primary-hover: color-mix(in srgb, var(--primary, #2563eb) 85%, white);
+  --border-hover: var(--primary, #2563eb);
+}
+
+.dark {
+  --surface-hover: color-mix(in srgb, var(--surface, #0e2433) 88%, white);
+  --primary-hover: color-mix(in srgb, var(--primary, #38bdf8) 85%, white);
+  --border-hover: var(--primary, #38bdf8);
+}
+
 @keyframes awan-glow-pulse {
   0%, 100% {
     box-shadow: 0 0 15px -3px rgba(25, 183, 201, 0.4), 0 0 6px -2px rgba(67, 214, 162, 0.3);

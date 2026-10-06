@@ -297,6 +297,10 @@
     "actions": "Actions",
     "device_fingerprint": "Device Fingerprint",
     "show_all_quotas": "Show All Quotas",
+    "show_all_emails": "Show All Emails",
+    "toggle_email_masking": "Toggle email masking / visibility",
+    "hide_email": "Hide email",
+    "show_email": "Show email",
     "device_fingerprint_dialog": {
       "title": "Device Fingerprint",
       "operations": "Device Fingerprint Operations",

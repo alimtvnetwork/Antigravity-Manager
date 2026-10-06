@@ -911,7 +911,7 @@ function AccountRowContent({
                                 className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-100"
                                 onClick={() => setShowEmail((current) => !current)}
                             >
-                                {showEmail ? 'Hide email' : 'Show email'}
+                                {showEmail ? t('accounts.hide_email') : t('accounts.show_email')}
                             </button>
                             <div className="px-3 py-1.5 text-xs text-slate-600">
                                 Cycle tokens: {weeklyCell.weeklyTokens ?? 0}

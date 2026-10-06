@@ -296,6 +296,10 @@
     "actions": "操作",
     "device_fingerprint": "设备指纹",
     "show_all_quotas": "显示所有配额",
+    "show_all_emails": "显示所有邮箱",
+    "toggle_email_masking": "切换邮箱掩码 / 显示状态",
+    "hide_email": "隐藏邮箱",
+    "show_email": "显示邮箱",
     "device_fingerprint_dialog": {
       "title": "设备指纹",
       "operations": "设备指纹操作",

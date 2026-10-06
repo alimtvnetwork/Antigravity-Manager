@@ -318,11 +318,8 @@ pub async fn fetch_quota_with_cache(
         .0
         .or_else(|| cached_project_id.map(|pid| pid.to_string()));
     let fetched_tier = fetched.1.clone();
-    let subscription_tier = resolve_fetched_subscription_tier(
-        existing_quota,
-        fetched.1,
-        load_assist_needed,
-    );
+    let subscription_tier =
+        resolve_fetched_subscription_tier(existing_quota, fetched.1, load_assist_needed);
     let tier_from_network = load_assist_needed && fetched_tier.is_some();
 
     // We keep project_id to store in the DB, but we NO LONGER force inject it into payload if it's absent
@@ -1003,16 +1000,15 @@ pub async fn warm_up_account(account_id: &str) -> Result<String, String> {
 
     let email = account_owned.email.clone();
     let (token, pid) = get_valid_token_for_warmup(&account_owned).await?;
-    let (fresh_quota, _) =
-        fetch_quota_with_cache(
-            &token,
-            &email,
-            Some(&pid),
-            Some(&account_owned.id),
-            account_owned.quota.as_ref(),
-        )
-        .await
-            .map_err(|e| format!("Failed to fetch quota: {}", e))?;
+    let (fresh_quota, _) = fetch_quota_with_cache(
+        &token,
+        &email,
+        Some(&pid),
+        Some(&account_owned.id),
+        account_owned.quota.as_ref(),
+    )
+    .await
+    .map_err(|e| format!("Failed to fetch quota: {}", e))?;
 
     // [FIX] Use mark_account_forbidden on 403 during warmup to keep account and index files in sync and notify frontend
     if fresh_quota.is_forbidden {

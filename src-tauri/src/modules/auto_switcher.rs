@@ -2631,6 +2631,7 @@ mod tests {
             models: vec![model_quota],
             last_updated: chrono::Utc::now().timestamp(),
             subscription_tier: Some("pro".to_string()),
+            subscription_tier_fetched_at: None,
             is_forbidden: false,
             forbidden_reason: None,
             model_forwarding_rules: std::collections::HashMap::new(),

@@ -81,7 +81,10 @@ pub async fn deploy_accounts_to_fleet(
             "Fleet deployment completed successfully.".to_string()
         }
     } else if raw_output.is_empty() {
-        format!("Fleet deployment exited with error code {:?}", output.status.code())
+        format!(
+            "Fleet deployment exited with error code {:?}",
+            output.status.code()
+        )
     } else {
         format!("Fleet deployment failed: {}", raw_output)
     };

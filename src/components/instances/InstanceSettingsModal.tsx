@@ -14,6 +14,7 @@ import {
     FileCode,
     SlidersHorizontal,
     Sparkles,
+    ArrowRight,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { isTauri } from '../../utils/env';
@@ -334,6 +335,71 @@ export function InstanceSettingsModal({
         }
     };
 
+    // Move Settings From Source to Target
+    const handleMoveSettings = async () => {
+        const sourceId = copySettingsSourceId || replicationSourceId;
+        if (!sourceId || !selectedTargetId) return;
+        if (sourceId === selectedTargetId) {
+            showToast('Source and target profiles are identical', 'warning');
+            return;
+        }
+        setIsOperating(true);
+        try {
+            await instanceService.copyInstanceSettings(sourceId, selectedTargetId);
+            await instanceService.enforceDefaultSettings(sourceId);
+            showToast(`Settings moved to target profile (source reset to baseline)`, 'success');
+            await loadSettings(selectedTargetId);
+            onInstancesUpdated?.();
+        } catch (err: any) {
+            showToast(`Failed to move settings: ${err?.message || err}`, 'error');
+        } finally {
+            setIsOperating(false);
+        }
+    };
+
+    // Move Projects/Workspaces From Source to Target
+    const handleMoveProjects = async () => {
+        const sourceId = copyProjectsSourceId || replicationSourceId;
+        if (!sourceId || !selectedTargetId) return;
+        if (sourceId === selectedTargetId) {
+            showToast('Source and target profiles are identical', 'warning');
+            return;
+        }
+        setIsOperating(true);
+        try {
+            const count = await instanceService.copyInstanceProjects(sourceId, selectedTargetId);
+            await instanceService.wipeInstanceSession(sourceId);
+            showToast(`Moved ${count} workspace folder(s) to target profile (source wiped)`, 'success');
+            onInstancesUpdated?.();
+        } catch (err: any) {
+            showToast(`Failed to move projects: ${err?.message || err}`, 'error');
+        } finally {
+            setIsOperating(false);
+        }
+    };
+
+    // Move Both Settings & Workspaces
+    const handleMoveBothDirect = async (sourceId: string) => {
+        if (!sourceId || !selectedTargetId) return;
+        if (sourceId === selectedTargetId) {
+            showToast('Source and target profiles are identical', 'warning');
+            return;
+        }
+        setIsOperating(true);
+        try {
+            const { projectsCount } = await instanceService.copyInstanceBoth(sourceId, selectedTargetId);
+            await instanceService.enforceDefaultSettings(sourceId);
+            await instanceService.wipeInstanceSession(sourceId);
+            showToast(`Moved settings & ${projectsCount} workspace folder(s) to target`, 'success');
+            await loadSettings(selectedTargetId);
+            onInstancesUpdated?.();
+        } catch (err: any) {
+            showToast(`Failed to move both: ${err?.message || err}`, 'error');
+        } finally {
+            setIsOperating(false);
+        }
+    };
+
     // Split paste from buffer
     const handlePasteFromBuffer = async (mode: 'both' | 'settings' | 'workspaces') => {
         if (!clipboardBuffer || !selectedTargetId) {
@@ -516,6 +582,8 @@ export function InstanceSettingsModal({
     const canRedo = historyIndex < history.length - 1;
     const currentInstanceObj = instances.find(i => i.config.id === selectedTargetId);
     const candidateSources = instances.filter(i => i.config.id !== selectedTargetId);
+    const currentSourceObj = instances.find(i => i.config.id === replicationSourceId) || candidateSources[0];
+    const currentTargetObj = currentInstanceObj;
 
     return (
         <div
@@ -759,7 +827,7 @@ export function InstanceSettingsModal({
                     <div className="space-y-3">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                             <span className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                                Cross-Instance Replication
+                                Cross-Instance Replication & Migration
                             </span>
 
                             {/* Buffer status indicator */}
@@ -783,81 +851,158 @@ export function InstanceSettingsModal({
                             )}
                         </div>
 
-                        {/* Master Replication Bar */}
-                        <div className="rounded-xl bg-slate-50 dark:bg-[#071a27]/80 border border-gray-200 dark:border-[#15334d] p-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                            <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 shrink-0">Source:</span>
-                                <select
-                                    value={replicationSourceId}
-                                    onChange={(e) => setReplicationSourceId(e.target.value)}
-                                    className="min-w-0 flex-1 truncate bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] rounded-lg px-2.5 py-1 text-xs font-bold text-blue-700 dark:text-cyan-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                                >
-                                    {candidateSources.map((inst, idx) => {
-                                        const seq = inst.config.seq_num ?? idx + 1;
-                                        const idSuffix = inst.config.id.startsWith('antigravity-')
-                                            ? inst.config.id
-                                            : `antigravity-${inst.config.id}`;
-                                        return (
-                                            <option key={inst.config.id} value={inst.config.id}>
-                                                #{seq} {inst.config.name} ({idSuffix})
-                                            </option>
-                                        );
-                                    })}
-                                </select>
+                        {/* Visually Separated Source vs Target Instance Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-stretch">
+                            {/* Source Instance Card */}
+                            <div className="rounded-xl bg-amber-500/5 dark:bg-amber-950/20 border-2 border-amber-500/30 dark:border-amber-500/40 p-3.5 space-y-2.5 flex flex-col justify-between">
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500 text-white shadow-xs">
+                                                Source
+                                            </span>
+                                            <span className="font-bold text-xs text-gray-900 dark:text-gray-100">
+                                                Origin Profile
+                                            </span>
+                                        </div>
+                                        {currentSourceObj?.is_running && (
+                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                                Running
+                                            </span>
+                                        )}
+                                    </div>
+                                    <select
+                                        value={replicationSourceId}
+                                        onChange={(e) => {
+                                            setReplicationSourceId(e.target.value);
+                                            setCopySettingsSourceId(e.target.value);
+                                            setCopyProjectsSourceId(e.target.value);
+                                        }}
+                                        className="w-full truncate bg-white dark:bg-[#0c2438] border border-amber-300 dark:border-amber-600/40 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                                    >
+                                        {candidateSources.map((inst, idx) => {
+                                            const seq = inst.config.seq_num ?? idx + 1;
+                                            const idSuffix = inst.config.id.startsWith('antigravity-')
+                                                ? inst.config.id
+                                                : `antigravity-${inst.config.id}`;
+                                            return (
+                                                <option key={inst.config.id} value={inst.config.id}>
+                                                    #{seq} {inst.config.name} ({idSuffix})
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+                                    <div className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center justify-between">
+                                        <span>Data to replicate or transfer</span>
+                                        <span className="font-mono">ID: {replicationSourceId || 'none'}</span>
+                                    </div>
+                                </div>
+                                <div className="pt-1 flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        disabled={isOperating || !replicationSourceId}
+                                        onClick={() => handleCopyBothDirect(replicationSourceId)}
+                                        className="flex-1 py-1.5 px-2.5 rounded-[4px] text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white shadow-xs transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                        title="Copy both settings and workspaces directly into target"
+                                    >
+                                        <Copy className="w-3.5 h-3.5" />
+                                        <span>Copy Both</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={isOperating || !replicationSourceId}
+                                        onClick={() => handleMoveBothDirect(replicationSourceId)}
+                                        className="flex-1 py-1.5 px-2.5 rounded-[4px] text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                        title="Move settings and workspaces to target (reset source to baseline)"
+                                    >
+                                        <ArrowRight className="w-3.5 h-3.5" />
+                                        <span>Move Both</span>
+                                    </button>
+                                </div>
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                                {/* Copy Both Action Button */}
-                                <button
-                                    type="button"
-                                    disabled={isOperating || !replicationSourceId}
-                                    onClick={() => handleCopyBothDirect(replicationSourceId)}
-                                    className="shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
-                                    title="Copy both settings and workspaces directly into target and update buffer"
-                                >
-                                    <Copy className="w-3.5 h-3.5" />
-                                    <span>Copy Both</span>
-                                </button>
-
-                                {/* Split Paste Segmented Pill Controls */}
-                                <div className="inline-flex rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-0.5 divide-x divide-emerald-500/20 shadow-2xs">
-                                    <button
-                                        type="button"
-                                        disabled={isOperating || !clipboardBuffer}
-                                        onClick={() => handlePasteFromBuffer('both')}
-                                        className="px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 rounded-l-md"
-                                        title="Paste both settings & workspaces from buffer into target"
+                            {/* Target Instance Card */}
+                            <div className="rounded-xl bg-cyan-500/5 dark:bg-cyan-950/20 border-2 border-cyan-500/30 dark:border-cyan-500/40 p-3.5 space-y-2.5 flex flex-col justify-between">
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-cyan-600 text-white shadow-xs">
+                                                Target
+                                            </span>
+                                            <span className="font-bold text-xs text-gray-900 dark:text-gray-100">
+                                                Destination Profile
+                                            </span>
+                                        </div>
+                                        {currentTargetObj?.is_running && (
+                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                                Running
+                                            </span>
+                                        )}
+                                    </div>
+                                    <select
+                                        value={selectedTargetId}
+                                        onChange={(e) => handleTargetChange(e.target.value)}
+                                        className="w-full truncate bg-white dark:bg-[#0c2438] border border-cyan-300 dark:border-cyan-600/40 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 cursor-pointer"
                                     >
-                                        <ClipboardPaste className="w-3.5 h-3.5" />
-                                        <span>Paste Both</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        disabled={isOperating || !clipboardBuffer}
-                                        onClick={() => handlePasteFromBuffer('settings')}
-                                        className="px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
-                                        title="Paste settings only from buffer into target"
-                                    >
-                                        <Sliders className="w-3 h-3" />
-                                        <span>Settings</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        disabled={isOperating || !clipboardBuffer}
-                                        onClick={() => handlePasteFromBuffer('workspaces')}
-                                        className="px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 rounded-r-md"
-                                        title="Paste workspaces and folders only from buffer into target"
-                                    >
-                                        <FolderSync className="w-3 h-3" />
-                                        <span>Folders</span>
-                                    </button>
+                                        {instances.map((inst, idx) => {
+                                            const seq = inst.config.seq_num ?? idx + 1;
+                                            const idSuffix = inst.config.id.startsWith('antigravity-')
+                                                ? inst.config.id
+                                                : `antigravity-${inst.config.id}`;
+                                            const isDefault = inst.config.is_default || inst.config.id === 'default';
+                                            return (
+                                                <option key={inst.config.id} value={inst.config.id}>
+                                                    #{seq} {inst.config.name} ({idSuffix}){isDefault ? ' [Default]' : ''}
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+                                    <div className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center justify-between">
+                                        <span>Recipient of applied configurations</span>
+                                        <span className="font-mono">ID: {selectedTargetId}</span>
+                                    </div>
+                                </div>
+                                <div className="pt-1">
+                                    {/* Segmented Paste Capsule */}
+                                    <div className="flex items-center rounded-[4px] border border-emerald-500/40 bg-emerald-500/10 p-0.5 divide-x divide-emerald-500/30 shadow-2xs">
+                                        <button
+                                            type="button"
+                                            disabled={isOperating || !clipboardBuffer}
+                                            onClick={() => handlePasteFromBuffer('both')}
+                                            className="flex-1 py-1 px-2 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1 rounded-l-[4px] rounded-r-none"
+                                            title="Paste both settings & workspaces from buffer into target"
+                                        >
+                                            <ClipboardPaste className="w-3.5 h-3.5" />
+                                            <span>Paste Both</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={isOperating || !clipboardBuffer}
+                                            onClick={() => handlePasteFromBuffer('settings')}
+                                            className="py-1 px-2 text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1 rounded-none"
+                                            title="Paste settings only from buffer into target"
+                                        >
+                                            <Sliders className="w-3 h-3" />
+                                            <span>Settings</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={isOperating || !clipboardBuffer}
+                                            onClick={() => handlePasteFromBuffer('workspaces')}
+                                            className="py-1 px-2 text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1 rounded-r-[4px] rounded-l-none"
+                                            title="Paste workspaces only from buffer into target"
+                                        >
+                                            <FolderSync className="w-3 h-3" />
+                                            <span>Folders</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Individual Cards for Settings and Workspaces */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {/* Copy Settings Card */}
+                            {/* Copy & Move Settings Card */}
                             <div className="rounded-xl bg-slate-50 dark:bg-[#071a27]/80 border border-gray-200 dark:border-[#15334d] p-3 space-y-2.5 flex flex-col justify-between">
                                 <div>
                                     <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -872,7 +1017,7 @@ export function InstanceSettingsModal({
                                         </span>
                                     </div>
                                     <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1" title="Copies color themes, policies, and Antigravity preferences into target">
-                                        Copies color themes, policies, and Antigravity preferences.
+                                        Replicate or transfer UI themes, policies, and Antigravity config.
                                     </p>
                                 </div>
                                 <div className="space-y-2 pt-1">
@@ -893,20 +1038,32 @@ export function InstanceSettingsModal({
                                             );
                                         })}
                                     </select>
-                                    <button
-                                        type="button"
-                                        disabled={isOperating || !copySettingsSourceId}
-                                        onClick={handleCopySettings}
-                                        className="w-full px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
-                                        title="Copy settings and themes from source to target profile"
-                                    >
-                                        <Sliders className="w-3 h-3" />
-                                        <span>Copy Settings Now</span>
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            disabled={isOperating || !copySettingsSourceId}
+                                            onClick={handleCopySettings}
+                                            className="flex-1 px-3 py-1.5 rounded-[4px] text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                            title="Copy settings and themes from source to target profile"
+                                        >
+                                            <Sliders className="w-3 h-3" />
+                                            <span>Copy Settings</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={isOperating || !copySettingsSourceId}
+                                            onClick={handleMoveSettings}
+                                            className="flex-1 px-3 py-1.5 rounded-[4px] text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white shadow-xs transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                            title="Move settings from source to target profile (resets source to baseline)"
+                                        >
+                                            <ArrowRight className="w-3 h-3" />
+                                            <span>Move Settings</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Copy Projects/Workspaces Card */}
+                            {/* Copy & Move Projects/Workspaces Card */}
                             <div className="rounded-xl bg-slate-50 dark:bg-[#071a27]/80 border border-gray-200 dark:border-[#15334d] p-3 space-y-2.5 flex flex-col justify-between">
                                 <div>
                                     <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -921,7 +1078,7 @@ export function InstanceSettingsModal({
                                         </span>
                                     </div>
                                     <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1" title="Copies open projects, workspace storage, and recent folder state">
-                                        Copies open projects, workspace storage, and recent folder state.
+                                        Replicate or transfer open projects, workspace storage, and recent folders.
                                     </p>
                                 </div>
                                 <div className="space-y-2 pt-1">
@@ -942,16 +1099,28 @@ export function InstanceSettingsModal({
                                             );
                                         })}
                                     </select>
-                                    <button
-                                        type="button"
-                                        disabled={isOperating || !copyProjectsSourceId}
-                                        onClick={handleCopyProjects}
-                                        className="w-full px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
-                                        title="Copy workspaces and project folders from source to target profile"
-                                    >
-                                        <FolderSync className="w-3 h-3" />
-                                        <span>Copy Folders Now</span>
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            disabled={isOperating || !copyProjectsSourceId}
+                                            onClick={handleCopyProjects}
+                                            className="flex-1 px-3 py-1.5 rounded-[4px] text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white shadow-xs transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                            title="Copy workspaces and project folders from source to target profile"
+                                        >
+                                            <FolderSync className="w-3 h-3" />
+                                            <span>Copy Folders</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={isOperating || !copyProjectsSourceId}
+                                            onClick={handleMoveProjects}
+                                            className="flex-1 px-3 py-1.5 rounded-[4px] text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white shadow-xs transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                            title="Move workspaces and project folders to target profile (source wiped)"
+                                        >
+                                            <ArrowRight className="w-3 h-3" />
+                                            <span>Move Folders</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -992,11 +1161,11 @@ export function InstanceSettingsModal({
 
                         {/* Group JSON tools into a contiguous segmented pill capsule ([Copy | Paste | Export | Import | Raw Editor]) */}
                         <div className="flex items-center justify-between flex-wrap gap-2">
-                            <div className="inline-flex items-center rounded-lg bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] p-0.5 divide-x divide-gray-200 dark:divide-[#15334d] shadow-2xs">
+                            <div className="inline-flex items-center rounded-[4px] bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] p-0.5 divide-x divide-gray-200 dark:divide-[#15334d] shadow-2xs">
                                 <button
                                     type="button"
                                     onClick={handleCopyToClipboard}
-                                    className="px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] rounded-l-md flex items-center gap-1.5 transition-colors cursor-pointer"
+                                    className="px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] rounded-l-[4px] rounded-r-none flex items-center gap-1.5 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                     title="Copy settings JSON to clipboard"
                                 >
                                     <Copy className="w-3.5 h-3.5 text-blue-500" />
@@ -1007,7 +1176,7 @@ export function InstanceSettingsModal({
                                     type="button"
                                     disabled={isOperating}
                                     onClick={handlePasteFromClipboard}
-                                    className="px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                                    className="px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] rounded-none flex items-center gap-1.5 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
                                     title="Paste settings JSON from clipboard and apply"
                                 >
                                     <ClipboardPaste className="w-3.5 h-3.5 text-emerald-500" />
@@ -1017,7 +1186,7 @@ export function InstanceSettingsModal({
                                 <button
                                     type="button"
                                     onClick={handleExportJsonFile}
-                                    className="px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] flex items-center gap-1.5 transition-colors cursor-pointer"
+                                    className="px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] rounded-none flex items-center gap-1.5 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                     title="Export settings to JSON file"
                                 >
                                     <Download className="w-3.5 h-3.5 text-indigo-500" />
@@ -1027,7 +1196,7 @@ export function InstanceSettingsModal({
                                 <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] flex items-center gap-1.5 transition-colors cursor-pointer"
+                                    className="px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] rounded-none flex items-center gap-1.5 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                     title="Import settings from JSON file"
                                 >
                                     <Upload className="w-3.5 h-3.5 text-purple-500" />
@@ -1038,7 +1207,7 @@ export function InstanceSettingsModal({
                                     type="button"
                                     onClick={() => setIsJsonExpanded(!isJsonExpanded)}
                                     className={cn(
-                                        "px-2.5 py-1.5 text-xs font-medium rounded-r-md flex items-center gap-1.5 transition-colors cursor-pointer",
+                                        "px-2.5 py-1.5 text-xs font-medium rounded-r-[4px] rounded-l-none flex items-center gap-1.5 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
                                         isJsonExpanded
                                             ? "bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-cyan-300 font-semibold"
                                             : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d]"

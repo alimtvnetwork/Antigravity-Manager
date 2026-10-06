@@ -55,11 +55,22 @@ export default function ThemeManager() {
             root.style.setProperty('--primary', palette.primary);
             root.style.setProperty('--fg', palette.fg);
 
+            const surfaceHover = palette.surfaceHover || `color-mix(in srgb, ${palette.surface} 88%, white)`;
+            const primaryHover = palette.primaryHover || `color-mix(in srgb, ${palette.primary} 85%, white)`;
+            const borderHover = palette.borderHover || palette.primary;
+
+            root.style.setProperty('--surface-hover', surfaceHover);
+            root.style.setProperty('--primary-hover', primaryHover);
+            root.style.setProperty('--border-hover', borderHover);
+
             // Additional semantic mappings for components
             root.style.setProperty('--app-bg', palette.bg);
             root.style.setProperty('--app-surface', palette.surface);
             root.style.setProperty('--app-primary', palette.primary);
             root.style.setProperty('--app-border', isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)');
+            root.style.setProperty('--app-surface-hover', surfaceHover);
+            root.style.setProperty('--app-primary-hover', primaryHover);
+            root.style.setProperty('--app-border-hover', borderHover);
 
             // Set Tauri window background color
             // Skip on Linux due to crash with transparent windows + softbuffer
