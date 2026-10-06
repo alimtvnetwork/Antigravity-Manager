@@ -6,8 +6,11 @@ use antigravity_tools_lib::modules::repo_db::{
 };
 use rusqlite::{params, Connection};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::sync::Mutex;
 use tempfile::tempdir;
+
+static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 /// Initialize real conversation_summaries.db SQLite database in the given directory
 fn init_summaries_db(db_path: &Path) -> Connection {
@@ -103,7 +106,7 @@ fn evaluate_instance_conversations_from_db(
 
     let mut results = Vec::new();
     for row in rows.flatten() {
-        let (cid, title, preview, status, not_fully_idle, ws_uris_opt, last_mod) = row;
+        let (cid, title, preview, status, not_fully_idle, ws_uris_opt, _last_mod) = row;
 
         let is_idle_count = not_fully_idle == 0;
         let has_idle_status = status.contains("IDLE")
@@ -822,6 +825,7 @@ async fn test_case_4_process_termination_gating_forces_idle() {
 // ----------------------------------------------------------------------------
 #[tokio::test]
 async fn test_e2e_suffix_matching_for_cloned_instances() {
+    let _env_guard = ENV_LOCK.lock().unwrap();
     let sandbox = tempdir().expect("create sandbox tempdir");
     let prev_data_dir = std::env::var_os("ABV_DATA_DIR");
     std::env::set_var("ABV_DATA_DIR", sandbox.path());
@@ -894,12 +898,29 @@ async fn test_e2e_suffix_matching_for_cloned_instances() {
 // ----------------------------------------------------------------------------
 #[tokio::test]
 async fn test_e2e_prompt_queue_dispatch_strict_instance_scoping() {
+    let _env_guard = ENV_LOCK.lock().unwrap();
     let sandbox = tempdir().expect("create sandbox tempdir");
     let prev_data_dir = std::env::var_os("ABV_DATA_DIR");
     std::env::set_var("ABV_DATA_DIR", sandbox.path());
 
     let conn = antigravity_tools_lib::modules::repo_db::connect_db().expect("connect repo db");
     let now = chrono::Utc::now().timestamp();
+
+    conn.execute(
+        "INSERT INTO running_projects 
+         (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7)",
+        params![
+            "shared-proj",
+            "default",
+            "shared-proj",
+            "d:/work/shared-proj",
+            "c:/ws/shared",
+            now,
+            now
+        ],
+    )
+    .expect("insert shared-proj running project");
 
     // Two prompts for the same repo path, but different instances:
     // prompt-8159 was created EARLIER (now - 100) than prompt-def (now - 50)
@@ -996,6 +1017,7 @@ async fn test_e2e_prompt_queue_dispatch_strict_instance_scoping() {
 // ----------------------------------------------------------------------------
 #[tokio::test]
 async fn test_e2e_running_projects_primary_key_namespacing() {
+    let _env_guard = ENV_LOCK.lock().unwrap();
     let sandbox = tempdir().expect("create sandbox tempdir");
     let prev_data_dir = std::env::var_os("ABV_DATA_DIR");
     std::env::set_var("ABV_DATA_DIR", sandbox.path());
@@ -2159,6 +2181,7 @@ fn assert_suffix_resolutions() {
 
 #[tokio::test]
 async fn test_case_c_suffix_alias_resolution_for_cloned_instances() {
+    let _env_guard = ENV_LOCK.lock().unwrap();
     let sandbox = tempdir().expect("create sandbox tempdir");
     let prev_data_dir = std::env::var_os("ABV_DATA_DIR");
     std::env::set_var("ABV_DATA_DIR", sandbox.path());
@@ -2243,6 +2266,7 @@ fn assert_case_d_isolation(conn: &Connection, id_def: &str, id_8159: &str, now: 
 
 #[tokio::test]
 async fn test_case_d_database_primary_key_composite_isolation() {
+    let _env_guard = ENV_LOCK.lock().unwrap();
     let sandbox = tempdir().expect("create sandbox tempdir");
     let prev_data_dir = std::env::var_os("ABV_DATA_DIR");
     std::env::set_var("ABV_DATA_DIR", sandbox.path());
@@ -2265,6 +2289,22 @@ async fn test_case_d_database_primary_key_composite_isolation() {
 }
 
 fn insert_case_e_prompts(conn: &Connection, now: i64) {
+    conn.execute(
+        "INSERT INTO running_projects 
+         (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7)",
+        params![
+            "p-agm",
+            "default",
+            "Antigravity-Manager",
+            "d:/work/Antigravity-Manager",
+            "c:/ws/agm",
+            now,
+            now
+        ],
+    )
+    .expect("insert p-agm running project");
+
     conn.execute(
         "INSERT INTO active_prompts (id, project_id, instance_id, repo_path, prompt_content, model, status, created_at, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
@@ -2353,6 +2393,7 @@ fn assert_case_e_gating(conn: &Connection, db_path: &Path, now: i64) {
 
 #[tokio::test]
 async fn test_case_e_stale_and_queued_prompts_do_not_trigger_running() {
+    let _env_guard = ENV_LOCK.lock().unwrap();
     let sandbox = tempdir().expect("create sandbox tempdir");
     let prev_data_dir = std::env::var_os("ABV_DATA_DIR");
     std::env::set_var("ABV_DATA_DIR", sandbox.path());

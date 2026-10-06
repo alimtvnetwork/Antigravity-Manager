@@ -71,7 +71,7 @@ function Accounts() {
   const { instances, activeInstanceId } = useInstanceStore();
 
   const boundInstanceAccountId = useMemo(() => {
-    const selectedInstance = instances.find((inst) => inst.id === activeInstanceId);
+    const selectedInstance = instances.find((inst) => inst.config.id === activeInstanceId);
     if (!selectedInstance) return null;
     return (
       selectedInstance.config.bound_account_id ||
@@ -207,30 +207,7 @@ function Accounts() {
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Single auto-scroll and highlight pulse effect for focused account
-  useEffect(() => {
-    if (!focusedAccountId) return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const scrollTarget = () => {
-      const cardEl = document.getElementById(`account-card-${focusedAccountId}`);
-      const rowEl = document.getElementById(`account-row-${focusedAccountId}`);
-      const targetEl = cardEl || rowEl;
-      if (targetEl) {
-        targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
-        timer = setTimeout(() => {
-          setFocusedAccountId(null);
-        }, 2000);
-      }
-    };
 
-    const rafId = requestAnimationFrame(scrollTarget);
-    return () => {
-      cancelAnimationFrame(rafId);
-      if (timer) {
-        clearTimeout(timer);
-      }
-    };
-  }, [focusedAccountId, currentPage, filter, searchQuery, paginatedAccounts]);
   const [localPageSize, setLocalPageSize] = useState<number | null>(() => {
     const saved = localStorage.getItem("accounts_page_size");
     const parsed = saved ? parseInt(saved, 10) : 150;
@@ -347,6 +324,31 @@ function Accounts() {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     return filteredAccounts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   }, [filteredAccounts, currentPage, ITEMS_PER_PAGE]);
+
+  // Single auto-scroll and highlight pulse effect for focused account
+  useEffect(() => {
+    if (!focusedAccountId) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const scrollTarget = () => {
+      const cardEl = document.getElementById(`account-card-${focusedAccountId}`);
+      const rowEl = document.getElementById(`account-row-${focusedAccountId}`);
+      const targetEl = cardEl || rowEl;
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        timer = setTimeout(() => {
+          setFocusedAccountId(null);
+        }, 2000);
+      }
+    };
+
+    const rafId = requestAnimationFrame(scrollTarget);
+    return () => {
+      cancelAnimationFrame(rafId);
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
+  }, [focusedAccountId, currentPage, filter, searchQuery, paginatedAccounts]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);

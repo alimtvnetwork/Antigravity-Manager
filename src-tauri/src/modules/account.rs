@@ -1465,7 +1465,7 @@ pub fn delete_account(account_id: &str) -> Result<(), String> {
         }
         save_account_index(&index)?;
     } else {
-        log::info!(
+        tracing::info!(
             "[delete_account] Account ID {} already absent from index; proceeding with idempotent cleanup",
             account_id
         );
