@@ -182,7 +182,7 @@ export default function MiniView() {
                         </span>
                     </div>
                 </div>
-                <div className="w-full bg-gray-100 dark:bg-[#15334d] rounded-full h-1.5 overflow-hidden">
+                <div className="w-full bg-gray-100 dark:bg-base-300 rounded-full h-1.5 overflow-hidden">
                     <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${model.percentage}%` }}
@@ -203,11 +203,11 @@ export default function MiniView() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 style={{ contain: 'layout paint' }}
-                className="w-[300px] flex flex-col bg-white/80 dark:bg-[#071a27]/90 backdrop-blur-md shadow-2xl overflow-hidden border-x border-y border-gray-200/50 dark:border-[#15334d] sm:rounded-2xl transform-gpu"
+                className="w-[300px] flex flex-col bg-white/80 theme-glass-bg-90 backdrop-blur-md shadow-2xl overflow-hidden border-x border-y border-gray-200/50 dark:border-base-300 sm:rounded-2xl transform-gpu"
             >
                 {/* Header / Drag Region with double click restore support */}
                 <div
-                    className="flex-none flex items-center justify-between px-3 py-1.5 bg-gray-50/50 dark:bg-[#0c2438]/80 border-b border-gray-100 dark:border-[#15334d] select-none cursor-default"
+                    className="flex-none flex items-center justify-between px-3 py-1.5 bg-gray-50/50 theme-glass-surface-80 border-b border-gray-100 dark:border-base-300 select-none cursor-default"
                     onMouseDown={handleMouseDown}
                     onDoubleClick={handleMaximize}
                     data-tauri-drag-region

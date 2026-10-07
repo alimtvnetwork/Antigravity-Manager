@@ -177,7 +177,7 @@ function Navbar() {
             onMouseDown={handleMouseDown}
             onDoubleClick={handleDoubleClick}
             style={{ position: 'sticky', top: 0, zIndex: 100, isolation: 'isolate' }}
-            className="py-1.5 transition-colors duration-200 bg-[#f5faf9] dark:bg-[#071a27] border-b border-gray-200/50 dark:border-[#15334d] select-none"
+            className="py-1.5 transition-colors duration-200 bg-awan-light dark:bg-base-100 border-b border-gray-200/50 dark:border-base-300 select-none"
         >
             <div className="w-full px-3 sm:px-4 md:px-6 relative" style={{ zIndex: 10 }}>
                 {/* Flexbox layout */}

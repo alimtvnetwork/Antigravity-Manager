@@ -166,7 +166,7 @@ export function NavSettings({
     return (
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {/* 1. Quick Clean + Theme Switcher + Language Preferences Segmented Pill Capsule */}
-            <div className="flex items-center rounded-full bg-gray-100 dark:bg-[#0c2438]/90 border border-gray-200/60 dark:border-[#15334d] p-0.5 shadow-xs">
+            <div className="flex items-center rounded-full bg-gray-100 theme-glass-surface-90 border border-gray-200/60 dark:border-base-300 p-0.5 shadow-xs">
                 {/* Antigravity Quick Clean (Recycle) Icon Button */}
                 <button
                     type="button"
@@ -195,7 +195,7 @@ export function NavSettings({
                                 window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'theme-switcher' } }));
                             }
                         }}
-                        className="h-7 px-2 hover:bg-gray-200 dark:hover:bg-[#15334d] flex items-center gap-1 transition-all duration-150 ease-out cursor-pointer text-[11px] font-semibold text-gray-700 dark:text-gray-300 border-r border-gray-200/50 dark:border-slate-700/60"
+                        className="h-7 px-2 hover:bg-gray-200 dark:hover:bg-base-300 flex items-center gap-1 transition-all duration-150 ease-out cursor-pointer text-[11px] font-semibold text-gray-700 dark:text-gray-300 border-r border-gray-200/50 dark:border-slate-700/60"
                         title={`Active Theme: ${currentPalette.label}`}
                         aria-expanded={isThemeOpen}
                     >
@@ -283,7 +283,7 @@ export function NavSettings({
                                 window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'nav-settings' } }));
                             }
                         }}
-                        className="h-7 px-2 rounded-r-full hover:bg-gray-200 dark:hover:bg-[#15334d] flex items-center gap-1 transition-all duration-150 ease-out cursor-pointer text-[11px] font-semibold text-gray-700 dark:text-gray-300"
+                        className="h-7 px-2 rounded-r-full hover:bg-gray-200 dark:hover:bg-base-300 flex items-center gap-1 transition-all duration-150 ease-out cursor-pointer text-[11px] font-semibold text-gray-700 dark:text-gray-300"
                         title="Theme & Language Preferences"
                     >
                         {theme === 'light' ? (
@@ -360,14 +360,14 @@ export function NavSettings({
 
             {/* Window controls (Minimize, Maximize/Restore, Close) - Tauri only: Permanently visible, never collapsed */}
             {isTauri() && (
-                <div className="flex items-center rounded-full bg-gray-100 dark:bg-[#0c2438]/90 border border-gray-200/60 dark:border-[#15334d] p-0.5 divide-x divide-gray-200/50 dark:divide-slate-700/60 shadow-xs z-50 shrink-0">
+                <div className="flex items-center rounded-full bg-gray-100 theme-glass-surface-90 border border-gray-200/60 dark:border-base-300 p-0.5 divide-x divide-gray-200/50 dark:divide-slate-700/60 shadow-xs z-50 shrink-0">
                     <button
                         type="button"
                         id="btn-window-minimize"
                         name="window-minimize"
                         data-xpath="//*[@id='btn-window-minimize']"
                         onClick={handleMinimize}
-                        className="w-7 h-7 rounded-l-full hover:bg-gray-200 dark:hover:bg-[#15334d] flex items-center justify-center transition-all duration-150 ease-out cursor-pointer"
+                        className="w-7 h-7 rounded-l-full hover:bg-gray-200 dark:hover:bg-base-300 flex items-center justify-center transition-all duration-150 ease-out cursor-pointer"
                         title={t('common.minimize', 'Minimize')}
                         aria-label="Minimize"
                     >
@@ -380,7 +380,7 @@ export function NavSettings({
                         name="window-maximize"
                         data-xpath="//*[@id='btn-window-maximize']"
                         onClick={handleToggleMaximize}
-                        className="w-7 h-7 hover:bg-gray-200 dark:hover:bg-[#15334d] flex items-center justify-center transition-all duration-150 ease-out cursor-pointer"
+                        className="w-7 h-7 hover:bg-gray-200 dark:hover:bg-base-300 flex items-center justify-center transition-all duration-150 ease-out cursor-pointer"
                         title={isMaximized ? t('common.restore', 'Restore') : t('common.maximize', 'Maximize')}
                         aria-label={isMaximized ? "Restore" : "Maximize"}
                     >

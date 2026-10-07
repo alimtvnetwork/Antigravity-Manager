@@ -82,7 +82,7 @@ function Layout() {
     }
 
     return (
-        <div className="h-screen flex flex-col bg-[#f5faf9] dark:bg-base-100">
+        <div className="h-screen flex flex-col bg-awan-light dark:bg-base-100">
             <BackgroundTaskRunner />
             <ToastContainer />
             <Navbar />

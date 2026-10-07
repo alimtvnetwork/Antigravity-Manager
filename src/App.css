@@ -40,6 +40,224 @@ h1, h2, h3, h4, .font-heading {
   --awan-light: #f5faf9;
 }
 
+/* ==========================================================================
+   L1 theme tokens: RiseUp Asia brand twins (namespaced --rise-*, no collisions)
+   READ-ONLY cite: riseup-asia-website-project/spec/05-brand-system.md §1–§1.2.
+   Hex twins only (oklch reference values live in that spec, not here).
+   Motion tokens cite: 02-spec/07-design-system/tokens/design-tokens.json.
+   ========================================================================== */
+:root,
+.dark {
+  --rise-amber: #FFAD01;
+  --rise-amber-hover: #FFC24A;
+  --rise-amber-ink: #8A5A00;
+  --rise-amber-transition: #FF9346;
+  --rise-violet: #791AB0;
+  --rise-violet-soft: #9B3FD1;
+  --rise-red: #C72D2D;
+  --rise-success: #33A96B;
+  --rise-bg: #0B0A09;
+  --rise-bg-raised: #151312;
+  --rise-surface: #1D1A18;
+  --rise-surface-hover: #262220;
+  --rise-fg: #F7F5F2;
+  --rise-fg-muted: #ADA8A2;
+  --rise-fg-subtle: #7A746F;
+  --rise-paper: #FBF9F6;
+  --rise-paper-raised: #F4F0EA;
+  --rise-paper-surface: #FFFFFF;
+  --rise-paper-fg: #141210;
+  --rise-paper-muted: #57514B;
+  --rise-grad-ember: linear-gradient(135deg, #FFAD01, #FF9346);
+  --rise-r-sm: 8px;
+  --rise-r-md: 14px;
+  --rise-r-lg: 20px;
+  --rise-r-xl: 28px;
+  --motion-fast: 150ms;
+  --motion-normal: 300ms;
+  --motion-slow: 500ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ==========================================================================
+   Deck-only slide stage contract (opt-in; app chrome never matches).
+   Cite: 02-spec/07-design-system/40-theme-switch.md §2–§3 (8 ids, 6 vars each).
+   Selectors are scoped to .slide-stage (see ui-slide-scope.md) so the bare
+   [data-theme] ids can never collide with daisyUI's html-level data-theme.
+   Count check (40-§6): exactly 8 `.slide-stage[data-theme]` blocks below.
+   ========================================================================== */
+.slide-stage {
+  background: var(--canvas);
+  color: var(--ink);
+  transition: background-color 0.45s cubic-bezier(0.4, 0, 0.2, 1), color 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.slide-stage[data-theme="bright-gold-tech"] {
+  --canvas: hsl(240 20% 4%);
+  --ink: hsl(0 0% 100%);
+  --ink-muted: hsl(218 11% 75%);
+  --accent: hsl(41 100% 50%);
+  --accent-ink: hsl(240 20% 4%);
+  --card: hsl(240 15% 11%);
+}
+.slide-stage[data-theme="noir-gold"] {
+  --canvas: hsl(0 0% 5%);
+  --ink: hsl(0 0% 100%);
+  --ink-muted: hsl(0 0% 65%);
+  --accent: hsl(45 56% 54%);
+  --accent-ink: hsl(0 0% 8%);
+  --card: hsl(0 0% 5%);
+}
+.slide-stage[data-theme="snow"] {
+  --canvas: #000000;
+  --ink: #ffffff;
+  --ink-muted: #b8b8b8;
+  --accent: #ffffff;
+  --accent-ink: #000000;
+  --card: #000000;
+}
+.slide-stage[data-theme="midnight"] {
+  --canvas: #101010;
+  --ink: #ffffff;
+  --ink-muted: #b8b8b8;
+  --accent: #ffd83a;
+  --accent-ink: #1a1100;
+  --card: #101010;
+}
+.slide-stage[data-theme="paper"] {
+  --canvas: #f5f0e6;
+  --ink: #1a1a1a;
+  --ink-muted: #615a4f;
+  --accent: #1d4ed8;
+  --accent-ink: #f5f0e6;
+  --card: #f5f0e6;
+}
+.slide-stage[data-theme="sunset"] {
+  --canvas: #1b0d1f;
+  --ink: #ffeaf0;
+  --ink-muted: #c89aa6;
+  --accent: #ff7a59;
+  --accent-ink: #1b0d1f;
+  --card: #1b0d1f;
+}
+.slide-stage[data-theme="print"] {
+  --canvas: #ffffff;
+  --ink: #000000;
+  --ink-muted: #444444;
+  --accent: #000000;
+  --accent-ink: #ffffff;
+  --card: #ffffff;
+}
+.slide-stage[data-theme="playbook"] {
+  --canvas: #faf7f3;
+  --ink: #141414;
+  --ink-muted: #6b6b6b;
+  --accent: #e8701a;
+  --accent-ink: #1a1a1a;
+  --card: #faf7f3;
+}
+/* Gold dot field lives ONLY on bright-gold-tech (40-§3; field geometry from
+   05-bright-gold-tech/01-tokens-background-and-chrome.md §3). */
+.slide-stage[data-theme="bright-gold-tech"] .slide-dark-bg {
+  background: hsl(240 20% 4%);
+  position: relative;
+}
+.slide-stage[data-theme="bright-gold-tech"] .slide-dark-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(ellipse 600px 600px at 55% 50%, hsl(41 100% 50% / 0.5), transparent);
+  opacity: 0.22;
+  pointer-events: none;
+}
+.slide-stage[data-theme="bright-gold-tech"] .slide-dark-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle 2px at center, hsl(41 80% 50% / 0.08) 2px, transparent 2px);
+  background-size: 16px 16px;
+  mask-image:
+    radial-gradient(ellipse 700px 550px at 55% 50%, #000 0%, rgba(0, 0, 0, 0.35) 55%, rgba(0, 0, 0, 0.1) 100%);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .slide-stage { transition-duration: 0.01ms; }
+}
+
+/* ==========================================================================
+   L3 daisyUI v5 custom themes (live definitions).
+   daisyUI v5 under Tailwind v3 reads themes ONLY from its built-in
+   theme/object.js — `daisyui.themes` objects in tailwind.config.js are dead
+   config (verified against daisyui@5.7.47 index.js/pluginOptionsHandler.js).
+   Custom themes therefore live here as --color-* var blocks, which is the
+   exact shape v5 emits for built-ins. All values cite RiseUp
+   spec/05-brand-system.md (READ-ONLY); see ui-daisy-rise-mapping.md.
+   ========================================================================== */
+[data-theme="riseup-dark"] {
+  color-scheme: dark;
+  --color-base-100: #0B0A09;
+  --color-base-200: #151312;
+  --color-base-300: #1D1A18;
+  --color-base-content: #F7F5F2;
+  --color-primary: #FFAD01;
+  --color-primary-content: #0B0A09;
+  --color-secondary: #ADA8A2;
+  --color-secondary-content: #0B0A09;
+  --color-accent: #FFC24A;
+  --color-accent-content: #0B0A09;
+  --color-neutral: #262220;
+  --color-neutral-content: #F7F5F2;
+  --color-info: #9B3FD1;
+  --color-info-content: #0B0A09;
+  --color-success: #33A96B;
+  --color-success-content: #0B0A09;
+  --color-warning: #FF9346;
+  --color-warning-content: #0B0A09;
+  --color-error: #C72D2D;
+  --color-error-content: #F7F5F2;
+  --radius-selector: 8px;
+  --radius-field: 14px;
+  --radius-box: 20px;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+[data-theme="riseup-paper"] {
+  color-scheme: light;
+  --color-base-100: #FFFFFF;
+  --color-base-200: #FBF9F6;
+  --color-base-300: #F4F0EA;
+  --color-base-content: #141210;
+  --color-primary: #FFAD01;
+  --color-primary-content: #0B0A09;
+  --color-secondary: #57514B;
+  --color-secondary-content: #FBF9F6;
+  --color-accent: #8A5A00;
+  --color-accent-content: #FBF9F6;
+  --color-neutral: #141210;
+  --color-neutral-content: #FBF9F6;
+  --color-info: #791AB0;
+  --color-info-content: #F7F5F2;
+  --color-success: #33A96B;
+  --color-success-content: #0B0A09;
+  --color-warning: #FF9346;
+  --color-warning-content: #0B0A09;
+  --color-error: #C72D2D;
+  --color-error-content: #F7F5F2;
+  --radius-selector: 8px;
+  --radius-field: 14px;
+  --radius-box: 20px;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
 :root {
   --surface-hover: color-mix(in srgb, var(--surface, #ffffff) 88%, white);
   --primary-hover: color-mix(in srgb, var(--primary, #2563eb) 85%, white);
@@ -128,6 +346,19 @@ body,
 }
 .dark .theme-surface {
   background-color: var(--app-surface, #0e2433);
+}
+
+/* Palette-aware dark glass fills for chrome (MiniView, NavSettings capsules).
+   Opacity-on-var() utilities (bg-[var(--bg)]/90) do not compile under
+   Tailwind v3, so these are explicit classes scoped to .dark. */
+.dark .theme-glass-bg-90 {
+  background-color: color-mix(in srgb, var(--bg) 90%, transparent);
+}
+.dark .theme-glass-surface-90 {
+  background-color: color-mix(in srgb, var(--surface) 90%, transparent);
+}
+.dark .theme-glass-surface-80 {
+  background-color: color-mix(in srgb, var(--surface) 80%, transparent);
 }
 
 /* 全局样式 */

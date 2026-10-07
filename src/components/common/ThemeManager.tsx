@@ -6,6 +6,14 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { isLinux } from '../../utils/env';
 import { findPalette, THEME_PALETTES } from './themePalettes';
 
+// Palettes with a dedicated daisyUI v5 theme block (src/App.css) map to it;
+// every other palette falls back to the dark|light base pair. RiseUp ids cite
+// riseup-asia-website-project/spec/05-brand-system.md §1.1–§1.2 (READ-ONLY).
+const DAISY_THEME_OVERRIDES: Record<string, string> = {
+    'riseup-dark': 'riseup-dark',
+    'riseup-paper': 'riseup-paper',
+};
+
 export default function ThemeManager() {
     const { config, loadConfig } = useConfigStore();
 
@@ -89,7 +97,7 @@ export default function ThemeManager() {
                 console.error('Window background sync failed:', e);
             }
 
-            root.setAttribute('data-theme', isDark ? 'dark' : 'light');
+            root.setAttribute('data-theme', DAISY_THEME_OVERRIDES[palette.id] ?? (isDark ? 'dark' : 'light'));
             root.style.backgroundColor = palette.bg;
             root.style.color = palette.fg;
 

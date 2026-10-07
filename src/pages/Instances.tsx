@@ -127,6 +127,9 @@ export const isNodeOwnedByInstance = (
     return false;
 };
 
+// Data-ink exception (see ui-instance-identity-hues.md): per-profile identity
+// hues are functional color coding (like chart series), not theme-ink, so the
+// 7 literal ramps below are intentionally kept off daisyUI semantics.
 const INSTANCE_THEMES = [
     {
         name: 'Indigo',
@@ -609,14 +612,14 @@ export default function Instances() {
                 {/* Header */}
                 <div className="space-y-3">
                     <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shrink-0">
+                        <div className="p-2 rounded-xl bg-primary/10 text-primary shrink-0">
                             <Laptop className="w-5 h-5" />
                         </div>
                         <div className="min-w-0">
-                            <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-base-content">
+                            <h1 className="text-lg sm:text-xl font-bold text-base-content">
                                 {t('instances.page_title', 'Instances & Profiles')}
                             </h1>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            <p className="text-xs text-base-content/60 mt-0.5">
                                 {t('instances.page_desc', 'Run multiple Antigravity windows in parallel with isolated credentials and extensions')}
                             </p>
                         </div>
@@ -624,8 +627,8 @@ export default function Instances() {
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     {/* Segmented Group 1: Status & Maintenance */}
-                    <div className="flex items-center rounded-[4px] bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
-                        <div className="px-3 py-1 text-xs text-slate-700 dark:text-slate-300 font-semibold whitespace-nowrap rounded-l-[4px] rounded-r-none">
+                    <div className="flex items-center rounded-[4px] bg-base-200 border border-base-300/80 dark:border-base-300 p-0.5 divide-x divide-base-300 shadow-2xs">
+                        <div className="px-3 py-1 text-xs text-base-content/80 font-semibold whitespace-nowrap rounded-l-[4px] rounded-r-none">
                             {t('instances.running_summary', 'Running {{running}} of {{total}}', {
                                 running: runningCount,
                                 total: instances.length,
@@ -638,10 +641,10 @@ export default function Instances() {
                                 fetchSwitcherStatus();
                             }}
                             disabled={isLoading}
-                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-base-content/80 dark:text-base-content hover:bg-base-300 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             title={t('common.refresh', 'Refresh')}
                         >
-                            <RotateCw className={cn("w-3.5 h-3.5 text-blue-500", isLoading && "animate-spin")} />
+                            <RotateCw className={cn("w-3.5 h-3.5 text-primary", isLoading && "motion-safe:animate-spin")} />
                             <span>{t('common.refresh', 'Refresh')}</span>
                         </button>
                         <button
@@ -657,10 +660,10 @@ export default function Instances() {
                                 }
                             }}
                             disabled={isLoading || isSyncingAll}
-                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-base-content/80 dark:text-base-content hover:bg-base-300 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             title="Synchronize process PIDs and account quotas across all instances"
                         >
-                            <FolderSync className={cn("w-3.5 h-3.5 text-cyan-500", isSyncingAll && "animate-spin")} />
+                            <FolderSync className={cn("w-3.5 h-3.5 text-info", isSyncingAll && "motion-safe:animate-spin")} />
                             <span>Sync All</span>
                         </button>
                         <button
@@ -674,7 +677,7 @@ export default function Instances() {
                                 }
                             }}
                             disabled={isLoading}
-                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-100/50 dark:hover:bg-amber-950/40 rounded-r-[4px] rounded-l-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-warning hover:bg-warning/10 rounded-r-[4px] rounded-l-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             title="Force-terminate lingering background Electron/Antigravity processes, purge lockfiles, and cleanly relaunch Antigravity"
                         >
                             <Sparkles className="w-3.5 h-3.5" />
@@ -684,7 +687,7 @@ export default function Instances() {
 
 
                     {/* Segmented Group 2: Automation & Settings */}
-                    <div className="flex items-center rounded-[4px] bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+                    <div className="flex items-center rounded-[4px] bg-base-200 border border-base-300/80 dark:border-base-300 p-0.5 divide-x divide-base-300 shadow-2xs">
                         <button
                             type="button"
                             onClick={async () => {
@@ -704,26 +707,26 @@ export default function Instances() {
                             className={cn(
                                 "flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-l-[4px] rounded-r-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
                                 switcherStatus?.is_running
-                                    ? "text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
-                                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-[#15334d]"
+                                    ? "text-success hover:bg-success/10"
+                                    : "text-base-content/70 dark:text-base-content/60 hover:bg-base-300"
                             )}
                             title="Toggle background auto-profile switcher daemon"
                         >
                             {switcherStatus?.is_running ? (
-                                <ToggleRight className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                                <ToggleRight className="w-4 h-4 text-success" />
                             ) : (
-                                <ToggleLeft className="w-4 h-4 text-slate-400" />
+                                <ToggleLeft className="w-4 h-4 text-base-content/50" />
                             )}
                             <span>Auto-Switch: {switcherStatus?.is_running ? 'ON' : 'OFF'}</span>
                         </button>
                         {switcherStatus?.is_running && (
                             <div
-                                className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-cyan-300 rounded-none"
+                                className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-base-content/80 rounded-none"
                                 title={`Auto-Switcher daemon next check in ${daemonCountdown}s (${daemonStatus?.current_stage || 'Normal'} stage, interval ${daemonStatus?.check_interval_seconds || 60}s)`}
                             >
                                 <span className="relative flex h-2 w-2 shrink-0">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-xs shadow-emerald-500/50"></span>
+                                    <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-success shadow-xs shadow-success/50"></span>
                                 </span>
                                 <span className="font-mono text-[11px] whitespace-nowrap">
                                     ⏱ {daemonCountdown}s Next Check
@@ -741,10 +744,10 @@ export default function Instances() {
                                 }
                             }}
                             disabled={isLoading}
-                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-base-content/80 dark:text-base-content hover:bg-base-300 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             title="Evaluate rolling quota across all monitored instances and auto-rotate any low quota accounts"
                         >
-                            <Sparkles className={cn("w-3.5 h-3.5 text-amber-500", isLoading && "animate-spin")} />
+                            <Sparkles className={cn("w-3.5 h-3.5 text-warning", isLoading && "motion-safe:animate-spin")} />
                             <span>Eval Quota</span>
                         </button>
                         <button
@@ -753,10 +756,10 @@ export default function Instances() {
                                 setSettingsModalTarget(null);
                                 setIsSettingsModalOpen(true);
                             }}
-                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-r-[4px] rounded-l-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-base-content/80 dark:text-base-content hover:bg-base-300 rounded-r-[4px] rounded-l-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             title="Instance Settings & Sync: Turbo mode, plan review, copy settings, folder sync, JSON tools"
                         >
-                            <SlidersHorizontal className="w-3.5 h-3.5 text-blue-500" />
+                            <SlidersHorizontal className="w-3.5 h-3.5 text-primary" />
                             <span>Settings & Sync</span>
                         </button>
                     </div>
@@ -765,15 +768,15 @@ export default function Instances() {
                     <div className="flex items-center gap-2">
                         {/* Density Switcher Capsule (when viewMode === 'card') */}
                         {viewMode === 'card' && (
-                            <div className="flex items-center rounded-[4px] bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+                            <div className="flex items-center rounded-[4px] bg-base-200 border border-base-300/80 dark:border-base-300 p-0.5 divide-x divide-base-300 shadow-2xs">
                                 <button
                                     type="button"
                                     onClick={() => handleSetCardDensity('normal')}
                                     className={cn(
                                         "flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-l-[4px] rounded-r-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
                                         cardDensity === 'normal'
-                                            ? "bg-white dark:bg-[#15334d] text-blue-600 dark:text-cyan-300 shadow-xs"
-                                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                                            ? "bg-base-100 dark:bg-base-300 text-primary shadow-xs"
+                                            : "text-base-content/70 dark:text-base-content/60 hover:text-base-content dark:hover:text-base-content"
                                     )}
                                     title="Normal Cards"
                                 >
@@ -786,8 +789,8 @@ export default function Instances() {
                                     className={cn(
                                         "flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-r-[4px] rounded-l-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
                                         cardDensity === 'compact'
-                                            ? "bg-white dark:bg-[#15334d] text-blue-600 dark:text-cyan-300 shadow-xs"
-                                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                                            ? "bg-base-100 dark:bg-base-300 text-primary shadow-xs"
+                                            : "text-base-content/70 dark:text-base-content/60 hover:text-base-content dark:hover:text-base-content"
                                     )}
                                     title="Compact Cards"
                                 >
@@ -798,15 +801,15 @@ export default function Instances() {
                         )}
 
                         {/* View Switcher Capsule */}
-                        <div className="flex items-center rounded-[4px] bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+                        <div className="flex items-center rounded-[4px] bg-base-200 border border-base-300/80 dark:border-base-300 p-0.5 divide-x divide-base-300 shadow-2xs">
                             <button
                                 type="button"
                                 onClick={() => handleSetViewMode('card')}
                                 className={cn(
                                     "flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-l-[4px] rounded-r-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
                                     viewMode === 'card'
-                                        ? "bg-white dark:bg-[#15334d] text-blue-600 dark:text-cyan-300 shadow-xs"
-                                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                                        ? "bg-base-100 dark:bg-base-300 text-primary shadow-xs"
+                                        : "text-base-content/70 dark:text-base-content/60 hover:text-base-content dark:hover:text-base-content"
                                     )}
                                 title="Card View"
                             >
@@ -819,8 +822,8 @@ export default function Instances() {
                                 className={cn(
                                     "flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-r-[4px] rounded-l-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
                                     viewMode === 'list'
-                                        ? "bg-white dark:bg-[#15334d] text-blue-600 dark:text-cyan-300 shadow-xs"
-                                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                                        ? "bg-base-100 dark:bg-base-300 text-primary shadow-xs"
+                                        : "text-base-content/70 dark:text-base-content/60 hover:text-base-content dark:hover:text-base-content"
                                 )}
                                 title="List View"
                             >
@@ -836,7 +839,7 @@ export default function Instances() {
                                 setNewInstanceName('');
                                 setIsCreateOpen(true);
                             }}
-                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[4px] bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-xs cursor-pointer transition-all duration-150 ease-out active:scale-[0.98]"
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[4px] bg-primary hover:bg-[var(--primary-hover)] text-primary-content text-xs font-semibold shadow-xs cursor-pointer transition-all duration-150 ease-out active:scale-[0.98]"
                         >
                             <Plus className="w-3.5 h-3.5" />
                             <span>{t('instances.create_btn', 'New Instance')}</span>
@@ -847,7 +850,7 @@ export default function Instances() {
 
             {/* Store Error Alert */}
             {error ? (
-                <div className="p-3.5 rounded-[5px] bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
+                <div className="p-3.5 rounded-[5px] bg-error/10 border border-error/30 text-error text-xs flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 shrink-0" />
                         <span>{error}</span>
@@ -864,7 +867,7 @@ export default function Instances() {
 
             {/* Action Error Alert */}
             {actionError ? (
-                <div className="p-3.5 rounded-[5px] bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
+                <div className="p-3.5 rounded-[5px] bg-error/10 border border-error/30 text-error text-xs flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 shrink-0" />
                         <span>{actionError}</span>
@@ -875,24 +878,24 @@ export default function Instances() {
 
             {/* Auto-Switcher Status Banner */}
             {switcherStatus?.is_running ? (
-                <div className="bg-gradient-to-r from-blue-50/90 via-sky-50/70 to-indigo-50/80 dark:from-blue-950/40 dark:via-[#0c2438]/60 dark:to-indigo-950/40 border border-blue-200/80 dark:border-blue-500/30 rounded-[5px] p-4 backdrop-blur-md shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+                <div className="bg-success/10 border border-success/30 rounded-[5px] p-4 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
                     <div className="flex items-center gap-3 min-w-0">
                         <span className="relative flex h-3 w-3 shrink-0">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 shadow-xs shadow-emerald-500/50"></span>
+                            <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-success shadow-xs shadow-success/50"></span>
                         </span>
                         <div className="flex flex-wrap items-center gap-2 min-w-0">
-                            <span className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
-                                <Sparkles className="w-3.5 h-3.5 text-blue-500 dark:text-cyan-400" />
+                            <span className="font-bold text-base-content flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5 text-success" />
                                 {t('instances.auto_switcher_active', 'Auto Profile Switcher Active')}
                             </span>
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-[5px] text-[11px] font-semibold font-mono bg-blue-500/15 text-blue-700 dark:text-cyan-300 border border-blue-400/30 shadow-2xs">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-[5px] text-[11px] font-semibold font-mono bg-success/15 text-success border border-success/30 shadow-2xs">
                                 Current Active Quota: {switcherStatus.current_quota_percent !== undefined && switcherStatus.current_quota_percent !== null
                                     ? `${switcherStatus.current_quota_percent.toFixed(0)}%`
                                     : '100%'}
                             </span>
                             {switcherStatus.last_switch_reason ? (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-[5px] text-[11px] font-medium bg-gray-500/10 text-gray-600 dark:text-gray-300 border border-gray-400/20 max-w-xs truncate" title={switcherStatus.last_switch_reason}>
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-[5px] text-[11px] font-medium bg-base-300/10 text-base-content/70 dark:text-base-content/80 border border-base-300/20 max-w-xs truncate" title={switcherStatus.last_switch_reason}>
                                     Reason: {switcherStatus.last_switch_reason}
                                 </span>
                             ) : null}
@@ -914,13 +917,13 @@ export default function Instances() {
                                         setActionError(e?.toString() || 'Rotation failed');
                                     }
                                 }}
-                                className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-[5px] bg-blue-600 hover:bg-blue-500 text-white shadow-xs cursor-pointer transition-colors active:scale-95 shrink-0"
+                                className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-[5px] bg-primary hover:bg-[var(--primary-hover)] text-primary-content shadow-xs cursor-pointer transition-colors active:scale-95 shrink-0"
                                 title={rotateTooltip}
                             >
                                 <FastForward className="w-3.5 h-3.5" />
                                 <span>{t('instances.rotate_next_best', 'Rotate to Next Best')}</span>
                                 {nextBestCandidate && (
-                                    <span className="px-1.5 py-0.5 rounded-[4px] bg-blue-500/30 text-[10px] font-mono font-normal max-w-[110px] truncate">
+                                    <span className="px-1.5 py-0.5 rounded-[4px] bg-primary-content/25 text-[10px] font-mono font-normal max-w-[110px] truncate">
                                         {nextBestCandidate.email.split('@')[0]}
                                     </span>
                                 )}
@@ -932,14 +935,14 @@ export default function Instances() {
 
             {/* Search Filter & Quick Action */}
             <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div className="flex items-center gap-2 flex-1 max-w-md bg-white dark:bg-base-200 border border-gray-200 dark:border-base-100 rounded-[5px] px-3 py-2 shadow-xs">
-                    <Search className="w-4 h-4 text-gray-400 shrink-0" />
+                <div className="flex items-center gap-2 flex-1 max-w-md bg-base-100 dark:bg-base-200 border border-base-300 rounded-[5px] px-3 py-2 shadow-xs">
+                    <Search className="w-4 h-4 text-base-content/50 shrink-0" />
                     <input
                         type="text"
                         placeholder={t('instances.search_placeholder', 'Search by profile name, ID, or bound email...')}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-transparent border-none outline-hidden text-xs text-gray-900 dark:text-base-content"
+                        className="w-full bg-transparent border-none outline-hidden text-xs text-base-content"
                     />
                 </div>
                 <button
@@ -956,21 +959,21 @@ export default function Instances() {
 
             {/* Instance Cards Grid or Empty / Loading States */}
             {isLoading && instances.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-base-200 rounded-[5px] border border-gray-200/80 dark:border-base-100">
-                    <RotateCw className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin mb-3" />
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <div className="flex flex-col items-center justify-center py-20 bg-base-100 dark:bg-base-200 rounded-[5px] border border-base-300/80 dark:border-base-300">
+                    <RotateCw className="w-8 h-8 text-primary motion-safe:animate-spin mb-3" />
+                    <p className="text-sm font-medium text-base-content/80">
                         {t('instances.loading', 'Loading instances and profiles...')}
                     </p>
                 </div>
             ) : instances.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 px-4 text-center bg-white dark:bg-base-200 rounded-[5px] border border-dashed border-gray-300 dark:border-base-100">
-                    <div className="p-4 rounded-[5px] bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 mb-4">
+                <div className="flex flex-col items-center justify-center py-16 px-4 text-center bg-base-100 dark:bg-base-200 rounded-[5px] border border-dashed border-base-300">
+                    <div className="p-4 rounded-[5px] bg-primary/10 text-primary mb-4">
                         <Laptop className="w-10 h-10" />
                     </div>
-                    <h3 className="text-base font-bold text-gray-900 dark:text-base-content mb-1">
+                    <h3 className="text-base font-bold text-base-content mb-1">
                         {t('instances.empty_title', 'No Profiles Found')}
                     </h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 max-w-md mb-6 leading-relaxed">
+                    <p className="text-xs text-base-content/60 max-w-md mb-6 leading-relaxed">
                         {t('instances.empty_desc', 'Instances allow you to run isolated Antigravity windows with dedicated account tokens, extensions, and workspaces. Initialize your default profile or create a custom one to get started.')}
                     </p>
                     <div className="flex items-center gap-3">
@@ -1001,12 +1004,12 @@ export default function Instances() {
                     </div>
                 </div>
             ) : filteredInstances.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center bg-white dark:bg-base-200 rounded-[5px] border border-gray-200/80 dark:border-base-100">
-                    <Search className="w-8 h-8 text-gray-400 mb-2" />
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <div className="flex flex-col items-center justify-center py-12 text-center bg-base-100 dark:bg-base-200 rounded-[5px] border border-base-300/80 dark:border-base-300">
+                    <Search className="w-8 h-8 text-base-content/50 mb-2" />
+                    <p className="text-sm font-medium text-base-content/80">
                         {t('instances.no_search_results', 'No profiles match your search')}
                     </p>
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-base-content/50 mt-1">
                         {t('instances.no_search_results_desc', 'Try searching with a different name, profile ID, or email')}
                     </p>
                 </div>
@@ -1132,15 +1135,15 @@ export default function Instances() {
                                 className={cn(
                                     "group relative rounded-[5px] border transition-all duration-200 flex flex-col justify-between overflow-hidden backdrop-blur-xs",
                                     isActive
-                                        ? cn(SELECTED_CARD_CLASSES, "border-amber-400/50 shadow-md")
-                                        : "bg-white dark:bg-[#0a1e30] border-gray-200/50 dark:border-[#15334d]/60 hover:border-gray-300/80 dark:hover:border-blue-500/40 hover:bg-slate-50/90 dark:hover:bg-[#061421] shadow-xs"
+                                        ? cn(SELECTED_CARD_CLASSES, "border-warning/30 shadow-md")
+                                        : "bg-base-100 dark:bg-base-200 border-base-300/50 dark:border-base-300/60 hover:border-base-300/80 dark:hover:border-primary/40 hover:bg-base-200/90 dark:hover:bg-base-100 shadow-xs"
                                 )}
                             >
                                 {/* Card Mutex Overlay when action is executing */}
                                 {isBusy && (
-                                    <div className="absolute inset-0 bg-white/75 dark:bg-[#071a27]/85 backdrop-blur-[2px] z-30 flex flex-col items-center justify-center gap-2 rounded-[5px] pointer-events-auto cursor-wait select-none">
-                                        <RotateCw className="w-5 h-5 animate-spin text-blue-500 dark:text-cyan-400" />
-                                        <span className="text-xs font-bold text-gray-800 dark:text-cyan-200 tracking-wide font-mono">
+                                    <div className="absolute inset-0 bg-white/75 dark:bg-black/70 backdrop-blur-[2px] z-30 flex flex-col items-center justify-center gap-2 rounded-[5px] pointer-events-auto cursor-wait select-none">
+                                        <RotateCw className="w-5 h-5 motion-safe:animate-spin text-primary" />
+                                        <span className="text-xs font-bold text-base-content tracking-wide font-mono">
                                             {getActionLabel(currentAction)}
                                         </span>
                                     </div>
@@ -1157,28 +1160,28 @@ export default function Instances() {
                                                 <span
                                                     className={cn(
                                                         "w-2.5 h-2.5 rounded-full shrink-0",
-                                                        inst.is_running ? "bg-emerald-500 shadow-xs shadow-emerald-500/50 animate-pulse" : "bg-gray-300 dark:bg-gray-600"
+                                                        inst.is_running ? "bg-success shadow-xs shadow-success/50 motion-safe:animate-pulse" : "bg-base-300 dark:bg-base-200"
                                                     )}
                                                 />
-                                                <span className="px-1.5 py-0.5 rounded-[5px] text-xs font-black bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25 shrink-0">
+                                                <span className="px-1.5 py-0.5 rounded-[5px] text-xs font-black bg-primary/15 text-primary border border-primary/25 shrink-0">
                                                     #{seqNumber}
                                                 </span>
-                                                <h3 className={cn("font-bold text-xs truncate shrink min-w-0", isActive ? "text-blue-900 dark:text-blue-100" : "text-gray-900 dark:text-base-content")} title={inst.config.name}>
+                                                <h3 className={cn("font-bold text-xs truncate shrink min-w-0", isActive ? "text-primary" : "text-base-content")} title={inst.config.name}>
                                                     {inst.config.name}
                                                 </h3>
                                                 {hasActiveTask && (
                                                     <button
                                                         type="button"
                                                         onClick={() => setPromptTreeInstance({ id: inst.config.id, name: inst.config.name, seqNum: inst.config.seq_num, executablePath: inst.config.executable_path })}
-                                                        className="inline-flex items-center gap-1 px-1.5 h-5 rounded-[5px] text-[9px] font-bold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30 shrink-0 cursor-pointer transition-colors shadow-2xs"
+                                                        className="inline-flex items-center gap-1 px-1.5 h-5 rounded-[5px] text-[9px] font-bold bg-info/15 hover:bg-info/25 text-info border border-info/30 shrink-0 cursor-pointer transition-colors shadow-2xs"
                                                         title="Active prompt/task running - Click to open Prompt Tree"
                                                     >
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse shrink-0" />
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-info motion-safe:animate-pulse shrink-0" />
                                                         <span>Prompt</span>
                                                     </button>
                                                 )}
                                                 {inst.config.is_default ? (
-                                                    <span className="h-5 px-1.5 rounded-[5px] text-[9px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-400/30 flex items-center justify-center shrink-0">
+                                                    <span className="h-5 px-1.5 rounded-[5px] text-[9px] font-bold bg-accent/15 text-accent border border-accent/30 flex items-center justify-center shrink-0">
                                                         DEFAULT
                                                     </span>
                                                 ) : (
@@ -1192,7 +1195,7 @@ export default function Instances() {
                                                                 setActionError(e?.toString() || 'Failed to set default profile');
                                                             }
                                                         }}
-                                                        className="h-5 px-1.5 rounded-[5px] text-[9px] font-medium text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-dashed border-gray-300 dark:border-[#15334d] transition-colors cursor-pointer flex items-center gap-1 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        className="h-5 px-1.5 rounded-[5px] text-[9px] font-medium text-base-content/50 hover:text-warning hover:bg-warning/10 border border-dashed border-base-300 transition-colors cursor-pointer flex items-center gap-1 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                                                         title="Set as default profile"
                                                     >
                                                         <Star className="w-2.5 h-2.5" />
@@ -1209,7 +1212,7 @@ export default function Instances() {
                                                     <button
                                                         disabled={isBusy}
                                                         onClick={() => setActiveInstance(inst.config.id)}
-                                                        className="text-[10px] text-gray-500 hover:text-blue-600 transition-colors font-medium mr-0.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        className="text-[10px] text-base-content/60 hover:text-primary transition-colors font-medium mr-0.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                         title="Set as active instance for account switches"
                                                     >
                                                         Set Active
@@ -1221,7 +1224,7 @@ export default function Instances() {
                                                         setEditTargetId(inst.config.id);
                                                         setEditInstanceName(inst.config.name);
                                                     }}
-                                                    className="p-1 rounded-[5px] text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="p-1 rounded-[5px] text-primary hover:bg-primary/10 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                     title={t('instances.edit_title', 'Rename profile')}
                                                 >
                                                     <Pencil className="w-3 h-3" />
@@ -1233,7 +1236,7 @@ export default function Instances() {
                                                         setCopyInstanceName(`${inst.config.name} Copy`);
                                                         setCopyProjects(true);
                                                     }}
-                                                    className="p-1 rounded-[5px] text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="p-1 rounded-[5px] text-accent hover:bg-accent/10 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                     title="Clone / Duplicate profile settings and extensions"
                                                 >
                                                     <Copy className="w-3 h-3" />
@@ -1242,11 +1245,11 @@ export default function Instances() {
                                                     <button
                                                         onClick={() => handleDelete(inst.config.id)}
                                                         disabled={inst.is_running || isBusy || deletingId === inst.config.id}
-                                                        className="p-1 rounded-[5px] text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                                                        className="p-1 rounded-[5px] text-error hover:bg-error/10 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                                                         title="Delete profile"
                                                     >
                                                         {currentAction === 'delete' ? (
-                                                            <RotateCw className="w-3 h-3 animate-spin text-rose-500" />
+                                                            <RotateCw className="w-3 h-3 motion-safe:animate-spin text-error" />
                                                         ) : (
                                                             <Trash2 className="w-3 h-3" />
                                                         )}
@@ -1257,12 +1260,12 @@ export default function Instances() {
 
                                         {/* Bound Account / Email Section: Compact py-1 px-2.5 rounded-md */}
                                         <div className={cn(
-                                            "py-1 px-2.5 rounded-md bg-gray-50/80 dark:bg-[#0c2438]/90 border border-gray-100 dark:border-[#15334d] mb-2.5 flex items-center justify-between gap-1.5 transition-all duration-200",
-                                            "group-hover:border-amber-400/40 dark:group-hover:border-amber-400/50 dark:group-hover:bg-[#050f18]"
+                                            "py-1 px-2.5 rounded-md bg-base-200/80 dark:bg-base-200/90 border border-base-300 mb-2.5 flex items-center justify-between gap-1.5 transition-all duration-200",
+                                            "group-hover:border-warning/30 dark:group-hover:bg-base-100"
                                         )}>
                                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                                <Mail className="w-3 h-3 text-gray-400 group-hover:text-amber-400 transition-colors shrink-0" />
-                                                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium shrink-0">
+                                                <Mail className="w-3 h-3 text-base-content/50 group-hover:text-warning transition-colors shrink-0" />
+                                                <span className="text-[10px] text-base-content/60 font-medium shrink-0">
                                                     Account:
                                                 </span>
                                                 {displayEmail ? (
@@ -1270,7 +1273,7 @@ export default function Instances() {
                                                         className={cn(
                                                             "px-1.5 py-0.5 rounded-md text-[11px] font-semibold font-mono border flex items-center gap-1 min-w-0 shadow-2xs transition-colors",
                                                             theme.emailPill,
-                                                            "group-hover:text-amber-600 dark:group-hover:text-amber-300"
+                                                            "group-hover:text-warning"
                                                         )}
                                                         title={displayEmail}
                                                     >
@@ -1278,7 +1281,7 @@ export default function Instances() {
                                                         <span className="truncate">{displayEmail}</span>
                                                     </span>
                                                 ) : (
-                                                    <span className="text-[11px] text-gray-400 italic">
+                                                    <span className="text-[11px] text-base-content/50 italic">
                                                         Unassigned
                                                     </span>
                                                 )}
@@ -1295,13 +1298,13 @@ export default function Instances() {
                                         {/* Colorful Gemini Quota & Weekly Progress Bar */}
                                         <div className="mb-2.5">
                                             {(geminiModel || weeklyQuota) ? (
-                                                <div className="p-2.5 rounded-md bg-gray-50/90 dark:bg-[#0c2438]/90 border border-gray-200/70 dark:border-[#15334d] space-y-2">
+                                                <div className="p-2.5 rounded-md bg-base-200/90 border border-base-300/70 dark:border-base-300 space-y-2">
                                                     {geminiModel && (
                                                         <div className="space-y-1">
                                                             <div className="flex items-center justify-between text-xs">
                                                                 <div className="flex items-center gap-1.5 min-w-0">
                                                                     <Gemini.Color className="w-3.5 h-3.5 shrink-0" />
-                                                                    <span className="font-semibold text-gray-800 dark:text-gray-200 text-xs truncate">
+                                                                    <span className="font-semibold text-base-content text-xs truncate">
                                                                         {geminiModel.display_name || geminiModel.name || 'Gemini 3.1 Pro'} (4H)
                                                                     </span>
                                                                 </div>
@@ -1313,9 +1316,9 @@ export default function Instances() {
                                                         </div>
                                                     )}
                                                     {weeklyQuota && (
-                                                        <div className={cn("space-y-1", geminiModel && "pt-1.5 border-t border-gray-200/60 dark:border-[#15334d]/60")}>
+                                                        <div className={cn("space-y-1", geminiModel && "pt-1.5 border-t border-base-300/60")}>
                                                             <div className="flex items-center justify-between text-xs">
-                                                                <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">
+                                                                <span className="text-[11px] font-medium text-base-content/70 dark:text-base-content/80">
                                                                     Weekly Quota
                                                                 </span>
                                                             </div>
@@ -1328,60 +1331,60 @@ export default function Instances() {
                                                     )}
                                                 </div>
                                             ) : boundAccount ? (
-                                                <div className="p-2 rounded-md bg-gray-50/60 dark:bg-[#0c2438]/90 border border-gray-100 dark:border-[#15334d] flex items-center justify-between text-xs text-gray-500">
+                                                <div className="p-2 rounded-md bg-base-200/60 dark:bg-base-200/90 border border-base-300 flex items-center justify-between text-xs text-base-content/60">
                                                     <div className="flex items-center gap-1.5">
                                                         <Gemini.Color className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                                                        <span className="text-[11px] text-gray-500 dark:text-gray-400">Quota not synced</span>
+                                                        <span className="text-[11px] text-base-content/60">Quota not synced</span>
                                                     </div>
                                                     <button
                                                         onClick={() => refreshQuota(boundAccount.id)}
-                                                        className="text-blue-600 dark:text-blue-400 hover:underline gap-1 text-[11px] cursor-pointer flex items-center"
+                                                        className="text-primary hover:underline gap-1 text-[11px] cursor-pointer flex items-center"
                                                     >
-                                                        <ArrowLeftRight className="w-3 h-3 text-blue-500" />
+                                                        <ArrowLeftRight className="w-3 h-3 text-primary" />
                                                         <span>Sync</span>
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <div className="p-2 rounded-md bg-gray-50/40 dark:bg-[#0c2438]/60 border border-dashed border-gray-200 dark:border-[#15334d] flex items-center justify-between text-xs text-gray-400">
+                                                <div className="p-2 rounded-md bg-base-200/40 dark:bg-base-200/60 border border-dashed border-base-300 flex items-center justify-between text-xs text-base-content/50">
                                                     <div className="flex items-center gap-1.5">
                                                         <Gemini.Color className="w-3.5 h-3.5 shrink-0 opacity-40 grayscale" />
                                                         <span className="text-[10px] italic">No profile bound</span>
                                                     </div>
-                                                    <span className="text-[10px] text-gray-400/80">Launch to assign</span>
+                                                    <span className="text-[10px] text-base-content/50">Launch to assign</span>
                                                 </div>
                                             )}
                                         </div>
 
                                         {/* Status and Profile details: Compact badge layout */}
-                                        <div className="space-y-1.5 py-2 border-t border-gray-100 dark:border-[#15334d]/80 text-xs">
+                                        <div className="space-y-1.5 py-2 border-t border-base-300 dark:border-base-300/80 text-xs">
                                             <div className="flex items-center justify-between gap-1.5 flex-wrap">
                                                 {/* Status Badge */}
                                                 {inst.is_running ? (
-                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[5px] text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 shadow-2xs">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[5px] text-[10px] font-semibold bg-success/10 text-success border border-success/20 shadow-2xs">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-success motion-safe:animate-pulse" />
                                                         Running {inst.pid ? `(${inst.pid})` : ''}
                                                     </span>
                                                 ) : (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-medium bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-400/20">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-medium bg-base-300/10 text-base-content/70 dark:text-base-content/60 border border-base-300/20">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-base-300" />
                                                         Idle
                                                     </span>
                                                 )}
 
                                                 {/* Profile ID Monospace Pill */}
                                                 <span
-                                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[5px] text-[10px] font-mono font-medium bg-gray-100 dark:bg-[#0c2438] text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-[#15334d] truncate max-w-[120px]"
+                                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[5px] text-[10px] font-mono font-medium bg-base-200 text-base-content/70 dark:text-base-content/80 border border-base-300 truncate max-w-[120px]"
                                                     title={`Profile ID: ${inst.config.id}`}
                                                 >
-                                                    <span className="text-gray-400 dark:text-slate-500">ID:</span>
+                                                    <span className="text-base-content/50">ID:</span>
                                                     <span className="truncate">{inst.config.id}</span>
                                                 </span>
                                             </div>
 
                                             {/* Path with clean folder badge and copy action */}
-                                            <div className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-[5px] bg-gray-50/80 dark:bg-[#0c2438]/70 border border-gray-200/70 dark:border-[#15334d] text-[10px] group transition-colors hover:border-gray-300 dark:hover:border-blue-500/30">
-                                                <div className="flex items-center gap-1 min-w-0 flex-1 text-gray-500 dark:text-slate-400" title={inst.config.data_dir}>
-                                                    <Folder className="w-3 h-3 shrink-0 text-blue-500/80" />
+                                            <div className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-[5px] bg-base-200/80 dark:bg-base-200/70 border border-base-300/70 dark:border-base-300 text-[10px] group transition-colors hover:border-base-300 dark:hover:border-primary/30">
+                                                <div className="flex items-center gap-1 min-w-0 flex-1 text-base-content/60" title={inst.config.data_dir}>
+                                                    <Folder className="w-3 h-3 shrink-0 text-primary/80" />
                                                     <span className="truncate font-mono" title={inst.config.data_dir}>{truncatePath(inst.config.data_dir)}</span>
                                                 </div>
                                                 <button
@@ -1395,7 +1398,7 @@ export default function Instances() {
                                                             showToast('Failed to copy path', 'error');
                                                         }
                                                     }}
-                                                    className="opacity-60 group-hover:opacity-100 p-0.5 rounded-[5px] hover:bg-gray-200 dark:hover:bg-[#15334d] text-gray-500 dark:text-gray-300 transition-opacity cursor-pointer shrink-0"
+                                                    className="opacity-60 group-hover:opacity-100 p-0.5 rounded-[5px] hover:bg-base-300 text-base-content/60 dark:text-base-content/80 transition-opacity cursor-pointer shrink-0"
                                                     title="Copy directory path"
                                                 >
                                                     <Copy className="w-3 h-3" />
@@ -1404,9 +1407,9 @@ export default function Instances() {
 
                                             {/* Executable path badge (renders for custom instances AND default instance) */}
                                             {effectiveExePath ? (
-                                                <div className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-[5px] bg-slate-100/70 dark:bg-slate-900/60 border border-slate-200/80 dark:border-[#15334d] text-[10px] group/exe transition-colors">
-                                                    <div className="flex items-center gap-1 min-w-0 flex-1 text-slate-700 dark:text-slate-300" title={effectiveExePath}>
-                                                        <Cpu className="w-3 h-3 shrink-0 text-cyan-500" />
+                                                <div className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-[5px] bg-base-200/70 dark:bg-base-200/60 border border-base-300/80 dark:border-base-300 text-[10px] group/exe transition-colors">
+                                                    <div className="flex items-center gap-1 min-w-0 flex-1 text-base-content/80" title={effectiveExePath}>
+                                                        <Cpu className="w-3 h-3 shrink-0 text-info" />
                                                         <span className="truncate font-mono" title={effectiveExePath}>{truncatePath(effectiveExePath)}</span>
                                                     </div>
                                                     <button
@@ -1420,7 +1423,7 @@ export default function Instances() {
                                                                 showToast('Failed to copy executable path', 'error');
                                                             }
                                                         }}
-                                                        className="opacity-60 group-hover/exe:opacity-100 p-0.5 rounded-[5px] hover:bg-slate-200 dark:hover:bg-[#15334d] text-slate-500 dark:text-slate-300 transition-opacity cursor-pointer shrink-0"
+                                                        className="opacity-60 group-hover/exe:opacity-100 p-0.5 rounded-[5px] hover:bg-base-300 text-base-content/60 dark:text-base-content/80 transition-opacity cursor-pointer shrink-0"
                                                         title="Copy executable path"
                                                     >
                                                         <Copy className="w-3 h-3" />
@@ -1452,13 +1455,13 @@ export default function Instances() {
                                             const displayedProjects = sortedProjects.slice(0, maxP);
 
                                             return (
-                                                <div className="mt-2 p-2 rounded-[5px] bg-gray-50/80 dark:bg-[#0c2438]/80 border border-gray-200/70 dark:border-[#15334d] text-xs">
-                                                    <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5 pb-1 border-b border-gray-200/60 dark:border-[#15334d]/60">
+                                                <div className="mt-2 p-2 rounded-[5px] bg-base-200/80 border border-base-300/70 dark:border-base-300 text-xs">
+                                                    <div className="flex items-center justify-between text-[11px] font-semibold text-base-content/80 mb-1.5 pb-1 border-b border-base-300/60">
                                                         <span className="flex items-center gap-1">
-                                                            <Folder className="w-3 h-3 text-blue-500" />
+                                                            <Folder className="w-3 h-3 text-primary" />
                                                             <span>Active / Recent Projects</span>
                                                         </span>
-                                                        <span className="px-1.5 py-0.2 rounded-[4px] text-[10px] font-mono bg-gray-200/70 dark:bg-[#15334d] text-slate-600 dark:text-slate-300">
+                                                        <span className="px-1.5 py-0.2 rounded-[4px] text-[10px] font-mono bg-base-300/70 dark:bg-base-300 text-base-content/70 dark:text-base-content/80">
                                                             {instanceProjects.length}
                                                         </span>
                                                     </div>
@@ -1479,23 +1482,23 @@ export default function Instances() {
                                                                             seqNum: inst.config.seq_num,
                                                                             executablePath: inst.config.executable_path,
                                                                         })}
-                                                                        className="flex items-center justify-between gap-1.5 px-1.5 py-1 rounded-[5px] bg-white dark:bg-[#081a2b] hover:bg-blue-50 dark:hover:bg-[#15334d] border border-gray-200/50 dark:border-[#15334d]/60 transition-colors cursor-pointer group/proj"
+                                                                        className="flex items-center justify-between gap-1.5 px-1.5 py-1 rounded-[5px] bg-base-100 dark:bg-base-200 hover:bg-primary/10 dark:hover:bg-base-300 border border-base-300/50 dark:border-base-300/60 transition-colors cursor-pointer group/proj"
                                                                         title="Double-click to open in Prompt Tree"
                                                                     >
                                                                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                                                            <Folder className="w-3 h-3 shrink-0 text-slate-400 group-hover/proj:text-blue-500 transition-colors" />
-                                                                            <span className="truncate font-medium text-[11px] text-slate-800 dark:text-slate-200" title={proj.repo_name}>
+                                                                            <Folder className="w-3 h-3 shrink-0 text-base-content/50 group-hover/proj:text-primary transition-colors" />
+                                                                            <span className="truncate font-medium text-[11px] text-base-content" title={proj.repo_name}>
                                                                                 {proj.repo_name}
                                                                             </span>
                                                                         </div>
                                                                         <div className="flex items-center gap-1 shrink-0">
                                                                             {isProjRunning && (
-                                                                                <span className="px-1 py-0.2 rounded-[4px] text-[9px] font-bold bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 border border-cyan-400/30 flex items-center gap-0.5">
-                                                                                    <span className="w-1 h-1 rounded-full bg-cyan-500 animate-pulse" />
+                                                                                <span className="px-1 py-0.2 rounded-[4px] text-[9px] font-bold bg-info/15 text-info border border-info/30 flex items-center gap-0.5">
+                                                                                    <span className="w-1 h-1 rounded-full bg-info motion-safe:animate-pulse" />
                                                                                     RUNNING
                                                                                 </span>
                                                                             )}
-                                                                            <span className="px-1.5 py-0.2 rounded-[4px] text-[9px] font-mono text-slate-500 dark:text-slate-400 bg-gray-100 dark:bg-[#0c2438] border border-gray-200/50 dark:border-[#15334d]">
+                                                                            <span className="px-1.5 py-0.2 rounded-[4px] text-[9px] font-mono text-base-content/60 bg-base-200 border border-base-300/50 dark:border-base-300">
                                                                                 {totalTurns} turns
                                                                             </span>
                                                                         </div>
@@ -1504,7 +1507,7 @@ export default function Instances() {
                                                             })}
                                                         </div>
                                                     ) : (
-                                                        <div className="text-[10px] text-gray-400 dark:text-slate-500 italic py-1 text-center">
+                                                        <div className="text-[10px] text-base-content/50 italic py-1 text-center">
                                                             No recent projects
                                                         </div>
                                                     )}
@@ -1514,20 +1517,20 @@ export default function Instances() {
                                     </div>
 
                                     {/* Card Actions Toolbar: 2 clean structured rows with 5-6px radius */}
-                                    <div className="pt-2.5 border-t border-gray-100 dark:border-[#15334d]/80 mt-2 space-y-1.5">
+                                    <div className="pt-2.5 border-t border-base-300 dark:border-base-300/80 mt-2 space-y-1.5">
                                         {/* Row 1: Primary Actions Capsule (Launch/Stop, Switch Account, Fast-Forward, Sync PID) */}
-                                        <div className="flex items-center rounded-[5px] overflow-hidden bg-slate-100 dark:bg-[#071a27] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs w-full">
+                                        <div className="flex items-center rounded-[5px] overflow-hidden bg-base-200 border border-base-300/80 dark:border-base-300 p-0.5 divide-x divide-base-300 shadow-2xs w-full">
                                             {inst.is_running ? (
-                                                <div className="flex-1 flex items-center divide-x divide-slate-200 dark:divide-[#15334d]">
+                                                <div className="flex-1 flex items-center divide-x divide-base-300">
                                                     <button
                                                         type="button"
                                                         disabled={isBusy}
                                                         onClick={() => handleStop(inst.config.id)}
-                                                        className="flex-1 flex items-center justify-center py-1 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-l-[4px] transition-colors cursor-pointer disabled:opacity-50"
+                                                        className="flex-1 flex items-center justify-center py-1 text-error hover:bg-error/10 rounded-l-[4px] transition-colors cursor-pointer disabled:opacity-50"
                                                         title="Stop Instance"
                                                     >
                                                         {currentAction === 'stop' ? (
-                                                            <RotateCw className="w-3.5 h-3.5 animate-spin text-rose-500" />
+                                                            <RotateCw className="w-3.5 h-3.5 motion-safe:animate-spin text-error" />
                                                         ) : (
                                                             <Square className="w-3.5 h-3.5 fill-current" />
                                                         )}
@@ -1536,11 +1539,11 @@ export default function Instances() {
                                                         type="button"
                                                         disabled={isBusy}
                                                         onClick={() => handleRestart(inst.config.id)}
-                                                        className="flex-1 flex items-center justify-center py-1 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer disabled:opacity-50"
+                                                        className="flex-1 flex items-center justify-center py-1 text-warning hover:bg-warning/10 transition-colors cursor-pointer disabled:opacity-50"
                                                         title="Restart Instance on Current Account"
                                                     >
                                                         {currentAction === 'restart' ? (
-                                                            <RotateCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                                                            <RotateCw className="w-3.5 h-3.5 motion-safe:animate-spin text-warning" />
                                                         ) : (
                                                             <RotateCcw className="w-3.5 h-3.5" />
                                                         )}
@@ -1551,11 +1554,11 @@ export default function Instances() {
                                                     type="button"
                                                     disabled={isBusy}
                                                     onClick={() => handleLaunch(inst.config.id)}
-                                                    className="flex-1 flex items-center justify-center py-1 text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40 rounded-l-[4px] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="flex-1 flex items-center justify-center py-1 text-info hover:bg-info/10 rounded-l-[4px] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                     title="Launch Instance"
                                                 >
                                                     {currentAction === 'launch' ? (
-                                                        <RotateCw className="w-3.5 h-3.5 animate-spin text-teal-500" />
+                                                        <RotateCw className="w-3.5 h-3.5 motion-safe:animate-spin text-info" />
                                                     ) : (
                                                         <Play className="w-3.5 h-3.5 fill-current" />
                                                     )}
@@ -1566,11 +1569,11 @@ export default function Instances() {
                                                 type="button"
                                                 disabled={isBusy}
                                                 onClick={() => setSwitchTargetInstance(inst)}
-                                                className="flex-1 flex items-center justify-center py-1 text-sky-600 dark:text-sky-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex-1 flex items-center justify-center py-1 text-info hover:bg-base-300 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Switch Account"
                                             >
                                                 {currentAction === 'switch' ? (
-                                                    <RotateCw className="w-3.5 h-3.5 animate-spin text-sky-500" />
+                                                    <RotateCw className="w-3.5 h-3.5 motion-safe:animate-spin text-info" />
                                                 ) : (
                                                     <ArrowRightLeft className="w-3.5 h-3.5" />
                                                 )}
@@ -1580,11 +1583,11 @@ export default function Instances() {
                                                 type="button"
                                                 disabled={isBusy}
                                                 onClick={() => handleFastForward(inst.config.id)}
-                                                className="flex-1 flex items-center justify-center py-1 text-amber-600 dark:text-amber-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex-1 flex items-center justify-center py-1 text-warning hover:bg-base-300 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Fast Forward to Next Best"
                                             >
                                                 {currentAction === 'fast-forward' ? (
-                                                    <RotateCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                                                    <RotateCw className="w-3.5 h-3.5 motion-safe:animate-spin text-warning" />
                                                 ) : (
                                                     <FastForward className="w-3.5 h-3.5" />
                                                 )}
@@ -1594,15 +1597,15 @@ export default function Instances() {
                                                 type="button"
                                                 disabled={isBusy || Boolean(syncingInstanceIds[inst.config.id])}
                                                 onClick={() => handleSync(inst.config.id)}
-                                                className="flex-1 flex items-center justify-center py-1 text-teal-600 dark:text-teal-400 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-r-[4px] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex-1 flex items-center justify-center py-1 text-info hover:bg-base-300 rounded-r-[4px] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Sync PID and Quota"
                                             >
-                                                <Cpu className={cn("w-3.5 h-3.5 text-teal-500", (currentAction === 'sync' || syncingInstanceIds[inst.config.id]) && "animate-pulse")} />
+                                                <Cpu className={cn("w-3.5 h-3.5 text-info", (currentAction === 'sync' || syncingInstanceIds[inst.config.id]) && "motion-safe:animate-pulse")} />
                                             </button>
                                         </div>
 
                                         {/* Row 2: Secondary Actions Capsule (Prompts Tree, Settings, Clone Profile, Audit, More Popover) */}
-                                        <div className="flex items-center rounded-[5px] overflow-hidden bg-slate-100 dark:bg-[#071a27] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs w-full relative">
+                                        <div className="flex items-center rounded-[5px] overflow-hidden bg-base-200 border border-base-300/80 dark:border-base-300 p-0.5 divide-x divide-base-300 shadow-2xs w-full relative">
                                             {/* Slot 1: Prompts Tree */}
                                             <button
                                                 type="button"
@@ -1611,14 +1614,14 @@ export default function Instances() {
                                                 className={cn(
                                                     "flex-1 flex items-center justify-center py-1 transition-colors cursor-pointer relative rounded-l-[4px] disabled:opacity-50 disabled:cursor-not-allowed",
                                                     hasActiveTask
-                                                        ? "bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-300 hover:bg-cyan-100 dark:hover:bg-cyan-900/50"
-                                                        : "text-slate-600 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 hover:bg-slate-200 dark:hover:bg-[#15334d]"
+                                                        ? "bg-info/10 text-info hover:bg-info/10"
+                                                        : "text-base-content/70 dark:text-base-content/60 hover:text-info hover:bg-base-300"
                                                 )}
                                                 title={hasActiveTask ? "Prompt Tree (Active Task Running)" : "Prompt Tree"}
                                             >
                                                 <Layers className="w-3.5 h-3.5" />
                                                 {hasActiveTask && (
-                                                    <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
+                                                    <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-info motion-safe:animate-pulse" />
                                                 )}
                                             </button>
 
@@ -1630,7 +1633,7 @@ export default function Instances() {
                                                     setSettingsModalTarget(inst);
                                                     setIsSettingsModalOpen(true);
                                                 }}
-                                                className="flex-1 flex items-center justify-center py-1 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex-1 flex items-center justify-center py-1 text-base-content/70 dark:text-base-content/60 hover:text-primary hover:bg-base-300 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Settings & Sync"
                                             >
                                                 <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -1645,7 +1648,7 @@ export default function Instances() {
                                                     setCopyInstanceName(`${inst.config.name} Copy`);
                                                     setCopyProjects(true);
                                                 }}
-                                                className="flex-1 flex items-center justify-center py-1 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex-1 flex items-center justify-center py-1 text-base-content/70 dark:text-base-content/60 hover:text-accent hover:bg-base-300 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Clone Profile"
                                             >
                                                 <Copy className="w-3.5 h-3.5" />
@@ -1660,7 +1663,7 @@ export default function Instances() {
                                                     name: inst.config.name,
                                                     sequence_name: inst.config.seq_num ? `Instance #${inst.config.seq_num}` : undefined
                                                 })}
-                                                className="flex-1 flex items-center justify-center py-1 text-slate-600 dark:text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex-1 flex items-center justify-center py-1 text-base-content/70 dark:text-base-content/60 hover:text-warning hover:bg-base-300 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 title="Audit Trail"
                                             >
                                                 <History className="w-3.5 h-3.5" />
@@ -1678,8 +1681,8 @@ export default function Instances() {
                                                     className={cn(
                                                         "w-full flex items-center justify-center py-1 rounded-r-[4px] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
                                                         cardMoreId === inst.config.id
-                                                            ? "bg-slate-200 dark:bg-[#15334d] text-slate-900 dark:text-white"
-                                                            : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-[#15334d]"
+                                                            ? "bg-base-300 text-base-content"
+                                                            : "text-base-content/70 dark:text-base-content/60 hover:bg-base-300"
                                                     )}
                                                     title="More Actions (Clone Executable, Wipe, Delete)"
                                                 >
@@ -1689,7 +1692,7 @@ export default function Instances() {
                                                 {/* More Popover Dropdown */}
                                                 {cardMoreId === inst.config.id && (
                                                     <div
-                                                        className="absolute right-0 bottom-full mb-1 z-30 min-w-[170px] rounded-[5px] border border-slate-200 dark:border-[#15334d] bg-white dark:bg-[#0c2438] py-1 text-slate-800 dark:text-slate-200 shadow-xl text-xs"
+                                                        className="absolute right-0 bottom-full mb-1 z-30 min-w-[170px] rounded-[5px] border border-base-300 bg-base-100 dark:bg-base-200 py-1 text-base-content shadow-xl text-xs"
                                                         onClick={(e) => e.stopPropagation()}
                                                     >
                                                         <button
@@ -1699,7 +1702,7 @@ export default function Instances() {
                                                                 setCardMoreId(null);
                                                                 handleCloneExecutable(inst.config.id);
                                                             }}
-                                                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#15334d] text-purple-600 dark:text-purple-400 cursor-pointer disabled:opacity-50"
+                                                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-base-200 dark:hover:bg-base-300 text-accent cursor-pointer disabled:opacity-50"
                                                         >
                                                             <Cpu className="w-3.5 h-3.5" />
                                                             <span>Clone Executable</span>
@@ -1711,9 +1714,9 @@ export default function Instances() {
                                                                 setCardMoreId(null);
                                                                 handleWipeSession(inst.config.id);
                                                             }}
-                                                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#15334d] text-amber-600 dark:text-amber-400 cursor-pointer disabled:opacity-40"
+                                                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-base-200 dark:hover:bg-base-300 text-warning cursor-pointer disabled:opacity-40"
                                                         >
-                                                            <KeyRound className="w-3.5 h-3.5 text-amber-500" />
+                                                            <KeyRound className="w-3.5 h-3.5 text-warning" />
                                                             <span>Wipe Credentials</span>
                                                         </button>
                                                         {!inst.config.is_default && (
@@ -1724,7 +1727,7 @@ export default function Instances() {
                                                                     setCardMoreId(null);
                                                                     handleDelete(inst.config.id);
                                                                 }}
-                                                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 cursor-pointer disabled:opacity-40"
+                                                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-error/10 text-error cursor-pointer disabled:opacity-40"
                                                             >
                                                                 <Trash2 className="w-3.5 h-3.5" />
                                                                 <span>Delete Profile</span>
@@ -1744,8 +1747,8 @@ export default function Instances() {
                                             "absolute inset-0 bg-gradient-to-r transition-all duration-300 ease-out transform",
                                             theme.accentBar,
                                             isActive
-                                                ? "opacity-60 scale-x-100 group-hover:opacity-100 group-hover:shadow-[0_0_8px_rgba(59,130,246,0.5)]"
-                                                : "opacity-0 scale-x-95 group-hover:opacity-100 group-hover:scale-x-100 group-hover:shadow-[0_0_8px_rgba(59,130,246,0.3)]"
+                                                ? "opacity-60 scale-x-100 group-hover:opacity-100"
+                                                : "opacity-0 scale-x-95 group-hover:opacity-100 group-hover:scale-x-100"
                                         )}
                                     />
                                 </div>
@@ -1768,13 +1771,13 @@ export default function Instances() {
                     }}
                 >
                     <div
-                        className="bg-white dark:bg-base-200 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 dark:border-base-100"
+                        className="bg-base-100 dark:bg-base-200 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-base-300"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-base-100 mb-4">
+                        <div className="flex items-center justify-between pb-3 border-b border-base-300 mb-4">
                             <div className="flex items-center gap-2.5">
-                                <Laptop className="w-5 h-5 text-blue-600" />
-                                <h3 className="font-bold text-base text-gray-900 dark:text-base-content">
+                                <Laptop className="w-5 h-5 text-primary" />
+                                <h3 className="font-bold text-base text-base-content">
                                     {t('instances.create_modal_title', 'Create New Profile')}
                                 </h3>
                             </div>
@@ -1787,16 +1790,16 @@ export default function Instances() {
                                     setNewInstanceFromInstance('');
                                     setNewInstanceLaunchImmediately(false);
                                 }}
-                                className="btn btn-ghost btn-xs btn-circle text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
+                                className="btn btn-ghost btn-xs btn-circle text-base-content/50 hover:text-base-content/70 dark:hover:text-base-content/80 cursor-pointer"
                                 title={t('common.close', 'Close')}
                             >
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                        <p className="text-xs text-base-content/60 mb-4">
                             Creates an isolated Antigravity profile folder with its own SQLite token store, extensions, and configuration.
                         </p>
-                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                        <label className="block text-xs font-semibold text-base-content/80 mb-1.5">
                             Profile Name
                         </label>
                         <input
@@ -1805,16 +1808,16 @@ export default function Instances() {
                             value={newInstanceName}
                             onChange={(e) => setNewInstanceName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                            className="input w-full bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 rounded-xl mb-4 text-sm"
+                            className="input w-full bg-base-200 dark:bg-base-100 border border-base-300 rounded-xl mb-4 text-sm"
                             autoFocus
                         />
-                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                        <label className="block text-xs font-semibold text-base-content/80 mb-1.5">
                             Initial Account (Optional)
                         </label>
                         <select
                             value={newInstanceBoundAccount}
                             onChange={(e) => setNewInstanceBoundAccount(e.target.value)}
-                            className="select select-sm w-full bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 rounded-xl mb-4 text-xs"
+                            className="select select-sm w-full bg-base-200 dark:bg-base-100 border border-base-300 rounded-xl mb-4 text-xs"
                         >
                             <option value="">Auto-assign next available account</option>
                             {accounts.map(acc => (
@@ -1824,13 +1827,13 @@ export default function Instances() {
                             ))}
                         </select>
 
-                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                        <label className="block text-xs font-semibold text-base-content/80 mb-1.5">
                             Clone Settings & Extensions From (Optional)
                         </label>
                         <select
                             value={newInstanceFromInstance}
                             onChange={(e) => setNewInstanceFromInstance(e.target.value)}
-                            className="select select-sm w-full bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 rounded-xl mb-4 text-xs"
+                            className="select select-sm w-full bg-base-200 dark:bg-base-100 border border-base-300 rounded-xl mb-4 text-xs"
                         >
                             <option value="">Blank profile (clean isolated sandbox)</option>
                             {instances.map(inst => (
@@ -1848,7 +1851,7 @@ export default function Instances() {
                                 onChange={(e) => setNewInstanceLaunchImmediately(e.target.checked)}
                                 className="checkbox checkbox-sm checkbox-primary rounded cursor-pointer"
                             />
-                            <label htmlFor="launch-immediately-check" className="text-xs text-gray-700 dark:text-gray-300 cursor-pointer select-none">
+                            <label htmlFor="launch-immediately-check" className="text-xs text-base-content/80 cursor-pointer select-none">
                                 Launch Antigravity window immediately after creation
                             </label>
                         </div>
@@ -1862,7 +1865,7 @@ export default function Instances() {
                                     setNewInstanceFromInstance('');
                                     setNewInstanceLaunchImmediately(false);
                                 }}
-                                className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400 rounded-[5px]"
+                                className="btn btn-ghost btn-sm text-base-content/70 dark:text-base-content/60 rounded-[5px]"
                             >
                                 {t('common.cancel', 'Cancel')}
                             </button>
@@ -1881,15 +1884,15 @@ export default function Instances() {
             {/* Switch Account Modal */}
             {switchTargetInstance && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-base-200 rounded-2xl p-6 w-full max-w-lg shadow-2xl border border-gray-100 dark:border-base-100 max-h-[85vh] flex flex-col">
-                        <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-base-100">
+                    <div className="bg-base-100 dark:bg-base-200 rounded-2xl p-6 w-full max-w-lg shadow-2xl border border-base-300 max-h-[85vh] flex flex-col">
+                        <div className="flex items-center justify-between pb-3 border-b border-base-300">
                             <div className="flex items-center gap-2.5">
-                                <ArrowRightLeft className="w-5 h-5 text-blue-600" />
+                                <ArrowRightLeft className="w-5 h-5 text-primary" />
                                 <div>
-                                    <h3 className="font-bold text-base text-gray-900 dark:text-base-content">
+                                    <h3 className="font-bold text-base text-base-content">
                                         Switch Account for {switchTargetInstance.config.name}
                                     </h3>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                    <p className="text-xs text-base-content/60 mt-0.5">
                                         Currently bound: <span className="font-mono font-medium">{switchTargetInstance.config.bound_email || 'None'}</span>
                                     </p>
                                 </div>
@@ -1907,13 +1910,13 @@ export default function Instances() {
 
                         <div className="pt-2 pb-1">
                             <div className="relative">
-                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-base-content/50" />
                                 <input
                                     type="text"
                                     value={accountSearchQuery}
                                     onChange={(e) => setAccountSearchQuery(e.target.value)}
                                     placeholder="Filter accounts by email or ID..."
-                                    className="w-full pl-8 pr-2.5 py-1 text-xs bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900 dark:text-base-content"
+                                    className="w-full pl-8 pr-2.5 py-1 text-xs bg-base-200 dark:bg-base-100 border border-base-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary text-base-content"
                                 />
                             </div>
                         </div>
@@ -1924,7 +1927,7 @@ export default function Instances() {
                                 if (!q) return true;
                                 return a.email.toLowerCase().includes(q) || a.id.toLowerCase().includes(q);
                             }).length === 0 ? (
-                                <p className="text-xs text-gray-400 text-center py-4">No accounts matching filter.</p>
+                                <p className="text-xs text-base-content/50 text-center py-4">No accounts matching filter.</p>
                             ) : (
                                 accounts
                                     .filter(a => {
@@ -1947,36 +1950,36 @@ export default function Instances() {
                                             className={cn(
                                                 "p-3 rounded-xl border flex items-center justify-between gap-3 transition-colors",
                                                 isCurrent
-                                                    ? "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800"
-                                                    : "bg-gray-50/60 dark:bg-base-100/60 border-gray-100 dark:border-base-100 hover:border-gray-300 dark:hover:border-base-300"
+                                                    ? "bg-primary/10 border-primary/30"
+                                                    : "bg-base-200/60 dark:bg-base-100/60 border-base-300 hover:border-base-300"
                                             )}
                                         >
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2 mb-1">
-                                                    <span className="font-mono text-xs font-semibold text-gray-900 dark:text-base-content truncate">
+                                                    <span className="font-mono text-xs font-semibold text-base-content truncate">
                                                         {acc.email}
                                                     </span>
                                                     <span className={cn(
                                                         "text-[9px] font-bold px-1.5 py-0.5 rounded",
-                                                        tier.includes('ULTRA') ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300" :
-                                                        tier.includes('PRO') ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" :
-                                                        "bg-gray-100 text-gray-600 dark:bg-[#15334d] dark:text-slate-300"
+                                                        tier.includes('ULTRA') ? "bg-accent/10 text-accent" :
+                                                        tier.includes('PRO') ? "bg-primary/10 text-primary" :
+                                                        "bg-base-200 text-base-content/70 dark:bg-base-300 dark:text-base-content/80"
                                                     )}>
                                                         {tier}
                                                     </span>
                                                     {isCurrent ? (
-                                                        <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
+                                                        <span className="text-[10px] text-primary font-semibold">
                                                             Active
                                                         </span>
                                                     ) : null}
                                                 </div>
-                                                <div className="flex items-center gap-2 text-[11px] text-gray-500">
+                                                <div className="flex items-center gap-2 text-[11px] text-base-content/60">
                                                     <span>Quota: {pct}%</span>
-                                                    <div className="w-24 h-1.5 bg-gray-200 dark:bg-base-300 rounded-full overflow-hidden">
+                                                    <div className="w-24 h-1.5 bg-base-300 rounded-full overflow-hidden">
                                                         <div
                                                             className={cn(
                                                                 "h-full rounded-full",
-                                                                pct >= 50 ? "bg-emerald-500" : pct >= 20 ? "bg-amber-500" : "bg-rose-500"
+                                                                pct >= 50 ? "bg-success" : pct >= 20 ? "bg-warning" : "bg-error"
                                                             )}
                                                             style={{ width: `${pct}%` }}
                                                         />
@@ -2008,7 +2011,7 @@ export default function Instances() {
                                             >
                                                 {actionState[switchTargetInstance.config.id] === 'switch' ? (
                                                     <span className="flex items-center gap-1">
-                                                        <RotateCw className="w-3 h-3 animate-spin" />
+                                                        <RotateCw className="w-3 h-3 motion-safe:animate-spin" />
                                                         <span>Switching...</span>
                                                     </span>
                                                 ) : isCurrent ? 'Current' : 'Select'}
@@ -2019,13 +2022,13 @@ export default function Instances() {
                             )}
                         </div>
 
-                        <div className="flex justify-end pt-3 border-t border-gray-100 dark:border-base-100">
+                        <div className="flex justify-end pt-3 border-t border-base-300">
                             <button
                                 onClick={() => {
                                     setSwitchTargetInstance(null);
                                     setAccountSearchQuery('');
                                 }}
-                                className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400 rounded-[5px]"
+                                className="btn btn-ghost btn-sm text-base-content/70 dark:text-base-content/60 rounded-[5px]"
                             >
                                 {t('common.close', 'Close')}
                             </button>
@@ -2044,19 +2047,19 @@ export default function Instances() {
                     }}
                 >
                     <div
-                        className="bg-white dark:bg-[#081a29] rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-[#153a54] ring-1 ring-black/5 dark:ring-white/5 transition-all"
+                        className="bg-base-100 dark:bg-base-200 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-base-300 ring-1 ring-black/5 dark:ring-white/5 transition-all"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between pb-3.5 border-b border-gray-100 dark:border-[#153a54] mb-4">
+                        <div className="flex items-center justify-between pb-3.5 border-b border-base-300 mb-4">
                             <div className="flex items-center gap-2.5">
-                                <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-[#0c283f] text-blue-600 dark:text-cyan-400 border border-blue-200/60 dark:border-cyan-500/30 shadow-xs">
+                                <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/30 shadow-xs">
                                     <Copy className="w-5 h-5" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-sm text-gray-900 dark:text-white tracking-tight">
+                                    <h3 className="font-bold text-sm text-base-content tracking-tight">
                                         {t('instances.copy_modal_title', 'Duplicate / Clone Profile')}
                                     </h3>
-                                    <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">
+                                    <p className="text-[11px] text-base-content/60 mt-0.5">
                                         {t('instances.copy_modal_subtitle', 'Create an isolated duplicate of this profile environment')}
                                     </p>
                                 </div>
@@ -2067,14 +2070,14 @@ export default function Instances() {
                                     setCopyTargetId(null);
                                     setCopyInstanceName('');
                                 }}
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#122e47] transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg text-base-content/50 hover:text-base-content/70 dark:text-base-content/60 dark:hover:text-base-content hover:bg-base-200 transition-colors cursor-pointer"
                                 title={t('common.close', 'Close')}
                             >
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
 
-                        <label className="block text-xs font-semibold text-gray-700 dark:text-slate-200 mb-1.5">
+                        <label className="block text-xs font-semibold text-base-content/80 dark:text-base-content mb-1.5">
                             {t('instances.copy_name_label', 'New Profile Name')}
                         </label>
                         <input
@@ -2083,13 +2086,13 @@ export default function Instances() {
                             value={copyInstanceName}
                             onChange={(e) => setCopyInstanceName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleCopy()}
-                            className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#051320] border border-gray-200 dark:border-[#173d5c] text-gray-900 dark:text-white rounded-xl mb-4 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:focus:ring-cyan-500/40 focus:border-blue-500 dark:focus:border-cyan-400 transition-all shadow-inner placeholder-gray-400 dark:placeholder-slate-500"
+                            className="w-full px-4 py-2.5 bg-base-200 dark:bg-base-100 border border-base-300 text-base-content rounded-xl mb-4 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all shadow-inner placeholder-base-content/40"
                             autoFocus
                         />
 
                         {/* Scope Selection Cards */}
                         <div className="mb-4 space-y-2">
-                            <span className="block text-[11px] font-bold text-gray-500 dark:text-cyan-400/90 uppercase tracking-wider mb-2">
+                            <span className="block text-[11px] font-bold text-base-content/60 uppercase tracking-wider mb-2">
                                 {t('instances.clone_mode_label', 'Duplication Scope / Clone Type')}
                             </span>
                             <div className="grid grid-cols-1 gap-2.5">
@@ -2098,31 +2101,31 @@ export default function Instances() {
                                     className={cn(
                                         "p-3.5 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3",
                                         cloneMode === 'full'
-                                            ? "border-blue-500 dark:border-cyan-400 bg-blue-50/80 dark:bg-[#0c283f] ring-2 ring-blue-500/20 dark:ring-cyan-400/25 shadow-xs dark:shadow-[0_0_15px_rgba(6,182,212,0.12)]"
-                                            : "border-gray-200 dark:border-[#14344d] bg-gray-50/50 dark:bg-[#061724] hover:border-gray-300 dark:hover:border-[#1e4a6d] hover:bg-gray-100/60 dark:hover:bg-[#092033]"
+                                            ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-xs"
+                                            : "border-base-300 bg-base-200/50 dark:bg-base-200 hover:bg-base-200/60"
                                     )}
                                 >
                                     <div className="mt-0.5 shrink-0">
                                         <div className={cn(
                                             "w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors",
                                             cloneMode === 'full'
-                                                ? "border-blue-600 dark:border-cyan-400 bg-blue-600 dark:bg-cyan-500"
-                                                : "border-gray-400 dark:border-slate-500 bg-transparent"
+                                                ? "border-primary bg-primary"
+                                                : "border-base-300 bg-transparent"
                                         )}>
-                                            {cloneMode === 'full' && <div className="w-1.5 h-1.5 rounded-full bg-white dark:bg-[#081a29]" />}
+                                            {cloneMode === 'full' && <div className="w-1.5 h-1.5 rounded-full bg-base-100 dark:bg-base-200" />}
                                         </div>
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <div className="font-bold text-xs text-gray-900 dark:text-white flex items-center justify-between gap-1.5">
+                                        <div className="font-bold text-xs text-base-content flex items-center justify-between gap-1.5">
                                             <span className="flex items-center gap-1.5">
-                                                <Layers className="w-3.5 h-3.5 text-blue-500 dark:text-cyan-400 shrink-0" />
+                                                <Layers className="w-3.5 h-3.5 text-primary shrink-0" />
                                                 <span>{t('instances.clone_mode_full', 'IDE Copy (Full Environment & Sessions)')}</span>
                                             </span>
-                                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-cyan-100 dark:bg-cyan-950/80 text-cyan-800 dark:text-cyan-300 border border-cyan-300/50 dark:border-cyan-500/30">
+                                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-info/10 text-info border border-info/30">
                                                 Full
                                             </span>
                                         </div>
-                                        <p className="text-[11px] text-gray-600 dark:text-slate-300 leading-relaxed mt-1">
+                                        <p className="text-[11px] text-base-content/70 dark:text-base-content/80 leading-relaxed mt-1">
                                             {t('instances.clone_mode_full_desc', 'Clones complete isolated environment, sessions, extensions, cache, and state.')}
                                         </p>
                                     </div>
@@ -2133,31 +2136,31 @@ export default function Instances() {
                                     className={cn(
                                         "p-3.5 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3",
                                         cloneMode === 'profile'
-                                            ? "border-blue-500 dark:border-cyan-400 bg-blue-50/80 dark:bg-[#0c283f] ring-2 ring-blue-500/20 dark:ring-cyan-400/25 shadow-xs dark:shadow-[0_0_15px_rgba(6,182,212,0.12)]"
-                                            : "border-gray-200 dark:border-[#14344d] bg-gray-50/50 dark:bg-[#061724] hover:border-gray-300 dark:hover:border-[#1e4a6d] hover:bg-gray-100/60 dark:hover:bg-[#092033]"
+                                            ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-xs"
+                                            : "border-base-300 bg-base-200/50 dark:bg-base-200 hover:bg-base-200/60"
                                     )}
                                 >
                                     <div className="mt-0.5 shrink-0">
                                         <div className={cn(
                                             "w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors",
                                             cloneMode === 'profile'
-                                                ? "border-blue-600 dark:border-cyan-400 bg-blue-600 dark:bg-cyan-500"
-                                                : "border-gray-400 dark:border-slate-500 bg-transparent"
+                                                ? "border-primary bg-primary"
+                                                : "border-base-300 bg-transparent"
                                         )}>
-                                            {cloneMode === 'profile' && <div className="w-1.5 h-1.5 rounded-full bg-white dark:bg-[#081a29]" />}
+                                            {cloneMode === 'profile' && <div className="w-1.5 h-1.5 rounded-full bg-base-100 dark:bg-base-200" />}
                                         </div>
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <div className="font-bold text-xs text-gray-900 dark:text-white flex items-center justify-between gap-1.5">
+                                        <div className="font-bold text-xs text-base-content flex items-center justify-between gap-1.5">
                                             <span className="flex items-center gap-1.5">
-                                                <Sliders className="w-3.5 h-3.5 text-indigo-500 dark:text-blue-400 shrink-0" />
+                                                <Sliders className="w-3.5 h-3.5 text-primary shrink-0" />
                                                 <span>{t('instances.clone_mode_profile', 'Profile Copy (Preferences & Snippets)')}</span>
                                             </span>
-                                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-base-200 text-base-content/80 border border-base-300">
                                                 Preferences
                                             </span>
                                         </div>
-                                        <p className="text-[11px] text-gray-600 dark:text-slate-300 leading-relaxed mt-1">
+                                        <p className="text-[11px] text-base-content/70 dark:text-base-content/80 leading-relaxed mt-1">
                                             {t('instances.clone_mode_profile_desc', 'Copies only User preferences, keybindings, and snippets without bulky runtime session state.')}
                                         </p>
                                     </div>
@@ -2171,20 +2174,20 @@ export default function Instances() {
                             className={cn(
                                 "mb-5 p-3.5 rounded-xl border transition-all flex items-center justify-between gap-3 cursor-pointer",
                                 copyProjects
-                                    ? "border-blue-500/70 dark:border-cyan-400/70 bg-blue-50/60 dark:bg-[#0c283f] ring-1 ring-blue-500/20 dark:ring-cyan-400/20 shadow-xs dark:shadow-[0_0_12px_rgba(6,182,212,0.1)]"
-                                    : "border-gray-200 dark:border-[#14344d] bg-gray-50/50 dark:bg-[#061724] hover:border-gray-300 dark:hover:border-[#1e4a6d]"
+                                    ? "border-primary/70 bg-primary/10 ring-1 ring-primary/20 shadow-xs"
+                                    : "border-base-300 bg-base-200/50 dark:bg-base-200 hover:border-base-300"
                             )}
                         >
                             <div className="min-w-0 pr-2">
                                 <label
                                     htmlFor="instances-page-copy-projects"
                                     onClick={(e) => e.stopPropagation()}
-                                    className="font-bold text-xs text-gray-900 dark:text-white cursor-pointer flex items-center gap-1.5"
+                                    className="font-bold text-xs text-base-content cursor-pointer flex items-center gap-1.5"
                                 >
-                                    <FolderSync className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />
+                                    <FolderSync className="w-3.5 h-3.5 text-success shrink-0" />
                                     <span>{t('instances.copy_projects_label', 'Copy Workspace Projects & Folders')}</span>
                                 </label>
-                                <p className="text-[11px] text-gray-600 dark:text-slate-300 mt-1 leading-relaxed">
+                                <p className="text-[11px] text-base-content/70 dark:text-base-content/80 mt-1 leading-relaxed">
                                     {t('instances.copy_projects_desc', 'Duplicate opened workspaces, project states, and recent folder paths into the new profile.')}
                                 </p>
                             </div>
@@ -2192,22 +2195,22 @@ export default function Instances() {
                                 className={cn(
                                     "w-5 h-5 rounded-md border flex items-center justify-center transition-all duration-200 shrink-0 shadow-xs",
                                     copyProjects
-                                        ? "border-blue-600 dark:border-cyan-400 bg-blue-600 dark:bg-cyan-500 text-white"
-                                        : "border-gray-300 dark:border-slate-600 bg-white dark:bg-[#040e16]"
+                                        ? "border-primary bg-primary text-primary-content"
+                                        : "border-base-300 bg-base-100"
                                 )}
                             >
                                 {copyProjects && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                             </div>
                         </div>
 
-                        <div className="flex justify-end items-center gap-2.5 pt-3 border-t border-gray-100 dark:border-[#153a54]">
+                        <div className="flex justify-end items-center gap-2.5 pt-3 border-t border-base-300">
                             <button
                                 type="button"
                                 onClick={() => {
                                     setCopyTargetId(null);
                                     setCopyInstanceName('');
                                 }}
-                                className="px-4 py-2.5 rounded-[5px] text-xs font-semibold text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-[#153a54] hover:bg-gray-100 dark:hover:bg-[#102a40] transition-all duration-200 active:scale-95 cursor-pointer"
+                                className="px-4 py-2.5 rounded-[5px] text-xs font-semibold text-base-content/70 dark:text-base-content/80 border border-base-300 hover:bg-base-200 transition-all duration-200 active:scale-95 cursor-pointer"
                             >
                                 {t('common.cancel', 'Cancel')}
                             </button>
@@ -2215,7 +2218,7 @@ export default function Instances() {
                                 type="button"
                                 onClick={handleCopy}
                                 disabled={!copyInstanceName.trim()}
-                                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:via-indigo-500 hover:to-cyan-400 text-white font-bold text-xs rounded-[5px] shadow-lg shadow-blue-500/25 dark:shadow-cyan-500/20 hover:shadow-cyan-500/40 transition-all duration-200 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
+                                className="px-5 py-2.5 bg-primary hover:bg-[var(--primary-hover)] text-primary-content font-bold text-xs rounded-[5px] shadow-lg transition-all duration-200 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
                             >
                                 <Copy className="w-3.5 h-3.5" />
                                 <span>{t('instances.duplicate', 'Duplicate')}</span>
@@ -2235,13 +2238,13 @@ export default function Instances() {
                     }}
                 >
                     <div
-                        className="bg-white dark:bg-base-200 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 dark:border-base-100"
+                        className="bg-base-100 dark:bg-base-200 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-base-300"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-base-100 mb-4">
+                        <div className="flex items-center justify-between pb-3 border-b border-base-300 mb-4">
                             <div className="flex items-center gap-2.5">
-                                <Pencil className="w-5 h-5 text-blue-600" />
-                                <h3 className="font-bold text-base text-gray-900 dark:text-base-content">
+                                <Pencil className="w-5 h-5 text-primary" />
+                                <h3 className="font-bold text-base text-base-content">
                                     {t('instances.edit_modal_title', 'Rename Profile')}
                                 </h3>
                             </div>
@@ -2251,13 +2254,13 @@ export default function Instances() {
                                     setEditTargetId(null);
                                     setEditInstanceName('');
                                 }}
-                                className="btn btn-ghost btn-xs btn-circle text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
+                                className="btn btn-ghost btn-xs btn-circle text-base-content/50 hover:text-base-content/70 dark:hover:text-base-content/80 cursor-pointer"
                                 title={t('common.close', 'Close')}
                             >
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                        <p className="text-xs text-base-content/60 mb-4">
                             {t('instances.edit_modal_desc', 'Update display name for this isolated instance profile.')}
                         </p>
                         <input
@@ -2266,13 +2269,13 @@ export default function Instances() {
                             value={editInstanceName}
                             onChange={(e) => setEditInstanceName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleEdit()}
-                            className="input w-full bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 rounded-xl mb-5 text-sm"
+                            className="input w-full bg-base-200 dark:bg-base-100 border border-base-300 rounded-xl mb-5 text-sm"
                             autoFocus
                         />
                         <div className="flex justify-end gap-2.5">
                             <button
                                 onClick={() => setEditTargetId(null)}
-                                className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400 rounded-[5px]"
+                                className="btn btn-ghost btn-sm text-base-content/70 dark:text-base-content/60 rounded-[5px]"
                             >
                                 {t('common.cancel', 'Cancel')}
                             </button>
@@ -2335,25 +2338,25 @@ export default function Instances() {
             >
                 {deleteModalTarget && (
                     <div className="space-y-3">
-                        <div className="p-3 rounded-xl bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-300">
+                        <div className="p-3 rounded-xl bg-error/10 border border-error/30 text-xs text-error">
                             {t(
                                 'instances.delete_warning',
                                 'Are you sure you want to delete this profile? This will permanently delete the isolated profile data directory and all settings.'
                             )}
                         </div>
-                        <div className="bg-gray-50 dark:bg-[#0c2438] rounded-xl p-3 border border-gray-200/70 dark:border-[#15334d] space-y-1.5 text-xs">
+                        <div className="bg-base-200 rounded-xl p-3 border border-base-300/70 dark:border-base-300 space-y-1.5 text-xs">
                             <div className="flex items-center justify-between">
-                                <span className="text-gray-500 dark:text-slate-400 font-medium">{t('instances.name', 'Profile Name')}:</span>
-                                <span className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                                    <span className="px-1.5 py-0.5 rounded-[5px] text-[10px] font-black bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25">
+                                <span className="text-base-content/60 font-medium">{t('instances.name', 'Profile Name')}:</span>
+                                <span className="font-bold text-base-content flex items-center gap-1.5">
+                                    <span className="px-1.5 py-0.5 rounded-[5px] text-[10px] font-black bg-primary/15 text-primary border border-primary/25">
                                         #{deleteModalTarget.config.seq_num ?? 0}
                                     </span>
                                     {deleteModalTarget.config.name}
                                 </span>
                             </div>
-                            <div className="flex flex-col gap-1 pt-1.5 border-t border-gray-200/50 dark:border-[#15334d]/60">
-                                <span className="text-gray-500 dark:text-slate-400 font-medium">{t('instances.data_dir', 'Data Directory')}:</span>
-                                <span className="font-mono text-[11px] text-gray-700 dark:text-slate-300 break-all bg-white dark:bg-[#071a27] p-1.5 rounded-lg border border-gray-200 dark:border-[#15334d]">
+                            <div className="flex flex-col gap-1 pt-1.5 border-t border-base-300/50 dark:border-base-300/60">
+                                <span className="text-base-content/60 font-medium">{t('instances.data_dir', 'Data Directory')}:</span>
+                                <span className="font-mono text-[11px] text-base-content/80 break-all bg-base-100 dark:bg-base-200 p-1.5 rounded-lg border border-base-300">
                                     {deleteModalTarget.config.data_dir}
                                 </span>
                             </div>
@@ -2376,26 +2379,26 @@ export default function Instances() {
             >
                 {wipeModalTarget && (
                     <div className="space-y-3">
-                        <div className="p-3 rounded-xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-xs text-amber-700 dark:text-amber-300">
+                        <div className="p-3 rounded-xl bg-warning/10 border border-warning/30 text-xs text-warning">
                             {t(
                                 'instances.wipe_warning',
                                 'This will clear all saved account credentials and session tokens from this profile without deleting its workspace or configurations.'
                             )}
                         </div>
-                        <div className="bg-gray-50 dark:bg-[#0c2438] rounded-xl p-3 border border-gray-200/70 dark:border-[#15334d] space-y-1.5 text-xs">
+                        <div className="bg-base-200 rounded-xl p-3 border border-base-300/70 dark:border-base-300 space-y-1.5 text-xs">
                             <div className="flex items-center justify-between">
-                                <span className="text-gray-500 dark:text-slate-400 font-medium">{t('instances.name', 'Profile Name')}:</span>
-                                <span className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                                    <span className="px-1.5 py-0.5 rounded-[5px] text-[10px] font-black bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25">
+                                <span className="text-base-content/60 font-medium">{t('instances.name', 'Profile Name')}:</span>
+                                <span className="font-bold text-base-content flex items-center gap-1.5">
+                                    <span className="px-1.5 py-0.5 rounded-[5px] text-[10px] font-black bg-primary/15 text-primary border border-primary/25">
                                         #{wipeModalTarget.config.seq_num ?? 0}
                                     </span>
                                     {wipeModalTarget.config.name}
                                 </span>
                             </div>
                             {wipeModalTarget.config.bound_email && (
-                                <div className="flex items-center justify-between pt-1.5 border-t border-gray-200/50 dark:border-[#15334d]/60">
-                                    <span className="text-gray-500 dark:text-slate-400 font-medium">{t('instances.bound_account', 'Bound Account')}:</span>
-                                    <span className="font-mono text-[11px] text-amber-600 dark:text-amber-400 font-semibold">
+                                <div className="flex items-center justify-between pt-1.5 border-t border-base-300/50 dark:border-base-300/60">
+                                    <span className="text-base-content/60 font-medium">{t('instances.bound_account', 'Bound Account')}:</span>
+                                    <span className="font-mono text-[11px] text-warning font-semibold">
                                         {wipeModalTarget.config.bound_email}
                                     </span>
                                 </div>

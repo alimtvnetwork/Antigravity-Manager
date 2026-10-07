@@ -27,6 +27,11 @@ export const THEME_PALETTES: ThemePalette[] = [
     { id: 'clean-wide', label: 'Clean Studio Light', bg: '#FFFFFF', surface: '#F8FAFC', primary: '#0284C7', fg: '#0F172A', dark: false, surfaceHover: '#F1F5F9', primaryHover: '#0369A1', borderHover: '#0284C7' },
     { id: 'cobalt', label: 'Cobalt Blue', bg: '#0B1528', surface: '#13223E', primary: '#3B82F6', fg: '#F1F5F9', dark: true, surfaceHover: '#1E3258', primaryHover: '#2563EB', borderHover: '#3B82F6' },
     { id: 'vscode-navy-gold', label: 'Navy Amber', bg: '#0A121E', surface: '#111F33', primary: '#F59E0B', fg: '#F8FAFC', dark: true, surfaceHover: '#1A2C47', primaryHover: '#D97706', borderHover: '#F59E0B' },
+    // RiseUp Asia brand ramp (READ-ONLY cite: riseup-asia-website-project/spec/05-brand-system.md §1.1 dark).
+    { id: 'riseup-dark', label: 'RiseUp Ember', bg: '#0B0A09', surface: '#1D1A18', primary: '#FFAD01', fg: '#F7F5F2', dark: true, surfaceHover: '#262220', primaryHover: '#FFC24A', borderHover: '#FFAD01' },
+    // RiseUp Asia warm paper (READ-ONLY cite: same file §1.2 light). Hover fill uses
+    // amber-ink #8A5A00 (darkening direction on paper); amber never carries body text (T10).
+    { id: 'riseup-paper', label: 'RiseUp Paper', bg: '#FBF9F6', surface: '#FFFFFF', primary: '#FFAD01', fg: '#141210', dark: false, surfaceHover: '#F4F0EA', primaryHover: '#8A5A00', borderHover: '#8A5A00' },
 ];
 
 export function findPalette(id: string): ThemePalette {

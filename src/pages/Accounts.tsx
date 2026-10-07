@@ -761,11 +761,11 @@ function Accounts() {
         <div className="flex items-center gap-1 flex-wrap sm:flex-nowrap overflow-x-auto lg:overflow-x-visible scrollbar-none max-w-full py-0.5 min-w-0 shrink-0">
           {/* Search box - responsive */}
           <div className="hidden lg:block flex-none w-36 relative transition-all focus-within:w-44">
-            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-base-content/50" />
             <input
               type="text"
               placeholder={t('accounts.search_placeholder')}
-              className="w-full h-8 pl-8 pr-3 bg-gray-100/50 dark:bg-white/[0.04] text-xs text-gray-900 dark:text-base-content border border-transparent hover:border-gray-200/50 dark:hover:border-white/5 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-gray-400 dark:placeholder:text-gray-500 transition-all"
+              className="w-full h-8 pl-8 pr-3 bg-base-200/50 dark:bg-base-content/5 text-xs text-base-content border border-transparent hover:border-base-300/50 dark:hover:border-base-content/5 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-base-content/50 dark:placeholder:text-base-content/60 transition-all"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -779,20 +779,20 @@ function Accounts() {
                   setIsSearchExpanded(true);
                   setTimeout(() => searchInputRef.current?.focus(), 100);
                 }}
-                className="h-8 w-8 inline-flex items-center justify-center bg-gray-100/40 dark:bg-white/[0.04] hover:bg-gray-200/60 dark:hover:bg-white/[0.08] rounded-lg transition-colors"
+                className="h-8 w-8 inline-flex items-center justify-center bg-base-200/40 dark:bg-base-content/5 hover:bg-base-300/60 dark:hover:bg-base-content/10 rounded-lg transition-colors"
                 title={t('accounts.search_placeholder')}
               >
-                <Search className="w-3.5 h-3.5 text-gray-600 dark:text-gray-300" />
+                <Search className="w-3.5 h-3.5 text-base-content/70 dark:text-base-content/80" />
               </button>
             ) : (
               <div className="absolute left-0 top-0 z-10 w-64 flex items-center gap-1">
                 <div className="flex-1 relative">
-                  <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-base-content/50" />
                   <input
                     ref={searchInputRef}
                     type="text"
                     placeholder={t('accounts.search_placeholder')}
-                    className="w-full h-8 pl-8 pr-3 bg-white dark:bg-slate-900 text-xs text-gray-900 dark:text-base-content border border-transparent rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-lg"
+                    className="w-full h-8 pl-8 pr-3 bg-base-100 dark:bg-base-200 text-xs text-base-content border border-transparent rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-base-content/50 dark:placeholder:text-base-content/60 shadow-lg"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onBlur={() => setIsSearchExpanded(false)}
@@ -803,13 +803,13 @@ function Accounts() {
           </div>
 
           {/* View mode switcher - Flat continuous grouping */}
-          <div className="h-8 inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-gray-100/40 dark:bg-white/[0.04] shrink-0">
+          <div className="h-8 inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-base-200/50 dark:bg-base-content/5 shrink-0">
             <button
               className={cn(
                 "h-7 w-7 inline-flex items-center justify-center rounded-md transition-all",
                 viewMode === "list"
-                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content",
+                  ? "bg-base-100 dark:bg-base-200 text-primary shadow-xs"
+                  : "text-base-content/60 hover:text-base-content",
               )}
               onClick={() => setViewMode("list")}
               title={t("accounts.views.list")}
@@ -820,8 +820,8 @@ function Accounts() {
               className={cn(
                 "h-7 w-7 inline-flex items-center justify-center rounded-md transition-all",
                 viewMode === "grid"
-                  ? "bg-white dark:bg-base-100 text-blue-600 dark:text-blue-400 shadow-xs"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-base-content",
+                  ? "bg-base-100 dark:bg-base-200 text-primary shadow-xs"
+                  : "text-base-content/60 hover:text-base-content",
               )}
               onClick={() => setViewMode("grid")}
               title={t("accounts.views.grid")}
@@ -832,7 +832,7 @@ function Accounts() {
 
           <label className="h-8 inline-flex items-center shrink-0">
             <select
-              className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-xs font-semibold text-slate-950 dark:border-slate-700 dark:bg-[#070b10] dark:text-[#f5d76e]"
+              className="h-8 rounded-lg border border-base-300 bg-base-100 px-2 text-xs font-semibold text-base-content dark:bg-base-100 dark:text-warning"
               value={filter}
               onChange={(event) => setFilter(event.target.value as FilterType)}
               aria-label="Account tier"
@@ -849,9 +849,9 @@ function Accounts() {
         <div className="flex items-center gap-2 shrink-0 ml-auto">
           {/* Batch operations if items selected */}
           {selectedIds.size > 0 && (
-            <div className="flex items-center rounded-md bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+            <div className="flex items-center rounded-md bg-base-200 border border-base-300/80 dark:border-base-300 p-0.5 divide-x divide-base-300 shadow-2xs">
               <button
-                className="px-2.5 py-1 text-red-600 dark:text-red-400 text-xs font-semibold rounded-l-md hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-2.5 py-1 text-error text-xs font-semibold rounded-l-md hover:bg-error/10 transition-colors flex items-center gap-1.5 cursor-pointer"
                 onClick={handleBatchDelete}
                 title={t("accounts.delete_selected", { count: selectedIds.size })}
               >
@@ -859,7 +859,7 @@ function Accounts() {
                 <span className="hidden xl:inline">{t("accounts.delete_selected", { count: selectedIds.size })}</span>
               </button>
               <button
-                className="px-2.5 py-1 text-orange-600 dark:text-orange-400 text-xs font-semibold hover:bg-orange-50 dark:hover:bg-orange-950/30 transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-2.5 py-1 text-warning text-xs font-semibold hover:bg-warning/10 transition-colors flex items-center gap-1.5 cursor-pointer"
                 onClick={() => handleBatchToggleProxy(false)}
                 title={t("accounts.disable_proxy_selected", { count: selectedIds.size })}
               >
@@ -867,7 +867,7 @@ function Accounts() {
                 <span className="hidden xl:inline">{t("accounts.disable_proxy_selected", { count: selectedIds.size })}</span>
               </button>
               <button
-                className="px-2.5 py-1 text-cyan-600 dark:text-cyan-400 text-xs font-semibold rounded-r-md hover:bg-cyan-50 dark:hover:bg-cyan-950/30 transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-2.5 py-1 text-success text-xs font-semibold rounded-r-md hover:bg-success/10 transition-colors flex items-center gap-1.5 cursor-pointer"
                 onClick={() => handleBatchToggleProxy(true)}
                 title={t("accounts.enable_proxy_selected", { count: selectedIds.size })}
               >
@@ -878,11 +878,11 @@ function Accounts() {
           )}
 
           {/* Segmented Pill Capsule: Focus, +, Refresh, Warm, Show All Quotas */}
-          <div className="flex items-center rounded-md bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+          <div className="flex items-center rounded-md bg-base-200 border border-base-300/80 dark:border-base-300 p-0.5 divide-x divide-base-300 shadow-2xs">
             {/* Focus Active/Picked Account Button */}
             <button
               type="button"
-              className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-l-md text-amber-700 dark:text-amber-300 hover:bg-amber-100/70 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-l-md text-warning hover:bg-warning/10 transition-colors cursor-pointer"
               onClick={handleFocusActiveAccount}
               title={
                 activeFocusTargetAccount
@@ -892,7 +892,7 @@ function Accounts() {
                   : "Focus active/picked account"
               }
             >
-              <LocateFixed className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <LocateFixed className="w-3.5 h-3.5 text-warning" />
               <span className="hidden sm:inline">Focus</span>
             </button>
 
@@ -900,13 +900,13 @@ function Accounts() {
             <AddAccountDialog
               onAdd={handleAddAccount}
               showText={false}
-              triggerClassName="flex items-center justify-center px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+              triggerClassName="flex items-center justify-center px-2.5 py-1 text-xs font-semibold text-base-content/80 dark:text-base-content hover:bg-base-300 transition-colors cursor-pointer"
             />
 
             {/* Refresh */}
             <button
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-blue-600 dark:text-cyan-300 hover:bg-blue-50 dark:hover:bg-[#15334d] transition-colors cursor-pointer",
+                "flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/10 dark:hover:bg-base-300 transition-colors cursor-pointer",
                 isRefreshing && "opacity-70 cursor-not-allowed"
               )}
               onClick={handleRefreshClick}
@@ -918,7 +918,7 @@ function Accounts() {
               }
             >
               <RefreshCw
-                className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")}
+                className={cn("w-3.5 h-3.5", isRefreshing && "motion-safe:animate-spin")}
               />
               <span className="hidden xl:inline">
                 {isRefreshing
@@ -932,7 +932,7 @@ function Accounts() {
             {/* Warmup */}
             <button
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-[#15334d] transition-colors cursor-pointer",
+                "flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-warning hover:bg-warning/10 dark:hover:bg-base-300 transition-colors cursor-pointer",
                 isWarmuping && "opacity-70 cursor-not-allowed"
               )}
               onClick={() => setIsWarmupConfirmOpen(true)}
@@ -944,7 +944,7 @@ function Accounts() {
               }
             >
               <Sparkles
-                className={cn("w-3.5 h-3.5", isWarmuping && "animate-pulse")}
+                className={cn("w-3.5 h-3.5", isWarmuping && "motion-safe:animate-pulse")}
               />
               <span className="hidden xl:inline">
                 {isWarmuping
@@ -957,7 +957,7 @@ function Accounts() {
 
             {/* Show All Emails */}
             <label
-              className="flex items-center gap-2 cursor-pointer select-none px-3 py-1 rounded-r-md text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors"
+              className="flex items-center gap-2 cursor-pointer select-none px-3 py-1 rounded-r-md text-base-content/70 dark:text-base-content/80 hover:bg-base-300 transition-colors"
               title={t("accounts.show_all_emails")}
             >
               <span className="text-xs font-semibold hidden xl:inline">
@@ -971,12 +971,12 @@ function Accounts() {
               />
             </label>
           </div>
-          <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 self-center mx-1 shrink-0"></div>
+          <div className="w-px h-4 bg-base-300 self-center mx-1 shrink-0"></div>
 
           <div className="relative group">
             <button
               type="button"
-              className="px-2.5 py-2 border border-gray-200 dark:border-base-300 text-gray-700 dark:text-gray-300 text-xs font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-base-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="px-2.5 py-2 border border-base-300 text-base-content/80 text-xs font-medium rounded-lg hover:bg-base-200 transition-colors flex items-center gap-1.5 cursor-pointer"
               onClick={() => {
                 setBackupModalTab("export");
                 setIsBackupModalOpen(true);
@@ -985,19 +985,19 @@ function Accounts() {
             >
               <Download className="w-3.5 h-3.5" />
               <span className="hidden lg:inline">Import / Export</span>
-              <ChevronDown className="w-3 h-3 text-gray-400" />
+              <ChevronDown className="w-3 h-3 text-base-content/50" />
             </button>
             <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-150 absolute right-0 top-full pt-1 w-44 z-[9999]">
-              <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-xl py-1 text-xs">
+              <div className="bg-base-100 dark:bg-base-200 border border-base-300 rounded-xl shadow-xl py-1 text-xs">
                 <button
                   type="button"
                   onClick={() => {
                     setBackupModalTab("import");
                     setIsBackupModalOpen(true);
                   }}
-                  className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-300 cursor-pointer"
+                  className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-base-200 dark:hover:bg-base-300 text-base-content/80 cursor-pointer"
                 >
-                  <Upload className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                  <Upload className="w-3.5 h-3.5 text-info" />
                   <span>{t("accounts.import_json")}</span>
                 </button>
                 <button
@@ -1006,9 +1006,9 @@ function Accounts() {
                     setBackupModalTab("export");
                     setIsBackupModalOpen(true);
                   }}
-                  className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-300 cursor-pointer"
+                  className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-base-200 dark:hover:bg-base-300 text-base-content/80 cursor-pointer"
                 >
-                  <Download className="w-3.5 h-3.5 text-blue-500" />
+                  <Download className="w-3.5 h-3.5 text-primary" />
                   <span>{t("common.export")}</span>
                 </button>
               </div>
@@ -1020,7 +1020,7 @@ function Accounts() {
       {/* Account list content area */}
       <div className="flex-1 min-h-0 relative" ref={containerRef}>
         {viewMode === "list" ? (
-          <div className="h-full bg-white dark:bg-base-100 rounded-2xl shadow-sm border border-gray-100 dark:border-base-200 flex flex-col overflow-hidden">
+          <div className="h-full bg-base-100 dark:bg-base-200 rounded-2xl shadow-sm border border-base-300 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto [&_th:nth-child(4)]:w-1/2 [&_th:nth-child(5)]:w-1/2 [&_th:nth-child(4)]:min-w-[220px] [&_th:nth-child(5)]:min-w-[220px] [&_td:nth-child(4)]:min-w-[220px] [&_td:nth-child(5)]:min-w-[220px]">
               <AccountTable
                 accounts={paginatedAccounts}
@@ -1108,16 +1108,16 @@ function Accounts() {
                     await installUpdate();
                   }}
                   disabled={isInstalling}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-blue-500/10 to-purple-500/10 hover:from-blue-500/20 hover:to-purple-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/20 shadow-xs transition-all duration-200 cursor-pointer active:scale-95 group disabled:opacity-75 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-primary/10 hover:bg-primary/15 text-primary border border-primary/20 shadow-xs transition-all duration-200 cursor-pointer active:scale-95 group disabled:opacity-75 disabled:cursor-not-allowed"
                   title="A newer version is available. Click to launch installer."
                 >
                   {isInstalling ? (
-                    <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin" />
+                    <Loader2 className="w-3.5 h-3.5 text-primary motion-safe:animate-spin" />
                   ) : (
-                    <Sparkles className="w-3.5 h-3.5 text-blue-500 group-hover:rotate-12 transition-transform" />
+                    <Sparkles className="w-3.5 h-3.5 text-primary group-hover:rotate-12 transition-transform" />
                   )}
                   <span>Update Available: v{updateInfo.latest_version}</span>
-                  <span className="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-1.5 py-0.5 rounded font-semibold ml-0.5 flex items-center gap-1">
+                  <span className="text-[10px] bg-primary hover:bg-[var(--primary-hover)] text-primary-content px-1.5 py-0.5 rounded font-semibold ml-0.5 flex items-center gap-1">
                     {isInstalling ? "Installing..." : "Install Now"}
                   </span>
                 </button>
