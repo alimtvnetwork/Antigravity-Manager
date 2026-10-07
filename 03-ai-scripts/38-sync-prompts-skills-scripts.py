@@ -190,16 +190,14 @@ def is_bump_script(path: Path) -> bool:
 
 
 def is_protected_memory_or_plan(path: Path) -> bool:
-    """Check if file or directory belongs to protected .ai-memory areas or target-repo domain skills.
+    """Check if file or directory belongs to protected .ai-memory areas.
 
     Protects plans/, temp-agents/, cicd-issues/, memory/, ambiguous-questions/,
-    and operational memory files, as well as repo-specific domain skills (agm-*) in target repositories.
+    and operational memory files in target repositories.
+    Target repositories own their operational memory logs and execution plans.
     These files must NEVER be overwritten, mirrored, or deleted during sync.
     """
     norm = str(path).replace("\\", "/").lower()
-
-    if "/agm-" in norm or "skills/agm-" in norm or path.name.lower().startswith("agm-"):
-        return True
 
     if ".ai-memory/memory" in norm:
         return True
