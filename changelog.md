@@ -1,3 +1,12 @@
+# Changelog
+
+## [v4.162.1] - 2026-10-07
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
 # 📝 Changelog
 
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
@@ -11,12 +20,10 @@
             -   **Rust Test Cleanliness**: Removed redundant unused imports in `src-tauri/tests/auto_switcher_e2e_test.rs`, maintaining zero warnings across all unit and integration test targets. (Thanks to @aukgit)
             -   **AI Memory Index & Plan Linking**: Resolved relative plan linkages in pending roadmaps (`86`, `87`, `88`) and added canonical AI memory documentation index (`.ai-memory/readme.md`). (Thanks to @aukgit)
 
-
     *   **v4.161.0 (2026-10-06)**:
         -   **[E2E Testing for Account Switch, IDE Detection, Prompt Tracking & Release Gates]**:
             -   **Compilation & Build Gates**: Resolved Rust logging macro compile error in `src-tauri/src/modules/account.rs` (`tracing::info!`); fixed TypeScript build errors across `src/pages/Accounts.tsx`, `src/pages/Instances.tsx`, `src/components/accounts/AccountCard.tsx`, and `AccountTable.tsx`; verified clean Vite and Cargo builds. (Thanks to @aukgit)
             -   **End-to-End Account Switch & Prompt Continuity**: Verified multi-instance profile isolation, conscious PID matching, running IDE discovery, running and queued prompt lifecycle tracking, project last conversation extraction, and split SQLite audit logging across CLI, IPC, and UI. (Thanks to @aukgit)
-
 
     *   **v4.160.0 (2026-10-06)**:
         -   **[Awan Cloud Design Modernization, UI/UX Contrast & Global CSS3 Transitions]**:
@@ -47,7 +54,6 @@
         -   **[Weekly Candidate Scoring DESC Order & Compact Integer Output]**:
             -   **Sort & Integer Output**: Standardized candidate scoring to descending sort order with integer output for SQLite persistence. (Thanks to @aukgit)
 
-
     *   **v4.157.0 (2026-10-05)**:
         -   **[Empty Prompt Tree Fix, Neon Green Progress Bar Restore, Hours-Elapsed Weekly Scoring, Modal Header Identity]**:
             -   **Fixed**: Prompt tree was completely empty because `detect_running_projects()` relied on `workspaceStorage/*/workspace.json` which is empty on managed Windows deployments. Added fallback in `compute_project_conversation_tree()` to synthesize `RunningProject` entries directly from `workspace_uris` in each instance's `conversation_summaries.db`, ensuring up to 200 recent conversations are always shown. Also fixed `workspace_storage_path: None` entries being incorrectly dropped by the filter. (Thanks to @aukgit)
@@ -56,7 +62,6 @@
             -   **Changed**: Accounts table header background updated from `dark:bg-slate-900/90` to `dark:bg-[#061220]` for a deeper navy alignment. (Thanks to @aukgit)
             -   **Added**: Prompt Tree Modal header now shows three identity badges: `#seq`, profile name, and `...\Antigravity.exe` trailing path. Props `sequenceNumber?` and `executablePath?` added to `PromptTreeViewModalProps`; all `setPromptTreeInstance` call sites in `Instances.tsx` now pass `seq_num` and `executable_path`. (Thanks to @aukgit)
             -   **Changed**: Replaced weekly quota scoring in `score_candidate_account()` with hours-elapsed-weighted formula: `hours_elapsed = 168 - hours_remaining_until_reset`, `weekly_effective_score = weekly_pct × hours_elapsed`, normalized by dividing by 16800. Weekly quota <8% is treated as zero. Sort direction is now ascending — accounts with the least hours elapsed (most recently reset) are prioritized first. Gemini-only (`gemini-weekly` buckets); Claude/3p buckets excluded with `TODO(claude)` stub. (Thanks to @aukgit)
-
 
     *   **v4.156.0 (2026-10-05)**:
         -   **[Instance Restart Split Button Capsule on Current Account]**: In both Table view (`InstanceTable.tsx`) and Card view (`Instances.tsx`) modes, converted the primary action for active instances into a seamless segmented split capsule (`rounded-[5px]`, dark-glass hairline divider). The left segment provides an immediate Stop (`<Square>`), while the right segment provides Restart (`<RotateCcw>`, tooltip "Restart Instance on Current Account") to cleanly terminate the process tree, poll for process exit and lock release (<1,500ms), purge the prompt tree cache, and relaunch on the currently bound account. The global busy overlay accurately reflects "Restarting...". (Thanks to @aukgit)
@@ -729,14 +734,12 @@
             -   **Frontend Diagnostic Modal Suppression (`src/services/accountService.ts`)**: Added `{ _suppressGlobalModal: true }` to `syncAccountFromDb()` Tauri IPC invocation, preventing speculative background account synchronization tasks from ever triggering intrusive full-screen red error modals in the UI.
             -   **Migration Logging & Observability (`src-tauri/src/modules/migration.rs`)**: Enhanced logging in `import_all_local_accounts` to provide clear warnings when candidate Keyring or SQLite DB OAuth tokens fail refresh due to expiration or revocation.
 
-
     *   **v4.91.0 (2026-09-28)**:
         -   **[Release v4.91.0: Pure JSON Email Telemetry, Strict 100% Quota Gating & Live Google API Probes, Telegram Project Deduplication, and Resilient Installer] Zero-HTML JSON email bodies with normalized schema, strict 100% 4-hour window quota enforcement with live Google API pre-switch probes and depleted bounce prevention, Telegram `/projects` deduplicated by workspace path with worker routing `<node-alias>:<cmd>` and `/prompts` catalog, and fixed `install.ps1` exit code leakage for seamless GitMap updates (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
             -   **Pure JSON Email Telemetry & Schema Normalization (`src-tauri/src/modules/notification_hub.rs`, `src-tauri/src/modules/email_sender.rs`)**: Enforced 100% pure JSON payload bodies when email subjects contain `[JSON]`, stripping all HTML, CSS `<style>` blocks, and markdown fences. Normalized telemetry fields to `previous_email`, `predicted_email`, `selected_email`, `quota_percent`, `threshold_activated`, `machine_name`, `node_alias`, `local_ip`, `running_prompts_count`, and `timestamp`, eliminating duplicated fields (`old_email`, `new_email`, `target_email`).
             -   **Strict 100% Quota Gating & Live Google API Probing (`src-tauri/src/modules/auto_switcher.rs`, `src-tauri/src/modules/account.rs`, `src/services/instanceService.ts`, `src/stores/useInstanceStore.ts`)**: Overhauled quota evaluation to compute the strict minimum across all short buckets and non-banned models (preventing Pro 20% from being masked by Flash 100%). Candidates under 100% quota are treated as 0.0% exhausted and excluded. Mandatory live Google API quota probes (`fetch_quota_with_retry`) verify fresh capacity prior to committing switches, strictly rejecting depleted or disabled profiles without unwanted fallback loops.
             -   **Telegram Project Deduplication & Fleet Routing (`src-tauri/src/modules/telegram_inbound.rs`)**: Deduplicated Telegram `/projects` output by canonical repository path, grouping multiple conversations under single project entries with active/total conversation counts. Added `<node-alias>:<command>` and `<ip>:<command>` selector syntax to dispatch commands to specific fleet nodes, introduced `/prompts` command with slugs and ~200-word preview snippets, and enabled prompt prefix/suffix/voice concatenation.
             -   **Installer Resilience & Exit Code Fix (`install.ps1`)**: Resolved Go `cmd.Run()` failure (`exit status 1`) in GitMap updater by adding explicit `$global:LASTEXITCODE = 0; exit 0` at script termination. Added graceful fallback to retain existing verified installations if remote binary downloads fail, ensuring reliable updates across all nodes.
-
 
     *   **v4.90.0 (2026-09-28)**:
         -   **[Release v4.90.0: Account Switch 98% Simulation E2E, Parallel Prompt Backup & Restoration, Multi-VM Collision Shielding & Sandbox Lifecycle Verification] Validated end-to-end 98% simulated failover, pre-switch live API quota refresh stability probe, multi-workspace parallel prompt snapshot to split SQLite with human names & image payloads, fast-forward button delegation, automatic prompt resumption & emergency alerts, Supabase lease & IMAP collision avoidance, sandbox instance lifecycle verification, comprehensive CLI help polish, and 15.0% production standard alignment (Thanks to alim, devorg.bd@gmail.com, @aukgit)**:
@@ -838,7 +841,6 @@
             -   **GitMap-Style Compile & Runtime Telemetry Parity (`src-tauri/src/modules/git_info.rs`, `build.rs`, `agm.rs`, `email_sender.rs`)**: Achieved 1:1 telemetry parity with GitMap. Injected `AGM_GIT_HASH`, `AGM_GIT_BRANCH`, and `AGM_LAST_RELEASE` during compilation in `build.rs` with runtime fallback in `git_info.rs`. Standardized terminal banners, `agm version`, `agm status`, and all outgoing email headers to embed exact Git metadata.
             -   **Enlarged Typography, Ubuntu Font Stack & High-Contrast White Links (`src-tauri/src/modules/email_sender.rs`)**: Overhauled HTML email styling with 28px titles, 16px body, 14-15px tables/code, and an explicit Ubuntu / Segoe UI / system-ui font stack. Styled all interactive action and target links with pure `#ffffff` text on pill badges, ensuring effortless readability across email clients.
             -   **Commands Cheat Sheet, Live Workspaces Table & Prompt Queue in CLI & Email (`src-tauri/src/bin/agm.rs`, `src-tauri/src/modules/email_sender.rs`, `repo_db.rs`)**: Integrated three comprehensive tables across both the `agm` CLI default output and idle alert emails: (1) categorized command reference with syntax examples; (2) discovered workspaces with live status, paths, and copy-pasteable email reply targets (`sub: <NODE> | proj-<id>`); (3) recent prompt tasks and in-flight queue inventory.
-
 
     *   **v4.78.0 (2026-09-27)**:
         -   **[Release v4.78.0: Multi-Channel System Update Notifications (Default Enabled), Email Remote Syntax Manual Upgrade, Zero-Loss Prompt Resumption Across Profile Switches, and Active-Only Low Credit Alerts] Automated Update Receipts via Email & Telegram, Ubuntu High-Contrast Typography, Resumption Without Reinjection Loops, and Targeted Quota Alerts**:
