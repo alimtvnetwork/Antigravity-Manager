@@ -99,8 +99,20 @@ pub fn launch_instance(instance_id: String) -> Result<(), crate::error::AppError
 }
 
 #[tauri::command]
-pub fn focus_or_launch_instance(instance_id: String) -> Result<bool, crate::error::AppError> {
-    instance::focus_or_launch_instance(&instance_id)
+pub fn focus_or_launch_instance(
+    instance_id: String,
+    workspace_path: Option<String>,
+) -> Result<bool, crate::error::AppError> {
+    instance::focus_or_launch_instance_with_workspace(&instance_id, workspace_path.as_deref())
+}
+
+#[tauri::command]
+pub fn focus_instance_workspace(
+    instance_id: String,
+    repo_path: String,
+    repo_name: String,
+) -> Result<bool, crate::error::AppError> {
+    instance::focus_or_launch_workspace(&instance_id, &repo_path, &repo_name)
 }
 
 #[tauri::command]

@@ -32,9 +32,10 @@ You can see that this is a serious bug where I have my prompts running, but I do
 ---
 
 ## 3. Invariant Checklist
-- [ ] **UI Capsule Rule:** Wrap adjacent toolbar actions into contiguous segmented pill capsules (`rounded-full`, shared border, subtle divider lines, dark-glass styling) per `AGENTS.md`.
-- [ ] **Prompt Origin Distinction:** Strictly distinguish root User Prompts from AI Subagent Instructions and System/Tool events.
-- [ ] **Running & Queue Indicators:** Prominently display glowing emerald pulse badges for running prompts and amber badges for queued prompts.
-- [ ] **Truncation Hygiene:** Never render raw `<truncated N bytes>` tags as ugly text; render sleek interactive callout banners.
-- [ ] **Copy & Export Parity:** Support single-prompt export (.md, .json) and rich copy with embedded image handling.
-- [ ] **FIFO Restore Preservation:** Prompts restored from backup must preserve exact sequence and FIFO injection.
+- [x] **UI Capsule Rule:** Wrap adjacent toolbar actions into contiguous segmented pill capsules (`rounded-full`, shared border, subtle divider lines, dark-glass styling) per `AGENTS.md`.
+- [x] **Prompt Origin Distinction:** Strictly distinguish root User Prompts from AI Subagent Instructions and System/Tool events.
+- [x] **Running & Queue Indicators:** Prominently display glowing emerald pulse badges for running prompts and amber badges for queued prompts.
+- [x] **Truncation Hygiene:** Never render raw `<truncated N bytes>` tags as ugly text; render sleek interactive callout banners.
+- [x] **Copy & Export Parity:** Support single-prompt export (.md, .json) and rich copy with embedded image handling.
+- [x] **FIFO Restore Preservation:** Prompts restored from backup must preserve exact sequence and FIFO injection.
+

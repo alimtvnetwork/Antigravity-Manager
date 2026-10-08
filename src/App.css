@@ -453,3 +453,8 @@ html[class*="palette-"] .dark\:bg-\[\#0a1e30\],
 html[class*="palette-"] .dark\:bg-\[\#081826\] {
   background-color: var(--surface) !important;
 }
+
+/* Emerald liveness glow for active running indicators (#1af18d) */
+.emerald-liveness-glow {
+  box-shadow: 0 0 6px rgba(26, 241, 141, 0.8), 0 0 2px rgba(26, 241, 141, 0.95);
+}

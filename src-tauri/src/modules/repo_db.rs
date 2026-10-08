@@ -620,28 +620,33 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
         }
     }
 
-    // Persist discovered projects into repo database
+    // Persist discovered projects into repo database safely without wiping fallback entries
     if let Ok(conn) = connect_db() {
+        // Only delete corrupted entries where BOTH workspace_storage_path is NULL AND the repo_path does not exist on disk
         let _ = conn.execute(
-            "DELETE FROM running_projects WHERE workspace_storage_path IS NULL OR instr(id, '__') = 0",
+            "DELETE FROM running_projects 
+             WHERE instr(id, '__') = 0 
+                OR (workspace_storage_path IS NULL AND (repo_path IS NULL OR repo_path = ''))",
             [],
         );
 
         let discovered_ids: std::collections::HashSet<String> =
             projects.iter().map(|p| p.id.clone()).collect();
         if let Ok(mut stmt) = conn.prepare(
-            "SELECT id, workspace_storage_path FROM running_projects WHERE instance_id = ?1",
+            "SELECT id, repo_path, workspace_storage_path FROM running_projects WHERE instance_id = ?1",
         ) {
-            let existing_rows: Vec<(String, Option<String>)> = stmt
-                .query_map(params![target_id], |r| Ok((r.get(0)?, r.get(1)?)))
+            let existing_rows: Vec<(String, String, Option<String>)> = stmt
+                .query_map(params![target_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
                 .map(|iter| iter.flatten().collect())
                 .unwrap_or_default();
-            for (old_id, wspath_opt) in existing_rows {
-                let path_exists = wspath_opt
+            for (old_id, repo_path, wspath_opt) in existing_rows {
+                let ws_exists = wspath_opt
                     .as_deref()
                     .map(|p| Path::new(p).exists())
                     .unwrap_or(false);
-                if !discovered_ids.contains(&old_id) || !path_exists {
+                let repo_exists = Path::new(&repo_path).exists();
+                let is_valid_fallback = wspath_opt.is_none() && repo_exists;
+                if !discovered_ids.contains(&old_id) && !ws_exists && !is_valid_fallback {
                     let _ = conn.execute(
                         "DELETE FROM running_projects WHERE id = ?1",
                         params![&old_id],
@@ -659,7 +664,7 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
                     instance_id = excluded.instance_id,
                     repo_name = excluded.repo_name,
                     repo_path = excluded.repo_path,
-                    workspace_storage_path = excluded.workspace_storage_path,
+                    workspace_storage_path = COALESCE(excluded.workspace_storage_path, running_projects.workspace_storage_path),
                     is_running = excluded.is_running,
                     last_detected_at = excluded.last_detected_at,
                     updated_at = excluded.updated_at",
@@ -1014,19 +1019,14 @@ pub fn discover_running_prompts_from_antigravity(instance_id: &str) -> Vec<Activ
                 cid.chars().take(8).collect::<String>()
             );
 
-            // Read transcript.jsonl from brain/<cid>/.system_generated/logs/transcript.jsonl
-            let transcript_file = base_dir
-                .join("brain")
-                .join(&cid)
-                .join(".system_generated")
-                .join("logs")
-                .join("transcript.jsonl");
+            // Read transcript file (prefers transcript_full.jsonl)
+            let transcript_file = resolve_transcript_path(&base_dir, &cid);
 
             let mut user_prompt: Option<String> = None;
             let mut image_payload: Option<String> = None;
 
-            if transcript_file.exists() {
-                if let Ok(content) = fs::read_to_string(&transcript_file) {
+            if let Some(tf) = transcript_file {
+                if let Ok(content) = fs::read_to_string(&tf) {
                     for line in content.lines().rev() {
                         if !line.contains("USER_INPUT") {
                             continue;
@@ -1507,7 +1507,7 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
             "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
              FROM active_prompts 
              WHERE status = 'backed_up'
-             ORDER BY updated_at DESC",
+             ORDER BY created_at ASC, id ASC",
         )
         .map_err(|e| format!("Failed to prepare dispatch query: {}", e))?;
 
@@ -3721,6 +3721,12 @@ pub struct AgmConversationNode {
     pub is_queued: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub latest_step_summary: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_response: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_results: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_calls_summary: Option<String>,
 }
 
 /// Project node in the AGM Tree View (Project -> Conversation -> 200-Word Prompt)
@@ -3739,6 +3745,10 @@ pub struct AgmProjectTreeNode {
     pub instance_exe_name: String,
     pub bound_email: Option<String>,
     pub is_running: bool,
+    #[serde(default)]
+    pub running_count: usize,
+    #[serde(default)]
+    pub queued_count: usize,
     pub conversations: Vec<AgmConversationNode>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub byte_size: Option<usize>,
@@ -3933,13 +3943,63 @@ pub fn extract_prompt_tail_snippet(raw_text: &str, tail_word_count: usize) -> St
 pub struct TranscriptInspection {
     pub step_count: usize,
     pub latest_prompt: Option<String>,
+    pub latest_response: Option<String>,
+    pub execution_results: Option<String>,
+    pub tool_calls_summary: Option<String>,
     pub latest_step_summary: Option<String>,
     pub is_subagent: bool,
     pub is_recent_active: bool,
+    pub is_non_prompt: bool,
 }
 
-/// Inspect transcript_full.jsonl (or transcript.jsonl) for a conversation to obtain:
-/// step count, un-truncated user prompt, latest step result/status summary, and subagent classification.
+/// Helper to read a specific un-truncated line content from transcript_full.jsonl
+fn get_line_from_full_transcript(full_path: &Path, target_line_idx: usize) -> Option<String> {
+    use std::io::{BufRead, BufReader};
+    let file = std::fs::File::open(full_path).ok()?;
+    let reader = BufReader::new(file);
+    for (idx, line_res) in reader.lines().enumerate() {
+        if idx == target_line_idx {
+            if let Ok(l) = line_res {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&l) {
+                    if let Some(c) = val.get("content").and_then(|v| v.as_str()) {
+                        return Some(c.to_string());
+                    }
+                }
+            }
+            break;
+        }
+    }
+    None
+}
+
+/// Resolve the best transcript file for a conversation ID:
+/// Prefers `transcript_full.jsonl` if non-empty; falls back to `transcript.jsonl`.
+pub fn resolve_transcript_path(base_dir: &Path, cid: &str) -> Option<PathBuf> {
+    let logs_dir = base_dir
+        .join("brain")
+        .join(cid)
+        .join(".system_generated")
+        .join("logs");
+
+    let full_path = logs_dir.join("transcript_full.jsonl");
+    if full_path.exists() {
+        if let Ok(meta) = std::fs::metadata(&full_path) {
+            if meta.len() > 0 {
+                return Some(full_path);
+            }
+        }
+    }
+
+    let regular_path = logs_dir.join("transcript.jsonl");
+    if regular_path.exists() {
+        return Some(regular_path);
+    }
+
+    None
+}
+
+/// Inspect transcript.jsonl and transcript_full.jsonl for a conversation to obtain:
+/// step count, un-truncated user prompt, AI response, tool execution output, and subagent classification.
 fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> TranscriptInspection {
     let logs_dir = base_dir
         .join("brain")
@@ -3947,14 +4007,10 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
         .join(".system_generated")
         .join("logs");
     let transcript_full_path = logs_dir.join("transcript_full.jsonl");
-    let transcript_path = logs_dir.join("transcript.jsonl");
 
-    let chosen_path = if transcript_full_path.exists() {
-        transcript_full_path
-    } else if transcript_path.exists() {
-        transcript_path
-    } else {
-        return TranscriptInspection::default();
+    let chosen_path = match resolve_transcript_path(base_dir, conversation_id) {
+        Some(p) => p,
+        None => return TranscriptInspection::default(),
     };
 
     let now_epoch = Utc::now().timestamp();
@@ -3964,7 +4020,7 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0);
-    let is_recent_active = mtime_epoch > 0 && (now_epoch - mtime_epoch <= 180);
+    let is_recent_active = mtime_epoch > 0 && (now_epoch - mtime_epoch <= 240);
 
     let content = match std::fs::read_to_string(&chosen_path) {
         Ok(c) => c,
@@ -3972,15 +4028,23 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
             return TranscriptInspection {
                 step_count: 0,
                 latest_prompt: None,
+                latest_response: None,
+                execution_results: None,
+                tool_calls_summary: None,
                 latest_step_summary: None,
                 is_subagent: false,
                 is_recent_active,
+                is_non_prompt: true,
             };
         }
     };
 
     let mut latest_prompt: Option<String> = None;
+    let mut latest_response: Option<String> = None;
+    let mut execution_results: Option<String> = None;
     let mut latest_step_summary: Option<String> = None;
+    let mut tool_counts: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
     let mut is_subagent = false;
     let mut has_real_user_prompt = false;
 
@@ -4005,6 +4069,7 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
                     || txt.contains("Worker")
                     || txt.contains("Author")
                     || txt.contains("Research")
+                    || txt.contains("Codebase Researcher")
                 {
                     is_subagent = true;
                 }
@@ -4012,52 +4077,111 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
         }
     }
 
-    for line in &lines {
+    for (line_idx, line) in lines.iter().enumerate() {
         let trimmed = line.trim();
-        if trimmed.contains("\"USER_INPUT\"") || trimmed.contains("\"USER_EXPLICIT\"") {
-            if let Ok(val) = serde_json::from_str::<serde_json::Value>(trimmed) {
-                let is_user_input = val
-                    .get("type")
-                    .and_then(|v| v.as_str())
-                    .map(|t| t == "USER_INPUT")
-                    .unwrap_or(false)
-                    || val
-                        .get("source")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s == "USER_EXPLICIT")
-                        .unwrap_or(false);
-                if is_user_input {
-                    if let Some(c) = val.get("content").and_then(|v| v.as_str()) {
-                        let c_trim = c.trim();
-                        // Ignore system notifications and background task messages that masquerade as user input
-                        let is_system_msg = c_trim
-                            .starts_with("The following is a <SYSTEM_MESSAGE>")
-                            || c_trim.starts_with("[Message] timestamp=")
-                            || c_trim.starts_with("Task id ")
-                            || c_trim.starts_with("<SYSTEM_MESSAGE>");
-                        if !is_system_msg {
-                            let clean = extract_clean_user_prompt(c);
-                            if !clean.is_empty() {
-                                latest_prompt = Some(clean);
-                                has_real_user_prompt = true;
-                            }
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(trimmed) {
+            let s_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("");
+            let s_source = val.get("source").and_then(|v| v.as_str()).unwrap_or("");
+
+            // 1. User inputs
+            if s_type == "USER_INPUT" || s_source == "USER_EXPLICIT" {
+                if let Some(c) = val.get("content").and_then(|v| v.as_str()) {
+                    let c_trim = c.trim();
+                    let is_system_msg = c_trim.starts_with("The following is a <SYSTEM_MESSAGE>")
+                        || c_trim.starts_with("[Message] timestamp=")
+                        || c_trim.starts_with("Task id ")
+                        || c_trim.starts_with("<SYSTEM_MESSAGE>");
+                    if !is_system_msg {
+                        let full_c = if val
+                            .get("truncated_fields")
+                            .and_then(|tf| tf.as_array())
+                            .map(|arr| arr.iter().any(|v| v.as_str() == Some("content")))
+                            .unwrap_or(false)
+                            && transcript_full_path.exists()
+                        {
+                            get_line_from_full_transcript(&transcript_full_path, line_idx)
+                                .unwrap_or_else(|| c.to_string())
+                        } else {
+                            c.to_string()
+                        };
+
+                        let clean = extract_clean_user_prompt(&full_c);
+                        if !clean.is_empty() {
+                            latest_prompt = Some(clean);
+                            has_real_user_prompt = true;
                         }
+                    } else if c_trim.contains("subagent") || c_trim.contains("Worker") {
+                        is_subagent = true;
+                    }
+                }
+            }
+
+            // 2. Model planner response (AI answer / thoughts)
+            if s_type == "PLANNER_RESPONSE" || s_source == "MODEL" {
+                if let Some(tool_calls) = val.get("tool_calls").and_then(|tc| tc.as_array()) {
+                    for tc in tool_calls {
+                        let name = tc
+                            .get("tool_name")
+                            .or_else(|| tc.get("name"))
+                            .and_then(|n| n.as_str())
+                            .unwrap_or("tool");
+                        *tool_counts.entry(name.to_string()).or_insert(0) += 1;
+                    }
+                }
+
+                if let Some(resp_txt) = val.get("content").and_then(|v| v.as_str()) {
+                    let resp_trim = resp_txt.trim();
+                    if !resp_trim.is_empty() {
+                        let full_resp = if val
+                            .get("truncated_fields")
+                            .and_then(|tf| tf.as_array())
+                            .map(|arr| arr.iter().any(|v| v.as_str() == Some("content")))
+                            .unwrap_or(false)
+                            && transcript_full_path.exists()
+                        {
+                            get_line_from_full_transcript(&transcript_full_path, line_idx)
+                                .unwrap_or_else(|| resp_txt.to_string())
+                        } else {
+                            resp_txt.to_string()
+                        };
+                        latest_response = Some(full_resp);
+                    }
+                }
+            }
+
+            // 3. Tool results / Generic output
+            if s_type == "GENERIC" {
+                if let Some(tool_out) = val.get("content").and_then(|v| v.as_str()) {
+                    let out_trim = tool_out.trim();
+                    if !out_trim.is_empty() && out_trim.len() > 10 {
+                        let preview: String = out_trim.chars().take(2000).collect();
+                        execution_results = Some(preview);
                     }
                 }
             }
         }
     }
 
-    // Inspect the last 1-3 lines to extract latest step result / activity summary
-    for line in lines.iter().rev().take(3) {
+    // DEEP SCAN: Inspect up to 10 lines in reverse order to bypass telemetry noise
+    for line in lines.iter().rev().take(10) {
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
+            let s_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("");
+
+            // Bypass pure telemetry / token usage metadata
+            if s_type == "TOKEN_USAGE" || s_type == "TELEMETRY" || s_type == "HEARTBEAT" {
+                continue;
+            }
+
             let step_idx = val
                 .get("step_index")
                 .and_then(|v| v.as_u64())
                 .unwrap_or(step_count as u64);
-            let s_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("STEP");
-            let s_status = val.get("status").and_then(|v| v.as_str()).unwrap_or("");
+            let s_status = val
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("running");
 
+            // 1. Check for genuine tool_calls
             if let Some(tool_calls) = val.get("tool_calls").and_then(|tc| tc.as_array()) {
                 if let Some(first_tc) = tool_calls.first() {
                     let tool_name = first_tc
@@ -4073,6 +4197,22 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
                 }
             }
 
+            // 2. Check for assistant thoughts / reasoning
+            if let Some(thinking) = val
+                .get("thinking")
+                .or_else(|| val.get("thought"))
+                .and_then(|t| t.as_str())
+            {
+                let clean_thought = thinking.trim().replace('\n', " ");
+                let snippet: String = clean_thought.chars().take(80).collect();
+                if !snippet.is_empty() {
+                    latest_step_summary =
+                        Some(format!("Step {} · Thinking · \"{}\"", step_idx, snippet));
+                    break;
+                }
+            }
+
+            // 3. Fallback to standard step content
             if let Some(txt) = val.get("content").and_then(|c| c.as_str()) {
                 let clean_txt = txt.trim().replace('\n', " ");
                 let short_txt: String = clean_txt.chars().take(80).collect();
@@ -4084,6 +4224,7 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
             } else if latest_step_summary.is_none() {
                 latest_step_summary =
                     Some(format!("Step {} · {} ({})", step_idx, s_type, s_status));
+                break;
             }
         }
     }
@@ -4092,12 +4233,30 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
         is_subagent = true;
     }
 
+    let tool_calls_summary = if !tool_counts.is_empty() {
+        let total: usize = tool_counts.values().sum();
+        let mut parts: Vec<String> = tool_counts
+            .iter()
+            .map(|(k, v)| format!("{}: {}", k, v))
+            .collect();
+        parts.sort();
+        Some(format!("{} tool calls ({})", total, parts.join(", ")))
+    } else {
+        None
+    };
+
+    let is_non_prompt = !has_real_user_prompt && !is_subagent;
+
     TranscriptInspection {
         step_count,
         latest_prompt,
+        latest_response,
+        execution_results,
+        tool_calls_summary,
         latest_step_summary,
         is_subagent,
         is_recent_active,
+        is_non_prompt,
     }
 }
 
@@ -4382,6 +4541,9 @@ fn compute_project_conversation_tree(
         prompt_category: String,
         is_queued: bool,
         latest_step_summary: Option<String>,
+        latest_response: Option<String>,
+        execution_results: Option<String>,
+        tool_calls_summary: Option<String>,
     }
 
     let mut convs_by_inst_and_path: std::collections::HashMap<(String, String), Vec<RawConvItem>> =
@@ -4497,19 +4659,27 @@ fn compute_project_conversation_tree(
                                 || status.contains("CANCELLED");
                             let is_explicit_idle = is_idle_count || has_idle_status;
 
-                            let is_conv_running = if is_explicit_idle || !is_recent {
+                            let inspection = inspect_conversation_transcript(base, &cid);
+
+                            let is_conv_running = if is_explicit_idle {
                                 false
-                            } else if is_owning_inst_alive && not_fully_idle > 0 && status.contains("RUNNING") {
+                            } else if is_owning_inst_alive && not_fully_idle > 0 && status.contains("RUNNING") && is_recent {
+                                true
+                            } else if is_owning_inst_alive && inspection.is_recent_active && !has_idle_status {
                                 true
                             } else {
                                 false
                             };
-                            let inspection = inspect_conversation_transcript(base, &cid);
                             let steps = inspection.step_count;
                             let effective_prompt = inspection
                                 .latest_prompt
                                 .filter(|s| !s.trim().is_empty())
                                 .unwrap_or_else(|| preview.clone());
+
+                            // Non-prompt filter: skip internal background hooks or non-prompts if not running
+                            if inspection.is_non_prompt && !is_conv_running {
+                                continue;
+                            }
 
                             let prompt_category = if inspection.is_subagent {
                                 "subagent".to_string()
@@ -4583,6 +4753,9 @@ fn compute_project_conversation_tree(
                                         prompt_category: prompt_category.clone(),
                                         is_queued,
                                         latest_step_summary: latest_step_summary.clone(),
+                                        latest_response: inspection.latest_response.clone(),
+                                        execution_results: inspection.execution_results.clone(),
+                                        tool_calls_summary: inspection.tool_calls_summary.clone(),
                                     });
                             }
                         }
@@ -4787,6 +4960,9 @@ fn compute_project_conversation_tree(
                     prompt_category: item.prompt_category.clone(),
                     is_queued: item.is_queued,
                     latest_step_summary: item.latest_step_summary.clone(),
+                    latest_response: item.latest_response.clone(),
+                    execution_results: item.execution_results.clone(),
+                    tool_calls_summary: item.tool_calls_summary.clone(),
                 });
             }
         }
@@ -4920,6 +5096,9 @@ fn compute_project_conversation_tree(
                     prompt_category: ap_category,
                     is_queued: is_ap_queued,
                     latest_step_summary: ap_step_summary,
+                    latest_response: None,
+                    execution_results: None,
+                    tool_calls_summary: None,
                 });
             }
         }
@@ -5097,6 +5276,8 @@ fn compute_project_conversation_tree(
 
         let grouped_convs = group_identical_conversation_runs(conv_nodes);
         let proj_byte_size: usize = grouped_convs.iter().map(|c| c.byte_size.unwrap_or(0)).sum();
+        let running_count = grouped_convs.iter().filter(|c| c.is_running).count();
+        let queued_count = grouped_convs.iter().filter(|c| c.is_queued).count();
 
         tree_nodes.push(AgmProjectTreeNode {
             seq_id: p_seq,
@@ -5111,6 +5292,8 @@ fn compute_project_conversation_tree(
             instance_exe_name,
             bound_email,
             is_running: proj_is_running,
+            running_count,
+            queued_count,
             conversations: grouped_convs,
             byte_size: Some(proj_byte_size),
             repeat_count: None,
@@ -5164,9 +5347,13 @@ pub fn group_identical_conversation_runs(
             let count = matches.len();
             let mut parent = matches[0].clone();
             let any_running = matches.iter().any(|m| m.is_running);
+            let any_queued = matches.iter().any(|m| m.is_queued);
             if any_running {
                 parent.is_running = true;
                 parent.status = "RUNNING".to_string();
+            } else if any_queued {
+                parent.is_queued = true;
+                parent.status = "QUEUED".to_string();
             }
             parent.byte_size = Some(parent.prompt_preview_200w.len());
             parent.repeat_count = Some(count);

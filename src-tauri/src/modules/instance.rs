@@ -3053,6 +3053,14 @@ pub fn wait_for_instance_prompt_channel(instance_id: &str) {
 
 /// Focus an already running instance window, or launch it if not running
 pub fn focus_or_launch_instance(instance_id: &str) -> Result<bool, crate::error::AppError> {
+    focus_or_launch_instance_with_workspace(instance_id, None)
+}
+
+/// Focus an already running instance window, or launch it with optional workspace path if not running
+pub fn focus_or_launch_instance_with_workspace(
+    instance_id: &str,
+    workspace_path: Option<&str>,
+) -> Result<bool, crate::error::AppError> {
     let registry = load_registry().map_err(crate::error::AppError::Config)?;
     let inst = registry
         .instances
@@ -3079,6 +3087,18 @@ pub fn focus_or_launch_instance(instance_id: &str) -> Result<bool, crate::error:
             "[Instance] Focus requested for '{}', focusing running PIDs: {:?}",
             instance_id, pids
         ));
+        if let Some(ws) = workspace_path {
+            let clean_ws = ws.trim_end_matches(['/', '\\']);
+            let repo_name = std::path::Path::new(clean_ws)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(clean_ws);
+            let focused_workspace =
+                crate::modules::process::focus_instance_workspace_window(&pids, repo_name);
+            if focused_workspace {
+                return Ok(true);
+            }
+        }
         let focused = crate::modules::process::focus_instance_pids(&pids);
         if focused {
             return Ok(true);
@@ -3086,10 +3106,69 @@ pub fn focus_or_launch_instance(instance_id: &str) -> Result<bool, crate::error:
     }
 
     crate::modules::logger::log_info(&format!(
-        "[Instance] Instance '{}' is not running or could not be focused; launching new process",
-        instance_id
+        "[Instance] Instance '{}' is not running or could not be focused; launching with workspace: {:?}",
+        instance_id, workspace_path
     ));
-    launch_instance(instance_id)?;
+    if let Some(ws) = workspace_path {
+        let ws_vec = vec![ws.to_string()];
+        launch_instance_with_workspaces(instance_id, Some(&ws_vec), true)?;
+    } else {
+        launch_instance(instance_id)?;
+    }
+    Ok(false)
+}
+
+/// Focus an already running instance window with matching workspace, or launch it targeted at workspace
+pub fn focus_or_launch_workspace(
+    instance_id: &str,
+    repo_path: &str,
+    repo_name: &str,
+) -> Result<bool, crate::error::AppError> {
+    let registry = load_registry().map_err(crate::error::AppError::Config)?;
+    let inst = registry
+        .instances
+        .iter()
+        .find(|i| i.id == instance_id)
+        .ok_or_else(|| {
+            crate::error::AppError::Config(format!("Instance {} not found", instance_id))
+        })?;
+
+    let is_default_inst = inst.is_default || inst.id == "default";
+    let mut pids = find_pids_for_data_dir(&inst.data_dir, is_default_inst);
+    if let Some(saved_pid) = inst.pid.or_else(|| get_instance_saved_pid(instance_id)) {
+        if saved_pid > 0 && !pids.contains(&saved_pid) {
+            let mut sys = System::new();
+            sys.refresh_processes(sysinfo::ProcessesToUpdate::All);
+            if sys.process(sysinfo::Pid::from_u32(saved_pid)).is_some() {
+                pids.push(saved_pid);
+            }
+        }
+    }
+
+    if !pids.is_empty() {
+        if !repo_name.is_empty() {
+            let focused =
+                crate::modules::process::focus_instance_workspace_window(&pids, repo_name);
+            if focused {
+                return Ok(true);
+            }
+        }
+        let focused = crate::modules::process::focus_instance_pids(&pids);
+        if focused {
+            return Ok(true);
+        }
+    }
+
+    let target_path = if !repo_path.is_empty() {
+        repo_path
+    } else {
+        repo_name
+    };
+    crate::modules::logger::log_info(&format!(
+        "[Instance] Launching instance '{}' targeted at workspace folder: {}",
+        instance_id, target_path
+    ));
+    launch_instance_with_workspaces(instance_id, Some(&[target_path.to_string()]), true)?;
     Ok(false)
 }
 

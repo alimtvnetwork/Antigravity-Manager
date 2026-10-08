@@ -209,15 +209,30 @@ export async function launchInstance(instanceId: string): Promise<void> {
     }
 }
 
-export async function focusOrLaunchInstance(instanceId: string): Promise<boolean> {
+export async function focusOrLaunchInstance(instanceId: string, workspacePath?: string): Promise<boolean> {
     try {
-        return await invoke('focus_or_launch_instance', { instanceId });
+        return await invoke('focus_or_launch_instance', { instanceId, workspacePath });
     } catch (e: any) {
         const captured = useErrorStore.getState().captureError(e, {
             source: 'instanceService.focusOrLaunchInstance',
             endpoint: 'focus_or_launch_instance',
             triggerAction: 'focus_or_launch_instance',
-            context: { instanceId },
+            context: { instanceId, workspacePath },
+        });
+        useErrorStore.getState().openErrorModal(captured);
+        throw e;
+    }
+}
+
+export async function focusInstanceWorkspace(instanceId: string, repoPath: string, repoName: string): Promise<boolean> {
+    try {
+        return await invoke('focus_instance_workspace', { instanceId, repoPath, repoName });
+    } catch (e: any) {
+        const captured = useErrorStore.getState().captureError(e, {
+            source: 'instanceService.focusInstanceWorkspace',
+            endpoint: 'focus_instance_workspace',
+            triggerAction: 'focus_instance_workspace',
+            context: { instanceId, repoPath, repoName },
         });
         useErrorStore.getState().openErrorModal(captured);
         throw e;

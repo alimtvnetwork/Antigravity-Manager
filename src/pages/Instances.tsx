@@ -723,7 +723,7 @@ export default function Instances() {
                             >
                                 <span className="relative flex h-2 w-2 shrink-0">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-xs shadow-emerald-500/50"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#1af18d] shadow-[0_0_6px_rgba(26,241,141,0.9)] animate-pulse"></span>
                                 </span>
                                 <span className="font-mono text-[11px] whitespace-nowrap">
                                     ⏱ {daemonCountdown}s Next Check
@@ -879,7 +879,7 @@ export default function Instances() {
                     <div className="flex items-center gap-3 min-w-0">
                         <span className="relative flex h-3 w-3 shrink-0">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 shadow-xs shadow-emerald-500/50"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-[#1af18d] shadow-[0_0_6px_rgba(26,241,141,0.9)] animate-pulse"></span>
                         </span>
                         <div className="flex flex-wrap items-center gap-2 min-w-0">
                             <span className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
@@ -1157,7 +1157,7 @@ export default function Instances() {
                                                 <span
                                                     className={cn(
                                                         "w-2.5 h-2.5 rounded-full shrink-0",
-                                                        inst.is_running ? "bg-emerald-500 shadow-xs shadow-emerald-500/50 animate-pulse" : "bg-gray-300 dark:bg-gray-600"
+                                                        inst.is_running ? "bg-[#1af18d] shadow-[0_0_6px_rgba(26,241,141,0.9)] animate-pulse" : "bg-gray-300 dark:bg-gray-600"
                                                     )}
                                                 />
                                                 <span className="px-1.5 py-0.5 rounded-[5px] text-xs font-black bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25 shrink-0">
@@ -1170,10 +1170,10 @@ export default function Instances() {
                                                     <button
                                                         type="button"
                                                         onClick={() => setPromptTreeInstance({ id: inst.config.id, name: inst.config.name, seqNum: inst.config.seq_num, executablePath: inst.config.executable_path })}
-                                                        className="inline-flex items-center gap-1 px-1.5 h-5 rounded-[5px] text-[9px] font-bold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30 shrink-0 cursor-pointer transition-colors shadow-2xs"
+                                                        className="inline-flex items-center gap-1 px-1.5 h-5 rounded-[5px] text-[9px] font-bold bg-[#1af18d]/15 hover:bg-[#1af18d]/25 text-emerald-700 dark:text-[#1af18d] border border-[#1af18d]/30 shrink-0 cursor-pointer transition-colors shadow-2xs"
                                                         title="Active prompt/task running - Click to open Prompt Tree"
                                                     >
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse shrink-0" />
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] shadow-[0_0_4px_rgba(26,241,141,0.9)] animate-pulse shrink-0" />
                                                         <span>Prompt</span>
                                                     </button>
                                                 )}
@@ -1357,8 +1357,8 @@ export default function Instances() {
                                             <div className="flex items-center justify-between gap-1.5 flex-wrap">
                                                 {/* Status Badge */}
                                                 {inst.is_running ? (
-                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[5px] text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 shadow-2xs">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[5px] text-[10px] font-semibold bg-[#1af18d]/10 text-emerald-700 dark:text-[#1af18d] border border-[#1af18d]/30 shadow-2xs">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] shadow-[0_0_4px_rgba(26,241,141,0.9)] animate-pulse" />
                                                         Running {inst.pid ? `(${inst.pid})` : ''}
                                                     </span>
                                                 ) : (
@@ -1490,8 +1490,8 @@ export default function Instances() {
                                                                         </div>
                                                                         <div className="flex items-center gap-1 shrink-0">
                                                                             {isProjRunning && (
-                                                                                <span className="px-1 py-0.2 rounded-[4px] text-[9px] font-bold bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 border border-cyan-400/30 flex items-center gap-0.5">
-                                                                                    <span className="w-1 h-1 rounded-full bg-cyan-500 animate-pulse" />
+                                                                                <span className="px-1 py-0.2 rounded-[4px] text-[9px] font-bold bg-[#1af18d]/15 text-emerald-700 dark:text-[#1af18d] border border-[#1af18d]/30 flex items-center gap-0.5 shadow-2xs">
+                                                                                    <span className="w-1 h-1 rounded-full bg-[#1af18d] shadow-[0_0_4px_rgba(26,241,141,0.9)] animate-pulse" />
                                                                                     RUNNING
                                                                                 </span>
                                                                             )}

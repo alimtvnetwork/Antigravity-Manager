@@ -31,6 +31,9 @@ import {
     ExternalLink,
     Bot,
     User,
+    Terminal,
+    Wrench,
+    Sparkles,
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { useInstanceStore } from '../../stores/useInstanceStore';
@@ -41,6 +44,7 @@ import {
     getArchivedProjectsForInstance,
     setArchivedProjectsForInstance,
     focusOrLaunchInstance,
+    focusInstanceWorkspace,
 } from '../../services/instanceService';
 import { cn } from '../../utils/cn';
 
@@ -69,6 +73,9 @@ export interface AgmConversationNode {
     prompt_category?: string;
     is_queued?: boolean;
     latest_step_summary?: string;
+    latest_response?: string;
+    execution_results?: string;
+    tool_calls_summary?: string;
 }
 
 export interface AgmProjectTreeNode {
@@ -176,12 +183,6 @@ function formatPromptForMarkdown(text: string): string {
     if (!text) return '';
     let formatted = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-    // Replace raw truncated bytes tags like <truncated 5750 bytes> with clean formatting
-    formatted = formatted.replace(
-        /<truncated\s+(\d+)\s+bytes>/gi,
-        '\n\n> ✂ *[Omitted $1 bytes from preview]*\n\n'
-    );
-
     // Separate inline markdown headings attached to paragraph text:
     // e.g. "# High Priority Instruction Hi there." -> "# High Priority Instruction\n\nHi there."
     formatted = formatted.replace(
@@ -194,6 +195,46 @@ function formatPromptForMarkdown(text: string): string {
     );
 
     return formatted;
+}
+
+export interface TruncatedContextCalloutProps {
+    omittedBytes?: number;
+    omittedLines?: number;
+    fullText?: string;
+    onExpandFull?: () => void;
+}
+
+export function TruncatedContextCallout({
+    omittedBytes,
+    omittedLines,
+    onExpandFull,
+}: TruncatedContextCalloutProps) {
+    const formattedSize = omittedBytes 
+        ? omittedBytes >= 1024 * 1024 
+            ? `${(omittedBytes / (1024 * 1024)).toFixed(1)} MB` 
+            : `${(omittedBytes / 1024).toFixed(1)} KB`
+        : omittedLines 
+            ? `${omittedLines} lines`
+            : 'transcript context';
+
+    return (
+        <div className="my-3 flex items-center justify-between px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs shadow-xs backdrop-blur-xs">
+            <div className="flex items-center gap-2 font-mono font-medium">
+                <span className="text-amber-500 text-sm">⚡</span>
+                <span>[Omitted {formattedSize} of transcript context - Click to inspect/expand]</span>
+            </div>
+            {onExpandFull && (
+                <button
+                    type="button"
+                    onClick={onExpandFull}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500 text-white dark:text-slate-900 font-bold hover:bg-amber-600 transition-colors text-[10px] cursor-pointer"
+                >
+                    <span>Expand Full</span>
+                    <ChevronDown className="w-3 h-3" />
+                </button>
+            )}
+        </div>
+    );
 }
 
 // Helper to check if a conversation has zero prompt content and untitled title (true ghost node)
@@ -258,100 +299,232 @@ function stripImagesFromPrompt(text: string): string {
         .trim();
 }
 
-export type PromptCategory = 'SUBAGENT_INSTRUCTION' | 'USER_PROMPT';
+// Helper for rich clipboard media copying with ClipboardItem
+export async function copyPromptWithRichImages(markdownText: string): Promise<boolean> {
+    try {
+        if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
+            await navigator.clipboard.writeText(markdownText);
+            return true;
+        }
 
-export interface PromptCategoryResult {
-    category: PromptCategory;
+        // Convert markdown images to HTML <img> tags
+        let htmlContent = markdownText
+            .replace(/\n\n/g, '</p><p>')
+            .replace(/\n/g, '<br/>')
+            .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" style="max-width:100%; border-radius:8px; margin:8px 0;" />');
+
+        htmlContent = `<!DOCTYPE html><html><body><p>${htmlContent}</p></body></html>`;
+
+        const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
+        const textBlob = new Blob([markdownText], { type: 'text/plain' });
+
+        const item = new ClipboardItem({
+            'text/html': htmlBlob,
+            'text/plain': textBlob,
+        });
+
+        await navigator.clipboard.write([item]);
+        return true;
+    } catch {
+        // Fallback to standard text copy if rich clipboard write fails
+        try {
+            await navigator.clipboard.writeText(markdownText);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+}
+
+export type PromptTier = 'USER_PROMPT' | 'SUBAGENT_INSTRUCTION' | 'SYSTEM_MESSAGE' | 'TOOL_OUTPUT';
+
+export interface TierClassificationResult {
+    tier: PromptTier;
+    category: PromptTier;
     label: string;
+    roleBadge: string;
+    badgeStyle: string;
+    iconName: 'user' | 'bot' | 'terminal' | 'wrench';
     isSubagent: boolean;
+    isNonPrompt: boolean;
+    confidence: number;
+    matchedPattern?: string;
+    subagentRole?: string;
     description: string;
+}
+
+export type PromptCategory = PromptTier;
+export type PromptCategoryResult = TierClassificationResult;
+
+export function classifyPromptTier(
+    text?: string,
+    title?: string,
+    metadata?: Record<string, any>
+): TierClassificationResult {
+    const raw = (text || '').trim();
+    const cleanTitle = (title || '').trim().toLowerCase();
+
+    // 1. Tool Output Classification (Highest Specificity)
+    const isToolOutput =
+        raw.startsWith('[Tool Result]') ||
+        raw.startsWith('{"tool_call_id":') ||
+        raw.startsWith('Tool returned:') ||
+        raw.includes('<tool_response>') ||
+        raw.includes('<tool_calls>') ||
+        (raw.startsWith('```') && (cleanTitle.includes('output') || cleanTitle.includes('result')));
+
+    if (isToolOutput) {
+        return {
+            tier: 'TOOL_OUTPUT',
+            category: 'TOOL_OUTPUT',
+            label: 'Tool Output',
+            roleBadge: 'TOOL',
+            badgeStyle: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-400/30',
+            iconName: 'wrench',
+            isSubagent: false,
+            isNonPrompt: true,
+            confidence: 0.98,
+            matchedPattern: 'tool_output_marker',
+            description: 'Diagnostic tool execution results and execution steps',
+        };
+    }
+
+    // 2. System Message Classification
+    const isSystemMessage =
+        raw.startsWith('<SYSTEM_MESSAGE>') ||
+        raw.includes('<conversation_transcript>') ||
+        raw.includes('<artifacts>') ||
+        cleanTitle.startsWith('system:');
+
+    if (isSystemMessage && !raw.includes('invoked by a caller agent') && !raw.includes('You are')) {
+        return {
+            tier: 'SYSTEM_MESSAGE',
+            category: 'SYSTEM_MESSAGE',
+            label: 'System Message',
+            roleBadge: 'SYSTEM',
+            badgeStyle: 'bg-zinc-500/15 text-zinc-700 dark:text-zinc-300 border-zinc-400/30',
+            iconName: 'terminal',
+            isSubagent: false,
+            isNonPrompt: true,
+            confidence: 0.95,
+            matchedPattern: 'system_message_tag',
+            description: 'System initialization directives and environment preambles',
+        };
+    }
+
+    // 3. AI Subagent Instruction Classification
+    const subagentRoleMatch =
+        raw.match(/Role:\s*([A-Za-z0-9_\-\s]{3,30})/i) ||
+        raw.match(/You are (?:the )?([A-Za-z0-9_\-\s]{3,30}) for Task/i);
+
+    const isSubagent =
+        raw.includes('invoked by a caller agent') ||
+        raw.includes('<subagent_reminder>') ||
+        raw.includes('send_message to communicate all results') ||
+        /Role:\s*(?:Codebase Researcher|Database Debugger|QA Tester|Subagent)/i.test(raw) ||
+        cleanTitle.includes('subagent') ||
+        cleanTitle.includes('worker-') ||
+        cleanTitle.includes('worker ') ||
+        cleanTitle.includes('author-') ||
+        cleanTitle.includes('researcher') ||
+        cleanTitle.includes('debugger') ||
+        metadata?.is_subagent === true ||
+        metadata?.prompt_category === 'subagent';
+
+    if (isSubagent) {
+        let detectedRole = 'Subagent';
+        if (subagentRoleMatch) {
+            detectedRole = subagentRoleMatch[1].trim();
+        } else if (cleanTitle.includes('researcher')) {
+            detectedRole = 'Researcher';
+        } else if (cleanTitle.includes('worker')) {
+            detectedRole = 'Worker';
+        } else if (cleanTitle.includes('debugger')) {
+            detectedRole = 'Debugger';
+        } else if (cleanTitle.includes('tester') || cleanTitle.includes('qa')) {
+            detectedRole = 'QA';
+        }
+
+        return {
+            tier: 'SUBAGENT_INSTRUCTION',
+            category: 'SUBAGENT_INSTRUCTION',
+            label: 'AI Subagent Instruction',
+            roleBadge: detectedRole,
+            badgeStyle: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-400/30',
+            iconName: 'bot',
+            isSubagent: true,
+            isNonPrompt: false,
+            confidence: 0.96,
+            matchedPattern: 'subagent_signature',
+            subagentRole: detectedRole,
+            description: 'Autonomous worker prompt or subagent execution directive',
+        };
+    }
+
+    // 4. Default: USER_PROMPT (Direct Human Request)
+    return {
+        tier: 'USER_PROMPT',
+        category: 'USER_PROMPT',
+        label: 'User Prompt',
+        roleBadge: 'USER',
+        badgeStyle: 'bg-sky-500/15 text-sky-700 dark:text-cyan-300 border-sky-400/30',
+        iconName: 'user',
+        isSubagent: false,
+        isNonPrompt: false,
+        confidence: 0.90,
+        description: 'Direct human directive submitted via chat, CLI, or task request',
+    };
 }
 
 export function detectPromptCategory(
     text?: string,
     title?: string,
     conv?: AgmConversationNode
-): PromptCategoryResult {
-    if (conv?.prompt_category === 'subagent') {
-        return {
-            category: 'SUBAGENT_INSTRUCTION',
-            label: 'AI Subagent Instruction',
-            isSubagent: true,
-            description: 'Detected as AI subagent directive or autonomous task execution',
-        };
-    }
-    if (conv?.prompt_category === 'user') {
-        return {
-            category: 'USER_PROMPT',
-            label: 'User Prompt',
-            isSubagent: false,
-            description: 'Direct user-initiated instruction or query',
-        };
-    }
+): TierClassificationResult {
+    return classifyPromptTier(text, title, conv as any);
+}
 
-    const raw = (text || '').trim();
-    const cleanTitle = (title || '').toLowerCase();
+export interface HierarchicalConversationNode {
+    primaryNode: AgmConversationNode;
+    classification: TierClassificationResult;
+    subagents: HierarchicalConversationNode[];
+    isExpanded: boolean;
+}
 
-    // Check title heuristics
-    const subagentTitlePatterns = [
-        /subagent/i,
-        /worker\s*\d+/i,
-        /author\s*\d+/i,
-        /task-\d+/i,
-        /researcher/i,
-        /supervisor/i,
-        /autonomous/i,
-    ];
-    for (const pattern of subagentTitlePatterns) {
-        if (pattern.test(cleanTitle)) {
-            return {
-                category: 'SUBAGENT_INSTRUCTION',
-                label: 'AI Subagent Instruction',
-                isSubagent: true,
-                description: 'Detected as AI subagent directive or autonomous task execution',
-            };
+export function assembleConversationHierarchy(
+    conversations: AgmConversationNode[]
+): HierarchicalConversationNode[] {
+    const rootNodes: HierarchicalConversationNode[] = [];
+    let currentRoot: HierarchicalConversationNode | null = null;
+
+    for (const conv of conversations) {
+        const classification = classifyPromptTier(conv.prompt_preview_200w, conv.title, conv);
+
+        const node: HierarchicalConversationNode = {
+            primaryNode: conv,
+            classification,
+            subagents: [],
+            isExpanded: true,
+        };
+
+        if (classification.tier === 'SUBAGENT_INSTRUCTION') {
+            if (currentRoot) {
+                // Attach as child sub-point to active root prompt
+                currentRoot.subagents.push(node);
+            } else {
+                // If no root has occurred yet, treat as standalone root
+                rootNodes.push(node);
+            }
+        } else {
+            // New User Prompt or System Message becomes new root
+            rootNodes.push(node);
+            if (classification.tier === 'USER_PROMPT') {
+                currentRoot = node;
+            }
         }
     }
 
-    // Check system preambles, tags, and subagent directives
-    const subagentContentPatterns = [
-        /<SYSTEM_MESSAGE>/i,
-        /<USER_REQUEST>/i,
-        /<ADDITIONAL_METADATA>/i,
-        /<identity>/i,
-        /<RULE\[/i,
-        /<scratchpad>/i,
-        /<guidelines>/i,
-        /<skills>/i,
-        /<subagents>/i,
-        /<conversation_transcript>/i,
-        /<artifacts>/i,
-        /You are Research/i,
-        /You are Worker/i,
-        /You are Author/i,
-        /You are Antigravity/i,
-        /Available skills:/i,
-        /Available subagents:/i,
-        /\[Message\] timestamp=/i,
-    ];
-
-    for (const pattern of subagentContentPatterns) {
-        if (pattern.test(raw)) {
-            return {
-                category: 'SUBAGENT_INSTRUCTION',
-                label: 'AI Subagent Instruction',
-                isSubagent: true,
-                description: 'Detected as AI subagent directive or system preamble',
-            };
-        }
-    }
-
-    return {
-        category: 'USER_PROMPT',
-        label: 'User Prompt',
-        isSubagent: false,
-        description: 'Direct user-initiated instruction or query',
-    };
+    return rootNodes;
 }
 
 export function normalizePromptForGrouping(conv: AgmConversationNode): string {
@@ -374,14 +547,19 @@ function parseInlineMarkdown(text: string): React.ReactNode[] {
         const [full, , imgAlt, imgSrc, linkText, linkUrl, truncCount, truncUnit, inlineCode, boldStar, boldUnder, delText, italicStar, italicUnder] = match;
 
         if (truncCount !== undefined) {
+            const count = parseInt(truncCount, 10);
+            const unit = truncUnit.toLowerCase();
+            const formattedSize = unit === 'bytes'
+                ? (count >= 1024 * 1024 ? `${(count / (1024 * 1024)).toFixed(1)} MB` : `${(count / 1024).toFixed(1)} KB`)
+                : `${count} lines`;
             rawNodes.push(
                 <span
                     key={`trunc-${match.index}`}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 my-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
-                    title={`Omitted ${truncCount} ${truncUnit} from prompt transcript`}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 my-0.5 rounded-full text-[10px] font-mono font-medium bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30 shadow-2xs"
+                    title={`Omitted ${truncCount} ${truncUnit} from prompt transcript context`}
                 >
-                    <span className="text-amber-500">✂</span>
-                    <span>[Omitted {truncCount} {truncUnit}]</span>
+                    <span className="text-amber-500 font-bold">⚡</span>
+                    <span>[Omitted {formattedSize} of transcript context]</span>
                 </span>
             );
         } else if (imgSrc !== undefined) {
@@ -641,14 +819,15 @@ function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, isTruncat
         // Truncated transcript omission banner
         const truncLineMatch = trimmed.match(/^<truncated\s+(\d+)\s+(bytes|lines)>/i);
         if (truncLineMatch) {
+            const count = parseInt(truncLineMatch[1], 10);
+            const unit = truncLineMatch[2].toLowerCase();
             elements.push(
-                <div
+                <TruncatedContextCallout
                     key={`trunc-block-${i}`}
-                    className="my-2.5 px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center gap-2 text-xs font-mono text-amber-800 dark:text-amber-300 shadow-2xs"
-                >
-                    <span className="text-amber-500 font-bold">✂</span>
-                    <span>[Omitted {truncLineMatch[1]} {truncLineMatch[2]} of transcript context]</span>
-                </div>
+                    omittedBytes={unit === 'bytes' ? count : undefined}
+                    omittedLines={unit === 'lines' ? count : undefined}
+                    onExpandFull={onToggleExpand}
+                />
             );
             continue;
         }
@@ -779,7 +958,7 @@ export default function PromptTreeViewModal({
     const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState<'all' | 'running' | 'queued' | 'latest_conv' | 'latest_prompt' | 'pinned' | 'archived'>('all');
-    const [categoryFilter, setCategoryFilter] = useState<'all' | 'user' | 'subagent'>('all');
+    const [categoryFilter, setCategoryFilter] = useState<'all' | 'user' | 'subagent' | 'system'>('all');
     const restoreFileInputRef = useRef<HTMLInputElement>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -819,12 +998,13 @@ export default function PromptTreeViewModal({
     const [editedPromptText, setEditedPromptText] = useState<string>('');
     const [viewMode, setViewMode] = useState<ViewMode>('preview');
     const [showAllWords, setShowAllWords] = useState<boolean>(false);
+    const [previewTab, setPreviewTab] = useState<'instruction' | 'results'>('instruction');
+    const [isCopiedResults, setIsCopiedResults] = useState(false);
 
     const [isCopied, setIsCopied] = useState(false);
     const [isResending, setIsResending] = useState(false);
     const [isEnqueueing, setIsEnqueueing] = useState(false);
     const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
-    const [expandedRepeatedGroups, setExpandedRepeatedGroups] = useState<Record<string, boolean>>({});
     const [actionMsg, setActionMsg] = useState<string | null>(null);
 
     // Live refs to prevent closure staleness in background auto-sync timer
@@ -1338,6 +1518,32 @@ export default function PromptTreeViewModal({
         }
     };
 
+    // Handle Copy with Images (HTML rich clipboard formatting with image tags)
+    const handleCopyWithImagesRich = async () => {
+        try {
+            let htmlContent = activePromptText
+                .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" style="max-width:100%;" /><br />')
+                .replace(/\n/g, '<br />');
+            const blobHtml = new Blob([htmlContent], { type: 'text/html' });
+            const blobText = new Blob([activePromptText], { type: 'text/plain' });
+            const item = new ClipboardItem({
+                'text/html': blobHtml,
+                'text/plain': blobText,
+            });
+            await navigator.clipboard.write([item]);
+            setIsCopiedRaw(true);
+            setActionMsg('Copied rich prompt with embedded images to clipboard!');
+            setTimeout(() => {
+                setIsCopiedRaw(false);
+                setActionMsg(null);
+            }, 2500);
+        } catch {
+            await navigator.clipboard.writeText(activePromptText);
+            setIsCopiedRaw(true);
+            setTimeout(() => setIsCopiedRaw(false), 2000);
+        }
+    };
+
     // Handle Save Extracted Images to files
     const handleSaveImages = () => {
         const text = activePromptText || selectedConversation?.prompt_preview_200w || '';
@@ -1477,7 +1683,7 @@ export default function PromptTreeViewModal({
 
             // 4. Focus or launch IDE instance window so user immediately sees it ("goes there")
             try {
-                await focusOrLaunchInstance(targetInstId);
+                await focusOrLaunchInstance(targetInstId, repoPath);
             } catch (focusErr) {
                 console.warn('focusOrLaunchInstance error', focusErr);
             }
@@ -1639,9 +1845,16 @@ ${activePromptText}
         try {
             setIsFocusing(true);
             const targetId = selectedProject?.instance_id || instanceId || 'default';
-            setActionMsg(`Focusing or launching IDE instance '${targetId}'...`);
-            const wasFocused = await focusOrLaunchInstance(targetId);
-            setActionMsg(wasFocused ? 'Antigravity IDE window focused!' : 'Antigravity IDE launched!');
+            const repoPath = selectedProject?.repo_path || '';
+            const repoName = selectedProject?.repo_name || '';
+            setActionMsg(`Focusing IDE workspace '${repoName || targetId}'...`);
+            const wasFocused = await focusInstanceWorkspace(targetId, repoPath, repoName);
+            if (wasFocused) {
+                setActionMsg(`Workspace window '${repoName}' focused!`);
+            } else {
+                const launched = await focusOrLaunchInstance(targetId, repoPath);
+                setActionMsg(launched ? 'Antigravity IDE window focused!' : 'Antigravity IDE launched!');
+            }
             setTimeout(() => setActionMsg(null), 3000);
         } catch (err: any) {
             setError(err?.toString() || 'Failed to focus IDE');
@@ -1733,18 +1946,25 @@ ${activePromptText}
             list = list.filter((p) => archivedProjectIds.includes(p.project_id));
         }
 
-        // 2.5 Category Filter (User vs Subagents)
+        // 2.5 Category Filter (User vs Subagents vs System/Tools)
         if (categoryFilter === 'user') {
             list = list.filter((p) =>
                 p.conversations.some(
-                    (c) => detectPromptCategory(c.prompt_preview_200w, c.title, c).category === 'USER_PROMPT'
+                    (c) => classifyPromptTier(c.prompt_preview_200w, c.title, c).tier === 'USER_PROMPT'
                 )
             );
         } else if (categoryFilter === 'subagent') {
             list = list.filter((p) =>
                 p.conversations.some(
-                    (c) => detectPromptCategory(c.prompt_preview_200w, c.title, c).category === 'SUBAGENT_INSTRUCTION'
+                    (c) => classifyPromptTier(c.prompt_preview_200w, c.title, c).tier === 'SUBAGENT_INSTRUCTION'
                 )
+            );
+        } else if (categoryFilter === 'system') {
+            list = list.filter((p) =>
+                p.conversations.some((c) => {
+                    const t = classifyPromptTier(c.prompt_preview_200w, c.title, c).tier;
+                    return t === 'SYSTEM_MESSAGE' || t === 'TOOL_OUTPUT';
+                })
             );
         }
 
@@ -1840,7 +2060,11 @@ ${activePromptText}
         const isConvSelected = selectedConversation?.conversation_id === conv.conversation_id;
         const isRunning = Boolean(conv.is_running) && !isGhostConversation(conv) && !(conv.prompt_word_count === 0 && (!conv.prompt_preview_200w || !conv.prompt_preview_200w.trim()));
         const isQueued = Boolean(conv.is_queued) || conv.status.toLowerCase().includes('queue');
-        const promptCategory = detectPromptCategory(conv.prompt_preview_200w, conv.title, conv);
+        const promptCategory = classifyPromptTier(conv.prompt_preview_200w, conv.title, conv);
+        const IconComponent =
+            promptCategory.tier === 'SUBAGENT_INSTRUCTION' ? Bot :
+            promptCategory.tier === 'SYSTEM_MESSAGE' ? Terminal :
+            promptCategory.tier === 'TOOL_OUTPUT' ? Wrench : User;
 
         return (
             <div
@@ -1856,11 +2080,7 @@ ${activePromptText}
                 title="Click to view prompt; double-click for Full inspector"
             >
                 <div className="flex items-center gap-1.5 min-w-0">
-                    {promptCategory.category === 'SUBAGENT_INSTRUCTION' ? (
-                        <Bot className={cn('h-3.5 w-3.5 shrink-0', isConvSelected ? 'text-white' : 'text-purple-500')} />
-                    ) : (
-                        <User className={cn('h-3.5 w-3.5 shrink-0', isConvSelected ? 'text-white' : 'text-sky-500')} />
-                    )}
+                    <IconComponent className={cn('h-3.5 w-3.5 shrink-0', isConvSelected ? 'text-white' : (promptCategory.tier === 'SUBAGENT_INSTRUCTION' ? 'text-purple-500' : promptCategory.tier === 'SYSTEM_MESSAGE' ? 'text-zinc-500' : promptCategory.tier === 'TOOL_OUTPUT' ? 'text-amber-500' : 'text-sky-500'))} />
                     <span
                         className={cn(
                             'text-[9px] font-mono px-1 py-0.2 rounded-[3px] shrink-0 font-medium whitespace-nowrap',
@@ -1874,15 +2094,17 @@ ${activePromptText}
                     </span>
                     <span className={cn(
                         "px-1.5 py-0.2 rounded-full text-[8.5px] font-mono font-bold uppercase tracking-wider shrink-0",
-                        promptCategory.category === 'SUBAGENT_INSTRUCTION'
-                            ? (isConvSelected
+                        isConvSelected
+                            ? (promptCategory.tier === 'SUBAGENT_INSTRUCTION'
                                 ? "bg-purple-300 text-purple-950 border border-purple-200"
-                                : "bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-400/30")
-                            : (isConvSelected
-                                ? "bg-sky-200 text-sky-950 border border-sky-100"
-                                : "bg-sky-500/15 text-sky-700 dark:text-cyan-300 border border-sky-400/30")
+                                : promptCategory.tier === 'SYSTEM_MESSAGE'
+                                ? "bg-zinc-300 text-zinc-950 border border-zinc-200"
+                                : promptCategory.tier === 'TOOL_OUTPUT'
+                                ? "bg-amber-300 text-amber-950 border border-amber-200"
+                                : "bg-sky-200 text-sky-950 border border-sky-100")
+                            : promptCategory.badgeStyle
                     )}>
-                        {promptCategory.category === 'SUBAGENT_INSTRUCTION' ? 'Subagent' : 'User'}
+                        {promptCategory.roleBadge || (promptCategory.tier === 'SUBAGENT_INSTRUCTION' ? 'Subagent' : promptCategory.tier === 'SYSTEM_MESSAGE' ? 'System' : promptCategory.tier === 'TOOL_OUTPUT' ? 'Tool' : 'User')}
                     </span>
                     {(conv.repeat_badge || (conv.repeat_count && conv.repeat_count > 1)) && (
                         <span
@@ -1930,8 +2152,8 @@ ${activePromptText}
                                 ? "bg-amber-300 text-amber-950 border-amber-200"
                                 : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40"
                         )}>
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                            QUEUED
+                            <Clock className="w-2.5 h-2.5 text-amber-500" />
+                            <span>QUEUED</span>
                         </span>
                     )}
                 </div>
@@ -1940,146 +2162,89 @@ ${activePromptText}
     };
 
     const renderConversationListWithGrouping = (convList: AgmConversationNode[], project: AgmProjectTreeNode) => {
-        const groups: { key: string; primary: AgmConversationNode; items: AgmConversationNode[] }[] = [];
-        const keyMap = new Map<string, { key: string; primary: AgmConversationNode; items: AgmConversationNode[] }>();
-
-        for (const conv of convList) {
-            if (conv.sub_runs && conv.sub_runs.length > 1) {
-                groups.push({
-                    key: `subruns-${conv.conversation_id}`,
-                    primary: conv,
-                    items: conv.sub_runs,
-                });
-                continue;
-            }
-
-            const normKey = normalizePromptForGrouping(conv);
-            const effectiveKey = normKey.length >= 8 ? normKey : `unique-${conv.conversation_id}`;
-            let group = keyMap.get(effectiveKey);
-            if (!group) {
-                group = { key: effectiveKey, primary: conv, items: [] };
-                keyMap.set(effectiveKey, group);
-                groups.push(group);
-            }
-            group.items.push(conv);
+        if (categoryFilter === 'subagent') {
+            return convList.map((conv) => renderConversationNode(conv, project));
         }
 
-        return groups.map((group) => {
-            if (group.items.length === 1) {
-                return renderConversationNode(group.primary, project);
-            }
+        const hierarchy = assembleConversationHierarchy(convList);
 
-            const primaryConv = group.primary;
-            const isGroupExpanded = Boolean(expandedRepeatedGroups[group.key]);
-            const isGroupRunning = group.items.some((c) => Boolean(c.is_running));
-            const isConvSelected = selectedConversation && group.items.some((c) => c.conversation_id === selectedConversation.conversation_id);
-            const promptCategory = detectPromptCategory(primaryConv.prompt_preview_200w, primaryConv.title, primaryConv);
-
+        return hierarchy.map((root) => {
             return (
-                <div key={`group-${group.key}`} className="space-y-0.5">
-                    {/* Master Repeated Node */}
-                    <div
-                        onClick={() => selectConversation(primaryConv, project)}
-                        onDoubleClick={() => openInspector(primaryConv, project.repo_path)}
-                        className={cn(
-                            'group flex items-center justify-between rounded-[5px] px-2 py-1.5 text-xs cursor-pointer transition-colors',
-                            isConvSelected
-                                ? 'bg-blue-600 text-white font-medium shadow-2xs'
-                                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#0c2438]'
-                        )}
-                        title={`Click to view prompt (${group.items.length} identical runs grouped)`}
-                    >
-                        <div className="flex items-center gap-1.5 min-w-0">
-                            {promptCategory.category === 'SUBAGENT_INSTRUCTION' ? (
-                                <Bot className={cn('h-3.5 w-3.5 shrink-0', isConvSelected ? 'text-white' : 'text-purple-500')} />
-                            ) : (
-                                <User className={cn('h-3.5 w-3.5 shrink-0', isConvSelected ? 'text-white' : 'text-sky-500')} />
-                            )}
-                            <span
-                                className={cn(
-                                    'text-[9px] font-mono px-1 py-0.2 rounded-[3px] shrink-0 font-medium whitespace-nowrap',
-                                    isConvSelected
-                                        ? 'bg-blue-700/80 text-white'
-                                        : 'bg-slate-200/90 dark:bg-[#15334d] text-slate-600 dark:text-cyan-300'
-                                )}
-                                title="GitMap Dual Sequence Badge"
-                            >
-                                {formatDualBadge(primaryConv.seq_code, 'C001', primaryConv.gitmap_seq_code, primaryConv.short_id || primaryConv.conversation_id.slice(0, 8))}
-                            </span>
-                            <span className={cn(
-                                "px-1.5 py-0.2 rounded-full text-[8.5px] font-mono font-bold uppercase tracking-wider shrink-0",
-                                promptCategory.category === 'SUBAGENT_INSTRUCTION'
-                                    ? (isConvSelected
-                                        ? "bg-purple-300 text-purple-950 border border-purple-200"
-                                        : "bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-400/30")
-                                    : (isConvSelected
-                                        ? "bg-sky-200 text-sky-950 border border-sky-100"
-                                        : "bg-sky-500/15 text-sky-700 dark:text-cyan-300 border border-sky-400/30")
-                            )}>
-                                {promptCategory.category === 'SUBAGENT_INSTRUCTION' ? 'Subagent' : 'User'}
-                            </span>
-                            {/* Frequency Badge */}
-                            <span
-                                className={cn(
-                                    "px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold shrink-0 border",
-                                    isConvSelected
-                                        ? "bg-amber-300 text-amber-950 border-amber-200"
-                                        : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
-                                )}
-                                title={`${group.items.length} duplicate/repeated prompt runs`}
-                            >
-                                x{group.items.length}
-                            </span>
-                            <span className="truncate text-[11px]">
-                                {primaryConv.title || primaryConv.short_id || primaryConv.conversation_id.slice(0, 8)}
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                            <span
-                                className={cn(
-                                    'text-[9px] font-mono px-1 rounded-[3px]',
-                                    isConvSelected
-                                        ? 'bg-blue-700/80 text-white'
-                                        : 'bg-slate-200 dark:bg-[#15334d] text-slate-500 dark:text-slate-400'
-                                )}
-                            >
-                                {primaryConv.step_count || 1} stp
-                            </span>
-                            {isGroupRunning && (
-                                <span className={cn(
-                                    "flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[8.5px] font-bold font-mono border animate-pulse",
-                                    isConvSelected
-                                        ? "bg-emerald-400 text-emerald-950 border-emerald-300"
-                                        : "bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border-emerald-500/40"
-                                )}>
-                                    <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] animate-pulse" />
-                                    RUNNING
-                                </span>
-                            )}
-                            <button
-                                type="button"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedRepeatedGroups((prev) => ({
-                                        ...prev,
-                                        [group.key]: !isGroupExpanded,
-                                    }));
-                                }}
-                                className={cn(
-                                    "p-0.5 rounded-[3px] transition-colors cursor-pointer",
-                                    isConvSelected ? "hover:bg-blue-700 text-white" : "hover:bg-slate-200 dark:hover:bg-[#15334d] text-slate-400"
-                                )}
-                                title={isGroupExpanded ? "Collapse historical runs" : "Expand historical runs"}
-                            >
-                                {isGroupExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                            </button>
-                        </div>
-                    </div>
+                <div key={`root-${root.primaryNode.conversation_id}`} className="space-y-0.5">
+                    {renderConversationNode(root.primaryNode, project)}
 
-                    {/* Sub-runs Drawer */}
-                    {isGroupExpanded && (
-                        <div className="ml-4 pl-2 border-l border-amber-500/30 space-y-0.5 py-0.5">
-                            {group.items.map((subConv) => renderConversationNode(subConv, project))}
+                    {/* Rendering Child Sub-Points (Indented with Branch Glyphs) */}
+                    {root.subagents.length > 0 && (
+                        <div className="pl-5 space-y-0.5 border-l-2 border-purple-300/40 dark:border-purple-800/40 ml-3.5 my-0.5">
+                            {root.subagents.map((subNode) => {
+                                const isSubSelected = selectedConversation?.conversation_id === subNode.primaryNode.conversation_id;
+                                const isSubRunning = Boolean(subNode.primaryNode.is_running);
+                                return (
+                                    <div
+                                        key={subNode.primaryNode.conversation_id}
+                                        onClick={() => selectConversation(subNode.primaryNode, project)}
+                                        onDoubleClick={() => openInspector(subNode.primaryNode, project.repo_path)}
+                                        className={cn(
+                                            "relative flex items-center justify-between rounded-[5px] px-2 py-1 text-xs cursor-pointer transition-colors group",
+                                            isSubSelected
+                                                ? "bg-purple-600 text-white font-medium shadow-2xs"
+                                                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#0c2438]"
+                                        )}
+                                        title="AI Subagent Task Instruction - Click to view"
+                                    >
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            {/* Tree Branch Connector Glyph */}
+                                            <span className="text-purple-400 dark:text-purple-400 font-mono text-[11px] select-none">↳</span>
+                                            <Bot className={cn("w-3.5 h-3.5 shrink-0", isSubSelected ? "text-white" : "text-purple-500")} />
+                                            <span
+                                                className={cn(
+                                                    'text-[9px] font-mono px-1 py-0.2 rounded-[3px] shrink-0 font-medium whitespace-nowrap',
+                                                    isSubSelected
+                                                        ? 'bg-purple-700 text-white'
+                                                        : 'bg-slate-200/90 dark:bg-[#15334d] text-slate-600 dark:text-cyan-300'
+                                                )}
+                                                title="GitMap Dual Sequence Badge"
+                                            >
+                                                {formatDualBadge(subNode.primaryNode.seq_code, 'C001', subNode.primaryNode.gitmap_seq_code, subNode.primaryNode.short_id || subNode.primaryNode.conversation_id.slice(0, 8))}
+                                            </span>
+                                            <span className={cn(
+                                                "px-1.5 py-0.2 rounded-full text-[8.5px] font-mono font-bold uppercase tracking-wider shrink-0",
+                                                isSubSelected
+                                                    ? "bg-purple-300 text-purple-950 border border-purple-200"
+                                                    : "bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-400/30"
+                                            )}>
+                                                {subNode.classification.roleBadge || 'Subagent'}
+                                            </span>
+                                            <span className="truncate text-[11px]">
+                                                {subNode.primaryNode.title || 'Subagent Task'}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <span
+                                                className={cn(
+                                                    'text-[9px] font-mono px-1 rounded-[3px]',
+                                                    isSubSelected
+                                                        ? 'bg-purple-700 text-white'
+                                                        : 'bg-slate-200 dark:bg-[#15334d] text-slate-500 dark:text-slate-400'
+                                                )}
+                                            >
+                                                {subNode.primaryNode.step_count || 1} stp
+                                            </span>
+                                            {isSubRunning && (
+                                                <span className={cn(
+                                                    "flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[8.5px] font-bold font-mono border animate-pulse",
+                                                    isSubSelected
+                                                        ? "bg-emerald-400 text-emerald-950 border-emerald-300"
+                                                        : "bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border-emerald-500/40"
+                                                )}>
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] animate-pulse" />
+                                                    RUNNING
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -2111,10 +2276,15 @@ ${activePromptText}
             if (isGhostConversation(conv) && activeFilter !== 'archived') {
                 return;
             }
-            if (categoryFilter !== 'all') {
-                const cat = detectPromptCategory(conv.prompt_preview_200w, conv.title, conv);
-                if (categoryFilter === 'user' && cat.category !== 'USER_PROMPT') return;
-                if (categoryFilter === 'subagent' && cat.category !== 'SUBAGENT_INSTRUCTION') return;
+            const cat = classifyPromptTier(conv.prompt_preview_200w, conv.title, conv);
+            if (categoryFilter === 'all') {
+                if (cat.isNonPrompt && !searchQuery.trim()) return;
+            } else if (categoryFilter === 'user') {
+                if (cat.tier !== 'USER_PROMPT') return;
+            } else if (categoryFilter === 'subagent') {
+                if (cat.tier !== 'SUBAGENT_INSTRUCTION') return;
+            } else if (categoryFilter === 'system') {
+                if (cat.tier !== 'SYSTEM_MESSAGE' && cat.tier !== 'TOOL_OUTPUT') return;
             }
             if (activeFilter === 'running' && !conv.is_running) {
                 return;
@@ -2132,6 +2302,8 @@ ${activePromptText}
         const isStaleGroupExpanded = Boolean(expandedStaleGroups[project.project_id]);
         const runningConversations = project.conversations.filter((c) => Boolean(c.is_running));
         const runningCount = runningConversations.length;
+        const queuedConversations = project.conversations.filter((c) => (Boolean(c.is_queued) || c.status.toLowerCase().includes('queue')) && !c.is_running);
+        const queuedCount = queuedConversations.length;
 
         return (
             <div key={project.project_id} className="space-y-0.5">
@@ -2178,10 +2350,18 @@ ${activePromptText}
                             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30">
                                 <span className="relative flex h-2 w-2">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#1af18d] shadow-[0_0_6px_rgba(26,241,141,0.9)]"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#1af18d] shadow-[0_0_6px_rgba(26,241,141,0.9)] animate-pulse"></span>
                                 </span>
                                 <span className="text-[9px] font-bold font-mono text-emerald-700 dark:text-[#1af18d]">
                                     {runningCount} RUNNING
+                                </span>
+                            </div>
+                        )}
+                        {queuedCount > 0 && (
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30">
+                                <Clock className="w-2.5 h-2.5 text-amber-500 shrink-0" />
+                                <span className="text-[9px] font-bold font-mono text-amber-700 dark:text-amber-300">
+                                    {queuedCount} QUEUED
                                 </span>
                             </div>
                         )}
@@ -2330,88 +2510,102 @@ ${activePromptText}
                                     );
                                 })()}
                             </div>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                                3-layer project & prompt hierarchy · markdown preview · task dispatch
-                            </p>
                         </div>
                     </div>
 
-                    {/* Header Toolbar Contiguous Segmented Dark-Glass Pill Capsule */}
-                    <div className="flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs shrink-0">
-                        <button
-                            type="button"
-                            onClick={handleBackup}
-                            className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] rounded-l-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                            title="Backup Prompts to JSON"
-                        >
-                            <Download className="w-3.5 h-3.5 text-indigo-500" />
-                            <span>Backup</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleRestore}
-                            className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                            title="Restore Prompts from JSON backup file"
-                        >
-                            <Upload className="w-3.5 h-3.5 text-emerald-500" />
-                            <span>Restore</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => loadTree(true, true)}
-                            disabled={isLoading}
-                            className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                            title="Refresh Tree"
-                        >
-                            <RefreshCw className={cn('w-3.5 h-3.5 text-blue-500', isLoading && 'animate-spin')} />
-                            <span>Refresh</span>
-                        </button>
-                        <div className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 rounded-none">
-                            <Clock className={cn("w-3.5 h-3.5 text-cyan-500", isAutoSyncing && "animate-spin")} />
-                            <span className="text-[10px] text-slate-500 dark:text-slate-400">Sync:</span>
-                            <select
-                                value={syncInterval}
-                                onChange={(e) => {
-                                    const val = e.target.value as SyncInterval;
-                                    setSyncInterval(val);
-                                    setPromptTreeSyncInterval(val);
-                                }}
-                                className="rounded-full bg-white dark:bg-[#071a27] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] text-[10px] px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-cyan-500 cursor-pointer"
-                                title="Auto-sync interval"
+                    {/* Top Right Header Controls: Two Independent Segmented Dark-Glass Capsules */}
+                    <div className="flex items-center gap-2 shrink-0">
+                        {/* Capsule 1: Data Operations Capsule */}
+                        <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#15334d]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#15334d]/80 shadow-2xs">
+                            {/* Backup Button */}
+                            <button
+                                type="button"
+                                onClick={handleBackup}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d]/90 rounded-l-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                title="Backup Prompts to JSON"
                             >
-                                <option value="15s">15s</option>
-                                <option value="30s">30s</option>
-                                <option value="1m">1m</option>
-                                <option value="2m">2m</option>
-                                <option value="off">Off</option>
-                            </select>
+                                <Download className="w-3.5 h-3.5 text-indigo-500" />
+                                <span>Backup</span>
+                            </button>
+
+                            {/* Restore Button */}
+                            <button
+                                type="button"
+                                onClick={handleRestore}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d]/90 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                title="Restore Prompts from JSON backup file"
+                            >
+                                <Upload className="w-3.5 h-3.5 text-emerald-500" />
+                                <span>Restore</span>
+                            </button>
+
+                            {/* Refresh Button */}
+                            <button
+                                type="button"
+                                onClick={() => loadTree(true, true)}
+                                disabled={isLoading}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d]/90 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                title="Refresh Tree"
+                            >
+                                <RefreshCw className={cn("w-3.5 h-3.5 text-blue-500", isLoading && "animate-spin")} />
+                                <span>Refresh</span>
+                            </button>
+
+                            {/* Sync Interval Selector with Transparent Inline Styling */}
+                            <div className="flex items-center gap-1 pl-2.5 pr-2 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 rounded-r-full">
+                                <Clock className={cn("w-3.5 h-3.5 text-cyan-500 shrink-0", isAutoSyncing && "animate-spin")} />
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 select-none">Sync:</span>
+                                <select
+                                    value={syncInterval}
+                                    onChange={(e) => {
+                                        const val = e.target.value as SyncInterval;
+                                        setSyncInterval(val);
+                                        setPromptTreeSyncInterval(val);
+                                    }}
+                                    className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:ring-0 focus:outline-none cursor-pointer pr-1 py-0"
+                                    title="Auto-sync interval timer"
+                                >
+                                    <option value="15s" className="bg-white dark:bg-[#0c2438]">15s</option>
+                                    <option value="30s" className="bg-white dark:bg-[#0c2438]">30s</option>
+                                    <option value="1m" className="bg-white dark:bg-[#0c2438]">1m</option>
+                                    <option value="2m" className="bg-white dark:bg-[#0c2438]">2m</option>
+                                    <option value="off" className="bg-white dark:bg-[#0c2438]">Off</option>
+                                </select>
+                            </div>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => setIsFullscreen(!isFullscreen)}
-                            className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                            title={isFullscreen ? 'Exit Full Screen' : 'Full Screen Mode'}
-                        >
-                            {isFullscreen ? (
-                                <>
-                                    <Minimize2 className="w-3.5 h-3.5 text-blue-500" />
-                                    <span>Exit</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Maximize2 className="w-3.5 h-3.5 text-blue-500" />
-                                    <span>Full</span>
-                                </>
-                            )}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="flex items-center px-2 py-1 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-500/10 dark:hover:bg-rose-500/20 rounded-r-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                            title="Close Modal"
-                        >
-                            <X className="h-3.5 w-3.5" />
-                        </button>
+
+                        {/* Capsule 2: Window Controls Capsule */}
+                        <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#15334d]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#15334d]/80 shadow-2xs">
+                            {/* Fullscreen Toggle */}
+                            <button
+                                type="button"
+                                onClick={() => setIsFullscreen(!isFullscreen)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d]/90 rounded-l-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                title={isFullscreen ? "Exit Full Screen" : "Full Screen Mode"}
+                            >
+                                {isFullscreen ? (
+                                    <>
+                                        <Minimize2 className="w-3.5 h-3.5 text-blue-500" />
+                                        <span>Exit</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Maximize2 className="w-3.5 h-3.5 text-blue-500" />
+                                        <span>Full</span>
+                                    </>
+                                )}
+                            </button>
+
+                            {/* Close Button with Rose Dark-Glass Hover */}
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="flex items-center px-2.5 py-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 dark:hover:bg-rose-500/20 rounded-r-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                title="Close Modal"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
 
                     <input
@@ -2472,7 +2666,7 @@ ${activePromptText}
                                 />
                             </div>
 
-                            {/* Row 1: Category Filter Segmented Capsule (User Prompts vs AI Subagents) */}
+                            {/* Row 1: 4-Tier Category Filter Segmented Capsule */}
                             <div className="flex items-center justify-between gap-1">
                                 <div className="w-full inline-flex items-center rounded-full border border-slate-200 dark:border-[#15334d] bg-white/80 dark:bg-[#0c2438]/80 backdrop-blur-xs p-0.5 shadow-2xs divide-x divide-slate-200 dark:divide-[#15334d]">
                                     <button
@@ -2484,8 +2678,9 @@ ${activePromptText}
                                                 ? "bg-blue-600 text-white shadow-2xs font-semibold"
                                                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                                         )}
+                                        title="All prompt types"
                                     >
-                                        All Types
+                                        All
                                     </button>
                                     <button
                                         type="button"
@@ -2499,13 +2694,13 @@ ${activePromptText}
                                         title="User Prompts submitted by humans"
                                     >
                                         <User className="w-2.5 h-2.5 shrink-0" />
-                                        <span>User Prompt</span>
+                                        <span>User</span>
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => setCategoryFilter('subagent')}
                                         className={cn(
-                                            "flex-1 py-1 text-[10px] font-medium rounded-r-full transition-colors flex items-center justify-center gap-1 cursor-pointer",
+                                            "flex-1 py-1 text-[10px] font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer",
                                             categoryFilter === 'subagent'
                                                 ? "bg-purple-600 text-white shadow-2xs font-semibold"
                                                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -2513,7 +2708,21 @@ ${activePromptText}
                                         title="Automated subagent and background task instructions"
                                     >
                                         <Bot className="w-2.5 h-2.5 shrink-0" />
-                                        <span>AI Subagent</span>
+                                        <span>Subagent</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCategoryFilter('system')}
+                                        className={cn(
+                                            "flex-1 py-1 text-[10px] font-medium rounded-r-full transition-colors flex items-center justify-center gap-1 cursor-pointer",
+                                            categoryFilter === 'system'
+                                                ? "bg-slate-700 dark:bg-slate-600 text-white shadow-2xs font-semibold"
+                                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                        )}
+                                        title="System messages & tool outputs"
+                                    >
+                                        <Terminal className="w-2.5 h-2.5 shrink-0" />
+                                        <span>System</span>
                                     </button>
                                 </div>
                             </div>
@@ -2675,29 +2884,32 @@ ${activePromptText}
                                                     #{selectedConversation.seq_code || 'P001'}
                                                 </span>
                                                 {(() => {
-                                                    const catInfo = detectPromptCategory(activePromptText, selectedConversation.title);
-                                                    const isSubagent = catInfo.category === 'SUBAGENT_INSTRUCTION';
+                                                    const tierInfo = classifyPromptTier(activePromptText, selectedConversation.title);
+                                                    const badgeColors: Record<PromptTier, string> = {
+                                                        USER_PROMPT: 'bg-sky-500/15 text-sky-700 dark:text-cyan-300 border-sky-500/30',
+                                                        SUBAGENT_INSTRUCTION: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30',
+                                                        SYSTEM_MESSAGE: 'bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/30',
+                                                        TOOL_OUTPUT: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
+                                                    };
+                                                    const badgeLabels: Record<PromptTier, string> = {
+                                                        USER_PROMPT: '[User Prompt]',
+                                                        SUBAGENT_INSTRUCTION: tierInfo.subagentRole ? `[Subagent: ${tierInfo.subagentRole}]` : '[AI Subagent]',
+                                                        SYSTEM_MESSAGE: '[System Directive]',
+                                                        TOOL_OUTPUT: '[Tool Output]',
+                                                    };
                                                     return (
                                                         <span
                                                             className={cn(
                                                                 "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-mono tracking-wide border shadow-2xs",
-                                                                isSubagent
-                                                                    ? "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30"
-                                                                    : "bg-sky-500/15 text-sky-700 dark:text-cyan-300 border-sky-500/30"
+                                                                badgeColors[tierInfo.tier]
                                                             )}
-                                                            title={catInfo.description}
+                                                            title={`${tierInfo.tier} (${Math.round(tierInfo.confidence * 100)}% match)`}
                                                         >
-                                                            {isSubagent ? (
-                                                                <>
-                                                                    <Bot className="w-3 h-3 text-purple-500 shrink-0" />
-                                                                    <span>[AI Subagent Instruction]</span>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <User className="w-3 h-3 text-sky-500 shrink-0" />
-                                                                    <span>[User Prompt]</span>
-                                                                </>
-                                                            )}
+                                                            {tierInfo.tier === 'USER_PROMPT' && <User className="w-3 h-3 text-sky-500 shrink-0" />}
+                                                            {tierInfo.tier === 'SUBAGENT_INSTRUCTION' && <Bot className="w-3 h-3 text-purple-500 shrink-0" />}
+                                                            {tierInfo.tier === 'SYSTEM_MESSAGE' && <Terminal className="w-3 h-3 text-slate-500 shrink-0" />}
+                                                            {tierInfo.tier === 'TOOL_OUTPUT' && <Wrench className="w-3 h-3 text-amber-500 shrink-0" />}
+                                                            <span>{badgeLabels[tierInfo.tier]}</span>
                                                         </span>
                                                     );
                                                 })()}
@@ -2791,19 +3003,15 @@ ${activePromptText}
                                                 <span>{isCopiedText ? 'Copied Text!' : 'Copy Text'}</span>
                                             </button>
 
-                                            {/* Copy With Images Button (verbatim raw prompt) */}
+                                            {/* Copy With Images Button (Rich HTML + Embedded Images) */}
                                             <button
                                                 type="button"
-                                                onClick={() => {
-                                                    navigator.clipboard.writeText(activePromptText);
-                                                    setIsCopiedRaw(true);
-                                                    setTimeout(() => setIsCopiedRaw(false), 2000);
-                                                }}
+                                                onClick={handleCopyWithImagesRich}
                                                 className="flex items-center gap-1 px-2.5 py-1 rounded-none text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                                                title="Copy raw prompt verbatim including markdown image syntax"
+                                                title="Copy prompt with rich embedded HTML images for document pasting"
                                             >
                                                 {isCopiedRaw ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-indigo-500" />}
-                                                <span>{isCopiedRaw ? 'Copied Verbatim!' : '+ Imgs'}</span>
+                                                <span>{isCopiedRaw ? 'Copied + Imgs!' : '+ Imgs'}</span>
                                             </button>
 
                                             {/* Save Images Button */}
@@ -2862,21 +3070,21 @@ ${activePromptText}
                                         </div>
 
                                         {/* Capsule 2: Execution & Workflow Capsule */}
-                                        <div className="flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs shrink-0">
-                                            {/* Confirmation Suffix Dropdown */}
-                                            <div className="flex items-center px-1.5 py-0.5 rounded-l-full">
+                                        <div className="flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#15334d]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#15334d]/80 shadow-2xs shrink-0">
+                                            {/* Confirmation Suffix Dropdown (Transparent inline select) */}
+                                            <div className="flex items-center px-2 py-1 rounded-l-full">
                                                 <select
                                                     value={confirmationSuffix}
                                                     onChange={(e) => setConfirmationSuffix(e.target.value)}
-                                                    className="rounded-full bg-white dark:bg-[#071a27] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] text-[11px] px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer max-w-[115px] truncate"
+                                                    className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-[11px] font-semibold focus:ring-0 focus:outline-none cursor-pointer max-w-[95px] truncate pr-1 py-0"
                                                     title="Confirmation suffix appended on Resend"
                                                 >
-                                                    <option value="None (Send as is)">Suffix: None</option>
-                                                    <option value="Is it done?">Suffix: Done?</option>
-                                                    <option value="Is it released?">Suffix: Released?</option>
-                                                    <option value="Are you sure about it?">Suffix: Sure?</option>
-                                                    <option value="Double check all edge cases">Suffix: Edge cases</option>
-                                                    <option value="Verify build and tests">Suffix: Verify tests</option>
+                                                    <option value="None (Send as is)" className="bg-white dark:bg-[#0c2438]">Suffix: None</option>
+                                                    <option value="Is it done?" className="bg-white dark:bg-[#0c2438]">Done?</option>
+                                                    <option value="Is it released?" className="bg-white dark:bg-[#0c2438]">Released?</option>
+                                                    <option value="Are you sure about it?" className="bg-white dark:bg-[#0c2438]">Sure?</option>
+                                                    <option value="Double check all edge cases" className="bg-white dark:bg-[#0c2438]">Edge cases</option>
+                                                    <option value="Verify build and tests" className="bg-white dark:bg-[#0c2438]">Verify tests</option>
                                                 </select>
                                             </div>
 
@@ -3005,11 +3213,54 @@ ${activePromptText}
 
                                 {/* View Mode Tabs & Word Count */}
                                 <div>
-                                    <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+                                    {/* Primary Tab Bar: Prompt Instruction vs AI Results & Outputs */}
+                                    <div className="flex items-center justify-between mb-3 gap-2 flex-wrap pb-2 border-b border-slate-200/60 dark:border-[#15334d]/60">
+                                        <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#15334d]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#15334d]/80 shadow-2xs">
+                                            <button
+                                                type="button"
+                                                onClick={() => setPreviewTab('instruction')}
+                                                className={cn(
+                                                    "flex items-center gap-1.5 px-3 py-1 rounded-l-full text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
+                                                    previewTab === 'instruction'
+                                                        ? "bg-blue-600 text-white shadow-2xs"
+                                                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                                                )}
+                                                title="View original prompt instruction"
+                                            >
+                                                <MessageSquare className="w-3.5 h-3.5" />
+                                                <span>Prompt Instruction</span>
+                                                {activeWordCount > 0 && (
+                                                    <span className="text-[10px] font-mono opacity-80">({activeWordCount}w)</span>
+                                                )}
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setPreviewTab('results')}
+                                                className={cn(
+                                                    "flex items-center gap-1.5 px-3 py-1 rounded-r-full text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
+                                                    previewTab === 'results'
+                                                        ? "bg-blue-600 text-white shadow-2xs"
+                                                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                                                )}
+                                                title="View AI execution outputs, responses and tools"
+                                            >
+                                                {selectedConversation.is_running ? (
+                                                    <span className="relative flex h-2 w-2">
+                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[#1af18d]"></span>
+                                                    </span>
+                                                ) : (
+                                                    <Terminal className="w-3.5 h-3.5 text-cyan-500" />
+                                                )}
+                                                <span>AI Results & Outputs</span>
+                                                {(selectedConversation.execution_results || selectedConversation.latest_response) && (
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                                                )}
+                                            </button>
+                                        </div>
+
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                                                Prompt Instruction ({activeWordCount} words)
-                                            </label>
                                             {selectedConversation && (
                                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20">
                                                     #{selectedConversation.seq_code || 'P001'}
@@ -3021,99 +3272,90 @@ ${activePromptText}
                                             >
                                                 [#{instanceSeqNum} · {instanceExeName} · {instanceNameDisplay}]
                                             </span>
-                                            {tailSnippet && (
-                                                <span className="text-[10px] italic text-slate-400 truncate max-w-xs" title={`Ending text: ${tailSnippet}`}>
-                                                    “… ending with: '{tailSnippet}'”
-                                                </span>
-                                            )}
-                                            {(isTruncated || activePromptText.trim().endsWith('...') || activePromptText.trim().endsWith('…') || showAllWords) && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowAllWords(!showAllWords)}
-                                                    className="flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[11px] font-semibold bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-800 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 transition-colors cursor-pointer"
-                                                    title={showAllWords ? 'Collapse full prompt text' : 'Expand full prompt text'}
-                                                >
-                                                    {showAllWords ? (
-                                                        <>
-                                                            <ChevronUp className="w-3 h-3" />
-                                                            <span>[Collapse]</span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <ChevronDown className="w-3 h-3" />
-                                                            <span>[Expand (Full Text)]</span>
-                                                        </>
-                                                    )}
-                                                </button>
-                                            )}
-                                        </div>
-
-                                        {/* View Mode Toggle Tabs */}
-                                        <div className="flex items-center rounded-[5px] bg-slate-100 dark:bg-[#071a27] border border-slate-200 dark:border-[#15334d] p-0.5">
-                                            <button
-                                                type="button"
-                                                onClick={() => setViewMode('preview')}
-                                                className={cn(
-                                                    'flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-[5px] transition-colors cursor-pointer',
-                                                    viewMode === 'preview'
-                                                        ? 'bg-white dark:bg-[#0c2438] text-blue-600 dark:text-cyan-300 font-semibold shadow-2xs border border-slate-200/60 dark:border-[#15334d]'
-                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                                                )}
-                                                title="Rich Markdown Preview"
-                                            >
-                                                <Eye className="w-3.5 h-3.5" />
-                                                <span>Preview</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setViewMode('raw')}
-                                                className={cn(
-                                                    'flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-[5px] transition-colors cursor-pointer',
-                                                    viewMode === 'raw'
-                                                        ? 'bg-white dark:bg-[#0c2438] text-blue-600 dark:text-cyan-300 font-semibold shadow-2xs border border-slate-200/60 dark:border-[#15334d]'
-                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                                                )}
-                                                title="Plain Monospace Raw View"
-                                            >
-                                                <Code className="w-3.5 h-3.5" />
-                                                <span>Raw</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setViewMode('edit')}
-                                                className={cn(
-                                                    'flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-[5px] transition-colors cursor-pointer',
-                                                    viewMode === 'edit'
-                                                        ? 'bg-white dark:bg-[#0c2438] text-blue-600 dark:text-cyan-300 font-semibold shadow-2xs border border-slate-200/60 dark:border-[#15334d]'
-                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                                                )}
-                                                title="Editable Textarea Mode"
-                                            >
-                                                <Edit3 className="w-3.5 h-3.5" />
-                                                <span>Edit</span>
-                                            </button>
                                         </div>
                                     </div>
 
-                                    {/* Tab 1: Preview Mode (Rich Markdown) */}
-                                    {viewMode === 'preview' && (
+                                    {/* Tab 1: Prompt Instruction View */}
+                                    {previewTab === 'instruction' && (
                                         <div className="space-y-3">
-                                            {/* Preview Pane Byte-Level Truncation Callout Banner */}
-                                            {(isTruncated || activePromptText.trim().endsWith('...') || activePromptText.trim().endsWith('…')) && !showAllWords && (
-                                                <div
-                                                    onClick={() => setShowAllWords(true)}
-                                                    className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold cursor-pointer hover:bg-amber-500/15 transition-all shadow-xs group"
-                                                    title="Click to expand full prompt text"
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-amber-500">⚡</span>
-                                                        <span>[Truncated: {formatByteSize(activeByteCount)} preserved - Click to Expand Full Text]</span>
-                                                    </div>
-                                                    <span className="font-mono text-[11px] underline opacity-80 group-hover:opacity-100">
-                                                        Expand All ({formatByteSize(activeByteCount)})
+                                            {/* Sub-Header: Words / Truncation Toggle & View Mode Toggle Tabs */}
+                                            <div className="flex items-center justify-between gap-2 flex-wrap pb-1">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 font-mono">
+                                                        {activeWordCount} words · {formatByteSize(activeByteCount)}
                                                     </span>
+                                                    {(isTruncated || activePromptText.trim().endsWith('...') || activePromptText.trim().endsWith('…') || showAllWords) && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowAllWords(!showAllWords)}
+                                                            className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-500/20 hover:bg-cyan-500/20 transition-all cursor-pointer"
+                                                            title={showAllWords ? 'Collapse full prompt text' : 'Expand full prompt text'}
+                                                        >
+                                                            {showAllWords ? (
+                                                                <>
+                                                                    <ChevronUp className="w-3 h-3" />
+                                                                    <span>Collapse Text</span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <ChevronDown className="w-3 h-3" />
+                                                                    <span>Expand Full Text</span>
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    )}
                                                 </div>
-                                            )}
+
+                                                {/* View Mode Toggle Tabs (Canonical Segmented Dark-Glass Pill Capsule) */}
+                                                <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#15334d]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#15334d]/80 shadow-2xs">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setViewMode('preview')}
+                                                        className={cn(
+                                                            'flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-l-full transition-colors cursor-pointer',
+                                                            viewMode === 'preview'
+                                                                ? 'bg-blue-600 text-white font-semibold shadow-2xs'
+                                                                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#15334d]/60'
+                                                        )}
+                                                        title="Rich Markdown Preview"
+                                                    >
+                                                        <Eye className="w-3.5 h-3.5" />
+                                                        <span>Preview</span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setViewMode('raw')}
+                                                        className={cn(
+                                                            'flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-none transition-colors cursor-pointer',
+                                                            viewMode === 'raw'
+                                                                ? 'bg-blue-600 text-white font-semibold shadow-2xs'
+                                                                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#15334d]/60'
+                                                        )}
+                                                        title="Plain Monospace Raw View"
+                                                    >
+                                                        <Code className="w-3.5 h-3.5" />
+                                                        <span>Raw</span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setViewMode('edit')}
+                                                        className={cn(
+                                                            'flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-r-full transition-colors cursor-pointer',
+                                                            viewMode === 'edit'
+                                                                ? 'bg-blue-600 text-white font-semibold shadow-2xs'
+                                                                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#15334d]/60'
+                                                        )}
+                                                        title="Editable Textarea Mode"
+                                                    >
+                                                        <Edit3 className="w-3.5 h-3.5" />
+                                                        <span>Edit</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Preview Mode (Rich Markdown) */}
+                                            {viewMode === 'preview' && (
+                                                <div className="space-y-3">
 
                                             <div
                                                 onDoubleClick={() => openInspector(selectedConversation, selectedProject?.repo_path || '')}
@@ -3282,7 +3524,145 @@ ${activePromptText}
                                         </div>
                                     )}
                                 </div>
-                            </div>
+                            )}
+
+                            {/* Tab 2: AI Results & Outputs View */}
+                            {previewTab === 'results' && (
+                                <div className="space-y-3">
+                                    {/* In-Flight Live Telemetry Status Banner if running */}
+                                    {selectedConversation.is_running && (
+                                        <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3.5 text-emerald-800 dark:text-emerald-200 shadow-xs space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="relative flex h-2.5 w-2.5">
+                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#1af18d]"></span>
+                                                    </span>
+                                                    <span className="font-bold text-xs uppercase tracking-wider font-mono">
+                                                        Live Execution in Progress
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-[10px] font-mono">
+                                                    {instancePid && (
+                                                        <span className="px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10">
+                                                            PID: {instancePid}
+                                                        </span>
+                                                    )}
+                                                    <span className="px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10">
+                                                        Elapsed: {formatDuration(elapsedSeconds)}
+                                                    </span>
+                                                    <span className="px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10">
+                                                        {selectedConversation.step_count || 1} steps
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            {selectedConversation.latest_step_summary && (
+                                                <div className="flex items-center gap-2 text-xs bg-black/5 dark:bg-black/20 p-2 rounded-lg font-mono">
+                                                    <Terminal className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                                                    <span className="truncate">{selectedConversation.latest_step_summary}</span>
+                                                </div>
+                                            )}
+                                            {selectedConversation.tool_calls_summary && (
+                                                <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300">
+                                                    <Wrench className="w-3.5 h-3.5 shrink-0" />
+                                                    <span className="truncate">{selectedConversation.tool_calls_summary}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Display captured AI Response or Execution Results */}
+                                    {(selectedConversation.execution_results || selectedConversation.latest_response) ? (
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                                                    Latest AI Response & Execution Output
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const parts = [];
+                                                        if (selectedConversation.latest_response) {
+                                                            parts.push(selectedConversation.latest_response);
+                                                        }
+                                                        if (selectedConversation.execution_results) {
+                                                            parts.push(`\n\n--- Execution Details ---\n${selectedConversation.execution_results}`);
+                                                        }
+                                                        const resText = parts.join('\n') || '';
+                                                        navigator.clipboard.writeText(resText);
+                                                        setIsCopiedResults(true);
+                                                        setTimeout(() => setIsCopiedResults(false), 2000);
+                                                    }}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-[#0c2438] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                                                    title="Copy AI execution results to clipboard"
+                                                >
+                                                    {isCopiedResults ? (
+                                                        <>
+                                                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                                            <span>Copied AI Results!</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Copy className="w-3.5 h-3.5" />
+                                                            <span>Copy AI Results</span>
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </div>
+
+                                            {/* 1. Assistant Text Response */}
+                                            {selectedConversation.latest_response && (
+                                                <div className="rounded-xl border border-slate-200 dark:border-[#15334d] bg-slate-50 dark:bg-[#071a27] p-5 text-xs text-slate-800 dark:text-slate-200 leading-relaxed max-h-[460px] overflow-y-auto shadow-inner">
+                                                    <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-slate-200/60 dark:border-[#15334d]/60 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
+                                                        <Sparkles className="w-3.5 h-3.5" />
+                                                        <span>AI Assistant Response</span>
+                                                    </div>
+                                                    <RichMarkdownRenderer
+                                                        content={selectedConversation.latest_response}
+                                                        showAllWords={true}
+                                                        onToggleExpand={() => {}}
+                                                        isTruncated={false}
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {/* 2. Tool & Terminal Execution Details */}
+                                            {selectedConversation.execution_results && (
+                                                <div className="rounded-xl border border-slate-200 dark:border-[#15334d] bg-slate-900 text-slate-100 p-4 font-mono text-[11px] leading-relaxed max-h-[300px] overflow-y-auto select-text shadow-inner">
+                                                    <div className="flex items-center gap-1.5 mb-2 pb-1 border-b border-slate-800 text-cyan-400 font-semibold text-[10px]">
+                                                        <Terminal className="w-3 h-3" />
+                                                        <span>Execution & Tool Details</span>
+                                                    </div>
+                                                    <pre className="whitespace-pre-wrap break-words">{selectedConversation.execution_results}</pre>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : !selectedConversation.is_running ? (
+                                        <div className="rounded-xl border border-dashed border-slate-200 dark:border-[#15334d] p-8 flex flex-col items-center justify-center text-center space-y-2 text-slate-400">
+                                            <Terminal className="w-8 h-8 text-slate-400/80 mb-1" />
+                                            <span className="font-semibold text-slate-600 dark:text-slate-300 text-xs">
+                                                No execution results recorded yet
+                                            </span>
+                                            <p className="text-[11px] max-w-sm text-slate-500">
+                                                This prompt has not produced output in the transcript log, or is currently waiting in queue.
+                                            </p>
+                                            <div className="flex items-center gap-2 pt-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleFocusIde}
+                                                    disabled={isFocusing}
+                                                    className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors cursor-pointer"
+                                                >
+                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                    <span>Open IDE Window</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : null}
+                                </div>
+                            )}
+                        </div>
+                    </div>
                         ) : (
                             <div className="flex-1 flex flex-col items-center justify-center text-slate-400 text-xs p-6 space-y-3 text-center">
                                 {selectedProject ? (

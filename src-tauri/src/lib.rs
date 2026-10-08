@@ -1097,6 +1097,7 @@ pub fn run() {
             commands::wipe_instance_session,
             commands::launch_instance,
             commands::focus_or_launch_instance,
+            commands::focus_instance_workspace,
             commands::clone_instance_executable,
             commands::set_instance_executable,
             commands::close_instance,
