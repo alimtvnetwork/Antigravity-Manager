@@ -282,7 +282,7 @@ pub async fn enqueue_prompt(
 
 #[tauri::command]
 pub fn get_running_instances_process_count() -> Result<usize, String> {
-    Ok(crate::modules::instance::get_instance_running_process_count())
+    Ok(crate::modules::instance::scan_and_cache_all_running_instances())
 }
 
 #[tauri::command]

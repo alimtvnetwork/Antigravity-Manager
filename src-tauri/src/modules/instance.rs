@@ -623,6 +623,13 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
 
     let normalized_target = data_dir.to_lowercase().replace('\\', "/");
     let clean_target = normalized_target.trim_end_matches('/');
+    let canonical_target = std::fs::canonicalize(data_dir).ok().map(|p| {
+        let s = p.to_string_lossy().to_lowercase().replace('\\', "/");
+        s.trim_start_matches("//?/")
+            .trim_start_matches(r"\\?\")
+            .trim_end_matches('/')
+            .to_string()
+    });
     let mut matched_pids = Vec::new();
 
     // Map child PID -> parent PID to trace process lineage
@@ -670,10 +677,14 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
             || exe.contains(".antigravity_tools")
             || matches_cloned_exe;
 
+        let has_target_match = (!clean_target.is_empty() && args_str.contains(clean_target))
+            || canonical_target
+                .as_ref()
+                .map_or(false, |c| !c.is_empty() && args_str.contains(c));
+
         let is_default_candidate = is_default
             && !has_instance_marker
-            && (!has_user_data_arg
-                || (!clean_target.is_empty() && args_str.contains(clean_target)))
+            && (!has_user_data_arg || has_target_match)
             && !is_helper
             && !args_str.contains(".antigravity_tools")
             && !args_str.contains("/instances/")
@@ -681,11 +692,12 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
             && !name.contains("manager")
             && !exe.contains("manager");
 
-        if (has_user_data_arg && has_instance_marker && !is_helper)
+        if (has_target_match && !is_helper)
+            || (has_user_data_arg && has_instance_marker && !is_helper)
             || (matches_cloned_exe && !is_helper)
         {
             instance_root_pids.insert(pid_u32);
-            if args_str.contains(clean_target) || matches_cloned_exe {
+            if has_target_match || matches_cloned_exe {
                 matched_pids.push(pid_u32);
             }
         } else if is_default_candidate {
@@ -3098,8 +3110,9 @@ pub fn invalidate_instance_process_cache(instance_id: &str) {
     }
 }
 
-/// Count total distinct Antigravity IDE instances currently running on this machine
-pub fn get_instance_running_process_count() -> usize {
+/// Force refresh process cache, enumerate all instances from registry, identify live PIDs, cache them, and return actively running count
+pub fn scan_and_cache_all_running_instances() -> usize {
+    force_refresh_process_cache();
     let registry = match load_registry() {
         Ok(r) => r,
         Err(_) => return 0,
@@ -3107,12 +3120,53 @@ pub fn get_instance_running_process_count() -> usize {
     let mut running_count = 0;
     for inst in &registry.instances {
         let is_default = inst.is_default || inst.id == "default";
-        let pids = find_pids_for_data_dir(&inst.data_dir, is_default);
-        if !pids.is_empty() {
+        let mut pids = find_pids_for_data_dir(&inst.data_dir, is_default);
+        if let Some(saved_pid) = inst.pid.or_else(|| get_instance_saved_pid(&inst.id)) {
+            let is_saved_alive =
+                saved_pid > 0 && is_pid_alive_os(saved_pid) && saved_pid_matches(saved_pid);
+            if is_saved_alive && !pids.contains(&saved_pid) {
+                pids.push(saved_pid);
+            }
+        }
+        if pids.is_empty() && is_default {
+            pids = crate::modules::process::get_antigravity_pids(None);
+        }
+        let is_running = !pids.is_empty();
+        let primary_pid = pids.first().copied();
+        if is_running {
             running_count += 1;
+        }
+        if let Ok(mut cache) = INSTANCE_PROCESS_CACHE.lock() {
+            cache.insert(
+                inst.id.clone(),
+                InstanceProcessCacheItem {
+                    instance_id: inst.id.clone(),
+                    pids: pids.clone(),
+                    primary_pid,
+                    is_running,
+                    last_checked: std::time::Instant::now(),
+                },
+            );
+            if !inst.name.is_empty() && inst.name != inst.id {
+                cache.insert(
+                    inst.name.clone(),
+                    InstanceProcessCacheItem {
+                        instance_id: inst.id.clone(),
+                        pids: pids.clone(),
+                        primary_pid,
+                        is_running,
+                        last_checked: std::time::Instant::now(),
+                    },
+                );
+            }
         }
     }
     running_count
+}
+
+/// Count total distinct Antigravity IDE instances currently running on this machine
+pub fn get_instance_running_process_count() -> usize {
+    scan_and_cache_all_running_instances()
 }
 
 /// Smart check if instance process is running, using cache with PID liveness verification
@@ -3127,12 +3181,15 @@ pub fn is_instance_process_running_smart(instance_id: &str) -> (bool, Option<u32
 
     if let Some(entry) = cached_entry {
         if let Some(pid) = entry.primary_pid {
-            if is_pid_alive_os(pid) {
+            let is_alive = is_pid_alive_os(pid) && saved_pid_matches(pid);
+            if is_alive {
                 return (true, Some(pid), entry.pids);
             }
         }
         invalidate_instance_process_cache(instance_id);
     }
+
+    force_refresh_process_cache();
 
     let registry = match load_registry() {
         Ok(r) => r,
@@ -3150,7 +3207,9 @@ pub fn is_instance_process_running_smart(instance_id: &str) -> (bool, Option<u32
     let is_default_inst = inst.is_default || inst.id == "default";
     let mut pids = find_pids_for_data_dir(&inst.data_dir, is_default_inst);
     if let Some(saved_pid) = inst.pid.or_else(|| get_instance_saved_pid(instance_id)) {
-        if saved_pid > 0 && !pids.contains(&saved_pid) && is_pid_alive_os(saved_pid) {
+        let is_saved_alive =
+            saved_pid > 0 && is_pid_alive_os(saved_pid) && saved_pid_matches(saved_pid);
+        if is_saved_alive && !pids.contains(&saved_pid) {
             pids.push(saved_pid);
         }
     }
@@ -3172,6 +3231,18 @@ pub fn is_instance_process_running_smart(instance_id: &str) -> (bool, Option<u32
                 last_checked: std::time::Instant::now(),
             },
         );
+        if !inst.name.is_empty() && inst.name != instance_id {
+            cache.insert(
+                inst.name.clone(),
+                InstanceProcessCacheItem {
+                    instance_id: inst.id.clone(),
+                    pids: pids.clone(),
+                    primary_pid,
+                    is_running,
+                    last_checked: std::time::Instant::now(),
+                },
+            );
+        }
     }
 
     (is_running, primary_pid, pids)
@@ -3179,7 +3250,8 @@ pub fn is_instance_process_running_smart(instance_id: &str) -> (bool, Option<u32
 
 /// Smart ensure instance is running:
 /// Checks process cache and OS PID table. If already running, reuses without reopening.
-/// If not running or cached PID is closed, launches instance, verifies the newly spawned PID, and caches it.
+/// If not running or cached PID is closed, launches instance, waits 800ms, invalidates cache,
+/// force refreshes scan, verifies the newly spawned PID, and caches it.
 pub fn ensure_instance_running_smart(
     instance_id: &str,
     workspace_path: Option<&str>,
@@ -3214,11 +3286,12 @@ pub fn ensure_instance_running_smart(
         launch_instance(instance_id)?;
     }
 
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    std::thread::sleep(std::time::Duration::from_millis(800));
     invalidate_instance_process_cache(instance_id);
-    let (now_running, new_pid, _) = is_instance_process_running_smart(instance_id);
+    force_refresh_process_cache();
+    let (is_now_running, new_pid, _) = is_instance_process_running_smart(instance_id);
 
-    Ok((now_running, new_pid))
+    Ok((is_now_running, new_pid))
 }
 
 /// Focus an already running instance window, or launch it if not running
@@ -4099,11 +4172,24 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
         .ok_or_else(|| format!("Instance {} not found", instance_id))?;
 
     let mut system = System::new();
-    system.refresh_processes(sysinfo::ProcessesToUpdate::All);
+    let refresh_kind = sysinfo::ProcessRefreshKind::new()
+        .with_cmd(sysinfo::UpdateKind::Always)
+        .with_exe(sysinfo::UpdateKind::Always);
+    system.refresh_processes_specifics(sysinfo::ProcessesToUpdate::All, refresh_kind);
 
     // 1. Gather all candidate PIDs for THIS specific instance only
     let is_default_inst = config.is_default || instance_id == "default";
     let mut pids = find_pids_for_data_dir(&config.data_dir, is_default_inst);
+    let norm_data = config.data_dir.to_lowercase().replace('\\', "/");
+    let clean_data = norm_data.trim_end_matches('/');
+    let canonical_data = std::fs::canonicalize(&config.data_dir).ok().map(|p| {
+        let s = p.to_string_lossy().to_lowercase().replace('\\', "/");
+        s.trim_start_matches("//?/")
+            .trim_start_matches(r"\\?\")
+            .trim_end_matches('/')
+            .to_string()
+    });
+
     if let Some(saved_pid) = config.pid.or_else(|| get_instance_saved_pid(instance_id)) {
         if let Some(proc) = system.process(sysinfo::Pid::from_u32(saved_pid)) {
             let proc_name = proc.name().to_string_lossy().to_lowercase();
@@ -4120,11 +4206,13 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
                     .map(|a| a.to_string_lossy().to_lowercase().replace('\\', "/"))
                     .collect::<Vec<String>>()
                     .join(" ");
-                let norm_data = config.data_dir.to_lowercase().replace('\\', "/");
-                let clean_data = norm_data.trim_end_matches('/');
                 let inst_id_lower = instance_id.to_lowercase();
+                let is_data_match = args_str.contains(clean_data)
+                    || canonical_data
+                        .as_ref()
+                        .map_or(false, |c| !c.is_empty() && args_str.contains(c));
                 if is_default_inst
-                    || args_str.contains(clean_data)
+                    || is_data_match
                     || proc_exe.contains(&inst_id_lower)
                     || proc_name.contains(&inst_id_lower)
                 {
@@ -4140,14 +4228,15 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     }
 
     if !is_default_inst {
-        let norm_data = config.data_dir.to_lowercase().replace('\\', "/");
-        let clean_data = norm_data.trim_end_matches('/');
         let inst_id_lower = instance_id.to_lowercase();
         let inst_marker_slash = format!("instances/{}", inst_id_lower);
         let inst_marker_bslash = format!("instances\\{}", inst_id_lower);
 
         let matches_instance = |args: &str, exe_path: &str, p_name: &str| -> bool {
             args.contains(clean_data)
+                || canonical_data
+                    .as_ref()
+                    .map_or(false, |c| !c.is_empty() && args.contains(c))
                 || args.contains(&inst_marker_slash)
                 || args.contains(&inst_marker_bslash)
                 || exe_path.contains(&inst_id_lower)

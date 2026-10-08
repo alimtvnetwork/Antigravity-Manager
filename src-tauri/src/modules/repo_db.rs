@@ -3305,6 +3305,24 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
         }
 
         if prompt.instance_id != "default" && !prompt.instance_id.is_empty() {
+            if let Ok(registry) = crate::modules::instance::load_registry() {
+                if let Some(inst) = registry
+                    .instances
+                    .iter()
+                    .find(|i| i.id == prompt.instance_id || i.name == prompt.instance_id)
+                {
+                    if !inst.data_dir.trim().is_empty() {
+                        cmd.arg("--user-data-dir").arg(&inst.data_dir);
+                    }
+                    if let Some(ref acc_id) = inst.bound_account_id {
+                        if let Ok(acc) = crate::modules::account::load_account(acc_id) {
+                            cmd.env("JETSKI_OAUTH_TOKEN", &acc.token.access_token);
+                            cmd.env("GEMINI_CLI_OAUTH_TOKEN", &acc.token.access_token);
+                        }
+                    }
+                }
+            }
+
             if let Ok(inst_home) =
                 crate::modules::instance::get_instance_home_dir(&prompt.instance_id)
             {
@@ -3318,21 +3336,6 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
                 cmd.env("SSH_TTY", "pty/0");
                 cmd.env("WSL_DISTRO_NAME", "antigravity-isolated");
                 cmd.env("DOCKER_CONTAINER", "1");
-
-                if let Ok(registry) = crate::modules::instance::load_registry() {
-                    if let Some(inst) = registry
-                        .instances
-                        .iter()
-                        .find(|i| i.id == prompt.instance_id)
-                    {
-                        if let Some(ref acc_id) = inst.bound_account_id {
-                            if let Ok(acc) = crate::modules::account::load_account(acc_id) {
-                                cmd.env("JETSKI_OAUTH_TOKEN", &acc.token.access_token);
-                                cmd.env("GEMINI_CLI_OAUTH_TOKEN", &acc.token.access_token);
-                            }
-                        }
-                    }
-                }
             }
         }
 
@@ -3369,6 +3372,81 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
     }
 }
 
+/// Cross-platform helper to copy text content to system clipboard
+pub fn copy_to_system_clipboard(content: &str) {
+    if content.trim().is_empty() {
+        return;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(mut child) = std::process::Command::new("clip")
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+        {
+            if let Some(ref mut stdin) = child.stdin {
+                let _ = std::io::Write::write_all(stdin, content.as_bytes());
+            }
+            let _ = child.wait();
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(mut child) = std::process::Command::new("pbcopy")
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+        {
+            if let Some(ref mut stdin) = child.stdin {
+                let _ = std::io::Write::write_all(stdin, content.as_bytes());
+            }
+            let _ = child.wait();
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let is_wayland = std::env::var("WAYLAND_DISPLAY").is_ok();
+        let mut has_copied = false;
+        if is_wayland {
+            if let Ok(mut child) = std::process::Command::new("wl-copy")
+                .stdin(std::process::Stdio::piped())
+                .spawn()
+            {
+                if let Some(ref mut stdin) = child.stdin {
+                    let _ = std::io::Write::write_all(stdin, content.as_bytes());
+                }
+                if let Ok(status) = child.wait() {
+                    has_copied = status.success();
+                }
+            }
+        }
+        if !has_copied {
+            if let Ok(mut child) = std::process::Command::new("xclip")
+                .args(["-selection", "clipboard"])
+                .stdin(std::process::Stdio::piped())
+                .spawn()
+            {
+                if let Some(ref mut stdin) = child.stdin {
+                    let _ = std::io::Write::write_all(stdin, content.as_bytes());
+                }
+                if let Ok(status) = child.wait() {
+                    has_copied = status.success();
+                }
+            }
+        }
+        if !has_copied {
+            if let Ok(mut child) = std::process::Command::new("xsel")
+                .args(["--clipboard", "--input"])
+                .stdin(std::process::Stdio::piped())
+                .spawn()
+            {
+                if let Some(ref mut stdin) = child.stdin {
+                    let _ = std::io::Write::write_all(stdin, content.as_bytes());
+                }
+                let _ = child.wait();
+            }
+        }
+    }
+}
+
 /// Send a prompt immediately for a specific instance, verifying process liveness,
 /// caching PID, updating SQLite split DB, writing .antigravity_resume_task.json, and executing via agy.
 pub fn send_prompt_now_for_instance(
@@ -3377,6 +3455,9 @@ pub fn send_prompt_now_for_instance(
     prompt_content: &str,
     conversation_id: Option<&str>,
 ) -> Result<ActivePrompt, String> {
+    crate::modules::instance::scan_and_cache_all_running_instances();
+    copy_to_system_clipboard(prompt_content);
+
     let clean_inst = if instance_id.trim().is_empty() || instance_id == "__default__" {
         "default"
     } else {
@@ -3462,6 +3543,9 @@ pub fn enqueue_prompt_for_instance(
     prompt_content: &str,
     conversation_id: Option<&str>,
 ) -> Result<ActivePrompt, String> {
+    crate::modules::instance::scan_and_cache_all_running_instances();
+    copy_to_system_clipboard(prompt_content);
+
     let clean_inst = if instance_id.trim().is_empty() || instance_id == "__default__" {
         "default"
     } else {
@@ -3857,16 +3941,13 @@ pub fn auto_resume_recent_prompts(
             }
         }
 
-        let (prompt_id, prompt_text, prompt_model, image_payload) = match maybe_prompt {
-            Some((id, content, model, img)) => (id, content, model, img),
-            None => {
-                let new_id = Uuid::new_v4().to_string();
-                let content = format!(
-                    "Resume active project workspace for '{}' [{}] after IDE crash recovery",
-                    project.repo_name, project.repo_path
-                );
-                (new_id, content, Some("gemini-pro".to_string()), None)
-            }
+        let Some((prompt_id, prompt_text, prompt_model, image_payload)) = maybe_prompt else {
+            crate::modules::logger::log_info(&format!(
+                "[RepoDB] auto_resume_recent_prompts skipping idle workspace '{}' (no prompt found)",
+                project.repo_path
+            ));
+            skipped_count += 1;
+            continue;
         };
 
         let sig = format!("{}:{}", project.repo_path, prompt_text.trim());
@@ -5384,12 +5465,85 @@ fn compute_project_conversation_tree(
                     continue;
                 }
 
+                let has_active_worker = if let Ok(workers) = get_active_agy_workers().lock() {
+                    let clean_target = normalize_path_for_compare(&proj.repo_path);
+                    workers.iter().any(|(key, &wpid)| {
+                        let (w_inst, w_path) = match key.split_once(':') {
+                            Some((inst, path)) => (inst, path),
+                            None => ("", key.as_str()),
+                        };
+                        let is_inst_match =
+                            if proj.instance_id == "default" || proj.instance_id == "__default__" {
+                                w_inst == "default" || w_inst == "__default__"
+                            } else {
+                                w_inst.eq_ignore_ascii_case(&proj.instance_id)
+                            };
+                        let is_path_match = !clean_target.is_empty()
+                            && normalize_path_for_compare(w_path) == clean_target;
+                        if is_inst_match && is_path_match && wpid > 0 {
+                            crate::modules::instance::is_pid_alive_os(wpid)
+                        } else {
+                            false
+                        }
+                    })
+                } else {
+                    false
+                };
+
+                let has_non_idle_summary = if let Some(ref session_id) = ap.session_id {
+                    let mut is_non_idle = false;
+                    for (owning_inst_id, base) in &candidate_dirs {
+                        let norm_owning =
+                            if owning_inst_id == "__default__" || owning_inst_id.is_empty() {
+                                "default"
+                            } else {
+                                owning_inst_id.as_str()
+                            };
+                        if norm_owning == norm_proj_inst || norm_owning == proj.instance_id {
+                            let s_db = base.join("conversation_summaries.db");
+                            if s_db.exists() {
+                                if let Ok(s_conn) = Connection::open_with_flags(
+                                    &s_db,
+                                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                                        | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+                                ) {
+                                    let _ = s_conn.pragma_update(None, "busy_timeout", 1000);
+                                    let query = "SELECT status, not_fully_idle FROM conversation_summaries WHERE conversation_id = ?1 LIMIT 1";
+                                    if let Ok((sum_status, not_idle)) =
+                                        s_conn.query_row(query, [session_id], |row| {
+                                            Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
+                                        })
+                                    {
+                                        let has_idle_marker = sum_status.contains("IDLE")
+                                            || sum_status.contains("COMPLETED")
+                                            || sum_status.contains("FAILED")
+                                            || sum_status.contains("CANCELLED");
+                                        if sum_status.contains("RUNNING")
+                                            && not_idle > 0
+                                            && !has_idle_marker
+                                        {
+                                            is_non_idle = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    is_non_idle
+                } else {
+                    false
+                };
+
+                let has_confirmed_running = has_active_worker || has_non_idle_summary;
+
                 let is_ap_queued = ap.status == "queued" || ap.status == "pending";
                 let is_run = is_inst_alive
                     && (ap.status == "running"
                         || ap.status == "in_flight"
                         || ap.status == "dispatched")
-                    && (now - ap.updated_at <= 600);
+                    && (now - ap.updated_at <= 600)
+                    && has_confirmed_running;
                 if only_running && !is_run {
                     continue;
                 }
@@ -5474,6 +5628,11 @@ fn compute_project_conversation_tree(
                         "RUNNING".to_string()
                     } else if is_ap_queued {
                         "QUEUED".to_string()
+                    } else if ap.status == "running"
+                        || ap.status == "dispatched"
+                        || ap.status == "in_flight"
+                    {
+                        "IDLE".to_string()
                     } else {
                         ap.status.to_uppercase()
                     },
@@ -6119,7 +6278,7 @@ pub fn format_tree_view_cli(max_words: usize, only_running: bool) -> String {
     for proj in &tree {
         let proj_badge = if proj.is_running { "🟢" } else { "⚪" };
         let label =
-            format_friendly_workspace_label(&proj.repo_name, &proj.project_id, &proj.repo_path);
+            format_friendly_workspace_label(&proj.project_id, &proj.repo_name, &proj.repo_path);
         let inst_seq_str = proj
             .instance_seq_num
             .map(|n| format!("#{} ", n))
@@ -6221,7 +6380,7 @@ pub fn format_tree_view_telegram_html(max_words: usize, only_running: bool) -> S
     for proj in &tree {
         let p_icon = if proj.is_running { "🟢" } else { "⚪" };
         let label =
-            format_friendly_workspace_label(&proj.repo_name, &proj.project_id, &proj.repo_path);
+            format_friendly_workspace_label(&proj.project_id, &proj.repo_name, &proj.repo_path);
         let inst_seq_str = proj
             .instance_seq_num
             .map(|n| format!("#{} ", n))

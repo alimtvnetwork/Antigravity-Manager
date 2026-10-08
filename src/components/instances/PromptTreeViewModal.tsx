@@ -116,9 +116,31 @@ type ViewMode = 'preview' | 'raw' | 'edit';
 
 // Helper to format clean, compact sequence badge without heavy bracket clutter
 function formatDualBadge(agmCode: string | undefined, defaultAgm: string, gmCode: string | undefined, defaultGm: string): string {
-    const raw = agmCode || defaultAgm || gmCode || defaultGm;
-    const clean = raw.replace(/^(AGM:|GM:)/i, '').trim();
-    return clean.startsWith('#') || clean.startsWith('P') || clean.startsWith('C') ? clean : `#${clean}`;
+    const combined = `${agmCode || ''} ${gmCode || ''}`;
+    const gmMatch = combined.match(/GM:#(\d+)/i);
+    if (gmMatch) {
+        return `#${gmMatch[1]}`;
+    }
+    const rawGm = (gmCode || defaultGm || '').replace(/[\[\]]/g, '').trim();
+    if (rawGm.startsWith('GM:#')) {
+        return rawGm.slice(3);
+    }
+    if (rawGm.startsWith('#')) {
+        return rawGm;
+    }
+    const rawAgm = (agmCode || defaultAgm || '').replace(/[\[\]]/g, '').trim();
+    if (rawAgm) {
+        const agmMatch = rawAgm.match(/(?:AGM:)?([PC]\d+)/i);
+        if (agmMatch) {
+            return agmMatch[1].toUpperCase();
+        }
+        const cleanAgm = rawAgm.replace(/^(AGM:)/i, '').trim();
+        if (cleanAgm) {
+            return cleanAgm;
+        }
+    }
+    const cleanGm = rawGm.replace(/^(GM:)/i, '').trim();
+    return cleanGm.startsWith('#') || cleanGm.startsWith('P') || cleanGm.startsWith('C') ? cleanGm : `#${cleanGm}`;
 }
 
 // Helper to count words
@@ -223,7 +245,7 @@ export function TruncatedContextCallout({
         >
             <div className="flex items-center gap-2 font-mono font-medium">
                 <span className="text-amber-500 text-sm">⚡</span>
-                <span>[Omitted {formattedSize} of transcript context - Click to inspect/expand]</span>
+                <span>Omitted {formattedSize} transcript context · Click to expand</span>
             </div>
             {onExpandFull && (
                 <button
@@ -602,7 +624,7 @@ function parseInlineMarkdown(text: string, onToggleExpand?: () => void): React.R
                     title={`Omitted ${truncCount} ${truncUnit} from prompt transcript context - Click to inspect/expand`}
                 >
                     <span className="text-amber-500 font-bold">⚡</span>
-                    <span>[Omitted {formattedSize} of transcript context - Click to inspect/expand]</span>
+                    <span>Omitted {formattedSize} transcript context · Click to expand</span>
                 </span>
             );
         } else if (imgSrc !== undefined) {
@@ -1709,13 +1731,6 @@ export default function PromptTreeViewModal({
             try {
                 await navigator.clipboard.writeText(promptContent);
             } catch {}
-
-            // 3. Focus or launch IDE instance window (re-uses existing without duplicate launch)
-            try {
-                await focusOrLaunchInstance(targetInstId, repoPath);
-            } catch (focusErr) {
-                console.warn('focusOrLaunchInstance error', focusErr);
-            }
 
             setActionMsg("Prompt Dispatched & Focused IDE (via Hotkey 'N' / Send Now)!");
             setTimeout(() => setActionMsg(null), 3500);
@@ -2884,7 +2899,7 @@ ${activePromptText}
                                         {/* Left: Sequence + Tier Badge + Status + Title + Instance Trio */}
                                         <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                                             <span className="inline-flex items-center px-1.5 py-0.5 rounded-[5px] text-[10px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20">
-                                                #{selectedConversation.seq_code || 'P001'}
+                                                {selectedConversation.seq_code || 'P001'}
                                             </span>
                                             {(() => {
                                                 const tierInfo = classifyPromptTier(activePromptText, selectedConversation.title);

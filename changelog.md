@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.166.0] - 2026-10-09
+
+### Added
+- 3-step smart instance process caching with closed-PID OS re-scan and multi-instance process counting
+- Reliable prompt dispatch via `--user-data-dir` socket alignment and cross-platform clipboard synchronization
+- Prompt Tree View bracket de-cluttering, sequence code styling, and clean context omission banners
+- Ghost running state eradication via active worker confirmation and removal of synthetic crash prompts
+- Full CLI parity for `agm prompts` (`ls`, `tree`, `send`, `enqueue`, `backup`, `restore`) and `agm doctor`
+
+---
+
 ## [v4.165.0] - 2026-10-09
 
 ### Added
@@ -72,6 +83,20 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.166.0 (2026-10-09)**:
+        -   **[Smart Process Caching & Prompt Dispatch Architecture]**:
+            -   **3-Step Smart Process Caching**: Implemented host-wide instance process enumeration (`scan_and_cache_all_running_instances`), verifying live PIDs against OS state before dispatch and invalidating stale caches on process exit. (Thanks to @aukgit)
+            -   **Closed-PID OS Re-Scan & Rerun**: Fortified `is_instance_process_running_smart` to re-scan the OS process table when a cached PID dies, launching the IDE only when verified not running. (Thanks to @aukgit)
+            -   **Profile Socket Alignment & Clipboard Sync**: Injected `--user-data-dir` in `spawn_prompt_via_agy` to ensure headless CLI dispatches connect directly to cloned instance sockets, accompanied by automatic system clipboard synchronization. (Thanks to @aukgit)
+            -   **Double-Launch Race Elimination**: Removed duplicate `focusOrLaunchInstance` in `PromptTreeViewModal.tsx`, preventing secondary background IDE launches. (Thanks to @aukgit)
+        -   **[Prompt Tree View De-cluttering & Ghost Running Eradication]**:
+            -   **Bracket Noise Elimination**: Replaced cumbersome bracketed tokens (`[AGM:P006 | GM:#6]`, `[AGM:C025 | GM:antigrav]`) with clean, minimalist `#6`, `P006`, and `C025` badges and borderless omission banners. (Thanks to @aukgit)
+            -   **Ghost Running Elimination**: Eradicated synthetic crash-recovery prompt manufacturing in `auto_resume_recent_prompts`, requiring empirical active worker validation before displaying active running states. (Thanks to @aukgit)
+        -   **[CLI Parity for Prompts Management & System Health]**:
+            -   **AGM Prompts Subcommands**: Added CLI routing and handlers for `agm prompts ls`, `tree`, `send`, `enqueue`, `backup`, and `restore` with complete `--json` and human-readable terminal table output. (Thanks to @aukgit)
+            -   **AGM Doctor Diagnostic Engine**: Added `agm doctor` system health checker evaluating nodes, proxy gateways, database connectivity, and running Antigravity processes. (Thanks to @aukgit)
+
+
     *   **v4.165.0 (2026-10-09)**:
         -   **[Smart Instance Process Cache & Anti-Restart Reliability]**:
             -   **Process Vitality Verification**: Implemented thread-safe `INSTANCE_PROCESS_CACHE` and OS PID verification (`libc::kill(pid, 0)` on Unix, `sysinfo` on Windows) to verify instance process state before dispatch or focus. (Thanks to @aukgit)
