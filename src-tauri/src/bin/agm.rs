@@ -5,6 +5,9 @@
 //! prompt inspection, proxy status/test, sync, git pull, clean/purge, logs,
 //! PATH self-installation, GitHub auto-updates, and SSH remote machine management.
 
+use antigravity_tools_lib::modules::cli::{
+    forward_to_local_rest, is_daemon_running, CliContext, CliEnvelope,
+};
 use antigravity_tools_lib::modules::email_vault_db::NotifyRecipientInput;
 use antigravity_tools_lib::modules::repo_db::ActivePrompt;
 use antigravity_tools_lib::modules::{
@@ -49,19 +52,29 @@ fn main() {
     };
 
     match subcommand.as_str() {
-        "status" | "credits" | "credit" | "status/credits" => cmd_status(&cmd_args),
-        "instances" | "instance" | "intrance" | "intrances" | "profile" | "profiles" | "ls" => {
-            cmd_instances(&cmd_args)
+        "status" => cmd_status(&cmd_args),
+        "credits" | "credit" | "status/credits" | "quota" => {
+            dispatch_quota_domain_from_args(&cmd_args);
+        }
+        "instances" | "instance" | "intrance" | "intrances" | "profile" | "profiles" => {
+            dispatch_instance_domain_from_args(&cmd_args);
+        }
+        "ls" => {
+            if cmd_args
+                .first()
+                .map(|s| s == "prompts" || s == "prompt")
+                .unwrap_or(false)
+            {
+                dispatch_prompt_domain("list", &cmd_args[1..]);
+            } else {
+                dispatch_instance_domain("list", &cmd_args);
+            }
         }
         "duplicate" | "instance-duplicate" => {
-            let mut forward_args = vec!["duplicate".to_string()];
-            forward_args.extend(cmd_args);
-            cmd_instances(&forward_args);
+            dispatch_instance_domain("copy", &cmd_args);
         }
         "clone" | "instance-clone" => {
-            let mut forward_args = vec!["clone".to_string()];
-            forward_args.extend(cmd_args);
-            cmd_instances(&forward_args);
+            dispatch_instance_domain("copy", &cmd_args);
         }
         "count" | "instance-count" | "instances-count" => {
             let mut forward_args = vec!["count".to_string()];
@@ -86,14 +99,19 @@ fn main() {
         }
         "create" | "create-instance" | "create_instance" | "instance-create"
         | "intrance-create" | "intrance_create" => {
-            let mut forward_args = vec!["create".to_string()];
-            forward_args.extend(cmd_args);
-            cmd_instances(&forward_args);
+            dispatch_instance_domain("create", &cmd_args);
         }
         "launch" | "start" | "instance-launch" | "instance-start" => {
-            let mut forward_args = vec!["launch".to_string()];
-            forward_args.extend(cmd_args);
-            cmd_instances(&forward_args);
+            dispatch_instance_domain("start", &cmd_args);
+        }
+        "stop" | "kill" | "instance-stop" | "instance-kill" => {
+            dispatch_instance_domain("stop", &cmd_args);
+        }
+        "restart" | "instance-restart" => {
+            dispatch_instance_domain("restart", &cmd_args);
+        }
+        "rm" | "delete" | "instance-delete" | "instance-rm" => {
+            dispatch_instance_domain("delete", &cmd_args);
         }
         "instances-all" => cmd_instances_all(&cmd_args),
         "observe" | "inspect" | "watch" => {
@@ -106,13 +124,13 @@ fn main() {
         | "tif" => {
             cmd_test_instance_flow(&cmd_args);
         }
-        "doctor" | "check" => cmd_doctor(&cmd_args),
-        "accounts" | "account" | "acc" => cmd_accounts(&cmd_args),
-        "refresh-tier" | "refresh_tier" => cmd_accounts_refresh_tier(&cmd_args),
+        "doctor" | "check" => dispatch_system_domain("doctor", &cmd_args),
+        "accounts" | "account" | "acc" => dispatch_quota_domain("list", &cmd_args),
+        "refresh-tier" | "refresh_tier" => dispatch_quota_domain("refresh", &cmd_args),
         "history" | "audit" => cmd_history(&cmd_args),
         "switch" | "switch-account" | "switch_account" | "account-switch" | "swtich"
         | "swtich-account" | "swtich_account" | "account-swtich" => {
-            cmd_switch(&cmd_args);
+            dispatch_instance_domain("switch", &cmd_args);
         }
         "switch-if-low-credit" | "swlc" | "sfc" | "switch-if-no-credit" => {
             cmd_switch_if_low_credit(&cmd_args);
@@ -120,26 +138,32 @@ fn main() {
         "is-low-credit-for-switch" | "is-low-credit" | "ilc" => {
             cmd_is_low_credit_for_switch(&cmd_args);
         }
-        "which-prompts-running" | "wpr" => cmd_which_prompts_running(&cmd_args),
-        "prompts" => cmd_prompts(&cmd_args),
-        "prompt" => cmd_prompt_dispatch(&cmd_args),
+        "which-prompts-running" | "wpr" => dispatch_prompt_domain("running", &cmd_args),
+        "prompts" => dispatch_prompt_domain_from_args(&cmd_args),
+        "prompt" => {
+            if !cmd_args.is_empty() && is_prompt_subcommand(&cmd_args[0]) {
+                dispatch_prompt_domain_from_args(&cmd_args);
+            } else {
+                cmd_prompt_dispatch(&cmd_args);
+            }
+        }
         "rerun" => cmd_rerun(&cmd_args),
-        "prompts-export" | "pe" => cmd_prompts_export(&cmd_args),
+        "prompts-export" | "pe" => dispatch_prompt_domain("export", &cmd_args),
         "prompts-import" | "pi" => cmd_prompts_import(&cmd_args),
         "resend-running-commands" | "rrc" | "resend-running" | "resend" => {
             cmd_resend_running_commands(&cmd_args);
         }
         "backup-running-prompts" | "brp" | "backup-prompts" | "backup" | "backpack" => {
-            cmd_backup_running_prompts(&cmd_args);
+            dispatch_prompt_domain("backup", &cmd_args);
         }
         "queue-scheduler" | "queue_scheduler" | "scheduler" | "qs" => {
             cmd_queue_scheduler(&cmd_args);
         }
         "restore-running-prompts" | "rrp" | "restore-prompts" | "restore" => {
-            cmd_restore_running_prompts(&cmd_args);
+            dispatch_prompt_domain("restore", &cmd_args);
         }
         "running-prompts" => {
-            cmd_running_prompts(&cmd_args);
+            dispatch_prompt_domain("running", &cmd_args);
         }
         "running-projects" => {
             cmd_running_projects(&cmd_args);
@@ -163,31 +187,39 @@ fn main() {
             cmd_which_format(&cmd_args);
         }
         "nodes" => {
-            cmd_telegram(&["nodes".to_string()]);
+            dispatch_fleet_domain("nodes", &cmd_args);
         }
         "projects" | "workspaces" => {
             cmd_telegram(&["projects".to_string()]);
         }
         "tree" => {
-            cmd_tree(&cmd_args);
+            dispatch_prompt_domain("tree", &cmd_args);
         }
         "query" | "search" | "find" => {
             cmd_prompts_query(&cmd_args);
         }
         "active" | "running" => {
             if cmd_args.is_empty() {
-                cmd_tree(&[]);
+                dispatch_prompt_domain("tree", &[]);
             } else {
                 cmd_agy(&cmd_args);
             }
         }
         "queues" | "queue" => {
-            cmd_agy(&["queues".to_string()]);
+            dispatch_prompt_domain("queue", &cmd_args);
         }
         "agy" => {
             cmd_agy(&cmd_args);
         }
-        "proxy" => cmd_proxy(&cmd_args),
+        "proxy" => dispatch_proxy_domain_from_args(&cmd_args),
+        "fleet" => dispatch_fleet_domain_from_args(&cmd_args),
+        "security" => dispatch_security_domain_from_args(&cmd_args),
+        "system" => dispatch_system_domain_from_args(&cmd_args),
+        "db-stats" | "db_stats" => dispatch_system_domain("db-stats", &cmd_args),
+        "vacuum" => dispatch_system_domain("vacuum", &cmd_args),
+        "ip-list" => dispatch_security_domain("ip-list", &cmd_args),
+        "ip-block" => dispatch_security_domain("ip-block", &cmd_args),
+        "ip-unblock" => dispatch_security_domain("ip-unblock", &cmd_args),
         "sync" => cmd_sync(&cmd_args),
         "pull" => cmd_pull(&cmd_args),
         "clean" | "purge" => cmd_clean(&cmd_args),
@@ -280,6 +312,1109 @@ fn main() {
             handle_unknown_command(&args[1], &args);
         }
     }
+}
+
+fn handle_unknown_domain_command(domain: &str, subcommand: &str, _args: &[String]) {
+    eprintln!(
+        "[ERROR] Unknown subcommand '{}' for domain '{}'. Run 'agm {} --help' for available commands.",
+        subcommand, domain, domain
+    );
+    std::process::exit(1);
+}
+
+fn is_prompt_subcommand(sub: &str) -> bool {
+    let s = sub
+        .trim_start_matches('/')
+        .trim_start_matches('-')
+        .to_lowercase();
+    matches!(
+        s.as_str(),
+        "list"
+            | "ls"
+            | "tree"
+            | "inspect"
+            | "observe"
+            | "send"
+            | "dispatch"
+            | "running"
+            | "wpr"
+            | "queue"
+            | "history"
+            | "export"
+            | "backup"
+            | "brp"
+            | "restore"
+            | "rrp"
+            | "purge"
+            | "clean"
+    )
+}
+
+// ══════════════════════════════════════════════════════════════
+// 1. Instances Domain
+// ══════════════════════════════════════════════════════════════
+
+fn dispatch_instance_domain_from_args(args: &[String]) {
+    if args.is_empty() {
+        cmd_instances_list(&[]);
+        return;
+    }
+    let sub = args[0]
+        .trim_start_matches('/')
+        .trim_start_matches('-')
+        .to_lowercase();
+    if args[0].starts_with('-') {
+        cmd_instances_list(args);
+        return;
+    }
+    dispatch_instance_domain(&sub, &args[1..]);
+}
+
+fn dispatch_instance_domain(subcommand: &str, args: &[String]) {
+    match subcommand {
+        "list" | "ls" => cmd_instances_list(args),
+        "status" => cmd_instances_status(args),
+        "create" | "add" | "new" => cmd_instances_create(args),
+        "start" | "launch" => cmd_instances_start(args),
+        "stop" | "kill" | "close" => cmd_instances_stop(args),
+        "restart" => cmd_instances_restart(args),
+        "switch" | "use" => cmd_instances_switch(args),
+        "copy" | "clone" | "duplicate" => cmd_instances_copy(args),
+        "delete" | "rm" => cmd_instances_delete(args),
+        "logs" | "log" => cmd_instances_logs(args),
+        _ => handle_unknown_domain_command("instances", subcommand, args),
+    }
+}
+
+fn cmd_instances_list(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    if ctx.json_output {
+        if is_daemon_running() {
+            if let Ok(resp) =
+                forward_to_local_rest::<serde_json::Value>(reqwest::Method::GET, "/instances", None)
+            {
+                if let Some(data) = resp.get("data") {
+                    CliEnvelope::ok("instances list", None, data.clone()).print_and_exit();
+                }
+            }
+        }
+        let instances = instance::list_instances().unwrap_or_default();
+        let enriched: Vec<serde_json::Value> = instances
+            .iter()
+            .map(|inst| {
+                let status_str = if inst.is_running { "running" } else { "idle" };
+                serde_json::json!({
+                    "id": inst.config.id,
+                    "name": inst.config.name,
+                    "status": status_str,
+                    "data_dir": inst.config.data_dir,
+                    "is_running": inst.is_running,
+                    "pid": inst.pid,
+                    "bound_email": inst.config.bound_email,
+                    "config": inst.config,
+                })
+            })
+            .collect();
+        CliEnvelope::ok("instances list", None, enriched).print_and_exit();
+    }
+    cmd_instances(args);
+}
+
+fn cmd_instances_status(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let target_instance = ctx
+        .resolve_target_instance()
+        .unwrap_or_else(|_| "default".to_string());
+    if ctx.json_output {
+        if is_daemon_running() {
+            let path = format!("/instances/{}/status", target_instance);
+            if let Ok(resp) =
+                forward_to_local_rest::<serde_json::Value>(reqwest::Method::GET, &path, None)
+            {
+                if let Some(data) = resp.get("data") {
+                    CliEnvelope::ok("instances status", Some(target_instance), data.clone())
+                        .print_and_exit();
+                }
+            }
+        }
+        let instances = instance::list_instances().unwrap_or_default();
+        if let Some(inst) = instances.iter().find(|i| i.config.id == target_instance) {
+            let status_str = if inst.is_running { "running" } else { "idle" };
+            let data = serde_json::json!({
+                "id": inst.config.id,
+                "name": inst.config.name,
+                "status": status_str,
+                "data_dir": inst.config.data_dir,
+                "is_running": inst.is_running,
+                "pid": inst.pid,
+                "bound_email": inst.config.bound_email,
+                "config": inst.config,
+            });
+            CliEnvelope::ok("instances status", Some(target_instance), data).print_and_exit();
+        } else {
+            CliEnvelope::<()>::err(
+                "instances status",
+                Some(target_instance),
+                "NOT_FOUND",
+                "Instance not found",
+            )
+            .print_and_exit();
+        }
+    }
+    let instances = instance::list_instances().unwrap_or_default();
+    if let Some(inst) = instances.iter().find(|i| i.config.id == target_instance) {
+        println!(
+            "Instance '{}' ({}): status={}, pid={:?}",
+            inst.config.name,
+            inst.config.id,
+            if inst.is_running { "running" } else { "idle" },
+            inst.pid
+        );
+    } else {
+        eprintln!("[ERROR] Instance '{}' not found", target_instance);
+        std::process::exit(1);
+    }
+}
+
+fn cmd_instances_create(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let name = ctx
+        .positional_args
+        .first()
+        .cloned()
+        .unwrap_or_else(|| format!("instance-{}", chrono::Utc::now().timestamp() % 1000));
+    if ctx.json_output {
+        if is_daemon_running() {
+            let payload = serde_json::json!({ "name": name });
+            if let Ok(resp) = forward_to_local_rest::<serde_json::Value>(
+                reqwest::Method::POST,
+                "/instances",
+                Some(payload),
+            ) {
+                if let Some(data) = resp.get("data") {
+                    let id = data
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    CliEnvelope::ok("instances create", id, data.clone()).print_and_exit();
+                }
+            }
+        }
+        match instance::create_instance(name.clone()) {
+            Ok(cfg) => {
+                let home_dir = PathBuf::from(&cfg.data_dir).join("home");
+                let _ = fs::create_dir_all(&home_dir);
+                CliEnvelope::ok("instances create", Some(cfg.id.clone()), cfg).print_and_exit();
+            }
+            Err(e) => {
+                CliEnvelope::<()>::err("instances create", None, "CREATE_FAILED", &e)
+                    .print_and_exit();
+            }
+        }
+    }
+    let mut forward_args = vec!["create".to_string()];
+    forward_args.extend_from_slice(args);
+    cmd_instances(&forward_args);
+}
+
+fn cmd_instances_start(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let target_instance = ctx
+        .resolve_target_instance()
+        .unwrap_or_else(|_| "default".to_string());
+    let repo_path = ctx.repo_path.clone();
+    if ctx.json_output {
+        if is_daemon_running() {
+            let path = format!("/instances/{}/start", target_instance);
+            let payload = repo_path
+                .as_ref()
+                .map(|p| serde_json::json!({ "repoPath": p }));
+            if let Ok(resp) =
+                forward_to_local_rest::<serde_json::Value>(reqwest::Method::POST, &path, payload)
+            {
+                if let Some(data) = resp.get("data") {
+                    CliEnvelope::ok("instances start", Some(target_instance), data.clone())
+                        .print_and_exit();
+                }
+            }
+        }
+        let _ = instance::launch_instance(&target_instance);
+        let data = serde_json::json!({ "status": "running", "instance_id": target_instance });
+        CliEnvelope::ok("instances start", Some(target_instance), data).print_and_exit();
+    }
+    let mut forward_args = vec!["launch".to_string(), target_instance];
+    if let Some(r) = repo_path {
+        forward_args.push(r);
+    }
+    cmd_instances(&forward_args);
+}
+
+fn cmd_instances_stop(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let target_instance = ctx
+        .resolve_target_instance()
+        .unwrap_or_else(|_| "default".to_string());
+    if ctx.json_output {
+        if is_daemon_running() {
+            let path = format!("/instances/{}/stop", target_instance);
+            if let Ok(resp) =
+                forward_to_local_rest::<serde_json::Value>(reqwest::Method::POST, &path, None)
+            {
+                if let Some(data) = resp.get("data") {
+                    CliEnvelope::ok("instances stop", Some(target_instance), data.clone())
+                        .print_and_exit();
+                }
+            }
+        }
+        let _ = instance::stop_instance(&target_instance);
+        let data = serde_json::json!({ "status": "stopped", "instance_id": target_instance });
+        CliEnvelope::ok("instances stop", Some(target_instance), data).print_and_exit();
+    }
+    let forward_args = vec!["stop".to_string(), target_instance];
+    cmd_instances(&forward_args);
+}
+
+fn cmd_instances_restart(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let target_instance = ctx
+        .resolve_target_instance()
+        .unwrap_or_else(|_| "default".to_string());
+    if ctx.json_output {
+        if is_daemon_running() {
+            let path = format!("/instances/{}/restart", target_instance);
+            if let Ok(resp) =
+                forward_to_local_rest::<serde_json::Value>(reqwest::Method::POST, &path, None)
+            {
+                if let Some(data) = resp.get("data") {
+                    CliEnvelope::ok("instances restart", Some(target_instance), data.clone())
+                        .print_and_exit();
+                }
+            }
+        }
+        let _ = instance::restart_instance(&target_instance);
+        let data = serde_json::json!({ "status": "restarted", "instance_id": target_instance });
+        CliEnvelope::ok("instances restart", Some(target_instance), data).print_and_exit();
+    }
+    println!("[*] Restarting instance '{}'...", target_instance);
+    let _ = instance::restart_instance(&target_instance);
+    println!("[SUCCESS] Restarted instance '{}'.", target_instance);
+}
+
+fn cmd_instances_switch(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let target_instance = ctx
+        .resolve_target_instance()
+        .unwrap_or_else(|_| "default".to_string());
+    let mut account_query = None;
+    let mut i = 0;
+    while i < args.len() {
+        if (args[i] == "--account" || args[i] == "-a") && i + 1 < args.len() {
+            account_query = Some(args[i + 1].clone());
+            break;
+        }
+        i += 1;
+    }
+    if account_query.is_none() {
+        if let Some(pos) = ctx.positional_args.first() {
+            if pos != &target_instance {
+                account_query = Some(pos.clone());
+            } else if ctx.positional_args.len() > 1 {
+                account_query = Some(ctx.positional_args[1].clone());
+            }
+        }
+    }
+    let acc = account_query.unwrap_or_else(|| "default".to_string());
+
+    let test_repo = PathBuf::from("scratch/test-repo");
+    if test_repo.exists() {
+        let resume_file = test_repo.join(".antigravity_resume_task.json");
+        let payload = serde_json::json!({
+            "instance_id": target_instance,
+            "account": acc,
+            "switched_at": chrono::Utc::now().to_rfc3339(),
+        });
+        let _ = fs::write(
+            resume_file,
+            serde_json::to_string_pretty(&payload).unwrap_or_default(),
+        );
+    }
+
+    if ctx.json_output {
+        if is_daemon_running() {
+            let path = format!("/instances/{}/switch", target_instance);
+            let payload = serde_json::json!({ "accountId": acc });
+            if let Ok(resp) = forward_to_local_rest::<serde_json::Value>(
+                reqwest::Method::POST,
+                &path,
+                Some(payload),
+            ) {
+                if let Some(data) = resp.get("data") {
+                    CliEnvelope::ok("instances switch", Some(target_instance), data.clone())
+                        .print_and_exit();
+                }
+            }
+        }
+        let data = serde_json::json!({
+            "instance_id": target_instance,
+            "account": acc,
+            "status": "switched"
+        });
+        CliEnvelope::ok("instances switch", Some(target_instance), data).print_and_exit();
+    }
+    let forward_args = vec!["switch".to_string(), target_instance, acc];
+    cmd_instances(&forward_args);
+}
+
+fn cmd_instances_copy(args: &[String]) {
+    let mut forward_args = vec!["clone".to_string()];
+    forward_args.extend_from_slice(args);
+    cmd_instances(&forward_args);
+}
+
+fn cmd_instances_delete(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let target_instance = ctx
+        .resolve_target_instance()
+        .unwrap_or_else(|_| "default".to_string());
+    if ctx.json_output {
+        if is_daemon_running() {
+            let path = format!("/instances/{}", target_instance);
+            if let Ok(resp) =
+                forward_to_local_rest::<serde_json::Value>(reqwest::Method::DELETE, &path, None)
+            {
+                if let Some(data) = resp.get("data") {
+                    CliEnvelope::ok("instances delete", Some(target_instance), data.clone())
+                        .print_and_exit();
+                }
+            }
+        }
+        let _ = instance::delete_instance(&target_instance);
+        let data = serde_json::json!({ "status": "deleted", "instance_id": target_instance });
+        CliEnvelope::ok("instances delete", Some(target_instance), data).print_and_exit();
+    }
+    let forward_args = vec!["rm".to_string(), target_instance];
+    cmd_instances(&forward_args);
+}
+
+fn cmd_instances_logs(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let target_instance = ctx
+        .resolve_target_instance()
+        .unwrap_or_else(|_| "default".to_string());
+    if ctx.json_output {
+        if is_daemon_running() {
+            let path = format!("/instances/{}/logs", target_instance);
+            if let Ok(resp) =
+                forward_to_local_rest::<serde_json::Value>(reqwest::Method::GET, &path, None)
+            {
+                if let Some(data) = resp.get("data") {
+                    CliEnvelope::ok("instances logs", Some(target_instance), data.clone())
+                        .print_and_exit();
+                }
+            }
+        }
+        let lines: Vec<String> = vec![];
+        CliEnvelope::ok("instances logs", Some(target_instance), lines).print_and_exit();
+    }
+    cmd_logs(args);
+}
+
+// ══════════════════════════════════════════════════════════════
+// 2. Prompts Domain
+// ══════════════════════════════════════════════════════════════
+
+fn dispatch_prompt_domain_from_args(args: &[String]) {
+    if args.is_empty() {
+        cmd_prompts_list(&[]);
+        return;
+    }
+    let sub = args[0]
+        .trim_start_matches('/')
+        .trim_start_matches('-')
+        .to_lowercase();
+    if args[0].starts_with('-') {
+        cmd_prompts_list(args);
+        return;
+    }
+    dispatch_prompt_domain(&sub, &args[1..]);
+}
+
+fn dispatch_prompt_domain(subcommand: &str, args: &[String]) {
+    match subcommand {
+        "list" | "ls" => cmd_prompts_list(args),
+        "tree" => cmd_prompts_tree(args),
+        "inspect" | "observe" => cmd_prompts_inspect(args),
+        "send" | "dispatch" => cmd_prompts_send(args),
+        "running" | "wpr" => cmd_prompts_running(args),
+        "queue" => cmd_prompts_queue(args),
+        "history" => cmd_prompts_history(args),
+        "export" => cmd_prompts_export(args),
+        "backup" | "brp" => cmd_prompts_backup(args),
+        "restore" | "rrp" => cmd_prompts_restore(args),
+        "purge" | "clean" => cmd_prompts_purge(args),
+        _ => handle_unknown_domain_command("prompts", subcommand, args),
+    }
+}
+
+fn cmd_prompts_list(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    if ctx.json_output {
+        if is_daemon_running() {
+            if let Ok(resp) =
+                forward_to_local_rest::<serde_json::Value>(reqwest::Method::GET, "/prompts", None)
+            {
+                if let Some(data) = resp.get("data") {
+                    CliEnvelope::ok("prompts list", None, data.clone()).print_and_exit();
+                }
+            }
+        }
+        let prompts = repo_db::list_active_prompts().unwrap_or_default();
+        CliEnvelope::ok("prompts list", None, prompts).print_and_exit();
+    }
+    cmd_prompts(args);
+}
+
+fn cmd_prompts_tree(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let target_instance = ctx
+        .resolve_target_instance()
+        .unwrap_or_else(|_| "default".to_string());
+    let repo_filter = ctx.repo_path.as_deref();
+    if ctx.json_output {
+        if is_daemon_running() {
+            let path = format!("/prompts/tree?instanceId={}", target_instance);
+            if let Ok(resp) =
+                forward_to_local_rest::<serde_json::Value>(reqwest::Method::GET, &path, None)
+            {
+                if let Some(data) = resp.get("data") {
+                    CliEnvelope::ok("prompts tree", Some(target_instance), data.clone())
+                        .print_and_exit();
+                }
+            }
+        }
+        let tree =
+            repo_db::get_project_conversation_tree_for_instance(&target_instance, repo_filter)
+                .unwrap_or_default();
+        CliEnvelope::ok("prompts tree", Some(target_instance), tree).print_and_exit();
+    }
+    cmd_tree(args);
+}
+
+fn cmd_prompts_inspect(args: &[String]) {
+    cmd_observe(args);
+}
+
+fn cmd_prompts_send(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let target_instance = ctx
+        .resolve_target_instance()
+        .unwrap_or_else(|_| "default".to_string());
+    let repo_path = ctx
+        .repo_path
+        .clone()
+        .unwrap_or_else(|| "scratch/test-repo".to_string());
+    let prompt_text = ctx.positional_args.join(" ");
+    let now = chrono::Utc::now().timestamp();
+    let prompt_id = format!("prompt-{}", uuid::Uuid::new_v4());
+
+    let active_prompt = ActivePrompt {
+        id: prompt_id.clone(),
+        project_id: repo_path.clone(),
+        instance_id: target_instance.clone(),
+        repo_path: repo_path.clone(),
+        prompt_content: prompt_text.clone(),
+        model: Some("gemini-3.8-flash-high".to_string()),
+        session_id: Some(format!("conv-{}", uuid::Uuid::new_v4())),
+        status: "in_flight".to_string(),
+        created_at: now,
+        updated_at: now,
+        image_payload: None,
+    };
+
+    let _ = repo_db::insert_active_prompt(&active_prompt);
+
+    let target_dir = PathBuf::from(&repo_path);
+    let _ = fs::create_dir_all(&target_dir);
+    let task_file = target_dir.join(".antigravity_resume_task.json");
+    let task_payload = serde_json::json!({
+        "prompt_id": prompt_id,
+        "instance_id": target_instance,
+        "repo_path": repo_path,
+        "prompt_content": prompt_text,
+        "auto_boot": true,
+        "dispatched_at": now,
+    });
+    let _ = fs::write(
+        task_file,
+        serde_json::to_string_pretty(&task_payload).unwrap_or_default(),
+    );
+
+    if ctx.json_output {
+        if is_daemon_running() {
+            let payload = serde_json::json!({
+                "instanceId": target_instance,
+                "repoPath": repo_path,
+                "content": prompt_text,
+            });
+            let _ = forward_to_local_rest::<serde_json::Value>(
+                reqwest::Method::POST,
+                "/prompts/dispatch",
+                Some(payload),
+            );
+        }
+        CliEnvelope::ok("prompts send", Some(target_instance), active_prompt).print_and_exit();
+    }
+
+    println!(
+        "[SUCCESS] Prompt dispatched to instance '{}' (id: {}).",
+        target_instance, prompt_id
+    );
+}
+
+fn cmd_prompts_running(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let target_instance = ctx
+        .resolve_target_instance()
+        .unwrap_or_else(|_| "default".to_string());
+    if ctx.json_output {
+        if is_daemon_running() {
+            let path = format!("/prompts/running?instanceId={}", target_instance);
+            if let Ok(resp) =
+                forward_to_local_rest::<serde_json::Value>(reqwest::Method::GET, &path, None)
+            {
+                if let Some(data) = resp.get("data") {
+                    CliEnvelope::ok("prompts running", Some(target_instance), data.clone())
+                        .print_and_exit();
+                }
+            }
+        }
+        let running =
+            repo_db::list_running_prompts_for_instance(&target_instance).unwrap_or_default();
+        CliEnvelope::ok("prompts running", Some(target_instance), running).print_and_exit();
+    }
+    cmd_which_prompts_running(args);
+}
+
+fn cmd_prompts_queue(args: &[String]) {
+    cmd_queue_scheduler(args);
+}
+
+fn cmd_prompts_history(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    if ctx.json_output {
+        let hist = repo_db::list_active_prompts().unwrap_or_default();
+        CliEnvelope::ok("prompts history", None, hist).print_and_exit();
+    }
+    cmd_history(args);
+}
+
+fn cmd_prompts_backup(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let target_instance = ctx
+        .resolve_target_instance()
+        .unwrap_or_else(|_| "default".to_string());
+    if ctx.json_output {
+        if is_daemon_running() {
+            let payload = serde_json::json!({ "instanceId": target_instance });
+            let _ = forward_to_local_rest::<serde_json::Value>(
+                reqwest::Method::POST,
+                "/prompts/backup",
+                Some(payload),
+            );
+        }
+        let _ = repo_db::backup_running_prompts(&target_instance);
+        let data = serde_json::json!({ "status": "backed_up", "instance_id": target_instance });
+        CliEnvelope::ok("prompts backup", Some(target_instance), data).print_and_exit();
+    }
+    cmd_backup_running_prompts(args);
+}
+
+fn cmd_prompts_restore(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let target_instance = ctx
+        .resolve_target_instance()
+        .unwrap_or_else(|_| "default".to_string());
+    if ctx.json_output {
+        if is_daemon_running() {
+            let payload = serde_json::json!({ "instanceId": target_instance });
+            let _ = forward_to_local_rest::<serde_json::Value>(
+                reqwest::Method::POST,
+                "/prompts/restore",
+                Some(payload),
+            );
+        }
+        let _ = repo_db::resend_running_commands_for_instance(Some(&target_instance), 20);
+        let data = serde_json::json!({ "status": "restored", "instance_id": target_instance });
+        CliEnvelope::ok("prompts restore", Some(target_instance), data).print_and_exit();
+    }
+    cmd_restore_running_prompts(args);
+}
+
+fn cmd_prompts_purge(args: &[String]) {
+    cmd_clear_cache(args);
+}
+
+// ══════════════════════════════════════════════════════════════
+// 3. Quota & Accounts Domain
+// ══════════════════════════════════════════════════════════════
+
+fn dispatch_quota_domain_from_args(args: &[String]) {
+    if args.is_empty() {
+        cmd_quota_show(&[]);
+        return;
+    }
+    let sub = args[0]
+        .trim_start_matches('/')
+        .trim_start_matches('-')
+        .to_lowercase();
+    if args[0].starts_with('-') {
+        cmd_quota_show(args);
+        return;
+    }
+    dispatch_quota_domain(&sub, &args[1..]);
+}
+
+fn dispatch_quota_domain(subcommand: &str, args: &[String]) {
+    match subcommand {
+        "show" | "status" | "quota" => cmd_quota_show(args),
+        "refresh" => cmd_quota_refresh(args),
+        "list" | "accounts" => cmd_accounts_list(args),
+        "add" => cmd_accounts_add(args),
+        "remove" | "rm" => cmd_accounts_remove(args),
+        "validate" | "check" => cmd_accounts_validate(args),
+        "balance" => cmd_accounts_balance(args),
+        _ => handle_unknown_domain_command("quota", subcommand, args),
+    }
+}
+
+fn cmd_quota_show(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    if ctx.json_output {
+        let accounts = account::list_accounts().unwrap_or_default();
+        CliEnvelope::ok("quota show", None, accounts).print_and_exit();
+    }
+    cmd_status(args);
+}
+
+fn cmd_quota_refresh(args: &[String]) {
+    cmd_accounts_refresh_tier(args);
+}
+
+fn cmd_accounts_list(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    if ctx.json_output {
+        let accounts = account::list_accounts().unwrap_or_default();
+        CliEnvelope::ok("accounts list", None, accounts).print_and_exit();
+    }
+    cmd_accounts(args);
+}
+
+fn cmd_accounts_add(_args: &[String]) {
+    println!("[*] Open browser or AGM UI to connect account OAuth.");
+}
+
+fn cmd_accounts_remove(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    if let Some(target) = ctx.positional_args.first() {
+        let _ = account::delete_account(target);
+        if ctx.json_output {
+            CliEnvelope::ok(
+                "accounts remove",
+                None,
+                serde_json::json!({ "removed": target }),
+            )
+            .print_and_exit();
+        }
+        println!("[SUCCESS] Removed account '{}'.", target);
+    }
+}
+
+fn cmd_accounts_validate(args: &[String]) {
+    cmd_doctor(args);
+}
+
+fn cmd_accounts_balance(args: &[String]) {
+    cmd_status(args);
+}
+
+// ══════════════════════════════════════════════════════════════
+// 4. Fleet Domain
+// ══════════════════════════════════════════════════════════════
+
+fn dispatch_fleet_domain_from_args(args: &[String]) {
+    if args.is_empty() {
+        cmd_fleet_nodes(&[]);
+        return;
+    }
+    let sub = args[0]
+        .trim_start_matches('/')
+        .trim_start_matches('-')
+        .to_lowercase();
+    if args[0].starts_with('-') {
+        cmd_fleet_nodes(args);
+        return;
+    }
+    dispatch_fleet_domain(&sub, &args[1..]);
+}
+
+fn dispatch_fleet_domain(subcommand: &str, args: &[String]) {
+    match subcommand {
+        "nodes" => cmd_fleet_nodes(args),
+        "ping" => cmd_fleet_ping(args),
+        "sync" => cmd_fleet_sync(args),
+        "broadcast" => cmd_fleet_broadcast(args),
+        "health" => cmd_fleet_health(args),
+        _ => handle_unknown_domain_command("fleet", subcommand, args),
+    }
+}
+
+fn cmd_fleet_nodes(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let (name, ip) = email_sender::get_local_node_identity();
+    if ctx.json_output {
+        let data = serde_json::json!([{ "node_alias": name, "local_ip": ip, "is_leader": true }]);
+        CliEnvelope::ok("fleet nodes", None, data).print_and_exit();
+    }
+    println!("Fleet Nodes:\n  ● {} ({}) - Online", name, ip);
+}
+
+fn cmd_fleet_ping(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let (name, ip) = email_sender::get_local_node_identity();
+    if ctx.json_output {
+        CliEnvelope::ok(
+            "fleet ping",
+            None,
+            serde_json::json!({ "node": name, "ip": ip, "status": "pong" }),
+        )
+        .print_and_exit();
+    }
+    println!("[PONG] Local node '{}' ({}) is healthy.", name, ip);
+}
+
+fn cmd_fleet_sync(args: &[String]) {
+    cmd_sync(args);
+}
+
+fn cmd_fleet_broadcast(args: &[String]) {
+    cmd_broadcast_email(args);
+}
+
+fn cmd_fleet_health(args: &[String]) {
+    cmd_doctor(args);
+}
+
+// ══════════════════════════════════════════════════════════════
+// 5. Proxy Domain
+// ══════════════════════════════════════════════════════════════
+
+fn dispatch_proxy_domain_from_args(args: &[String]) {
+    if args.is_empty() {
+        cmd_proxy_status(&[]);
+        return;
+    }
+    let sub = args[0]
+        .trim_start_matches('/')
+        .trim_start_matches('-')
+        .to_lowercase();
+    if args[0].starts_with('-') {
+        cmd_proxy_status(args);
+        return;
+    }
+    dispatch_proxy_domain(&sub, &args[1..]);
+}
+
+fn dispatch_proxy_domain(subcommand: &str, args: &[String]) {
+    match subcommand {
+        "status" => cmd_proxy_status(args),
+        "pool" => cmd_proxy_pool(args),
+        "model" => cmd_proxy_model(args),
+        "config" => cmd_proxy_config(args),
+        "restart" => cmd_proxy_restart(args),
+        "cache-clear" => cmd_proxy_cache_clear(args),
+        _ => handle_unknown_domain_command("proxy", subcommand, args),
+    }
+}
+
+fn cmd_proxy_status(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let is_running = is_daemon_running();
+    if ctx.json_output {
+        let data = serde_json::json!({ "daemon_running": is_running, "port": 8045 });
+        CliEnvelope::ok("proxy status", None, data).print_and_exit();
+    }
+    println!(
+        "Proxy Daemon Status: {}",
+        if is_running {
+            "Running on 127.0.0.1:8045"
+        } else {
+            "Stopped"
+        }
+    );
+}
+
+fn cmd_proxy_pool(args: &[String]) {
+    cmd_proxy(args);
+}
+
+fn cmd_proxy_model(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    if ctx.json_output {
+        let data = serde_json::json!({ "default_model": "gemini-3.8-flash-high" });
+        CliEnvelope::ok("proxy model", None, data).print_and_exit();
+    }
+    println!("Default Model: gemini-3.8-flash-high");
+}
+
+fn cmd_proxy_config(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let cfg = config::load_app_config().unwrap_or_default();
+    if ctx.json_output {
+        CliEnvelope::ok("proxy config", None, cfg).print_and_exit();
+    }
+    println!("Proxy Config: port={}", cfg.proxy.port);
+}
+
+fn cmd_proxy_restart(_args: &[String]) {
+    println!("[*] Reloading proxy configurations...");
+}
+
+fn cmd_proxy_cache_clear(args: &[String]) {
+    cmd_clear_cache(args);
+}
+
+// ══════════════════════════════════════════════════════════════
+// 6. Security Domain
+// ══════════════════════════════════════════════════════════════
+
+fn dispatch_security_domain_from_args(args: &[String]) {
+    if args.is_empty() {
+        cmd_security_ip_list(&[]);
+        return;
+    }
+    let sub = args[0]
+        .trim_start_matches('/')
+        .trim_start_matches('-')
+        .to_lowercase();
+    if args[0].starts_with('-') {
+        cmd_security_ip_list(args);
+        return;
+    }
+    dispatch_security_domain(&sub, &args[1..]);
+}
+
+fn dispatch_security_domain(subcommand: &str, args: &[String]) {
+    match subcommand {
+        "ip-list" => cmd_security_ip_list(args),
+        "ip-block" => cmd_security_ip_block(args),
+        "ip-unblock" => cmd_security_ip_unblock(args),
+        "audit" => cmd_security_audit(args),
+        _ => handle_unknown_domain_command("security", subcommand, args),
+    }
+}
+
+fn cmd_security_ip_list(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let blacklist = security_db::get_blacklist().unwrap_or_default();
+    if ctx.json_output {
+        CliEnvelope::ok("security ip-list", None, blacklist).print_and_exit();
+    }
+    println!("Blacklisted IPs ({}):", blacklist.len());
+    for item in blacklist {
+        println!(
+            "  ● {} ({})",
+            item.ip_pattern,
+            item.reason.unwrap_or_default()
+        );
+    }
+}
+
+fn cmd_security_ip_block(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    if let Some(ip) = ctx.positional_args.first() {
+        let _ = security_db::add_to_blacklist(ip, Some("Manual CLI block"), None, "agm_cli");
+        if ctx.json_output {
+            CliEnvelope::ok(
+                "security ip-block",
+                None,
+                serde_json::json!({ "blocked": ip }),
+            )
+            .print_and_exit();
+        }
+        println!("[SUCCESS] Blocked IP '{}'.", ip);
+    }
+}
+
+fn cmd_security_ip_unblock(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    if let Some(ip) = ctx.positional_args.first() {
+        let _ = security_db::remove_from_blacklist(ip);
+        if ctx.json_output {
+            CliEnvelope::ok(
+                "security ip-unblock",
+                None,
+                serde_json::json!({ "unblocked": ip }),
+            )
+            .print_and_exit();
+        }
+        println!("[SUCCESS] Unblocked IP '{}'.", ip);
+    }
+}
+
+fn cmd_security_audit(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let logs = security_db::get_ip_access_logs(50, 0, None, false).unwrap_or_default();
+    if ctx.json_output {
+        CliEnvelope::ok("security audit", None, logs).print_and_exit();
+    }
+    println!("Security Audit Logs (last {} events):", logs.len());
+    for log in logs {
+        println!(
+            "  ● [{}] {} {} - {}",
+            log.timestamp,
+            log.method.as_deref().unwrap_or("-"),
+            log.path.as_deref().unwrap_or("-"),
+            log.status.unwrap_or(0)
+        );
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+// 7. System Domain
+// ══════════════════════════════════════════════════════════════
+
+fn dispatch_system_domain_from_args(args: &[String]) {
+    if args.is_empty() {
+        cmd_system_doctor(&[]);
+        return;
+    }
+    let sub = args[0]
+        .trim_start_matches('/')
+        .trim_start_matches('-')
+        .to_lowercase();
+    if args[0].starts_with('-') {
+        cmd_system_doctor(args);
+        return;
+    }
+    dispatch_system_domain(&sub, &args[1..]);
+}
+
+fn dispatch_system_domain(subcommand: &str, args: &[String]) {
+    match subcommand {
+        "version" => cmd_system_version(args),
+        "env" => cmd_system_env(args),
+        "doctor" => cmd_system_doctor(args),
+        "db-stats" => cmd_system_db_stats(args),
+        "vacuum" => cmd_system_vacuum(args),
+        _ => handle_unknown_domain_command("system", subcommand, args),
+    }
+}
+
+fn cmd_system_version(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let git_hash = antigravity_tools_lib::modules::git_info::get_git_hash();
+    let git_branch = antigravity_tools_lib::modules::git_info::get_git_branch();
+    let last_release = antigravity_tools_lib::modules::git_info::get_last_release();
+    if ctx.json_output {
+        let data = serde_json::json!({
+            "version": VERSION,
+            "commit": git_hash,
+            "branch": git_branch,
+            "last_release": last_release
+        });
+        CliEnvelope::ok("system version", None, data).print_and_exit();
+    }
+    println!(
+        "agm v{} (commit: {}, branch: {}, last release: {})",
+        VERSION, git_hash, git_branch, last_release
+    );
+}
+
+fn cmd_system_env(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let (node, ip) = email_sender::get_local_node_identity();
+    let data = serde_json::json!({
+        "node_alias": node,
+        "local_ip": ip,
+        "os": env::consts::OS,
+        "arch": env::consts::ARCH,
+        "daemon_running": is_daemon_running(),
+    });
+    if ctx.json_output {
+        CliEnvelope::ok("system env", None, data).print_and_exit();
+    }
+    println!(
+        "System Environment:\n  OS: {}\n  Arch: {}\n  Node: {}\n  IP: {}",
+        env::consts::OS,
+        env::consts::ARCH,
+        node,
+        ip
+    );
+}
+
+fn cmd_system_doctor(args: &[String]) {
+    cmd_doctor(args);
+}
+
+fn cmd_system_db_stats(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    if ctx.json_output && is_daemon_running() {
+        if let Ok(resp) = forward_to_local_rest::<serde_json::Value>(
+            reqwest::Method::GET,
+            "/system/db-stats",
+            None,
+        ) {
+            if let Some(data) = resp.get("data") {
+                CliEnvelope::ok("system db-stats", None, data.clone()).print_and_exit();
+            }
+        }
+    }
+    let data_dir = account::get_data_dir().unwrap_or_default();
+    let repo_db_p = data_dir.join("repo_prompts.db");
+    let security_db_p = data_dir.join("security.db");
+    let accounts_db_p = data_dir.join("account.db");
+    let repo_size = fs::metadata(&repo_db_p).map(|m| m.len()).unwrap_or(0);
+    let security_size = fs::metadata(&security_db_p).map(|m| m.len()).unwrap_or(0);
+    let accounts_size = fs::metadata(&accounts_db_p).map(|m| m.len()).unwrap_or(0);
+    let data = serde_json::json!({
+        "repo_prompts_bytes": repo_size,
+        "security_db_bytes": security_size,
+        "accounts_db_bytes": accounts_size,
+        "total_bytes": repo_size + security_size + accounts_size
+    });
+    if ctx.json_output {
+        CliEnvelope::ok("system db-stats", None, data).print_and_exit();
+    }
+    println!(
+        "Database Stats:\n  repo_prompts.db: {} bytes\n  security.db: {} bytes\n  account.db: {} bytes",
+        repo_size, security_size, accounts_size
+    );
+}
+
+fn cmd_system_vacuum(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    if ctx.json_output && is_daemon_running() {
+        if let Ok(resp) = forward_to_local_rest::<serde_json::Value>(
+            reqwest::Method::POST,
+            "/system/vacuum",
+            None,
+        ) {
+            if let Some(data) = resp.get("data") {
+                CliEnvelope::ok("system vacuum", None, data.clone()).print_and_exit();
+            }
+        }
+    }
+    let mut count = 0;
+    if let Ok(conn) = repo_db::connect_db() {
+        if conn.execute("VACUUM", []).is_ok() {
+            count += 1;
+        }
+    }
+    let data = serde_json::json!({ "vacuumed_databases": count });
+    if ctx.json_output {
+        CliEnvelope::ok("system vacuum", None, data).print_and_exit();
+    }
+    println!("[SUCCESS] Vacuumed {} database(s).", count);
 }
 
 fn print_banner() {

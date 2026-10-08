@@ -2773,6 +2773,16 @@ pub fn is_any_prompt_actively_running() -> bool {
     false
 }
 
+/// Insert active prompt into database
+pub fn insert_active_prompt(prompt: &ActivePrompt) -> Result<(), String> {
+    save_or_requeue_prompt(prompt)
+}
+
+/// List active prompts from database
+pub fn list_active_prompts() -> Result<Vec<ActivePrompt>, String> {
+    list_all_prompts()
+}
+
 /// Save or re-queue an active prompt into active_prompts and running_projects
 pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
     let conn = connect_db()?;
@@ -3697,6 +3707,20 @@ pub struct AgmConversationNode {
     pub prompt_tail_snippet: String,
     pub prompt_word_count: usize,
     pub last_modified: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub byte_size: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repeat_count: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repeat_badge: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sub_runs: Vec<AgmConversationNode>,
+    #[serde(default)]
+    pub prompt_category: String,
+    #[serde(default)]
+    pub is_queued: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_step_summary: Option<String>,
 }
 
 /// Project node in the AGM Tree View (Project -> Conversation -> 200-Word Prompt)
@@ -3716,6 +3740,12 @@ pub struct AgmProjectTreeNode {
     pub bound_email: Option<String>,
     pub is_running: bool,
     pub conversations: Vec<AgmConversationNode>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub byte_size: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repeat_count: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repeat_badge: Option<String>,
 }
 
 /// Resolved target from an AGM or GitMap Sequence ID (`P001`, `AGM:P001`, `GM:#1`, `C001`, `AGM:C001`, `GM:<cid>`, or conversation UUID prefix)
@@ -3899,32 +3929,91 @@ pub fn extract_prompt_tail_snippet(raw_text: &str, tail_word_count: usize) -> St
     }
 }
 
-/// Inspect transcript.jsonl for a conversation to obtain `(step_count, latest_user_prompt)`
-fn inspect_conversation_transcript(
-    base_dir: &Path,
-    conversation_id: &str,
-) -> (usize, Option<String>) {
-    let transcript_path = base_dir
+#[derive(Debug, Clone, Default)]
+pub struct TranscriptInspection {
+    pub step_count: usize,
+    pub latest_prompt: Option<String>,
+    pub latest_step_summary: Option<String>,
+    pub is_subagent: bool,
+    pub is_recent_active: bool,
+}
+
+/// Inspect transcript_full.jsonl (or transcript.jsonl) for a conversation to obtain:
+/// step count, un-truncated user prompt, latest step result/status summary, and subagent classification.
+fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> TranscriptInspection {
+    let logs_dir = base_dir
         .join("brain")
         .join(conversation_id)
         .join(".system_generated")
-        .join("logs")
-        .join("transcript.jsonl");
-    if !transcript_path.exists() {
-        return (0, None);
-    }
-    let content = match std::fs::read_to_string(&transcript_path) {
-        Ok(c) => c,
-        Err(_) => return (0, None),
+        .join("logs");
+    let transcript_full_path = logs_dir.join("transcript_full.jsonl");
+    let transcript_path = logs_dir.join("transcript.jsonl");
+
+    let chosen_path = if transcript_full_path.exists() {
+        transcript_full_path
+    } else if transcript_path.exists() {
+        transcript_path
+    } else {
+        return TranscriptInspection::default();
     };
-    let mut step_count = 0usize;
-    let mut latest_prompt: Option<String> = None;
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
+
+    let now_epoch = Utc::now().timestamp();
+    let mtime_epoch = std::fs::metadata(&chosen_path)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let is_recent_active = mtime_epoch > 0 && (now_epoch - mtime_epoch <= 180);
+
+    let content = match std::fs::read_to_string(&chosen_path) {
+        Ok(c) => c,
+        Err(_) => {
+            return TranscriptInspection {
+                step_count: 0,
+                latest_prompt: None,
+                latest_step_summary: None,
+                is_subagent: false,
+                is_recent_active,
+            };
         }
-        step_count += 1;
+    };
+
+    let mut latest_prompt: Option<String> = None;
+    let mut latest_step_summary: Option<String> = None;
+    let mut is_subagent = false;
+    let mut has_real_user_prompt = false;
+
+    let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
+    let step_count = lines.len();
+
+    // Check first step to see if this conversation was initiated as an autonomous subagent
+    if let Some(first_line) = lines.first() {
+        if let Ok(first_val) = serde_json::from_str::<serde_json::Value>(first_line) {
+            let src = first_val
+                .get("source")
+                .and_then(|s| s.as_str())
+                .unwrap_or("");
+            let tp = first_val.get("type").and_then(|t| t.as_str()).unwrap_or("");
+            if src == "SYSTEM" || tp == "SYSTEM_MESSAGE" {
+                let txt = first_val
+                    .get("content")
+                    .and_then(|c| c.as_str())
+                    .unwrap_or("");
+                if txt.contains("You are ")
+                    || txt.contains("subagent")
+                    || txt.contains("Worker")
+                    || txt.contains("Author")
+                    || txt.contains("Research")
+                {
+                    is_subagent = true;
+                }
+            }
+        }
+    }
+
+    for line in &lines {
+        let trimmed = line.trim();
         if trimmed.contains("\"USER_INPUT\"") || trimmed.contains("\"USER_EXPLICIT\"") {
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(trimmed) {
                 let is_user_input = val
@@ -3939,16 +4028,77 @@ fn inspect_conversation_transcript(
                         .unwrap_or(false);
                 if is_user_input {
                     if let Some(c) = val.get("content").and_then(|v| v.as_str()) {
-                        let clean = extract_clean_user_prompt(c);
-                        if !clean.is_empty() {
-                            latest_prompt = Some(clean);
+                        let c_trim = c.trim();
+                        // Ignore system notifications and background task messages that masquerade as user input
+                        let is_system_msg = c_trim
+                            .starts_with("The following is a <SYSTEM_MESSAGE>")
+                            || c_trim.starts_with("[Message] timestamp=")
+                            || c_trim.starts_with("Task id ")
+                            || c_trim.starts_with("<SYSTEM_MESSAGE>");
+                        if !is_system_msg {
+                            let clean = extract_clean_user_prompt(c);
+                            if !clean.is_empty() {
+                                latest_prompt = Some(clean);
+                                has_real_user_prompt = true;
+                            }
                         }
                     }
                 }
             }
         }
     }
-    (step_count, latest_prompt)
+
+    // Inspect the last 1-3 lines to extract latest step result / activity summary
+    for line in lines.iter().rev().take(3) {
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
+            let step_idx = val
+                .get("step_index")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(step_count as u64);
+            let s_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("STEP");
+            let s_status = val.get("status").and_then(|v| v.as_str()).unwrap_or("");
+
+            if let Some(tool_calls) = val.get("tool_calls").and_then(|tc| tc.as_array()) {
+                if let Some(first_tc) = tool_calls.first() {
+                    let tool_name = first_tc
+                        .get("tool_name")
+                        .or_else(|| first_tc.get("name"))
+                        .and_then(|n| n.as_str())
+                        .unwrap_or("action");
+                    latest_step_summary = Some(format!(
+                        "Step {} · Tool: {} ({})",
+                        step_idx, tool_name, s_status
+                    ));
+                    break;
+                }
+            }
+
+            if let Some(txt) = val.get("content").and_then(|c| c.as_str()) {
+                let clean_txt = txt.trim().replace('\n', " ");
+                let short_txt: String = clean_txt.chars().take(80).collect();
+                if !short_txt.is_empty() {
+                    latest_step_summary =
+                        Some(format!("Step {} · {} · {}", step_idx, s_type, short_txt));
+                    break;
+                }
+            } else if latest_step_summary.is_none() {
+                latest_step_summary =
+                    Some(format!("Step {} · {} ({})", step_idx, s_type, s_status));
+            }
+        }
+    }
+
+    if !has_real_user_prompt && is_subagent {
+        is_subagent = true;
+    }
+
+    TranscriptInspection {
+        step_count,
+        latest_prompt,
+        latest_step_summary,
+        is_subagent,
+        is_recent_active,
+    }
 }
 
 /// Build the AGM Project -> Conversation -> 200-Word Prompt Tree across ALL registered instances
@@ -4098,87 +4248,92 @@ fn compute_project_conversation_tree(
             .collect()
     };
 
-    // ===== Fallback: Build synthetic projects from conversation_summaries.db =====
-    // When workspaceStorage is empty (common on managed Windows deployments), supplement
+    // ===== Fallback & Discovery: Supplement projects from conversation_summaries.db =====
+    // When workspaceStorage is empty (common on Windows deployments), supplement
     // projects list from workspace_uris in conversation_summaries.db.
     let mut projects: Vec<RunningProject> = projects; // shadow as mutable
-    if projects.is_empty() {
-        let now_fb = Utc::now().timestamp();
-        let candidate_dirs_fb = gemini_dirs_tagged(target);
-        let mut seen_fb: std::collections::HashSet<(String, String)> =
-            std::collections::HashSet::new();
-        for (owning_inst_id, base) in &candidate_dirs_fb {
-            let summaries_db = base.join("conversation_summaries.db");
-            if !summaries_db.exists() {
-                continue;
-            }
-            let s_conn_res = Connection::open_with_flags(
-                &summaries_db,
-                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
-            );
-            let s_conn = match s_conn_res {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
-            let _ = s_conn.pragma_update(None, "busy_timeout", 3000);
-            let sql = "SELECT workspace_uris, last_modified_time, status, not_fully_idle \
-                       FROM conversation_summaries \
-                       WHERE workspace_uris IS NOT NULL AND workspace_uris != '[]' \
-                       ORDER BY last_modified_time DESC \
-                       LIMIT 200";
-            let mut stmt_opt = s_conn.prepare(sql).ok();
-            if let Some(ref mut stmt) = stmt_opt {
-                if let Ok(rows) = stmt.query_map([], |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, String>(2)?,
-                        row.get::<_, i32>(3)?,
-                    ))
-                }) {
-                    for item in rows.flatten() {
-                        let (ws_uris_raw, _last_time, status, not_fully_idle) = item;
-                        let uris: Vec<String> =
-                            serde_json::from_str(&ws_uris_raw).unwrap_or_default();
-                        for uri in uris {
-                            let raw_path = decode_uri_to_path(&uri);
-                            if raw_path.len() < 4 {
-                                continue;
-                            }
-                            let norm_inst =
-                                if owning_inst_id == "__default__" || owning_inst_id.is_empty() {
-                                    "default".to_string()
-                                } else {
-                                    crate::modules::instance::resolve_instance_id(owning_inst_id)
-                                        .unwrap_or_else(|_| owning_inst_id.clone())
-                                };
-                            let repo_name = Path::new(&raw_path)
-                                .file_name()
-                                .map(|n| n.to_string_lossy().to_string())
-                                .unwrap_or_else(|| "unnamed".to_string());
-                            let project_key =
-                                format!("{}__{}", repo_name.to_lowercase(), norm_inst);
-                            if !seen_fb.insert((norm_inst.clone(), raw_path.clone())) {
-                                continue;
-                            }
-                            let is_running = status.contains("RUNNING") && not_fully_idle > 0;
-                            projects.push(RunningProject {
-                                id: project_key,
-                                instance_id: norm_inst,
-                                repo_name,
-                                repo_path: raw_path,
-                                workspace_storage_path: None,
-                                is_running,
-                                last_detected_at: now_fb,
-                            });
+    let now_fb = Utc::now().timestamp();
+    let candidate_dirs_fb = gemini_dirs_tagged(target);
+    let mut seen_fb: std::collections::HashSet<(String, String)> = projects
+        .iter()
+        .map(|p| {
+            (
+                p.instance_id.clone(),
+                normalize_path_for_compare(&p.repo_path),
+            )
+        })
+        .collect();
+
+    for (owning_inst_id, base) in &candidate_dirs_fb {
+        let summaries_db = base.join("conversation_summaries.db");
+        if !summaries_db.exists() {
+            continue;
+        }
+        let s_conn_res = Connection::open_with_flags(
+            &summaries_db,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+        );
+        let s_conn = match s_conn_res {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        let _ = s_conn.pragma_update(None, "busy_timeout", 3000);
+        let sql = "SELECT workspace_uris, last_modified_time, status, not_fully_idle \
+                   FROM conversation_summaries \
+                   WHERE workspace_uris IS NOT NULL AND workspace_uris != '[]' \
+                   ORDER BY last_modified_time DESC \
+                   LIMIT 200";
+        let mut stmt_opt = s_conn.prepare(sql).ok();
+        if let Some(ref mut stmt) = stmt_opt {
+            if let Ok(rows) = stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, i32>(3)?,
+                ))
+            }) {
+                for item in rows.flatten() {
+                    let (ws_uris_raw, _last_time, status, not_fully_idle) = item;
+                    let uris: Vec<String> = serde_json::from_str(&ws_uris_raw).unwrap_or_default();
+                    for uri in uris {
+                        let raw_path = decode_uri_to_path(&uri);
+                        if raw_path.len() < 4 {
+                            continue;
                         }
+                        let norm_inst =
+                            if owning_inst_id == "__default__" || owning_inst_id.is_empty() {
+                                "default".to_string()
+                            } else {
+                                crate::modules::instance::resolve_instance_id(owning_inst_id)
+                                    .unwrap_or_else(|_| owning_inst_id.clone())
+                            };
+                        let norm_path_cmp = normalize_path_for_compare(&raw_path);
+                        if !seen_fb.insert((norm_inst.clone(), norm_path_cmp)) {
+                            continue;
+                        }
+                        let repo_name = Path::new(&raw_path)
+                            .file_name()
+                            .map(|n| n.to_string_lossy().to_string())
+                            .unwrap_or_else(|| "unnamed".to_string());
+                        let project_key = format!("{}__{}", repo_name.to_lowercase(), norm_inst);
+                        let is_running = status.contains("RUNNING") && not_fully_idle > 0;
+                        projects.push(RunningProject {
+                            id: project_key,
+                            instance_id: norm_inst,
+                            repo_name,
+                            repo_path: raw_path,
+                            workspace_storage_path: None,
+                            is_running,
+                            last_detected_at: now_fb,
+                        });
                     }
                 }
             }
-            drop(stmt_opt);
         }
+        drop(stmt_opt);
     }
-    // ===== End Fallback =====
+    // ===== End Fallback & Discovery =====
 
     // Telemetry probe logging for instance liveness
     if let Some(target_id) = target {
@@ -4214,10 +4369,23 @@ fn compute_project_conversation_tree(
 
     let conn_opt = connect_db().ok();
 
-    let mut convs_by_inst_and_path: std::collections::HashMap<
-        (String, String),
-        Vec<(String, String, String, String, bool, usize, String, String)>,
-    > = std::collections::HashMap::new();
+    #[derive(Debug, Clone)]
+    struct RawConvItem {
+        cid: String,
+        title: String,
+        prompt: String,
+        status: String,
+        is_running: bool,
+        steps: usize,
+        last_mod: String,
+        conv_inst_id: String,
+        prompt_category: String,
+        is_queued: bool,
+        latest_step_summary: Option<String>,
+    }
+
+    let mut convs_by_inst_and_path: std::collections::HashMap<(String, String), Vec<RawConvItem>> =
+        std::collections::HashMap::new();
 
     let mut active_prompts_by_inst_and_path: std::collections::HashMap<
         (String, String),
@@ -4336,10 +4504,34 @@ fn compute_project_conversation_tree(
                             } else {
                                 false
                             };
-                            let (steps, transcript_prompt) = inspect_conversation_transcript(base, &cid);
-                            let effective_prompt = transcript_prompt
+                            let inspection = inspect_conversation_transcript(base, &cid);
+                            let steps = inspection.step_count;
+                            let effective_prompt = inspection
+                                .latest_prompt
                                 .filter(|s| !s.trim().is_empty())
                                 .unwrap_or_else(|| preview.clone());
+
+                            let prompt_category = if inspection.is_subagent {
+                                "subagent".to_string()
+                            } else {
+                                let p_lower = effective_prompt.to_lowercase();
+                                let t_lower = title.to_lowercase();
+                                if t_lower.contains("subagent")
+                                    || t_lower.contains("research agent")
+                                    || p_lower.contains("you are research")
+                                    || p_lower.contains("you are worker")
+                                    || p_lower.contains("<system_message>")
+                                    || p_lower.contains("internal subagent")
+                                {
+                                    "subagent".to_string()
+                                } else {
+                                    "user".to_string()
+                                }
+                            };
+
+                            let is_queued = status.to_lowercase().contains("queue")
+                                || status.to_lowercase().contains("pending");
+                            let latest_step_summary = inspection.latest_step_summary;
 
                             // Ghost conversation filter: skip untitled / empty title with empty prompt (regardless of running status)
                             let is_untitled_candidate = title.trim().is_empty()
@@ -4376,16 +4568,22 @@ fn compute_project_conversation_tree(
                                 assigned_paths.push("__unassigned__".to_string());
                             }
                             for p_key in assigned_paths {
-                                convs_by_inst_and_path.entry((norm_owning_inst.clone(), p_key)).or_default().push((
-                                    cid.clone(),
-                                    title.clone(),
-                                    effective_prompt.clone(),
-                                    status.clone(),
-                                    is_conv_running,
-                                    steps,
-                                    last_time_str.clone(),
-                                    owning_inst_id.clone(),
-                                ));
+                                convs_by_inst_and_path
+                                    .entry((norm_owning_inst.clone(), p_key))
+                                    .or_default()
+                                    .push(RawConvItem {
+                                        cid: cid.clone(),
+                                        title: title.clone(),
+                                        prompt: effective_prompt.clone(),
+                                        status: status.clone(),
+                                        is_running: is_conv_running,
+                                        steps,
+                                        last_mod: last_time_str.clone(),
+                                        conv_inst_id: owning_inst_id.clone(),
+                                        prompt_category: prompt_category.clone(),
+                                        is_queued,
+                                        latest_step_summary: latest_step_summary.clone(),
+                                    });
                             }
                         }
                     }
@@ -4481,47 +4679,48 @@ fn compute_project_conversation_tree(
         if let Some(raw_convs) =
             convs_by_inst_and_path.get(&(norm_proj_inst.clone(), norm_path.clone()))
         {
-            for (cid, title, raw_prompt, status, is_run, steps, last_mod, conv_inst_id) in raw_convs
-            {
-                let (preview_200w, word_count) = extract_prompt_words_preview(raw_prompt, word_cap);
+            for item in raw_convs {
+                let (preview_200w, word_count) =
+                    extract_prompt_words_preview(&item.prompt, word_cap);
 
                 // Filter out empty "Untitled Conversation" (0 Words) nodes
-                let is_untitled =
-                    title.trim().is_empty() || title.to_lowercase().starts_with("untitled");
-                let is_empty_prompt = raw_prompt.trim().is_empty() || word_count == 0;
+                let is_untitled = item.title.trim().is_empty()
+                    || item.title.to_lowercase().starts_with("untitled");
+                let is_empty_prompt = item.prompt.trim().is_empty() || word_count == 0;
                 if is_untitled && is_empty_prompt {
                     continue;
                 }
 
-                let effective_is_run = is_inst_alive && *is_run;
+                let effective_is_run = is_inst_alive && item.is_running;
                 if only_running && !effective_is_run {
                     continue;
                 }
                 let c_seq = if let Some(ref conn) = conn_opt {
                     ensure_conversation_sequence_in_conn(
                         conn,
-                        cid,
+                        &item.cid,
                         &project_key,
-                        title,
-                        conv_inst_id,
+                        &item.title,
+                        &item.conv_inst_id,
                     )
                 } else {
                     (conv_nodes.len() as i64) + 1
                 };
-                let short_id = if cid.len() >= 8 {
-                    cid[..8].to_string()
+                let short_id = if item.cid.len() >= 8 {
+                    item.cid[..8].to_string()
                 } else {
-                    cid.clone()
+                    item.cid.clone()
                 };
-                let tail_snippet = extract_prompt_tail_snippet(raw_prompt, 12);
+                let tail_snippet = extract_prompt_tail_snippet(&item.prompt, 12);
 
-                let (c_inst_seq, c_inst_name, c_inst_exe) = if conv_inst_id == &proj.instance_id {
+                let (c_inst_seq, c_inst_name, c_inst_exe) = if item.conv_inst_id == proj.instance_id
+                {
                     (
                         instance_seq_num,
                         instance_name.clone(),
                         instance_exe_name.clone(),
                     )
-                } else if conv_inst_id == "default" || conv_inst_id == "__default__" {
+                } else if item.conv_inst_id == "default" || item.conv_inst_id == "__default__" {
                     (
                         Some(1),
                         "default".to_string(),
@@ -4530,7 +4729,7 @@ fn compute_project_conversation_tree(
                 } else if let Some(inst) = registry
                     .instances
                     .iter()
-                    .find(|i| i.id == *conv_inst_id || i.name == *conv_inst_id)
+                    .find(|i| i.id == item.conv_inst_id || i.name == item.conv_inst_id)
                 {
                     (
                         inst.seq_num,
@@ -4543,8 +4742,11 @@ fn compute_project_conversation_tree(
                 } else {
                     (
                         None,
-                        conv_inst_id.clone(),
-                        crate::modules::instance::resolve_instance_exe_name(conv_inst_id, None),
+                        item.conv_inst_id.clone(),
+                        crate::modules::instance::resolve_instance_exe_name(
+                            &item.conv_inst_id,
+                            None,
+                        ),
                     )
                 };
 
@@ -4552,30 +4754,39 @@ fn compute_project_conversation_tree(
                     seq_id: c_seq,
                     seq_code: format!("C{:03}", c_seq),
                     gitmap_seq_code: format!("GM:{}", short_id),
-                    conversation_id: cid.clone(),
+                    conversation_id: item.cid.clone(),
                     short_id,
-                    title: if title.trim().is_empty() {
+                    title: if item.title.trim().is_empty() {
                         "Untitled Conversation".to_string()
                     } else {
-                        title.clone()
+                        item.title.clone()
                     },
                     status: if effective_is_run {
                         "RUNNING".to_string()
-                    } else if status.trim().is_empty() || status.contains("RUNNING") {
+                    } else if item.is_queued {
+                        "QUEUED".to_string()
+                    } else if item.status.trim().is_empty() || item.status.contains("RUNNING") {
                         "IDLE".to_string()
                     } else {
-                        status.clone()
+                        item.status.clone()
                     },
                     is_running: effective_is_run,
-                    step_count: *steps,
-                    instance_id: conv_inst_id.clone(),
+                    step_count: item.steps,
+                    instance_id: item.conv_inst_id.clone(),
                     instance_seq_num: c_inst_seq,
                     instance_name: c_inst_name,
                     instance_exe_name: c_inst_exe,
                     prompt_preview_200w: preview_200w,
                     prompt_tail_snippet: tail_snippet,
                     prompt_word_count: word_count,
-                    last_modified: last_mod.clone(),
+                    last_modified: item.last_mod.clone(),
+                    byte_size: Some(item.prompt.len()),
+                    repeat_count: None,
+                    repeat_badge: None,
+                    sub_runs: Vec::new(),
+                    prompt_category: item.prompt_category.clone(),
+                    is_queued: item.is_queued,
+                    latest_step_summary: item.latest_step_summary.clone(),
                 });
             }
         }
@@ -4599,8 +4810,12 @@ fn compute_project_conversation_tree(
                     continue;
                 }
 
-                let is_run =
-                    is_inst_alive && ap.status == "running" && (now - ap.updated_at <= 600);
+                let is_ap_queued = ap.status == "queued" || ap.status == "pending";
+                let is_run = is_inst_alive
+                    && (ap.status == "running"
+                        || ap.status == "in_flight"
+                        || ap.status == "dispatched")
+                    && (now - ap.updated_at <= 600);
                 if only_running && !is_run {
                     continue;
                 }
@@ -4655,6 +4870,25 @@ fn compute_project_conversation_tree(
                     )
                 };
 
+                let ap_category = {
+                    let p_lower = ap.prompt_content.to_lowercase();
+                    if p_lower.contains("you are research")
+                        || p_lower.contains("you are worker")
+                        || p_lower.contains("<system_message>")
+                    {
+                        "subagent".to_string()
+                    } else {
+                        "user".to_string()
+                    }
+                };
+                let ap_step_summary = if is_run {
+                    Some("Prompt in flight / processing".to_string())
+                } else if is_ap_queued {
+                    Some("In queue, waiting for slot".to_string())
+                } else {
+                    None
+                };
+
                 conv_nodes.push(AgmConversationNode {
                     seq_id: c_seq,
                     seq_code: format!("C{:03}", c_seq),
@@ -4662,7 +4896,13 @@ fn compute_project_conversation_tree(
                     conversation_id: cid,
                     short_id,
                     title,
-                    status: ap.status.to_uppercase(),
+                    status: if is_run {
+                        "RUNNING".to_string()
+                    } else if is_ap_queued {
+                        "QUEUED".to_string()
+                    } else {
+                        ap.status.to_uppercase()
+                    },
                     is_running: is_run,
                     step_count: 0,
                     instance_id: ap.instance_id.clone(),
@@ -4673,6 +4913,13 @@ fn compute_project_conversation_tree(
                     prompt_tail_snippet: tail_snippet,
                     prompt_word_count: word_count,
                     last_modified: ap.updated_at.to_string(),
+                    byte_size: Some(ap.prompt_content.len()),
+                    repeat_count: None,
+                    repeat_badge: None,
+                    sub_runs: Vec::new(),
+                    prompt_category: ap_category,
+                    is_queued: is_ap_queued,
+                    latest_step_summary: ap_step_summary,
                 });
             }
         }
@@ -4848,6 +5095,9 @@ fn compute_project_conversation_tree(
             }
         }
 
+        let grouped_convs = group_identical_conversation_runs(conv_nodes);
+        let proj_byte_size: usize = grouped_convs.iter().map(|c| c.byte_size.unwrap_or(0)).sum();
+
         tree_nodes.push(AgmProjectTreeNode {
             seq_id: p_seq,
             seq_code: format!("P{:03}", p_seq),
@@ -4861,12 +5111,137 @@ fn compute_project_conversation_tree(
             instance_exe_name,
             bound_email,
             is_running: proj_is_running,
-            conversations: conv_nodes,
+            conversations: grouped_convs,
+            byte_size: Some(proj_byte_size),
+            repeat_count: None,
+            repeat_badge: None,
         });
     }
 
     tree_nodes.sort_by_key(|n| n.seq_id);
     tree_nodes
+}
+
+/// Compact grouping of conversation nodes with identical prompts into a single parent node with repeat badge
+pub fn group_identical_conversation_runs(
+    convs: Vec<AgmConversationNode>,
+) -> Vec<AgmConversationNode> {
+    if convs.is_empty() {
+        return Vec::new();
+    }
+    let mut grouped: Vec<AgmConversationNode> = Vec::new();
+    let mut seen_indices: std::collections::HashSet<usize> = std::collections::HashSet::new();
+
+    for i in 0..convs.len() {
+        if seen_indices.contains(&i) {
+            continue;
+        }
+        let current = &convs[i];
+        let p_key = current.prompt_preview_200w.trim();
+        let t_key = current.title.trim();
+
+        let mut matches = vec![current.clone()];
+        seen_indices.insert(i);
+
+        for j in (i + 1)..convs.len() {
+            if seen_indices.contains(&j) {
+                continue;
+            }
+            let next = &convs[j];
+            let next_p = next.prompt_preview_200w.trim();
+            let next_t = next.title.trim();
+
+            let is_match = (!p_key.is_empty() && p_key == next_p)
+                || (!t_key.is_empty() && t_key != "Untitled Conversation" && t_key == next_t);
+
+            if is_match {
+                matches.push(next.clone());
+                seen_indices.insert(j);
+            }
+        }
+
+        if matches.len() > 1 {
+            let count = matches.len();
+            let mut parent = matches[0].clone();
+            let any_running = matches.iter().any(|m| m.is_running);
+            if any_running {
+                parent.is_running = true;
+                parent.status = "RUNNING".to_string();
+            }
+            parent.byte_size = Some(parent.prompt_preview_200w.len());
+            parent.repeat_count = Some(count);
+            parent.repeat_badge = Some(format!("x{}", count));
+            parent.sub_runs = matches;
+            grouped.push(parent);
+        } else {
+            let mut single = current.clone();
+            single.byte_size = Some(single.prompt_preview_200w.len());
+            single.repeat_count = None;
+            single.repeat_badge = None;
+            single.sub_runs = Vec::new();
+            grouped.push(single);
+        }
+    }
+    grouped
+}
+
+/// Helper method for prompt tree retrieval scoped to instance with optional repo filter
+pub fn get_project_conversation_tree_for_instance(
+    instance_id: &str,
+    repo_filter: Option<&str>,
+) -> Result<Vec<AgmProjectTreeNode>, String> {
+    let mut tree = get_project_conversation_tree_cached(Some(instance_id), 200, false, true);
+    if let Some(filter) = repo_filter {
+        let f_clean = filter.trim().to_lowercase().replace('\\', "/");
+        tree.retain(|p| {
+            let p_repo = p.repo_path.to_lowercase().replace('\\', "/");
+            let p_name = p.repo_name.to_lowercase();
+            p_repo == f_clean
+                || p_repo.contains(&f_clean)
+                || p_name == f_clean
+                || p_name.contains(&f_clean)
+        });
+    }
+    Ok(tree)
+}
+
+/// Helper method to list actively running or in-flight prompts for an instance
+pub fn list_running_prompts_for_instance(instance_id: &str) -> Result<Vec<ActivePrompt>, String> {
+    let conn = connect_db()?;
+    let norm = if instance_id == "default" || instance_id == "__default__" {
+        "default".to_string()
+    } else {
+        crate::modules::instance::resolve_instance_id(instance_id)
+            .unwrap_or_else(|_| instance_id.to_string())
+    };
+    let mut stmt = conn.prepare(
+        "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload
+         FROM active_prompts
+         WHERE (instance_id = ?1 OR (instance_id = '__default__' AND ?1 = 'default'))
+           AND status IN ('running', 'in_flight', 'dispatched')
+         ORDER BY updated_at DESC"
+    ).map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map(params![&norm], |row| {
+            Ok(ActivePrompt {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                instance_id: row.get(2)?,
+                repo_path: row.get(3)?,
+                prompt_content: row.get(4)?,
+                model: row.get(5)?,
+                session_id: row.get(6)?,
+                status: row.get(7)?,
+                created_at: row.get(8)?,
+                updated_at: row.get(9)?,
+                image_payload: row.get(10).ok(),
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .flatten()
+        .collect();
+    Ok(rows)
 }
 
 /// Resolve an AGM or GitMap Sequence ID (`P001`, `AGM:P001`, `GM:#1`, `C001`, `AGM:C001`, `GM:<cid>`, or conversation UUID prefix)

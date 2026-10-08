@@ -604,7 +604,7 @@ export default function Instances() {
     };
 
     return (
-        <div className="h-full w-full overflow-y-auto custom-thin-scrollbar">
+        <div className="h-full w-full overflow-y-auto">
             <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 pt-2 pb-4 space-y-3">
                 {/* Header */}
                 <div className="space-y-3">
@@ -1133,7 +1133,7 @@ export default function Instances() {
                                     "group relative rounded-[5px] border transition-all duration-200 flex flex-col justify-between overflow-hidden backdrop-blur-xs",
                                     isActive
                                         ? cn(SELECTED_CARD_CLASSES, "border-amber-400/50 shadow-md")
-                                        : "bg-white dark:bg-[#0a1e30] border-gray-200/50 dark:border-[#15334d]/60 hover:border-blue-400/40 dark:hover:border-blue-500/40 hover:bg-slate-50/90 dark:hover:bg-[#061421] shadow-xs hover:shadow-md transition-all duration-200 ease-out"
+                                        : "bg-white dark:bg-[#0a1e30] border-gray-200/50 dark:border-[#15334d]/60 hover:border-gray-300/80 dark:hover:border-blue-500/40 hover:bg-slate-50/90 dark:hover:bg-[#061421] shadow-xs"
                                 )}
                             >
                                 {/* Card Mutex Overlay when action is executing */}
@@ -1148,11 +1148,11 @@ export default function Instances() {
 
                                 <div className={cn(
                                     "flex flex-col flex-1 justify-between min-w-0",
-                                    cardDensity === 'compact' ? "p-2" : "p-2.5"
+                                    cardDensity === 'compact' ? "p-2.5" : "p-3.5"
                                 )}>
                                     {/* Card Top */}
                                     <div className="min-w-0">
-                                        <div className="flex items-center justify-between gap-2 mb-2 h-6 flex-nowrap min-w-0">
+                                        <div className="flex items-center justify-between gap-2 mb-2.5 h-6 flex-nowrap min-w-0">
                                             <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-nowrap overflow-hidden">
                                                 <span
                                                     className={cn(
@@ -1255,9 +1255,9 @@ export default function Instances() {
                                             </div>
                                         </div>
 
-                                        {/* Bound Account / Email Section: Compact py-1 px-2 rounded-md */}
+                                        {/* Bound Account / Email Section: Compact py-1 px-2.5 rounded-md */}
                                         <div className={cn(
-                                            "py-1 px-2 rounded-md bg-gray-50/80 dark:bg-[#0c2438]/90 border border-gray-100 dark:border-[#15334d] mb-2 flex items-center justify-between gap-1.5 transition-all duration-200",
+                                            "py-1 px-2.5 rounded-md bg-gray-50/80 dark:bg-[#0c2438]/90 border border-gray-100 dark:border-[#15334d] mb-2.5 flex items-center justify-between gap-1.5 transition-all duration-200",
                                             "group-hover:border-amber-400/40 dark:group-hover:border-amber-400/50 dark:group-hover:bg-[#050f18]"
                                         )}>
                                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
@@ -1293,9 +1293,9 @@ export default function Instances() {
                                         </div>
 
                                         {/* Colorful Gemini Quota & Weekly Progress Bar */}
-                                        <div className="mb-2">
+                                        <div className="mb-2.5">
                                             {(geminiModel || weeklyQuota) ? (
-                                                <div className="p-2 rounded-md bg-gray-50/90 dark:bg-[#0c2438]/90 border border-gray-200/70 dark:border-[#15334d] space-y-1.5">
+                                                <div className="p-2.5 rounded-md bg-gray-50/90 dark:bg-[#0c2438]/90 border border-gray-200/70 dark:border-[#15334d] space-y-2">
                                                     {geminiModel && (
                                                         <div className="space-y-1">
                                                             <div className="flex items-center justify-between text-xs">
@@ -1353,7 +1353,7 @@ export default function Instances() {
                                         </div>
 
                                         {/* Status and Profile details: Compact badge layout */}
-                                        <div className="space-y-1 py-1.5 border-t border-gray-100 dark:border-[#15334d]/80 text-xs">
+                                        <div className="space-y-1.5 py-2 border-t border-gray-100 dark:border-[#15334d]/80 text-xs">
                                             <div className="flex items-center justify-between gap-1.5 flex-wrap">
                                                 {/* Status Badge */}
                                                 {inst.is_running ? (
@@ -1452,8 +1452,8 @@ export default function Instances() {
                                             const displayedProjects = sortedProjects.slice(0, maxP);
 
                                             return (
-                                                <div className="mt-1.5 p-1.5 rounded-[5px] bg-gray-50/80 dark:bg-[#0c2438]/80 border border-gray-200/70 dark:border-[#15334d] text-xs">
-                                                    <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1 pb-0.5 border-b border-gray-200/60 dark:border-[#15334d]/60">
+                                                <div className="mt-2 p-2 rounded-[5px] bg-gray-50/80 dark:bg-[#0c2438]/80 border border-gray-200/70 dark:border-[#15334d] text-xs">
+                                                    <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5 pb-1 border-b border-gray-200/60 dark:border-[#15334d]/60">
                                                         <span className="flex items-center gap-1">
                                                             <Folder className="w-3 h-3 text-blue-500" />
                                                             <span>Active / Recent Projects</span>
@@ -1464,7 +1464,7 @@ export default function Instances() {
                                                     </div>
 
                                                     {displayedProjects.length > 0 ? (
-                                                        <div className="space-y-1 max-h-[110px] overflow-y-auto custom-thin-scrollbar">
+                                                        <div className="space-y-1">
                                                             {displayedProjects.map((proj) => {
                                                                 const isProjRunning = Boolean(inst.is_running) && Boolean(proj.is_running);
                                                                 const totalTurns = proj.conversations?.reduce((sum, c) => sum + Math.max(c.step_count || 1, 1), 0) || 0;
@@ -1472,15 +1472,15 @@ export default function Instances() {
                                                                 return (
                                                                     <div
                                                                         key={proj.project_id}
-                                                                        onDoubleClick={() => setPromptTreeInstance({
+                                                                        onClick={() => setPromptTreeInstance({
                                                                             id: inst.config.id,
                                                                             name: inst.config.name,
                                                                             projectId: proj.project_id,
                                                                             seqNum: inst.config.seq_num,
                                                                             executablePath: inst.config.executable_path,
                                                                         })}
-                                                                        className="flex items-center justify-between gap-1.5 py-1 px-2 rounded-[5px] bg-white dark:bg-[#081a2b] hover:bg-blue-50 dark:hover:bg-[#15334d] border border-gray-200/60 dark:border-[#15334d]/70 hover:border-blue-400/40 dark:hover:border-blue-500/40 transition-colors cursor-pointer group/proj"
-                                                                        title="Double-click to open in Prompt Tree"
+                                                                        className="flex items-center justify-between gap-1.5 px-1.5 py-1 rounded-[5px] bg-white dark:bg-[#081a2b] hover:bg-blue-50 dark:hover:bg-[#15334d] border border-gray-200/50 dark:border-[#15334d]/60 transition-colors cursor-pointer group/proj"
+                                                                        title="Click to view prompts in Prompt Tree"
                                                                     >
                                                                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                                                                             <Folder className="w-3 h-3 shrink-0 text-slate-400 group-hover/proj:text-blue-500 transition-colors" />
@@ -1495,7 +1495,7 @@ export default function Instances() {
                                                                                     RUNNING
                                                                                 </span>
                                                                             )}
-                                                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold text-slate-500 dark:text-slate-400 bg-gray-100/90 dark:bg-[#0c2438] border border-gray-200/60 dark:border-[#15334d]">
+                                                                            <span className="px-1.5 py-0.2 rounded-[4px] text-[9px] font-mono text-slate-500 dark:text-slate-400 bg-gray-100 dark:bg-[#0c2438] border border-gray-200/50 dark:border-[#15334d]">
                                                                                 {totalTurns} turns
                                                                             </span>
                                                                         </div>
@@ -1514,7 +1514,7 @@ export default function Instances() {
                                     </div>
 
                                     {/* Card Actions Toolbar: 2 clean structured rows with 5-6px radius */}
-                                    <div className="pt-2 border-t border-gray-100 dark:border-[#15334d]/80 mt-1.5 space-y-1">
+                                    <div className="pt-2.5 border-t border-gray-100 dark:border-[#15334d]/80 mt-2 space-y-1.5">
                                         {/* Row 1: Primary Actions Capsule (Launch/Stop, Switch Account, Fast-Forward, Sync PID) */}
                                         <div className="flex items-center rounded-[5px] overflow-hidden bg-slate-100 dark:bg-[#071a27] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs w-full">
                                             {inst.is_running ? (

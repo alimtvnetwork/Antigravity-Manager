@@ -1,4 +1,6 @@
-use crate::modules::{account, auto_switcher, backup_prompts_db, config, instance, repo_db};
+use crate::modules::{account, auto_switcher, config, instance};
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
 
 #[cfg(target_os = "windows")]
 fn attach_parent_console() {
@@ -10,6 +12,196 @@ fn attach_parent_console() {
     unsafe {
         AttachConsole(ATTACH_PARENT_PROCESS);
     }
+}
+
+/// Unified argument extractor for AGM CLI commands
+#[derive(Debug, Clone, Default)]
+pub struct CliContext {
+    pub instance_id: Option<String>,
+    pub repo_path: Option<String>,
+    pub json_output: bool,
+    pub all_instances: bool,
+    pub verbose: bool,
+    pub dry_run: bool,
+    pub positional_args: Vec<String>,
+}
+
+impl CliContext {
+    pub fn parse(args: &[String]) -> Self {
+        let mut ctx = Self::default();
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_str() {
+                "-i" | "--instance" | "--profile" => {
+                    if i + 1 < args.len() {
+                        ctx.instance_id = Some(args[i + 1].clone());
+                        i += 1;
+                    }
+                }
+                "-r" | "--repo" | "--workspace" => {
+                    if i + 1 < args.len() {
+                        ctx.repo_path = Some(args[i + 1].clone());
+                        i += 1;
+                    }
+                }
+                "--json" | "-j" => {
+                    ctx.json_output = true;
+                }
+                "-a" | "--all" => {
+                    ctx.all_instances = true;
+                }
+                "-v" | "--verbose" => {
+                    ctx.verbose = true;
+                }
+                "--dry-run" => {
+                    ctx.dry_run = true;
+                }
+                arg if !arg.starts_with('-') => {
+                    ctx.positional_args.push(arg.to_string());
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+        ctx
+    }
+
+    /// Resolves canonical instance ID or falls back to active instance
+    pub fn resolve_target_instance(&self) -> Result<String, String> {
+        if let Some(ref raw_id) = self.instance_id {
+            crate::modules::instance::resolve_instance_id(raw_id)
+        } else {
+            crate::modules::instance::get_active_instance_id()
+        }
+    }
+}
+
+/// Generic JSON envelope for standard CLI responses
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CliEnvelope<T: Serialize> {
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<T>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<CliErrorPayload>,
+    pub meta: CliMetaPayload,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CliErrorPayload {
+    pub code: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CliMetaPayload {
+    pub command: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instance_id: Option<String>,
+    pub timestamp: String,
+    pub version: String,
+}
+
+impl<T: Serialize> CliEnvelope<T> {
+    pub fn ok(command: &str, instance_id: Option<String>, data: T) -> Self {
+        Self {
+            success: true,
+            data: Some(data),
+            error: None,
+            meta: CliMetaPayload {
+                command: command.to_string(),
+                instance_id,
+                timestamp: Utc::now().to_rfc3339(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+            },
+        }
+    }
+
+    pub fn err(command: &str, instance_id: Option<String>, code: &str, message: &str) -> Self {
+        Self {
+            success: false,
+            data: None,
+            error: Some(CliErrorPayload {
+                code: code.to_string(),
+                message: message.to_string(),
+            }),
+            meta: CliMetaPayload {
+                command: command.to_string(),
+                instance_id,
+                timestamp: Utc::now().to_rfc3339(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+            },
+        }
+    }
+
+    pub fn print_and_exit(&self) -> ! {
+        let json_str = serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".to_string());
+        println!("{}", json_str);
+        if self.success {
+            std::process::exit(0);
+        } else {
+            std::process::exit(1);
+        }
+    }
+}
+
+/// Check if the local Antigravity runtime daemon is running on 127.0.0.1:8045
+pub fn is_daemon_running() -> bool {
+    use std::net::{SocketAddr, TcpStream};
+    use std::time::Duration;
+    let addr = SocketAddr::from(([127, 0, 0, 1], 8045));
+    TcpStream::connect_timeout(&addr, Duration::from_millis(150)).is_ok()
+}
+
+/// Helper to forward CLI actions to the local authenticated REST API daemon
+pub fn forward_to_local_rest<T: serde::de::DeserializeOwned>(
+    method: reqwest::Method,
+    path: &str,
+    body: Option<serde_json::Value>,
+) -> Result<T, String> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let admin_token = std::env::var("AGM_ADMIN_TOKEN")
+        .or_else(|_| std::env::var("ABV_API_KEY"))
+        .unwrap_or_else(|_| {
+            crate::modules::config::load_app_config()
+                .ok()
+                .and_then(|c| {
+                    c.proxy
+                        .admin_password
+                        .filter(|p| !p.is_empty())
+                        .or(Some(c.proxy.api_key))
+                })
+                .unwrap_or_default()
+        });
+
+    let norm_path = if path.starts_with('/') {
+        path.to_string()
+    } else {
+        format!("/{}", path)
+    };
+    let url = format!("http://127.0.0.1:8045/api{}", norm_path);
+    let mut req = client.request(method, &url);
+    if !admin_token.is_empty() {
+        req = req.header("Authorization", format!("Bearer {}", admin_token));
+        req = req.header("x-api-key", &admin_token);
+    }
+    if let Some(json_payload) = body {
+        req = req.json(&json_payload);
+    }
+
+    let resp = req
+        .send()
+        .map_err(|e| format!("Daemon communication failed: {}", e))?;
+    if !resp.status().is_success() {
+        return Err(format!("Daemon returned HTTP status {}", resp.status()));
+    }
+
+    resp.json::<T>()
+        .map_err(|e| format!("Failed to parse response: {}", e))
 }
 
 /// Check and handle CLI arguments passed from terminal.
@@ -165,8 +357,6 @@ pub fn handle_cli_arguments() -> bool {
                     "auto-switch" | "autoswitch" | "auto" => print_auto_switch_cli_help(),
                     "agy" | "cache" | "clean" => print_agy_cli_help(),
                     "supabase" | "sb" => print_supabase_cli_help(),
-                    "prompts" | "prompt" | "prompt-tree" => print_prompts_cli_help(),
-                    "doctor" | "check" => print_doctor_cli_help(),
                     _ => print_all_cli_help(),
                 }
             } else {
@@ -222,16 +412,6 @@ pub fn handle_cli_arguments() -> bool {
 
         "supabase" | "sb" => {
             handle_supabase_subcommand(&rest_args);
-            true
-        }
-
-        "prompts" | "prompt" | "prompt-tree" => {
-            handle_prompts_subcommand(&rest_args);
-            true
-        }
-
-        "doctor" | "check" => {
-            handle_doctor_command(&rest_args);
             true
         }
 
@@ -1295,10 +1475,6 @@ fn print_all_cli_help() {
     println!("  switch, switch-account       Directly switch authenticated Google Gemini accounts");
     println!("  auto-switch, auto            Autonomous rolling quota background monitor daemon");
     println!("  fast-forward, ff             Rotate profile immediately to the healthiest account");
-    println!(
-        "  prompts, prompt              List, inspect tree, backup, and restore active prompts"
-    );
-    println!("  doctor, check                Run comprehensive system health diagnostics");
     println!("  agy                          Prune conversation steps and clear local cache");
     println!("  update                       Perform fleet-wide update & diagnostic verification");
     println!("  ui, open-ui                  Launch the graphical desktop interface");
@@ -1315,10 +1491,6 @@ fn print_all_cli_help() {
     print_switch_cli_help();
     println!();
     print_auto_switch_cli_help();
-    println!();
-    print_prompts_cli_help();
-    println!();
-    print_doctor_cli_help();
     println!();
     print_supabase_cli_help();
 }
@@ -1706,560 +1878,5 @@ fn print_preflight_report(report: &crate::modules::agy_cleaner::PreflightReport)
     println!("  [NOTE] Temporary directories may be pruned by the OS over time; revert promptly if needed.");
     println!("================================================================================");
     println!(" [NOTE] Pre-flight mode active. No files modified. No processes terminated.");
-    println!("================================================================================");
-}
-
-// -----------------------------------------------------------------------------
-// Prompts Subcommand Handler
-// -----------------------------------------------------------------------------
-
-fn handle_prompts_subcommand(args: &[String]) {
-    if args.is_empty() || is_flag_present(args, &["--help", "-h", "help"]) {
-        print_prompts_cli_help();
-        std::process::exit(0);
-    }
-
-    let sub = args[0].to_lowercase();
-    let sub_args = &args[1..];
-
-    match sub.as_str() {
-        "ls" | "list" => {
-            let is_json = is_flag_present(sub_args, &["--json", "-j"]);
-            let is_all = is_flag_present(sub_args, &["--all", "-a"]);
-            let is_force = is_flag_present(sub_args, &["--force", "-f", "--refresh"]);
-            let is_running_only = !is_all;
-
-            let mut instance_id: Option<String> = None;
-            let mut i = 0;
-            while i < sub_args.len() {
-                let arg_low = sub_args[i].to_lowercase();
-                if (arg_low == "--instance" || arg_low == "-i") && i + 1 < sub_args.len() {
-                    instance_id = Some(sub_args[i + 1].clone());
-                    i += 2;
-                    continue;
-                }
-                i += 1;
-            }
-
-            let resolved_inst = instance_id.as_deref().and_then(|id| {
-                instance::resolve_instance_id(id)
-                    .ok()
-                    .or_else(|| Some(id.to_string()))
-            });
-
-            let tree = repo_db::get_project_conversation_tree_cached(
-                resolved_inst.as_deref(),
-                100,
-                is_running_only,
-                is_force,
-            );
-
-            if is_json {
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&tree).unwrap_or_else(|_| "[]".to_string())
-                );
-                std::process::exit(0);
-            }
-
-            println!(
-                "\nActive Prompts & Workspaces ({} projects detected):",
-                tree.len()
-            );
-            println!(
-                "{:<8} {:<24} {:<12} {:<10} {:<32} {}",
-                "SEQ", "PROJECT", "INSTANCE", "STATUS", "CONVERSATION", "PROMPT SNIPPET"
-            );
-            println!("{}", "-".repeat(110));
-
-            let mut total_prompts = 0usize;
-            for p in &tree {
-                for c in &p.conversations {
-                    total_prompts += 1;
-                    let display_conv = if c.title.len() > 30 {
-                        format!("{}...", &c.title[..28])
-                    } else if !c.title.is_empty() {
-                        c.title.clone()
-                    } else {
-                        c.short_id.clone()
-                    };
-                    let snippet = c.prompt_preview_200w.replace('\n', " ");
-                    let display_snippet = if snippet.len() > 36 {
-                        format!("{}...", &snippet[..34])
-                    } else {
-                        snippet
-                    };
-                    println!(
-                        "{:<8} {:<24} {:<12} {:<10} {:<32} {}",
-                        c.seq_code,
-                        if p.repo_name.len() > 22 {
-                            format!("{}...", &p.repo_name[..20])
-                        } else {
-                            p.repo_name.clone()
-                        },
-                        p.instance_id,
-                        if c.is_running { "RUNNING" } else { "IDLE" },
-                        display_conv,
-                        display_snippet
-                    );
-                }
-            }
-
-            if total_prompts == 0 {
-                println!("  (No matching active prompts found. Use '--all' to display idle conversations)");
-            } else {
-                println!("\nTotal prompts listed: {}", total_prompts);
-            }
-            std::process::exit(0);
-        }
-
-        "tree" => {
-            let is_json = is_flag_present(sub_args, &["--json", "-j"]);
-            let is_all = is_flag_present(sub_args, &["--all", "-a"]);
-            let is_force = is_flag_present(sub_args, &["--force", "-f", "--refresh"]);
-            let is_running_only = !is_all;
-
-            let mut instance_id: Option<String> = None;
-            let mut i = 0;
-            while i < sub_args.len() {
-                let arg_low = sub_args[i].to_lowercase();
-                if (arg_low == "--instance" || arg_low == "-i") && i + 1 < sub_args.len() {
-                    instance_id = Some(sub_args[i + 1].clone());
-                    i += 2;
-                    continue;
-                }
-                i += 1;
-            }
-
-            let resolved_inst = instance_id.as_deref().and_then(|id| {
-                instance::resolve_instance_id(id)
-                    .ok()
-                    .or_else(|| Some(id.to_string()))
-            });
-
-            let tree = repo_db::get_project_conversation_tree_cached(
-                resolved_inst.as_deref(),
-                150,
-                is_running_only,
-                is_force,
-            );
-
-            if is_json {
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&tree).unwrap_or_else(|_| "[]".to_string())
-                );
-                std::process::exit(0);
-            }
-
-            println!("\nAntigravity Project Conversation Tree:");
-            if tree.is_empty() {
-                println!("  (No projects or active conversations found. Use '--all' to inspect all workspaces)");
-                std::process::exit(0);
-            }
-
-            for (p_idx, p) in tree.iter().enumerate() {
-                let is_p_last = p_idx + 1 == tree.len();
-                let p_prefix = if is_p_last {
-                    "└── "
-                } else {
-                    "├── "
-                };
-                let child_indent = if is_p_last { "    " } else { "│   " };
-
-                let p_status = if p.is_running { "[RUNNING]" } else { "[IDLE]" };
-                println!(
-                    "{}[{}] {} ({}) {}",
-                    p_prefix, p.seq_code, p.repo_name, p.instance_id, p_status
-                );
-
-                for (c_idx, c) in p.conversations.iter().enumerate() {
-                    let is_c_last = c_idx + 1 == p.conversations.len();
-                    let c_prefix = if is_c_last {
-                        "└── "
-                    } else {
-                        "├── "
-                    };
-                    let c_indent = if is_c_last { "    " } else { "│   " };
-
-                    let c_status = if c.is_running { "[RUNNING]" } else { "[IDLE]" };
-                    let title = if !c.title.is_empty() {
-                        &c.title
-                    } else {
-                        &c.short_id
-                    };
-                    println!(
-                        "{}{}[{}] \"{}\" (steps: {}) {}",
-                        child_indent, c_prefix, c.seq_code, title, c.step_count, c_status
-                    );
-
-                    if !c.prompt_preview_200w.is_empty() {
-                        let single_line = c.prompt_preview_200w.replace('\n', " ");
-                        let preview = if single_line.len() > 80 {
-                            format!("{}...", &single_line[..78])
-                        } else {
-                            single_line
-                        };
-                        println!("{}{}{}└─ \"{}\"", child_indent, c_indent, "", preview);
-                    }
-                }
-            }
-            std::process::exit(0);
-        }
-
-        "backup" => {
-            let is_json = is_flag_present(sub_args, &["--json", "-j"]);
-            let mut instance_id: Option<String> = None;
-            let mut custom_file: Option<String> = None;
-
-            let mut i = 0;
-            while i < sub_args.len() {
-                let arg_low = sub_args[i].to_lowercase();
-                if (arg_low == "--instance" || arg_low == "-i") && i + 1 < sub_args.len() {
-                    instance_id = Some(sub_args[i + 1].clone());
-                    i += 2;
-                    continue;
-                }
-                if (arg_low == "--file" || arg_low == "-f") && i + 1 < sub_args.len() {
-                    custom_file = Some(sub_args[i + 1].clone());
-                    i += 2;
-                    continue;
-                }
-                i += 1;
-            }
-
-            let resolved_inst = instance_id.as_deref().and_then(|id| {
-                instance::resolve_instance_id(id)
-                    .ok()
-                    .or_else(|| Some(id.to_string()))
-            });
-
-            match backup_prompts_db::backup_active_running_prompts(
-                resolved_inst.as_deref(),
-                custom_file.as_deref(),
-            ) {
-                Ok((batch_info, records)) => {
-                    if is_json {
-                        let out = serde_json::json!({
-                            "batch": batch_info,
-                            "records": records,
-                        });
-                        println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
-                        std::process::exit(0);
-                    }
-                    println!("\n[SUCCESS] Active prompts backed up successfully!");
-                    println!("  Batch ID:         {}", batch_info.id);
-                    println!("  Prompts Count:    {}", batch_info.prompts_count);
-                    println!("  Storage Target:   {}", batch_info.file_path);
-                    println!("  Retention Period: {} days", batch_info.retention_days);
-                    std::process::exit(0);
-                }
-                Err(e) => {
-                    eprintln!("[ERROR] Prompt backup failed: {}", e);
-                    std::process::exit(1);
-                }
-            }
-        }
-
-        "restore" => {
-            let is_json = is_flag_present(sub_args, &["--json", "-j"]);
-            let is_keep_backup = is_flag_present(sub_args, &["--keep", "-k"]);
-            let mut instance_id: Option<String> = None;
-            let mut custom_file: Option<String> = None;
-
-            let mut i = 0;
-            while i < sub_args.len() {
-                let arg_low = sub_args[i].to_lowercase();
-                if (arg_low == "--instance" || arg_low == "-i") && i + 1 < sub_args.len() {
-                    instance_id = Some(sub_args[i + 1].clone());
-                    i += 2;
-                    continue;
-                }
-                if (arg_low == "--file" || arg_low == "-f") && i + 1 < sub_args.len() {
-                    custom_file = Some(sub_args[i + 1].clone());
-                    i += 2;
-                    continue;
-                }
-                i += 1;
-            }
-
-            let resolved_inst = instance_id.as_deref().and_then(|id| {
-                instance::resolve_instance_id(id)
-                    .ok()
-                    .or_else(|| Some(id.to_string()))
-            });
-
-            match backup_prompts_db::restore_running_prompts(
-                resolved_inst.as_deref(),
-                is_keep_backup,
-                custom_file.as_deref(),
-            ) {
-                Ok(restored) => {
-                    if is_json {
-                        println!(
-                            "{}",
-                            serde_json::to_string_pretty(&restored).unwrap_or_default()
-                        );
-                        std::process::exit(0);
-                    }
-                    println!("\n[SUCCESS] Prompt restoration completed!");
-                    println!("  Restored Prompts: {}", restored.len());
-                    for r in &restored {
-                        println!(
-                            "    • [{}] Project: {} (Conv: {})",
-                            r.id, r.project_name, r.conversation_id
-                        );
-                    }
-                    std::process::exit(0);
-                }
-                Err(e) => {
-                    eprintln!("[ERROR] Prompt restoration failed: {}", e);
-                    std::process::exit(1);
-                }
-            }
-        }
-
-        _ => {
-            eprintln!("[ERROR] Unknown prompts subcommand '{}'.", sub);
-            println!("Run 'antigravity-manager prompts --help' for usage instructions.");
-            std::process::exit(1);
-        }
-    }
-}
-
-fn print_prompts_cli_help() {
-    println!("================================================================================");
-    println!("         Antigravity-Manager: Prompts & Workspace Conversation Tree CLI        ");
-    println!("================================================================================");
-    println!("Usage:");
-    println!("  antigravity-manager prompts <subcommand> [options]");
-    println!("  agm prompts <subcommand> [options]");
-    println!();
-    println!("Aliases: prompts, prompt, prompt-tree");
-    println!();
-    println!("Subcommands:");
-    println!(
-        "  ls, list                         List active running prompts and workspace targets"
-    );
-    println!("  tree                             Display ASCII hierarchical conversation tree");
-    println!(
-        "  backup                           Backup active running prompts into split SQLite DB"
-    );
-    println!("  restore                          Restore backed up prompts for active profiles");
-    println!();
-    println!("Options & Flags:");
-    println!("  --instance, -i <id>              Filter or scope to a specific instance profile");
-    println!("  --all, -a                        Include idle/historical conversations (default: running only)");
-    println!(
-        "  --force, -f, --refresh           Bypass SQLite tree cache and re-scan live workspaces"
-    );
-    println!("  --keep, -k                       Keep backup records marked active after restore");
-    println!("  --json, -j                       Output structured JSON format");
-    println!();
-    println!("Examples:");
-    println!("  # List all currently running prompts across all profiles");
-    println!("  antigravity-manager prompts ls");
-    println!();
-    println!("  # View ASCII tree of active workspaces for a specific instance");
-    println!("  antigravity-manager prompts tree -i default");
-    println!();
-    println!("  # Output full conversation tree in JSON format");
-    println!("  antigravity-manager prompts tree --all --json");
-    println!();
-    println!("  # Backup active running prompts before maintenance");
-    println!("  antigravity-manager prompts backup");
-    println!();
-    println!("  # Restore backed up prompts for instance #2");
-    println!("  antigravity-manager prompts restore -i #2");
-    println!("================================================================================");
-}
-
-// -----------------------------------------------------------------------------
-// Doctor & Health Diagnostic Subcommand Handler
-// -----------------------------------------------------------------------------
-
-fn handle_doctor_command(args: &[String]) {
-    if is_flag_present(args, &["--help", "-h", "help"]) {
-        print_doctor_cli_help();
-        std::process::exit(0);
-    }
-
-    let is_json = is_flag_present(args, &["--json", "-j"]);
-
-    // 1. Account check
-    let (is_accounts_healthy, accounts_count, accounts_msg) = match account::load_account_index() {
-        Ok(idx) => {
-            let active = idx.accounts.iter().filter(|a| !a.disabled).count();
-            (
-                true,
-                idx.accounts.len(),
-                format!("{} accounts ({} active)", idx.accounts.len(), active),
-            )
-        }
-        Err(e) => (false, 0, format!("Failed to read accounts: {}", e)),
-    };
-
-    // 2. Instances check
-    let (is_instances_healthy, instances_count, instances_msg) = match instance::list_instances() {
-        Ok(insts) => {
-            let running = insts.iter().filter(|i| i.is_running).count();
-            (
-                true,
-                insts.len(),
-                format!("{} profiles ({} running)", insts.len(), running),
-            )
-        }
-        Err(e) => (false, 0, format!("Failed to list instances: {}", e)),
-    };
-
-    // 3. Repo DB check
-    let (is_repo_db_healthy, prompts_count, repo_db_msg) = match repo_db::connect_db() {
-        Ok(_) => {
-            let p_count = repo_db::list_all_prompts().map(|v| v.len()).unwrap_or(0);
-            (
-                true,
-                p_count,
-                format!("Connected successfully ({} active prompt records)", p_count),
-            )
-        }
-        Err(e) => (false, 0, format!("Connection failed: {}", e)),
-    };
-
-    // 4. Backup DB check
-    let (is_backup_db_healthy, backup_db_msg) = match backup_prompts_db::connect_backup_db(None) {
-        Ok(_) => (true, "Connected successfully".to_string()),
-        Err(e) => (false, format!("Connection failed: {}", e)),
-    };
-
-    // 5. Proxy Gateway check (127.0.0.1:8045)
-    let is_gateway_online = std::net::TcpStream::connect_timeout(
-        &std::net::SocketAddr::from(([127, 0, 0, 1], 8045)),
-        std::time::Duration::from_millis(500),
-    )
-    .is_ok();
-    let gateway_msg = if is_gateway_online {
-        "Online & listening on 127.0.0.1:8045 (OK)".to_string()
-    } else {
-        "Offline on port 8045 (Normal if desktop app is closed)".to_string()
-    };
-
-    let is_overall_healthy =
-        is_accounts_healthy && is_instances_healthy && is_repo_db_healthy && is_backup_db_healthy;
-
-    if is_json {
-        let report = serde_json::json!({
-            "is_overall_healthy": is_overall_healthy,
-            "is_accounts_healthy": is_accounts_healthy,
-            "accounts_count": accounts_count,
-            "is_instances_healthy": is_instances_healthy,
-            "instances_count": instances_count,
-            "is_repo_db_healthy": is_repo_db_healthy,
-            "prompts_count": prompts_count,
-            "is_backup_db_healthy": is_backup_db_healthy,
-            "is_gateway_online": is_gateway_online,
-            "diagnostics": {
-                "accounts": accounts_msg,
-                "instances": instances_msg,
-                "repo_db": repo_db_msg,
-                "backup_db": backup_db_msg,
-                "gateway": gateway_msg,
-            }
-        });
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&report).unwrap_or_default()
-        );
-        std::process::exit(if is_overall_healthy { 0 } else { 1 });
-    }
-
-    println!("================================================================================");
-    println!("             Antigravity-Manager System Health & Doctor Report                  ");
-    println!("================================================================================");
-    println!("  {:<24} {:<8} {}", "SUBSYSTEM", "STATUS", "DETAILS");
-    println!("  {}", "-".repeat(76));
-
-    let acc_status = if is_accounts_healthy {
-        "[PASS]"
-    } else {
-        "[FAIL]"
-    };
-    println!(
-        "  {:<24} {:<8} {}",
-        "Account Registry", acc_status, accounts_msg
-    );
-
-    let inst_status = if is_instances_healthy {
-        "[PASS]"
-    } else {
-        "[FAIL]"
-    };
-    println!(
-        "  {:<24} {:<8} {}",
-        "Instance Profiles", inst_status, instances_msg
-    );
-
-    let rdb_status = if is_repo_db_healthy {
-        "[PASS]"
-    } else {
-        "[FAIL]"
-    };
-    println!(
-        "  {:<24} {:<8} {}",
-        "Repo State DB", rdb_status, repo_db_msg
-    );
-
-    let bdb_status = if is_backup_db_healthy {
-        "[PASS]"
-    } else {
-        "[FAIL]"
-    };
-    println!(
-        "  {:<24} {:<8} {}",
-        "Prompt Backup DB", bdb_status, backup_db_msg
-    );
-
-    let gw_status = if is_gateway_online {
-        "[ONLINE]"
-    } else {
-        "[STANDBY]"
-    };
-    println!("  {:<24} {:<8} {}", "Proxy Gateway", gw_status, gateway_msg);
-
-    println!("================================================================================");
-    if is_overall_healthy {
-        println!("  System Status: HEALTHY - All core databases and registries are accessible.");
-    } else {
-        println!("  System Status: ATTENTION REQUIRED - One or more components reported errors.");
-    }
-    println!("================================================================================");
-
-    std::process::exit(if is_overall_healthy { 0 } else { 1 });
-}
-
-fn print_doctor_cli_help() {
-    println!("================================================================================");
-    println!("             Antigravity-Manager: System Doctor & Diagnostics CLI               ");
-    println!("================================================================================");
-    println!("Usage:");
-    println!("  antigravity-manager doctor [options]");
-    println!("  agm check [options]");
-    println!();
-    println!("Aliases: doctor, check");
-    println!();
-    println!("Description:");
-    println!("  Runs non-destructive self-diagnostics across accounts, instances, Split-DB");
-    println!("  registries (repo_db, prompt_backup_db), and the local AI Proxy Gateway.");
-    println!();
-    println!("Options & Flags:");
-    println!(
-        "  --json, -j                       Output diagnostic report in structured JSON format"
-    );
-    println!();
-    println!("Examples:");
-    println!("  # Run full system diagnostics");
-    println!("  antigravity-manager doctor");
-    println!();
-    println!("  # Machine-readable health check");
-    println!("  antigravity-manager doctor --json");
     println!("================================================================================");
 }

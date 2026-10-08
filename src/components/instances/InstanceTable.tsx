@@ -133,7 +133,7 @@ export default function InstanceTable({
 
     return (
         <div className="w-full overflow-hidden rounded-[5px] border border-slate-200/90 dark:border-slate-800/90 bg-white dark:bg-[#0c2438] shadow-xs">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-[#15334d]">
                 <table className="w-full text-left text-xs">
                     <thead>
                         <tr className="border-b border-slate-200/90 dark:border-slate-800/90 bg-slate-50/80 dark:bg-[#071a27] text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -207,7 +207,7 @@ export default function InstanceTable({
                                     )}
                                 >
                                     {/* 1. Merged Profile & Account */}
-                                    <td className="px-2 py-1.5 min-w-[150px] max-w-[190px]">
+                                    <td className="px-2 py-1 min-w-[150px] max-w-[190px]">
                                         <div className="flex items-center gap-1.5 flex-wrap">
                                             <span className="px-1.5 py-0.5 rounded-[5px] text-[10px] font-mono font-bold bg-slate-100 dark:bg-[#071a27] text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-[#15334d]">
                                                 #{seq}
@@ -287,9 +287,9 @@ export default function InstanceTable({
                                     </td>
 
                                     {/* 2. Model Quota & Weekly Quota */}
-                                    <td className="px-2 py-1.5 whitespace-nowrap min-w-[160px] max-w-[200px]">
+                                    <td className="px-2 py-1 whitespace-nowrap min-w-[150px] max-w-[190px]">
                                         {(percentage !== null || weeklyQuota !== null) ? (
-                                            <div className="space-y-1.5 min-w-[150px]">
+                                            <div className="space-y-1 min-w-[150px]">
                                                 {percentage !== null && (
                                                     <div className="space-y-0.5">
                                                         <div className="flex items-center justify-between text-[10px] font-mono">
@@ -324,7 +324,7 @@ export default function InstanceTable({
                                     </td>
 
                                     {/* 3. Status & PID */}
-                                    <td className="px-2 py-1.5 whitespace-nowrap min-w-[90px] max-w-[110px]">
+                                    <td className="px-2 py-1 whitespace-nowrap min-w-[90px] max-w-[110px]">
                                         {isBusy ? (
                                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[5px] text-[11px] font-bold bg-blue-50 text-blue-700 dark:bg-cyan-950/60 dark:text-cyan-300 border border-blue-300/60 dark:border-cyan-500/40 animate-pulse shadow-2xs">
                                                 <RotateCw className="w-3 h-3 animate-spin text-blue-500 dark:text-cyan-400 shrink-0" />
@@ -344,7 +344,7 @@ export default function InstanceTable({
 
                                     {/* 4. Executable / Data Path */}
                                     <td
-                                        className="px-2 py-1.5 whitespace-nowrap min-w-[110px] max-w-[130px]"
+                                        className="px-2 py-1 whitespace-nowrap min-w-[110px] max-w-[130px]"
                                         title={(inst as any).data_dir || inst.config.data_dir || inst.config.executable_path}
                                     >
                                         {(() => {
@@ -374,7 +374,7 @@ export default function InstanceTable({
                                     </td>
 
                                     {/* 5. Actions: 3 Primary + More Dropdown */}
-                                    <td className="px-2 py-1.5 text-right whitespace-nowrap w-[130px]">
+                                    <td className="px-2 py-1 text-right whitespace-nowrap w-[130px]">
                                         <div className="inline-flex items-center rounded-[5px] overflow-hidden bg-slate-100 dark:bg-[#071a27] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
                                             {/* Primary 1: Launch / Stop */}
                                             {/* Primary 1: Split Stop / Restart when running, or Launch when stopped */}

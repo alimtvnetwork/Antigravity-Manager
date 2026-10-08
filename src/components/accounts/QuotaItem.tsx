@@ -69,7 +69,7 @@ export function QuotaItem({
         <div className="min-w-0">
             <div
                 className={cn(
-                    "relative h-[22px] flex items-center px-1.5 rounded-md border border-slate-200/80 dark:border-slate-800/80 bg-slate-100/90 dark:bg-[#071a27]/90 group/quota gap-1.5",
+                    "relative h-[20px] flex items-center px-1.5 rounded-md border border-slate-200/80 dark:border-slate-800/80 bg-slate-100/90 dark:bg-[#071a27]/90 group/quota gap-1.5",
                     showLiveIssue && "border-amber-400/70 dark:border-amber-500/70 bg-amber-50/80 dark:bg-amber-950/30 ring-1 ring-amber-400/30",
                     isUnavailable && "border-rose-400/70 dark:border-rose-500/70 bg-rose-50/80 dark:bg-rose-950/30 ring-rose-400/30",
                     className

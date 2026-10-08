@@ -717,6 +717,38 @@ impl AxumServer {
         // 2. Build management API (mandatory authentication)
         let admin_routes = Router::new()
             .route("/health", get(health_check_handler))
+            // ── Instance Management REST Routes ──
+            .route(
+                "/instances",
+                get(admin_list_instances).post(admin_create_instance),
+            )
+            .route(
+                "/instances/:id",
+                get(admin_get_instance_detail).delete(admin_delete_instance),
+            )
+            .route("/instances/:id/status", get(admin_get_instance_status))
+            .route("/instances/:id/start", post(admin_start_instance))
+            .route("/instances/:id/stop", post(admin_stop_instance))
+            .route("/instances/:id/restart", post(admin_restart_instance))
+            .route("/instances/:id/switch", post(admin_switch_instance_account))
+            .route("/instances/:id/clone", post(admin_clone_instance))
+            .route("/instances/:id/logs", get(admin_get_instance_logs))
+            // ── Prompt Lifecycle REST Routes ──
+            .route(
+                "/prompts",
+                get(admin_list_prompts).post(admin_dispatch_prompt),
+            )
+            .route("/prompts/tree", get(admin_get_prompt_tree))
+            .route("/prompts/running", get(admin_get_running_prompts))
+            .route("/prompts/dispatch", post(admin_dispatch_prompt))
+            .route("/prompts/queue/tick", post(admin_tick_prompt_queue))
+            .route("/prompts/backup", post(admin_backup_prompts))
+            .route("/prompts/restore", post(admin_restore_prompts))
+            .route("/prompts/purge", post(admin_purge_prompts))
+            .route("/prompts/:id", get(admin_get_prompt_detail))
+            // ── System Diagnostics REST Routes ──
+            .route("/system/db-stats", get(admin_get_db_stats))
+            .route("/system/vacuum", post(admin_vacuum_system))
             .route(
                 "/accounts",
                 get(admin_list_accounts).post(admin_add_account),
@@ -4854,6 +4886,647 @@ async fn admin_get_droid_config_content(
                 Json(ErrorResponse { error: e }),
             )
         })
+}
+
+// ── Subtask 04 REST Handlers: Instances, Prompts, and System ──
+
+fn log_admin_audit(endpoint: &str, method: &str, status_code: i32) {
+    let log = crate::modules::security_db::IpAccessLog {
+        id: uuid::Uuid::new_v4().to_string(),
+        client_ip: "127.0.0.1".to_string(),
+        timestamp: chrono::Utc::now().timestamp(),
+        method: Some(method.to_string()),
+        path: Some(endpoint.to_string()),
+        user_agent: Some("AGM-REST-Admin".to_string()),
+        status: Some(status_code),
+        duration: Some(0),
+        api_key_hash: None,
+        blocked: false,
+        block_reason: None,
+        username: Some("admin".to_string()),
+    };
+    let _ = crate::modules::security_db::save_ip_access_log(&log);
+}
+
+// ── Instance Handlers ──
+
+async fn admin_list_instances() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit("/api/instances", "GET", 200);
+    match crate::modules::instance::list_instances() {
+        Ok(instances) => {
+            let enriched: Vec<serde_json::Value> = instances
+                .iter()
+                .map(|inst| {
+                    let status_str = if inst.is_running { "running" } else { "idle" };
+                    serde_json::json!({
+                        "id": inst.config.id,
+                        "name": inst.config.name,
+                        "status": status_str,
+                        "data_dir": inst.config.data_dir,
+                        "is_running": inst.is_running,
+                        "pid": inst.pid,
+                        "bound_email": inst.config.bound_email,
+                        "config": inst.config,
+                    })
+                })
+                .collect();
+            Ok(Json(serde_json::json!({
+                "success": true,
+                "data": enriched,
+                "error": null,
+            })))
+        }
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+    }
+}
+
+#[derive(Deserialize, Default)]
+struct CreateInstancePayload {
+    name: String,
+    account: Option<String>,
+    from: Option<String>,
+}
+
+async fn admin_create_instance(
+    Json(payload): Json<CreateInstancePayload>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit("/api/instances", "POST", 201);
+    let result = if let Some(ref source) = payload.from {
+        let resolved_src = crate::modules::instance::resolve_instance_id(source)
+            .unwrap_or_else(|_| source.clone());
+        crate::modules::instance::copy_instance(&resolved_src, payload.name, Some("full"))
+    } else {
+        crate::modules::instance::create_instance_with_account(
+            payload.name,
+            payload.account.as_deref(),
+        )
+    };
+
+    match result {
+        Ok(cfg) => Ok((
+            StatusCode::CREATED,
+            Json(serde_json::json!({
+                "success": true,
+                "data": cfg,
+                "error": null,
+            })),
+        )),
+        Err(e) => Err((StatusCode::BAD_REQUEST, Json(ErrorResponse { error: e }))),
+    }
+}
+
+async fn admin_get_instance_detail(
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit(&format!("/api/instances/{}", id), "GET", 200);
+    let resolved =
+        crate::modules::instance::resolve_instance_id(&id).unwrap_or_else(|_| id.clone());
+    let instances = crate::modules::instance::list_instances().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )
+    })?;
+
+    if let Some(target) = instances
+        .into_iter()
+        .find(|i| i.config.id == resolved || i.config.name == resolved)
+    {
+        Ok(Json(
+            serde_json::json!({ "success": true, "data": target, "error": null }),
+        ))
+    } else {
+        Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: format!("Instance '{}' not found", id),
+            }),
+        ))
+    }
+}
+
+async fn admin_delete_instance(
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit(&format!("/api/instances/{}", id), "DELETE", 200);
+    let resolved =
+        crate::modules::instance::resolve_instance_id(&id).unwrap_or_else(|_| id.clone());
+    match crate::modules::instance::delete_instance(&resolved) {
+        Ok(_) => Ok(Json(serde_json::json!({
+            "success": true,
+            "data": { "id": resolved, "deleted": true },
+            "error": null,
+        }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+    }
+}
+
+async fn admin_get_instance_status(
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit(&format!("/api/instances/{}/status", id), "GET", 200);
+    let resolved =
+        crate::modules::instance::resolve_instance_id(&id).unwrap_or_else(|_| id.clone());
+    let instances = crate::modules::instance::list_instances().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )
+    })?;
+
+    if let Some(target) = instances
+        .into_iter()
+        .find(|i| i.config.id == resolved || i.config.name == resolved)
+    {
+        Ok(Json(serde_json::json!({
+            "success": true,
+            "data": {
+                "id": target.config.id,
+                "name": target.config.name,
+                "is_running": target.is_running,
+                "pid": target.pid,
+                "data_dir": target.config.data_dir,
+            },
+            "error": null,
+        })))
+    } else {
+        Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: format!("Instance '{}' not found", id),
+            }),
+        ))
+    }
+}
+
+#[derive(Deserialize, Default)]
+struct LaunchInstancePayload {
+    #[serde(rename = "repoPath")]
+    repo_path: Option<String>,
+}
+
+async fn admin_start_instance(
+    Path(id): Path<String>,
+    Json(payload): Json<Option<LaunchInstancePayload>>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit(&format!("/api/instances/{}/start", id), "POST", 200);
+    let resolved =
+        crate::modules::instance::resolve_instance_id(&id).unwrap_or_else(|_| id.clone());
+    let repo_opt = payload.and_then(|p| p.repo_path);
+    let extra = repo_opt.as_ref().map(|r| vec![r.clone()]);
+    match crate::modules::instance::launch_instance_with_workspaces(
+        &resolved,
+        extra.as_deref(),
+        true,
+    ) {
+        Ok(_) => Ok(Json(serde_json::json!({
+            "success": true,
+            "data": { "id": resolved, "status": "running" },
+            "error": null,
+        }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )),
+    }
+}
+
+async fn admin_stop_instance(
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit(&format!("/api/instances/{}/stop", id), "POST", 200);
+    let resolved =
+        crate::modules::instance::resolve_instance_id(&id).unwrap_or_else(|_| id.clone());
+    match crate::modules::instance::stop_instance(&resolved) {
+        Ok(_) => Ok(Json(serde_json::json!({
+            "success": true,
+            "data": { "id": resolved, "status": "stopped" },
+            "error": null,
+        }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+    }
+}
+
+async fn admin_restart_instance(
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit(&format!("/api/instances/{}/restart", id), "POST", 200);
+    let resolved =
+        crate::modules::instance::resolve_instance_id(&id).unwrap_or_else(|_| id.clone());
+    let _ = crate::modules::instance::stop_instance(&resolved);
+    match crate::modules::instance::launch_instance(&resolved) {
+        Ok(_) => Ok(Json(serde_json::json!({
+            "success": true,
+            "data": { "id": resolved, "status": "restarted" },
+            "error": null,
+        }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )),
+    }
+}
+
+#[derive(Deserialize)]
+struct SwitchInstanceAccountPayload {
+    account: Option<String>,
+    #[serde(rename = "accountId")]
+    account_id: Option<String>,
+}
+
+async fn admin_switch_instance_account(
+    Path(id): Path<String>,
+    Json(payload): Json<SwitchInstanceAccountPayload>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit(&format!("/api/instances/{}/switch", id), "POST", 200);
+    let resolved =
+        crate::modules::instance::resolve_instance_id(&id).unwrap_or_else(|_| id.clone());
+    let target_acc = payload.account.or(payload.account_id).unwrap_or_default();
+    if target_acc.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "Missing account query parameter".to_string(),
+            }),
+        ));
+    }
+    match crate::modules::instance::switch_account_to_instance(&target_acc, Some(&resolved)).await {
+        Ok(_) => Ok(Json(serde_json::json!({
+            "success": true,
+            "data": { "instance_id": resolved, "account": target_acc },
+            "error": null,
+        }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+    }
+}
+
+#[derive(Deserialize)]
+struct CloneInstancePayload {
+    name: String,
+}
+
+async fn admin_clone_instance(
+    Path(id): Path<String>,
+    Json(payload): Json<CloneInstancePayload>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit(&format!("/api/instances/{}/clone", id), "POST", 201);
+    let resolved =
+        crate::modules::instance::resolve_instance_id(&id).unwrap_or_else(|_| id.clone());
+    match crate::modules::instance::copy_instance(&resolved, payload.name, Some("full")) {
+        Ok(cfg) => Ok((
+            StatusCode::CREATED,
+            Json(serde_json::json!({
+                "success": true,
+                "data": cfg,
+                "error": null,
+            })),
+        )),
+        Err(e) => Err((StatusCode::BAD_REQUEST, Json(ErrorResponse { error: e }))),
+    }
+}
+
+async fn admin_get_instance_logs(
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit(&format!("/api/instances/{}/logs", id), "GET", 200);
+    let resolved =
+        crate::modules::instance::resolve_instance_id(&id).unwrap_or_else(|_| id.clone());
+    let reg = crate::modules::instance::load_registry().unwrap_or_default();
+    let data_dir = reg
+        .instances
+        .iter()
+        .find(|i| i.id == resolved)
+        .map(|i| i.data_dir.clone())
+        .unwrap_or_else(|| {
+            crate::modules::instance::get_default_antigravity_data_dir()
+                .to_string_lossy()
+                .to_string()
+        });
+    let log_file = std::path::Path::new(&data_dir).join("antigravity_startup.log");
+    let logs = if log_file.exists() {
+        std::fs::read_to_string(&log_file).unwrap_or_default()
+    } else {
+        String::new()
+    };
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "data": { "instance_id": resolved, "logs": logs },
+        "error": null,
+    })))
+}
+
+// ── Prompt Lifecycle Handlers ──
+
+#[derive(Deserialize, Default)]
+struct PromptQueryParameters {
+    #[serde(rename = "instanceId")]
+    instance_id: Option<String>,
+    repo: Option<String>,
+}
+
+async fn admin_list_prompts(
+    Query(params): Query<PromptQueryParameters>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit("/api/prompts", "GET", 200);
+    let prompts = if let Some(ref inst) = params.instance_id {
+        crate::modules::repo_db::list_running_prompts_for_instance(inst)
+    } else {
+        crate::modules::repo_db::list_all_prompts()
+    };
+    match prompts {
+        Ok(list) => Ok(Json(serde_json::json!({
+            "success": true,
+            "data": list,
+            "error": null,
+        }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+    }
+}
+
+async fn admin_get_prompt_tree(
+    Query(params): Query<PromptQueryParameters>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit("/api/prompts/tree", "GET", 200);
+    let target = params.instance_id.as_deref().unwrap_or("default");
+    match crate::modules::repo_db::get_project_conversation_tree_for_instance(
+        target,
+        params.repo.as_deref(),
+    ) {
+        Ok(tree) => Ok(Json(serde_json::json!({
+            "success": true,
+            "data": tree,
+            "error": null,
+        }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+    }
+}
+
+async fn admin_get_running_prompts(
+    Query(params): Query<PromptQueryParameters>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit("/api/prompts/running", "GET", 200);
+    let target = params.instance_id.as_deref().unwrap_or("default");
+    match crate::modules::repo_db::list_running_prompts_for_instance(target) {
+        Ok(running) => Ok(Json(serde_json::json!({
+            "success": true,
+            "data": running,
+            "error": null,
+        }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+    }
+}
+
+#[derive(Deserialize)]
+struct DispatchPromptPayload {
+    #[serde(rename = "instanceId")]
+    instance_id: Option<String>,
+    #[serde(rename = "repoPath")]
+    repo_path: Option<String>,
+    content: String,
+    model: Option<String>,
+}
+
+async fn admin_dispatch_prompt(
+    Json(payload): Json<DispatchPromptPayload>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit("/api/prompts/dispatch", "POST", 200);
+    let inst = payload.instance_id.unwrap_or_else(|| "default".to_string());
+    let repo = payload
+        .repo_path
+        .unwrap_or_else(|| "scratch/test-repo".to_string());
+    let now = chrono::Utc::now().timestamp();
+    let prompt_id = format!("prompt-{}", uuid::Uuid::new_v4());
+    let active_prompt = crate::modules::repo_db::ActivePrompt {
+        id: prompt_id.clone(),
+        project_id: repo.clone(),
+        instance_id: inst.clone(),
+        repo_path: repo.clone(),
+        prompt_content: payload.content.clone(),
+        model: payload.model,
+        session_id: Some(format!("conv-{}", uuid::Uuid::new_v4())),
+        status: "in_flight".to_string(),
+        created_at: now,
+        updated_at: now,
+        image_payload: None,
+    };
+
+    match crate::modules::repo_db::insert_active_prompt(&active_prompt) {
+        Ok(_) => Ok(Json(serde_json::json!({
+            "success": true,
+            "data": active_prompt,
+            "error": null,
+        }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+    }
+}
+
+async fn admin_tick_prompt_queue() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit("/api/prompts/queue/tick", "POST", 200);
+    match crate::modules::repo_db::check_and_dispatch_enqueued_prompts(None) {
+        Ok(dispatched) => Ok(Json(serde_json::json!({
+            "success": true,
+            "data": { "dispatched_count": dispatched },
+            "error": null,
+        }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+    }
+}
+
+#[derive(Deserialize, Default)]
+struct PromptScopePayload {
+    #[serde(rename = "instanceId")]
+    instance_id: Option<String>,
+    keep: Option<usize>,
+}
+
+async fn admin_backup_prompts(
+    Json(payload): Json<Option<PromptScopePayload>>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit("/api/prompts/backup", "POST", 200);
+    let target = payload
+        .as_ref()
+        .and_then(|p| p.instance_id.as_deref())
+        .unwrap_or("default");
+    match crate::modules::repo_db::backup_running_prompts(target) {
+        Ok(backed) => Ok(Json(serde_json::json!({
+            "success": true,
+            "data": { "backed_up_count": backed },
+            "error": null,
+        }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+    }
+}
+
+async fn admin_restore_prompts(
+    Json(payload): Json<Option<PromptScopePayload>>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit("/api/prompts/restore", "POST", 200);
+    let target = payload
+        .as_ref()
+        .and_then(|p| p.instance_id.as_deref())
+        .unwrap_or("default");
+    match crate::modules::repo_db::dispatch_running_prompts(target) {
+        Ok(restored) => Ok(Json(serde_json::json!({
+            "success": true,
+            "data": { "restored_count": restored },
+            "error": null,
+        }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+    }
+}
+
+async fn admin_purge_prompts(
+    Json(payload): Json<Option<PromptScopePayload>>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit("/api/prompts/purge", "POST", 200);
+    let keep_count = payload.and_then(|p| p.keep).unwrap_or(10);
+    match crate::modules::agy_cleaner::prune_conversations_only(keep_count) {
+        Ok(freed) => Ok(Json(serde_json::json!({
+            "success": true,
+            "data": { "pruned_bytes": freed.total_freed_bytes, "kept": freed.preserved_count },
+            "error": null,
+        }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+    }
+}
+
+async fn admin_get_prompt_detail(
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit(&format!("/api/prompts/{}", id), "GET", 200);
+    let conn = crate::modules::repo_db::connect_db().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )
+    })?;
+    let found = conn.query_row(
+        "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload
+         FROM active_prompts WHERE id = ?1",
+        [&id],
+        |row| {
+            Ok(crate::modules::repo_db::ActivePrompt {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                instance_id: row.get(2)?,
+                repo_path: row.get(3)?,
+                prompt_content: row.get(4)?,
+                model: row.get(5)?,
+                session_id: row.get(6)?,
+                status: row.get(7)?,
+                created_at: row.get(8)?,
+                updated_at: row.get(9)?,
+                image_payload: row.get(10).ok(),
+            })
+        },
+    ).ok();
+
+    if let Some(prompt) = found {
+        Ok(Json(
+            serde_json::json!({ "success": true, "data": prompt, "error": null }),
+        ))
+    } else {
+        Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: format!("Prompt '{}' not found", id),
+            }),
+        ))
+    }
+}
+
+// ── System Diagnostics Handlers ──
+
+async fn admin_get_db_stats() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit("/api/system/db-stats", "GET", 200);
+    let data_dir = crate::modules::account::get_data_dir().unwrap_or_default();
+    let repo_db_p = data_dir.join("repo_prompts.db");
+    let security_db_p = data_dir.join("security.db");
+    let accounts_db_p = data_dir.join("account.db");
+
+    let repo_size = std::fs::metadata(&repo_db_p).map(|m| m.len()).unwrap_or(0);
+    let security_size = std::fs::metadata(&security_db_p)
+        .map(|m| m.len())
+        .unwrap_or(0);
+    let accounts_size = std::fs::metadata(&accounts_db_p)
+        .map(|m| m.len())
+        .unwrap_or(0);
+
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "data": {
+            "repo_prompts_bytes": repo_size,
+            "security_db_bytes": security_size,
+            "accounts_db_bytes": accounts_size,
+            "total_bytes": repo_size + security_size + accounts_size,
+        },
+        "error": null,
+    })))
+}
+
+async fn admin_vacuum_system() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    log_admin_audit("/api/system/vacuum", "POST", 200);
+    let mut vacuumed_count = 0;
+    if let Ok(conn) = crate::modules::repo_db::connect_db() {
+        if conn.execute("VACUUM", []).is_ok() {
+            vacuumed_count += 1;
+        }
+    }
+    if let Ok(data_dir) = crate::modules::account::get_data_dir() {
+        let sec_path = data_dir.join("security.db");
+        if sec_path.exists() {
+            if let Ok(conn) = rusqlite::Connection::open(&sec_path) {
+                if conn.execute("VACUUM", []).is_ok() {
+                    vacuumed_count += 1;
+                }
+            }
+        }
+    }
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "data": { "vacuumed_databases": vacuumed_count },
+        "error": null,
+    })))
 }
 
 #[cfg(test)]

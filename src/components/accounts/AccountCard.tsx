@@ -177,7 +177,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
             id={`account-card-${account.id}`}
             ref={cardRef}
             className={cn(
-            "flex flex-col p-3 rounded-xl border border-slate-200/80 dark:border-slate-800/80 border-l-2 transition-all duration-200 bg-white dark:bg-[#0c2438]",
+            "flex flex-col p-2 sm:p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800/80 border-l-2 transition-all duration-200 bg-white dark:bg-[#0c2438]",
             isFocused
                 ? "bg-teal-50/90 dark:bg-[#0e2c44] text-slate-900 dark:text-cyan-300 font-bold border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/80 dark:border-slate-800/80 shadow-md ring-1 ring-cyan-500/30"
                 : isCurrent
@@ -189,7 +189,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
         )}>
 
             {/* Header: Checkbox + Email + Badges */}
-            <div className="flex-none flex items-start gap-3 mb-2">
+            <div className="flex-none flex items-start gap-3 mb-1.5">
                 <input
                     type="checkbox"
                     className="mt-1 checkbox checkbox-xs rounded border-2 border-gray-400 dark:border-gray-500 checked:border-blue-600 checked:bg-blue-600 [--chkbg:theme(colors.blue.600)] [--chkfg:white]"
@@ -282,7 +282,7 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
 
 
             {/* Quota display */}
-            <div className="flex-1 px-2 mb-2 overflow-y-auto scrollbar-none">
+            <div className="flex-1 px-1.5 mb-1.5 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-[#15334d]/60 scrollbar-track-transparent">
                 {isDisabled || account.quota?.is_forbidden || account.proxy_disabled || account.validation_blocked ? (
                     <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 h-full py-4 text-center">
                         <div className={cn(

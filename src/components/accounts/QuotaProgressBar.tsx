@@ -27,35 +27,19 @@ export function QuotaProgressBar({
     isWeeklyConstrained = false,
     className,
     heightClassName = "h-3.5",
-    checkpoints = [100, 75, 50, 25],
+    checkpoints = [100, 75, 50, 25, 0],
     showCheckpoints = true,
     Icon,
 }: QuotaProgressBarProps) {
     const clamped = Math.min(100, Math.max(0, Number.isFinite(percentage) ? percentage : 0));
-    const isCritical = clamped < 25;
-    const hasCheckpoints = showCheckpoints;
 
-    // Piecewise gradient matching modern specification:
-    // < 25%: deep dark red transition
-    // >= 75%: neon emerald
-    // 50-74%: emerald to teal
-    // 25-49%: amber to orange
-    const getTrackGradient = (pct: number) => {
-        if (pct < 25) {
-            return 'bg-gradient-to-r from-[#7f1d1d] via-[#991b1b] to-[#dc2626]';
-        }
-        if (pct >= 75) {
-            return 'bg-gradient-to-r from-emerald-400 to-[#1af18d]';
-        }
-        if (pct >= 50) {
-            return 'bg-gradient-to-r from-emerald-500 via-teal-400 to-[#1af18d]';
-        }
-        return 'bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500';
+    // Continuous left-to-right color blend starting with deep dark-red anchor to prominent vibrant green
+    const getTrackGradient = (_pct?: number) => {
+        return 'bg-gradient-to-r from-[#520808] via-rose-600 via-amber-400 via-emerald-400 to-[#1af18d]';
     };
 
     const getTrackGlow = (pct: number) => {
-        if (pct >= 75) return 'shadow-[0_0_10px_rgba(26,241,141,0.75)]';
-        if (pct < 25) return 'shadow-[0_0_8px_rgba(220,38,38,0.75)]';
+        if (pct >= 50) return 'shadow-[0_0_10px_rgba(26,241,141,0.75)]';
         return '';
     };
 
@@ -75,34 +59,25 @@ export function QuotaProgressBar({
         }
     };
 
-    // Milestone bubble styling blending seamlessly with track gradient at that position
-    const getNodeStyle = (checkpoint: number, isFilled: boolean, isCriticalState: boolean) => {
-        if (isCriticalState && checkpoint <= 25) {
-            return 'bg-[#991b1b] border-[1.5px] border-[#dc2626] shadow-[0_0_8px_rgba(220,38,38,0.75)]';
+    // Milestone bubble styling based on percentage value
+    const getNodeStyle = (checkpoint: number, isFilled: boolean) => {
+        if (!isFilled) {
+            return 'bg-slate-200/50 dark:bg-[#0c2438] border border-slate-300 dark:border-[#15334d]/60 shadow-none';
         }
-        if (isFilled) {
-            if (checkpoint >= 100) {
-                return 'bg-[#1af18d] border-[1.5px] border-[#1af18d] shadow-[0_0_8px_rgba(26,241,141,0.85)]';
-            }
-            if (checkpoint >= 75) {
-                return 'bg-[#34d399] border-[1.5px] border-[#34d399] shadow-[0_0_6px_rgba(52,211,153,0.6)]';
-            }
-            if (checkpoint >= 50) {
-                return 'bg-[#f59e0b] border-[1.5px] border-[#f59e0b] shadow-none';
-            }
-            if (checkpoint >= 25) {
-                return 'bg-[#f97316] border-[1.5px] border-[#f97316] shadow-none';
-            }
-            return 'bg-rose-500 border-[1.5px] border-rose-400 shadow-none';
+        if (checkpoint >= 75) {
+            return 'bg-[#1af18d] border-[1.5px] border-emerald-300 shadow-[0_0_8px_rgba(26,241,141,0.85)]';
         }
-        return 'bg-slate-200/50 dark:bg-[#0c2438] border border-slate-300 dark:border-[#15334d]/60 shadow-none';
+        if (checkpoint >= 50) {
+            return 'bg-emerald-400 border-[1.5px] border-emerald-300 shadow-none';
+        }
+        if (checkpoint >= 25) {
+            return 'bg-amber-400 dark:bg-amber-500 border-[1.5px] border-amber-300 dark:border-amber-400 shadow-none';
+        }
+        return 'bg-rose-600 border-[1.5px] border-rose-400 shadow-none';
     };
 
-    // Cap milestone nodes strictly at max 5
-    const sortedCheckpoints = [...checkpoints]
-        .filter((cp) => cp > 0)
-        .sort((a, b) => b - a)
-        .slice(0, 5);
+    const activeCheckpoints = (checkpoints && checkpoints.length > 0 ? checkpoints : [100, 75, 50, 25, 0]).slice(0, 5);
+    const sortedCheckpoints = [...activeCheckpoints].sort((a, b) => b - a);
 
     return (
         <div className={cn("w-[82%] max-w-[82%] flex items-center gap-2", className)}>
@@ -148,38 +123,39 @@ export function QuotaProgressBar({
                 </div>
 
                 {/* Milestone Checkpoint Nodes */}
-                {hasCheckpoints && sortedCheckpoints.map((cp) => {
-                    const isFilled = clamped >= cp || (isCritical && cp <= 25);
+                {showCheckpoints && sortedCheckpoints.map((cp) => {
+                    const isFilled = clamped >= cp;
                     const leftPos = cp >= 100 ? '100%' : cp <= 0 ? '0%' : `${cp}%`;
                     const transform = cp >= 100 ? 'translate(-100%, -50%)' : cp <= 0 ? 'translate(0, -50%)' : 'translate(-50%, -50%)';
+                    const isCritical = clamped < 25;
 
                     return (
                         <div
                             key={cp}
                             className={cn(
                                 "absolute top-1/2 w-3.5 h-3.5 rounded-full flex items-center justify-center transition-all duration-300 z-10 pointer-events-none",
-                                isCritical && cp <= 25 && "w-[15px] h-[15px]",
-                                getNodeStyle(cp, isFilled, isCritical)
+                                getNodeStyle(cp, isFilled)
                             )}
                             style={{ left: leftPos, transform }}
                             title={`Checkpoint ${cp}%`}
                         >
-                            {isCritical && cp <= 25 ? (
-                                <span className="text-[7.5px] font-mono font-black text-white leading-none tracking-tight">
-                                    {clamped}%
-                                </span>
-                            ) : isCritical ? null : (
-                                <svg
-                                    className={cn(
-                                        "w-2 h-2 fill-none stroke-current transition-colors",
-                                        isFilled ? "text-white stroke-[2.5]" : "text-gray-400/50 dark:text-white/30 stroke-[2.2]"
-                                    )}
-                                    viewBox="0 0 12 12"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                >
-                                    <path d="M2.5 6.5L4.8 8.8L9.5 3.5" />
-                                </svg>
+                            {isFilled ? (
+                                isCritical && cp <= 25 ? (
+                                    <span className="text-[7.5px] font-black font-mono text-white leading-none tracking-tighter select-none">
+                                        {Math.round(clamped)}%
+                                    </span>
+                                ) : (
+                                    <svg
+                                        className="w-2 h-2 fill-none stroke-current text-white stroke-[2.5]"
+                                        viewBox="0 0 12 12"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    >
+                                        <path d="M2.5 6.5L4.8 8.8L9.5 3.5" />
+                                    </svg>
+                                )
+                            ) : (
+                                <span className="w-1 h-1 rounded-full bg-slate-400/40 dark:bg-white/20" />
                             )}
                         </div>
                     );
@@ -215,12 +191,10 @@ export function QuotaProgressBar({
                     )}
 
                     {/* Enlarge 30% and 50% weekly quota typography and badges */}
-                    {isWeekly && (clamped === 50 || clamped === 30 || isCritical) ? (
+                    {isWeekly && (clamped === 50 || clamped === 30) ? (
                         <span className={cn(
                             "text-[11px] font-black font-mono px-1 py-[0.5px] rounded border shadow-2xs",
-                            isCritical
-                                ? "bg-rose-950/80 text-white border-rose-500/60 shadow-xs"
-                                : clamped === 50
+                            clamped === 50
                                 ? "bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700/60"
                                 : "bg-rose-100 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-700/60"
                         )}>
