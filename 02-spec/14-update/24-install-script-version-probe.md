@@ -94,7 +94,7 @@ request. So why bother ordering at all? Two reasons:
    accept is already the winner. No second pass, no `Sort-Object` on every
    iteration.
 2. **Middle-out dispatch helps degraded environments.** On networks that
-   serialise outbound HTTPS connections (corporate proxies, low-fd shells,
+   serialize outbound HTTPS connections (corporate proxies, low-fd shells,
    throttled CI runners), 20 "parallel" requests effectively become a queue.
    Most active forks land in the middle of the +1..+20 window — start there
    and expand outward so the queue hits the likely winner sooner.
@@ -120,7 +120,7 @@ public contract.
 ### Short-circuit / cancellation
 
 After a result settles for the highest queued `N`, in-flight lower-N
-probes MAY be cancelled to free sockets. This is an optimisation, not
+probes MAY be canceled to free sockets. This is an optimization, not
 required for correctness.
 
 ---

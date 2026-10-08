@@ -381,7 +381,7 @@ This section formalises the dispositions of v1.0 open questions so dumb-AI imple
 
 - ❌ Storing anything other than self-contained full-snapshot zips under `var/snapshots/`.
 - ❌ Adding a `BasedOnSnapshotCatalogId` FK to `BackupSnapshotCatalog` — there is nothing to base anything on.
-- ❌ "Optimising" the build path to skip days when no `SyncOpLedger` rows changed — every scheduled day MUST produce a snapshot row, even an identical one. Dedup is the v2.0 spec's job, not the build path's.
+- ❌ "optimizing" the build path to skip days when no `SyncOpLedger` rows changed — every scheduled day MUST produce a snapshot row, even an identical one. Dedup is the v2.0 spec's job, not the build path's.
 - ❌ Allocating error codes `WORKER-940-05+` "for diff-chain failures" — error codes are added when the feature ships, not before.
 
 ### 14.2 OQ-23-2 — Partial-table / per-tenant restore
