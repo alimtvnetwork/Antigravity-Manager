@@ -124,3 +124,15 @@ pub async fn get_local_node_info() -> AppResult<LocalNodeInfo> {
 pub async fn auto_discover_supabase_credentials() -> AppResult<SupabaseConfig> {
     supabase_sync::auto_discover_supabase_credentials()
 }
+
+#[tauri::command]
+pub async fn get_supabase_fleet_machines(
+) -> AppResult<Vec<crate::modules::supabase_sync::FleetMachineInfo>> {
+    crate::modules::supabase_sync::fetch_fleet_machines().await
+}
+
+#[tauri::command]
+pub async fn sync_supabase_now() -> AppResult<()> {
+    crate::modules::supabase_sync::sync_local_node_now().await?;
+    Ok(())
+}

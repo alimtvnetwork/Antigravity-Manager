@@ -72,6 +72,34 @@ export interface LocalNodeInfo {
     uptime_seconds: number;
 }
 
+export interface FleetInstanceItem {
+    instance_id: string;
+    profile_name: string;
+    bound_account_id: string;
+    bound_account_email: string;
+    is_active: boolean;
+    status: string;
+    running_prompts_count: number;
+    updated_at: number;
+    is_leased: boolean;
+    lease_expires_at?: number;
+}
+
+export interface FleetMachineInfo {
+    node_id: string;
+    alias: string;
+    ip_address: string;
+    uptime_seconds: number;
+    last_heartbeat_at: number;
+    status: string;
+    is_local: boolean;
+    source: string;
+    total_instances: number;
+    total_running_prompts: number;
+    active_accounts: string[];
+    instances: FleetInstanceItem[];
+}
+
 export const supabaseService = {
     async getConfig(): Promise<SupabaseConfig> {
         try {
@@ -209,5 +237,13 @@ export const supabaseService = {
                 uptime_seconds: 0,
             };
         }
+    },
+
+    async getFleetMachines(): Promise<FleetMachineInfo[]> {
+        return await invoke<FleetMachineInfo[]>('get_supabase_fleet_machines');
+    },
+
+    async syncNow(): Promise<void> {
+        await invoke('sync_supabase_now');
     },
 };

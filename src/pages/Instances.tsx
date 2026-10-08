@@ -54,6 +54,7 @@ import { InstanceSettingsModal } from '../components/instances/InstanceSettingsM
 import InstanceTable, { type InstanceActionType } from '../components/instances/InstanceTable';
 import PromptTreeViewModal, { type AgmProjectTreeNode } from '../components/instances/PromptTreeViewModal';
 import InstanceAuditTrailModal from '../components/instances/InstanceAuditTrailModal';
+import { FleetMachinesTable } from '../components/instances/FleetMachinesTable';
 import ModalDialog from '../components/common/ModalDialog';
 import { findQuotaModel } from '../config/modelConfig';
 import { isTauri } from '../utils/env';
@@ -1754,6 +1755,9 @@ export default function Instances() {
                     })}
                 </div>
             )}
+
+            {/* Fleet Machines & Cross-Node Instance Sync Table */}
+            <FleetMachinesTable />
 
             {/* Create Instance Modal */}
             {isCreateOpen && (

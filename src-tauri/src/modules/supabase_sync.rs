@@ -55,6 +55,38 @@ impl Default for SupabaseConfig {
     }
 }
 
+/// Instance profile data model exposed for fleet management
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FleetInstanceItem {
+    pub instance_id: String,
+    pub profile_name: String,
+    pub bound_account_id: String,
+    pub bound_account_email: String,
+    pub is_active: bool,
+    pub status: String,
+    pub running_prompts_count: usize,
+    pub updated_at: i64,
+    pub is_leased: bool,
+    pub lease_expires_at: Option<i64>,
+}
+
+/// Fleet machine node data model aggregating host telemetry and child instance profiles
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FleetMachineInfo {
+    pub node_id: String,
+    pub alias: String,
+    pub ip_address: String,
+    pub uptime_seconds: u64,
+    pub last_heartbeat_at: i64,
+    pub status: String,
+    pub is_local: bool,
+    pub source: String,
+    pub total_instances: usize,
+    pub total_running_prompts: usize,
+    pub active_accounts: Vec<String>,
+    pub instances: Vec<FleetInstanceItem>,
+}
+
 /// Global shared configuration state
 static GLOBAL_CONFIG: Lazy<Arc<RwLock<Option<SupabaseConfig>>>> =
     Lazy::new(|| Arc::new(RwLock::new(None)));
@@ -659,6 +691,12 @@ pub async fn send_heartbeat(endpoint: &SupabaseEndpoint, node_alias: &str) -> Re
         let profile_id = format!("{}_{}", node_id, inst.id);
         let active_acc_id = inst.bound_account_id.clone().unwrap_or_default();
         let active_acc_email = inst.bound_email.clone().unwrap_or_default();
+        let running_prompts =
+            crate::modules::repo_db::discover_running_prompts_from_antigravity(&inst.id);
+        let running_prompts_count = running_prompts
+            .iter()
+            .filter(|p| p.status == "running" || p.status == "executing")
+            .count();
         let profile_payload = json!({
             "id": profile_id,
             "node_id": node_id,
@@ -668,6 +706,7 @@ pub async fn send_heartbeat(endpoint: &SupabaseEndpoint, node_alias: &str) -> Re
             "is_active": is_active,
             "quota_percent": 100,
             "status": if is_active { "running" } else { "idle" },
+            "running_prompts_count": running_prompts_count,
             "updated_at": now
         });
         let _ = client
@@ -705,6 +744,12 @@ fn build_sync_payloads(
 ) -> (serde_json::Value, serde_json::Value) {
     let now = Utc::now().timestamp();
     let node_id = get_local_node_id();
+    let running_prompts =
+        crate::modules::repo_db::discover_running_prompts_from_antigravity(&inst.id);
+    let running_prompts_count = running_prompts
+        .iter()
+        .filter(|p| p.status == "running" || p.status == "executing")
+        .count();
     let node_payload = json!({
         "id": node_id,
         "alias": config.node_alias,
@@ -723,6 +768,7 @@ fn build_sync_payloads(
         "is_active": inst.is_default,
         "quota_percent": 100,
         "status": if inst.is_default { "running" } else { "idle" },
+        "running_prompts_count": running_prompts_count,
         "updated_at": now
     });
     (node_payload, profile_payload)
@@ -854,6 +900,341 @@ pub async fn sync_local_node_now() -> Result<(), AppError> {
 /// Trigger manual synchronization of local node and profiles to Supabase
 pub async fn trigger_manual_sync() -> Result<(), AppError> {
     sync_local_node_now().await
+}
+
+#[derive(Debug, Deserialize)]
+struct PostgrestNodeRow {
+    id: String,
+    #[serde(default)]
+    alias: String,
+    #[serde(default)]
+    ip_address: String,
+    #[serde(default)]
+    uptime_seconds: u64,
+    #[serde(default)]
+    last_heartbeat_at: i64,
+    #[serde(default)]
+    status: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct PostgrestProfileRow {
+    id: String,
+    node_id: String,
+    #[serde(default)]
+    profile_name: String,
+    #[serde(default)]
+    active_account_id: String,
+    #[serde(default)]
+    active_account_email: String,
+    #[serde(default)]
+    is_active: bool,
+    #[serde(default)]
+    status: String,
+    #[serde(default)]
+    running_prompts_count: Option<usize>,
+    #[serde(default)]
+    updated_at: i64,
+}
+
+#[derive(Debug, Deserialize)]
+struct PostgrestLeaseRow {
+    #[serde(default)]
+    account_id: String,
+    #[serde(default)]
+    account_email: String,
+    #[serde(default)]
+    node_id: String,
+    #[serde(default)]
+    profile_name: String,
+    #[serde(default)]
+    expires_at: i64,
+}
+
+fn construct_local_machine_info(
+    config: &SupabaseConfig,
+    leases: &[PostgrestLeaseRow],
+) -> FleetMachineInfo {
+    let local_node_id = get_local_node_id();
+    let local_ip = get_local_ip();
+    let uptime = get_uptime_seconds();
+    let now = Utc::now().timestamp();
+    let alias = if config.node_alias.is_empty() {
+        let short_id = if local_node_id.len() > 6 {
+            &local_node_id[..6]
+        } else {
+            &local_node_id
+        };
+        format!("Node-{}", short_id)
+    } else {
+        config.node_alias.clone()
+    };
+
+    let mut local_instances = Vec::new();
+    let mut total_running = 0;
+    let mut active_accounts_set = HashSet::new();
+
+    if let Ok(inst_statuses) = instance::list_instances() {
+        for status in inst_statuses {
+            let inst = status.config;
+            let prompts =
+                crate::modules::repo_db::discover_running_prompts_from_antigravity(&inst.id);
+            let running_count = prompts
+                .iter()
+                .filter(|p| p.status == "running" || p.status == "executing")
+                .count();
+            total_running += running_count;
+
+            let email = inst.bound_email.clone().unwrap_or_default();
+            let acc_id = inst.bound_account_id.clone().unwrap_or_default();
+            if email.len() > 0 {
+                active_accounts_set.insert(email.clone());
+            } else if acc_id.len() > 0 {
+                active_accounts_set.insert(acc_id.clone());
+            }
+
+            let is_active = status.is_running || inst.is_default;
+            let inst_status_str = if is_active {
+                "running".to_string()
+            } else {
+                "idle".to_string()
+            };
+
+            let mut is_leased = false;
+            let mut lease_expires_at = None;
+            for l in leases {
+                let is_active_lease = l.expires_at > now;
+                let has_bound_account = acc_id.len() > 0;
+                let has_bound_email = email.len() > 0;
+                let is_matching_account = (has_bound_account && l.account_id == acc_id)
+                    || (has_bound_email && l.account_email == email);
+                let is_matching_node = l.node_id == local_node_id;
+                let has_inst_name = inst.name.len() > 0;
+                let is_matching_profile = has_inst_name && l.profile_name == inst.name;
+
+                if is_active_lease
+                    && (is_matching_account || (is_matching_node && is_matching_profile))
+                {
+                    is_leased = true;
+                    lease_expires_at = Some(l.expires_at);
+                    break;
+                }
+            }
+
+            local_instances.push(FleetInstanceItem {
+                instance_id: inst.id,
+                profile_name: inst.name,
+                bound_account_id: acc_id,
+                bound_account_email: email,
+                is_active,
+                status: inst_status_str,
+                running_prompts_count: running_count,
+                updated_at: now,
+                is_leased,
+                lease_expires_at,
+            });
+        }
+    }
+
+    let mut active_accounts: Vec<String> = active_accounts_set.into_iter().collect();
+    active_accounts.sort();
+
+    let total_instances = local_instances.len();
+
+    FleetMachineInfo {
+        node_id: local_node_id,
+        alias,
+        ip_address: local_ip,
+        uptime_seconds: uptime,
+        last_heartbeat_at: now,
+        status: "online".to_string(),
+        is_local: true,
+        source: "local".to_string(),
+        total_instances,
+        total_running_prompts: total_running,
+        active_accounts,
+        instances: local_instances,
+    }
+}
+
+/// Fetch list of fleet machines with child instance profiles and active leases from Supabase.
+/// Falls back to returning local machine info if Supabase is offline or unconfigured.
+pub async fn fetch_fleet_machines() -> crate::error::AppResult<Vec<FleetMachineInfo>> {
+    let config = load_config().unwrap_or_default();
+    let local_node_id = get_local_node_id();
+    let now = Utc::now().timestamp();
+
+    let root_ep = config
+        .endpoints
+        .iter()
+        .find(|ep| ep.is_enabled && ep.role == "root")
+        .cloned();
+
+    let client = match root_ep {
+        Some(ref ep) => match SupabaseClient::new(ep) {
+            Ok(c) => Some(c),
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to initialize Supabase client for fleet query: {}",
+                    e
+                );
+                None
+            }
+        },
+        None => None,
+    };
+
+    let mut raw_nodes: Vec<PostgrestNodeRow> = Vec::new();
+    let mut raw_profiles: Vec<PostgrestProfileRow> = Vec::new();
+    let mut raw_leases: Vec<PostgrestLeaseRow> = Vec::new();
+
+    if let Some(ref c) = client {
+        if let Ok(val) = c
+            .select("nodes", "select=*&order=last_heartbeat_at.desc")
+            .await
+        {
+            raw_nodes = serde_json::from_value(val).unwrap_or_default();
+        }
+        if let Ok(val) = c.select("instance_profiles", "select=*").await {
+            raw_profiles = serde_json::from_value(val).unwrap_or_default();
+        }
+        if let Ok(val) = c.select("workspace_leases", "select=*").await {
+            raw_leases = serde_json::from_value(val).unwrap_or_default();
+        }
+    }
+
+    if raw_nodes.is_empty() {
+        let local_machine = construct_local_machine_info(&config, &raw_leases);
+        return Ok(vec![local_machine]);
+    }
+
+    let mut profiles_by_node: std::collections::HashMap<String, Vec<PostgrestProfileRow>> =
+        std::collections::HashMap::new();
+    for p in raw_profiles {
+        profiles_by_node
+            .entry(p.node_id.clone())
+            .or_default()
+            .push(p);
+    }
+
+    let mut machines = Vec::new();
+    let mut has_local_node = false;
+
+    for node in raw_nodes {
+        let is_local = node.id == local_node_id;
+        if is_local {
+            has_local_node = true;
+            let mut local_info = construct_local_machine_info(&config, &raw_leases);
+            local_info.source = "supabase".to_string();
+            machines.push(local_info);
+            continue;
+        }
+
+        let node_profiles = profiles_by_node.remove(&node.id).unwrap_or_default();
+        let mut instances = Vec::new();
+        let mut active_accounts_set = HashSet::new();
+        let mut total_running_prompts = 0;
+
+        for prof in node_profiles {
+            let prefix = format!("{}_", node.id);
+            let instance_id = if prof.id.starts_with(&prefix) {
+                prof.id[prefix.len()..].to_string()
+            } else {
+                prof.id.clone()
+            };
+
+            let running_count = prof.running_prompts_count.unwrap_or(0);
+            total_running_prompts += running_count;
+
+            if prof.active_account_email.len() > 0 {
+                active_accounts_set.insert(prof.active_account_email.clone());
+            } else if prof.active_account_id.len() > 0 {
+                active_accounts_set.insert(prof.active_account_id.clone());
+            }
+
+            let mut is_leased = false;
+            let mut lease_expires_at = None;
+            for l in &raw_leases {
+                let is_active_lease = l.expires_at > now;
+                let has_prof_acc_id = prof.active_account_id.len() > 0;
+                let has_prof_acc_email = prof.active_account_email.len() > 0;
+                let is_matching_account = (has_prof_acc_id
+                    && l.account_id == prof.active_account_id)
+                    || (has_prof_acc_email && l.account_email == prof.active_account_email);
+                let is_matching_node = l.node_id == node.id;
+                let has_prof_name = prof.profile_name.len() > 0;
+                let is_matching_profile = has_prof_name && l.profile_name == prof.profile_name;
+
+                if is_active_lease
+                    && (is_matching_account || (is_matching_node && is_matching_profile))
+                {
+                    is_leased = true;
+                    lease_expires_at = Some(l.expires_at);
+                    break;
+                }
+            }
+
+            instances.push(FleetInstanceItem {
+                instance_id,
+                profile_name: prof.profile_name,
+                bound_account_id: prof.active_account_id,
+                bound_account_email: prof.active_account_email,
+                is_active: prof.is_active,
+                status: prof.status,
+                running_prompts_count: running_count,
+                updated_at: prof.updated_at,
+                is_leased,
+                lease_expires_at,
+            });
+        }
+
+        let mut active_accounts: Vec<String> = active_accounts_set.into_iter().collect();
+        active_accounts.sort();
+
+        let total_instances = instances.len();
+
+        machines.push(FleetMachineInfo {
+            node_id: node.id,
+            alias: node.alias,
+            ip_address: node.ip_address,
+            uptime_seconds: node.uptime_seconds,
+            last_heartbeat_at: node.last_heartbeat_at,
+            status: node.status,
+            is_local: false,
+            source: "supabase".to_string(),
+            total_instances,
+            total_running_prompts,
+            active_accounts,
+            instances,
+        });
+    }
+
+    if has_local_node {
+        // Local node is already present in machines
+    } else {
+        let local_machine = construct_local_machine_info(&config, &raw_leases);
+        machines.insert(0, local_machine);
+    }
+
+    // Sort machines: local machine is first, followed by online remote nodes sorted by heartbeat desc or alias
+    machines.sort_by(|a, b| match (a.is_local, b.is_local) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => {
+            let is_a_online = a.status == "online";
+            let is_b_online = b.status == "online";
+            match (is_a_online, is_b_online) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => b
+                    .last_heartbeat_at
+                    .cmp(&a.last_heartbeat_at)
+                    .then_with(|| a.alias.to_lowercase().cmp(&b.alias.to_lowercase())),
+            }
+        }
+    });
+
+    Ok(machines)
 }
 
 /// Start background synchronization daemon
@@ -1153,5 +1534,18 @@ mod tests {
                 assert_eq!(first.role, "root");
             }
         }
+    }
+
+    #[test]
+    fn test_fleet_machine_info_and_local_construction() {
+        let cfg = SupabaseConfig::default();
+        let local_info = construct_local_machine_info(&cfg, &[]);
+        assert!(local_info.is_local);
+        assert_eq!(local_info.status, "online");
+        assert_eq!(local_info.source, "local");
+        assert!(!local_info.node_id.is_empty());
+
+        let serialized = serde_json::to_string(&local_info).expect("serialize works");
+        assert!(serialized.contains("\"is_local\":true"));
     }
 }
