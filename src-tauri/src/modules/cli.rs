@@ -23,6 +23,10 @@ pub struct CliContext {
     pub all_instances: bool,
     pub verbose: bool,
     pub dry_run: bool,
+    pub model: Option<String>,
+    pub prefix: Option<String>,
+    pub suffix: Option<String>,
+    pub fifo: bool,
     pub positional_args: Vec<String>,
 }
 
@@ -43,6 +47,27 @@ impl CliContext {
                         ctx.repo_path = Some(args[i + 1].clone());
                         i += 1;
                     }
+                }
+                "-m" | "--model" => {
+                    if i + 1 < args.len() {
+                        ctx.model = Some(args[i + 1].clone());
+                        i += 1;
+                    }
+                }
+                "--prefix" => {
+                    if i + 1 < args.len() {
+                        ctx.prefix = Some(args[i + 1].clone());
+                        i += 1;
+                    }
+                }
+                "--suffix" => {
+                    if i + 1 < args.len() {
+                        ctx.suffix = Some(args[i + 1].clone());
+                        i += 1;
+                    }
+                }
+                "--fifo" => {
+                    ctx.fifo = true;
                 }
                 "--json" | "-j" => {
                     ctx.json_output = true;
@@ -66,10 +91,17 @@ impl CliContext {
         ctx
     }
 
-    /// Resolves canonical instance ID or falls back to active instance
+    /// Resolves canonical instance ID or falls back to active instance.
+    /// Checks explicit `--instance` flag first, then first positional argument if it resolves to an instance.
     pub fn resolve_target_instance(&self) -> Result<String, String> {
         if let Some(ref raw_id) = self.instance_id {
             crate::modules::instance::resolve_instance_id(raw_id)
+        } else if let Some(first) = self.positional_args.first() {
+            if let Ok(resolved) = crate::modules::instance::resolve_instance_id(first) {
+                Ok(resolved)
+            } else {
+                crate::modules::instance::get_active_instance_id()
+            }
         } else {
             crate::modules::instance::get_active_instance_id()
         }
@@ -80,6 +112,14 @@ impl CliContext {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CliEnvelope<T: Serialize> {
     pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instance_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<T>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -104,8 +144,13 @@ pub struct CliMetaPayload {
 
 impl<T: Serialize> CliEnvelope<T> {
     pub fn ok(command: &str, instance_id: Option<String>, data: T) -> Self {
+        let now_unix = Utc::now().timestamp();
         Self {
             success: true,
+            status: Some("success".to_string()),
+            command: Some(command.to_string()),
+            instance_id: instance_id.clone(),
+            timestamp: Some(now_unix),
             data: Some(data),
             error: None,
             meta: CliMetaPayload {
@@ -118,8 +163,13 @@ impl<T: Serialize> CliEnvelope<T> {
     }
 
     pub fn err(command: &str, instance_id: Option<String>, code: &str, message: &str) -> Self {
+        let now_unix = Utc::now().timestamp();
         Self {
             success: false,
+            status: Some("error".to_string()),
+            command: Some(command.to_string()),
+            instance_id: instance_id.clone(),
+            timestamp: Some(now_unix),
             data: None,
             error: Some(CliErrorPayload {
                 code: code.to_string(),

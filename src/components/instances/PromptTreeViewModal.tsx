@@ -112,11 +112,11 @@ interface PromptTreeViewModalProps {
 
 type ViewMode = 'preview' | 'raw' | 'edit';
 
-// Helper to format GitMap dual sequence badge [AGM:P001 | GM:#1] or [AGM:C001 | GM:<cid>]
+// Helper to format GitMap dual sequence badge: P001 · #1 or C001 · <cid>
 function formatDualBadge(agmCode: string | undefined, defaultAgm: string, gmCode: string | undefined, defaultGm: string): string {
-    const agm = agmCode ? (agmCode.startsWith('AGM:') ? agmCode : `AGM:${agmCode}`) : `AGM:${defaultAgm}`;
-    const gm = gmCode ? (gmCode.startsWith('GM:') ? gmCode : `GM:${gmCode}`) : `GM:${defaultGm}`;
-    return `[${agm} | ${gm}]`;
+    const rawAgm = (agmCode || defaultAgm).replace(/^AGM:/i, '').trim();
+    const rawGm = (gmCode || defaultGm).replace(/^GM:/i, '').trim();
+    return `${rawAgm} · ${rawGm}`;
 }
 
 // Helper to count words
@@ -1720,7 +1720,12 @@ export default function PromptTreeViewModal({
 
             // 4. Focus or launch IDE instance window so user immediately sees it ("goes there")
             try {
-                await focusOrLaunchInstance(targetInstId, repoPath);
+                if (repoPath) {
+                    const repoName = repoPath.split(/[/\\]/).filter(Boolean).pop() || repoPath;
+                    await focusInstanceWorkspace(targetInstId, repoPath, repoName);
+                } else {
+                    await focusOrLaunchInstance(targetInstId);
+                }
             } catch (focusErr) {
                 console.warn('focusOrLaunchInstance error', focusErr);
             }
@@ -1832,12 +1837,15 @@ ${activePromptText}
             const promptContent = editedPromptText.trim() || activePromptText || selectedConversation.prompt_preview_200w || '';
             const repoPath = selectedProject?.repo_path || '';
 
+            const targetInstId = selectedProject?.instance_id || instanceId || 'default';
             let enqueued = false;
             try {
                 await invoke('enqueue_prompt', {
+                    instanceId: targetInstId,
+                    promptText: promptContent,
+                    workspacePath: repoPath,
                     conversationId: selectedConversation.conversation_id,
                     projectId: selectedProject?.project_id,
-                    instanceId: selectedProject?.instance_id || instanceId || 'default',
                     repoPath,
                     promptContent,
                 });
@@ -2118,7 +2126,11 @@ ${activePromptText}
                 title="Click to view prompt; double-click for Full inspector"
             >
                 <div className="flex items-center gap-1.5 min-w-0">
-                    <IconComponent className={cn('h-3.5 w-3.5 shrink-0', isConvSelected ? 'text-white' : (promptCategory.tier === 'SUBAGENT_INSTRUCTION' ? 'text-purple-500' : promptCategory.tier === 'SYSTEM_MESSAGE' ? 'text-zinc-500' : promptCategory.tier === 'TOOL_OUTPUT' ? 'text-amber-500' : 'text-sky-500'))} />
+                    <span title={promptCategory.roleBadge || promptCategory.tier} className="shrink-0 flex items-center">
+                        <IconComponent
+                            className={cn('h-3.5 w-3.5 shrink-0', isConvSelected ? 'text-white' : (promptCategory.tier === 'SUBAGENT_INSTRUCTION' ? 'text-purple-500' : promptCategory.tier === 'SYSTEM_MESSAGE' ? 'text-zinc-500' : promptCategory.tier === 'TOOL_OUTPUT' ? 'text-amber-500' : 'text-sky-500'))}
+                        />
+                    </span>
                     <span
                         className={cn(
                             'text-[9px] font-mono px-1 py-0.2 rounded-[3px] shrink-0 font-medium whitespace-nowrap',
@@ -2129,20 +2141,6 @@ ${activePromptText}
                         title="GitMap Dual Sequence Badge"
                     >
                         {formatDualBadge(conv.seq_code, 'C001', conv.gitmap_seq_code, conv.short_id || conv.conversation_id.slice(0, 8))}
-                    </span>
-                    <span className={cn(
-                        "px-1.5 py-0.2 rounded-full text-[8.5px] font-mono font-bold uppercase tracking-wider shrink-0",
-                        isConvSelected
-                            ? (promptCategory.tier === 'SUBAGENT_INSTRUCTION'
-                                ? "bg-purple-300 text-purple-950 border border-purple-200"
-                                : promptCategory.tier === 'SYSTEM_MESSAGE'
-                                ? "bg-zinc-300 text-zinc-950 border border-zinc-200"
-                                : promptCategory.tier === 'TOOL_OUTPUT'
-                                ? "bg-amber-300 text-amber-950 border border-amber-200"
-                                : "bg-sky-200 text-sky-950 border border-sky-100")
-                            : promptCategory.badgeStyle
-                    )}>
-                        {promptCategory.roleBadge || (promptCategory.tier === 'SUBAGENT_INSTRUCTION' ? 'Subagent' : promptCategory.tier === 'SYSTEM_MESSAGE' ? 'System' : promptCategory.tier === 'TOOL_OUTPUT' ? 'Tool' : 'User')}
                     </span>
                     {(conv.repeat_badge || (conv.repeat_count && conv.repeat_count > 1)) && (
                         <span
@@ -2236,7 +2234,11 @@ ${activePromptText}
                                             <span className="text-purple-400 dark:text-purple-400 font-mono text-[11px] select-none shrink-0">
                                                 {isLast ? '└──' : '↳'}
                                             </span>
-                                            <Bot className={cn("w-3.5 h-3.5 shrink-0", isSubSelected ? "text-white" : "text-purple-500")} />
+                                            <span title={subNode.classification.roleBadge || 'Subagent'} className="shrink-0 flex items-center">
+                                                <Bot
+                                                    className={cn("w-3.5 h-3.5 shrink-0", isSubSelected ? "text-white" : "text-purple-500")}
+                                                />
+                                            </span>
                                             <span
                                                 className={cn(
                                                     'text-[9px] font-mono px-1 py-0.2 rounded-[3px] shrink-0 font-medium whitespace-nowrap',
@@ -2247,14 +2249,6 @@ ${activePromptText}
                                                 title="GitMap Dual Sequence Badge"
                                             >
                                                 {formatDualBadge(subNode.primaryNode.seq_code, 'C001', subNode.primaryNode.gitmap_seq_code, subNode.primaryNode.short_id || subNode.primaryNode.conversation_id.slice(0, 8))}
-                                            </span>
-                                            <span className={cn(
-                                                "px-1.5 py-0.2 rounded-full text-[8.5px] font-mono font-bold uppercase tracking-wider shrink-0",
-                                                isSubSelected
-                                                    ? "bg-purple-300 text-purple-950 border border-purple-200"
-                                                    : "bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-400/30"
-                                            )}>
-                                                {subNode.classification.roleBadge || 'Subagent'}
                                             </span>
                                             <span className="truncate text-[11px]">
                                                 {subNode.primaryNode.title || 'Subagent Task'}
@@ -3402,12 +3396,12 @@ ${activePromptText}
                                                             {showAllWords ? (
                                                                 <>
                                                                     <ChevronUp className="w-3.5 h-3.5" />
-                                                                    <span>Show Less [Collapse]</span>
+                                                                    <span>Show Less</span>
                                                                 </>
                                                             ) : (
                                                                 <>
                                                                     <ChevronDown className="w-3.5 h-3.5" />
-                                                                    <span>Show All ({totalWords || activeWordCount}w) [Expand (Full Text)]</span>
+                                                                    <span>Show All ({totalWords || activeWordCount}w)</span>
                                                                 </>
                                                             )}
                                                         </button>

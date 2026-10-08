@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.165.0] - 2026-10-09
+
+### Added
+- **Smart Instance Process Cache & Relaunch Prevention**: Implemented two-tier process cache (`SMART_PROCESS_CACHE`) with sub-millisecond targeted PID liveness verification (`is_pid_alive_targeted`). Decoupled window focus failures from process liveness, ensuring prompt send and enqueue operations never terminate or relaunch already running IDE instances. (Thanks to @aukgit)
+- **Prompt Enqueue IPC Command & Strict FIFO Queueing**: Registered `enqueue_prompt` IPC command and wired `agm prompt queue` to persist prompts with status `queued` in strict First-In-First-Out order (`ORDER BY created_at ASC, id ASC`). (Thanks to @aukgit)
+- **False-Positive Running Prompt Elimination**: Hardened transcript inspection (`inspect_conversation_transcript`) with terminal state detection (`is_terminal_done`) for completed planner responses, narrowed timestamp window to 60s, and pruned stale `running_projects` SQLite rows. (Thanks to @aukgit)
+- **Prompt Tree View UI Compaction & Bracket Stripping**: Streamlined `formatDualBadge` to `${rawAgm} · ${rawGm}` (e.g. `P001 · #1`, `C001 · <cid>`), eliminating redundant brackets and `AGM:` prefixes. Replaced verbose uppercase role badges with clean tooltips and stripped bracket noise from button labels (`Show Less`, `Show All (${words}w)`). (Thanks to @aukgit)
+- **CLI Parity & Safe Host-Shielded E2E Testing**: Expanded `agm` CLI verbs (`instance status`, `prompt send`, `prompt running`, `prompt queue`) with unified JSON envelopes (`CliEnvelope`), and verified all 5 test cases with 100% pass rate in safe E2E test harness `03-ai-scripts/45-prompt-dispatch-process-cache-e2e.py`. (Thanks to @aukgit)
+
+---
+
 ## [v4.164.0] - 2026-10-08
 
 ### Added
@@ -62,6 +73,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.165.0 (2026-10-09)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.164.0 (2026-10-08)**:
         -   **[Prompt Tree In-Flight Execution Banner & Window Focus]**:
             -   **Active Execution Banner**: Added dedicated in-flight execution banner inside `PromptTreeViewModal` displaying animated pulse, live agent step summary, elapsed runtime, and step counter. (Thanks to @aukgit)

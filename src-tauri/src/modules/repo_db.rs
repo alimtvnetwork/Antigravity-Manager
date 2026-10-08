@@ -4,6 +4,7 @@
 
 #![allow(dead_code)]
 
+use crate::error::AppError;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use chrono::Utc;
@@ -622,6 +623,12 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
 
     // Persist discovered projects into repo database safely without wiping fallback entries
     if let Ok(conn) = connect_db() {
+        // Prune stale projects that have not been detected within the last 120 seconds
+        let _ = conn.execute(
+            "DELETE FROM running_projects WHERE last_detected_at < (?1 - 120)",
+            params![now],
+        );
+
         // Only delete corrupted entries where BOTH workspace_storage_path is NULL AND the repo_path does not exist on disk
         let _ = conn.execute(
             "DELETE FROM running_projects 
@@ -1885,7 +1892,7 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                    AND (?2 = 'all' OR instance_id = ?2 OR (?2 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))
                    AND status = 'running'
                    AND updated_at >= ?3",
-                params![project_id, norm_inst, now - 600],
+                params![project_id, norm_inst, now - 120],
                 |r| r.get(0),
             )
             .unwrap_or(0)
@@ -1984,7 +1991,7 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                         // for active turns with not_fully_idle > 0 && status.contains("RUNNING"), ensuring reasoning/thinking models
                         // (Claude 3.7 Thinking, Gemini 2.5 Pro) are not prematurely flipped to IDLE mid-generation!
                         let conv_time = parse_flexible_timestamp(&_last_time_str);
-                        let is_recent = conv_time > 0 && (now - conv_time <= 600);
+                        let is_recent = conv_time > 0 && (now - conv_time <= 60);
 
                         if !is_recent {
                             continue;
@@ -2061,7 +2068,7 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
         .prepare(
             "SELECT DISTINCT project_id, instance_id, repo_path FROM active_prompts 
              WHERE status IN ('backed_up', 'queued', 'pending')
-             ORDER BY updated_at ASC",
+             ORDER BY created_at ASC, id ASC",
         )
         .map_err(|e| format!("Failed to query candidate enqueued projects: {}", e))?;
 
@@ -2238,6 +2245,73 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
 
     invalidate_prompt_tree_cache(target_instance);
     Ok(dispatched_count)
+}
+
+/// Enqueue a prompt for an instance into active_prompts FIFO scheduler table.
+pub fn enqueue_prompt_for_instance(
+    instance_id: &str,
+    prompt_text: &str,
+    workspace_path: Option<&str>,
+) -> Result<i64, AppError> {
+    enqueue_prompt_for_instance_full(instance_id, prompt_text, workspace_path, None, None)
+}
+
+/// Enqueue a prompt with optional conversation_id and project_id metadata.
+pub fn enqueue_prompt_for_instance_full(
+    instance_id: &str,
+    prompt_text: &str,
+    workspace_path: Option<&str>,
+    conversation_id: Option<&str>,
+    project_id: Option<&str>,
+) -> Result<i64, AppError> {
+    let conn = connect_db().map_err(AppError::Config)?;
+    let now = Utc::now().timestamp();
+    let norm_inst = crate::modules::instance::resolve_instance_id(instance_id)
+        .unwrap_or_else(|_| instance_id.to_string());
+    let clean_repo = workspace_path.unwrap_or("").trim();
+    let proj_id = project_id
+        .map(|s| s.to_string())
+        .or_else(|| {
+            if clean_repo.is_empty() {
+                None
+            } else {
+                conn.query_row(
+                    "SELECT id FROM running_projects WHERE repo_path = ?1 LIMIT 1",
+                    rusqlite::params![clean_repo],
+                    |r| r.get(0),
+                )
+                .ok()
+            }
+        })
+        .unwrap_or_else(|| {
+            if clean_repo.is_empty() {
+                norm_inst.clone()
+            } else {
+                clean_repo.to_string()
+            }
+        });
+
+    let prompt_uuid = format!("queued-{}-{}", norm_inst, uuid::Uuid::new_v4());
+
+    conn.execute(
+        "INSERT INTO active_prompts (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'gemini-2.5-pro', ?6, 'queued', ?7, ?8)",
+        rusqlite::params![
+            &prompt_uuid,
+            &proj_id,
+            &norm_inst,
+            clean_repo,
+            prompt_text,
+            conversation_id,
+            now,
+            now,
+        ],
+    )
+    .map_err(AppError::Database)?;
+
+    let row_id = conn.last_insert_rowid();
+    invalidate_prompt_tree_cache(Some(&norm_inst));
+    Ok(row_id)
 }
 
 /// Re-enqueue running conversations for an instance before switch/restart.
@@ -4085,6 +4159,7 @@ pub struct TranscriptInspection {
     pub is_subagent: bool,
     pub is_recent_active: bool,
     pub is_non_prompt: bool,
+    pub is_terminal_done: bool,
 }
 
 /// Helper to read a specific un-truncated line content from transcript_full.jsonl
@@ -4155,7 +4230,7 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0);
-    let is_recent_active = mtime_epoch > 0 && (now_epoch - mtime_epoch <= 240);
+    let is_recent_active = mtime_epoch > 0 && (now_epoch - mtime_epoch <= 60);
 
     let content = match std::fs::read_to_string(&chosen_path) {
         Ok(c) => c,
@@ -4170,6 +4245,7 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
                 is_subagent: false,
                 is_recent_active,
                 is_non_prompt: true,
+                is_terminal_done: false,
             };
         }
     };
@@ -4307,10 +4383,13 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
         }
     }
 
+    let mut is_terminal_done = false;
+
     // DEEP SCAN: Inspect up to 10 lines in reverse order to bypass telemetry noise
     for line in lines.iter().rev().take(10) {
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
             let s_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("");
+            let s_source = val.get("source").and_then(|v| v.as_str()).unwrap_or("");
 
             // Bypass pure telemetry / token usage metadata
             if s_type == "TOKEN_USAGE" || s_type == "TELEMETRY" || s_type == "HEARTBEAT" {
@@ -4325,6 +4404,18 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
                 .get("status")
                 .and_then(|v| v.as_str())
                 .unwrap_or("running");
+
+            // Inspect for terminal completion
+            if s_type == "PLANNER_RESPONSE" || s_source == "MODEL" {
+                let tool_calls = val.get("tool_calls").and_then(|tc| tc.as_array());
+                let has_open_tools = tool_calls.map(|tc| !tc.is_empty()).unwrap_or(false);
+                if (s_status.eq_ignore_ascii_case("DONE")
+                    || s_status.eq_ignore_ascii_case("COMPLETED"))
+                    && !has_open_tools
+                {
+                    is_terminal_done = true;
+                }
+            }
 
             // 1. Check for genuine tool_calls
             if let Some(tool_calls) = val.get("tool_calls").and_then(|tc| tc.as_array()) {
@@ -4423,6 +4514,11 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
     };
 
     let is_non_prompt = !has_real_user_prompt && !is_subagent;
+    let effective_recent_active = if is_terminal_done {
+        false
+    } else {
+        is_recent_active
+    };
 
     TranscriptInspection {
         step_count,
@@ -4432,8 +4528,9 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
         tool_calls_summary,
         latest_step_summary,
         is_subagent,
-        is_recent_active,
+        is_recent_active: effective_recent_active,
         is_non_prompt,
+        is_terminal_done,
     }
 }
 
@@ -4830,7 +4927,7 @@ fn compute_project_conversation_tree(
                             }
 
                             let conv_ts = parse_flexible_timestamp(&last_time_str);
-                            let is_recent = conv_ts > 0 && (now - conv_ts <= 600);
+                            let is_recent = conv_ts > 0 && (now - conv_ts <= 60);
 
                             let is_idle_count = not_fully_idle == 0;
                             let has_idle_status = status.contains("IDLE")
@@ -4841,7 +4938,7 @@ fn compute_project_conversation_tree(
 
                             let inspection = inspect_conversation_transcript(base, &cid);
 
-                            let is_conv_running = if is_explicit_idle {
+                            let is_conv_running = if is_explicit_idle || inspection.is_terminal_done {
                                 false
                             } else if is_owning_inst_alive && not_fully_idle > 0 && status.contains("RUNNING") && is_recent {
                                 true
@@ -5463,10 +5560,9 @@ fn compute_project_conversation_tree(
         );
 
         if only_running {
-            if !proj_is_running {
-                if !has_conv_nodes {
-                    continue;
-                }
+            let has_any_running_conv = conv_nodes.iter().any(|c| c.is_running);
+            if !proj_is_running && !has_any_running_conv {
+                continue;
             }
         }
 

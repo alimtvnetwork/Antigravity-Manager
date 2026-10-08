@@ -1,9 +1,11 @@
 use crate::error::{AppError, AppResult};
 pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 use once_cell::sync::Lazy;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::{Arc, RwLock};
 use sysinfo::System;
 
 #[cfg(target_os = "windows")]
@@ -79,6 +81,148 @@ pub fn open_instance_db() -> Result<rusqlite::Connection, String> {
     Ok(conn)
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct InstanceProcessRecord {
+    pub instance_id: String,
+    pub pid: u32,
+    pub data_dir: String,
+    pub launched_at: i64,
+    pub last_verified_at: i64,
+    pub is_alive: bool,
+    pub command_line: Option<String>,
+}
+
+pub static SMART_PROCESS_CACHE: Lazy<Arc<RwLock<HashMap<String, InstanceProcessRecord>>>> =
+    Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
+
+/// Check if a specific PID is alive in the operating system in sub-millisecond time.
+pub fn is_pid_alive_targeted(pid: u32) -> bool {
+    if pid == 0 {
+        return false;
+    }
+
+    let mut sys = System::new();
+    let target = sysinfo::Pid::from_u32(pid);
+    sys.refresh_processes_specifics(
+        sysinfo::ProcessesToUpdate::Some(&[target]),
+        sysinfo::ProcessRefreshKind::new(),
+    );
+    sys.process(target).is_some()
+}
+
+/// Query the in-memory smart process cache or discover living PID from the OS.
+pub fn get_or_detect_instance_process(instance_id: &str) -> Option<InstanceProcessRecord> {
+    let resolved_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
+    let now = chrono::Utc::now().timestamp();
+
+    // 1. Tier 1: Fast cached verification
+    {
+        let cache_read = SMART_PROCESS_CACHE.read().ok()?;
+        if let Some(record) = cache_read.get(&resolved_id) {
+            if record.pid > 0 && is_pid_alive_targeted(record.pid) {
+                drop(cache_read);
+                if let Ok(mut cache_write) = SMART_PROCESS_CACHE.write() {
+                    if let Some(rec) = cache_write.get_mut(&resolved_id) {
+                        rec.last_verified_at = now;
+                        rec.is_alive = true;
+                        return Some(rec.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    // Remove stale cache entry
+    if let Ok(mut cache_write) = SMART_PROCESS_CACHE.write() {
+        cache_write.remove(&resolved_id);
+    }
+
+    // 2. Tier 2: Targeted system re-scan
+    let registry = load_registry().ok()?;
+    let inst = registry
+        .instances
+        .iter()
+        .find(|i| i.id == resolved_id || (resolved_id == "default" && i.is_default))?;
+
+    let is_default = inst.is_default || inst.id == "default";
+    let pids = find_pids_for_data_dir(&inst.data_dir, is_default);
+    let candidate_pid = pids.first().copied().or_else(|| {
+        let saved = inst.pid.or_else(|| get_instance_saved_pid(&resolved_id));
+        saved.filter(|&sp| sp > 0 && is_pid_alive_targeted(sp))
+    });
+
+    if let Some(pid) = candidate_pid {
+        if pid > 0 && is_pid_alive_targeted(pid) {
+            let record = InstanceProcessRecord {
+                instance_id: resolved_id.clone(),
+                pid,
+                data_dir: inst.data_dir.clone(),
+                launched_at: now,
+                last_verified_at: now,
+                is_alive: true,
+                command_line: None,
+            };
+            if let Ok(mut cache_write) = SMART_PROCESS_CACHE.write() {
+                cache_write.insert(resolved_id.clone(), record.clone());
+            }
+            let _ = record_instance_pid(&resolved_id, pid, &inst.data_dir);
+            return Some(record);
+        }
+    }
+
+    None
+}
+
+/// Guarantee that the instance is running prior to prompt dispatch.
+/// If already running, attempts focus but NEVER terminates or relaunches.
+/// Only if confirmed dead across the OS, cold launches targeted at workspace.
+pub fn ensure_instance_running_for_dispatch(
+    instance_id: &str,
+    workspace_path: Option<&str>,
+) -> Result<u32, AppError> {
+    let resolved_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
+
+    if let Some(record) = get_or_detect_instance_process(&resolved_id) {
+        let pids = vec![record.pid];
+        let is_workspace_focused = if let Some(ws) = workspace_path {
+            let clean_ws = ws.trim_end_matches(['/', '\\']);
+            let repo_name = std::path::Path::new(clean_ws)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(clean_ws);
+            crate::modules::process::focus_instance_workspace_window(&pids, repo_name)
+        } else {
+            false
+        };
+
+        if !is_workspace_focused {
+            let _ = crate::modules::process::focus_instance_pids(&pids);
+        }
+
+        crate::modules::logger::log_info(&format!(
+            "[SmartProcessCache] Instance '{}' (PID {}) is verified running; keeping process intact",
+            resolved_id, record.pid
+        ));
+        return Ok(record.pid);
+    }
+
+    crate::modules::logger::log_info(&format!(
+        "[SmartProcessCache] Instance '{}' confirmed dead across OS; cold launching targeted at workspace: {:?}",
+        resolved_id, workspace_path
+    ));
+
+    if let Some(ws) = workspace_path {
+        let ws_vec = vec![ws.to_string()];
+        launch_instance_with_workspaces(&resolved_id, Some(&ws_vec), true)?;
+    } else {
+        launch_instance(&resolved_id)?;
+    }
+
+    let record = get_or_detect_instance_process(&resolved_id);
+    let launched_pid = record.map(|r| r.pid).unwrap_or(0);
+    Ok(launched_pid)
+}
+
 /// Record an instance PID launch in the SQLite database and in registry
 pub fn record_instance_pid(instance_id: &str, pid: u32, data_dir: &str) -> Result<(), String> {
     let now = chrono::Utc::now().timestamp();
@@ -100,6 +244,21 @@ pub fn record_instance_pid(instance_id: &str, pid: u32, data_dir: &str) -> Resul
             inst.pid = Some(pid);
             inst.last_used = now;
             let _ = save_registry(&registry);
+        }
+    }
+
+    if pid > 0 {
+        if let Ok(mut cache) = SMART_PROCESS_CACHE.write() {
+            let record = InstanceProcessRecord {
+                instance_id: instance_id.to_string(),
+                pid,
+                data_dir: data_dir.to_string(),
+                launched_at: now,
+                last_verified_at: now,
+                is_alive: true,
+                command_line: None,
+            };
+            cache.insert(instance_id.to_string(), record);
         }
     }
 
@@ -147,6 +306,11 @@ pub fn mark_instance_stopped(instance_id: &str) -> Result<(), String> {
             let _ = save_registry(&registry);
         }
     }
+
+    if let Ok(mut cache) = SMART_PROCESS_CACHE.write() {
+        cache.remove(instance_id);
+    }
+
     Ok(())
 }
 
@@ -3061,62 +3225,46 @@ pub fn focus_or_launch_instance_with_workspace(
     instance_id: &str,
     workspace_path: Option<&str>,
 ) -> Result<bool, crate::error::AppError> {
-    let registry = load_registry().map_err(crate::error::AppError::Config)?;
-    let inst = registry
-        .instances
-        .iter()
-        .find(|i| i.id == instance_id)
-        .ok_or_else(|| {
-            crate::error::AppError::Config(format!("Instance {} not found", instance_id))
-        })?;
+    let resolved_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
 
-    let is_default_inst = inst.is_default || inst.id == "default";
-    let mut pids = find_pids_for_data_dir(&inst.data_dir, is_default_inst);
-    if let Some(saved_pid) = inst.pid.or_else(|| get_instance_saved_pid(instance_id)) {
-        if saved_pid > 0 && !pids.contains(&saved_pid) {
-            let mut sys = System::new();
-            sys.refresh_processes(sysinfo::ProcessesToUpdate::All);
-            if sys.process(sysinfo::Pid::from_u32(saved_pid)).is_some() {
-                pids.push(saved_pid);
-            }
-        }
-    }
-    if pids.is_empty() && is_default_inst {
-        pids = crate::modules::process::get_antigravity_pids(None);
-    }
-
-    if !pids.is_empty() {
-        crate::modules::logger::log_info(&format!(
-            "[Instance] Focus requested for '{}', focusing running PIDs: {:?}",
-            instance_id, pids
-        ));
-        if let Some(ws) = workspace_path {
+    if let Some(record) = get_or_detect_instance_process(&resolved_id) {
+        let pids = vec![record.pid];
+        let is_workspace_focused = if let Some(ws) = workspace_path {
             let clean_ws = ws.trim_end_matches(['/', '\\']);
             let repo_name = std::path::Path::new(clean_ws)
                 .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or(clean_ws);
-            let focused_workspace =
-                crate::modules::process::focus_instance_workspace_window(&pids, repo_name);
-            if focused_workspace {
-                return Ok(true);
-            }
+            crate::modules::process::focus_instance_workspace_window(&pids, repo_name)
+        } else {
+            false
+        };
+
+        let is_focused = if is_workspace_focused {
+            true
+        } else {
+            crate::modules::process::focus_instance_pids(&pids)
+        };
+
+        if !is_focused {
+            crate::modules::logger::log_info(&format!(
+                "[Instance] Instance '{}' (PID {}) is running, but OS focus window could not be raised; keeping living process intact",
+                resolved_id, record.pid
+            ));
         }
-        let focused = crate::modules::process::focus_instance_pids(&pids);
-        if focused {
-            return Ok(true);
-        }
+
+        return Ok(is_focused);
     }
 
     crate::modules::logger::log_info(&format!(
-        "[Instance] Instance '{}' is not running or could not be focused; launching with workspace: {:?}",
-        instance_id, workspace_path
+        "[Instance] Instance '{}' is not running; launching with workspace: {:?}",
+        resolved_id, workspace_path
     ));
     if let Some(ws) = workspace_path {
         let ws_vec = vec![ws.to_string()];
-        launch_instance_with_workspaces(instance_id, Some(&ws_vec), true)?;
+        launch_instance_with_workspaces(&resolved_id, Some(&ws_vec), true)?;
     } else {
-        launch_instance(instance_id)?;
+        launch_instance(&resolved_id)?;
     }
     Ok(false)
 }
@@ -3127,42 +3275,30 @@ pub fn focus_or_launch_workspace(
     repo_path: &str,
     repo_name: &str,
 ) -> Result<bool, crate::error::AppError> {
-    let registry = load_registry().map_err(crate::error::AppError::Config)?;
-    let inst = registry
-        .instances
-        .iter()
-        .find(|i| i.id == instance_id)
-        .ok_or_else(|| {
-            crate::error::AppError::Config(format!("Instance {} not found", instance_id))
-        })?;
+    let resolved_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
 
-    let is_default_inst = inst.is_default || inst.id == "default";
-    let mut pids = find_pids_for_data_dir(&inst.data_dir, is_default_inst);
-    if let Some(saved_pid) = inst.pid.or_else(|| get_instance_saved_pid(instance_id)) {
-        if saved_pid > 0 && !pids.contains(&saved_pid) {
-            let mut sys = System::new();
-            sys.refresh_processes(sysinfo::ProcessesToUpdate::All);
-            if sys.process(sysinfo::Pid::from_u32(saved_pid)).is_some() {
-                pids.push(saved_pid);
-            }
-        }
-    }
-    if pids.is_empty() && is_default_inst {
-        pids = crate::modules::process::get_antigravity_pids(None);
-    }
+    if let Some(record) = get_or_detect_instance_process(&resolved_id) {
+        let pids = vec![record.pid];
+        let is_workspace_focused = if !repo_name.is_empty() {
+            crate::modules::process::focus_instance_workspace_window(&pids, repo_name)
+        } else {
+            false
+        };
 
-    if !pids.is_empty() {
-        if !repo_name.is_empty() {
-            let focused =
-                crate::modules::process::focus_instance_workspace_window(&pids, repo_name);
-            if focused {
-                return Ok(true);
-            }
+        let is_focused = if is_workspace_focused {
+            true
+        } else {
+            crate::modules::process::focus_instance_pids(&pids)
+        };
+
+        if !is_focused {
+            crate::modules::logger::log_info(&format!(
+                "[Instance] Instance '{}' (PID {}) is running, but workspace window focus could not be established; keeping living process intact",
+                resolved_id, record.pid
+            ));
         }
-        let focused = crate::modules::process::focus_instance_pids(&pids);
-        if focused {
-            return Ok(true);
-        }
+
+        return Ok(is_focused);
     }
 
     let target_path = if !repo_path.is_empty() {
@@ -3172,9 +3308,9 @@ pub fn focus_or_launch_workspace(
     };
     crate::modules::logger::log_info(&format!(
         "[Instance] Launching instance '{}' targeted at workspace folder: {}",
-        instance_id, target_path
+        resolved_id, target_path
     ));
-    launch_instance_with_workspaces(instance_id, Some(&[target_path.to_string()]), true)?;
+    launch_instance_with_workspaces(&resolved_id, Some(&[target_path.to_string()]), true)?;
     Ok(false)
 }
 
@@ -4283,6 +4419,9 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     }
 
     let _ = mark_instance_stopped(instance_id);
+    if let Ok(mut cache) = SMART_PROCESS_CACHE.write() {
+        cache.remove(instance_id);
+    }
     crate::modules::repo_db::invalidate_prompt_tree_cache(Some(instance_id));
 
     // Small settle delay to ensure OS flushes file handles and SQLite locks
