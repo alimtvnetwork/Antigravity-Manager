@@ -116,31 +116,12 @@ type ViewMode = 'preview' | 'raw' | 'edit';
 
 // Helper to format clean, compact sequence badge without heavy bracket clutter
 function formatDualBadge(agmCode: string | undefined, defaultAgm: string, gmCode: string | undefined, defaultGm: string): string {
-    const combined = `${agmCode || ''} ${gmCode || ''}`;
-    const gmMatch = combined.match(/GM:#(\d+)/i);
-    if (gmMatch) {
-        return `#${gmMatch[1]}`;
+    const rawAgm = (agmCode || defaultAgm || '').replace(/^AGM:/i, '').replace(/[\[\]]/g, '').trim();
+    const rawGm = (gmCode || defaultGm || '').replace(/^GM:/i, '').replace(/[\[\]]/g, '').trim();
+    if (rawAgm && rawGm && rawAgm !== rawGm) {
+        return `${rawAgm} · ${rawGm}`;
     }
-    const rawGm = (gmCode || defaultGm || '').replace(/[\[\]]/g, '').trim();
-    if (rawGm.startsWith('GM:#')) {
-        return rawGm.slice(3);
-    }
-    if (rawGm.startsWith('#')) {
-        return rawGm;
-    }
-    const rawAgm = (agmCode || defaultAgm || '').replace(/[\[\]]/g, '').trim();
-    if (rawAgm) {
-        const agmMatch = rawAgm.match(/(?:AGM:)?([PC]\d+)/i);
-        if (agmMatch) {
-            return agmMatch[1].toUpperCase();
-        }
-        const cleanAgm = rawAgm.replace(/^(AGM:)/i, '').trim();
-        if (cleanAgm) {
-            return cleanAgm;
-        }
-    }
-    const cleanGm = rawGm.replace(/^(GM:)/i, '').trim();
-    return cleanGm.startsWith('#') || cleanGm.startsWith('P') || cleanGm.startsWith('C') ? cleanGm : `#${cleanGm}`;
+    return rawGm || rawAgm || defaultAgm;
 }
 
 // Helper to count words
@@ -1850,13 +1831,25 @@ ${activePromptText}
             setActionMsg('Enqueueing prompt into FIFO scheduler queue...');
             const promptContent = editedPromptText.trim() || activePromptText || selectedConversation.prompt_preview_200w || '';
             const repoPath = selectedProject?.repo_path || '';
+            const targetInstId = selectedProject?.instance_id || instanceId || 'default';
             try {
-                await enqueuePrompt(
-                    targetInstId,
-                    repoPath,
-                    promptContent,
-                    selectedConversation.conversation_id
-                );
+                try {
+                    await invoke('enqueue_prompt', {
+                        instanceId: targetInstId,
+                        promptText: promptContent,
+                        workspacePath: repoPath,
+                        repoPath,
+                        promptContent,
+                        conversationId: selectedConversation.conversation_id,
+                    });
+                } catch {
+                    await enqueuePrompt(
+                        targetInstId,
+                        repoPath,
+                        promptContent,
+                        selectedConversation.conversation_id
+                    );
+                }
             } catch (queueErr) {
                 // Fallback: write .antigravity_resume_task.json with queued status
                 if (repoPath) {
