@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.162.3-3B82F6?style=flat-square" alt="Version v4.162.3">
+    <img src="https://img.shields.io/badge/Version-v4.162.5-3B82F6?style=flat-square" alt="Version v4.162.5">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
@@ -114,7 +114,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.162.3)**
+**Bar 2: Version-Based Installation (v4.162.5)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -553,7 +553,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.162.3**: Hardened local CI/CD runner test inventory parsing (`06-cicd-local-runner.py`) supporting both list and dictionary schemas; expanded sequence integrity linter exemptions (`21-sequence-integrity-linter.py`); purged unused imports in `auto_switcher_e2e_test.rs`; synchronized AI memory pending plan roadmaps and index documentation; verified 100% clean pre-flight quality gates across Rust clippy, fmt, and Vite frontend builds. (Thanks to @aukgit)
+> Latest version **v4.162.5**: Modernized prompt tree view with segmented dark-glass pill capsules, prompt classification, and repeated prompt grouping; capped quota progress bar milestone dots to maximum 5 with low-quota (<25%) deep red track transition and numeric percentage checkpoints; tightened instance card whitespace and added custom thin scrollbars; expanded AGM CLI with `prompts` and `doctor` commands with `--json` parity. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → CHANGELOG_EN.md](CHANGELOG_EN.md)**
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## [v4.162.5] - 2026-10-08
+
+### Added
+- Modernize prompt tree view with compact dark-glass pill capsules, prompt classification, and repeated prompt grouping
+- Quota progress bar milestone dot capping (max 5), low-quota (<25%) dark red transition, and numeric percentage checkpoints
+- Instance card whitespace reduction and custom thin scrollbars
+- AGM CLI prompt management (`agm prompts ls|tree|backup|restore`) and system diagnostics (`agm doctor`)
+
+---
+
 ## [v4.162.3] - 2026-10-07
 
 ### Added
@@ -26,6 +36,23 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.162.5 (2026-10-08)**:
+        -   **[Prompt Tree Modernization & Pill Capsule Header]**:
+            -   **Segmented Pill Capsule Toolbar**: Redesigned header actions into contiguous segmented dark-glass pill capsules (`rounded-full`, shared border, subtle dividers) with compact typography and icons. (Thanks to @aukgit)
+            -   **Prompt Classification & Subagent Distinction**: Implemented dual-source classification distinguishing genuine user prompts (`USER`), automated subagent briefs (`SUBAGENT`), and drafts. (Thanks to @aukgit)
+            -   **Repeated Prompt Deduplication & Grouping**: Grouped consecutive or matching repeated prompts into collapsible clusters (`(xN)`) in tree navigation. (Thanks to @aukgit)
+            -   **Pulsing Activity Indicators**: Added real-time glowing status badges (`RUNNING` in emerald and `QUEUED` in amber) in tree nodes and inspector headers. (Thanks to @aukgit)
+            -   **Truncated Byte Suppression & Export**: Suppressed raw truncated byte markers from previews and added rich Copy with Images and JSON/Markdown Export. (Thanks to @aukgit)
+        -   **[Quota Progress Bar & Low Quota Dark Red Transition]**:
+            -   **Milestone Dot Capping**: Capped milestone checkpoints to at most 5 nodes (`[100, 75, 50, 25]`), seamlessly blending node borders and backgrounds with the track gradient. (Thanks to @aukgit)
+            -   **Critical Quota (< 25%) Dark Red & Numbers**: Shifted track to deep red below 25% with white text and rendered numeric percentage values directly inside low-quota milestone balls instead of checkmarks. (Thanks to @aukgit)
+        -   **[Instance Card Density & Custom Thin Scrollbars]**:
+            -   **Whitespace Compaction**: Tightened padding (`p-2.5` / `p-2`) across cards and recent project lists, preventing excessive whitespace. (Thanks to @aukgit)
+            -   **Thin Scrollbars**: Added dedicated `.custom-thin-scrollbar` (4px width) for sleek, accessible scroll areas. (Thanks to @aukgit)
+        -   **[AGM CLI Commands & Diagnostics]**:
+            -   **CLI Verbs & Telemetry**: Added `agm prompts ls|tree|backup|restore` and `agm doctor` commands with `--json` parity and help documentation. (Thanks to @aukgit)
+
+
     *   **v4.162.0 (2026-10-07)**:
         -   **[CI Runner Inventory Robustness & Sequence Linter Integrity]**:
             -   **Test Runner Schema Compatibility**: Hardened `03-ai-scripts/06-cicd-local-runner.py` to robustly handle both list and dictionary test inventory structures in `run_smart_go_tests`, preventing runtime type errors during automated pre-flight testing. (Thanks to @aukgit)

@@ -1,5 +1,5 @@
 cask "antigravity-tools" do
-  version "4.162.0"
+  version "4.162.5"
   sha256 :no_check
 
   name "Antigravity Manager Tools By Alim"

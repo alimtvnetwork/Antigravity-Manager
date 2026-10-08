@@ -33,7 +33,6 @@ export function QuotaProgressBar({
 }: QuotaProgressBarProps) {
     const clamped = Math.min(100, Math.max(0, Number.isFinite(percentage) ? percentage : 0));
     const isCritical = clamped < 25;
-    const isHealthy = clamped >= 75;
     const hasCheckpoints = showCheckpoints;
 
     // Piecewise gradient matching modern specification:
