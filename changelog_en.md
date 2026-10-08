@@ -3,6 +3,17 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.164.0 (2026-10-08)**:
+        -   **[Prompt Tree In-Flight Execution Banner & Window Focus]**:
+            -   **Active Execution Banner**: Added dedicated in-flight execution banner inside `PromptTreeViewModal` displaying animated pulse, live agent step summary, elapsed runtime, and step counter. (Thanks to @aukgit)
+            -   **Direct Antigravity Window Activation**: Implemented 1-click "Open in Antigravity Window" button with Win32 un-minimize (`ShowWindow` SW_RESTORE 9), foreground focus (`SetForegroundWindow`), and process PID fallback resolution. (Thanks to @aukgit)
+        -   **[FIFO Prompt Restore & Origin Classification Hardening]**:
+            -   **Strict FIFO Ordering**: Enforced strict First-In-First-Out ordering (`ORDER BY created_at ASC, id ASC`) across prompt backup restore and `auto_resume_recent_prompts` queries. (Thanks to @aukgit)
+            -   **Deep Subagent Classification**: Extended detection keywords (`debugger`, `architect`, `tester`, `invoked by a caller agent`) to reliably differentiate subagent background tasks from user instructions. (Thanks to @aukgit)
+        -   **[Fleet Synchronization Refinement & Deduplication]**:
+            -   **Unified Schema & Types**: Unified `FleetMachineInfo` data structures and deduplicated imports across Supabase sync modules and Tauri IPC handlers. (Thanks to @aukgit)
+            -   **UI Streamlining**: Deduplicated `<FleetMachinesTable />` elements, refining privacy email masking and 15-second auto-polling countdown pills. (Thanks to @aukgit)
+
     *   **v4.163.0 (2026-10-08)**:
 -   **[Supabase Multi-Machine Fleet Synchronization & Observability]**:
             -   **Fleet Machines Telemetry & Aggregation**: Implemented multi-machine cluster synchronization in `src-tauri/src/modules/supabase_sync.rs`, joining PostgREST `nodes`, `instance_profiles`, and `workspace_leases` to expose cross-machine worker aliases, IPs, active profiles, bound accounts, and distributed lease states. (Thanks to @aukgit)

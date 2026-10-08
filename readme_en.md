@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.163.0)
+> Professional AI Account Management & Protocol Proxy System (v4.164.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.163.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.164.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,8 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.163.0**: Integrated multi-machine fleet synchronization with Supabase, adding `<FleetMachinesTable />` beneath local instances across Card and Table views to display remote nodes, active running instances, privacy-masked bound accounts, live running prompt count telemetry, and 15-second auto-polling. (Thanks to @aukgit)
-> Latest version **v4.163.0**: Implemented multi-machine fleet synchronization and cross-node instance observability via Supabase; added `FleetMachinesTable` in the Instances section displaying worker nodes, IPs, instance profiles, masked accounts, and live running prompts; added idempotent schema extensions for prompt telemetry and new Tauri IPC commands `get_supabase_fleet_machines` and `sync_supabase_now`. (Thanks to @aukgit)
+> Latest version **v4.164.0**: Added prompt tree in-flight execution banner with elapsed timer, step counter, and direct Antigravity window un-minimize/focus; enforced strict FIFO database ordering across prompt backup restore and auto-resume queries; deepened subagent classification heuristics; streamlined Supabase multi-machine fleet synchronization and deduplicated schemas. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → CHANGELOG_EN.md](CHANGELOG_EN.md)**
 
