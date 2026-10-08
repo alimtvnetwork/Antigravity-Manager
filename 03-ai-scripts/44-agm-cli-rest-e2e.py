@@ -135,6 +135,19 @@ def call_rest_api(path: str, method: str = "GET", body: dict = None) -> dict:
 def scan_protected_ide_pids() -> set[int]:
     """Scan and record protected IDE PIDs that must NEVER be touched."""
     protected_pids = set()
+    
+    # 1. Capture bound instance PIDs from AGM
+    try:
+        res = run_agm_cli(["instances", "list"])
+        if res.get("success") and isinstance(res.get("data"), list):
+            for inst in res["data"]:
+                pid = inst.get("pid")
+                if pid and isinstance(pid, int):
+                    protected_pids.add(pid)
+    except Exception:
+        pass
+
+    # 2. Capture persistent main IDE processes from tasklist
     if platform.system() == "Windows":
         try:
             output = subprocess.check_output(
@@ -144,14 +157,21 @@ def scan_protected_ide_pids() -> set[int]:
             )
             for line in output.strip().splitlines():
                 parts = line.strip().split('","')
-                if len(parts) >= 2:
+                if len(parts) >= 5:
                     proc_name = parts[0].strip('"').lower()
                     pid_str = parts[1].strip('"')
+                    mem_str = parts[4].strip('"').replace(',', '').replace(' K', '').strip()
+                    try:
+                        mem_k = int(mem_str)
+                    except ValueError:
+                        mem_k = 0
                     if any(target in proc_name for target in ["antigravity", "cursor", "code.exe", "windsurf"]):
-                        try:
-                            protected_pids.add(int(pid_str))
-                        except ValueError:
-                            pass
+                        # Focus on long-running main IDE instances (>= 50MB memory) rather than short-lived worker helpers
+                        if mem_k >= 50000:
+                            try:
+                                protected_pids.add(int(pid_str))
+                            except ValueError:
+                                pass
         except Exception as e:
             print(f"[WARN] Failed to scan tasklist: {e}")
     return protected_pids
