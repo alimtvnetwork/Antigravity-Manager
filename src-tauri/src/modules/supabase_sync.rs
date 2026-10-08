@@ -70,21 +70,66 @@ pub struct FleetInstanceItem {
     pub lease_expires_at: Option<i64>,
 }
 
-/// Fleet machine node data model aggregating host telemetry and child instance profiles
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Active child instance profile summary running under a specific node
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct FleetInstanceSummary {
+    pub profile_id: String,
+    pub profile_name: String,
+    pub is_running: bool,
+    pub bound_account_id: Option<String>,
+    pub bound_account_email: Option<String>,
+}
+
+/// Active account lease held by a node in the cluster
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct FleetLeaseInfo {
+    pub account_id: String,
+    pub account_email: String,
+    pub profile_name: String,
+    pub leased_at: i64,
+    pub expires_at: i64,
+    pub is_expired: bool,
+}
+
+/// Comprehensive machine info aggregating node telemetry, profiles, and leases
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct FleetMachineInfo {
     pub node_id: String,
+    #[serde(default)]
+    pub node_alias: String,
+    #[serde(default)]
     pub alias: String,
+    #[serde(default)]
+    pub os_info: Option<String>,
     pub ip_address: String,
-    pub uptime_seconds: u64,
+    #[serde(default)]
+    pub is_online: bool,
+    #[serde(default)]
+    pub last_heartbeat_timestamp: i64,
+    #[serde(default)]
     pub last_heartbeat_at: i64,
+    pub uptime_seconds: u64,
+    #[serde(default)]
     pub status: String,
     pub is_local: bool,
+    #[serde(default)]
     pub source: String,
-    pub total_instances: usize,
+    #[serde(default)]
+    pub in_flight_prompts_count: usize,
+    #[serde(default)]
     pub total_running_prompts: usize,
-    pub active_accounts: Vec<String>,
+    #[serde(default)]
+    pub total_instances: usize,
+    #[serde(default)]
+    pub active_instances: Vec<FleetInstanceSummary>,
+    #[serde(default)]
     pub instances: Vec<FleetInstanceItem>,
+    #[serde(default)]
+    pub bound_emails: Vec<String>,
+    #[serde(default)]
+    pub active_accounts: Vec<String>,
+    #[serde(default)]
+    pub leases: Vec<FleetLeaseInfo>,
 }
 
 /// Global shared configuration state
@@ -1084,17 +1129,23 @@ fn construct_local_machine_info(
 
     FleetMachineInfo {
         node_id: local_node_id,
+        node_alias: alias.clone(),
         alias,
         ip_address: local_ip,
         uptime_seconds: uptime,
         last_heartbeat_at: now,
+        last_heartbeat_timestamp: now,
         status: "online".to_string(),
+        is_online: true,
         is_local: true,
         source: "local".to_string(),
         total_instances,
         total_running_prompts: total_running,
-        active_accounts,
+        in_flight_prompts_count: total_running,
+        active_accounts: active_accounts.clone(),
+        bound_emails: active_accounts,
         instances: local_instances,
+        ..Default::default()
     }
 }
 
@@ -1234,19 +1285,26 @@ pub async fn fetch_fleet_machines() -> crate::error::AppResult<Vec<FleetMachineI
 
         let total_instances = instances.len();
 
+        let is_online = node.status == "online";
         machines.push(FleetMachineInfo {
             node_id: node.id,
+            node_alias: node.alias.clone(),
             alias: node.alias,
             ip_address: node.ip_address,
             uptime_seconds: node.uptime_seconds,
             last_heartbeat_at: node.last_heartbeat_at,
+            last_heartbeat_timestamp: node.last_heartbeat_at,
             status: node.status,
+            is_online,
             is_local: false,
             source: "supabase".to_string(),
             total_instances,
             total_running_prompts,
-            active_accounts,
+            in_flight_prompts_count: total_running_prompts,
+            active_accounts: active_accounts.clone(),
+            bound_emails: active_accounts,
             instances,
+            ..Default::default()
         });
     }
 
@@ -1444,44 +1502,6 @@ pub async fn migrate_database_data(
     })
 }
 
-/// Summary of an IDE instance registered on a fleet node
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FleetInstanceSummary {
-    pub profile_id: String,
-    pub profile_name: String,
-    pub is_running: bool,
-    pub bound_account_id: Option<String>,
-    pub bound_account_email: Option<String>,
-}
-
-/// Active account lease held by a node in the cluster
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FleetLeaseInfo {
-    pub account_id: String,
-    pub account_email: String,
-    pub profile_name: String,
-    pub leased_at: i64,
-    pub expires_at: i64,
-    pub is_expired: bool,
-}
-
-/// Comprehensive machine info aggregated across nodes, profiles, and leases
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FleetMachineInfo {
-    pub node_id: String,
-    pub node_alias: String,
-    pub os_info: Option<String>,
-    pub ip_address: String,
-    pub is_online: bool,
-    pub last_heartbeat_timestamp: i64,
-    pub uptime_seconds: u64,
-    pub in_flight_prompts_count: usize,
-    pub active_instances: Vec<FleetInstanceSummary>,
-    pub bound_emails: Vec<String>,
-    pub leases: Vec<FleetLeaseInfo>,
-    pub is_local: bool,
-}
-
 /// Build local fallback machine telemetry when sync is disabled or Supabase is unreachable
 pub fn build_local_fallback_machine() -> Vec<FleetMachineInfo> {
     let node_id = get_local_node_id();
@@ -1529,17 +1549,25 @@ pub fn build_local_fallback_machine() -> Vec<FleetMachineInfo> {
 
     let local_machine = FleetMachineInfo {
         node_id,
-        node_alias,
+        node_alias: node_alias.clone(),
+        alias: node_alias,
         os_info: Some(std::env::consts::OS.to_string()),
         ip_address,
         is_online: true,
         last_heartbeat_timestamp: now,
+        last_heartbeat_at: now,
         uptime_seconds,
+        status: "online".to_string(),
+        source: "local".to_string(),
         in_flight_prompts_count: running_prompts_count,
+        total_running_prompts: running_prompts_count,
+        total_instances: active_instances.len(),
         active_instances,
-        bound_emails,
+        bound_emails: bound_emails.clone(),
+        active_accounts: bound_emails,
         leases: Vec::new(),
         is_local: true,
+        ..Default::default()
     };
 
     vec![local_machine]
@@ -1819,19 +1847,32 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
         let mut bound_emails: Vec<String> = email_set.into_iter().collect();
         bound_emails.sort();
 
+        let status = if is_online {
+            "online".to_string()
+        } else {
+            "offline".to_string()
+        };
         machines.push(FleetMachineInfo {
             node_id,
-            node_alias,
+            node_alias: node_alias.clone(),
+            alias: node_alias,
             os_info,
             ip_address,
             is_online,
             last_heartbeat_timestamp,
+            last_heartbeat_at: last_heartbeat_timestamp,
             uptime_seconds,
+            status,
+            source: "supabase".to_string(),
             in_flight_prompts_count,
+            total_running_prompts: in_flight_prompts_count,
+            total_instances: active_instances.len(),
             active_instances,
-            bound_emails,
+            bound_emails: bound_emails.clone(),
+            active_accounts: bound_emails,
             leases,
             is_local,
+            ..Default::default()
         });
     }
 
@@ -2016,6 +2057,7 @@ mod tests {
                 bound_emails: vec![],
                 leases: vec![],
                 is_local: false,
+                ..Default::default()
             },
             FleetMachineInfo {
                 node_id: "node-online".to_string(),
@@ -2030,6 +2072,7 @@ mod tests {
                 bound_emails: vec![],
                 leases: vec![],
                 is_local: false,
+                ..Default::default()
             },
             FleetMachineInfo {
                 node_id: "node-local".to_string(),
@@ -2044,6 +2087,7 @@ mod tests {
                 bound_emails: vec![],
                 leases: vec![],
                 is_local: true,
+                ..Default::default()
             },
         ];
 

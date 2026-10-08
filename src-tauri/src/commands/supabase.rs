@@ -9,11 +9,11 @@ use crate::modules::supabase_client::{
     EndpointTestResult, SupabaseClient, SupabaseEndpoint, TableVerificationResult,
 };
 use crate::modules::supabase_schema;
-use crate::modules::supabase_sync::{
-    self, DataMigrationSummary, FleetInstanceSummary, FleetLeaseInfo, FleetMachineInfo,
-    SupabaseConfig,
+use crate::modules::supabase_sync;
+pub use crate::modules::supabase_sync::{
+    DataMigrationSummary, FleetInstanceItem, FleetInstanceSummary, FleetLeaseInfo,
+    FleetMachineInfo, SupabaseConfig,
 };
-pub use crate::modules::supabase_sync::{FleetInstanceSummary, FleetLeaseInfo, FleetMachineInfo};
 use crate::modules::workspace_lease_manager::{self, LeaseResult, WorkspaceLease};
 use serde::{Deserialize, Serialize};
 
