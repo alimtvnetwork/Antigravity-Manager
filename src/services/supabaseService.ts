@@ -87,6 +87,8 @@ export interface FleetLeaseInfo {
     leased_at: number;
     expires_at: number;
     is_expired: boolean;
+}
+
 export interface FleetInstanceItem {
     instance_id: string;
     profile_name: string;
@@ -113,17 +115,14 @@ export interface FleetMachineInfo {
     bound_emails: string[];
     leases?: FleetLeaseInfo[];
     is_local?: boolean;
-    alias: string;
-    ip_address: string;
-    uptime_seconds: number;
-    last_heartbeat_at: number;
-    status: string;
-    is_local: boolean;
-    source: string;
-    total_instances: number;
-    total_running_prompts: number;
-    active_accounts: string[];
-    instances: FleetInstanceItem[];
+    alias?: string;
+    last_heartbeat_at?: number;
+    status?: string;
+    source?: string;
+    total_instances?: number;
+    total_running_prompts?: number;
+    active_accounts?: string[];
+    instances?: FleetInstanceItem[];
 }
 
 export const supabaseService = {
@@ -273,7 +272,6 @@ export const supabaseService = {
             useErrorStore.getState().captureError(error, { source: 'SupabaseService' });
             return [];
         }
-        return await invoke<FleetMachineInfo[]>('get_supabase_fleet_machines');
     },
 
     async syncNow(): Promise<void> {

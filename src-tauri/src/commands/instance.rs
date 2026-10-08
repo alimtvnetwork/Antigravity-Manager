@@ -243,6 +243,11 @@ pub fn resume_recent_project_prompts(
 }
 
 #[tauri::command]
+pub fn restore_prompts_backup(backup_json: String) -> Result<usize, String> {
+    crate::modules::repo_db::restore_prompts_from_backup_json(&backup_json)
+}
+
+#[tauri::command]
 pub fn assign_project_to_instance(
     instance_id: String,
     repo_paths: Vec<String>,

@@ -2254,17 +2254,17 @@ pub fn requeue_running_conversations_for_instance(instance_id: &str) -> Result<u
         let stmt_res = if instance_id == "all" {
             conn.prepare(
                 "SELECT id, project_id, instance_id, repo_path, prompt_content, session_id 
-                 FROM active_prompts WHERE status = 'backed_up' ORDER BY updated_at DESC LIMIT 50",
+                 FROM active_prompts WHERE status = 'backed_up' ORDER BY created_at ASC, id ASC LIMIT 50",
             )
         } else if is_all_or_default {
             conn.prepare(
                 "SELECT id, project_id, instance_id, repo_path, prompt_content, session_id 
-                 FROM active_prompts WHERE status = 'backed_up' AND instance_id IN ('default', '__default__', '') ORDER BY updated_at DESC LIMIT 50",
+                 FROM active_prompts WHERE status = 'backed_up' AND instance_id IN ('default', '__default__', '') ORDER BY created_at ASC, id ASC LIMIT 50",
             )
         } else {
             conn.prepare(
                 "SELECT id, project_id, instance_id, repo_path, prompt_content, session_id 
-                 FROM active_prompts WHERE status = 'backed_up' AND instance_id = ?1 ORDER BY updated_at DESC LIMIT 50",
+                 FROM active_prompts WHERE status = 'backed_up' AND instance_id = ?1 ORDER BY created_at ASC, id ASC LIMIT 50",
             )
         };
 
@@ -2366,7 +2366,7 @@ pub fn list_backed_up_prompts() -> Result<Vec<ActivePrompt>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
-             FROM active_prompts WHERE status = 'backed_up' ORDER BY created_at DESC",
+             FROM active_prompts WHERE status = 'backed_up' ORDER BY created_at ASC, id ASC",
         )
         .map_err(|e| format!("Failed to prepare list prompts query: {}", e))?;
 
@@ -2391,6 +2391,139 @@ pub fn list_backed_up_prompts() -> Result<Vec<ActivePrompt>, String> {
         .collect();
 
     Ok(rows)
+}
+
+/// Restore prompts from a JSON backup file in strict FIFO order, persisting into active_prompts and refreshing the tree cache
+pub fn restore_prompts_from_backup_json(backup_json: &str) -> Result<usize, String> {
+    let val: serde_json::Value = serde_json::from_str(backup_json)
+        .map_err(|e| format!("Invalid JSON backup format: {}", e))?;
+
+    let conn = connect_db()?;
+    let now = Utc::now().timestamp();
+    let mut restored_count = 0;
+
+    // 1. If activePrompts array is present:
+    if let Some(prompts_arr) = val.get("activePrompts").and_then(|v| v.as_array()) {
+        let mut sorted_prompts = prompts_arr.clone();
+        sorted_prompts.sort_by_key(|p| p.get("created_at").and_then(|v| v.as_i64()).unwrap_or(0));
+
+        for p in sorted_prompts {
+            let id = p.get("id").and_then(|v| v.as_str()).unwrap_or("");
+            let content = p
+                .get("prompt_content")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            if id.is_empty() || content.trim().is_empty() {
+                continue;
+            }
+            let project_id = p
+                .get("project_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("default");
+            let instance_id = p
+                .get("instance_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("default");
+            let repo_path = p.get("repo_path").and_then(|v| v.as_str()).unwrap_or("");
+            let model = p.get("model").and_then(|v| v.as_str()).unwrap_or("gemini");
+            let session_id = p.get("session_id").and_then(|v| v.as_str());
+            let created_at = p.get("created_at").and_then(|v| v.as_i64()).unwrap_or(now);
+            let img = p.get("image_payload").and_then(|v| v.as_str());
+
+            let _ = conn.execute(
+                "INSERT OR IGNORE INTO running_projects (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at)
+                 VALUES (?1, ?2, ?3, ?4, NULL, 0, ?5)",
+                rusqlite::params![project_id, instance_id, project_id, repo_path, now],
+            );
+
+            let _ = conn.execute(
+                "INSERT INTO active_prompts (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'backed_up', ?8, ?9, ?10)
+                 ON CONFLICT(id) DO UPDATE SET
+                    prompt_content = excluded.prompt_content,
+                    status = 'backed_up',
+                    updated_at = excluded.updated_at",
+                rusqlite::params![id, project_id, instance_id, repo_path, content, model, session_id, created_at, now, img],
+            );
+            restored_count += 1;
+        }
+    }
+
+    // 2. If projects array is present:
+    if let Some(projects_arr) = val.get("projects").and_then(|v| v.as_array()) {
+        for proj in projects_arr {
+            let proj_id = proj
+                .get("project_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("default");
+            let repo_name = proj.get("repo_name").and_then(|v| v.as_str()).unwrap_or("");
+            let repo_path = proj.get("repo_path").and_then(|v| v.as_str()).unwrap_or("");
+            let inst_id = proj
+                .get("instance_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("default");
+
+            let _ = conn.execute(
+                "INSERT OR IGNORE INTO running_projects (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at)
+                 VALUES (?1, ?2, ?3, ?4, NULL, 0, ?5)",
+                rusqlite::params![proj_id, inst_id, repo_name, repo_path, now],
+            );
+
+            if let Some(convs) = proj.get("conversations").and_then(|v| v.as_array()) {
+                let mut sorted_convs = convs.clone();
+                sorted_convs.sort_by_key(|c| {
+                    c.get("last_modified")
+                        .and_then(|v| v.as_str())
+                        .map(|s| parse_flexible_timestamp(s))
+                        .unwrap_or(0)
+                });
+
+                for conv in sorted_convs {
+                    let cid = conv
+                        .get("conversation_id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let prompt_text = conv
+                        .get("full_prompt_text")
+                        .or_else(|| conv.get("prompt_preview_200w"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+
+                    if cid.is_empty() || prompt_text.trim().is_empty() {
+                        continue;
+                    }
+
+                    let prompt_id = format!("restored_{}_{}", proj_id, cid);
+                    let conv_time = conv
+                        .get("last_modified")
+                        .and_then(|v| v.as_str())
+                        .map(|s| parse_flexible_timestamp(s))
+                        .unwrap_or(now);
+
+                    let _ = conn.execute(
+                        "INSERT INTO active_prompts (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at)
+                         VALUES (?1, ?2, ?3, ?4, ?5, 'gemini', ?6, 'backed_up', ?7, ?8)
+                         ON CONFLICT(id) DO UPDATE SET
+                            prompt_content = excluded.prompt_content,
+                            status = 'backed_up',
+                            updated_at = excluded.updated_at",
+                        rusqlite::params![prompt_id, proj_id, inst_id, repo_path, prompt_text, cid, conv_time, now],
+                    );
+                    restored_count += 1;
+                }
+            }
+        }
+    }
+
+    // Invalidate prompt tree cache to show freshly restored entries
+    invalidate_prompt_tree_cache(None);
+
+    crate::modules::logger::log_info(&format!(
+        "[RepoDB] Restored and synchronized {} prompts from backup file in FIFO order",
+        restored_count
+    ));
+
+    Ok(restored_count)
 }
 
 pub struct SwitchPromptSnap {
@@ -3521,7 +3654,7 @@ pub fn auto_resume_recent_prompts(
                  FROM active_prompts 
                  WHERE (project_id = ?1 OR repo_path = ?2 OR project_id LIKE ?3)
                    AND (instance_id = ?4 OR (?4 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))
-                 ORDER BY created_at DESC LIMIT 1",
+                 ORDER BY created_at ASC, id ASC LIMIT 1",
             )
             .map_err(|e| format!("Failed to prepare prompt query: {}", e))?;
 
@@ -3727,6 +3860,8 @@ pub struct AgmConversationNode {
     pub execution_results: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_calls_summary: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub full_prompt_text: Option<String>,
 }
 
 /// Project node in the AGM Tree View (Project -> Conversation -> 200-Word Prompt)
@@ -4064,12 +4199,17 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
                     .get("content")
                     .and_then(|c| c.as_str())
                     .unwrap_or("");
+                let txt_lower = txt.to_lowercase();
                 if txt.contains("You are ")
-                    || txt.contains("subagent")
-                    || txt.contains("Worker")
-                    || txt.contains("Author")
-                    || txt.contains("Research")
-                    || txt.contains("Codebase Researcher")
+                    || txt_lower.contains("subagent")
+                    || txt_lower.contains("worker")
+                    || txt_lower.contains("author")
+                    || txt_lower.contains("research")
+                    || txt_lower.contains("debugger")
+                    || txt_lower.contains("analysis")
+                    || txt_lower.contains("architect")
+                    || txt_lower.contains("invoked by a caller agent")
+                    || txt_lower.contains("execute enhanced read memory")
                 {
                     is_subagent = true;
                 }
@@ -4687,9 +4827,22 @@ fn compute_project_conversation_tree(
                                 let p_lower = effective_prompt.to_lowercase();
                                 let t_lower = title.to_lowercase();
                                 if t_lower.contains("subagent")
-                                    || t_lower.contains("research agent")
+                                    || t_lower.contains("research")
+                                    || t_lower.contains("worker")
+                                    || t_lower.contains("author")
+                                    || t_lower.contains("analysis")
+                                    || t_lower.contains("memory analysis")
+                                    || t_lower.contains("read & understand")
+                                    || t_lower.contains("safe removal")
+                                    || t_lower.contains("debugger")
+                                    || t_lower.contains("architect")
+                                    || t_lower.contains("tester")
                                     || p_lower.contains("you are research")
                                     || p_lower.contains("you are worker")
+                                    || p_lower.contains("you are a")
+                                    || p_lower.contains("invoked by a caller agent")
+                                    || p_lower.contains("execute enhanced read memory")
+                                    || p_lower.contains("<subagent_reminder>")
                                     || p_lower.contains("<system_message>")
                                     || p_lower.contains("internal subagent")
                                 {
@@ -4726,8 +4879,9 @@ fn compute_project_conversation_tree(
                                 }
                             }
 
-                            // Prefix-length / valid path guard: if marked running but no decodable path >= 6 chars, force idle
+                            // Prefix-length / valid path guard: if marked running with assigned paths but no decodable path >= 6 chars, force idle
                             let is_conv_running = if is_conv_running
+                                && !assigned_paths.is_empty()
                                 && !assigned_paths.iter().any(|p| p.len() >= 6)
                             {
                                 false
@@ -4963,6 +5117,7 @@ fn compute_project_conversation_tree(
                     latest_response: item.latest_response.clone(),
                     execution_results: item.execution_results.clone(),
                     tool_calls_summary: item.tool_calls_summary.clone(),
+                    full_prompt_text: Some(item.prompt.clone()),
                 });
             }
         }
@@ -5099,6 +5254,7 @@ fn compute_project_conversation_tree(
                     latest_response: None,
                     execution_results: None,
                     tool_calls_summary: None,
+                    full_prompt_text: Some(ap.prompt_content.clone()),
                 });
             }
         }

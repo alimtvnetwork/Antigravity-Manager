@@ -1118,6 +1118,7 @@ pub fn run() {
             commands::trigger_manual_profile_rotation,
             commands::list_running_projects,
             commands::list_backed_up_prompts,
+            commands::restore_prompts_backup,
             commands::clean_and_restart_workspace,
             commands::resume_recent_project_prompts,
             commands::assign_project_to_instance,

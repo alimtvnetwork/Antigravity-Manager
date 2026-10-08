@@ -2063,6 +2063,9 @@ mod tests {
         assert!(machines[0].is_local);
         assert_eq!(machines[1].node_id, "node-online");
         assert_eq!(machines[2].node_id, "node-offline");
+    }
+
+    #[test]
     fn test_fleet_machine_info_and_local_construction() {
         let cfg = SupabaseConfig::default();
         let local_info = construct_local_machine_info(&cfg, &[]);

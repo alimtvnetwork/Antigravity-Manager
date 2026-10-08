@@ -72,6 +72,7 @@ export interface AgmConversationNode {
     sub_runs?: AgmConversationNode[];
     prompt_category?: string;
     is_queued?: boolean;
+    full_prompt_text?: string;
     latest_step_summary?: string;
     latest_response?: string;
     execution_results?: string;
@@ -92,6 +93,8 @@ export interface AgmProjectTreeNode {
     bound_email?: string;
     is_running: boolean;
     conversations: AgmConversationNode[];
+    running_count?: number;
+    queued_count?: number;
     byte_size?: number;
     repeat_count?: number;
     repeat_badge?: string;
@@ -123,16 +126,6 @@ function countWords(str: string): number {
     return trimmed.split(/\s+/).length;
 }
 
-// Helper to extract concluding tail snippet (10-12 words)
-function getPromptTailSnippet(text: string, fallbackSnippet?: string): string {
-    const source = text && text.trim() ? text.trim() : fallbackSnippet && fallbackSnippet.trim() ? fallbackSnippet.trim() : '';
-    if (!source) return '';
-    const words = source.split(/\s+/).filter(Boolean);
-    if (words.length <= 12) {
-        return words.join(' ');
-    }
-    return words.slice(-12).join(' ');
-}
 
 // Helper to truncate text at word limit while strictly preserving original line breaks and newlines
 function getTruncatedText(text: string, maxWords: number): { displayText: string; isTruncated: boolean; totalWords: number } {
@@ -218,7 +211,11 @@ export function TruncatedContextCallout({
             : 'transcript context';
 
     return (
-        <div className="my-3 flex items-center justify-between px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs shadow-xs backdrop-blur-xs">
+        <div
+            onClick={onExpandFull}
+            className="my-3 flex items-center justify-between px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs shadow-xs backdrop-blur-xs cursor-pointer hover:bg-amber-500/20 transition-all"
+            title="Click to inspect/expand full un-truncated context"
+        >
             <div className="flex items-center gap-2 font-mono font-medium">
                 <span className="text-amber-500 text-sm">⚡</span>
                 <span>[Omitted {formattedSize} of transcript context - Click to inspect/expand]</span>
@@ -226,7 +223,10 @@ export function TruncatedContextCallout({
             {onExpandFull && (
                 <button
                     type="button"
-                    onClick={onExpandFull}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onExpandFull();
+                    }}
                     className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500 text-white dark:text-slate-900 font-bold hover:bg-amber-600 transition-colors text-[10px] cursor-pointer"
                 >
                     <span>Expand Full</span>
@@ -415,19 +415,34 @@ export function classifyPromptTier(
     // 3. AI Subagent Instruction Classification
     const subagentRoleMatch =
         raw.match(/Role:\s*([A-Za-z0-9_\-\s]{3,30})/i) ||
-        raw.match(/You are (?:the )?([A-Za-z0-9_\-\s]{3,30}) for Task/i);
+        raw.match(/You are (?:the )?([A-Za-z0-9_\-\s]{3,30}) for Task/i) ||
+        raw.match(/You are an? ([A-Za-z0-9_\-\s]{3,30}) agent/i);
 
     const isSubagent =
         raw.includes('invoked by a caller agent') ||
         raw.includes('<subagent_reminder>') ||
         raw.includes('send_message to communicate all results') ||
-        /Role:\s*(?:Codebase Researcher|Database Debugger|QA Tester|Subagent)/i.test(raw) ||
+        raw.includes('Execute enhanced Read Memory protocol') ||
+        raw.includes('You are pair programming with a USER') ||
+        raw.includes('Project Structure Memory Analysis') ||
+        raw.includes('Safe Removal Architect') ||
+        raw.includes('Spec Author') ||
+        raw.includes('Codebase Researcher') ||
+        raw.includes('Database Debugger') ||
+        raw.includes('QA Tester') ||
+        raw.includes('Read & Understand') ||
+        /Role:\s*(?:Codebase Researcher|Database Debugger|QA Tester|Subagent|Worker|Architect)/i.test(raw) ||
         cleanTitle.includes('subagent') ||
         cleanTitle.includes('worker-') ||
         cleanTitle.includes('worker ') ||
         cleanTitle.includes('author-') ||
         cleanTitle.includes('researcher') ||
         cleanTitle.includes('debugger') ||
+        cleanTitle.includes('memory') ||
+        cleanTitle.includes('analysis') ||
+        cleanTitle.includes('spec') ||
+        cleanTitle.includes('tester') ||
+        cleanTitle.includes('qa') ||
         metadata?.is_subagent === true ||
         metadata?.prompt_category === 'subagent';
 
@@ -435,14 +450,22 @@ export function classifyPromptTier(
         let detectedRole = 'Subagent';
         if (subagentRoleMatch) {
             detectedRole = subagentRoleMatch[1].trim();
-        } else if (cleanTitle.includes('researcher')) {
+        } else if (cleanTitle.includes('memory') || raw.includes('Memory Analysis')) {
+            detectedRole = 'Memory Analysis';
+        } else if (cleanTitle.includes('spec') || raw.includes('Spec Author')) {
+            detectedRole = 'Spec Author';
+        } else if (cleanTitle.includes('research') || raw.includes('Researcher')) {
             detectedRole = 'Researcher';
         } else if (cleanTitle.includes('worker')) {
             detectedRole = 'Worker';
-        } else if (cleanTitle.includes('debugger')) {
+        } else if (cleanTitle.includes('debug') || raw.includes('Debugger')) {
             detectedRole = 'Debugger';
-        } else if (cleanTitle.includes('tester') || cleanTitle.includes('qa')) {
-            detectedRole = 'QA';
+        } else if (cleanTitle.includes('tester') || cleanTitle.includes('qa') || raw.includes('QA Tester')) {
+            detectedRole = 'QA Tester';
+        } else if (cleanTitle.includes('architect') || raw.includes('Architect')) {
+            detectedRole = 'Architect';
+        } else if (cleanTitle.includes('analysis') || raw.includes('Analysis')) {
+            detectedRole = 'Analysis';
         }
 
         return {
@@ -533,7 +556,7 @@ export function normalizePromptForGrouping(conv: AgmConversationNode): string {
 }
 
 // Inline Markdown parser (Headings, bold, italic, code blocks, inline code, lists, images, blockquotes, truncated callouts)
-function parseInlineMarkdown(text: string): React.ReactNode[] {
+function parseInlineMarkdown(text: string, onToggleExpand?: () => void): React.ReactNode[] {
     const rawNodes: React.ReactNode[] = [];
     const tokenRegex = /(!\[(.*?)\]\((.*?)\)|\[(.*?)\]\((.*?)\)|<truncated\s+(\d+)\s+(bytes|lines)>|`([^`]+)`|\*\*([^*]+)\*\*|__([^_]+)__|~~([^~]+)~~|\*([^*]+)\*|_([^_]+)_)/gi;
     let lastIndex = 0;
@@ -555,11 +578,12 @@ function parseInlineMarkdown(text: string): React.ReactNode[] {
             rawNodes.push(
                 <span
                     key={`trunc-${match.index}`}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 my-0.5 rounded-full text-[10px] font-mono font-medium bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30 shadow-2xs"
-                    title={`Omitted ${truncCount} ${truncUnit} from prompt transcript context`}
+                    onClick={onToggleExpand}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 my-0.5 rounded-full text-[10px] font-mono font-medium bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30 shadow-2xs cursor-pointer hover:bg-amber-500/25 transition-all"
+                    title={`Omitted ${truncCount} ${truncUnit} from prompt transcript context - Click to inspect/expand`}
                 >
                     <span className="text-amber-500 font-bold">⚡</span>
-                    <span>[Omitted {formattedSize} of transcript context]</span>
+                    <span>[Omitted {formattedSize} of transcript context - Click to inspect/expand]</span>
                 </span>
             );
         } else if (imgSrc !== undefined) {
@@ -1140,7 +1164,7 @@ export default function PromptTreeViewModal({
     const selectConversation = useCallback((conv: AgmConversationNode, project: AgmProjectTreeNode) => {
         setSelectedProject(project);
         setSelectedConversation(conv);
-        const text = conv.prompt_preview_200w || '';
+        const text = conv.full_prompt_text || conv.prompt_preview_200w || '';
         setActivePromptText(text);
         setEditedPromptText(text);
         setShowAllWords(false);
@@ -1475,21 +1499,17 @@ export default function PromptTreeViewModal({
         const reader = new FileReader();
         reader.onload = async (event) => {
             try {
-                setActionMsg('Importing and validating prompts backup...');
+                setActionMsg('Importing and persisting prompts backup into SQLite...');
                 const content = event.target?.result as string;
-                const parsed = JSON.parse(content);
-                if (parsed.projects && Array.isArray(parsed.projects)) {
-                    setTreeData(parsed.projects);
-                    setActionMsg(`Restored ${parsed.projects.length} projects from backup file!`);
-                } else if (Array.isArray(parsed)) {
-                    setActionMsg(`Restored ${parsed.length} prompt entries from backup file!`);
-                }
+                JSON.parse(content);
+                const restoredCount = await invoke<number>('restore_prompts_backup', { backupJson: content });
+                setActionMsg(`Successfully restored and persisted ${restoredCount} prompts in strict FIFO order!`);
+                await loadTree(true, true);
                 setTimeout(() => {
                     setActionMsg(null);
-                    loadTree(true, true);
-                }, 3000);
-            } catch {
-                setError('Invalid JSON backup file format');
+                }, 3500);
+            } catch (err: any) {
+                setError(`Restore failed: ${err?.message || err || 'Invalid backup format'}`);
             }
         };
         reader.readAsText(file);
@@ -2038,10 +2058,6 @@ ${activePromptText}
         if (bytes < 1024) return `${bytes} B`;
         return `${(bytes / 1024).toFixed(1)} KB`;
     };
-
-    const tailSnippet = useMemo(() => {
-        return getPromptTailSnippet(activePromptText, selectedConversation?.prompt_tail_snippet || selectedConversation?.prompt_preview_200w);
-    }, [activePromptText, selectedConversation?.prompt_tail_snippet, selectedConversation?.prompt_preview_200w]);
 
     const instanceSeqNum = selectedConversation?.instance_seq_num
         ?? selectedProject?.instance_seq_num
@@ -2872,325 +2888,281 @@ ${activePromptText}
                     {/* Right Panel: Prompt Details, Markdown Modes & Actions */}
                     <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#0c2438]">
                         {selectedConversation ? (
-                            <div className="flex-1 flex flex-col p-6 overflow-y-auto space-y-5">
+                            <div className="flex-1 flex flex-col px-5 py-3.5 overflow-y-auto space-y-3">
                                 {/* Prompt Content Header */}
-                                {/* Prompt Content Header */}
-                                <div className="space-y-2.5 pb-3 border-b border-slate-200 dark:border-[#15334d] shrink-0">
-                                    {/* Row 1: Identity & Metadata */}
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-[5px] text-[11px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20">
-                                                    #{selectedConversation.seq_code || 'P001'}
+                                <div className="space-y-2 pb-2.5 border-b border-slate-200 dark:border-[#15334d] shrink-0">
+                                    {/* Row 1: Identity, Badges & Actions */}
+                                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                                        {/* Left: Sequence + Tier Badge + Status + Title + Instance Trio */}
+                                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-[5px] text-[11px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20">
+                                                #{selectedConversation.seq_code || 'P001'}
+                                            </span>
+                                            {(() => {
+                                                const tierInfo = classifyPromptTier(activePromptText, selectedConversation.title);
+                                                const badgeColors: Record<PromptTier, string> = {
+                                                    USER_PROMPT: 'bg-sky-500/15 text-sky-700 dark:text-cyan-300 border-sky-500/30',
+                                                    SUBAGENT_INSTRUCTION: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30',
+                                                    SYSTEM_MESSAGE: 'bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/30',
+                                                    TOOL_OUTPUT: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
+                                                };
+                                                const badgeLabels: Record<PromptTier, string> = {
+                                                    USER_PROMPT: '[User Prompt]',
+                                                    SUBAGENT_INSTRUCTION: tierInfo.subagentRole ? `[Subagent: ${tierInfo.subagentRole}]` : '[AI Subagent]',
+                                                    SYSTEM_MESSAGE: '[System Directive]',
+                                                    TOOL_OUTPUT: '[Tool Output]',
+                                                };
+                                                return (
+                                                    <span
+                                                        className={cn(
+                                                            "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-mono tracking-wide border shadow-2xs",
+                                                            badgeColors[tierInfo.tier]
+                                                        )}
+                                                        title={`${tierInfo.tier} (${Math.round(tierInfo.confidence * 100)}% match)`}
+                                                    >
+                                                        {tierInfo.tier === 'USER_PROMPT' && <User className="w-3 h-3 text-sky-500 shrink-0" />}
+                                                        {tierInfo.tier === 'SUBAGENT_INSTRUCTION' && <Bot className="w-3 h-3 text-purple-500 shrink-0" />}
+                                                        {tierInfo.tier === 'SYSTEM_MESSAGE' && <Terminal className="w-3 h-3 text-slate-500 shrink-0" />}
+                                                        {tierInfo.tier === 'TOOL_OUTPUT' && <Wrench className="w-3 h-3 text-amber-500 shrink-0" />}
+                                                        <span>{badgeLabels[tierInfo.tier]}</span>
+                                                    </span>
+                                                );
+                                            })()}
+                                            {(Boolean(selectedConversation.is_running) && !isGhostConversation(selectedConversation) && !(selectedConversation.prompt_word_count === 0 && (!selectedConversation.prompt_preview_200w || !selectedConversation.prompt_preview_200w.trim()))) && (
+                                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border border-emerald-500/40 shadow-2xs animate-pulse">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] animate-pulse" />
+                                                    <span>RUNNING</span>
+                                                    {instancePid ? (
+                                                        <span className="font-mono text-[9px] opacity-80">(PID: {instancePid})</span>
+                                                    ) : null}
+                                                    <span className="font-mono text-[9px] border-l border-emerald-400/40 pl-1">
+                                                        {formatDuration(elapsedSeconds)}
+                                                    </span>
                                                 </span>
-                                                {(() => {
-                                                    const tierInfo = classifyPromptTier(activePromptText, selectedConversation.title);
-                                                    const badgeColors: Record<PromptTier, string> = {
-                                                        USER_PROMPT: 'bg-sky-500/15 text-sky-700 dark:text-cyan-300 border-sky-500/30',
-                                                        SUBAGENT_INSTRUCTION: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30',
-                                                        SYSTEM_MESSAGE: 'bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/30',
-                                                        TOOL_OUTPUT: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
-                                                    };
-                                                    const badgeLabels: Record<PromptTier, string> = {
-                                                        USER_PROMPT: '[User Prompt]',
-                                                        SUBAGENT_INSTRUCTION: tierInfo.subagentRole ? `[Subagent: ${tierInfo.subagentRole}]` : '[AI Subagent]',
-                                                        SYSTEM_MESSAGE: '[System Directive]',
-                                                        TOOL_OUTPUT: '[Tool Output]',
-                                                    };
-                                                    return (
-                                                        <span
-                                                            className={cn(
-                                                                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-mono tracking-wide border shadow-2xs",
-                                                                badgeColors[tierInfo.tier]
-                                                            )}
-                                                            title={`${tierInfo.tier} (${Math.round(tierInfo.confidence * 100)}% match)`}
-                                                        >
-                                                            {tierInfo.tier === 'USER_PROMPT' && <User className="w-3 h-3 text-sky-500 shrink-0" />}
-                                                            {tierInfo.tier === 'SUBAGENT_INSTRUCTION' && <Bot className="w-3 h-3 text-purple-500 shrink-0" />}
-                                                            {tierInfo.tier === 'SYSTEM_MESSAGE' && <Terminal className="w-3 h-3 text-slate-500 shrink-0" />}
-                                                            {tierInfo.tier === 'TOOL_OUTPUT' && <Wrench className="w-3 h-3 text-amber-500 shrink-0" />}
-                                                            <span>{badgeLabels[tierInfo.tier]}</span>
-                                                        </span>
-                                                    );
-                                                })()}
-                                                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate max-w-md">
-                                                    {selectedConversation.title || selectedConversation.short_id}
-                                                </h3>
-                                                {(selectedConversation.repeat_count || 1) > 1 && (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs">
-                                                        x{selectedConversation.repeat_count} runs
-                                                    </span>
-                                                )}
-                                                {(Boolean(selectedConversation.is_running) && !isGhostConversation(selectedConversation) && !(selectedConversation.prompt_word_count === 0 && (!selectedConversation.prompt_preview_200w || !selectedConversation.prompt_preview_200w.trim()))) && (
-                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-2xs">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                                        <span>RUNNING</span>
-                                                        {instancePid ? (
-                                                            <span className="font-mono text-[9px] opacity-80">(PID: {instancePid})</span>
-                                                        ) : null}
-                                                        <span className="font-mono text-[9px] text-emerald-600 dark:text-emerald-400 border-l border-emerald-400/40 pl-1">
-                                                            {formatDuration(elapsedSeconds)}
-                                                        </span>
-                                                    </span>
-                                                )}
-                                                {Boolean(selectedConversation.is_queued) && (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs">
-                                                        <Clock className="w-3 h-3 text-amber-500" />
-                                                        <span>QUEUED</span>
-                                                    </span>
-                                                )}
+                                            )}
+                                            {Boolean(selectedConversation.is_queued) && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs">
+                                                    <Clock className="w-3 h-3 text-amber-500" />
+                                                    <span>QUEUED</span>
+                                                </span>
+                                            )}
+                                            <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-xs md:max-w-sm lg:max-w-md">
+                                                {selectedConversation.title || selectedConversation.short_id}
+                                            </h3>
+                                            {(selectedConversation.repeat_count || 1) > 1 && (
+                                                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs">
+                                                    x{selectedConversation.repeat_count} runs
+                                                </span>
+                                            )}
+                                            {/* Instance Identity Trio */}
+                                            <div
+                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[5px] bg-purple-500/10 dark:bg-purple-950/30 border border-purple-500/20 text-purple-700 dark:text-purple-300 font-mono text-[10px]"
+                                                title={`Instance #${instanceSeqNum} · ${instanceExeName} · ${instanceNameDisplay}`}
+                                            >
+                                                <span className="font-bold">#{instanceSeqNum}</span>
+                                                <span className="opacity-40">·</span>
+                                                <span>{instanceExeName}</span>
+                                                <span className="opacity-40">·</span>
+                                                <span className="font-semibold text-purple-800 dark:text-purple-200">{instanceNameDisplay}</span>
                                             </div>
+                                        </div>
 
-                                            <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                                {selectedProject && (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-medium bg-slate-100 dark:bg-[#071a27] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#15334d]">
-                                                        <Folder className="w-3 h-3 text-blue-500" />
-                                                        <span>{selectedProject.repo_name}</span>
-                                                    </span>
-                                                )}
-                                                {/* Instance Identity Trio */}
-                                                <div
-                                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[5px] bg-purple-500/10 dark:bg-purple-950/30 border border-purple-500/20 text-purple-700 dark:text-purple-300 font-mono text-[10.5px]"
-                                                    title={`Instance Sequence #${instanceSeqNum} | Executable: ${instanceExeName} | Profile: ${instanceNameDisplay}`}
+                                        {/* Right: The 2 Canonical Segmented Dark-Glass Action Capsules */}
+                                        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
+                                            {/* Capsule 1: Content & Export */}
+                                            <div className="flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs shrink-0">
+                                                {/* Copy Text Button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const cleanText = stripImagesFromPrompt(activePromptText);
+                                                        navigator.clipboard.writeText(cleanText);
+                                                        setIsCopiedText(true);
+                                                        setTimeout(() => setIsCopiedText(false), 2000);
+                                                    }}
+                                                    className="flex items-center gap-1 px-2.5 py-1 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                                    title="Copy clean prompt text (excluding embedded images)"
                                                 >
-                                                    <span className="font-bold">#{instanceSeqNum}</span>
-                                                    <span className="opacity-40">·</span>
-                                                    <span>{instanceExeName}</span>
-                                                    <span className="opacity-40">·</span>
-                                                    <span className="font-semibold text-purple-800 dark:text-purple-200">{instanceNameDisplay}</span>
+                                                    {isCopiedText ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />}
+                                                    <span>{isCopiedText ? 'Copied!' : 'Copy Text'}</span>
+                                                </button>
+
+                                                {/* Copy With Images */}
+                                                <button
+                                                    type="button"
+                                                    onClick={handleCopyWithImagesRich}
+                                                    className="flex items-center gap-1 px-2 py-1 rounded-none text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                                    title="Copy prompt with rich embedded HTML images for document pasting"
+                                                >
+                                                    {isCopiedRaw ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-indigo-500" />}
+                                                    <span>{isCopiedRaw ? 'Copied + Imgs!' : '+ Imgs'}</span>
+                                                </button>
+
+                                                {/* Save Images */}
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSaveImages}
+                                                    className="flex items-center gap-1 px-2 py-1 rounded-none text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                                    title="Extract and save embedded images"
+                                                >
+                                                    <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
+                                                    <span>Save Imgs</span>
+                                                </button>
+
+                                                {/* Export Dropdown */}
+                                                <div className="relative inline-block rounded-r-full">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+                                                        className="flex items-center gap-1 px-2.5 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                                        title="Export Prompt to Markdown or JSON"
+                                                    >
+                                                        <Download className="w-3.5 h-3.5 text-amber-500" />
+                                                        <span>Export</span>
+                                                        <ChevronDown className="w-3 h-3 text-slate-400" />
+                                                    </button>
+                                                    {isExportMenuOpen && (
+                                                        <div
+                                                            className="absolute right-0 top-full mt-1.5 z-50 w-36 rounded-xl bg-white dark:bg-[#0c2438] border border-slate-200 dark:border-[#15334d] shadow-xl py-1 animate-in fade-in zoom-in-95 duration-100"
+                                                            onMouseLeave={() => setIsExportMenuOpen(false)}
+                                                        >
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    handleExport('md');
+                                                                    setIsExportMenuOpen(false);
+                                                                }}
+                                                                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#15334d] text-left cursor-pointer transition-colors"
+                                                            >
+                                                                <FileText className="w-3.5 h-3.5 text-cyan-500" />
+                                                                <span>Export as .md</span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    handleExport('json');
+                                                                    setIsExportMenuOpen(false);
+                                                                }}
+                                                                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#15334d] text-left cursor-pointer transition-colors"
+                                                            >
+                                                                <Code className="w-3.5 h-3.5 text-amber-500" />
+                                                                <span>Export as .json</span>
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                {tailSnippet && (
-                                                    <div
-                                                        className="hidden md:flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 italic truncate max-w-xs lg:max-w-sm"
-                                                        title={`Concluding text: ${tailSnippet}`}
+                                            </div>
+
+                                            {/* Capsule 2: Execution & Workflow */}
+                                            <div className="flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#15334d]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#15334d]/80 shadow-2xs shrink-0">
+                                                {/* Confirmation Suffix Dropdown */}
+                                                <div className="flex items-center px-2 py-1 rounded-l-full">
+                                                    <select
+                                                        value={confirmationSuffix}
+                                                        onChange={(e) => setConfirmationSuffix(e.target.value)}
+                                                        className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-[11px] font-semibold focus:ring-0 focus:outline-none cursor-pointer max-w-[95px] truncate pr-1 py-0"
+                                                        title="Confirmation suffix appended on Resend"
                                                     >
-                                                        <span className="opacity-60">… ending with:</span>
-                                                        <span className="font-medium text-slate-700 dark:text-slate-300 truncate">
-                                                            '{tailSnippet}'
-                                                        </span>
-                                                    </div>
-                                                )}
+                                                        <option value="None (Send as is)" className="bg-white dark:bg-[#0c2438]">Suffix: None</option>
+                                                        <option value="Is it done?" className="bg-white dark:bg-[#0c2438]">Done?</option>
+                                                        <option value="Is it released?" className="bg-white dark:bg-[#0c2438]">Released?</option>
+                                                        <option value="Are you sure about it?" className="bg-white dark:bg-[#0c2438]">Sure?</option>
+                                                        <option value="Double check all edge cases" className="bg-white dark:bg-[#0c2438]">Edge cases</option>
+                                                        <option value="Verify build and tests" className="bg-white dark:bg-[#0c2438]">Verify tests</option>
+                                                    </select>
+                                                </div>
+
+                                                {/* Focus IDE Button */}
                                                 <button
                                                     type="button"
-                                                    onClick={() => setIsDetailsModalOpen(true)}
-                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-medium bg-slate-100 dark:bg-[#071a27] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
-                                                    title="View full conversation & project details"
+                                                    onClick={handleFocusIde}
+                                                    disabled={isFocusing}
+                                                    className="flex items-center gap-1 px-2.5 py-1 text-sky-700 dark:text-sky-300 hover:bg-sky-100/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
+                                                    title="Focus Antigravity IDE window or launch instance"
                                                 >
-                                                    <FileText className="w-3 h-3 text-slate-400" />
-                                                    <span>Details</span>
+                                                    <ExternalLink className={cn('w-3.5 h-3.5 text-sky-500', isFocusing && 'animate-spin')} />
+                                                    <span>Focus IDE</span>
                                                 </button>
-                                            </div>
-                                        </div>
-                                    </div>
 
-                                    {/* Row 2: Action Buttons (2 Contiguous Segmented Dark-Glass Capsules) */}
-                                    <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar pt-2 border-t border-slate-100 dark:border-[#15334d]/60">
-                                        {/* Capsule 1: Content & Export Capsule */}
-                                        <div className="flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs shrink-0">
-                                            {/* Copy Text Button (clean text only) */}
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    const cleanText = stripImagesFromPrompt(activePromptText);
-                                                    navigator.clipboard.writeText(cleanText);
-                                                    setIsCopiedText(true);
-                                                    setTimeout(() => setIsCopiedText(false), 2000);
-                                                }}
-                                                className="flex items-center gap-1 px-2.5 py-1 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                                                title="Copy clean prompt text (excluding embedded images)"
-                                            >
-                                                {isCopiedText ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />}
-                                                <span>{isCopiedText ? 'Copied Text!' : 'Copy Text'}</span>
-                                            </button>
-
-                                            {/* Copy With Images Button (Rich HTML + Embedded Images) */}
-                                            <button
-                                                type="button"
-                                                onClick={handleCopyWithImagesRich}
-                                                className="flex items-center gap-1 px-2.5 py-1 rounded-none text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                                                title="Copy prompt with rich embedded HTML images for document pasting"
-                                            >
-                                                {isCopiedRaw ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-indigo-500" />}
-                                                <span>{isCopiedRaw ? 'Copied + Imgs!' : '+ Imgs'}</span>
-                                            </button>
-
-                                            {/* Save Images Button */}
-                                            <button
-                                                type="button"
-                                                onClick={handleSaveImages}
-                                                className="flex items-center gap-1 px-2.5 py-1 rounded-none text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                                                title="Extract and save embedded images"
-                                            >
-                                                <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
-                                                <span>Save Imgs</span>
-                                            </button>
-
-                                            {/* Dedicated Export Dropdown (.md / .json) */}
-                                            <div className="relative inline-block rounded-r-full">
+                                                {/* Send Now Button (Hotkey: N) */}
                                                 <button
                                                     type="button"
-                                                    onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
-                                                    className="flex items-center gap-1 px-2.5 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                                                    title="Export Prompt to Markdown or JSON"
+                                                    onClick={handleResendPrompt}
+                                                    disabled={isResending}
+                                                    className="flex items-center gap-1 px-2.5 py-1 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
+                                                    title="Immediately inject prompt to running instance [Hotkey: N]"
                                                 >
-                                                    <Download className="w-3.5 h-3.5 text-amber-500" />
-                                                    <span>Export</span>
-                                                    <ChevronDown className="w-3 h-3 text-slate-400" />
+                                                    <RotateCw className={cn('w-3.5 h-3.5 text-emerald-500', isResending && 'animate-spin')} />
+                                                    <span>Send</span>
+                                                    <kbd className="ml-0.5 px-1 py-0.2 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded text-[9px] font-mono font-bold">N</kbd>
                                                 </button>
-                                                {isExportMenuOpen && (
-                                                    <div
-                                                        className="absolute right-0 top-full mt-1.5 z-50 w-36 rounded-xl bg-white dark:bg-[#0c2438] border border-slate-200 dark:border-[#15334d] shadow-xl py-1 animate-in fade-in zoom-in-95 duration-100"
-                                                        onMouseLeave={() => setIsExportMenuOpen(false)}
-                                                    >
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                handleExport('md');
-                                                                setIsExportMenuOpen(false);
-                                                            }}
-                                                            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#15334d] text-left cursor-pointer transition-colors"
-                                                        >
-                                                            <FileText className="w-3.5 h-3.5 text-cyan-500" />
-                                                            <span>Export as .md</span>
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                handleExport('json');
-                                                                setIsExportMenuOpen(false);
-                                                            }}
-                                                            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#15334d] text-left cursor-pointer transition-colors"
-                                                        >
-                                                            <Code className="w-3.5 h-3.5 text-amber-500" />
-                                                            <span>Export as .json</span>
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
 
-                                        {/* Capsule 2: Execution & Workflow Capsule */}
-                                        <div className="flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#15334d]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#15334d]/80 shadow-2xs shrink-0">
-                                            {/* Confirmation Suffix Dropdown (Transparent inline select) */}
-                                            <div className="flex items-center px-2 py-1 rounded-l-full">
-                                                <select
-                                                    value={confirmationSuffix}
-                                                    onChange={(e) => setConfirmationSuffix(e.target.value)}
-                                                    className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-[11px] font-semibold focus:ring-0 focus:outline-none cursor-pointer max-w-[95px] truncate pr-1 py-0"
-                                                    title="Confirmation suffix appended on Resend"
+                                                {/* Enqueue Button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={handleEnqueuePrompt}
+                                                    disabled={isEnqueueing}
+                                                    className="flex items-center gap-1 px-2.5 py-1 text-purple-700 dark:text-purple-300 hover:bg-purple-100/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
+                                                    title="Enqueue prompt into FIFO scheduler queue"
                                                 >
-                                                    <option value="None (Send as is)" className="bg-white dark:bg-[#0c2438]">Suffix: None</option>
-                                                    <option value="Is it done?" className="bg-white dark:bg-[#0c2438]">Done?</option>
-                                                    <option value="Is it released?" className="bg-white dark:bg-[#0c2438]">Released?</option>
-                                                    <option value="Are you sure about it?" className="bg-white dark:bg-[#0c2438]">Sure?</option>
-                                                    <option value="Double check all edge cases" className="bg-white dark:bg-[#0c2438]">Edge cases</option>
-                                                    <option value="Verify build and tests" className="bg-white dark:bg-[#0c2438]">Verify tests</option>
-                                                </select>
+                                                    <ListPlus className="w-3.5 h-3.5 text-purple-500" />
+                                                    <span>Queue</span>
+                                                </button>
+
+                                                {/* Full Inspector */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openInspector(selectedConversation, selectedProject?.repo_path || '')}
+                                                    className="flex items-center gap-1 px-2.5 py-1 text-blue-700 dark:text-cyan-300 hover:bg-blue-100/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer rounded-r-full"
+                                                    title="Full-Screen Inspector"
+                                                >
+                                                    <Maximize2 className="h-3.5 w-3.5 text-blue-500" />
+                                                    <span>Full</span>
+                                                </button>
                                             </div>
-
-                                            {/* Focus IDE Button */}
-                                            <button
-                                                type="button"
-                                                onClick={handleFocusIde}
-                                                disabled={isFocusing}
-                                                className="flex items-center gap-1 px-2.5 py-1 text-sky-700 dark:text-sky-300 hover:bg-sky-100/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
-                                                title="Focus Antigravity IDE window or launch instance"
-                                            >
-                                                <ExternalLink className={cn('w-3.5 h-3.5 text-sky-500', isFocusing && 'animate-spin')} />
-                                                <span>Focus IDE</span>
-                                            </button>
-
-                                            {/* Send Now Button (Hotkey: N) */}
-                                            <button
-                                                type="button"
-                                                onClick={handleResendPrompt}
-                                                disabled={isResending}
-                                                className="flex items-center gap-1 px-2.5 py-1 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
-                                                title="Immediately inject prompt to running instance (writes .antigravity_resume_task.json) [Hotkey: N]"
-                                            >
-                                                <RotateCw className={cn('w-3.5 h-3.5 text-emerald-500', isResending && 'animate-spin')} />
-                                                <span>Send</span>
-                                                <kbd className="ml-0.5 px-1 py-0.2 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded text-[9px] font-mono font-bold">N</kbd>
-                                            </button>
-
-                                            {/* Enqueue Button */}
-                                            <button
-                                                type="button"
-                                                onClick={handleEnqueuePrompt}
-                                                disabled={isEnqueueing}
-                                                className="flex items-center gap-1 px-2.5 py-1 text-purple-700 dark:text-purple-300 hover:bg-purple-100/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
-                                                title="Enqueue prompt into FIFO scheduler queue"
-                                            >
-                                                <ListPlus className="w-3.5 h-3.5 text-purple-500" />
-                                                <span>Queue</span>
-                                            </button>
-
-                                            {/* Full Button */}
-                                            <button
-                                                type="button"
-                                                onClick={() => openInspector(selectedConversation, selectedProject?.repo_path || '')}
-                                                className="flex items-center gap-1 px-2.5 py-1 text-blue-700 dark:text-cyan-300 hover:bg-blue-100/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer rounded-r-full"
-                                                title="Full-Screen Inspector"
-                                            >
-                                                <Maximize2 className="h-3.5 w-3.5 text-blue-500" />
-                                                <span>Full</span>
-                                            </button>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* In-Flight Execution or Queued Progress Banner */}
+                                {/* In-Flight Execution or Queued Slim Banner (if active) */}
                                 {(Boolean(selectedConversation.is_running) || Boolean(selectedConversation.is_queued)) && !isGhostConversation(selectedConversation) && (
                                     <div className={cn(
-                                        "rounded-xl border p-3 flex items-center justify-between gap-3 shadow-xs transition-all shrink-0",
+                                        "rounded-xl border px-3.5 py-2 flex items-center justify-between gap-3 shadow-2xs transition-all shrink-0",
                                         selectedConversation.is_running
                                             ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-200"
                                             : "bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-200"
                                     )}>
                                         <div className="flex items-center gap-2.5 min-w-0">
-                                            <span className="relative flex h-3 w-3 shrink-0">
+                                            <span className="relative flex h-2.5 w-2.5 shrink-0">
                                                 <span className={cn(
                                                     "animate-ping absolute inline-flex h-full w-full rounded-full opacity-75",
                                                     selectedConversation.is_running ? "bg-emerald-400" : "bg-amber-400"
                                                 )} />
                                                 <span className={cn(
-                                                    "relative inline-flex rounded-full h-3 w-3",
+                                                    "relative inline-flex rounded-full h-2.5 w-2.5",
                                                     selectedConversation.is_running ? "bg-emerald-500" : "bg-amber-500"
                                                 )} />
                                             </span>
-                                            <div className="min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="font-bold text-xs font-mono uppercase tracking-wider">
-                                                        {selectedConversation.is_running ? 'Active In-Flight Task' : 'Queued Task'}
+                                            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                                                <span className="font-bold text-xs font-mono uppercase tracking-wider">
+                                                    {selectedConversation.is_running ? 'In-Flight Execution' : 'Queued Task'}
+                                                </span>
+                                                {instancePid ? (
+                                                    <span className="font-mono text-[9.5px] px-1.5 py-0.2 rounded bg-black/10 dark:bg-white/10">
+                                                        PID: {instancePid}
                                                     </span>
-                                                    {instancePid ? (
-                                                        <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-black/10 dark:bg-white/10">
-                                                            PID: {instancePid}
-                                                        </span>
-                                                    ) : null}
-                                                    {selectedConversation.is_running && (
-                                                        <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-black/10 dark:bg-white/10">
-                                                            Elapsed: {formatDuration(elapsedSeconds)}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="text-xs truncate opacity-90 mt-0.5 flex items-center gap-1.5">
-                                                    {selectedConversation.is_running ? (
-                                                        <>
-                                                            <RefreshCw className="w-3 h-3 animate-spin shrink-0 text-emerald-500" />
-                                                            <span className="font-medium truncate">
-                                                                {selectedConversation.latest_step_summary || 'Task actively executing in Antigravity session...'}
-                                                            </span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Clock className="w-3 h-3 shrink-0 text-amber-500" />
-                                                            <span className="font-medium truncate">
-                                                                Awaiting scheduler execution slot · Click &quot;Send&quot; to force dispatch
-                                                            </span>
-                                                        </>
-                                                    )}
-                                                </div>
+                                                ) : null}
+                                                {selectedConversation.is_running && (
+                                                    <span className="font-mono text-[9.5px] px-1.5 py-0.2 rounded bg-black/10 dark:bg-white/10">
+                                                        {formatDuration(elapsedSeconds)}
+                                                    </span>
+                                                )}
+                                                <span className="opacity-40">·</span>
+                                                <span className="text-xs truncate opacity-90 font-medium">
+                                                    {selectedConversation.is_running
+                                                        ? (selectedConversation.latest_step_summary || 'Task actively executing in Antigravity session...')
+                                                        : 'Awaiting scheduler execution slot'}
+                                                </span>
                                             </div>
                                         </div>
                                         <button
@@ -3198,115 +3170,96 @@ ${activePromptText}
                                             onClick={handleFocusIde}
                                             disabled={isFocusing}
                                             className={cn(
-                                                "shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border shadow-2xs transition-all cursor-pointer",
+                                                "shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border shadow-2xs transition-all cursor-pointer",
                                                 selectedConversation.is_running
                                                     ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700"
                                                     : "bg-amber-600 hover:bg-amber-700 text-white border-amber-700"
                                             )}
                                             title="Focus Antigravity IDE workspace"
                                         >
-                                            <ExternalLink className="w-3.5 h-3.5" />
-                                            <span>Open IDE Window</span>
+                                            <ExternalLink className="w-3 h-3" />
+                                            <span>Open IDE</span>
                                         </button>
                                     </div>
                                 )}
 
-                                {/* View Mode Tabs & Word Count */}
-                                <div>
-                                    {/* Primary Tab Bar: Prompt Instruction vs AI Results & Outputs */}
-                                    <div className="flex items-center justify-between mb-3 gap-2 flex-wrap pb-2 border-b border-slate-200/60 dark:border-[#15334d]/60">
-                                        <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#15334d]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#15334d]/80 shadow-2xs">
-                                            <button
-                                                type="button"
-                                                onClick={() => setPreviewTab('instruction')}
-                                                className={cn(
-                                                    "flex items-center gap-1.5 px-3 py-1 rounded-l-full text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
-                                                    previewTab === 'instruction'
-                                                        ? "bg-blue-600 text-white shadow-2xs"
-                                                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
-                                                )}
-                                                title="View original prompt instruction"
-                                            >
-                                                <MessageSquare className="w-3.5 h-3.5" />
-                                                <span>Prompt Instruction</span>
-                                                {activeWordCount > 0 && (
-                                                    <span className="text-[10px] font-mono opacity-80">({activeWordCount}w)</span>
-                                                )}
-                                            </button>
-
-                                            <button
-                                                type="button"
-                                                onClick={() => setPreviewTab('results')}
-                                                className={cn(
-                                                    "flex items-center gap-1.5 px-3 py-1 rounded-r-full text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
-                                                    previewTab === 'results'
-                                                        ? "bg-blue-600 text-white shadow-2xs"
-                                                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
-                                                )}
-                                                title="View AI execution outputs, responses and tools"
-                                            >
-                                                {selectedConversation.is_running ? (
-                                                    <span className="relative flex h-2 w-2">
-                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[#1af18d]"></span>
-                                                    </span>
-                                                ) : (
-                                                    <Terminal className="w-3.5 h-3.5 text-cyan-500" />
-                                                )}
-                                                <span>AI Results & Outputs</span>
-                                                {(selectedConversation.execution_results || selectedConversation.latest_response) && (
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                                                )}
-                                            </button>
-                                        </div>
-
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            {selectedConversation && (
-                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20">
-                                                    #{selectedConversation.seq_code || 'P001'}
-                                                </span>
+                                {/* Row 2: Unified Navigation Tabs & View Controls */}
+                                <div className="flex items-center justify-between gap-3 flex-wrap pb-1 border-b border-slate-200/60 dark:border-[#15334d]/60">
+                                    {/* Primary Tabs Capsule: Prompt Instruction vs AI Results */}
+                                    <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#15334d]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#15334d]/80 shadow-2xs">
+                                        <button
+                                            type="button"
+                                            onClick={() => setPreviewTab('instruction')}
+                                            className={cn(
+                                                "flex items-center gap-1.5 px-3 py-1 rounded-l-full text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
+                                                previewTab === 'instruction'
+                                                    ? "bg-blue-600 text-white shadow-2xs"
+                                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
                                             )}
-                                            <span
-                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20"
-                                                title="Instance Identity Trio: Sequence · Executable · Instance Name"
-                                            >
-                                                [#{instanceSeqNum} · {instanceExeName} · {instanceNameDisplay}]
-                                            </span>
-                                        </div>
+                                            title="View original prompt instruction"
+                                        >
+                                            <MessageSquare className="w-3.5 h-3.5" />
+                                            <span>Prompt Instruction</span>
+                                            {activeWordCount > 0 && (
+                                                <span className="text-[10px] font-mono opacity-80">({activeWordCount}w)</span>
+                                            )}
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setPreviewTab('results')}
+                                            className={cn(
+                                                "flex items-center gap-1.5 px-3 py-1 rounded-r-full text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
+                                                previewTab === 'results'
+                                                    ? "bg-blue-600 text-white shadow-2xs"
+                                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                                            )}
+                                            title="View AI execution outputs, responses and tools"
+                                        >
+                                            {selectedConversation.is_running ? (
+                                                <span className="relative flex h-2 w-2">
+                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#1af18d]"></span>
+                                                </span>
+                                            ) : (
+                                                <Terminal className="w-3.5 h-3.5 text-cyan-500" />
+                                            )}
+                                            <span>AI Results & Outputs</span>
+                                            {(selectedConversation.execution_results || selectedConversation.latest_response) && (
+                                                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                                            )}
+                                        </button>
                                     </div>
 
-                                    {/* Tab 1: Prompt Instruction View */}
-                                    {previewTab === 'instruction' && (
-                                        <div className="space-y-3">
-                                            {/* Sub-Header: Words / Truncation Toggle & View Mode Toggle Tabs */}
-                                            <div className="flex items-center justify-between gap-2 flex-wrap pb-1">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 font-mono">
-                                                        {activeWordCount} words · {formatByteSize(activeByteCount)}
-                                                    </span>
-                                                    {(isTruncated || activePromptText.trim().endsWith('...') || activePromptText.trim().endsWith('…') || showAllWords) && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setShowAllWords(!showAllWords)}
-                                                            className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-500/20 hover:bg-cyan-500/20 transition-all cursor-pointer"
-                                                            title={showAllWords ? 'Collapse full prompt text' : 'Expand full prompt text'}
-                                                        >
-                                                            {showAllWords ? (
-                                                                <>
-                                                                    <ChevronUp className="w-3 h-3" />
-                                                                    <span>Collapse Text</span>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <ChevronDown className="w-3 h-3" />
-                                                                    <span>Expand Full Text</span>
-                                                                </>
-                                                            )}
-                                                        </button>
-                                                    )}
-                                                </div>
+                                    {/* Right Controls: View Mode Capsule (Preview/Raw/Edit) + Expand Toggle + Details */}
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        {previewTab === 'instruction' && (
+                                            <>
+                                                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 font-mono hidden sm:inline">
+                                                    {activeWordCount} words · {formatByteSize(activeByteCount)}
+                                                </span>
+                                                {(isTruncated || activePromptText.trim().endsWith('...') || activePromptText.trim().endsWith('…') || showAllWords) && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowAllWords(!showAllWords)}
+                                                        className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-500/20 hover:bg-cyan-500/20 transition-all cursor-pointer"
+                                                        title={showAllWords ? 'Collapse full prompt text' : 'Expand full prompt text'}
+                                                    >
+                                                        {showAllWords ? (
+                                                            <>
+                                                                <ChevronUp className="w-3 h-3" />
+                                                                <span>Collapse</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <ChevronDown className="w-3 h-3" />
+                                                                <span>Expand Full</span>
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                )}
 
-                                                {/* View Mode Toggle Tabs (Canonical Segmented Dark-Glass Pill Capsule) */}
+                                                {/* View Mode Toggle Capsule */}
                                                 <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#15334d]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#15334d]/80 shadow-2xs">
                                                     <button
                                                         type="button"
@@ -3351,7 +3304,24 @@ ${activePromptText}
                                                         <span>Edit</span>
                                                     </button>
                                                 </div>
-                                            </div>
+                                            </>
+                                        )}
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsDetailsModalOpen(true)}
+                                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-[#071a27] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                                            title="View full conversation & project details"
+                                        >
+                                            <FileText className="w-3 h-3 text-slate-400" />
+                                            <span>Details</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Tab 1: Prompt Instruction View */}
+                                {previewTab === 'instruction' && (
+                                    <div className="space-y-3">
 
                                             {/* Preview Mode (Rich Markdown) */}
                                             {viewMode === 'preview' && (
@@ -3662,7 +3632,6 @@ ${activePromptText}
                                 </div>
                             )}
                         </div>
-                    </div>
                         ) : (
                             <div className="flex-1 flex flex-col items-center justify-center text-slate-400 text-xs p-6 space-y-3 text-center">
                                 {selectedProject ? (
@@ -3720,27 +3689,38 @@ ${activePromptText}
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            {/* Inspector Actions Capsule */}
+                            <div className="flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs shrink-0">
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        navigator.clipboard.writeText(inspectorPrompt.text);
+                                        const cleanText = stripImagesFromPrompt(inspectorPrompt.text);
+                                        navigator.clipboard.writeText(cleanText);
                                         setIsCopied(true);
                                         setTimeout(() => setIsCopied(false), 2000);
                                     }}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] bg-slate-100 hover:bg-slate-200 dark:bg-[#15334d] dark:hover:bg-[#1c4566] text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer border border-slate-200 dark:border-[#15334d]"
-                                    title="Copy full text"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                    title="Copy clean prompt text"
                                 >
-                                    {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                                    {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />}
                                     <span>{isCopied ? 'Copied!' : 'Copy Text'}</span>
                                 </button>
                                 <button
                                     type="button"
+                                    onClick={handleCopyWithImagesRich}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                    title="Copy rich text with images"
+                                >
+                                    {isCopiedRaw ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-indigo-500" />}
+                                    <span>{isCopiedRaw ? 'Copied + Imgs!' : '+ Imgs'}</span>
+                                </button>
+                                <button
+                                    type="button"
                                     onClick={() => setInspectorPrompt(null)}
-                                    className="rounded-[5px] p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-[#15334d] dark:hover:text-slate-200 transition-colors cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-[#15334d]"
+                                    className="flex items-center px-2.5 py-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 dark:hover:bg-rose-500/20 rounded-r-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                     title="Close Inspector"
                                 >
-                                    <X className="h-5 w-5" />
+                                    <X className="h-4 w-4" />
                                 </button>
                             </div>
                         </div>

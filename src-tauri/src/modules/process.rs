@@ -2791,6 +2791,7 @@ if (-not ([System.Management.Automation.PSTypeName]'Antigravity.Win32WorkspaceWi
             [Antigravity.Win32WorkspaceWindow]::BringWindowToTop($hwnd);
             [Antigravity.Win32WorkspaceWindow]::SetForegroundWindow($hwnd);
             $global:act = $true;
+            $script:act = $true;
             return $false;
         }}
     }}
@@ -2798,19 +2799,21 @@ if (-not ([System.Management.Automation.PSTypeName]'Antigravity.Win32WorkspaceWi
 }}, [IntPtr]::Zero);
 
 # 2. Second pass: Fallback to any MainWindowHandle if exact repo title not found
-if (-not $act) {{
+if (-not $global:act -and -not $script:act -and -not $act) {{
     foreach ($p in $pids) {{
         $proc = Get-Process -Id $p -ErrorAction SilentlyContinue;
         if ($proc -and $proc.MainWindowHandle -ne 0) {{
             [Antigravity.Win32WorkspaceWindow]::ShowWindow($proc.MainWindowHandle, 9);
             [Antigravity.Win32WorkspaceWindow]::BringWindowToTop($proc.MainWindowHandle);
             [Antigravity.Win32WorkspaceWindow]::SetForegroundWindow($proc.MainWindowHandle);
+            $global:act = $true;
+            $script:act = $true;
             $act = $true;
             break;
         }}
     }}
 }}
-exit $(if ($act) {{ 0 }} else {{ 1 }})"#,
+exit $(if ($global:act -or $script:act -or $act) {{ 0 }} else {{ 1 }})"#,
         pid_list, safe_repo
     );
 

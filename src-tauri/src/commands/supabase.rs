@@ -132,6 +132,9 @@ pub async fn auto_discover_supabase_credentials() -> AppResult<SupabaseConfig> {
 #[tauri::command]
 pub async fn get_fleet_machines() -> AppResult<Vec<FleetMachineInfo>> {
     supabase_sync::query_fleet_machines().await
+}
+
+#[tauri::command]
 pub async fn get_supabase_fleet_machines(
 ) -> AppResult<Vec<crate::modules::supabase_sync::FleetMachineInfo>> {
     crate::modules::supabase_sync::fetch_fleet_machines().await
