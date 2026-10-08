@@ -115,17 +115,75 @@ function getPromptTailSnippet(text: string, fallbackSnippet?: string): string {
     return words.slice(-12).join(' ');
 }
 
+// Helper to strip raw byte truncation markers and truncation artifacts
+export function stripTruncatedBytes(text: string): string {
+    if (!text) return '';
+    return text
+        .replace(/<truncated\s+\d+\s+bytes>/gi, '')
+        .replace(/\[truncated\s+\d+\s+bytes\]/gi, '')
+        .replace(/<truncated\s+\d+\s+lines>/gi, '')
+        .replace(/\[truncated\s+\d+\s+lines\]/gi, '')
+        .replace(/\x00/g, '');
+}
+
+// Helper to download content as file in browser
+export function downloadFile(filename: string, content: string, mimeType: string) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+export type PromptCategory = 'subagent' | 'user' | 'draft';
+
+// Detect whether conversation item is a direct user prompt, subagent instruction, or draft
+export function getPromptCategory(conv: AgmConversationNode, promptText?: string): PromptCategory {
+    if (isGhostConversation(conv)) {
+        return 'draft';
+    }
+    const text = (promptText || conv.prompt_preview_200w || conv.title || '').trim();
+    if (!text || conv.prompt_word_count === 0) {
+        return 'draft';
+    }
+    const lower = text.toLowerCase();
+    const titleLower = (conv.title || '').toLowerCase();
+    const isSubagent =
+        lower.includes('research subagent') ||
+        lower.includes('spec author') ||
+        lower.includes('worker 01') ||
+        lower.includes('worker 02') ||
+        lower.includes('worker 03') ||
+        lower.includes('you are research') ||
+        lower.includes('tool capabilities & strict read-only boundary') ||
+        lower.includes('<system_message>') ||
+        lower.includes('<system_prompt>') ||
+        lower.includes('you are worker') ||
+        lower.includes('### boundaries & crash prevention') ||
+        titleLower.includes('worker ') ||
+        titleLower.includes('subagent');
+    if (isSubagent) {
+        return 'subagent';
+    }
+    return 'user';
+}
+
 // Helper to truncate text at word limit while strictly preserving original line breaks and newlines
 function getTruncatedText(text: string, maxWords: number): { displayText: string; isTruncated: boolean; totalWords: number } {
-    const trimmed = text.trim();
+    const sanitized = stripTruncatedBytes(text);
+    const trimmed = sanitized.trim();
     if (!trimmed) return { displayText: '', isTruncated: false, totalWords: 0 };
     const allWords = trimmed.split(/\s+/).filter(Boolean);
     const totalWords = allWords.length;
     if (totalWords <= maxWords) {
-        return { displayText: text, isTruncated: false, totalWords };
+        return { displayText: sanitized, isTruncated: false, totalWords };
     }
 
-    const lines = text.split('\n');
+    const lines = sanitized.split('\n');
     const selectedLines: string[] = [];
     let wordsCollected = 0;
 
@@ -162,7 +220,7 @@ function getTruncatedText(text: string, maxWords: number): { displayText: string
 // Pre-formatter to ensure inline markdown headings and paragraph line gaps have explicit spacing
 function formatPromptForMarkdown(text: string): string {
     if (!text) return '';
-    let formatted = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    let formatted = stripTruncatedBytes(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
     // Separate inline markdown headings attached to paragraph text:
     // e.g. "# High Priority Instruction Hi there." -> "# High Priority Instruction\n\nHi there."
@@ -665,6 +723,7 @@ export default function PromptTreeViewModal({
 
     const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
     const [expandedStaleGroups, setExpandedStaleGroups] = useState<Record<string, boolean>>({});
+    const [expandedPromptGroups, setExpandedPromptGroups] = useState<Record<string, boolean>>({});
 
     const [selectedProject, setSelectedProject] = useState<AgmProjectTreeNode | null>(null);
     const [selectedConversation, setSelectedConversation] = useState<AgmConversationNode | null>(null);
@@ -1558,9 +1617,99 @@ export default function PromptTreeViewModal({
         ?? instanceName
         ?? 'Default';
 
+    // Copy prompt text with markdown images and rich HTML representation
+    const handleCopyWithImages = useCallback(async () => {
+        try {
+            const plainText = activePromptText;
+            let htmlContent = plainText
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\n/g, '<br/>');
+            htmlContent = htmlContent.replace(
+                /!\[(.*?)\]\((.*?)\)/g,
+                '<img src="$2" alt="$1" style="max-width:100%; border-radius:4px;" />'
+            );
+
+            if (navigator.clipboard && window.ClipboardItem) {
+                const textBlob = new Blob([plainText], { type: 'text/plain' });
+                const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
+                await navigator.clipboard.write([
+                    new ClipboardItem({
+                        'text/plain': textBlob,
+                        'text/html': htmlBlob,
+                    }),
+                ]);
+            } else {
+                await navigator.clipboard.writeText(plainText);
+            }
+            setIsCopiedRaw(true);
+            setTimeout(() => setIsCopiedRaw(false), 2000);
+        } catch {
+            await navigator.clipboard.writeText(activePromptText);
+            setIsCopiedRaw(true);
+            setTimeout(() => setIsCopiedRaw(false), 2000);
+        }
+    }, [activePromptText]);
+
+    // Export selected prompt to Markdown (.md) or JSON with formatted frontmatter and timestamps
+    const handleExportPrompt = useCallback((format: 'markdown' | 'json' = 'markdown') => {
+        if (!selectedConversation) return;
+        const nowIso = new Date().toISOString();
+        const safeTitle = (selectedConversation.title || selectedConversation.short_id || 'prompt')
+            .replace(/[/\\?%*:|"<>]/g, '-')
+            .slice(0, 40);
+
+        if (format === 'json') {
+            const exportPayload = {
+                title: selectedConversation.title || selectedConversation.short_id,
+                conversation_id: selectedConversation.conversation_id,
+                short_id: selectedConversation.short_id,
+                sequence_code: selectedConversation.seq_code,
+                gitmap_sequence_code: selectedConversation.gitmap_seq_code,
+                status: selectedConversation.status,
+                is_running: Boolean(selectedConversation.is_running),
+                step_count: selectedConversation.step_count,
+                project_name: selectedProject?.repo_name || 'unknown',
+                project_path: selectedProject?.repo_path || '',
+                instance_name: instanceNameDisplay,
+                instance_sequence: instanceSeqNum,
+                instance_exe: instanceExeName,
+                exported_at: nowIso,
+                last_modified: selectedConversation.last_modified,
+                prompt_content: activePromptText,
+            };
+            downloadFile(`${safeTitle}.json`, JSON.stringify(exportPayload, null, 2), 'application/json');
+        } else {
+            const frontmatter = [
+                '---',
+                `title: "${selectedConversation.title || selectedConversation.short_id}"`,
+                `conversation_id: "${selectedConversation.conversation_id}"`,
+                `sequence_code: "${selectedConversation.seq_code || 'P001'}"`,
+                `project: "${selectedProject?.repo_name || 'unknown'}"`,
+                `instance: "${instanceNameDisplay} (#${instanceSeqNum}) - ${instanceExeName}"`,
+                `step_count: ${selectedConversation.step_count || 1}`,
+                `status: "${selectedConversation.status || 'unknown'}"`,
+                `is_running: ${Boolean(selectedConversation.is_running)}`,
+                `last_modified: "${selectedConversation.last_modified || nowIso}"`,
+                `exported_at: "${nowIso}"`,
+                '---',
+                '',
+                activePromptText,
+            ].join('\n');
+            downloadFile(`${safeTitle}.md`, frontmatter, 'text/markdown');
+        }
+        setActionMsg(`Exported prompt as ${format === 'json' ? 'JSON' : 'Markdown'}!`);
+        setTimeout(() => setActionMsg(null), 3000);
+    }, [selectedConversation, selectedProject, instanceNameDisplay, instanceSeqNum, instanceExeName, activePromptText]);
+
     const renderConversationNode = (conv: AgmConversationNode, project: AgmProjectTreeNode) => {
         const isConvSelected = selectedConversation?.conversation_id === conv.conversation_id;
-        const isRunning = Boolean(conv.is_running) && !isGhostConversation(conv) && !(conv.prompt_word_count === 0 && (!conv.prompt_preview_200w || !conv.prompt_preview_200w.trim()));
+        const isRunning = (Boolean(conv.is_running) || conv.status === 'running') && !isGhostConversation(conv) && !(conv.prompt_word_count === 0 && (!conv.prompt_preview_200w || !conv.prompt_preview_200w.trim()));
+        const isQueued = (conv.status === 'queued' || conv.status === 'pending') && !isRunning;
+        const promptCategory = getPromptCategory(conv, conv.prompt_preview_200w);
+        const isSubagent = promptCategory === 'subagent';
+        const isDraft = promptCategory === 'draft';
 
         return (
             <div
@@ -1588,6 +1737,32 @@ export default function PromptTreeViewModal({
                     >
                         {formatDualBadge(conv.seq_code, 'C001', conv.gitmap_seq_code, conv.short_id || conv.conversation_id.slice(0, 8))}
                     </span>
+                    {isSubagent && (
+                        <span
+                            className={cn(
+                                "text-[9px] font-mono font-semibold px-1 py-0.2 rounded shrink-0",
+                                isConvSelected
+                                    ? "bg-purple-900/60 text-purple-200 border border-purple-400/50"
+                                    : "bg-purple-900/40 text-purple-300 border border-purple-500/40"
+                            )}
+                            title="Subagent Prompt / AI Instruction"
+                        >
+                            SUBAGENT
+                        </span>
+                    )}
+                    {isDraft && (
+                        <span
+                            className={cn(
+                                "text-[9px] font-mono font-semibold px-1 py-0.2 rounded shrink-0",
+                                isConvSelected
+                                    ? "bg-slate-700/60 text-slate-200 border border-slate-400/50"
+                                    : "bg-slate-500/20 text-slate-400 border border-slate-500/30"
+                            )}
+                            title="Draft / Untitled Prompt"
+                        >
+                            DRAFT
+                        </span>
+                    )}
                     <span className="truncate text-[11px]">
                         {conv.title || conv.short_id || conv.conversation_id.slice(0, 8)}
                     </span>
@@ -1607,6 +1782,12 @@ export default function PromptTreeViewModal({
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 animate-pulse">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                             RUNNING
+                        </span>
+                    )}
+                    {isQueued && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                            QUEUED
                         </span>
                     )}
                 </div>
@@ -1644,6 +1825,39 @@ export default function PromptTreeViewModal({
                 activeConversations.push(conv);
             }
         });
+
+        // Group consecutive or matching repeated prompts (e.g. repeated "Fix Pipeline Error And Bump") into an expandable cluster with a repeat count pill (e.g. (x4))
+        const groupedActive: Array<{
+            groupKey: string;
+            title: string;
+            conversations: AgmConversationNode[];
+            isGrouped: boolean;
+        }> = [];
+
+        const groupMap = new Map<string, AgmConversationNode[]>();
+        const groupOrder: string[] = [];
+
+        for (const conv of activeConversations) {
+            const rawTitle = (conv.title || conv.short_id || conv.conversation_id.slice(0, 8)).trim();
+            const key = rawTitle.toLowerCase();
+            if (!groupMap.has(key)) {
+                groupMap.set(key, []);
+                groupOrder.push(key);
+            }
+            groupMap.get(key)!.push(conv);
+        }
+
+        for (const key of groupOrder) {
+            const convs = groupMap.get(key)!;
+            const title = convs[0].title || convs[0].short_id || convs[0].conversation_id.slice(0, 8);
+            const isGrouped = convs.length > 1;
+            groupedActive.push({
+                groupKey: `${project.project_id}-${key}`,
+                title,
+                conversations: convs,
+                isGrouped,
+            });
+        }
 
         const isStaleGroupExpanded = Boolean(expandedStaleGroups[project.project_id]);
 
@@ -1739,8 +1953,85 @@ export default function PromptTreeViewModal({
                 {/* Layer 2: Conversations List */}
                 {isProjectExpanded && (
                     <div className="ml-4 pl-2 border-l border-slate-200 dark:border-[#15334d]/60 space-y-0.5 py-0.5">
-                        {/* Active Conversations */}
-                        {activeConversations.map((conv) => renderConversationNode(conv, project))}
+                        {/* Active Conversations (with repeated prompt grouping) */}
+                        {groupedActive.map((group) => {
+                            if (!group.isGrouped) {
+                                return renderConversationNode(group.conversations[0], project);
+                            }
+                            const isGroupExpanded = Boolean(expandedPromptGroups[group.groupKey]);
+                            const latestConv = group.conversations[0];
+                            const isAnyRunning = group.conversations.some((c) => Boolean(c.is_running) || c.status === 'running');
+                            const isAnyQueued = group.conversations.some((c) => (c.status === 'queued' || c.status === 'pending') && !c.is_running);
+                            const totalGroupSteps = group.conversations.reduce((sum, c) => sum + (c.step_count || 1), 0);
+                            const isGroupSelected = group.conversations.some(
+                                (c) => c.conversation_id === selectedConversation?.conversation_id
+                            );
+
+                            return (
+                                <div key={group.groupKey} className="space-y-0.5">
+                                    <div
+                                        onClick={() => {
+                                            selectConversation(latestConv, project);
+                                            setExpandedPromptGroups((prev) => ({
+                                                ...prev,
+                                                [group.groupKey]: !isGroupExpanded,
+                                            }));
+                                        }}
+                                        className={cn(
+                                            'group flex items-center justify-between rounded-[5px] px-2 py-1.5 text-xs cursor-pointer transition-colors',
+                                            isGroupSelected
+                                                ? 'bg-blue-600/20 text-blue-900 dark:text-cyan-200 border border-blue-500/30'
+                                                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#0c2438]'
+                                        )}
+                                        title={`Repeated prompt (${group.conversations.length} runs, ${totalGroupSteps} total steps). Click to expand/collapse and select latest.`}
+                                    >
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            {isGroupExpanded ? (
+                                                <ChevronDown className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                            ) : (
+                                                <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                            )}
+                                            <Layers className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                            <span
+                                                className="text-[9px] font-mono px-1 py-0.2 rounded-[3px] shrink-0 font-medium whitespace-nowrap bg-slate-200/90 dark:bg-[#15334d] text-slate-600 dark:text-cyan-300"
+                                                title="GitMap Sequence of Latest Run"
+                                            >
+                                                {formatDualBadge(latestConv.seq_code, 'C001', latestConv.gitmap_seq_code, latestConv.short_id || latestConv.conversation_id.slice(0, 8))}
+                                            </span>
+                                            <span className="truncate text-[11px] font-medium">
+                                                {group.title}
+                                            </span>
+                                            <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold font-mono bg-blue-500/15 text-blue-600 dark:text-cyan-400 border border-blue-500/30 shrink-0">
+                                                (x{group.conversations.length})
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <span className="text-[9px] font-mono px-1 rounded-[3px] bg-slate-200 dark:bg-[#15334d] text-slate-500 dark:text-slate-400">
+                                                {totalGroupSteps} stp
+                                            </span>
+                                            {isAnyRunning && (
+                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 animate-pulse">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                                    RUNNING
+                                                </span>
+                                            )}
+                                            {isAnyQueued && !isAnyRunning && (
+                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 animate-pulse">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                                    QUEUED
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {isGroupExpanded && (
+                                        <div className="ml-3 pl-2 border-l border-blue-200/50 dark:border-blue-900/40 space-y-0.5 py-0.5">
+                                            {group.conversations.map((conv) => renderConversationNode(conv, project))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
 
                         {/* Collapsible Stale / Empty Prompts Node */}
                         {staleConversations.length > 0 && (
@@ -1842,40 +2133,43 @@ export default function PromptTreeViewModal({
                         </div>
                     </div>
 
-                    {/* Toolbar Capsule */}
+                    {/* Toolbar Capsule (Segmented Dark-Glass Pill Capsule) */}
                     <div className="flex items-center gap-2">
-                        <div className="flex items-center rounded-[4px] bg-slate-100 dark:bg-[#0c2438] border border-slate-200 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+                        <div className="inline-flex items-center rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700/60 p-0.5 shadow-md">
                             <button
                                 type="button"
                                 onClick={handleBackup}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-l-[4px] rounded-r-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:bg-slate-800/80 rounded-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title="Backup Prompts to JSON"
                             >
-                                <Download className="w-3.5 h-3.5 text-indigo-500" />
+                                <Download className="w-3.5 h-3.5 text-indigo-400" />
                                 <span>Backup</span>
                             </button>
+                            <div className="h-3.5 w-px bg-slate-700/60 mx-0.5" />
                             <button
                                 type="button"
                                 onClick={handleRestore}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:bg-slate-800/80 rounded-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title="Restore Running Prompts (7s stabilization delay)"
                             >
-                                <Upload className="w-3.5 h-3.5 text-emerald-500" />
+                                <Upload className="w-3.5 h-3.5 text-emerald-400" />
                                 <span>Restore</span>
                             </button>
+                            <div className="h-3.5 w-px bg-slate-700/60 mx-0.5" />
                             <button
                                 type="button"
                                 onClick={() => loadTree(true, true)}
                                 disabled={isLoading}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:bg-slate-800/80 rounded-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
                                 title="Refresh Tree"
                             >
-                                <RefreshCw className={cn('w-3.5 h-3.5 text-blue-500', isLoading && 'animate-spin')} />
+                                <RefreshCw className={cn('w-3.5 h-3.5 text-blue-400', isLoading && 'animate-spin')} />
                                 <span>Refresh</span>
                             </button>
-                            <div className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 rounded-none">
-                                <Clock className={cn("w-3.5 h-3.5 text-cyan-500", isAutoSyncing && "animate-spin")} />
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400">Sync:</span>
+                            <div className="h-3.5 w-px bg-slate-700/60 mx-0.5" />
+                            <div className="flex items-center gap-1 px-2 py-0.5 text-xs font-semibold text-slate-200">
+                                <Clock className={cn("w-3.5 h-3.5 text-cyan-400", isAutoSyncing && "animate-spin")} />
+                                <span className="text-[11px] text-slate-400">Sync:</span>
                                 <select
                                     value={syncInterval}
                                     onChange={(e) => {
@@ -1883,30 +2177,31 @@ export default function PromptTreeViewModal({
                                         setSyncInterval(val);
                                         setPromptTreeSyncInterval(val);
                                     }}
-                                    className="rounded-[4px] bg-white dark:bg-[#071a27] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] text-xs px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-cyan-500 cursor-pointer"
+                                    className="rounded-full bg-slate-800/70 text-slate-200 border border-slate-700/60 text-xs px-1.5 py-0.5 focus:outline-none cursor-pointer hover:bg-slate-800"
                                     title="Auto-sync interval"
                                 >
-                                    <option value="15s">15s</option>
-                                    <option value="30s">30s</option>
-                                    <option value="1m">1m</option>
-                                    <option value="2m">2m</option>
-                                    <option value="off">Off</option>
+                                    <option value="15s" className="bg-slate-900 text-slate-200">15s</option>
+                                    <option value="30s" className="bg-slate-900 text-slate-200">30s</option>
+                                    <option value="1m" className="bg-slate-900 text-slate-200">1m</option>
+                                    <option value="2m" className="bg-slate-900 text-slate-200">2m</option>
+                                    <option value="off" className="bg-slate-900 text-slate-200">Off</option>
                                 </select>
                             </div>
+                            <div className="h-3.5 w-px bg-slate-700/60 mx-0.5" />
                             <button
                                 type="button"
                                 onClick={() => setIsFullscreen(!isFullscreen)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-r-[4px] rounded-l-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:bg-slate-800/80 rounded-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title={isFullscreen ? 'Exit Full Screen' : 'Full Screen Mode'}
                             >
                                 {isFullscreen ? (
                                     <>
-                                        <Minimize2 className="w-3.5 h-3.5 text-blue-500" />
+                                        <Minimize2 className="w-3.5 h-3.5 text-blue-400" />
                                         <span>Exit</span>
                                     </>
                                 ) : (
                                     <>
-                                        <Maximize2 className="w-3.5 h-3.5 text-blue-500" />
+                                        <Maximize2 className="w-3.5 h-3.5 text-blue-400" />
                                         <span>Full</span>
                                     </>
                                 )}
@@ -1916,7 +2211,7 @@ export default function PromptTreeViewModal({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="rounded-[4px] p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-[#15334d] dark:hover:text-slate-200 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-[#15334d]"
+                            className="rounded-full p-1.5 text-slate-400 hover:bg-slate-800/80 hover:text-slate-200 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer border border-transparent hover:border-slate-700/60"
                             title="Close"
                         >
                             <X className="h-5 w-5" />
@@ -2121,10 +2416,32 @@ export default function PromptTreeViewModal({
                                             <span className="inline-flex items-center px-2 py-0.5 rounded-[5px] text-[11px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20">
                                                 #{selectedConversation.seq_code || 'P001'}
                                             </span>
+                                            {(() => {
+                                                const cat = getPromptCategory(selectedConversation, activePromptText);
+                                                if (cat === 'subagent') {
+                                                    return (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-900/40 text-purple-300 border border-purple-500/40">
+                                                            SUBAGENT INSTRUCTION
+                                                        </span>
+                                                    );
+                                                }
+                                                if (cat === 'draft') {
+                                                    return (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-500/20 text-slate-400 border border-slate-500/30">
+                                                            DRAFT
+                                                        </span>
+                                                    );
+                                                }
+                                                return (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-900/40 text-blue-300 border border-blue-500/40">
+                                                        USER PROMPT
+                                                    </span>
+                                                );
+                                            })()}
                                             <h3 className="text-base font-bold text-slate-900 dark:text-white">
                                                 {selectedConversation.title || selectedConversation.short_id}
                                             </h3>
-                                            {(Boolean(selectedConversation.is_running) && !isGhostConversation(selectedConversation) && !(selectedConversation.prompt_word_count === 0 && (!selectedConversation.prompt_preview_200w || !selectedConversation.prompt_preview_200w.trim()))) && (
+                                            {(Boolean(selectedConversation.is_running) || selectedConversation.status === 'running') && !isGhostConversation(selectedConversation) && !(selectedConversation.prompt_word_count === 0 && (!selectedConversation.prompt_preview_200w || !selectedConversation.prompt_preview_200w.trim())) && (
                                                 <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-2xs">
                                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                                     <span>RUNNING</span>
@@ -2134,6 +2451,12 @@ export default function PromptTreeViewModal({
                                                     <span className="font-mono text-[9px] text-emerald-600 dark:text-emerald-400 border-l border-emerald-400/40 pl-1">
                                                         {formatDuration(elapsedSeconds)}
                                                     </span>
+                                                </span>
+                                            )}
+                                            {(selectedConversation.status === 'queued' || selectedConversation.status === 'pending') && !selectedConversation.is_running && (
+                                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                                    <span>QUEUED</span>
                                                 </span>
                                             )}
                                         </div>
@@ -2178,8 +2501,8 @@ export default function PromptTreeViewModal({
                                         </div>
                                     </div>
 
-                                    {/* Action Buttons: Copy Text, Copy With Images, Save Images, Suffix Dropdown, Focus IDE, Resend, Enqueue, Full */}
-                                    <div className="flex flex-wrap items-center gap-1.5">
+                                    {/* Action Buttons: Segmented Dark-Glass Pill Capsule */}
+                                    <div className="inline-flex flex-wrap items-center rounded-full bg-slate-900/80 dark:bg-slate-900/90 backdrop-blur-md border border-slate-700/60 p-0.5 shadow-md">
                                         {/* Copy Text Button (clean text only) */}
                                         <button
                                             type="button"
@@ -2189,52 +2512,61 @@ export default function PromptTreeViewModal({
                                                 setIsCopiedText(true);
                                                 setTimeout(() => setIsCopiedText(false), 2000);
                                             }}
-                                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-[5px] bg-slate-100 dark:bg-[#0c2438] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d] text-xs font-semibold transition-colors cursor-pointer"
+                                            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-slate-200 hover:bg-slate-800/80 text-xs font-semibold transition-colors cursor-pointer"
                                             title="Copy clean prompt text (excluding embedded images)"
                                         >
-                                            {isCopiedText ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />}
+                                            {isCopiedText ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
                                             <span>{isCopiedText ? 'Copied Text!' : 'Copy Text'}</span>
                                         </button>
 
-                                        {/* Copy With Images Button (verbatim raw prompt) */}
+                                        {/* Copy With Images Button (verbatim rich prompt) */}
                                         <button
                                             type="button"
-                                            onClick={() => {
-                                                navigator.clipboard.writeText(activePromptText);
-                                                setIsCopiedRaw(true);
-                                                setTimeout(() => setIsCopiedRaw(false), 2000);
-                                            }}
-                                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-[5px] bg-slate-100 dark:bg-[#0c2438] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d] text-xs font-semibold transition-colors cursor-pointer"
-                                            title="Copy raw prompt verbatim including markdown image syntax"
+                                            onClick={handleCopyWithImages}
+                                            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-slate-200 hover:bg-slate-800/80 text-xs font-semibold transition-colors cursor-pointer"
+                                            title="Copy rich content with markdown image tags and clipboard HTML"
                                         >
-                                            {isCopiedRaw ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-indigo-500" />}
+                                            {isCopiedRaw ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-indigo-400" />}
                                             <span>{isCopiedRaw ? 'Copied Verbatim!' : 'Copy With Images'}</span>
+                                        </button>
+
+                                        {/* Export Button */}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleExportPrompt('markdown')}
+                                            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-slate-200 hover:bg-slate-800/80 text-xs font-semibold transition-colors cursor-pointer"
+                                            title="Export prompt to Markdown (.md) with metadata frontmatter"
+                                        >
+                                            <Download className="w-3.5 h-3.5 text-cyan-400" />
+                                            <span>Export</span>
                                         </button>
 
                                         {/* Save Images Button */}
                                         <button
                                             type="button"
                                             onClick={handleSaveImages}
-                                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-[5px] bg-slate-100 dark:bg-[#0c2438] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d] text-xs font-semibold transition-colors cursor-pointer"
+                                            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-slate-200 hover:bg-slate-800/80 text-xs font-semibold transition-colors cursor-pointer"
                                             title="Extract and save embedded images"
                                         >
-                                            <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
+                                            <ImageIcon className="w-3.5 h-3.5 text-blue-400" />
                                             <span>Save Images</span>
                                         </button>
+
+                                        <div className="h-3.5 w-px bg-slate-700/60 mx-0.5" />
 
                                         {/* Confirmation Suffix Dropdown */}
                                         <select
                                             value={confirmationSuffix}
                                             onChange={(e) => setConfirmationSuffix(e.target.value)}
-                                            className="rounded-[5px] bg-slate-100 dark:bg-[#0c2438] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] text-xs px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                            className="rounded-full bg-slate-800/70 text-slate-200 border border-slate-700/60 text-xs px-2 py-1 focus:outline-none cursor-pointer hover:bg-slate-800"
                                             title="Confirmation suffix appended on Resend"
                                         >
-                                            <option value="None (Send as is)">Suffix: None (Send as is)</option>
-                                            <option value="Is it done?">Suffix: Is it done?</option>
-                                            <option value="Is it released?">Suffix: Is it released?</option>
-                                            <option value="Are you sure about it?">Suffix: Are you sure about it?</option>
-                                            <option value="Double check all edge cases">Suffix: Double check all edge cases</option>
-                                            <option value="Verify build and tests">Suffix: Verify build and tests</option>
+                                            <option value="None (Send as is)" className="bg-slate-900 text-slate-200">Suffix: None (Send as is)</option>
+                                            <option value="Is it done?" className="bg-slate-900 text-slate-200">Suffix: Is it done?</option>
+                                            <option value="Is it released?" className="bg-slate-900 text-slate-200">Suffix: Is it released?</option>
+                                            <option value="Are you sure about it?" className="bg-slate-900 text-slate-200">Suffix: Are you sure about it?</option>
+                                            <option value="Double check all edge cases" className="bg-slate-900 text-slate-200">Suffix: Double check all edge cases</option>
+                                            <option value="Verify build and tests" className="bg-slate-900 text-slate-200">Suffix: Verify build and tests</option>
                                         </select>
 
                                         {/* Focus IDE Button */}
@@ -2242,24 +2574,26 @@ export default function PromptTreeViewModal({
                                             type="button"
                                             onClick={handleFocusIde}
                                             disabled={isFocusing}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] bg-sky-50 dark:bg-[#0c2438] text-sky-700 dark:text-sky-300 border border-sky-300/60 dark:border-[#15334d] hover:bg-sky-100 dark:hover:bg-[#15334d] text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                                            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-sky-300 hover:bg-sky-950/40 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
                                             title="Focus Antigravity IDE window or launch instance"
                                         >
-                                            <ExternalLink className={cn('w-3.5 h-3.5 text-sky-500', isFocusing && 'animate-spin')} />
+                                            <ExternalLink className={cn('w-3.5 h-3.5 text-sky-400', isFocusing && 'animate-spin')} />
                                             <span>Focus IDE</span>
                                         </button>
+
+                                        <div className="h-3.5 w-px bg-slate-700/60 mx-0.5" />
 
                                         {/* Send Now Button (Hotkey: N) */}
                                         <button
                                             type="button"
                                             onClick={handleResendPrompt}
                                             disabled={isResending}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] bg-emerald-50 dark:bg-[#0c2438] text-emerald-700 dark:text-emerald-300 border border-emerald-300/60 dark:border-[#15334d] hover:bg-emerald-100 dark:hover:bg-[#15334d] text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                                            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600/30 text-emerald-300 hover:bg-emerald-600/40 border border-emerald-500/40 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
                                             title="Immediately inject prompt to running instance (writes .antigravity_resume_task.json) [Hotkey: N]"
                                         >
-                                            <RotateCw className={cn('w-3.5 h-3.5 text-emerald-500', isResending && 'animate-spin')} />
+                                            <RotateCw className={cn('w-3.5 h-3.5 text-emerald-400', isResending && 'animate-spin')} />
                                             <span>Send Now</span>
-                                            <kbd className="ml-0.5 px-1 py-0.2 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded text-[9px] font-mono font-bold">N</kbd>
+                                            <kbd className="ml-0.5 px-1 py-0.2 bg-emerald-500/20 text-emerald-300 rounded text-[9px] font-mono font-bold">N</kbd>
                                         </button>
 
                                         {/* Enqueue Button */}
@@ -2267,10 +2601,10 @@ export default function PromptTreeViewModal({
                                             type="button"
                                             onClick={handleEnqueuePrompt}
                                             disabled={isEnqueueing}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] bg-purple-50 dark:bg-[#0c2438] text-purple-700 dark:text-purple-300 border border-purple-300/60 dark:border-[#15334d] hover:bg-purple-100 dark:hover:bg-[#15334d] text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                                            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-600/30 text-purple-300 hover:bg-purple-600/40 border border-purple-500/40 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
                                             title="Enqueue prompt into FIFO scheduler queue"
                                         >
-                                            <ListPlus className="w-3.5 h-3.5 text-purple-500" />
+                                            <ListPlus className="w-3.5 h-3.5 text-purple-400" />
                                             <span>Enqueue</span>
                                         </button>
 
@@ -2278,7 +2612,7 @@ export default function PromptTreeViewModal({
                                         <button
                                             type="button"
                                             onClick={() => openInspector(selectedConversation, selectedProject?.repo_path || '')}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] bg-blue-50 dark:bg-[#0c2438] text-blue-700 dark:text-cyan-300 border border-blue-200 dark:border-[#15334d] text-xs font-semibold hover:bg-blue-100 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                                            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-600/30 text-cyan-300 hover:bg-blue-600/40 border border-blue-500/40 text-xs font-semibold transition-colors cursor-pointer"
                                             title="Full-Screen Inspector"
                                         >
                                             <Maximize2 className="h-3.5 w-3.5" />
@@ -2596,9 +2930,38 @@ export default function PromptTreeViewModal({
                                     <FileText className="h-5 w-5" />
                                 </div>
                                 <div>
-                                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                                        {inspectorPrompt.title}
-                                    </h3>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                                            {inspectorPrompt.title}
+                                        </h3>
+                                        {(() => {
+                                            const lower = inspectorPrompt.text.toLowerCase();
+                                            const isSubagent =
+                                                lower.includes('research subagent') ||
+                                                lower.includes('spec author') ||
+                                                lower.includes('worker 01') ||
+                                                lower.includes('worker 02') ||
+                                                lower.includes('worker 03') ||
+                                                lower.includes('you are research') ||
+                                                lower.includes('tool capabilities & strict read-only boundary') ||
+                                                lower.includes('<system_message>') ||
+                                                lower.includes('<system_prompt>') ||
+                                                lower.includes('you are worker') ||
+                                                lower.includes('### boundaries & crash prevention');
+                                            if (isSubagent) {
+                                                return (
+                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-900/40 text-purple-300 border border-purple-500/40">
+                                                        SUBAGENT INSTRUCTION
+                                                    </span>
+                                                );
+                                            }
+                                            return (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-900/40 text-blue-300 border border-blue-500/40">
+                                                    USER PROMPT
+                                                </span>
+                                            );
+                                        })()}
+                                    </div>
                                     <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
                                         <span>Conv: {inspectorPrompt.convId}</span>
                                         <span>·</span>

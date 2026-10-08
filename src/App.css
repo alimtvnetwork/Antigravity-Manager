@@ -256,6 +256,43 @@ a {
 .dark .payload-viewer-scroll::-webkit-scrollbar-thumb:hover {
   background-color: rgba(148, 163, 184, 0.7);
 }
+
+/* Dedicated thin custom scrollbar for instance cards, compact lists and modals */
+.custom-thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.35) transparent;
+}
+
+.custom-thin-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.custom-thin-scrollbar::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+.custom-thin-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.35);
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+.custom-thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(107, 114, 128, 0.65);
+}
+
+.dark .custom-thin-scrollbar {
+  scrollbar-color: rgba(148, 163, 184, 0.28) transparent;
+}
+
+.dark .custom-thin-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.28);
+}
+
+.dark .custom-thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.55);
+}
 /* View Transitions API 主题切换动画 */
 ::view-transition-old(root),
 ::view-transition-new(root) {
