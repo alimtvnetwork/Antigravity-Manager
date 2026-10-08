@@ -243,6 +243,49 @@ pub fn resume_recent_project_prompts(
 }
 
 #[tauri::command]
+pub async fn send_prompt_now(
+    instance_id: String,
+    repo_path: String,
+    prompt_content: String,
+    conversation_id: Option<String>,
+) -> Result<crate::modules::repo_db::ActivePrompt, String> {
+    tokio::task::spawn_blocking(move || {
+        crate::modules::repo_db::send_prompt_now_for_instance(
+            &instance_id,
+            &repo_path,
+            &prompt_content,
+            conversation_id.as_deref(),
+        )
+    })
+    .await
+    .map_err(|e| format!("Task execution failed: {}", e))?
+}
+
+#[tauri::command]
+pub async fn enqueue_prompt(
+    instance_id: String,
+    repo_path: String,
+    prompt_content: String,
+    conversation_id: Option<String>,
+) -> Result<crate::modules::repo_db::ActivePrompt, String> {
+    tokio::task::spawn_blocking(move || {
+        crate::modules::repo_db::enqueue_prompt_for_instance(
+            &instance_id,
+            &repo_path,
+            &prompt_content,
+            conversation_id.as_deref(),
+        )
+    })
+    .await
+    .map_err(|e| format!("Task execution failed: {}", e))?
+}
+
+#[tauri::command]
+pub fn get_running_instances_process_count() -> Result<usize, String> {
+    Ok(crate::modules::instance::get_instance_running_process_count())
+}
+
+#[tauri::command]
 pub fn restore_prompts_backup(backup_json: String) -> Result<usize, String> {
     crate::modules::repo_db::restore_prompts_from_backup_json(&backup_json)
 }

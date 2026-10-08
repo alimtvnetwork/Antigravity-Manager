@@ -1,5 +1,15 @@
 # Changelog
 
+## [v4.165.0] - 2026-10-09
+
+### Added
+- Smart instance process cache and OS PID vitality checks eliminating duplicate IDE launches
+- Dedicated Tauri IPC commands `send_prompt_now`, `enqueue_prompt`, and `get_running_instances_process_count`
+- Bracket tag clutter elimination in Prompt Tree View, replacing noisy dual badges with streamlined sequence pills
+- Ghost running indicator eradication and duration formatter hygiene preventing `NaNm NaNs` display
+
+---
+
 ## [v4.164.0] - 2026-10-08
 
 ### Added
@@ -62,7 +72,18 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
-    *   **v4.164.0 (2026-10-08)**:
+    *   **v4.165.0 (2026-10-09)**:
+        -   **[Smart Instance Process Cache & Anti-Restart Reliability]**:
+            -   **Process Vitality Verification**: Implemented thread-safe `INSTANCE_PROCESS_CACHE` and OS PID verification (`libc::kill(pid, 0)` on Unix, `sysinfo` on Windows) to verify instance process state before dispatch or focus. (Thanks to @aukgit)
+            -   **Duplicate Launch Prevention**: Refactored `focus_or_launch_instance_with_workspace` and `focus_or_launch_workspace` with `ensure_instance_running_smart`, completely eliminating the blind restart fallthrough defect on Linux and Wayland. (Thanks to @aukgit)
+        -   **[Prompt Dispatch & Enqueue IPC Architecture]**:
+            -   **First-Class IPC Handlers**: Registered missing `send_prompt_now`, `enqueue_prompt`, and `get_running_instances_process_count` Tauri IPC handlers in backend commands and application router. (Thanks to @aukgit)
+            -   **Direct Dispatch & Queue Decoupling**: Implemented `send_prompt_now_for_instance` and `enqueue_prompt_for_instance` in `repo_db.rs`, writing `.antigravity_resume_task.json` tasks with proper execution flags. (Thanks to @aukgit)
+        -   **[Prompt Tree View De-cluttering & Sequence Hygiene]**:
+            -   **Bracket Noise Elimination**: Replaced verbose `[AGM:P006 | GM:#6]` and `[AGM:C025 | GM:antigrav]` tag wrappers with streamlined `#6`, `P006`, and `C025` sequence indicators. (Thanks to @aukgit)
+        -   **[Ghost Running Eradication & Duration Formatter Hygiene]**:
+            -   **Reverse-Scan Transcript Verification**: Hardened `inspect_conversation_transcript` to scan backwards past trailing records and detect genuine step completions (`DONE`, `COMPLETED`, `ERROR`), suppressing false active states. (Thanks to @aukgit)
+            -   **Duration Formatter Guard**: Fortified `formatDuration` against non-finite or `NaN` timestamps, parsing numeric epoch strings and ISO dates safely to eradicate `NaNm NaNs` errors. (Thanks to @aukgit)
         -   **[Prompt Tree In-Flight Execution Banner & Window Focus]**:
             -   **Active Execution Banner**: Added dedicated in-flight execution banner inside `PromptTreeViewModal` displaying animated pulse, live agent step summary, elapsed runtime, and step counter. (Thanks to @aukgit)
             -   **Direct Antigravity Window Activation**: Implemented 1-click "Open in Antigravity Window" button with Win32 un-minimize (`ShowWindow` SW_RESTORE 9), foreground focus (`SetForegroundWindow`), and process PID fallback resolution. (Thanks to @aukgit)

@@ -45,6 +45,8 @@ import {
     setArchivedProjectsForInstance,
     focusOrLaunchInstance,
     focusInstanceWorkspace,
+    sendPromptNow,
+    enqueuePrompt,
 } from '../../services/instanceService';
 import { cn } from '../../utils/cn';
 
@@ -112,11 +114,11 @@ interface PromptTreeViewModalProps {
 
 type ViewMode = 'preview' | 'raw' | 'edit';
 
-// Helper to format GitMap dual sequence badge [AGM:P001 | GM:#1] or [AGM:C001 | GM:<cid>]
+// Helper to format clean, compact sequence badge without heavy bracket clutter
 function formatDualBadge(agmCode: string | undefined, defaultAgm: string, gmCode: string | undefined, defaultGm: string): string {
-    const agm = agmCode ? (agmCode.startsWith('AGM:') ? agmCode : `AGM:${agmCode}`) : `AGM:${defaultAgm}`;
-    const gm = gmCode ? (gmCode.startsWith('GM:') ? gmCode : `GM:${gmCode}`) : `GM:${defaultGm}`;
-    return `[${agm} | ${gm}]`;
+    const raw = agmCode || defaultAgm || gmCode || defaultGm;
+    const clean = raw.replace(/^(AGM:|GM:)/i, '').trim();
+    return clean.startsWith('#') || clean.startsWith('P') || clean.startsWith('C') ? clean : `#${clean}`;
 }
 
 // Helper to count words
@@ -1069,13 +1071,28 @@ export default function PromptTreeViewModal({
             setElapsedSeconds(0);
             return;
         }
-        const startTime = selectedConversation.last_modified
-            ? new Date(selectedConversation.last_modified).getTime()
-            : Date.now();
+        let startTime = Date.now();
+        if (selectedConversation.last_modified) {
+            const raw = selectedConversation.last_modified;
+            if (typeof raw === 'number') {
+                startTime = raw < 1e11 ? raw * 1000 : raw;
+            } else {
+                const trimmed = String(raw).trim();
+                if (/^\d+$/.test(trimmed)) {
+                    const num = Number(trimmed);
+                    startTime = num < 1e11 ? num * 1000 : num;
+                } else {
+                    const parsed = Date.parse(trimmed);
+                    if (Number.isFinite(parsed) && parsed > 0) {
+                        startTime = parsed;
+                    }
+                }
+            }
+        }
         const updateElapsed = () => {
             const now = Date.now();
             const diff = Math.max(0, Math.floor((now - startTime) / 1000));
-            setElapsedSeconds(diff);
+            setElapsedSeconds(Number.isFinite(diff) ? diff : 0);
         };
         updateElapsed();
         const timer = setInterval(updateElapsed, 1000);
@@ -1083,8 +1100,10 @@ export default function PromptTreeViewModal({
     }, [selectedConversation?.conversation_id, selectedConversation?.is_running, selectedConversation?.last_modified]);
 
     const formatDuration = (secs: number) => {
+        if (!Number.isFinite(secs) || isNaN(secs) || secs < 0) return '0s';
         const m = Math.floor(secs / 60);
         const s = secs % 60;
+        if (m === 0) return `${s}s`;
         return `${m}m ${s < 10 ? '0' : ''}${s}s`;
     };
 
@@ -1678,47 +1697,20 @@ export default function PromptTreeViewModal({
             }
             const repoPath = proj?.repo_path || '';
 
-            // 1. Write .antigravity_resume_task.json to project directory
-            if (repoPath) {
-                const taskPath = `${repoPath.replace(/[\\/]+$/, '')}/.antigravity_resume_task.json`;
-                const payload = {
-                    prompt_id: conv?.conversation_id || `prompt-${Date.now()}`,
-                    project_id: proj?.project_id || '',
-                    instance_id: proj?.instance_id || instanceId || 'default',
-                    repo_path: repoPath,
-                    prompt_content: promptContent,
-                    model: 'gemini-2.5-pro',
-                    auto_boot: true,
-                    status: 'dispatched',
-                    resumed_at: Math.floor(Date.now() / 1000),
-                };
-                try {
-                    await invoke('save_text_file', {
-                        path: taskPath,
-                        content: JSON.stringify(payload, null, 2),
-                    });
-                } catch (fsErr) {
-                    console.warn('save_text_file resume error', fsErr);
-                }
-            }
-
-            // 2. Trigger auto resume command
+            // 1. Dispatch prompt directly to running instance via sendPromptNow
             const targetInstId = proj?.instance_id || instanceId || 'default';
             try {
-                await invoke('resume_recent_project_prompts', {
-                    instanceId: targetInstId,
-                    maxAgeSeconds: 3600,
-                });
-            } catch {
-                // non-fatal fallback
+                await sendPromptNow(targetInstId, repoPath, promptContent, conv?.conversation_id);
+            } catch (sendErr) {
+                console.warn('sendPromptNow error', sendErr);
             }
 
-            // 3. Copy prompt content to clipboard so user can paste immediately
+            // 2. Copy prompt content to clipboard so user can paste immediately
             try {
                 await navigator.clipboard.writeText(promptContent);
             } catch {}
 
-            // 4. Focus or launch IDE instance window so user immediately sees it ("goes there")
+            // 3. Focus or launch IDE instance window (re-uses existing without duplicate launch)
             try {
                 await focusOrLaunchInstance(targetInstId, repoPath);
             } catch (focusErr) {
@@ -1831,45 +1823,16 @@ ${activePromptText}
             setActionMsg('Enqueueing prompt into FIFO scheduler queue...');
             const promptContent = editedPromptText.trim() || activePromptText || selectedConversation.prompt_preview_200w || '';
             const repoPath = selectedProject?.repo_path || '';
+            const targetInstId = selectedProject?.instance_id || instanceId || 'default';
 
-            let enqueued = false;
-            try {
-                await invoke('enqueue_prompt', {
-                    conversationId: selectedConversation.conversation_id,
-                    projectId: selectedProject?.project_id,
-                    instanceId: selectedProject?.instance_id || instanceId || 'default',
-                    repoPath,
-                    promptContent,
-                });
-                enqueued = true;
-            } catch {
-                // Fallback: write .antigravity_resume_task.json with queued status
-                if (repoPath) {
-                    const taskPath = `${repoPath.replace(/[\\/]+$/, '')}/.antigravity_resume_task.json`;
-                    const payload = {
-                        prompt_id: selectedConversation.conversation_id || `prompt-${Date.now()}`,
-                        project_id: selectedProject?.project_id || '',
-                        instance_id: selectedProject?.instance_id || instanceId || 'default',
-                        repo_path: repoPath,
-                        prompt_content: promptContent,
-                        model: 'gemini-2.5-pro',
-                        auto_boot: false,
-                        status: 'queued',
-                        queued_at: Math.floor(Date.now() / 1000),
-                    };
-                    try {
-                        await invoke('save_text_file', {
-                            path: taskPath,
-                            content: JSON.stringify(payload, null, 2),
-                        });
-                        enqueued = true;
-                    } catch (fsErr) {
-                        console.warn('save_text_file queue error', fsErr);
-                    }
-                }
-            }
+            await enqueuePrompt(
+                targetInstId,
+                repoPath,
+                promptContent,
+                selectedConversation.conversation_id
+            );
 
-            setActionMsg(enqueued ? 'Prompt enqueued into FIFO scheduler queue!' : 'Prompt recorded for queue scheduler!');
+            setActionMsg('Prompt enqueued into FIFO scheduler queue!');
             setTimeout(() => setActionMsg(null), 3500);
         } catch (err: any) {
             setError(err?.toString() || 'Failed to enqueue prompt');

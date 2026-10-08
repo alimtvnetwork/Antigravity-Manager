@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.164.0)
+> Professional AI Account Management & Protocol Proxy System (v4.165.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.164.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.165.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.164.0**: Added prompt tree in-flight execution banner with elapsed timer, step counter, and direct Antigravity window un-minimize/focus; enforced strict FIFO database ordering across prompt backup restore and auto-resume queries; deepened subagent classification heuristics; streamlined Supabase multi-machine fleet synchronization and deduplicated schemas. (Thanks to @aukgit)
+> Latest version **v4.165.0**: Implemented smart instance process caching and OS PID vitality checks eliminating duplicate IDE launches; added first-class Tauri IPC commands for prompt dispatch and enqueueing; eliminated bracket tag clutter in Prompt Tree View; eradicated ghost running indicators and hardened duration formatting against NaNm NaNs. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → CHANGELOG_EN.md](CHANGELOG_EN.md)**
 

@@ -3369,6 +3369,162 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
     }
 }
 
+/// Send a prompt immediately for a specific instance, verifying process liveness,
+/// caching PID, updating SQLite split DB, writing .antigravity_resume_task.json, and executing via agy.
+pub fn send_prompt_now_for_instance(
+    instance_id: &str,
+    repo_path: &str,
+    prompt_content: &str,
+    conversation_id: Option<&str>,
+) -> Result<ActivePrompt, String> {
+    let clean_inst = if instance_id.trim().is_empty() || instance_id == "__default__" {
+        "default"
+    } else {
+        instance_id.trim()
+    };
+    let canonical_inst = crate::modules::instance::resolve_instance_id(clean_inst)
+        .unwrap_or_else(|_| clean_inst.to_string());
+
+    // 1. Ensure instance is running with smart process cache (reuses existing process without reopening)
+    if let Err(e) =
+        crate::modules::instance::ensure_instance_running_smart(&canonical_inst, Some(repo_path))
+    {
+        crate::modules::logger::log_warn(&format!(
+            "[RepoDB] ensure_instance_running_smart warning for '{}': {}",
+            canonical_inst, e
+        ));
+    }
+
+    // 2. Generate prompt ID and record in DB
+    let prompt_id = format!("p-{}", &uuid::Uuid::new_v4().to_string()[..8]);
+    let clean_repo_name = Path::new(repo_path)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "project".to_string());
+    let now = Utc::now().timestamp();
+
+    let active_prompt = ActivePrompt {
+        id: prompt_id,
+        project_id: clean_repo_name.clone(),
+        instance_id: canonical_inst.clone(),
+        repo_path: repo_path.to_string(),
+        prompt_content: prompt_content.to_string(),
+        model: Some("gemini-2.5-pro".to_string()),
+        session_id: conversation_id.map(|s| s.to_string()),
+        status: "running".to_string(),
+        created_at: now,
+        updated_at: now,
+        image_payload: None,
+    };
+
+    save_or_requeue_prompt(&active_prompt)?;
+
+    // 3. Write resume task files to repo
+    if !repo_path.trim().is_empty() {
+        let ws_dir = PathBuf::from(repo_path);
+        if ws_dir.exists() {
+            let payload = serde_json::json!({
+                "prompt_id": active_prompt.id,
+                "project_id": active_prompt.project_id,
+                "instance_id": canonical_inst,
+                "repo_path": repo_path,
+                "prompt_content": prompt_content,
+                "model": "gemini-2.5-pro",
+                "auto_boot": true,
+                "status": "dispatched",
+                "resumed_at": now,
+            });
+            let serialized = serde_json::to_string_pretty(&payload).unwrap_or_default();
+            let _ = fs::write(ws_dir.join(".antigravity_resume_task.json"), &serialized);
+            let _ = fs::write(
+                ws_dir.join(format!(".antigravity_resume_task.{}.json", canonical_inst)),
+                &serialized,
+            );
+        }
+    }
+
+    // 4. Dispatch via agy CLI execution
+    let spawned = spawn_prompt_via_agy(&active_prompt);
+    crate::modules::logger::log_info(&format!(
+        "[RepoDB] send_prompt_now_for_instance dispatched prompt '{}' (spawned: {}) for instance '{}' in '{}'",
+        active_prompt.id, spawned, canonical_inst, repo_path
+    ));
+
+    Ok(active_prompt)
+}
+
+/// Enqueue a prompt into the FIFO queue for a specific instance,
+/// saving to SQLite split DB and writing .antigravity_resume_task.json with status queued.
+pub fn enqueue_prompt_for_instance(
+    instance_id: &str,
+    repo_path: &str,
+    prompt_content: &str,
+    conversation_id: Option<&str>,
+) -> Result<ActivePrompt, String> {
+    let clean_inst = if instance_id.trim().is_empty() || instance_id == "__default__" {
+        "default"
+    } else {
+        instance_id.trim()
+    };
+    let canonical_inst = crate::modules::instance::resolve_instance_id(clean_inst)
+        .unwrap_or_else(|_| clean_inst.to_string());
+
+    let prompt_id = format!("queued-{}", &uuid::Uuid::new_v4().to_string()[..8]);
+    let clean_repo_name = Path::new(repo_path)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "project".to_string());
+    let now = Utc::now().timestamp();
+
+    let active_prompt = ActivePrompt {
+        id: prompt_id,
+        project_id: clean_repo_name,
+        instance_id: canonical_inst.clone(),
+        repo_path: repo_path.to_string(),
+        prompt_content: prompt_content.to_string(),
+        model: Some("gemini-2.5-pro".to_string()),
+        session_id: conversation_id.map(|s| s.to_string()),
+        status: "queued".to_string(),
+        created_at: now,
+        updated_at: now,
+        image_payload: None,
+    };
+
+    save_or_requeue_prompt(&active_prompt)?;
+
+    if !repo_path.trim().is_empty() {
+        let ws_dir = PathBuf::from(repo_path);
+        if ws_dir.exists() {
+            let payload = serde_json::json!({
+                "prompt_id": active_prompt.id,
+                "project_id": active_prompt.project_id,
+                "instance_id": canonical_inst,
+                "repo_path": repo_path,
+                "prompt_content": prompt_content,
+                "model": "gemini-2.5-pro",
+                "auto_boot": false,
+                "status": "queued",
+                "queued_at": now,
+            });
+            let serialized = serde_json::to_string_pretty(&payload).unwrap_or_default();
+            let _ = fs::write(ws_dir.join(".antigravity_resume_task.json"), &serialized);
+            let _ = fs::write(
+                ws_dir.join(format!(".antigravity_resume_task.{}.json", canonical_inst)),
+                &serialized,
+            );
+        }
+    }
+
+    crate::modules::logger::log_info(&format!(
+        "[RepoDB] enqueue_prompt_for_instance recorded prompt '{}' for instance '{}' in '{}'",
+        active_prompt.id, canonical_inst, repo_path
+    ));
+
+    Ok(active_prompt)
+}
+
 /// Resend and restore all previous running/backed-up/dispatched commands across all instances.
 pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, String> {
     resend_running_commands_for_instance(None, limit)
@@ -4155,7 +4311,6 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0);
-    let is_recent_active = mtime_epoch > 0 && (now_epoch - mtime_epoch <= 240);
 
     let content = match std::fs::read_to_string(&chosen_path) {
         Ok(c) => c,
@@ -4168,11 +4323,51 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
                 tool_calls_summary: None,
                 latest_step_summary: None,
                 is_subagent: false,
-                is_recent_active,
+                is_recent_active: false,
                 is_non_prompt: true,
             };
         }
     };
+
+    let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
+    let step_count = lines.len();
+
+    // Check if the conversation turn has completed or is waiting for user
+    let mut is_completed_or_waiting = false;
+    for line in lines.iter().rev().take(5) {
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
+            let s_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("");
+            if s_type == "TOKEN_USAGE" || s_type == "TELEMETRY" || s_type == "HEARTBEAT" {
+                continue;
+            }
+            let s_status = val.get("status").and_then(|v| v.as_str()).unwrap_or("");
+            if s_status.eq_ignore_ascii_case("done")
+                || s_status.eq_ignore_ascii_case("completed")
+                || s_status.eq_ignore_ascii_case("error")
+                || s_status.eq_ignore_ascii_case("idle")
+            {
+                is_completed_or_waiting = true;
+                break;
+            }
+            if s_type == "PLANNER_RESPONSE"
+                || val.get("source").and_then(|s| s.as_str()) == Some("MODEL")
+            {
+                let has_tool_calls = val
+                    .get("tool_calls")
+                    .and_then(|t| t.as_array())
+                    .map(|a| !a.is_empty())
+                    .unwrap_or(false);
+                if !has_tool_calls && (s_status.is_empty() || s_status.eq_ignore_ascii_case("done"))
+                {
+                    is_completed_or_waiting = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    let is_recent_active =
+        !is_completed_or_waiting && mtime_epoch > 0 && (now_epoch - mtime_epoch <= 240);
 
     let mut latest_prompt: Option<String> = None;
     let mut latest_response: Option<String> = None;
@@ -4182,9 +4377,6 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
         std::collections::HashMap::new();
     let mut is_subagent = false;
     let mut has_real_user_prompt = false;
-
-    let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
-    let step_count = lines.len();
 
     // Check first step to see if this conversation was initiated as an autonomous subagent
     if let Some(first_line) = lines.first() {
@@ -4533,6 +4725,17 @@ fn compute_project_conversation_tree(
     let target = target_instance.filter(|t| !t.is_empty() && *t != "all");
     let registry = crate::modules::instance::load_registry().unwrap_or_default();
     let now = Utc::now().timestamp();
+
+    // Automatically transition stale in-flight prompts (> 300s without update) to completed
+    if let Ok(conn) = connect_db() {
+        let _ = conn.execute(
+            "UPDATE active_prompts 
+             SET status = 'completed', updated_at = ?1 
+             WHERE status IN ('running', 'in_flight', 'dispatched') 
+               AND (?1 - updated_at > 300)",
+            rusqlite::params![now],
+        );
+    }
 
     if let Some(target_id) = target {
         if target_id == "default" || target_id == "__default__" {
