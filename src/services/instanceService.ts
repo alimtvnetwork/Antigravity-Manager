@@ -239,6 +239,54 @@ export async function focusInstanceWorkspace(instanceId: string, repoPath: strin
     }
 }
 
+export async function sendPromptNow(
+    instanceId: string,
+    repoPath: string,
+    promptContent: string,
+    conversationId?: string
+): Promise<any> {
+    try {
+        return await invoke('send_prompt_now', { instanceId, repoPath, promptContent, conversationId });
+    } catch (e: any) {
+        const captured = useErrorStore.getState().captureError(e, {
+            source: 'instanceService.sendPromptNow',
+            endpoint: 'send_prompt_now',
+            triggerAction: 'send_prompt_now',
+            context: { instanceId, repoPath },
+        });
+        useErrorStore.getState().openErrorModal(captured);
+        throw e;
+    }
+}
+
+export async function enqueuePrompt(
+    instanceId: string,
+    repoPath: string,
+    promptContent: string,
+    conversationId?: string
+): Promise<any> {
+    try {
+        return await invoke('enqueue_prompt', { instanceId, repoPath, promptContent, conversationId });
+    } catch (e: any) {
+        const captured = useErrorStore.getState().captureError(e, {
+            source: 'instanceService.enqueuePrompt',
+            endpoint: 'enqueue_prompt',
+            triggerAction: 'enqueue_prompt',
+            context: { instanceId, repoPath },
+        });
+        useErrorStore.getState().openErrorModal(captured);
+        throw e;
+    }
+}
+
+export async function getRunningInstancesProcessCount(): Promise<number> {
+    try {
+        return await invoke('get_running_instances_process_count');
+    } catch {
+        return 0;
+    }
+}
+
 export async function cloneInstanceExecutable(instanceId: string): Promise<string> {
     try {
         return await invoke('clone_instance_executable', { instanceId });

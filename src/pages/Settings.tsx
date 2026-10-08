@@ -47,6 +47,7 @@ function Settings() {
     const { enable, disable, isEnabled, open: openDebugModal } = useDebugConsole();
     const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'email' | 'themes' | 'supabase' | 'advanced' | 'debug' | 'about'>('general');
     const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.165.0');
+    const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.166.0');
     const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
     const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
     const [formData, setFormData] = useState<AppConfig>({

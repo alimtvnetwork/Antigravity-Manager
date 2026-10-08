@@ -1,5 +1,24 @@
 # Changelog
 
+## [v4.166.0] - 2026-10-09
+
+### Added
+- 3-step smart instance process caching with closed-PID OS re-scan and multi-instance process counting
+- Reliable prompt dispatch via `--user-data-dir` socket alignment and cross-platform clipboard synchronization
+- Prompt Tree View bracket de-cluttering, sequence code styling, and clean context omission banners
+- Ghost running state eradication via active worker confirmation and removal of synthetic crash prompts
+- Full CLI parity for `agm prompts` (`ls`, `tree`, `send`, `enqueue`, `backup`, `restore`) and `agm doctor`
+
+---
+
+## [v4.165.0] - 2026-10-09
+
+### Added
+- Smart instance process cache and OS PID vitality checks eliminating duplicate IDE launches
+- Dedicated Tauri IPC commands `send_prompt_now`, `enqueue_prompt`, and `get_running_instances_process_count`
+- Bracket tag clutter elimination in Prompt Tree View, replacing noisy dual badges with streamlined sequence pills
+- Ghost running indicator eradication and duration formatter hygiene preventing `NaNm NaNs` display
+
 ## [v4.165.0] - 2026-10-09
 
 ### Added
@@ -73,7 +92,34 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+*   **v4.166.0 (2026-10-09)**:
+        -   **[Smart Process Caching & Prompt Dispatch Architecture]**:
+            -   **3-Step Smart Process Caching**: Implemented host-wide instance process enumeration (`scan_and_cache_all_running_instances`), verifying live PIDs against OS state before dispatch and invalidating stale caches on process exit. (Thanks to @aukgit)
+            -   **Closed-PID OS Re-Scan & Rerun**: Fortified `is_instance_process_running_smart` to re-scan the OS process table when a cached PID dies, launching the IDE only when verified not running. (Thanks to @aukgit)
+            -   **Profile Socket Alignment & Clipboard Sync**: Injected `--user-data-dir` in `spawn_prompt_via_agy` to ensure headless CLI dispatches connect directly to cloned instance sockets, accompanied by automatic system clipboard synchronization. (Thanks to @aukgit)
+            -   **Double-Launch Race Elimination**: Removed duplicate `focusOrLaunchInstance` in `PromptTreeViewModal.tsx`, preventing secondary background IDE launches. (Thanks to @aukgit)
+        -   **[Prompt Tree View De-cluttering & Ghost Running Eradication]**:
+            -   **Bracket Noise Elimination**: Replaced cumbersome bracketed tokens (`[AGM:P006 | GM:#6]`, `[AGM:C025 | GM:antigrav]`) with clean, minimalist `#6`, `P006`, and `C025` badges and borderless omission banners. (Thanks to @aukgit)
+            -   **Ghost Running Elimination**: Eradicated synthetic crash-recovery prompt manufacturing in `auto_resume_recent_prompts`, requiring empirical active worker validation before displaying active running states. (Thanks to @aukgit)
+        -   **[CLI Parity for Prompts Management & System Health]**:
+            -   **AGM Prompts Subcommands**: Added CLI routing and handlers for `agm prompts ls`, `tree`, `send`, `enqueue`, `backup`, and `restore` with complete `--json` and human-readable terminal table output. (Thanks to @aukgit)
+            -   **AGM Doctor Diagnostic Engine**: Added `agm doctor` system health checker evaluating nodes, proxy gateways, database connectivity, and running Antigravity processes. (Thanks to @aukgit)
+
+
     *   **v4.165.0 (2026-10-09)**:
+        -   **[Smart Instance Process Cache & Anti-Restart Reliability]**:
+            -   **Process Vitality Verification**: Implemented thread-safe `INSTANCE_PROCESS_CACHE` and OS PID verification (`libc::kill(pid, 0)` on Unix, `sysinfo` on Windows) to verify instance process state before dispatch or focus. (Thanks to @aukgit)
+            -   **Duplicate Launch Prevention**: Refactored `focus_or_launch_instance_with_workspace` and `focus_or_launch_workspace` with `ensure_instance_running_smart`, completely eliminating the blind restart fallthrough defect on Linux and Wayland. (Thanks to @aukgit)
+        -   **[Prompt Dispatch & Enqueue IPC Architecture]**:
+            -   **First-Class IPC Handlers**: Registered missing `send_prompt_now`, `enqueue_prompt`, and `get_running_instances_process_count` Tauri IPC handlers in backend commands and application router. (Thanks to @aukgit)
+            -   **Direct Dispatch & Queue Decoupling**: Implemented `send_prompt_now_for_instance` and `enqueue_prompt_for_instance` in `repo_db.rs`, writing `.antigravity_resume_task.json` tasks with proper execution flags. (Thanks to @aukgit)
+        -   **[Prompt Tree View De-cluttering & Sequence Hygiene]**:
+            -   **Bracket Noise Elimination**: Replaced verbose `[AGM:P006 | GM:#6]` and `[AGM:C025 | GM:antigrav]` tag wrappers with streamlined `#6`, `P006`, and `C025` sequence indicators. (Thanks to @aukgit)
+        -   **[Ghost Running Eradication & Duration Formatter Hygiene]**:
+            -   **Reverse-Scan Transcript Verification**: Hardened `inspect_conversation_transcript` to scan backwards past trailing records and detect genuine step completions (`DONE`, `COMPLETED`, `ERROR`), suppressing false active states. (Thanks to @aukgit)
+            -   **Duration Formatter Guard**: Fortified `formatDuration` against non-finite or `NaN` timestamps, parsing numeric epoch strings and ISO dates safely to eradicate `NaNm NaNs` errors. (Thanks to @aukgit)
+
+*   **v4.165.0 (2026-10-09)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
 
