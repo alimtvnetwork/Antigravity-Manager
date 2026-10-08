@@ -2575,7 +2575,7 @@ pub fn list_all_prompts() -> Result<Vec<ActivePrompt>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
-             FROM active_prompts ORDER BY created_at DESC LIMIT 50",
+             FROM active_prompts ORDER BY created_at ASC, id ASC LIMIT 500",
         )
         .map_err(|e| format!("Failed to prepare list prompts query: {}", e))?;
 
@@ -4289,12 +4289,17 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
                 }
             }
 
-            // 3. Tool results / Generic output
-            if s_type == "GENERIC" {
+            // 3. Tool results / Generic output / Tool call steps
+            if s_type == "GENERIC"
+                || s_type == "TOOL_OUTPUT"
+                || s_type == "TOOL_RESPONSE"
+                || s_source == "TOOL"
+                || val.get("tool_call_id").is_some()
+            {
                 if let Some(tool_out) = val.get("content").and_then(|v| v.as_str()) {
                     let out_trim = tool_out.trim();
-                    if !out_trim.is_empty() && out_trim.len() > 10 {
-                        let preview: String = out_trim.chars().take(2000).collect();
+                    if !out_trim.is_empty() && out_trim.len() > 5 {
+                        let preview: String = out_trim.chars().take(4000).collect();
                         execution_results = Some(preview);
                     }
                 }
@@ -4329,10 +4334,34 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
                         .or_else(|| first_tc.get("name"))
                         .and_then(|n| n.as_str())
                         .unwrap_or("action");
-                    latest_step_summary = Some(format!(
-                        "Step {} · Tool: {} ({})",
-                        step_idx, tool_name, s_status
-                    ));
+                    if latest_step_summary.is_none() {
+                        latest_step_summary = Some(format!(
+                            "Step {} · Tool: {} ({})",
+                            step_idx, tool_name, s_status
+                        ));
+                    }
+                    if execution_results.is_none() {
+                        let call_descs: Vec<String> = tool_calls
+                            .iter()
+                            .map(|tc| {
+                                let name = tc
+                                    .get("tool_name")
+                                    .or_else(|| tc.get("name"))
+                                    .and_then(|n| n.as_str())
+                                    .unwrap_or("tool");
+                                let args = tc
+                                    .get("arguments")
+                                    .or_else(|| tc.get("args"))
+                                    .map(|a| a.to_string())
+                                    .unwrap_or_default();
+                                format!("{}({})", name, args)
+                            })
+                            .collect();
+                        execution_results = Some(format!(
+                            "In-Flight Tool Execution:\n{}",
+                            call_descs.join("\n")
+                        ));
+                    }
                     break;
                 }
             }
@@ -4343,11 +4372,19 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
                 .or_else(|| val.get("thought"))
                 .and_then(|t| t.as_str())
             {
-                let clean_thought = thinking.trim().replace('\n', " ");
-                let snippet: String = clean_thought.chars().take(80).collect();
-                if !snippet.is_empty() {
+                let clean_thought = thinking.trim();
+                let snippet: String = clean_thought.replace('\n', " ").chars().take(80).collect();
+                if !snippet.is_empty() && latest_step_summary.is_none() {
                     latest_step_summary =
                         Some(format!("Step {} · Thinking · \"{}\"", step_idx, snippet));
+                }
+                if latest_response.is_none() && !clean_thought.is_empty() {
+                    latest_response = Some(format!(
+                        "💭 *AI Thinking / Reasoning:*\n\n{}",
+                        clean_thought
+                    ));
+                }
+                if latest_step_summary.is_some() {
                     break;
                 }
             }
@@ -4737,27 +4774,30 @@ fn compute_project_conversation_tree(
             });
 
             if let Ok(s_conn) = s_conn {
-                let is_owning_inst_alive =
-                    if owning_inst_id == "default" || owning_inst_id == "__default__" {
+                let is_owning_inst_alive = if owning_inst_id == "default"
+                    || owning_inst_id == "__default__"
+                {
+                    crate::modules::process::is_antigravity_running(None) || {
                         let def_dir = crate::modules::instance::get_default_antigravity_data_dir();
                         !crate::modules::instance::find_pids_for_data_dir(
                             &def_dir.to_string_lossy(),
                             true,
                         )
                         .is_empty()
-                    } else if let Some(inst) = registry
-                        .instances
-                        .iter()
-                        .find(|i| i.id == *owning_inst_id || i.name == *owning_inst_id)
-                    {
-                        crate::modules::instance::is_instance_running(
-                            &inst.id,
-                            &inst.data_dir,
-                            inst.pid,
-                        )
-                    } else {
-                        false
-                    };
+                    }
+                } else if let Some(inst) = registry
+                    .instances
+                    .iter()
+                    .find(|i| i.id == *owning_inst_id || i.name == *owning_inst_id)
+                {
+                    crate::modules::instance::is_instance_running(
+                        &inst.id,
+                        &inst.data_dir,
+                        inst.pid,
+                    ) || (inst.is_default && crate::modules::process::is_antigravity_running(None))
+                } else {
+                    crate::modules::process::is_antigravity_running(None)
+                };
 
                 let _ = s_conn.pragma_update(None, "busy_timeout", 3000);
                 if let Ok(mut stmt) = s_conn.prepare(

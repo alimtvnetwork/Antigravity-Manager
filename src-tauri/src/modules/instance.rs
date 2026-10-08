@@ -3081,6 +3081,9 @@ pub fn focus_or_launch_instance_with_workspace(
             }
         }
     }
+    if pids.is_empty() && is_default_inst {
+        pids = crate::modules::process::get_antigravity_pids(None);
+    }
 
     if !pids.is_empty() {
         crate::modules::logger::log_info(&format!(
@@ -3143,6 +3146,9 @@ pub fn focus_or_launch_workspace(
                 pids.push(saved_pid);
             }
         }
+    }
+    if pids.is_empty() && is_default_inst {
+        pids = crate::modules::process::get_antigravity_pids(None);
     }
 
     if !pids.is_empty() {

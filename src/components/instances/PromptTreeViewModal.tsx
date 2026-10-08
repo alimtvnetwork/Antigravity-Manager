@@ -176,6 +176,9 @@ function formatPromptForMarkdown(text: string): string {
     if (!text) return '';
     let formatted = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
+    // Elevate inline <truncated ...> markers to standalone block callouts
+    formatted = formatted.replace(/(<truncated\s+\d+\s+(?:bytes|lines)>)/gi, '\n\n$1\n\n');
+
     // Separate inline markdown headings attached to paragraph text:
     // e.g. "# High Priority Instruction Hi there." -> "# High Priority Instruction\n\nHi there."
     formatted = formatted.replace(
@@ -517,10 +520,17 @@ export interface HierarchicalConversationNode {
 export function assembleConversationHierarchy(
     conversations: AgmConversationNode[]
 ): HierarchicalConversationNode[] {
+    // Sort chronologically ascending (oldest first) so that a user prompt precedes the subagents it spawned
+    const chronological = [...conversations].sort((a, b) => {
+        const aTime = new Date(a.last_modified).getTime() || 0;
+        const bTime = new Date(b.last_modified).getTime() || 0;
+        return aTime - bTime;
+    });
+
     const rootNodes: HierarchicalConversationNode[] = [];
     let currentRoot: HierarchicalConversationNode | null = null;
 
-    for (const conv of conversations) {
+    for (const conv of chronological) {
         const classification = classifyPromptTier(conv.prompt_preview_200w, conv.title, conv);
 
         const node: HierarchicalConversationNode = {
@@ -539,7 +549,7 @@ export function assembleConversationHierarchy(
                 rootNodes.push(node);
             }
         } else {
-            // New User Prompt or System Message becomes new root
+            // New User Prompt, System Message or Tool Output becomes new root
             rootNodes.push(node);
             if (classification.tier === 'USER_PROMPT') {
                 currentRoot = node;
@@ -547,7 +557,14 @@ export function assembleConversationHierarchy(
         }
     }
 
-    return rootNodes;
+    // Reverse rootNodes so the newest user prompt appears at top,
+    // and sort running roots to the top
+    return rootNodes.reverse().sort((a, b) => {
+        const aRunning = Boolean(a.primaryNode.is_running) || a.subagents.some((s) => Boolean(s.primaryNode.is_running));
+        const bRunning = Boolean(b.primaryNode.is_running) || b.subagents.some((s) => Boolean(s.primaryNode.is_running));
+        if (aRunning !== bRunning) return aRunning ? -1 : 1;
+        return 0;
+    });
 }
 
 export function normalizePromptForGrouping(conv: AgmConversationNode): string {
@@ -709,7 +726,7 @@ function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, isTruncat
             elements.push(
                 <ul key={`ul-${keyPrefix}`} className="list-disc ml-5 my-2 space-y-1 text-xs text-slate-700 dark:text-slate-300">
                     {currentList.items.map((item, idx) => (
-                        <li key={idx}>{parseInlineMarkdown(item)}</li>
+                        <li key={idx}>{parseInlineMarkdown(item, onToggleExpand)}</li>
                     ))}
                 </ul>
             );
@@ -717,7 +734,7 @@ function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, isTruncat
             elements.push(
                 <ol key={`ol-${keyPrefix}`} className="list-decimal ml-5 my-2 space-y-1 text-xs text-slate-700 dark:text-slate-300">
                     {currentList.items.map((item, idx) => (
-                        <li key={idx}>{parseInlineMarkdown(item)}</li>
+                        <li key={idx}>{parseInlineMarkdown(item, onToggleExpand)}</li>
                     ))}
                 </ol>
             );
@@ -733,7 +750,7 @@ function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, isTruncat
                 key={`quote-${keyPrefix}`}
                 className="border-l-3 border-blue-500/80 bg-blue-50/30 dark:bg-blue-950/20 px-3 py-1.5 my-2 rounded-r-[5px] text-xs italic text-slate-700 dark:text-slate-300"
             >
-                {parseInlineMarkdown(text)}
+                {parseInlineMarkdown(text, onToggleExpand)}
             </blockquote>
         );
     };
@@ -866,7 +883,7 @@ function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, isTruncat
         if (trimmed.startsWith('# ')) {
             elements.push(
                 <h1 key={`h1-${i}`} className="text-base font-bold mt-3 mb-1.5 text-slate-900 dark:text-white pb-1 border-b border-slate-200 dark:border-[#15334d]">
-                    {parseInlineMarkdown(trimmed.slice(2))}
+                    {parseInlineMarkdown(trimmed.slice(2), onToggleExpand)}
                 </h1>
             );
             continue;
@@ -874,7 +891,7 @@ function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, isTruncat
         if (trimmed.startsWith('## ')) {
             elements.push(
                 <h2 key={`h2-${i}`} className="text-sm font-bold mt-2.5 mb-1 text-slate-900 dark:text-white pb-0.5 border-b border-slate-200/60 dark:border-[#15334d]/60">
-                    {parseInlineMarkdown(trimmed.slice(3))}
+                    {parseInlineMarkdown(trimmed.slice(3), onToggleExpand)}
                 </h2>
             );
             continue;
@@ -882,7 +899,7 @@ function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, isTruncat
         if (trimmed.startsWith('### ')) {
             elements.push(
                 <h3 key={`h3-${i}`} className="text-xs font-bold mt-2 mb-1 text-slate-900 dark:text-white">
-                    {parseInlineMarkdown(trimmed.slice(4))}
+                    {parseInlineMarkdown(trimmed.slice(4), onToggleExpand)}
                 </h3>
             );
             continue;
@@ -890,7 +907,7 @@ function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, isTruncat
         if (trimmed.startsWith('#### ')) {
             elements.push(
                 <h4 key={`h4-${i}`} className="text-xs font-semibold mt-1.5 mb-0.5 text-slate-800 dark:text-slate-200">
-                    {parseInlineMarkdown(trimmed.slice(5))}
+                    {parseInlineMarkdown(trimmed.slice(5), onToggleExpand)}
                 </h4>
             );
             continue;
@@ -924,7 +941,7 @@ function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, isTruncat
             elements.push(
                 <div key={`p-wrap-${i}`} className="my-1.5 leading-relaxed">
                     <p className="text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words inline">
-                        {parseInlineMarkdown(cleanLine)}
+                        {parseInlineMarkdown(cleanLine, onToggleExpand)}
                     </p>
                     <span
                         onClick={(e) => {
@@ -943,7 +960,7 @@ function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, isTruncat
             elements.push(
                 <div key={`p-wrap-${i}`} className="my-1.5 leading-relaxed">
                     <p className="text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words">
-                        {parseInlineMarkdown(line)}
+                        {parseInlineMarkdown(line, onToggleExpand)}
                     </p>
                     <br className="my-1.5 block select-none" />
                 </div>
@@ -1396,7 +1413,7 @@ export default function PromptTreeViewModal({
                         );
                         if (updatedConv) {
                             setSelectedConversation(updatedConv);
-                            const freshText = updatedConv.prompt_preview_200w || '';
+                            const freshText = updatedConv.full_prompt_text || updatedConv.prompt_preview_200w || '';
                             setActivePromptText(freshText);
                             // Do not clobber user's dirty textarea edits
                             setEditedPromptText((prev) => (prev === currentActiveText ? freshText : prev));
@@ -2054,6 +2071,11 @@ ${activePromptText}
         return new TextEncoder().encode(activePromptText).length;
     }, [activePromptText]);
 
+    const hasImages = useMemo(() => {
+        const text = activePromptText || selectedConversation?.prompt_preview_200w || '';
+        return /!\[.*?\]\((?:https?:\/\/.*?|data:image\/.*?;base64,.*?|[^\s)]+)\)/.test(text);
+    }, [activePromptText, selectedConversation]);
+
     const formatByteSize = (bytes: number): string => {
         if (bytes < 1024) return `${bytes} B`;
         return `${(bytes / 1024).toFixed(1)} KB`;
@@ -2192,9 +2214,10 @@ ${activePromptText}
                     {/* Rendering Child Sub-Points (Indented with Branch Glyphs) */}
                     {root.subagents.length > 0 && (
                         <div className="pl-5 space-y-0.5 border-l-2 border-purple-300/40 dark:border-purple-800/40 ml-3.5 my-0.5">
-                            {root.subagents.map((subNode) => {
+                            {root.subagents.map((subNode, subIdx) => {
                                 const isSubSelected = selectedConversation?.conversation_id === subNode.primaryNode.conversation_id;
                                 const isSubRunning = Boolean(subNode.primaryNode.is_running);
+                                const isLast = subIdx === root.subagents.length - 1;
                                 return (
                                     <div
                                         key={subNode.primaryNode.conversation_id}
@@ -2209,8 +2232,10 @@ ${activePromptText}
                                         title="AI Subagent Task Instruction - Click to view"
                                     >
                                         <div className="flex items-center gap-1.5 min-w-0">
-                                            {/* Tree Branch Connector Glyph */}
-                                            <span className="text-purple-400 dark:text-purple-400 font-mono text-[11px] select-none">↳</span>
+                                            {/* Tree Branch Connector Glyph: ↳ or └── */}
+                                            <span className="text-purple-400 dark:text-purple-400 font-mono text-[11px] select-none shrink-0">
+                                                {isLast ? '└──' : '↳'}
+                                            </span>
                                             <Bot className={cn("w-3.5 h-3.5 shrink-0", isSubSelected ? "text-white" : "text-purple-500")} />
                                             <span
                                                 className={cn(
@@ -2530,14 +2555,14 @@ ${activePromptText}
                     </div>
 
                     {/* Top Right Header Controls: Two Independent Segmented Dark-Glass Capsules */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0">
                         {/* Capsule 1: Data Operations Capsule */}
                         <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#15334d]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#15334d]/80 shadow-2xs">
                             {/* Backup Button */}
                             <button
                                 type="button"
                                 onClick={handleBackup}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d]/90 rounded-l-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d]/90 rounded-l-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title="Backup Prompts to JSON"
                             >
                                 <Download className="w-3.5 h-3.5 text-indigo-500" />
@@ -2548,7 +2573,7 @@ ${activePromptText}
                             <button
                                 type="button"
                                 onClick={handleRestore}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d]/90 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d]/90 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title="Restore Prompts from JSON backup file"
                             >
                                 <Upload className="w-3.5 h-3.5 text-emerald-500" />
@@ -2560,7 +2585,7 @@ ${activePromptText}
                                 type="button"
                                 onClick={() => loadTree(true, true)}
                                 disabled={isLoading}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d]/90 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d]/90 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title="Refresh Tree"
                             >
                                 <RefreshCw className={cn("w-3.5 h-3.5 text-blue-500", isLoading && "animate-spin")} />
@@ -2568,9 +2593,9 @@ ${activePromptText}
                             </button>
 
                             {/* Sync Interval Selector with Transparent Inline Styling */}
-                            <div className="flex items-center gap-1 pl-2.5 pr-2 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 rounded-r-full">
-                                <Clock className={cn("w-3.5 h-3.5 text-cyan-500 shrink-0", isAutoSyncing && "animate-spin")} />
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400 select-none">Sync:</span>
+                            <div className="flex items-center gap-1 pl-2 pr-1.5 py-0.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 rounded-r-full">
+                                <Clock className={cn("w-3 h-3 text-cyan-500 shrink-0", isAutoSyncing && "animate-spin")} />
+                                <span className="text-[10px] text-slate-500 dark:text-slate-400 select-none">Sync:</span>
                                 <select
                                     value={syncInterval}
                                     onChange={(e) => {
@@ -2578,7 +2603,7 @@ ${activePromptText}
                                         setSyncInterval(val);
                                         setPromptTreeSyncInterval(val);
                                     }}
-                                    className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:ring-0 focus:outline-none cursor-pointer pr-1 py-0"
+                                    className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-[11px] font-semibold focus:ring-0 focus:outline-none cursor-pointer pr-1 py-0"
                                     title="Auto-sync interval timer"
                                 >
                                     <option value="15s" className="bg-white dark:bg-[#0c2438]">15s</option>
@@ -2596,7 +2621,7 @@ ${activePromptText}
                             <button
                                 type="button"
                                 onClick={() => setIsFullscreen(!isFullscreen)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d]/90 rounded-l-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d]/90 rounded-l-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title={isFullscreen ? "Exit Full Screen" : "Full Screen Mode"}
                             >
                                 {isFullscreen ? (
@@ -2616,10 +2641,10 @@ ${activePromptText}
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="flex items-center px-2.5 py-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 dark:hover:bg-rose-500/20 rounded-r-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                className="flex items-center px-2 py-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 dark:hover:bg-rose-500/20 rounded-r-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title="Close Modal"
                             >
-                                <X className="w-4 h-4" />
+                                <X className="w-3.5 h-3.5" />
                             </button>
                         </div>
                     </div>
@@ -2892,10 +2917,10 @@ ${activePromptText}
                                 {/* Prompt Content Header */}
                                 <div className="space-y-2 pb-2.5 border-b border-slate-200 dark:border-[#15334d] shrink-0">
                                     {/* Row 1: Identity, Badges & Actions */}
-                                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                                    <div className="flex items-center justify-between gap-2.5 flex-wrap">
                                         {/* Left: Sequence + Tier Badge + Status + Title + Instance Trio */}
-                                        <div className="flex items-center gap-2 flex-wrap min-w-0">
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded-[5px] text-[11px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20">
+                                        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-[5px] text-[10px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20">
                                                 #{selectedConversation.seq_code || 'P001'}
                                             </span>
                                             {(() => {
@@ -2907,29 +2932,29 @@ ${activePromptText}
                                                     TOOL_OUTPUT: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
                                                 };
                                                 const badgeLabels: Record<PromptTier, string> = {
-                                                    USER_PROMPT: '[User Prompt]',
-                                                    SUBAGENT_INSTRUCTION: tierInfo.subagentRole ? `[Subagent: ${tierInfo.subagentRole}]` : '[AI Subagent]',
-                                                    SYSTEM_MESSAGE: '[System Directive]',
-                                                    TOOL_OUTPUT: '[Tool Output]',
+                                                    USER_PROMPT: 'User Prompt',
+                                                    SUBAGENT_INSTRUCTION: tierInfo.subagentRole ? `Subagent: ${tierInfo.subagentRole}` : 'AI Subagent',
+                                                    SYSTEM_MESSAGE: 'System',
+                                                    TOOL_OUTPUT: 'Tool Output',
                                                 };
                                                 return (
                                                     <span
                                                         className={cn(
-                                                            "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-mono tracking-wide border shadow-2xs",
+                                                            "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold font-mono tracking-wide border shadow-2xs",
                                                             badgeColors[tierInfo.tier]
                                                         )}
                                                         title={`${tierInfo.tier} (${Math.round(tierInfo.confidence * 100)}% match)`}
                                                     >
-                                                        {tierInfo.tier === 'USER_PROMPT' && <User className="w-3 h-3 text-sky-500 shrink-0" />}
-                                                        {tierInfo.tier === 'SUBAGENT_INSTRUCTION' && <Bot className="w-3 h-3 text-purple-500 shrink-0" />}
-                                                        {tierInfo.tier === 'SYSTEM_MESSAGE' && <Terminal className="w-3 h-3 text-slate-500 shrink-0" />}
-                                                        {tierInfo.tier === 'TOOL_OUTPUT' && <Wrench className="w-3 h-3 text-amber-500 shrink-0" />}
+                                                        {tierInfo.tier === 'USER_PROMPT' && <User className="w-2.5 h-2.5 text-sky-500 shrink-0" />}
+                                                        {tierInfo.tier === 'SUBAGENT_INSTRUCTION' && <Bot className="w-2.5 h-2.5 text-purple-500 shrink-0" />}
+                                                        {tierInfo.tier === 'SYSTEM_MESSAGE' && <Terminal className="w-2.5 h-2.5 text-slate-500 shrink-0" />}
+                                                        {tierInfo.tier === 'TOOL_OUTPUT' && <Wrench className="w-2.5 h-2.5 text-amber-500 shrink-0" />}
                                                         <span>{badgeLabels[tierInfo.tier]}</span>
                                                     </span>
                                                 );
                                             })()}
                                             {(Boolean(selectedConversation.is_running) && !isGhostConversation(selectedConversation) && !(selectedConversation.prompt_word_count === 0 && (!selectedConversation.prompt_preview_200w || !selectedConversation.prompt_preview_200w.trim()))) && (
-                                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border border-emerald-500/40 shadow-2xs animate-pulse">
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border border-emerald-500/40 shadow-2xs animate-pulse">
                                                     <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] animate-pulse" />
                                                     <span>RUNNING</span>
                                                     {instancePid ? (
@@ -2941,22 +2966,22 @@ ${activePromptText}
                                                 </span>
                                             )}
                                             {Boolean(selectedConversation.is_queued) && (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs">
-                                                    <Clock className="w-3 h-3 text-amber-500" />
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs">
+                                                    <Clock className="w-2.5 h-2.5 text-amber-500" />
                                                     <span>QUEUED</span>
                                                 </span>
                                             )}
-                                            <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-xs md:max-w-sm lg:max-w-md">
+                                            <h3 className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[200px] md:max-w-xs" title={selectedConversation.title || selectedConversation.short_id}>
                                                 {selectedConversation.title || selectedConversation.short_id}
                                             </h3>
                                             {(selectedConversation.repeat_count || 1) > 1 && (
-                                                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs">
+                                                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[8.5px] font-mono font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs">
                                                     x{selectedConversation.repeat_count} runs
                                                 </span>
                                             )}
                                             {/* Instance Identity Trio */}
                                             <div
-                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[5px] bg-purple-500/10 dark:bg-purple-950/30 border border-purple-500/20 text-purple-700 dark:text-purple-300 font-mono text-[10px]"
+                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[5px] bg-purple-500/10 dark:bg-purple-950/30 border border-purple-500/20 text-purple-700 dark:text-purple-300 font-mono text-[9.5px]"
                                                 title={`Instance #${instanceSeqNum} · ${instanceExeName} · ${instanceNameDisplay}`}
                                             >
                                                 <span className="font-bold">#{instanceSeqNum}</span>
@@ -2968,7 +2993,7 @@ ${activePromptText}
                                         </div>
 
                                         {/* Right: The 2 Canonical Segmented Dark-Glass Action Capsules */}
-                                        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
+                                        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
                                             {/* Capsule 1: Content & Export */}
                                             <div className="flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs shrink-0">
                                                 {/* Copy Text Button */}
@@ -2980,46 +3005,51 @@ ${activePromptText}
                                                         setIsCopiedText(true);
                                                         setTimeout(() => setIsCopiedText(false), 2000);
                                                     }}
-                                                    className="flex items-center gap-1 px-2.5 py-1 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                                    className="flex items-center gap-1 px-2 py-0.5 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                                     title="Copy clean prompt text (excluding embedded images)"
                                                 >
-                                                    {isCopiedText ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />}
-                                                    <span>{isCopiedText ? 'Copied!' : 'Copy Text'}</span>
+                                                    {isCopiedText ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-slate-500 dark:text-slate-400" />}
+                                                    <span>{isCopiedText ? 'Copied!' : 'Copy'}</span>
                                                 </button>
 
                                                 {/* Copy With Images */}
                                                 <button
                                                     type="button"
                                                     onClick={handleCopyWithImagesRich}
-                                                    className="flex items-center gap-1 px-2 py-1 rounded-none text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                                    className={cn(
+                                                        "flex items-center gap-1 px-2 py-0.5 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
+                                                        !hasImages && "rounded-r-none"
+                                                    )}
                                                     title="Copy prompt with rich embedded HTML images for document pasting"
                                                 >
-                                                    {isCopiedRaw ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-indigo-500" />}
+                                                    {isCopiedRaw ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-indigo-500" />}
                                                     <span>{isCopiedRaw ? 'Copied + Imgs!' : '+ Imgs'}</span>
                                                 </button>
 
-                                                {/* Save Images */}
-                                                <button
-                                                    type="button"
-                                                    onClick={handleSaveImages}
-                                                    className="flex items-center gap-1 px-2 py-1 rounded-none text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                                                    title="Extract and save embedded images"
-                                                >
-                                                    <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
-                                                    <span>Save Imgs</span>
-                                                </button>
+                                                {/* Save Images (conditionally rendered only when images exist) */}
+                                                {hasImages && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleSaveImages}
+                                                        className="flex items-center gap-1 px-2 py-0.5 rounded-none text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                                        title="Extract and save embedded images"
+                                                    >
+                                                        <ImageIcon className="w-3 h-3 text-blue-500" />
+                                                        <span>Save Imgs</span>
+                                                    </button>
+                                                )}
 
                                                 {/* Export Dropdown */}
                                                 <div className="relative inline-block rounded-r-full">
                                                     <button
                                                         type="button"
                                                         onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
-                                                        className="flex items-center gap-1 px-2.5 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                                        className="flex items-center gap-1 px-2 py-0.5 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                                         title="Export Prompt to Markdown or JSON"
                                                     >
-                                                        <Download className="w-3.5 h-3.5 text-amber-500" />
+                                                        <Download className="w-3 h-3 text-amber-500" />
                                                         <span>Export</span>
-                                                        <ChevronDown className="w-3 h-3 text-slate-400" />
+                                                        <ChevronDown className="w-2.5 h-2.5 text-slate-400" />
                                                     </button>
                                                     {isExportMenuOpen && (
                                                         <div
@@ -3056,11 +3086,11 @@ ${activePromptText}
                                             {/* Capsule 2: Execution & Workflow */}
                                             <div className="flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#15334d]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#15334d]/80 shadow-2xs shrink-0">
                                                 {/* Confirmation Suffix Dropdown */}
-                                                <div className="flex items-center px-2 py-1 rounded-l-full">
+                                                <div className="flex items-center px-1.5 py-0.5 rounded-l-full">
                                                     <select
                                                         value={confirmationSuffix}
                                                         onChange={(e) => setConfirmationSuffix(e.target.value)}
-                                                        className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-[11px] font-semibold focus:ring-0 focus:outline-none cursor-pointer max-w-[95px] truncate pr-1 py-0"
+                                                        className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-[10.5px] font-semibold focus:ring-0 focus:outline-none cursor-pointer max-w-[85px] truncate pr-1 py-0"
                                                         title="Confirmation suffix appended on Resend"
                                                     >
                                                         <option value="None (Send as is)" className="bg-white dark:bg-[#0c2438]">Suffix: None</option>
@@ -3077,10 +3107,10 @@ ${activePromptText}
                                                     type="button"
                                                     onClick={handleFocusIde}
                                                     disabled={isFocusing}
-                                                    className="flex items-center gap-1 px-2.5 py-1 text-sky-700 dark:text-sky-300 hover:bg-sky-100/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
+                                                    className="flex items-center gap-1 px-2 py-0.5 text-sky-700 dark:text-sky-300 hover:bg-sky-100/80 dark:hover:bg-[#15334d] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
                                                     title="Focus Antigravity IDE window or launch instance"
                                                 >
-                                                    <ExternalLink className={cn('w-3.5 h-3.5 text-sky-500', isFocusing && 'animate-spin')} />
+                                                    <ExternalLink className={cn('w-3 h-3 text-sky-500', isFocusing && 'animate-spin')} />
                                                     <span>Focus IDE</span>
                                                 </button>
 
@@ -3089,12 +3119,12 @@ ${activePromptText}
                                                     type="button"
                                                     onClick={handleResendPrompt}
                                                     disabled={isResending}
-                                                    className="flex items-center gap-1 px-2.5 py-1 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
+                                                    className="flex items-center gap-1 px-2 py-0.5 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-[#15334d] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
                                                     title="Immediately inject prompt to running instance [Hotkey: N]"
                                                 >
-                                                    <RotateCw className={cn('w-3.5 h-3.5 text-emerald-500', isResending && 'animate-spin')} />
+                                                    <RotateCw className={cn('w-3 h-3 text-emerald-500', isResending && 'animate-spin')} />
                                                     <span>Send</span>
-                                                    <kbd className="ml-0.5 px-1 py-0.2 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded text-[9px] font-mono font-bold">N</kbd>
+                                                    <kbd className="ml-0.5 px-1 py-0.2 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded text-[8.5px] font-mono font-bold">N</kbd>
                                                 </button>
 
                                                 {/* Enqueue Button */}
@@ -3102,10 +3132,10 @@ ${activePromptText}
                                                     type="button"
                                                     onClick={handleEnqueuePrompt}
                                                     disabled={isEnqueueing}
-                                                    className="flex items-center gap-1 px-2.5 py-1 text-purple-700 dark:text-purple-300 hover:bg-purple-100/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
+                                                    className="flex items-center gap-1 px-2 py-0.5 text-purple-700 dark:text-purple-300 hover:bg-purple-100/80 dark:hover:bg-[#15334d] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
                                                     title="Enqueue prompt into FIFO scheduler queue"
                                                 >
-                                                    <ListPlus className="w-3.5 h-3.5 text-purple-500" />
+                                                    <ListPlus className="w-3 h-3 text-purple-500" />
                                                     <span>Queue</span>
                                                 </button>
 
@@ -3113,10 +3143,10 @@ ${activePromptText}
                                                 <button
                                                     type="button"
                                                     onClick={() => openInspector(selectedConversation, selectedProject?.repo_path || '')}
-                                                    className="flex items-center gap-1 px-2.5 py-1 text-blue-700 dark:text-cyan-300 hover:bg-blue-100/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer rounded-r-full"
+                                                    className="flex items-center gap-1 px-2 py-0.5 text-blue-700 dark:text-cyan-300 hover:bg-blue-100/80 dark:hover:bg-[#15334d] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer rounded-r-full"
                                                     title="Full-Screen Inspector"
                                                 >
-                                                    <Maximize2 className="h-3.5 w-3.5 text-blue-500" />
+                                                    <Maximize2 className="h-3 w-3 text-blue-500" />
                                                     <span>Full</span>
                                                 </button>
                                             </div>
@@ -3607,7 +3637,39 @@ ${activePromptText}
                                                 </div>
                                             )}
                                         </div>
-                                    ) : !selectedConversation.is_running ? (
+                                    ) : selectedConversation.is_running ? (
+                                        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-8 flex flex-col items-center justify-center text-center space-y-3">
+                                            <div className="relative flex h-10 w-10 items-center justify-center">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md">
+                                                    <Sparkles className="w-4 h-4 animate-spin" />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <div className="text-xs font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider font-mono">
+                                                    In-Flight Antigravity Execution Active
+                                                </div>
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-md">
+                                                    {selectedConversation.latest_step_summary || 'Agent is actively thinking, evaluating code, or executing tools in the main Antigravity window.'}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-2 pt-1 font-mono text-[10px] text-emerald-700 dark:text-[#1af18d] bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                                                <span>Elapsed: {formatDuration(elapsedSeconds)}</span>
+                                                <span>·</span>
+                                                <span>Step {selectedConversation.step_count || 1}</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={handleFocusIde}
+                                                disabled={isFocusing}
+                                                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-all duration-150 cursor-pointer shadow-xs mt-2"
+                                                title="Open and focus the Antigravity main window"
+                                            >
+                                                <ExternalLink className="w-3.5 h-3.5" />
+                                                <span>Open in Antigravity Window</span>
+                                            </button>
+                                        </div>
+                                    ) : (
                                         <div className="rounded-xl border border-dashed border-slate-200 dark:border-[#15334d] p-8 flex flex-col items-center justify-center text-center space-y-2 text-slate-400">
                                             <Terminal className="w-8 h-8 text-slate-400/80 mb-1" />
                                             <span className="font-semibold text-slate-600 dark:text-slate-300 text-xs">
@@ -3628,7 +3690,7 @@ ${activePromptText}
                                                 </button>
                                             </div>
                                         </div>
-                                    ) : null}
+                                    )}
                                 </div>
                             )}
                         </div>
