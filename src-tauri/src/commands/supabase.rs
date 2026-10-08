@@ -9,7 +9,11 @@ use crate::modules::supabase_client::{
     EndpointTestResult, SupabaseClient, SupabaseEndpoint, TableVerificationResult,
 };
 use crate::modules::supabase_schema;
-use crate::modules::supabase_sync::{self, DataMigrationSummary, SupabaseConfig};
+use crate::modules::supabase_sync::{
+    self, DataMigrationSummary, FleetInstanceSummary, FleetLeaseInfo, FleetMachineInfo,
+    SupabaseConfig,
+};
+pub use crate::modules::supabase_sync::{FleetInstanceSummary, FleetLeaseInfo, FleetMachineInfo};
 use crate::modules::workspace_lease_manager::{self, LeaseResult, WorkspaceLease};
 use serde::{Deserialize, Serialize};
 
@@ -123,4 +127,9 @@ pub async fn get_local_node_info() -> AppResult<LocalNodeInfo> {
 #[tauri::command]
 pub async fn auto_discover_supabase_credentials() -> AppResult<SupabaseConfig> {
     supabase_sync::auto_discover_supabase_credentials()
+}
+
+#[tauri::command]
+pub async fn get_fleet_machines() -> AppResult<Vec<FleetMachineInfo>> {
+    supabase_sync::query_fleet_machines().await
 }

@@ -13,7 +13,7 @@ use chrono::Utc;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -640,6 +640,18 @@ pub async fn send_heartbeat(endpoint: &SupabaseEndpoint, node_alias: &str) -> Re
         instances_to_sync = reg.instances;
     }
 
+    // Compute live in-flight prompts count
+    let mut running_prompts_count = 0;
+    if let Ok(conn) = crate::modules::repo_db::connect_db() {
+        if let Ok(mut stmt) =
+            conn.prepare("SELECT count(*) FROM active_prompts WHERE status = 'running'")
+        {
+            if let Ok(cnt) = stmt.query_row([], |row| row.get::<_, usize>(0)) {
+                running_prompts_count = cnt;
+            }
+        }
+    }
+
     // 1. Upsert node record
     let node_payload = json!({
         "id": node_id,
@@ -647,11 +659,40 @@ pub async fn send_heartbeat(endpoint: &SupabaseEndpoint, node_alias: &str) -> Re
         "ip_address": local_ip,
         "uptime_seconds": uptime,
         "project_count": project_count,
+        "running_prompts_count": running_prompts_count,
         "last_heartbeat_at": now,
         "status": "online"
     });
 
-    client.upsert("nodes", node_payload, "id").await?;
+    let upsert_res = client.upsert("nodes", node_payload, "id").await;
+    let should_fallback = match &upsert_res {
+        Ok(val) => {
+            if let Some(msg) = postgrest_error_message(val) {
+                msg.contains("running_prompts_count")
+            } else {
+                false
+            }
+        }
+        Err(e) => e.to_string().contains("running_prompts_count"),
+    };
+
+    if should_fallback {
+        tracing::warn!(
+            "[Heartbeat] Supabase nodes table missing 'running_prompts_count' column. Falling back without prompt count."
+        );
+        let base_payload = json!({
+            "id": node_id,
+            "alias": node_alias,
+            "ip_address": local_ip,
+            "uptime_seconds": uptime,
+            "project_count": project_count,
+            "last_heartbeat_at": now,
+            "status": "online"
+        });
+        client.upsert("nodes", base_payload, "id").await?;
+    } else {
+        upsert_res?;
+    }
 
     // 2. Upsert instance profiles (Child of this node)
     for inst in instances_to_sync {
@@ -1022,6 +1063,419 @@ pub async fn migrate_database_data(
     })
 }
 
+/// Summary of an IDE instance registered on a fleet node
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FleetInstanceSummary {
+    pub profile_id: String,
+    pub profile_name: String,
+    pub is_running: bool,
+    pub bound_account_id: Option<String>,
+    pub bound_account_email: Option<String>,
+}
+
+/// Active account lease held by a node in the cluster
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FleetLeaseInfo {
+    pub account_id: String,
+    pub account_email: String,
+    pub profile_name: String,
+    pub leased_at: i64,
+    pub expires_at: i64,
+    pub is_expired: bool,
+}
+
+/// Comprehensive machine info aggregated across nodes, profiles, and leases
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FleetMachineInfo {
+    pub node_id: String,
+    pub node_alias: String,
+    pub os_info: Option<String>,
+    pub ip_address: String,
+    pub is_online: bool,
+    pub last_heartbeat_timestamp: i64,
+    pub uptime_seconds: u64,
+    pub in_flight_prompts_count: usize,
+    pub active_instances: Vec<FleetInstanceSummary>,
+    pub bound_emails: Vec<String>,
+    pub leases: Vec<FleetLeaseInfo>,
+    pub is_local: bool,
+}
+
+/// Build local fallback machine telemetry when sync is disabled or Supabase is unreachable
+pub fn build_local_fallback_machine() -> Vec<FleetMachineInfo> {
+    let node_id = get_local_node_id();
+    let config = load_config().unwrap_or_default();
+    let node_alias = config.node_alias;
+    let ip_address = get_local_ip();
+    let uptime_seconds = get_uptime_seconds();
+    let now = Utc::now().timestamp();
+
+    let mut running_prompts_count = 0;
+    if let Ok(conn) = crate::modules::repo_db::connect_db() {
+        if let Ok(mut stmt) =
+            conn.prepare("SELECT count(*) FROM active_prompts WHERE status = 'running'")
+        {
+            if let Ok(cnt) = stmt.query_row([], |row| row.get::<_, usize>(0)) {
+                running_prompts_count = cnt;
+            }
+        }
+    }
+
+    let mut active_instances = Vec::new();
+    let mut bound_emails_set = HashSet::new();
+    if let Ok(reg) = crate::modules::instance::load_registry() {
+        for inst in reg.instances {
+            let is_running =
+                crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
+            if let Some(ref em) = inst.bound_email {
+                let trimmed = em.trim();
+                if !trimmed.is_empty() {
+                    bound_emails_set.insert(trimmed.to_string());
+                }
+            }
+            active_instances.push(FleetInstanceSummary {
+                profile_id: format!("{}_{}", node_id, inst.id),
+                profile_name: inst.name,
+                is_running,
+                bound_account_id: inst.bound_account_id,
+                bound_account_email: inst.bound_email,
+            });
+        }
+    }
+
+    let mut bound_emails: Vec<String> = bound_emails_set.into_iter().collect();
+    bound_emails.sort();
+
+    let local_machine = FleetMachineInfo {
+        node_id,
+        node_alias,
+        os_info: Some(std::env::consts::OS.to_string()),
+        ip_address,
+        is_online: true,
+        last_heartbeat_timestamp: now,
+        uptime_seconds,
+        in_flight_prompts_count: running_prompts_count,
+        active_instances,
+        bound_emails,
+        leases: Vec::new(),
+        is_local: true,
+    };
+
+    vec![local_machine]
+}
+
+/// Query fleet machines aggregating nodes, instance profiles, and workspace leases across the cluster
+pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
+    let config = load_config().unwrap_or_default();
+    if !config.is_sync_enabled {
+        return Ok(build_local_fallback_machine());
+    }
+
+    let root_ep = match config
+        .endpoints
+        .iter()
+        .find(|ep| ep.is_enabled && ep.role == "root")
+    {
+        Some(ep) => ep.clone(),
+        None => return Ok(build_local_fallback_machine()),
+    };
+
+    let client = match SupabaseClient::new(&root_ep) {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!(
+                "[Fleet] Failed to create Supabase client for fleet query: {}",
+                e
+            );
+            return Ok(build_local_fallback_machine());
+        }
+    };
+
+    let nodes_val = match client
+        .select("nodes", "select=*&order=last_heartbeat_at.desc")
+        .await
+    {
+        Ok(val) => val,
+        Err(e) => {
+            tracing::warn!("[Fleet] Failed to query nodes from Supabase: {}", e);
+            return Ok(build_local_fallback_machine());
+        }
+    };
+
+    if let Some(msg) = postgrest_error_message(&nodes_val) {
+        tracing::warn!("[Fleet] PostgREST error querying nodes: {}", msg);
+        return Ok(build_local_fallback_machine());
+    }
+
+    let nodes_array = match nodes_val.as_array() {
+        Some(arr) => arr.clone(),
+        None => return Ok(build_local_fallback_machine()),
+    };
+
+    let profiles_val = client
+        .select("instance_profiles", "select=*")
+        .await
+        .unwrap_or(serde_json::Value::Array(Vec::new()));
+
+    let mut profiles_by_node: HashMap<String, Vec<FleetInstanceSummary>> = HashMap::new();
+    if let Some(prof_array) = profiles_val.as_array() {
+        for p in prof_array {
+            let node_id = p
+                .get("node_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            if node_id.is_empty() {
+                continue;
+            }
+            let profile_id = p
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            let profile_name = p
+                .get("profile_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            let is_active = p
+                .get("is_active")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let status_str = p.get("status").and_then(|v| v.as_str()).unwrap_or_default();
+            let is_running = is_active || status_str == "running";
+            let bound_account_id = p
+                .get("active_account_id")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string());
+            let bound_account_email = p
+                .get("active_account_email")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string());
+
+            profiles_by_node
+                .entry(node_id)
+                .or_default()
+                .push(FleetInstanceSummary {
+                    profile_id,
+                    profile_name,
+                    is_running,
+                    bound_account_id,
+                    bound_account_email,
+                });
+        }
+    }
+
+    let leases_val = client
+        .select("workspace_leases", "select=*")
+        .await
+        .unwrap_or(serde_json::Value::Array(Vec::new()));
+
+    let now = Utc::now().timestamp();
+    let mut leases_by_node: HashMap<String, Vec<FleetLeaseInfo>> = HashMap::new();
+    if let Some(leases_array) = leases_val.as_array() {
+        for l in leases_array {
+            let node_id = l
+                .get("node_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            if node_id.is_empty() {
+                continue;
+            }
+            let account_id = l
+                .get("account_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            let account_email = l
+                .get("account_email")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            let profile_name = l
+                .get("profile_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            let leased_at = l.get("leased_at").and_then(|v| v.as_i64()).unwrap_or(0);
+            let expires_at = l.get("expires_at").and_then(|v| v.as_i64()).unwrap_or(0);
+            let is_expired = expires_at < now;
+
+            leases_by_node
+                .entry(node_id)
+                .or_default()
+                .push(FleetLeaseInfo {
+                    account_id,
+                    account_email,
+                    profile_name,
+                    leased_at,
+                    expires_at,
+                    is_expired,
+                });
+        }
+    }
+
+    let local_node_id = get_local_node_id();
+    let mut machines = Vec::new();
+    let mut has_local = false;
+
+    for n in &nodes_array {
+        let node_id = n
+            .get("id")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        if node_id.is_empty() {
+            continue;
+        }
+        let is_local = node_id == local_node_id;
+        if is_local {
+            has_local = true;
+        }
+        let mut node_alias = n
+            .get("alias")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        if is_local && node_alias.is_empty() {
+            node_alias = config.node_alias.clone();
+        }
+        let ip_address = n
+            .get("ip_address")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let uptime_seconds = if is_local {
+            get_uptime_seconds()
+        } else {
+            n.get("uptime_seconds")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0)
+        };
+        let last_heartbeat_timestamp = if is_local {
+            now
+        } else {
+            n.get("last_heartbeat_at")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0)
+        };
+        let is_online = if is_local {
+            true
+        } else {
+            (now - last_heartbeat_timestamp).abs() < 180
+        };
+        let os_info = n
+            .get("os_info")
+            .or_else(|| n.get("os"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .or_else(|| {
+                if is_local {
+                    Some(std::env::consts::OS.to_string())
+                } else {
+                    None
+                }
+            });
+
+        let in_flight_prompts_count = if is_local {
+            let mut running_cnt = 0;
+            if let Ok(conn) = crate::modules::repo_db::connect_db() {
+                if let Ok(mut stmt) =
+                    conn.prepare("SELECT count(*) FROM active_prompts WHERE status = 'running'")
+                {
+                    if let Ok(cnt) = stmt.query_row([], |row| row.get::<_, usize>(0)) {
+                        running_cnt = cnt;
+                    }
+                }
+            }
+            running_cnt
+        } else {
+            n.get("running_prompts_count")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as usize
+        };
+
+        let mut active_instances = profiles_by_node.remove(&node_id).unwrap_or_default();
+        if is_local && active_instances.is_empty() {
+            if let Ok(reg) = crate::modules::instance::load_registry() {
+                for inst in reg.instances {
+                    let is_running = crate::modules::instance::is_instance_running(
+                        &inst.id,
+                        &inst.data_dir,
+                        inst.pid,
+                    );
+                    active_instances.push(FleetInstanceSummary {
+                        profile_id: format!("{}_{}", local_node_id, inst.id),
+                        profile_name: inst.name,
+                        is_running,
+                        bound_account_id: inst.bound_account_id,
+                        bound_account_email: inst.bound_email,
+                    });
+                }
+            }
+        }
+
+        let leases = leases_by_node.remove(&node_id).unwrap_or_default();
+
+        let mut email_set = HashSet::new();
+        for inst in &active_instances {
+            if let Some(ref em) = inst.bound_account_email {
+                let trimmed = em.trim();
+                if !trimmed.is_empty() {
+                    email_set.insert(trimmed.to_string());
+                }
+            }
+        }
+        for l in &leases {
+            let trimmed = l.account_email.trim();
+            if !trimmed.is_empty() {
+                email_set.insert(trimmed.to_string());
+            }
+        }
+        let mut bound_emails: Vec<String> = email_set.into_iter().collect();
+        bound_emails.sort();
+
+        machines.push(FleetMachineInfo {
+            node_id,
+            node_alias,
+            os_info,
+            ip_address,
+            is_online,
+            last_heartbeat_timestamp,
+            uptime_seconds,
+            in_flight_prompts_count,
+            active_instances,
+            bound_emails,
+            leases,
+            is_local,
+        });
+    }
+
+    if !has_local {
+        let fallback = build_local_fallback_machine();
+        if let Some(local_machine) = fallback.into_iter().next() {
+            machines.push(local_machine);
+        }
+    }
+
+    machines.sort_by(|a, b| {
+        if a.is_local != b.is_local {
+            return b.is_local.cmp(&a.is_local);
+        }
+        if a.is_online != b.is_online {
+            return b.is_online.cmp(&a.is_online);
+        }
+        a.node_alias
+            .to_lowercase()
+            .cmp(&b.node_alias.to_lowercase())
+    });
+
+    Ok(machines)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1153,5 +1607,80 @@ mod tests {
                 assert_eq!(first.role, "root");
             }
         }
+    }
+
+    #[test]
+    fn test_build_local_fallback_machine() {
+        let machines = build_local_fallback_machine();
+        assert_eq!(machines.len(), 1);
+        let m = &machines[0];
+        assert!(m.is_local);
+        assert!(m.is_online);
+        assert!(!m.node_id.is_empty());
+    }
+
+    #[test]
+    fn test_fleet_machine_info_sorting() {
+        let mut machines = vec![
+            FleetMachineInfo {
+                node_id: "node-offline".to_string(),
+                node_alias: "Bravo Offline".to_string(),
+                os_info: None,
+                ip_address: "10.0.0.2".to_string(),
+                is_online: false,
+                last_heartbeat_timestamp: 0,
+                uptime_seconds: 10,
+                in_flight_prompts_count: 0,
+                active_instances: vec![],
+                bound_emails: vec![],
+                leases: vec![],
+                is_local: false,
+            },
+            FleetMachineInfo {
+                node_id: "node-online".to_string(),
+                node_alias: "Charlie Online".to_string(),
+                os_info: None,
+                ip_address: "10.0.0.3".to_string(),
+                is_online: true,
+                last_heartbeat_timestamp: 100,
+                uptime_seconds: 50,
+                in_flight_prompts_count: 0,
+                active_instances: vec![],
+                bound_emails: vec![],
+                leases: vec![],
+                is_local: false,
+            },
+            FleetMachineInfo {
+                node_id: "node-local".to_string(),
+                node_alias: "Alpha Local".to_string(),
+                os_info: None,
+                ip_address: "127.0.0.1".to_string(),
+                is_online: true,
+                last_heartbeat_timestamp: 100,
+                uptime_seconds: 100,
+                in_flight_prompts_count: 1,
+                active_instances: vec![],
+                bound_emails: vec![],
+                leases: vec![],
+                is_local: true,
+            },
+        ];
+
+        machines.sort_by(|a, b| {
+            if a.is_local != b.is_local {
+                return b.is_local.cmp(&a.is_local);
+            }
+            if a.is_online != b.is_online {
+                return b.is_online.cmp(&a.is_online);
+            }
+            a.node_alias
+                .to_lowercase()
+                .cmp(&b.node_alias.to_lowercase())
+        });
+
+        assert_eq!(machines[0].node_id, "node-local");
+        assert!(machines[0].is_local);
+        assert_eq!(machines[1].node_id, "node-online");
+        assert_eq!(machines[2].node_id, "node-offline");
     }
 }

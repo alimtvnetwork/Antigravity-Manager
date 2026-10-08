@@ -3,6 +3,14 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.163.0 (2026-10-08)**:
+        -   **[Supabase Multi-Machine Fleet Synchronization & Remote Worker Visibility]**:
+            -   **Remote Fleet Machines Table**: Added `<FleetMachinesTable />` mounted beneath local instances in both Card mode and Table mode, displaying remote cluster worker machines, operating system, IP address with 1-click copy, active running instances, bound accounts, running prompt counts, and real-time heartbeat statuses. (Thanks to @aukgit)
+            -   **Account Privacy & Masking**: Implemented masked account email format (`u***r@domain.com`) with both individual row eye toggles and a global toggle pill for privacy protection. (Thanks to @aukgit)
+            -   **In-Flight Prompt Telemetry**: Enhanced Supabase background heartbeat with live running prompts count computed from local SQLite `active_prompts`, providing remote visibility into active workloads across the fleet. (Thanks to @aukgit)
+            -   **Resilient Fallback & PostgREST Compatibility**: Implemented automatic fallback to local machine metrics when Supabase is disabled or unreachable, plus graceful column-missing tolerance during schema migrations. (Thanks to @aukgit)
+            -   **Auto-Polling & Countdown Capsule**: Integrated 15-second background auto-refresh with a sleek segmented pill countdown and manual refresh trigger. (Thanks to @aukgit)
+
     *   **v4.162.5 (2026-10-08)**:
         -   **[Prompt Tree Modernization & Pill Capsule Header]**:
             -   **Segmented Pill Capsule Toolbar**: Redesigned header actions into contiguous segmented dark-glass pill capsules (`rounded-full`, shared border, subtle dividers) with compact typography and icons. (Thanks to @aukgit)

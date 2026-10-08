@@ -52,6 +52,7 @@ import {
 import { invoke } from '@tauri-apps/api/core';
 import { InstanceSettingsModal } from '../components/instances/InstanceSettingsModal';
 import InstanceTable, { type InstanceActionType } from '../components/instances/InstanceTable';
+import { FleetMachinesTable } from '../components/instances/FleetMachinesTable';
 import PromptTreeViewModal, { type AgmProjectTreeNode } from '../components/instances/PromptTreeViewModal';
 import InstanceAuditTrailModal from '../components/instances/InstanceAuditTrailModal';
 import ModalDialog from '../components/common/ModalDialog';
@@ -1754,6 +1755,11 @@ export default function Instances() {
                     })}
                 </div>
             )}
+
+            {/* Remote Fleet Machines Section (Visible in both Card & Table views) */}
+            <div className="mt-8 pt-6 border-t border-slate-200/60 dark:border-slate-800/80">
+                <FleetMachinesTable />
+            </div>
 
             {/* Create Instance Modal */}
             {isCreateOpen && (
