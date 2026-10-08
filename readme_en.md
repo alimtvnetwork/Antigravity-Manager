@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.165.0)
+> Professional AI Account Management & Protocol Proxy System (v4.167.0)
 > Professional AI Account Management & Protocol Proxy System (v4.166.0)
 
 <div align="center">
@@ -11,7 +11,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.165.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.167.0-blue?style=flat-square" alt="Version">
       <img src="https://img.shields.io/badge/Version-4.166.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
@@ -508,7 +508,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.165.0**: Implemented smart instance process cache with targeted PID liveness verification, preventing duplicate IDE window launches on prompt dispatch; wired `enqueue_prompt` IPC command with strict FIFO queueing; eliminated false-positive running prompt indicators using terminal planner state detection; compacted prompt tree view badges (`P001 · #1`, `C001 · <cid>`) and stripped bracket clutter; expanded AGM CLI prompt verbs (`status`, `send`, `running`, `queue`) with unified JSON envelopes and 100% verified safe E2E testing. (Thanks to @aukgit)
+> Latest version **v4.167.0**: Implemented smart multi-instance process cache with targeted PID vitality checks, preventing duplicate IDE window launches on prompt dispatch; wired `enqueue_prompt` IPC command with strict FIFO queueing; eliminated false-positive running prompt indicators using terminal planner state detection; compacted prompt tree view badges (`P001 · #1`, `C001 · <cid>`) and stripped bracket clutter; expanded AGM CLI prompt verbs (`status`, `send`, `running`, `queue`) with unified JSON envelopes and 100% verified safe host-shielded E2E testing. (Thanks to @aukgit)
 > Latest version **v4.166.0**: Implemented 3-step smart instance process caching with closed-PID OS re-scan and multi-instance process counting; aligned `--user-data-dir` CLI prompt dispatch with cross-platform clipboard synchronization; eliminated bracket noise in Prompt Tree View; eradicated ghost running indicators; and delivered CLI parity for `agm prompts` and `agm doctor`. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → CHANGELOG_EN.md](CHANGELOG_EN.md)**

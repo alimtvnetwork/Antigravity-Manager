@@ -3,6 +3,18 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.167.0 (2026-10-09)**:
+        -   **[Multi-Instance Process Cache & Relaunch Prevention]**:
+            -   **Two-Tier Process Cache & Targeted PID Verification**: Implemented two-tier process cache (`SMART_PROCESS_CACHE`) with sub-millisecond targeted PID vitality verification (`is_pid_alive_targeted`). Decoupled window focus failures from process liveness, ensuring prompt send and enqueue operations never terminate or relaunch already running Antigravity IDE instances. (Thanks to @aukgit)
+        -   **[Prompt Enqueue IPC Command & Strict FIFO Queueing]**:
+            -   **Strict FIFO Queueing**: Wired `enqueue_prompt` IPC handler and CLI command (`agm prompt queue`) to persist in-flight prompts with status `queued` in strict First-In-First-Out order (`ORDER BY created_at ASC, id ASC`) with automatic local fallback task persistence. (Thanks to @aukgit)
+        -   **[False-Positive Running Prompt Elimination]**:
+            -   **Terminal Planner State Detection**: Hardened transcript inspection (`inspect_conversation_transcript`) with terminal state detection (`is_terminal_done`) for completed planner responses, narrowed modified timestamp freshness window to 60s, and pruned stale `running_projects` SQLite records. (Thanks to @aukgit)
+        -   **[Prompt Tree View UI Compaction & Bracket Stripping]**:
+            -   **Bracket Noise Elimination**: Streamlined sequence badges to clean `P001 · #1` and `C001 · <cid>` without heavy bracket clutter, eliminated redundant uppercase role badges in favor of native tooltips, and stripped bracket noise from button labels (`Show Less`, `Show All (${words}w)`). (Thanks to @aukgit)
+        -   **[Host-Shielded E2E Testing & CLI Parity]**:
+            -   **Automated E2E Verification**: Verified 5/5 test cases with 100% pass rate in safe host-shielded test harness `03-ai-scripts/45-prompt-dispatch-process-cache-e2e.py`, expanding `agm` CLI verbs (`instance status`, `prompt send`, `prompt running`, `prompt queue`) with unified JSON envelopes. (Thanks to @aukgit)
+
 *   **v4.166.0 (2026-10-09)**:
         -   **[Smart Process Caching & Prompt Dispatch Architecture]**:
             -   **3-Step Smart Process Caching**: Implemented host-wide instance process enumeration (`scan_and_cache_all_running_instances`), verifying live PIDs against OS state before dispatch and invalidating stale caches on process exit. (Thanks to @aukgit)
