@@ -1165,6 +1165,8 @@ pub fn run() {
             commands::get_local_node_info,
             commands::auto_discover_supabase_credentials,
             commands::get_fleet_machines,
+            commands::supabase::get_supabase_fleet_machines,
+            commands::supabase::sync_supabase_now,
             // Telegram Inbound Watcher commands
             commands::get_telegram_config,
             commands::save_telegram_config,

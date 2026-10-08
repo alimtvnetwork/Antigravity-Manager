@@ -3,6 +3,11 @@
 ## [v4.163.0] - 2026-10-08
 
 ### Added
+- Multi-machine fleet synchronization and cross-node instance observability via Supabase
+- FleetMachinesTable component in Instances section displaying worker nodes, IPs, instances, accounts, and running prompts
+- Idempotent database schema extension for running prompt counts and real-time heartbeat telemetry
+- Tauri IPC commands `get_supabase_fleet_machines` and `sync_supabase_now`
+
 - Remote fleet machines table beneath local instances in both Card and Table views
 - Supabase multi-machine cluster aggregation for worker nodes, running instances, and bound accounts
 - Account email privacy masking with row-level and global unmask toggles
@@ -48,7 +53,21 @@
 
 *   **Version History**:
     *   **v4.163.0 (2026-10-08)**:
-        -   **[Supabase Multi-Machine Fleet Synchronization & Remote Worker Visibility]**:
+-   **[Supabase Multi-Machine Fleet Synchronization & Observability]**:
+            -   **Fleet Machines Telemetry & Aggregation**: Implemented multi-machine cluster synchronization in `src-tauri/src/modules/supabase_sync.rs`, joining PostgREST `nodes`, `instance_profiles`, and `workspace_leases` to expose cross-machine worker aliases, IPs, active profiles, bound accounts, and distributed lease states. (Thanks to @aukgit)
+            -   **Real-time Prompt Telemetry Discovery**: Extended `send_heartbeat()` to discover live running prompts via `repo_db::discover_running_prompts_from_antigravity()`, upserting active prompt counts to Supabase for instant cross-node visibility. (Thanks to @aukgit)
+            -   **Schema Extension & Migration Integrity**: Extended `public.instance_profiles` with `running_prompts_count INT NOT NULL DEFAULT 0` with idempotent SQL migrations in `src-tauri/src/modules/supabase_schema.rs`. (Thanks to @aukgit)
+            -   **Offline Fallback & Local Machine Guarantee**: Guaranteed local machine presence and state synthesis in `fetch_fleet_machines()`, ensuring graceful degradation when offline or when Supabase sync is unconfigured. (Thanks to @aukgit)
+        -   **[Instances Dashboard Fleet Machines Table UI]**:
+            -   **Fleet Machines Table Component**: Created `src/components/instances/FleetMachinesTable.tsx` providing a unified dark-glass observational dashboard at the bottom of the Instances section across both Card Mode and Table Mode. (Thanks to @aukgit)
+            -   **Worker Grouping & Telemetry Metrics**: Displayed machines grouped by worker node (`Worker 1 (Local)`, `Worker 2 (Remote Node-...)`) with 1-click clipboard IP copy, live status indicators, uptime counters, and active lease badges. (Thanks to @aukgit)
+            -   **Masked Accounts & Running Prompt Badges**: Rendered connected Google account emails masked by default with 1-click unmask toggle, paired with vibrant cyan pulsing badges showing real-time running prompt counts per machine. (Thanks to @aukgit)
+            -   **Strict Read-Only Observational Safety**: Guarded remote nodes from accidental termination or modification by strictly restricting remote rows to observational metrics. (Thanks to @aukgit)
+        -   **[Tauri IPC & Frontend Service Integration]**:
+            -   **IPC Commands**: Added `get_supabase_fleet_machines` and `sync_supabase_now` handlers in `src-tauri/src/commands/supabase.rs`, registered in `src-tauri/src/lib.rs`. (Thanks to @aukgit)
+            -   **Frontend Service**: Added `getFleetMachines()` and `syncNow()` in `src/services/supabaseService.ts` with 10s auto-polling and manual sync trigger. (Thanks to @aukgit)
+
+-   **[Supabase Multi-Machine Fleet Synchronization & Remote Worker Visibility]**:
             -   **Remote Fleet Machines Table**: Added `<FleetMachinesTable />` mounted beneath local instances in both Card mode and Table mode, displaying remote cluster worker machines, operating system, IP address with 1-click copy, active running instances, bound accounts, running prompt counts, and real-time heartbeat statuses. (Thanks to @aukgit)
             -   **Account Privacy & Masking**: Implemented masked account email format (`u***r@domain.com`) with both individual row eye toggles and a global toggle pill for privacy protection. (Thanks to @aukgit)
             -   **In-Flight Prompt Telemetry**: Enhanced Supabase background heartbeat with live running prompts count computed from local SQLite `active_prompts`, providing remote visibility into active workloads across the fleet. (Thanks to @aukgit)

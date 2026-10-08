@@ -28,8 +28,11 @@ CREATE TABLE IF NOT EXISTS public.instance_profiles (
     is_active BOOLEAN NOT NULL DEFAULT false,
     quota_percent INT NOT NULL DEFAULT 100,
     status TEXT NOT NULL DEFAULT 'idle',
+    running_prompts_count INT NOT NULL DEFAULT 0,
     updated_at BIGINT NOT NULL DEFAULT 0
 );
+
+ALTER TABLE public.instance_profiles ADD COLUMN IF NOT EXISTS running_prompts_count INT NOT NULL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS idx_profiles_node ON public.instance_profiles (node_id);
 
@@ -235,6 +238,7 @@ mod tests {
         let root_sql = get_schema_sql("root");
         assert!(root_sql.contains("CREATE TABLE IF NOT EXISTS public.nodes"));
         assert!(root_sql.contains("CREATE TABLE IF NOT EXISTS public.instance_profiles"));
+        assert!(root_sql.contains("running_prompts_count INT NOT NULL DEFAULT 0"));
         assert!(root_sql.contains("CREATE TABLE IF NOT EXISTS public.workspace_leases"));
         assert!(root_sql.contains("CREATE OR REPLACE FUNCTION public.acquire_workspace_lease"));
 

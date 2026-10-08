@@ -507,6 +507,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 ## 📝 Changelog
 
 > Latest version **v4.163.0**: Integrated multi-machine fleet synchronization with Supabase, adding `<FleetMachinesTable />` beneath local instances across Card and Table views to display remote nodes, active running instances, privacy-masked bound accounts, live running prompt count telemetry, and 15-second auto-polling. (Thanks to @aukgit)
+> Latest version **v4.163.0**: Implemented multi-machine fleet synchronization and cross-node instance observability via Supabase; added `FleetMachinesTable` in the Instances section displaying worker nodes, IPs, instance profiles, masked accounts, and live running prompts; added idempotent schema extensions for prompt telemetry and new Tauri IPC commands `get_supabase_fleet_machines` and `sync_supabase_now`. (Thanks to @aukgit)
 
 👉 **[View Full Changelog → CHANGELOG_EN.md](CHANGELOG_EN.md)**
 
