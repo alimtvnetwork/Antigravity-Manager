@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.171.0-3B82F6?style=flat-square" alt="Version v4.171.0">
+    <img src="https://img.shields.io/badge/Version-v4.172.0-3B82F6?style=flat-square" alt="Version v4.172.0">
     <img src="https://img.shields.io/badge/Version-v4.166.0-3B82F6?style=flat-square" alt="Version v4.166.0">
   </a>
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -115,7 +115,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.171.0)**
+**Bar 2: Version-Based Installation (v4.172.0)**
 **Bar 2: Version-Based Installation (v4.166.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
@@ -555,6 +555,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
+> Latest version **v4.172.0**: Smart Multi-Instance Process Cache Multi-PID Survival & Deep Transcript Scan — enhanced `check_cached_pid_alive` with surviving child PID promotion, Windows 8.3 short-path expansion (`GetShortPathNameW`), path normalization, and zero-relaunch guarantee; guarded against killing running IDE sessions in `launch_instance_inner_with_extra_workspaces`; deepened reverse transcript scan to 25 lines with telemetry noise immunity and 45s prompt TTLs to eradicate ghost running items; stripped literal bracket tokens (`[Collapse Full Text]`, `[Expand Full Text]`) and word count clutter across Prompt Tree View. (Thanks to @aukgit)
 > Latest version **v4.171.0**: Smart Multi-Instance Process Cache & Relaunch Prevention — resolved instance relaunch bug via canonical instance ID resolution (`is_instance_process_running_smart`), closed-PID OS re-scan, and zero-relaunch guarantee; unified `enqueue_prompt` IPC handler with strict FIFO queueing; eradicated ghost running indicators (`WHERE status IN ('queued', 'pending')`); compacted Prompt Tree View badges (`P001 · #1`, `C001 · <cid>`) and stripped bracket clutter; 100% verified via host-shielded E2E testing. (Thanks to @aukgit)
 > Latest version **v4.170.0**: New Toolchain settings page — install dev tools from the UI via backend endpoints with live progress; installer script v3 adds stackable profiles, `--dry-run` preview, `--troubleshoot`, `--ssh` remote install, and new items (Node.js, pnpm, sccache, cargo-watch, Tauri CLI, gh) for shell and PowerShell. (Thanks to @aukgit)
 > Latest version **v4.169.0**: Fixed CI build failure (`E0428`) from duplicate `enqueue_prompt` / `enqueue_prompt_for_instance` definitions — removed the stale command variants, migrated `agm prompts enqueue` to the canonical `enqueue_prompt_for_instance_full` route (GUI/CLI parity), and de-duplicated the command registration in `lib.rs`. (Thanks to @aukgit)

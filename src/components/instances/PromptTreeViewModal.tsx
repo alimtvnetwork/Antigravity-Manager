@@ -115,7 +115,7 @@ interface PromptTreeViewModalProps {
 type ViewMode = 'preview' | 'raw' | 'edit';
 
 // Helper to format clean, compact sequence badge without heavy bracket clutter
-function formatDualBadge(agmCode: string | undefined, defaultAgm: string, gmCode: string | undefined, defaultGm: string): string {
+export function formatDualBadge(agmCode: string | undefined, defaultAgm: string, gmCode: string | undefined, defaultGm: string): string {
     const rawAgm = (agmCode || defaultAgm || '').replace(/^AGM:/i, '').replace(/[\[\]]/g, '').trim();
     const rawGm = (gmCode || defaultGm || '').replace(/^GM:/i, '').replace(/[\[\]]/g, '').trim();
     if (rawAgm && rawGm && rawAgm !== rawGm) {
@@ -956,7 +956,7 @@ function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, isTruncat
                         title={showAllWords ? 'Click to collapse preview to 120 words' : 'Click to expand full prompt text'}
                         className="cursor-pointer font-bold text-cyan-600 dark:text-cyan-400 hover:underline px-1.5 py-0.5 rounded bg-cyan-500/10 hover:bg-cyan-500/20 transition-colors ml-1.5 inline-block select-none"
                     >
-                        {showAllWords ? '... [Collapse]' : '... [Expand Full Text]'}
+                        {showAllWords ? 'Collapse full text' : 'Expand full text'}
                     </span>
                     <br className="my-1.5 block select-none" />
                 </div>
@@ -2138,9 +2138,9 @@ ${activePromptText}
                                 ? 'bg-blue-700/80 text-white'
                                 : 'bg-slate-200/90 dark:bg-[#15334d] text-slate-600 dark:text-cyan-300'
                         )}
-                        title="GitMap Dual Sequence Badge"
+                        title={conv.short_id ? `GitMap SHA: ${conv.short_id}` : (conv.gitmap_seq_code ? `GitMap: ${conv.gitmap_seq_code}` : undefined)}
                     >
-                        {formatDualBadge(conv.seq_code, 'C001', conv.gitmap_seq_code, conv.short_id || conv.conversation_id.slice(0, 8))}
+                        {conv.seq_code || 'C001'}
                     </span>
                     {(conv.repeat_badge || (conv.repeat_count && conv.repeat_count > 1)) && (
                         <span
@@ -2246,9 +2246,9 @@ ${activePromptText}
                                                         ? 'bg-purple-700 text-white'
                                                         : 'bg-slate-200/90 dark:bg-[#15334d] text-slate-600 dark:text-cyan-300'
                                                 )}
-                                                title="GitMap Dual Sequence Badge"
+                                                title={subNode.primaryNode.short_id ? `GitMap SHA: ${subNode.primaryNode.short_id}` : (subNode.primaryNode.gitmap_seq_code ? `GitMap: ${subNode.primaryNode.gitmap_seq_code}` : undefined)}
                                             >
-                                                {formatDualBadge(subNode.primaryNode.seq_code, 'C001', subNode.primaryNode.gitmap_seq_code, subNode.primaryNode.short_id || subNode.primaryNode.conversation_id.slice(0, 8))}
+                                                {subNode.primaryNode.seq_code || 'C001'}
                                             </span>
                                             <span className="truncate text-[11px]">
                                                 {subNode.primaryNode.title || 'Subagent Task'}
@@ -2374,9 +2374,9 @@ ${activePromptText}
                                     ? 'bg-blue-600/20 text-blue-700 dark:text-cyan-300 border border-blue-500/30'
                                     : 'bg-slate-200 dark:bg-[#15334d] text-slate-600 dark:text-cyan-400'
                             )}
-                            title="GitMap Dual Sequence Badge"
+                            title={project.gitmap_seq_code || (project.seq_id ? `Project #${project.seq_id}` : undefined)}
                         >
-                            {formatDualBadge(project.seq_code, 'P001', project.gitmap_seq_code, `#${project.seq_id || 1}`)}
+                            {project.seq_code || 'P001'}
                         </span>
                         <span className="truncate">{project.repo_name}</span>
                     </div>
@@ -2957,7 +2957,7 @@ ${activePromptText}
 
                                             {/* Subtle Instance Context (Breadcrumb style) */}
                                             <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate" title={`Instance #${instanceSeqNum} · ${instanceExeName} (${instanceNameDisplay})`}>
-                                                #{instanceSeqNum} · {instanceNameDisplay}
+                                                #{selectedConversation.seq_code ? selectedConversation.seq_code.replace(/^#/, '') : `C${String(instanceSeqNum).padStart(3, '0')}`} · {instanceNameDisplay}
                                             </span>
                                         </div>
 
@@ -3140,9 +3140,6 @@ ${activePromptText}
                                         >
                                             <MessageSquare className="w-3.5 h-3.5" />
                                             <span>Prompt Instruction</span>
-                                            {activeWordCount > 0 && (
-                                                <span className="text-[10px] font-mono opacity-80">({activeWordCount}w)</span>
-                                            )}
                                         </button>
 
                                         <button
@@ -3287,7 +3284,7 @@ ${activePromptText}
                                                             title="Click to expand or collapse full prompt text"
                                                             className="cursor-pointer text-xs font-semibold text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1 select-none"
                                                         >
-                                                            {showAllWords ? '... [Collapse Full Text]' : '... [Expand Full Text]'}
+                                                            {showAllWords ? 'Collapse full text' : 'Expand full text'}
                                                         </span>
                                                     </div>
                                                 )}
@@ -3297,8 +3294,8 @@ ${activePromptText}
                                             <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                                                 <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                                                     {isTruncated && !showAllWords
-                                                        ? `Truncated preview at 120 words (${totalWords} total · ${formatByteSize(activeByteCount)})`
-                                                        : `Showing all ${activeWordCount} words (${formatByteSize(activeByteCount)})`}
+                                                        ? `${totalWords} words · ${formatByteSize(activeByteCount)}`
+                                                        : `${activeWordCount} words · ${formatByteSize(activeByteCount)}`}
                                                 </div>
 
                                                 <div className="flex items-center gap-2">
@@ -3317,7 +3314,7 @@ ${activePromptText}
                                                             ) : (
                                                                 <>
                                                                     <ChevronDown className="w-3.5 h-3.5" />
-                                                                    <span>Show All ({totalWords || activeWordCount}w)</span>
+                                                                    <span>Show All ({totalWords || activeWordCount} words)</span>
                                                                 </>
                                                             )}
                                                         </button>
@@ -3772,7 +3769,7 @@ ${activePromptText}
                                                 title="Click to expand or collapse full prompt text"
                                                 className="cursor-pointer text-xs font-semibold text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1 select-none"
                                             >
-                                                {showAllWords ? '... [Collapse Full Text]' : '... [Expand Full Text]'}
+                                                {showAllWords ? 'Collapse full text' : 'Expand full text'}
                                             </span>
                                         </div>
                                     )}

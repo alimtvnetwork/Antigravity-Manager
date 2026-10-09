@@ -2,7 +2,7 @@
 """
 45-prompt-dispatch-process-cache-e2e.py
 
-End-to-End safe verification test suite for Task 147:
+End-to-End safe verification test suite for Task 151:
 Smart Instance Process Cache, Prompt Dispatch, FIFO Queueing, and UI Compaction.
 
 Test Cases:
@@ -32,6 +32,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PROMPT_MODAL_PATH = REPO_ROOT / "src" / "components" / "instances" / "PromptTreeViewModal.tsx"
+INSTANCE_TABLE_PATH = REPO_ROOT / "src" / "components" / "instances" / "InstanceTable.tsx"
 CLI_RS_PATH = REPO_ROOT / "src-tauri" / "src" / "modules" / "cli.rs"
 AGM_RS_PATH = REPO_ROOT / "src-tauri" / "src" / "bin" / "agm.rs"
 
@@ -423,6 +424,33 @@ def run_tc05_ui_compaction_and_segmented_actions() -> bool:
         print(f"  {FAIL_BADGE} Structured enqueue payload with instanceId, promptText, workspacePath not found")
         return False
 
+    # 6. Verify elimination of [Collapse Full Text] and [Expand Full Text] literal brackets
+    has_bracket_collapse = "[Collapse Full Text]" in modal_code or "[Expand Full Text]" in modal_code or "... [Collapse]" in modal_code
+    if has_bracket_collapse:
+        print(f"  {FAIL_BADGE} Found literal bracket tokens: [Collapse Full Text], [Expand Full Text], or [Collapse]")
+        return False
+
+    has_clean_collapse = "Collapse full text" in modal_code and "Expand full text" in modal_code
+    if not has_clean_collapse:
+        print(f"  {FAIL_BADGE} Clean 'Collapse full text' / 'Expand full text' not found in PromptTreeViewModal.tsx")
+        return False
+
+    # 7. Verify InstanceTable status pill styling and dot separator
+    if INSTANCE_TABLE_PATH.exists():
+        table_code = INSTANCE_TABLE_PATH.read_text(encoding="utf-8")
+        has_clean_running_dot = "Running · ${inst.pid}" in table_code or "Running{inst.pid ? ` · ${inst.pid}`" in table_code
+        has_bracket_running = "Running{inst.pid ? ` (${inst.pid})`" in table_code
+        if has_bracket_running:
+            print(f"  {FAIL_BADGE} InstanceTable still has parenthesized Running (pid)")
+            return False
+        if not has_clean_running_dot:
+            print(f"  {FAIL_BADGE} Clean 'Running · {pid}' not found in InstanceTable.tsx")
+            return False
+        has_rounded_full_status = "rounded-full" in table_code
+        if not has_rounded_full_status:
+            print(f"  {FAIL_BADGE} Status pill capsule missing rounded-full styling in InstanceTable.tsx")
+            return False
+
     print(f"  {PASS_BADGE} TC05 passed: PromptTreeViewModal UI compaction and segmented actions fully verified")
     return True
 
@@ -460,7 +488,7 @@ def main() -> int:
     print(f"  Final Score: {total_passed}/{total_tests} test cases passed")
 
     if total_passed == total_tests:
-        print(f"\n\033[92m[SUCCESS] All Task 147 verification criteria fully satisfied!\033[0m")
+        print(f"\n\033[92m[SUCCESS] All Task 151 verification criteria fully satisfied!\033[0m")
         return 0
     else:
         print(f"\n\033[91m[FAILURE] {total_tests - total_passed} test case(s) failed.\033[0m")

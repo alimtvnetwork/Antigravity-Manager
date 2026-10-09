@@ -326,17 +326,17 @@ export default function InstanceTable({
                                     {/* 3. Status & PID */}
                                     <td className="px-2 py-1 whitespace-nowrap min-w-[85px] max-w-[105px]">
                                         {isBusy ? (
-                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-cyan-950/60 dark:text-cyan-300 border border-blue-300/60 dark:border-cyan-500/40 animate-pulse shadow-2xs">
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50/90 text-blue-700 dark:bg-cyan-950/60 dark:text-cyan-300 border border-blue-300/60 dark:border-cyan-500/40 backdrop-blur-xs animate-pulse shadow-2xs">
                                                 <RotateCw className="w-2.5 h-2.5 animate-spin text-blue-500 dark:text-cyan-400 shrink-0" />
                                                 <span>{getActionLabel(currentAction)}</span>
                                             </span>
                                         ) : inst.is_running ? (
-                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] text-[10px] font-semibold bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-300/50 dark:border-teal-800/80">
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-50/90 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-300/50 dark:border-teal-800/80 backdrop-blur-xs">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
-                                                Running{inst.pid ? ` (${inst.pid})` : ''}
+                                                Running{inst.pid ? ` · ${inst.pid}` : ''}
                                             </span>
                                         ) : (
-                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-[4px] text-[10px] font-medium bg-slate-100 text-slate-600 dark:bg-[#071a27] dark:text-slate-400 border border-slate-200 dark:border-[#15334d]">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100/90 text-slate-600 dark:bg-[#071a27]/90 dark:text-slate-400 border border-slate-200 dark:border-[#15334d] backdrop-blur-xs">
                                                 Idle
                                             </span>
                                         )}

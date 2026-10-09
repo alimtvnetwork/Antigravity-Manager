@@ -768,19 +768,64 @@ fn get_cached_antigravity_processes() -> Vec<CachedProcessInfo> {
     procs
 }
 
+#[cfg(target_os = "windows")]
+fn get_windows_8_3_short_path(path: &str) -> Option<String> {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+    extern "system" {
+        fn GetShortPathNameW(
+            lpszLongPath: *const u16,
+            lpszShortPath: *mut u16,
+            cchBuffer: u32,
+        ) -> u32;
+    }
+    let wide: Vec<u16> = OsStr::new(path)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    let mut buf = vec![0u16; 512];
+    let len = unsafe { GetShortPathNameW(wide.as_ptr(), buf.as_mut_ptr(), buf.len() as u32) };
+    if len > 0 && (len as usize) < buf.len() {
+        let short = String::from_utf16_lossy(&buf[..len as usize]);
+        Some(
+            short
+                .to_lowercase()
+                .replace('\\', "/")
+                .trim_end_matches('/')
+                .to_string(),
+        )
+    } else {
+        None
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn get_windows_8_3_short_path(_path: &str) -> Option<String> {
+    None
+}
+
 /// Inspect running Antigravity processes matching an instance data_dir
 pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
     let processes = get_cached_antigravity_processes();
 
-    let normalized_target = data_dir.to_lowercase().replace('\\', "/");
-    let clean_target = normalized_target.trim_end_matches('/');
-    let canonical_target = std::fs::canonicalize(data_dir).ok().map(|p| {
+    let norm_slash = data_dir.to_lowercase().replace('\\', "/");
+    let clean_slash = norm_slash.trim_end_matches('/').to_string();
+    let norm_bslash = data_dir.to_lowercase().replace('/', "\\");
+    let clean_bslash = norm_bslash.trim_end_matches('\\').to_string();
+
+    let canonical_expanded = std::fs::canonicalize(data_dir).ok().map(|p| {
         let s = p.to_string_lossy().to_lowercase().replace('\\', "/");
         s.trim_start_matches("//?/")
             .trim_start_matches(r"\\?\")
             .trim_end_matches('/')
             .to_string()
     });
+
+    #[cfg(target_os = "windows")]
+    let short_path_opt = get_windows_8_3_short_path(data_dir);
+    #[cfg(not(target_os = "windows"))]
+    let short_path_opt: Option<String> = None;
+
     let mut matched_pids = Vec::new();
 
     // Map child PID -> parent PID to trace process lineage
@@ -805,8 +850,8 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
             || name.contains("utility")
             || args_str.contains("utility");
 
-        let inst_id_opt = if clean_target.contains("/instances/") {
-            clean_target
+        let inst_id_opt = if clean_slash.contains("/instances/") {
+            clean_slash
                 .split("/instances/")
                 .nth(1)
                 .and_then(|s| s.split('/').next())
@@ -828,10 +873,14 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
             || exe.contains(".antigravity_tools")
             || matches_cloned_exe;
 
-        let has_target_match = (!clean_target.is_empty() && args_str.contains(clean_target))
-            || canonical_target
+        let has_target_match = (!clean_slash.is_empty() && args_str.contains(&clean_slash))
+            || (!clean_bslash.is_empty() && args_str.contains(&clean_bslash))
+            || canonical_expanded
                 .as_ref()
-                .map_or(false, |c| !c.is_empty() && args_str.contains(c));
+                .map_or(false, |c| !c.is_empty() && args_str.contains(c))
+            || short_path_opt
+                .as_ref()
+                .map_or(false, |s| !s.is_empty() && args_str.contains(s));
 
         let is_default_candidate = is_default
             && !has_instance_marker
@@ -909,7 +958,7 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
             let mut curr = pid_u32;
             for _ in 0..10 {
                 if let Some(&p) = parent_map.get(&curr) {
-                    if matched_set.contains(&p) {
+                    if matched_set.contains(&p) || instance_root_pids.contains(&p) {
                         matched_pids.push(pid_u32);
                         break;
                     }
@@ -3214,16 +3263,6 @@ pub fn wait_for_instance_prompt_channel(instance_id: &str) {
     }
 }
 
-/// Process cache entry for an Antigravity IDE instance
-#[derive(Debug, Clone)]
-pub struct InstanceProcessCacheItem {
-    pub instance_id: String,
-    pub pids: Vec<u32>,
-    pub primary_pid: Option<u32>,
-    pub is_running: bool,
-    pub last_checked: std::time::Instant,
-}
-
 /// Force refresh process cache, enumerate all instances from registry, identify live PIDs, cache them, and return actively running count
 pub fn scan_and_cache_all_running_instances() -> usize {
     force_refresh_process_cache();
@@ -3281,15 +3320,53 @@ fn check_cached_pid_alive(
     instance_id: &str,
     canonical_id: &str,
 ) -> Option<(bool, Option<u32>, Vec<u32>)> {
-    let entry = get_cached_instance_process(canonical_id)
+    let mut entry = get_cached_instance_process(canonical_id)
         .or_else(|| get_cached_instance_process(instance_id))?;
-    if let Some(pid) = entry.primary_pid {
-        let is_alive = is_pid_alive_targeted(pid) && saved_pid_matches(pid);
-        if is_alive {
-            return Some((true, Some(pid), entry.pids));
+
+    // 1. Verify primary PID
+    if let Some(primary) = entry.primary_pid {
+        if is_pid_alive_targeted(primary) && saved_pid_matches(primary) {
+            return Some((true, Some(primary), entry.pids));
         }
     }
-    invalidate_instance_process_cache(instance_id);
+
+    // 2. Multi-PID Vitality Fallback: Check all surviving PIDs
+    let surviving_pids: Vec<u32> = entry
+        .pids
+        .iter()
+        .copied()
+        .filter(|&pid| pid > 0 && is_pid_alive_targeted(pid) && saved_pid_matches(pid))
+        .collect();
+
+    if !surviving_pids.is_empty() {
+        let promoted_pid = surviving_pids[0];
+        crate::modules::logger::log_info(&format!(
+            "[SmartProcessCache] Primary PID {:?} exited for instance '{}'. Promoted surviving child PID {} from {} candidates.",
+            entry.primary_pid, canonical_id, promoted_pid, surviving_pids.len()
+        ));
+
+        // Promote new primary PID and update cache
+        entry.primary_pid = Some(promoted_pid);
+        entry.pid = promoted_pid;
+        entry.pids = surviving_pids.clone();
+        entry.last_verified_at = chrono::Utc::now().timestamp();
+        entry.is_alive = true;
+
+        if let Ok(mut cache) = INSTANCE_PROCESS_CACHE.write() {
+            cache.insert(canonical_id.to_string(), entry.clone());
+            if instance_id != canonical_id {
+                cache.insert(instance_id.to_string(), entry.clone());
+            }
+        }
+        let _ = record_instance_pid(canonical_id, promoted_pid, &entry.data_dir);
+        return Some((true, Some(promoted_pid), surviving_pids));
+    }
+
+    // 3. Only invalidate cache when all candidate PIDs are dead
+    invalidate_instance_process_cache(canonical_id);
+    if instance_id != canonical_id {
+        invalidate_instance_process_cache(instance_id);
+    }
     None
 }
 
@@ -3559,34 +3636,44 @@ fn launch_instance_inner_with_extra_workspaces(
         crate::modules::process::detect_antigravity_with_diagnostics(None)?
     };
 
-    // Close only the existing process for THIS target instance if running, allowing OS to unmap locks
-    let _ = close_instance(instance_id);
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    // Guard against killing running instances:
+    // If the instance process is verified to be alive and running, NEVER kill it with close_instance!
+    let (is_already_running, _, _) = is_instance_process_running_smart(instance_id);
+    if !is_already_running {
+        // Close only the existing process for THIS target instance if running, allowing OS to unmap locks
+        let _ = close_instance(instance_id);
+        std::thread::sleep(std::time::Duration::from_millis(300));
 
-    // Clean any orphaned lock files in the target instance data directory
-    let has_target_dir = target_data_path.exists();
-    if has_target_dir {
-        let lockfile = target_data_path.join("lockfile");
-        if lockfile.exists() {
-            let _ = fs::remove_file(&lockfile);
-        }
-        let code_lock = target_data_path.join("code.lock");
-        let has_code_lock = code_lock.exists();
-        if has_code_lock {
-            let _ = fs::remove_file(&code_lock);
-        }
-        if let Ok(entries) = fs::read_dir(&target_data_path) {
-            for entry in entries.flatten() {
-                let fname = entry.file_name().to_string_lossy().to_lowercase();
-                let is_stale_lock = fname == "lockfile"
-                    || fname.starts_with("singleton")
-                    || fname.ends_with(".lock")
-                    || fname == "code.lock";
-                if is_stale_lock {
-                    let _ = fs::remove_file(entry.path());
+        // Clean any orphaned lock files in the target instance data directory
+        let has_target_dir = target_data_path.exists();
+        if has_target_dir {
+            let lockfile = target_data_path.join("lockfile");
+            if lockfile.exists() {
+                let _ = fs::remove_file(&lockfile);
+            }
+            let code_lock = target_data_path.join("code.lock");
+            let has_code_lock = code_lock.exists();
+            if has_code_lock {
+                let _ = fs::remove_file(&code_lock);
+            }
+            if let Ok(entries) = fs::read_dir(&target_data_path) {
+                for entry in entries.flatten() {
+                    let fname = entry.file_name().to_string_lossy().to_lowercase();
+                    let is_stale_lock = fname == "lockfile"
+                        || fname.starts_with("singleton")
+                        || fname.ends_with(".lock")
+                        || fname == "code.lock";
+                    if is_stale_lock {
+                        let _ = fs::remove_file(entry.path());
+                    }
                 }
             }
         }
+    } else {
+        crate::modules::logger::log_info(&format!(
+            "[Instance] Target instance '{}' is already running; bypassing close_instance and preserving active process locks.",
+            instance_id
+        ));
     }
 
     // If an account is bound to this instance profile, sync credentials and inject token directly into isolated state.vscdb and system keyring AFTER process exit.

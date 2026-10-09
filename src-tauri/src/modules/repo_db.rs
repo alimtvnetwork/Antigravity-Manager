@@ -1462,7 +1462,7 @@ pub fn verify_prompts_running() -> usize {
         let db_count: usize = conn
             .query_row(
                 "SELECT COUNT(*) FROM active_prompts WHERE status = 'running' OR (status = 'dispatched' AND updated_at >= ?1)",
-                params![now - 300],
+                params![now - 45],
                 |r| r.get(0),
             )
             .unwrap_or(0);
@@ -1909,7 +1909,7 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                    AND (?2 = 'all' OR instance_id = ?2 OR (?2 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))
                    AND status = 'running'
                    AND updated_at >= ?3",
-                params![project_id, norm_inst, now - 120],
+                params![project_id, norm_inst, now - 45],
                 |r| r.get(0),
             )
             .unwrap_or(0)
@@ -4470,10 +4470,16 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
 
     // Check if the conversation turn has completed or is waiting for user
     let mut is_completed_or_waiting = false;
-    for line in lines.iter().rev().take(5) {
+    for line in lines.iter().rev().take(25) {
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
             let s_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("");
-            if s_type == "TOKEN_USAGE" || s_type == "TELEMETRY" || s_type == "HEARTBEAT" {
+            if s_type == "TOKEN_USAGE"
+                || s_type == "TELEMETRY"
+                || s_type == "HEARTBEAT"
+                || s_type == "PROGRESS"
+                || s_type == "METRICS"
+                || s_type == "SYSTEM_LOG"
+            {
                 continue;
             }
             let s_status = val.get("status").and_then(|v| v.as_str()).unwrap_or("");
@@ -4493,7 +4499,11 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
                     .and_then(|t| t.as_array())
                     .map(|a| !a.is_empty())
                     .unwrap_or(false);
-                if !has_tool_calls && (s_status.is_empty() || s_status.eq_ignore_ascii_case("done"))
+                if !has_tool_calls
+                    && (s_status.is_empty()
+                        || s_status.eq_ignore_ascii_case("done")
+                        || s_status.eq_ignore_ascii_case("completed")
+                        || s_status.eq_ignore_ascii_case("idle"))
                 {
                     is_completed_or_waiting = true;
                     break;
@@ -4637,14 +4647,20 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
 
     let mut is_terminal_done = false;
 
-    // DEEP SCAN: Inspect up to 10 lines in reverse order to bypass telemetry noise
-    for line in lines.iter().rev().take(10) {
+    // DEEP SCAN: Inspect up to 25 lines in reverse order to bypass telemetry noise
+    for line in lines.iter().rev().take(25) {
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
             let s_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("");
             let s_source = val.get("source").and_then(|v| v.as_str()).unwrap_or("");
 
             // Bypass pure telemetry / token usage metadata
-            if s_type == "TOKEN_USAGE" || s_type == "TELEMETRY" || s_type == "HEARTBEAT" {
+            if s_type == "TOKEN_USAGE"
+                || s_type == "TELEMETRY"
+                || s_type == "HEARTBEAT"
+                || s_type == "PROGRESS"
+                || s_type == "METRICS"
+                || s_type == "SYSTEM_LOG"
+            {
                 continue;
             }
 
@@ -4652,19 +4668,17 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
                 .get("step_index")
                 .and_then(|v| v.as_u64())
                 .unwrap_or(step_count as u64);
-            let s_status = val
-                .get("status")
-                .and_then(|v| v.as_str())
-                .unwrap_or("running");
+            let s_status = val.get("status").and_then(|v| v.as_str()).unwrap_or("");
 
             // Inspect for terminal completion
             if s_type == "PLANNER_RESPONSE" || s_source == "MODEL" {
                 let tool_calls = val.get("tool_calls").and_then(|tc| tc.as_array());
                 let has_open_tools = tool_calls.map(|tc| !tc.is_empty()).unwrap_or(false);
-                if (s_status.eq_ignore_ascii_case("DONE")
-                    || s_status.eq_ignore_ascii_case("COMPLETED"))
-                    && !has_open_tools
-                {
+                let is_explicit_done = s_status.eq_ignore_ascii_case("DONE")
+                    || s_status.eq_ignore_ascii_case("COMPLETED")
+                    || s_status.eq_ignore_ascii_case("IDLE")
+                    || s_status.eq_ignore_ascii_case("ERROR");
+                if !has_open_tools && (is_explicit_done || s_status.is_empty()) {
                     is_terminal_done = true;
                 }
             }
@@ -4884,13 +4898,13 @@ fn compute_project_conversation_tree(
     let registry = crate::modules::instance::load_registry().unwrap_or_default();
     let now = Utc::now().timestamp();
 
-    // Automatically transition stale in-flight prompts (> 300s without update) to completed
+    // Automatically transition stale in-flight prompts (> 45s without update) to completed
     if let Ok(conn) = connect_db() {
         let _ = conn.execute(
             "UPDATE active_prompts 
              SET status = 'completed', updated_at = ?1 
              WHERE status IN ('running', 'in_flight', 'dispatched') 
-               AND (?1 - updated_at > 300)",
+               AND (?1 - updated_at > 45)",
             rusqlite::params![now],
         );
     }
@@ -4962,6 +4976,26 @@ fn compute_project_conversation_tree(
         .collect();
 
     for (owning_inst_id, base) in &candidate_dirs_fb {
+        // Verify if the owning instance process is actually alive on the OS
+        let is_owning_inst_alive = if owning_inst_id == "default" || owning_inst_id == "__default__"
+        {
+            crate::modules::process::is_antigravity_running(None) || {
+                let def_dir = crate::modules::instance::get_default_antigravity_data_dir();
+                !crate::modules::instance::find_pids_for_data_dir(&def_dir.to_string_lossy(), true)
+                    .is_empty()
+            }
+        } else if let Some(inst) = registry
+            .instances
+            .iter()
+            .find(|i| i.id == *owning_inst_id || i.name == *owning_inst_id)
+        {
+            let (is_running, _, _) =
+                crate::modules::instance::is_instance_process_running_smart(&inst.id);
+            is_running
+        } else {
+            false
+        };
+
         let summaries_db = base.join("conversation_summaries.db");
         if !summaries_db.exists() {
             continue;
@@ -4994,7 +5028,10 @@ fn compute_project_conversation_tree(
                     let (ws_uris_raw, last_time_str, status, not_fully_idle) = item;
                     let last_time_epoch = parse_flexible_timestamp(&last_time_str);
                     let is_recent = last_time_epoch > 0 && (now_fb - last_time_epoch <= 120);
-                    let is_running = status.contains("RUNNING") && not_fully_idle > 0 && is_recent;
+                    let is_running = is_owning_inst_alive
+                        && status.contains("RUNNING")
+                        && not_fully_idle > 0
+                        && is_recent;
                     let uris: Vec<String> = serde_json::from_str(&ws_uris_raw).unwrap_or_default();
                     for uri in uris {
                         let raw_path = decode_uri_to_path(&uri);
@@ -5629,11 +5666,12 @@ fn compute_project_conversation_tree(
                 let has_confirmed_running = has_active_worker || has_non_idle_summary;
 
                 let is_ap_queued = ap.status == "queued" || ap.status == "pending";
+                let max_allowed_ttl = if has_active_worker { 300 } else { 45 };
                 let is_run = is_inst_alive
                     && (ap.status == "running"
                         || ap.status == "in_flight"
                         || ap.status == "dispatched")
-                    && (now - ap.updated_at <= 600)
+                    && (now - ap.updated_at <= max_allowed_ttl)
                     && has_confirmed_running;
                 if only_running && !is_run {
                     continue;
