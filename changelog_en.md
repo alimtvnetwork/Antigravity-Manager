@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.169.0 (2026-10-10)**:
+        -   **CI Build Fix — Duplicate enqueue_prompt Definitions**:
+            -   **Description**: Fixed CI build failure (`E0428`) caused by duplicate `enqueue_prompt` / `enqueue_prompt_for_instance` definitions left behind by parallel feature streams: removed the stale 4-arg `enqueue_prompt` Tauri command (`src-tauri/src/commands/instance.rs`) and the stale `enqueue_prompt_for_instance` implementation (`src-tauri/src/modules/repo_db.rs`); the superset `enqueue_prompt` command (optional fields, `AppResult<serde_json::Value>`) remains and is backward-compatible with existing frontend invoke args. Migrated the `agm prompts enqueue` CLI verb (`src-tauri/src/modules/cli.rs`) to the canonical `enqueue_prompt_for_instance_full` route for GUI/CLI parity, and removed the duplicate `commands::enqueue_prompt` registration in `src-tauri/src/lib.rs`. (Thanks to @aukgit)
+
     *   **v4.168.0 (2026-10-10)**:
         -   **Model Inventory Curation**:
             -   **Description**: Curated the model inventory (`src/config/modelConfig.ts`): removed the outdated Gemini 2.5 series (flash, flash-lite, flash-thinking, pro); kept the nano tier (gemini-3.1-flash-lite); added 5 newer open-source models in a new 'Open Source' group (gpt-oss-20b, deepseek-v4, qwen3-max, qwen3-8b, llama-4-maverick); every model now carries priority, capabilities, and speed annotations (`nano`/`fast`/`balanced`/`powerful`). (Thanks to @aukgit)
