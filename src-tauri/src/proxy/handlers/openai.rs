@@ -2514,7 +2514,7 @@ pub async fn handle_chat_completions(
                 // Combine first chunk with remaining stream
                 let combined_stream =
                     futures::stream::once(
-                        async move { Ok::<Bytes, String>(first_data_chunk.unwrap()) },
+                        async move { Ok::<Bytes, String>(first_data_chunk.unwrap_or_default()) },
                     )
                     .chain(openai_stream);
 
@@ -4355,7 +4355,7 @@ pub async fn handle_completions(
                     }
 
                     let combined_stream = futures::stream::once(async move {
-                        Ok::<Bytes, String>(first_data_chunk.unwrap())
+                        Ok::<Bytes, String>(first_data_chunk.unwrap_or_default())
                     })
                     .chain(openai_stream);
                     let converted_meta = json!({
@@ -4494,7 +4494,7 @@ pub async fn handle_completions(
                     }
 
                     let combined_stream = futures::stream::once(async move {
-                        Ok::<Bytes, String>(first_data_chunk.unwrap())
+                        Ok::<Bytes, String>(first_data_chunk.unwrap_or_default())
                     })
                     .chain(openai_stream);
                     let converted_meta = json!({
