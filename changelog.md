@@ -103,6 +103,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.170.0 (2026-10-10)**:
+        -   **Toolchain Installer UI + Profiles + SSH**:
+            -   **Description**: New Toolchain settings page: install dev tools from the UI via backend endpoints with live progress. Installer script v3 adds stackable profiles (`minimal`/`rust-dev`/`frontend`/`full`), `--dry-run` preview, `--list-items`, `--troubleshoot`, `--ssh` remote install, and new items (Node.js, pnpm, sccache, cargo-watch, Tauri CLI, gh) — for both shell and PowerShell. (Thanks to @aukgit)
+
+
     *   **v4.169.0 (2026-10-10)**:
         -   **CI Build Fix — Duplicate enqueue_prompt Definitions**:
             -   **Description**: Fixed CI build failure (`E0428`) caused by duplicate `enqueue_prompt` / `enqueue_prompt_for_instance` definitions left behind by parallel feature streams: removed the stale 4-arg `enqueue_prompt` Tauri command (`src-tauri/src/commands/instance.rs`) and the stale `enqueue_prompt_for_instance` implementation (`src-tauri/src/modules/repo_db.rs`); the superset `enqueue_prompt` command (optional fields, `AppResult<serde_json::Value>`) remains and is backward-compatible with existing frontend invoke args. Migrated the `agm prompts enqueue` CLI verb (`src-tauri/src/modules/cli.rs`) to the canonical `enqueue_prompt_for_instance_full` route for GUI/CLI parity, and removed the duplicate `commands::enqueue_prompt` registration in `src-tauri/src/lib.rs`. (Thanks to @aukgit)
