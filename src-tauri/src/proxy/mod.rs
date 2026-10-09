@@ -1,4 +1,12 @@
 // proxy module - API reverse proxy service
+//
+// SCOPE GUARDRAIL (docs/module-tiers.md): this is CORE gateway code. It may
+// import CORE and SUPPORT modules from `crate::modules`, but must NOT import
+// ADJACENT modules (email_*, telegram_inbound, supabase_*, ssh_manager,
+// cloudflared, notification_hub, backup_prompts_db, agy_cleaner, cache).
+// If an adjacent feature needs proxy data, the dependency must point
+// ADJACENT -> proxy, never the reverse. This is a documentary guardrail;
+// keep it true by review, not by compiler gate.
 
 // Existing modules
 pub mod config;

@@ -2269,32 +2269,43 @@ fn execute_prompts_enqueue(sub_args: &[String]) {
             .unwrap_or_else(|_| ".".to_string())
     });
 
-    match repo_db::enqueue_prompt_for_instance(&target_inst, &target_repo, &prompt_text, None) {
-        Ok(active_prompt) => {
+    match repo_db::enqueue_prompt_for_instance_full(
+        &target_inst,
+        &prompt_text,
+        Some(&target_repo),
+        None,
+        None,
+    ) {
+        Ok(row_id) => {
             if is_json {
                 let payload = serde_json::json!({
-                    "prompt_id": active_prompt.id,
-                    "instance_id": active_prompt.instance_id,
-                    "repo_path": active_prompt.repo_path,
-                    "status": active_prompt.status,
+                    "prompt_row_id": row_id,
+                    "instance_id": target_inst,
+                    "repo_path": target_repo,
+                    "status": "queued",
                     "is_queued": true,
-                    "created_at": active_prompt.created_at,
                 });
                 CliEnvelope::ok("prompts enqueue", Some(target_inst), payload).print_and_exit();
             }
             println!("[CLI] Prompt successfully enqueued:");
-            println!("  ID:          {}", active_prompt.id);
-            println!("  Instance:    {}", active_prompt.instance_id);
-            println!("  Repo:        {}", active_prompt.repo_path);
-            println!("  Status:      {}", active_prompt.status);
+            println!("  Row ID:      {}", row_id);
+            println!("  Instance:    {}", target_inst);
+            println!("  Repo:        {}", target_repo);
+            println!("  Status:      queued");
             std::process::exit(0);
         }
         Err(e) => {
+            let msg = e.to_string();
             if is_json {
-                CliEnvelope::<()>::err("prompts enqueue", Some(target_inst), "ENQUEUE_FAILED", &e)
-                    .print_and_exit();
+                CliEnvelope::<()>::err(
+                    "prompts enqueue",
+                    Some(target_inst),
+                    "ENQUEUE_FAILED",
+                    &msg,
+                )
+                .print_and_exit();
             }
-            eprintln!("[ERROR] Failed to enqueue prompt: {}", e);
+            eprintln!("[ERROR] Failed to enqueue prompt: {}", msg);
             std::process::exit(1);
         }
     }
