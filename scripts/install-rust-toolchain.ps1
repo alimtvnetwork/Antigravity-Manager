@@ -102,6 +102,15 @@ if ($hasRustc -and $hasCargo -and -not $Force) {
     Refresh-SessionPath
 }
 
+# 1b. Ensure required components (clippy + rustfmt are project gates)
+Write-Step "Ensuring clippy + rustfmt components..."
+try {
+    & rustup component add clippy rustfmt 2>$null
+    Write-Success "clippy + rustfmt ready."
+} catch {
+    Write-Warn "Could not add clippy/rustfmt (offline?)."
+}
+
 # 2. Inspect LLVM & Clang
 if (-not $SkipLlvm) {
     Write-Step "Checking LLVM and Clang compiler..."
