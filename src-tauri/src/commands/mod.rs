@@ -31,6 +31,9 @@ pub use supabase::*;
 // 导出 telegram 命令
 pub mod telegram;
 pub use telegram::*;
+// 导出 toolchain 命令 (Toolchain Installer UI backend)
+pub mod toolchain;
+pub use toolchain::*;
 // 导出 fleet 命令 (GitMap Fleet Sync)
 pub mod fleet;
 pub use fleet::*;

@@ -1189,6 +1189,10 @@ pub fn run() {
             commands::check_gitmap_available,
             commands::check_gitmap_installed,
             commands::deploy_accounts_to_fleet,
+            // Toolchain Installer commands
+            commands::toolchain_list_items,
+            commands::toolchain_check,
+            commands::toolchain_install,
         ])
 
 

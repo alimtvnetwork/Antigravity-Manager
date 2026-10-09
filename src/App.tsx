@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Accounts from './pages/Accounts';
 import Instances from './pages/Instances';
 import Settings from './pages/Settings';
+import Toolchain from './pages/Toolchain';
 import Audit from './pages/Audit';
 import ApiProxy from './pages/ApiProxy';
 
@@ -92,6 +93,10 @@ const router = createBrowserRouter([
       {
         path: 'settings',
         element: <Settings />,
+      },
+      {
+        path: 'toolchain',
+        element: <Toolchain />,
       },
     ],
   },
