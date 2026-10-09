@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.171.0 (2026-10-10)**:
+        -   **Smart Instance Process Cache, Relaunch Prevention & Ghost Running Fix**:
+            -   **Description**: Resolved root-cause IDE instance relaunch bug by integrating canonical instance ID resolution into `is_instance_process_running_smart` to resolve sequence numbers (`1`), aliases (`default`), and case variants before checking the process cache; implemented two-tier closed-PID double-check and OS re-scan before declaring instances offline; decoupled window focus failures from process liveness to guarantee zero unwanted restarts when the IDE is already running. Unified `enqueue_prompt` IPC handler and CLI command (`agm prompt queue`) with strict FIFO queueing (`ORDER BY created_at ASC, id ASC`) and `.antigravity_resume_task.json` persistence. Eradicated false-positive running prompt indicators by filtering `auto_resume_recent_prompts` strictly to `WHERE status IN ('queued', 'pending')`, eliminating idle conversation bypasses, and enforcing terminal planner state detection (`is_terminal_done`). Compacted Prompt Tree View UI badges (`P001 · #1`, `C001 · <cid>`), stripped outer bracket tokens and redundant role labels, and verified 100% pass rate across all 5 test cases in safe host-shielded E2E test harness `03-ai-scripts/45-prompt-dispatch-process-cache-e2e.py`. (Thanks to @aukgit)
+
     *   **v4.170.0 (2026-10-10)**:
         -   **Toolchain Installer UI + Profiles + SSH**:
             -   **Description**: New Toolchain settings page: install dev tools from the UI via backend endpoints with live progress. Installer script v3 adds stackable profiles (`minimal`/`rust-dev`/`frontend`/`full`), `--dry-run` preview, `--list-items`, `--troubleshoot`, `--ssh` remote install, and new items (Node.js, pnpm, sccache, cargo-watch, Tauri CLI, gh) — for both shell and PowerShell. (Thanks to @aukgit)
