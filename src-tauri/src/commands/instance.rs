@@ -262,25 +262,6 @@ pub async fn send_prompt_now(
 }
 
 #[tauri::command]
-pub async fn enqueue_prompt(
-    instance_id: String,
-    repo_path: String,
-    prompt_content: String,
-    conversation_id: Option<String>,
-) -> Result<crate::modules::repo_db::ActivePrompt, String> {
-    tokio::task::spawn_blocking(move || {
-        crate::modules::repo_db::enqueue_prompt_for_instance(
-            &instance_id,
-            &repo_path,
-            &prompt_content,
-            conversation_id.as_deref(),
-        )
-    })
-    .await
-    .map_err(|e| format!("Task execution failed: {}", e))?
-}
-
-#[tauri::command]
 pub fn get_running_instances_process_count() -> Result<usize, String> {
     Ok(crate::modules::instance::scan_and_cache_all_running_instances())
 }

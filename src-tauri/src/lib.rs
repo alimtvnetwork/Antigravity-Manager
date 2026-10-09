@@ -1127,7 +1127,6 @@ pub fn run() {
             commands::assign_project_to_instance,
             commands::get_instance_workspace_folders,
             commands::get_project_conversation_tree,
-            commands::enqueue_prompt,
             commands::get_instance_switch_history,
             commands::get_instance_audit_trail,
             commands::sync_instance_pid_and_quota,
