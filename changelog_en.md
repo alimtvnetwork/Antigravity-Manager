@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.168.0 (2026-10-10)**:
+        -   **Model Inventory Curation**:
+            -   **Description**: Curated the model inventory (`src/config/modelConfig.ts`): removed the outdated Gemini 2.5 series (flash, flash-lite, flash-thinking, pro); kept the nano tier (gemini-3.1-flash-lite); added 5 newer open-source models in a new 'Open Source' group (gpt-oss-20b, deepseek-v4, qwen3-max, qwen3-8b, llama-4-maverick); every model now carries priority, capabilities, and speed annotations (`nano`/`fast`/`balanced`/`powerful`). (Thanks to @aukgit)
+
     *   **v4.167.0 (2026-10-09)**:
         -   **[Multi-Instance Process Cache & Relaunch Prevention]**:
             -   **Two-Tier Process Cache & Targeted PID Verification**: Implemented two-tier process cache (`SMART_PROCESS_CACHE`) with sub-millisecond targeted PID vitality verification (`is_pid_alive_targeted`). Decoupled window focus failures from process liveness, ensuring prompt send and enqueue operations never terminate or relaunch already running Antigravity IDE instances. (Thanks to @aukgit)

@@ -103,6 +103,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.168.0 (2026-10-10)**:
+        -   **Model Inventory Curation**:
+            -   **Description**: Curated the model inventory (`src/config/modelConfig.ts`): removed the outdated Gemini 2.5 series (flash, flash-lite, flash-thinking, pro); kept the nano tier (gemini-3.1-flash-lite); added 5 newer open-source models in a new 'Open Source' group (gpt-oss-20b, deepseek-v4, qwen3-max, qwen3-8b, llama-4-maverick); every model now carries priority, capabilities, and speed annotations (`nano`/`fast`/`balanced`/`powerful`). (Thanks to @aukgit)
+
+
     *   **v4.167.0 (2026-10-09)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
