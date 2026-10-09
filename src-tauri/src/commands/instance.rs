@@ -249,9 +249,10 @@ pub async fn send_prompt_now(
     prompt_content: String,
     conversation_id: Option<String>,
 ) -> Result<crate::modules::repo_db::ActivePrompt, String> {
+    let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
     tokio::task::spawn_blocking(move || {
         crate::modules::repo_db::send_prompt_now_for_instance(
-            &instance_id,
+            &resolved_id,
             &repo_path,
             &prompt_content,
             conversation_id.as_deref(),
@@ -267,10 +268,12 @@ pub async fn enqueue_prompt(
     repo_path: String,
     prompt_content: String,
     conversation_id: Option<String>,
+    _project_id: Option<String>,
 ) -> Result<crate::modules::repo_db::ActivePrompt, String> {
+    let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
     tokio::task::spawn_blocking(move || {
         crate::modules::repo_db::enqueue_prompt_for_instance(
-            &instance_id,
+            &resolved_id,
             &repo_path,
             &prompt_content,
             conversation_id.as_deref(),
@@ -414,34 +417,4 @@ pub async fn sync_instance_pid_and_quota(instance_id: String) -> Result<Instance
 #[tauri::command]
 pub async fn sync_all_instances_and_quotas() -> Result<Vec<InstanceStatus>, String> {
     instance::sync_all_instances_and_quotas_logic().await
-}
-
-#[tauri::command]
-pub async fn enqueue_prompt(
-    instance_id: String,
-    prompt_text: Option<String>,
-    prompt_content: Option<String>,
-    workspace_path: Option<String>,
-    repo_path: Option<String>,
-    conversation_id: Option<String>,
-    project_id: Option<String>,
-) -> crate::error::AppResult<serde_json::Value> {
-    let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
-    let prompt = prompt_text.or(prompt_content).unwrap_or_default();
-    let workspace = workspace_path.or(repo_path);
-
-    let row_id = crate::modules::repo_db::enqueue_prompt_for_instance_full(
-        &resolved_id,
-        &prompt,
-        workspace.as_deref(),
-        conversation_id.as_deref(),
-        project_id.as_deref(),
-    )?;
-
-    Ok(serde_json::json!({
-        "success": true,
-        "prompt_id": row_id,
-        "instance_id": resolved_id,
-        "status": "queued"
-    }))
 }

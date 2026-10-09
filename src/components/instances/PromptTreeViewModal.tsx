@@ -1713,16 +1713,14 @@ export default function PromptTreeViewModal({
                 await navigator.clipboard.writeText(promptContent);
             } catch {}
 
-            // 4. Focus or launch IDE instance window so user immediately sees it ("goes there")
+            // 4. Focus IDE instance window if workspace is known (avoids secondary launch hazard)
             try {
                 if (repoPath) {
                     const repoName = repoPath.split(/[/\\]/).filter(Boolean).pop() || repoPath;
                     await focusInstanceWorkspace(targetInstId, repoPath, repoName);
-                } else {
-                    await focusOrLaunchInstance(targetInstId);
                 }
             } catch (focusErr) {
-                console.warn('focusOrLaunchInstance error', focusErr);
+                console.warn('focusInstanceWorkspace error', focusErr);
             }
 
             setActionMsg("Prompt Dispatched & Focused IDE (via Hotkey 'N' / Send Now)!");
@@ -2914,78 +2912,53 @@ ${activePromptText}
                                 <div className="space-y-2 pb-2.5 border-b border-slate-200 dark:border-[#15334d] shrink-0">
                                     {/* Row 1: Identity, Badges & Actions */}
                                     <div className="flex items-center justify-between gap-2.5 flex-wrap">
-                                        {/* Left: Sequence + Tier Badge + Status + Title + Instance Trio */}
-                                        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-[5px] text-[10px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20">
-                                                {selectedConversation.seq_code || 'P001'}
-                                            </span>
+                                        {/* Left: Indicator 1 (Sequence + Tier), Indicator 2 (Status Capsule), Title, Instance Context */}
+                                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                            {/* Indicator 1: Clean Sequence Code with compact Origin Tier Icon */}
                                             {(() => {
+                                                const rawSeq = selectedConversation.seq_code || 'P001';
+                                                const cleanSeq = rawSeq.replace(/^(AGM:|GM:)/i, '').replace(/[\[\]]/g, '').trim();
+                                                const seqDisplay = cleanSeq.startsWith('#') || cleanSeq.startsWith('P') || cleanSeq.startsWith('C') ? cleanSeq : `#${cleanSeq}`;
                                                 const tierInfo = classifyPromptTier(activePromptText, selectedConversation.title);
-                                                const badgeColors: Record<PromptTier, string> = {
-                                                    USER_PROMPT: 'bg-sky-500/15 text-sky-700 dark:text-cyan-300 border-sky-500/30',
-                                                    SUBAGENT_INSTRUCTION: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30',
-                                                    SYSTEM_MESSAGE: 'bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/30',
-                                                    TOOL_OUTPUT: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
-                                                };
-                                                const badgeLabels: Record<PromptTier, string> = {
-                                                    USER_PROMPT: 'User Prompt',
-                                                    SUBAGENT_INSTRUCTION: tierInfo.subagentRole ? `Subagent: ${tierInfo.subagentRole}` : 'AI Subagent',
-                                                    SYSTEM_MESSAGE: 'System',
-                                                    TOOL_OUTPUT: 'Tool Output',
-                                                };
                                                 return (
-                                                    <span
-                                                        className={cn(
-                                                            "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold font-mono tracking-wide border shadow-2xs",
-                                                            badgeColors[tierInfo.tier]
-                                                        )}
-                                                        title={`${tierInfo.tier} (${Math.round(tierInfo.confidence * 100)}% match)`}
-                                                    >
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20" title={`${tierInfo.tier}`}>
                                                         {tierInfo.tier === 'USER_PROMPT' && <User className="w-2.5 h-2.5 text-sky-500 shrink-0" />}
                                                         {tierInfo.tier === 'SUBAGENT_INSTRUCTION' && <Bot className="w-2.5 h-2.5 text-purple-500 shrink-0" />}
                                                         {tierInfo.tier === 'SYSTEM_MESSAGE' && <Terminal className="w-2.5 h-2.5 text-slate-500 shrink-0" />}
                                                         {tierInfo.tier === 'TOOL_OUTPUT' && <Wrench className="w-2.5 h-2.5 text-amber-500 shrink-0" />}
-                                                        <span>{badgeLabels[tierInfo.tier]}</span>
+                                                        <span>{seqDisplay}</span>
                                                     </span>
                                                 );
                                             })()}
-                                            {(Boolean(selectedConversation.is_running) && !isGhostConversation(selectedConversation) && !(selectedConversation.prompt_word_count === 0 && (!selectedConversation.prompt_preview_200w || !selectedConversation.prompt_preview_200w.trim()))) && (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border border-emerald-500/40 shadow-2xs animate-pulse">
+
+                                            {/* Indicator 2: Unified Status Capsule */}
+                                            {Boolean(selectedConversation.is_running) && !isGhostConversation(selectedConversation) ? (
+                                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9.5px] font-bold font-mono bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border border-emerald-500/40 shadow-2xs animate-pulse">
                                                     <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] animate-pulse" />
                                                     <span>RUNNING</span>
-                                                    {instancePid ? (
-                                                        <span className="font-mono text-[9px] opacity-80">(PID: {instancePid})</span>
-                                                    ) : null}
-                                                    <span className="font-mono text-[9px] border-l border-emerald-400/40 pl-1">
-                                                        {formatDuration(elapsedSeconds)}
-                                                    </span>
+                                                    {instancePid ? <span className="opacity-80">PID: {instancePid}</span> : null}
+                                                    <span className="border-l border-emerald-400/40 pl-1">{formatDuration(elapsedSeconds)}</span>
                                                 </span>
-                                            )}
-                                            {Boolean(selectedConversation.is_queued) && (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs">
+                                            ) : Boolean(selectedConversation.is_queued) ? (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold font-mono bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs">
                                                     <Clock className="w-2.5 h-2.5 text-amber-500" />
                                                     <span>QUEUED</span>
                                                 </span>
+                                            ) : (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                                                    IDLE
+                                                </span>
                                             )}
+
+                                            {/* Title */}
                                             <h3 className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[200px] md:max-w-xs" title={selectedConversation.title || selectedConversation.short_id}>
                                                 {selectedConversation.title || selectedConversation.short_id}
                                             </h3>
-                                            {(selectedConversation.repeat_count || 1) > 1 && (
-                                                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[8.5px] font-mono font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs">
-                                                    x{selectedConversation.repeat_count} runs
-                                                </span>
-                                            )}
-                                            {/* Instance Identity Trio */}
-                                            <div
-                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[5px] bg-purple-500/10 dark:bg-purple-950/30 border border-purple-500/20 text-purple-700 dark:text-purple-300 font-mono text-[9.5px]"
-                                                title={`Instance #${instanceSeqNum} · ${instanceExeName} · ${instanceNameDisplay}`}
-                                            >
-                                                <span className="font-bold">#{instanceSeqNum}</span>
-                                                <span className="opacity-40">·</span>
-                                                <span>{instanceExeName}</span>
-                                                <span className="opacity-40">·</span>
-                                                <span className="font-semibold text-purple-800 dark:text-purple-200">{instanceNameDisplay}</span>
-                                            </div>
+
+                                            {/* Subtle Instance Context (Breadcrumb style) */}
+                                            <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate" title={`Instance #${instanceSeqNum} · ${instanceExeName} (${instanceNameDisplay})`}>
+                                                #{instanceSeqNum} · {instanceNameDisplay}
+                                            </span>
                                         </div>
 
                                         {/* Right: The 2 Canonical Segmented Dark-Glass Action Capsules */}
@@ -3116,7 +3089,7 @@ ${activePromptText}
                                                     onClick={handleResendPrompt}
                                                     disabled={isResending}
                                                     className="flex items-center gap-1 px-2 py-0.5 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-[#15334d] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
-                                                    title="Immediately inject prompt to running instance [Hotkey: N]"
+                                                    title="Immediately inject prompt to running instance (Hotkey: N)"
                                                 >
                                                     <RotateCw className={cn('w-3 h-3 text-emerald-500', isResending && 'animate-spin')} />
                                                     <span>Send</span>
@@ -3149,65 +3122,6 @@ ${activePromptText}
                                         </div>
                                     </div>
                                 </div>
-
-                                {/* In-Flight Execution or Queued Slim Banner (if active) */}
-                                {(Boolean(selectedConversation.is_running) || Boolean(selectedConversation.is_queued)) && !isGhostConversation(selectedConversation) && (
-                                    <div className={cn(
-                                        "rounded-xl border px-3.5 py-2 flex items-center justify-between gap-3 shadow-2xs transition-all shrink-0",
-                                        selectedConversation.is_running
-                                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-200"
-                                            : "bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-200"
-                                    )}>
-                                        <div className="flex items-center gap-2.5 min-w-0">
-                                            <span className="relative flex h-2.5 w-2.5 shrink-0">
-                                                <span className={cn(
-                                                    "animate-ping absolute inline-flex h-full w-full rounded-full opacity-75",
-                                                    selectedConversation.is_running ? "bg-emerald-400" : "bg-amber-400"
-                                                )} />
-                                                <span className={cn(
-                                                    "relative inline-flex rounded-full h-2.5 w-2.5",
-                                                    selectedConversation.is_running ? "bg-emerald-500" : "bg-amber-500"
-                                                )} />
-                                            </span>
-                                            <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                                                <span className="font-bold text-xs font-mono uppercase tracking-wider">
-                                                    {selectedConversation.is_running ? 'In-Flight Execution' : 'Queued Task'}
-                                                </span>
-                                                {instancePid ? (
-                                                    <span className="font-mono text-[9.5px] px-1.5 py-0.2 rounded bg-black/10 dark:bg-white/10">
-                                                        PID: {instancePid}
-                                                    </span>
-                                                ) : null}
-                                                {selectedConversation.is_running && (
-                                                    <span className="font-mono text-[9.5px] px-1.5 py-0.2 rounded bg-black/10 dark:bg-white/10">
-                                                        {formatDuration(elapsedSeconds)}
-                                                    </span>
-                                                )}
-                                                <span className="opacity-40">·</span>
-                                                <span className="text-xs truncate opacity-90 font-medium">
-                                                    {selectedConversation.is_running
-                                                        ? (selectedConversation.latest_step_summary || 'Task actively executing in Antigravity session...')
-                                                        : 'Awaiting scheduler execution slot'}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={handleFocusIde}
-                                            disabled={isFocusing}
-                                            className={cn(
-                                                "shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border shadow-2xs transition-all cursor-pointer",
-                                                selectedConversation.is_running
-                                                    ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700"
-                                                    : "bg-amber-600 hover:bg-amber-700 text-white border-amber-700"
-                                            )}
-                                            title="Focus Antigravity IDE workspace"
-                                        >
-                                            <ExternalLink className="w-3 h-3" />
-                                            <span>Open IDE</span>
-                                        </button>
-                                    </div>
-                                )}
 
                                 {/* Row 2: Unified Navigation Tabs & View Controls */}
                                 <div className="flex items-center justify-between gap-3 flex-wrap pb-1 border-b border-slate-200/60 dark:border-[#15334d]/60">
@@ -3706,7 +3620,7 @@ ${activePromptText}
                                             onClick={handleResendPrompt}
                                             disabled={isResending}
                                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] bg-emerald-50 dark:bg-[#0c2438] text-emerald-700 dark:text-emerald-300 border border-emerald-300/60 dark:border-[#15334d] hover:bg-emerald-100 dark:hover:bg-[#15334d] text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50 mt-1"
-                                            title="Send latest prompt from this project [Hotkey: N]"
+                                            title="Send latest prompt from this project (Hotkey: N)"
                                         >
                                             <RotateCw className={cn('w-3.5 h-3.5 text-emerald-500', isResending && 'animate-spin')} />
                                             <span>Send Now</span>

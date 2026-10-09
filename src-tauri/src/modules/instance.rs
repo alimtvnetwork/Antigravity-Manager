@@ -85,6 +85,8 @@ pub fn open_instance_db() -> Result<rusqlite::Connection, String> {
 pub struct InstanceProcessRecord {
     pub instance_id: String,
     pub pid: u32,
+    pub pids: Vec<u32>,
+    pub primary_pid: Option<u32>,
     pub data_dir: String,
     pub launched_at: i64,
     pub last_verified_at: i64,
@@ -92,85 +94,90 @@ pub struct InstanceProcessRecord {
     pub command_line: Option<String>,
 }
 
-pub static SMART_PROCESS_CACHE: Lazy<Arc<RwLock<HashMap<String, InstanceProcessRecord>>>> =
+pub type InstanceProcessCacheItem = InstanceProcessRecord;
+
+pub static INSTANCE_PROCESS_CACHE: Lazy<Arc<RwLock<HashMap<String, InstanceProcessRecord>>>> =
     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
 
-/// Check if a specific PID is alive in the operating system in sub-millisecond time.
-pub fn is_pid_alive_targeted(pid: u32) -> bool {
+pub static SMART_PROCESS_CACHE: Lazy<Arc<RwLock<HashMap<String, InstanceProcessRecord>>>> =
+    Lazy::new(|| INSTANCE_PROCESS_CACHE.clone());
+
+/// Check if a PID is alive in the OS process table
+pub fn is_pid_alive_os(pid: u32) -> bool {
     if pid == 0 {
         return false;
     }
+    #[cfg(unix)]
+    {
+        let ret = unsafe { libc::kill(pid as libc::pid_t, 0) };
+        if ret == 0 {
+            return true;
+        }
+        let err = std::io::Error::last_os_error().raw_os_error();
+        err == Some(libc::EPERM)
+    }
+    #[cfg(not(unix))]
+    {
+        let mut sys = sysinfo::System::new();
+        let target_pid = sysinfo::Pid::from_u32(pid);
+        sys.refresh_processes_specifics(
+            sysinfo::ProcessesToUpdate::Some(&[target_pid]),
+            sysinfo::ProcessRefreshKind::new(),
+        );
+        sys.process(target_pid).is_some()
+    }
+}
 
-    let mut sys = System::new();
-    let target = sysinfo::Pid::from_u32(pid);
-    sys.refresh_processes_specifics(
-        sysinfo::ProcessesToUpdate::Some(&[target]),
-        sysinfo::ProcessRefreshKind::new(),
-    );
-    sys.process(target).is_some()
+/// Check if a specific PID is alive in the operating system in sub-millisecond time.
+pub fn is_pid_alive_targeted(pid: u32) -> bool {
+    is_pid_alive_os(pid)
+}
+
+/// Get cached instance process record if present
+pub fn get_cached_instance_process(instance_id: &str) -> Option<InstanceProcessRecord> {
+    let cache = INSTANCE_PROCESS_CACHE.read().ok()?;
+    cache.get(instance_id).cloned()
+}
+
+/// Invalidate process cache entry for a specific instance and its canonical ID
+pub fn invalidate_instance_process_cache(instance_id: &str) {
+    if let Ok(mut cache) = INSTANCE_PROCESS_CACHE.write() {
+        cache.remove(instance_id);
+        if let Ok(canonical_id) = resolve_instance_id(instance_id) {
+            cache.remove(&canonical_id);
+        }
+    }
+}
+
+/// Update cached process record for an instance
+pub fn update_cached_instance_process(record: InstanceProcessRecord) {
+    if let Ok(mut cache) = INSTANCE_PROCESS_CACHE.write() {
+        cache.insert(record.instance_id.clone(), record);
+    }
 }
 
 /// Query the in-memory smart process cache or discover living PID from the OS.
 pub fn get_or_detect_instance_process(instance_id: &str) -> Option<InstanceProcessRecord> {
-    let resolved_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
-    let now = chrono::Utc::now().timestamp();
-
-    // 1. Tier 1: Fast cached verification
-    {
-        let cache_read = SMART_PROCESS_CACHE.read().ok()?;
-        if let Some(record) = cache_read.get(&resolved_id) {
-            if record.pid > 0 && is_pid_alive_targeted(record.pid) {
-                drop(cache_read);
-                if let Ok(mut cache_write) = SMART_PROCESS_CACHE.write() {
-                    if let Some(rec) = cache_write.get_mut(&resolved_id) {
-                        rec.last_verified_at = now;
-                        rec.is_alive = true;
-                        return Some(rec.clone());
-                    }
-                }
-            }
-        }
-    }
-
-    // Remove stale cache entry
-    if let Ok(mut cache_write) = SMART_PROCESS_CACHE.write() {
-        cache_write.remove(&resolved_id);
-    }
-
-    // 2. Tier 2: Targeted system re-scan
-    let registry = load_registry().ok()?;
-    let inst = registry
-        .instances
-        .iter()
-        .find(|i| i.id == resolved_id || (resolved_id == "default" && i.is_default))?;
-
-    let is_default = inst.is_default || inst.id == "default";
-    let pids = find_pids_for_data_dir(&inst.data_dir, is_default);
-    let candidate_pid = pids.first().copied().or_else(|| {
-        let saved = inst.pid.or_else(|| get_instance_saved_pid(&resolved_id));
-        saved.filter(|&sp| sp > 0 && is_pid_alive_targeted(sp))
-    });
-
-    if let Some(pid) = candidate_pid {
-        if pid > 0 && is_pid_alive_targeted(pid) {
-            let record = InstanceProcessRecord {
-                instance_id: resolved_id.clone(),
-                pid,
-                data_dir: inst.data_dir.clone(),
+    let canonical_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
+    let (is_running, primary_pid, pids) = is_instance_process_running_smart(&canonical_id);
+    if is_running {
+        get_cached_instance_process(&canonical_id).or_else(|| {
+            let now = chrono::Utc::now().timestamp();
+            Some(InstanceProcessRecord {
+                instance_id: canonical_id.clone(),
+                pid: primary_pid.unwrap_or(0),
+                pids,
+                primary_pid,
+                data_dir: String::new(),
                 launched_at: now,
                 last_verified_at: now,
                 is_alive: true,
                 command_line: None,
-            };
-            if let Ok(mut cache_write) = SMART_PROCESS_CACHE.write() {
-                cache_write.insert(resolved_id.clone(), record.clone());
-            }
-            let _ = record_instance_pid(&resolved_id, pid, &inst.data_dir);
-            return Some(record);
-        }
+            })
+        })
+    } else {
+        None
     }
-
-    None
 }
 
 /// Guarantee that the instance is running prior to prompt dispatch.
@@ -180,51 +187,18 @@ pub fn ensure_instance_running_for_dispatch(
     instance_id: &str,
     workspace_path: Option<&str>,
 ) -> Result<u32, AppError> {
-    let resolved_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
-
-    if let Some(record) = get_or_detect_instance_process(&resolved_id) {
-        let pids = vec![record.pid];
-        let is_workspace_focused = if let Some(ws) = workspace_path {
-            let clean_ws = ws.trim_end_matches(['/', '\\']);
-            let repo_name = std::path::Path::new(clean_ws)
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or(clean_ws);
-            crate::modules::process::focus_instance_workspace_window(&pids, repo_name)
-        } else {
-            false
-        };
-
-        if !is_workspace_focused {
-            let _ = crate::modules::process::focus_instance_pids(&pids);
-        }
-
-        crate::modules::logger::log_info(&format!(
-            "[SmartProcessCache] Instance '{}' (PID {}) is verified running; keeping process intact",
-            resolved_id, record.pid
-        ));
-        return Ok(record.pid);
-    }
-
-    crate::modules::logger::log_info(&format!(
-        "[SmartProcessCache] Instance '{}' confirmed dead across OS; cold launching targeted at workspace: {:?}",
-        resolved_id, workspace_path
-    ));
-
-    if let Some(ws) = workspace_path {
-        let ws_vec = vec![ws.to_string()];
-        launch_instance_with_workspaces(&resolved_id, Some(&ws_vec), true)?;
+    let canonical_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
+    let (is_running, pid) = ensure_instance_running_smart(&canonical_id, workspace_path)?;
+    if is_running {
+        Ok(pid.unwrap_or(0))
     } else {
-        launch_instance(&resolved_id)?;
+        Err(AppError::Process("Failed to launch instance".to_string()))
     }
-
-    let record = get_or_detect_instance_process(&resolved_id);
-    let launched_pid = record.map(|r| r.pid).unwrap_or(0);
-    Ok(launched_pid)
 }
 
 /// Record an instance PID launch in the SQLite database and in registry
 pub fn record_instance_pid(instance_id: &str, pid: u32, data_dir: &str) -> Result<(), String> {
+    let canonical_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
     let now = chrono::Utc::now().timestamp();
     if let Ok(conn) = open_instance_db() {
         let _ = conn.execute(
@@ -235,12 +209,16 @@ pub fn record_instance_pid(instance_id: &str, pid: u32, data_dir: &str) -> Resul
                 data_dir = excluded.data_dir,
                 launched_at = excluded.launched_at,
                 is_active = 1",
-            rusqlite::params![instance_id, pid as i64, data_dir, now],
+            rusqlite::params![canonical_id, pid as i64, data_dir, now],
         );
     }
 
     if let Ok(mut registry) = load_registry() {
-        if let Some(inst) = registry.instances.iter_mut().find(|i| i.id == instance_id) {
+        if let Some(inst) = registry
+            .instances
+            .iter_mut()
+            .find(|i| i.id == canonical_id || i.id == instance_id)
+        {
             inst.pid = Some(pid);
             inst.last_used = now;
             let _ = save_registry(&registry);
@@ -248,23 +226,28 @@ pub fn record_instance_pid(instance_id: &str, pid: u32, data_dir: &str) -> Resul
     }
 
     if pid > 0 {
-        if let Ok(mut cache) = SMART_PROCESS_CACHE.write() {
+        if let Ok(mut cache) = INSTANCE_PROCESS_CACHE.write() {
             let record = InstanceProcessRecord {
-                instance_id: instance_id.to_string(),
+                instance_id: canonical_id.clone(),
                 pid,
+                pids: vec![pid],
+                primary_pid: Some(pid),
                 data_dir: data_dir.to_string(),
                 launched_at: now,
                 last_verified_at: now,
                 is_alive: true,
                 command_line: None,
             };
-            cache.insert(instance_id.to_string(), record);
+            cache.insert(canonical_id.clone(), record.clone());
+            if instance_id != canonical_id {
+                cache.insert(instance_id.to_string(), record);
+            }
         }
     }
 
     crate::modules::logger::log_info(&format!(
         "[Instance] Saved instance '{}' launch PID {} to SQLite DB and registry",
-        instance_id, pid
+        canonical_id, pid
     ));
     Ok(())
 }
@@ -293,23 +276,27 @@ pub fn get_instance_saved_pid(instance_id: &str) -> Option<u32> {
 
 /// Mark instance PID as stopped in SQLite DB and registry
 pub fn mark_instance_stopped(instance_id: &str) -> Result<(), String> {
+    let canonical_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
     if let Ok(conn) = open_instance_db() {
         let _ = conn.execute(
-            "UPDATE instance_processes SET is_active = 0 WHERE instance_id = ?1",
-            rusqlite::params![instance_id],
+            "UPDATE instance_processes SET is_active = 0 WHERE instance_id = ?1 OR instance_id = ?2",
+            rusqlite::params![canonical_id, instance_id],
         );
     }
 
     if let Ok(mut registry) = load_registry() {
-        if let Some(inst) = registry.instances.iter_mut().find(|i| i.id == instance_id) {
+        if let Some(inst) = registry
+            .instances
+            .iter_mut()
+            .find(|i| i.id == canonical_id || i.id == instance_id)
+        {
             inst.pid = None;
             let _ = save_registry(&registry);
         }
     }
 
-    if let Ok(mut cache) = SMART_PROCESS_CACHE.write() {
-        cache.remove(instance_id);
-    }
+    invalidate_instance_process_cache(instance_id);
+    invalidate_instance_process_cache(&canonical_id);
 
     Ok(())
 }
@@ -3237,43 +3224,6 @@ pub struct InstanceProcessCacheItem {
     pub last_checked: std::time::Instant,
 }
 
-static INSTANCE_PROCESS_CACHE: std::sync::LazyLock<
-    std::sync::Mutex<std::collections::HashMap<String, InstanceProcessCacheItem>>,
-> = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
-
-/// Check if a PID is alive in the OS process table
-pub fn is_pid_alive_os(pid: u32) -> bool {
-    if pid == 0 {
-        return false;
-    }
-    #[cfg(unix)]
-    {
-        let ret = unsafe { libc::kill(pid as libc::pid_t, 0) };
-        if ret == 0 {
-            return true;
-        }
-        let err = std::io::Error::last_os_error().raw_os_error();
-        err == Some(libc::EPERM)
-    }
-    #[cfg(not(unix))]
-    {
-        let mut sys = sysinfo::System::new();
-        let target_pid = sysinfo::Pid::from_u32(pid);
-        sys.refresh_processes_specifics(
-            sysinfo::ProcessesToUpdate::Some(&[target_pid]),
-            sysinfo::ProcessRefreshKind::new(),
-        );
-        sys.process(target_pid).is_some()
-    }
-}
-
-/// Invalidate process cache entry for a specific instance
-pub fn invalidate_instance_process_cache(instance_id: &str) {
-    if let Ok(mut cache) = INSTANCE_PROCESS_CACHE.lock() {
-        cache.remove(instance_id);
-    }
-}
-
 /// Force refresh process cache, enumerate all instances from registry, identify live PIDs, cache them, and return actively running count
 pub fn scan_and_cache_all_running_instances() -> usize {
     force_refresh_process_cache();
@@ -3282,12 +3232,13 @@ pub fn scan_and_cache_all_running_instances() -> usize {
         Err(_) => return 0,
     };
     let mut running_count = 0;
+    let now = chrono::Utc::now().timestamp();
     for inst in &registry.instances {
         let is_default = inst.is_default || inst.id == "default";
         let mut pids = find_pids_for_data_dir(&inst.data_dir, is_default);
         if let Some(saved_pid) = inst.pid.or_else(|| get_instance_saved_pid(&inst.id)) {
             let is_saved_alive =
-                saved_pid > 0 && is_pid_alive_os(saved_pid) && saved_pid_matches(saved_pid);
+                saved_pid > 0 && is_pid_alive_targeted(saved_pid) && saved_pid_matches(saved_pid);
             if is_saved_alive && !pids.contains(&saved_pid) {
                 pids.push(saved_pid);
             }
@@ -3300,28 +3251,21 @@ pub fn scan_and_cache_all_running_instances() -> usize {
         if is_running {
             running_count += 1;
         }
-        if let Ok(mut cache) = INSTANCE_PROCESS_CACHE.lock() {
-            cache.insert(
-                inst.id.clone(),
-                InstanceProcessCacheItem {
-                    instance_id: inst.id.clone(),
-                    pids: pids.clone(),
-                    primary_pid,
-                    is_running,
-                    last_checked: std::time::Instant::now(),
-                },
-            );
+        let record = InstanceProcessRecord {
+            instance_id: inst.id.clone(),
+            pid: primary_pid.unwrap_or(0),
+            pids: pids.clone(),
+            primary_pid,
+            data_dir: inst.data_dir.clone(),
+            launched_at: now,
+            last_verified_at: now,
+            is_alive: is_running,
+            command_line: None,
+        };
+        if let Ok(mut cache) = INSTANCE_PROCESS_CACHE.write() {
+            cache.insert(inst.id.clone(), record.clone());
             if !inst.name.is_empty() && inst.name != inst.id {
-                cache.insert(
-                    inst.name.clone(),
-                    InstanceProcessCacheItem {
-                        instance_id: inst.id.clone(),
-                        pids: pids.clone(),
-                        primary_pid,
-                        is_running,
-                        last_checked: std::time::Instant::now(),
-                    },
-                );
+                cache.insert(inst.name.clone(), record);
             }
         }
     }
@@ -3333,46 +3277,29 @@ pub fn get_instance_running_process_count() -> usize {
     scan_and_cache_all_running_instances()
 }
 
-/// Smart check if instance process is running, using cache with PID liveness verification
-pub fn is_instance_process_running_smart(instance_id: &str) -> (bool, Option<u32>, Vec<u32>) {
-    let cached_entry = {
-        if let Ok(cache) = INSTANCE_PROCESS_CACHE.lock() {
-            cache.get(instance_id).cloned()
-        } else {
-            None
+fn check_cached_pid_alive(
+    instance_id: &str,
+    canonical_id: &str,
+) -> Option<(bool, Option<u32>, Vec<u32>)> {
+    let entry = get_cached_instance_process(canonical_id)
+        .or_else(|| get_cached_instance_process(instance_id))?;
+    if let Some(pid) = entry.primary_pid {
+        let is_alive = is_pid_alive_targeted(pid) && saved_pid_matches(pid);
+        if is_alive {
+            return Some((true, Some(pid), entry.pids));
         }
-    };
-
-    if let Some(entry) = cached_entry {
-        if let Some(pid) = entry.primary_pid {
-            let is_alive = is_pid_alive_os(pid) && saved_pid_matches(pid);
-            if is_alive {
-                return (true, Some(pid), entry.pids);
-            }
-        }
-        invalidate_instance_process_cache(instance_id);
     }
+    invalidate_instance_process_cache(instance_id);
+    None
+}
 
-    force_refresh_process_cache();
-
-    let registry = match load_registry() {
-        Ok(r) => r,
-        Err(_) => return (false, None, Vec::new()),
-    };
-    let inst = match registry
-        .instances
-        .iter()
-        .find(|i| i.id == instance_id || i.name == instance_id)
-    {
-        Some(i) => i,
-        None => return (false, None, Vec::new()),
-    };
-
-    let is_default_inst = inst.is_default || inst.id == "default";
+fn scan_instance_os_pids(inst: &InstanceConfig, canonical_id: &str) -> Vec<u32> {
+    let is_default_inst = inst.is_default || inst.id == "default" || canonical_id == "default";
     let mut pids = find_pids_for_data_dir(&inst.data_dir, is_default_inst);
-    if let Some(saved_pid) = inst.pid.or_else(|| get_instance_saved_pid(instance_id)) {
+    let saved = inst.pid.or_else(|| get_instance_saved_pid(canonical_id));
+    if let Some(saved_pid) = saved {
         let is_saved_alive =
-            saved_pid > 0 && is_pid_alive_os(saved_pid) && saved_pid_matches(saved_pid);
+            saved_pid > 0 && is_pid_alive_targeted(saved_pid) && saved_pid_matches(saved_pid);
         if is_saved_alive && !pids.contains(&saved_pid) {
             pids.push(saved_pid);
         }
@@ -3380,36 +3307,84 @@ pub fn is_instance_process_running_smart(instance_id: &str) -> (bool, Option<u32
     if pids.is_empty() && is_default_inst {
         pids = crate::modules::process::get_antigravity_pids(None);
     }
+    pids
+}
 
-    let is_running = !pids.is_empty();
+fn cache_live_instance_process(
+    canonical_id: &str,
+    alias: &str,
+    name: &str,
+    data_dir: &str,
+    pids: Vec<u32>,
+) -> (Option<u32>, Vec<u32>) {
     let primary_pid = pids.first().copied();
-
-    if let Ok(mut cache) = INSTANCE_PROCESS_CACHE.lock() {
-        cache.insert(
-            instance_id.to_string(),
-            InstanceProcessCacheItem {
-                instance_id: instance_id.to_string(),
-                pids: pids.clone(),
-                primary_pid,
-                is_running,
-                last_checked: std::time::Instant::now(),
-            },
-        );
-        if !inst.name.is_empty() && inst.name != instance_id {
-            cache.insert(
-                inst.name.clone(),
-                InstanceProcessCacheItem {
-                    instance_id: inst.id.clone(),
-                    pids: pids.clone(),
-                    primary_pid,
-                    is_running,
-                    last_checked: std::time::Instant::now(),
-                },
-            );
+    let now = chrono::Utc::now().timestamp();
+    let record = InstanceProcessRecord {
+        instance_id: canonical_id.to_string(),
+        pid: primary_pid.unwrap_or(0),
+        pids: pids.clone(),
+        primary_pid,
+        data_dir: data_dir.to_string(),
+        launched_at: now,
+        last_verified_at: now,
+        is_alive: !pids.is_empty(),
+        command_line: None,
+    };
+    if let Ok(mut cache) = INSTANCE_PROCESS_CACHE.write() {
+        cache.insert(canonical_id.to_string(), record.clone());
+        if alias != canonical_id {
+            cache.insert(alias.to_string(), record.clone());
+        }
+        if !name.is_empty() && name != canonical_id {
+            cache.insert(name.to_string(), record);
         }
     }
+    if let Some(pid) = primary_pid {
+        let _ = record_instance_pid(canonical_id, pid, data_dir);
+    }
+    (primary_pid, pids)
+}
 
-    (is_running, primary_pid, pids)
+/// Smart check if instance process is running, using cache with PID liveness verification
+pub fn is_instance_process_running_smart(instance_id: &str) -> (bool, Option<u32>, Vec<u32>) {
+    let canonical_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
+    if let Some(res) = check_cached_pid_alive(instance_id, &canonical_id) {
+        return res;
+    }
+    force_refresh_process_cache();
+    let registry = match load_registry() {
+        Ok(r) => r,
+        Err(_) => return (false, None, Vec::new()),
+    };
+    let inst = registry.instances.iter().find(|i| {
+        i.id == canonical_id
+            || i.id == instance_id
+            || i.name == instance_id
+            || (canonical_id == "default" && i.is_default)
+    });
+    let Some(inst) = inst else {
+        return (false, None, Vec::new());
+    };
+    let pids = scan_instance_os_pids(inst, &canonical_id);
+    if pids.is_empty() {
+        return (false, None, Vec::new());
+    }
+    let (primary_pid, pids) =
+        cache_live_instance_process(&canonical_id, instance_id, &inst.name, &inst.data_dir, pids);
+    (true, primary_pid, pids)
+}
+
+fn focus_running_instance(pids: &[u32], workspace_path: Option<&str>) {
+    if let Some(ws) = workspace_path {
+        let clean_ws = ws.trim_end_matches(['/', '\\']);
+        let repo_name = Path::new(clean_ws)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(clean_ws);
+        let _ = crate::modules::process::focus_instance_workspace_window(pids, repo_name);
+    } else {
+        let _ = crate::modules::process::focus_instance_pids(pids);
+    }
 }
 
 /// Smart ensure instance is running:
@@ -3420,40 +3395,32 @@ pub fn ensure_instance_running_smart(
     instance_id: &str,
     workspace_path: Option<&str>,
 ) -> Result<(bool, Option<u32>), crate::error::AppError> {
-    let (is_running, primary_pid, pids) = is_instance_process_running_smart(instance_id);
+    let canonical_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
+    let (is_running, primary_pid, pids) = is_instance_process_running_smart(&canonical_id);
     if is_running {
         crate::modules::logger::log_info(&format!(
-            "[Instance] Instance '{}' is already running (PID: {:?}). Reusing existing process without re-launching.",
-            instance_id, primary_pid
+            "[SmartProcessCache] Instance '{}' ({}) is verified running (PID: {:?}). Zero relaunch guarantee active.",
+            instance_id, canonical_id, primary_pid
         ));
-        if let Some(ws) = workspace_path {
-            let clean_ws = ws.trim_end_matches(['/', '\\']);
-            let repo_name = std::path::Path::new(clean_ws)
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or(clean_ws);
-            let _ = crate::modules::process::focus_instance_workspace_window(&pids, repo_name);
-        } else {
-            let _ = crate::modules::process::focus_instance_pids(&pids);
-        }
+        focus_running_instance(&pids, workspace_path);
         return Ok((true, primary_pid));
     }
 
     crate::modules::logger::log_info(&format!(
-        "[Instance] Instance '{}' is not running (PID closed/not found). Launching IDE instance...",
-        instance_id
+        "[SmartProcessCache] Instance '{}' ({}) confirmed offline across OS. Initiating cold launch...",
+        instance_id, canonical_id
     ));
     if let Some(ws) = workspace_path {
         let ws_vec = vec![ws.to_string()];
-        launch_instance_with_workspaces(instance_id, Some(&ws_vec), true)?;
+        launch_instance_with_workspaces(&canonical_id, Some(&ws_vec), true)?;
     } else {
-        launch_instance(instance_id)?;
+        launch_instance(&canonical_id)?;
     }
 
     std::thread::sleep(std::time::Duration::from_millis(800));
-    invalidate_instance_process_cache(instance_id);
+    invalidate_instance_process_cache(&canonical_id);
     force_refresh_process_cache();
-    let (is_now_running, new_pid, _) = is_instance_process_running_smart(instance_id);
+    let (is_now_running, new_pid, _) = is_instance_process_running_smart(&canonical_id);
 
     Ok((is_now_running, new_pid))
 }
@@ -3468,7 +3435,8 @@ pub fn focus_or_launch_instance_with_workspace(
     instance_id: &str,
     workspace_path: Option<&str>,
 ) -> Result<bool, crate::error::AppError> {
-    let (is_running, _) = ensure_instance_running_smart(instance_id, workspace_path)?;
+    let canonical_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
+    let (is_running, _) = ensure_instance_running_smart(&canonical_id, workspace_path)?;
     Ok(is_running)
 }
 
@@ -3478,12 +3446,13 @@ pub fn focus_or_launch_workspace(
     repo_path: &str,
     repo_name: &str,
 ) -> Result<bool, crate::error::AppError> {
+    let canonical_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
     let target_path = if !repo_path.is_empty() {
         repo_path
     } else {
         repo_name
     };
-    let (is_running, _) = ensure_instance_running_smart(instance_id, Some(target_path))?;
+    let (is_running, _) = ensure_instance_running_smart(&canonical_id, Some(target_path))?;
     Ok(is_running)
 }
 
@@ -4608,9 +4577,7 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     }
 
     let _ = mark_instance_stopped(instance_id);
-    if let Ok(mut cache) = SMART_PROCESS_CACHE.write() {
-        cache.remove(instance_id);
-    }
+    invalidate_instance_process_cache(instance_id);
     crate::modules::repo_db::invalidate_prompt_tree_cache(Some(instance_id));
 
     // Small settle delay to ensure OS flushes file handles and SQLite locks

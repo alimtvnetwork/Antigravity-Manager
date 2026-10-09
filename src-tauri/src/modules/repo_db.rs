@@ -922,10 +922,11 @@ struct ConversationSummaryRow {
     status: String,
     not_fully_idle: i32,
     workspace_uris: Option<String>,
+    last_modified_time: Option<String>,
 }
 
 fn read_conversation_summary_rows(conn: &Connection) -> Vec<ConversationSummaryRow> {
-    let wide = "SELECT conversation_id, preview, status, not_fully_idle, workspace_uris
+    let wide = "SELECT conversation_id, preview, status, not_fully_idle, workspace_uris, last_modified_time
          FROM conversation_summaries
          ORDER BY last_modified_time DESC
          LIMIT 25";
@@ -937,6 +938,7 @@ fn read_conversation_summary_rows(conn: &Connection) -> Vec<ConversationSummaryR
                 status: row.get::<_, Option<String>>(2)?.unwrap_or_default(),
                 not_fully_idle: row.get::<_, Option<i32>>(3)?.unwrap_or(0),
                 workspace_uris: row.get(4)?,
+                last_modified_time: row.get::<_, Option<String>>(5).ok().flatten(),
             })
         }) {
             return rows.flatten().collect();
@@ -954,8 +956,9 @@ fn read_conversation_summary_rows(conn: &Connection) -> Vec<ConversationSummaryR
             cid: row.get(0)?,
             preview: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
             status: String::new(),
-            not_fully_idle: 1,
+            not_fully_idle: 0,
             workspace_uris: row.get(2)?,
+            last_modified_time: None,
         })
     }) else {
         return Vec::new();
@@ -1000,9 +1003,23 @@ pub fn discover_running_prompts_from_antigravity(instance_id: &str) -> Vec<Activ
                 continue;
             }
 
-            let is_running_or_recent =
-                not_fully_idle != 0 || status.contains("RUNNING") || prompts.is_empty();
-            if !is_running_or_recent && prompts.len() >= 5 {
+            let is_genuinely_running = not_fully_idle != 0 && status.contains("RUNNING");
+            if !is_genuinely_running {
+                continue;
+            }
+
+            let last_time_epoch = item
+                .last_modified_time
+                .as_deref()
+                .map(parse_flexible_timestamp)
+                .unwrap_or(0);
+            let is_recent = last_time_epoch > 0 && (now - last_time_epoch <= 60);
+            if !is_recent {
+                continue;
+            }
+
+            let inspection = inspect_conversation_transcript(&base_dir, &cid);
+            if inspection.is_terminal_done {
                 continue;
             }
 
@@ -2247,70 +2264,25 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
     Ok(dispatched_count)
 }
 
-/// Enqueue a prompt for an instance into active_prompts FIFO scheduler table.
-pub fn enqueue_prompt_for_instance(
-    instance_id: &str,
-    prompt_text: &str,
-    workspace_path: Option<&str>,
-) -> Result<i64, AppError> {
-    enqueue_prompt_for_instance_full(instance_id, prompt_text, workspace_path, None, None)
-}
-
-/// Enqueue a prompt with optional conversation_id and project_id metadata.
+/// Enqueue a prompt with optional conversation_id and project_id metadata, delegating to the authoritative enqueue_prompt_for_instance.
 pub fn enqueue_prompt_for_instance_full(
     instance_id: &str,
     prompt_text: &str,
     workspace_path: Option<&str>,
     conversation_id: Option<&str>,
-    project_id: Option<&str>,
+    _project_id: Option<&str>,
 ) -> Result<i64, AppError> {
+    let repo_path = workspace_path.unwrap_or("").trim();
+    let prompt = enqueue_prompt_for_instance(instance_id, repo_path, prompt_text, conversation_id)
+        .map_err(AppError::Config)?;
     let conn = connect_db().map_err(AppError::Config)?;
-    let now = Utc::now().timestamp();
-    let norm_inst = crate::modules::instance::resolve_instance_id(instance_id)
-        .unwrap_or_else(|_| instance_id.to_string());
-    let clean_repo = workspace_path.unwrap_or("").trim();
-    let proj_id = project_id
-        .map(|s| s.to_string())
-        .or_else(|| {
-            if clean_repo.is_empty() {
-                None
-            } else {
-                conn.query_row(
-                    "SELECT id FROM running_projects WHERE repo_path = ?1 LIMIT 1",
-                    rusqlite::params![clean_repo],
-                    |r| r.get(0),
-                )
-                .ok()
-            }
-        })
-        .unwrap_or_else(|| {
-            if clean_repo.is_empty() {
-                norm_inst.clone()
-            } else {
-                clean_repo.to_string()
-            }
-        });
-
-    let prompt_uuid = format!("queued-{}-{}", norm_inst, uuid::Uuid::new_v4());
-
-    conn.execute(
-        "INSERT INTO active_prompts (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, 'gemini-2.5-pro', ?6, 'queued', ?7, ?8)",
-        rusqlite::params![
-            &prompt_uuid,
-            &proj_id,
-            &norm_inst,
-            clean_repo,
-            prompt_text,
-            conversation_id,
-            now,
-            now,
-        ],
-    )
-    .map_err(AppError::Database)?;
-
-    let row_id = conn.last_insert_rowid();
-    invalidate_prompt_tree_cache(Some(&norm_inst));
+    let row_id: i64 = conn
+        .query_row(
+            "SELECT rowid FROM active_prompts WHERE id = ?1 LIMIT 1",
+            rusqlite::params![&prompt.id],
+            |r| r.get(0),
+        )
+        .unwrap_or(1);
     Ok(row_id)
 }
 
@@ -3675,6 +3647,8 @@ pub fn enqueue_prompt_for_instance(
         }
     }
 
+    invalidate_prompt_tree_cache(Some(&canonical_inst));
+
     crate::modules::logger::log_info(&format!(
         "[RepoDB] enqueue_prompt_for_instance recorded prompt '{}' for instance '{}' in '{}'",
         active_prompt.id, canonical_inst, repo_path
@@ -3966,7 +3940,8 @@ pub fn auto_resume_recent_prompts(
             .prepare(
                 "SELECT id, prompt_content, model, image_payload 
                  FROM active_prompts 
-                 WHERE (project_id = ?1 OR repo_path = ?2 OR project_id LIKE ?3)
+                 WHERE status IN ('queued', 'pending')
+                   AND (project_id = ?1 OR repo_path = ?2 OR project_id LIKE ?3)
                    AND (instance_id = ?4 OR (?4 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))
                  ORDER BY created_at ASC, id ASC LIMIT 1",
             )
@@ -3986,28 +3961,32 @@ pub fn auto_resume_recent_prompts(
             )
             .ok();
 
-        // If not found in DB, check existing .antigravity_resume_task.json
+        // If not found in DB, check existing .antigravity_resume_task.json with valid queued/pending status
         if maybe_prompt.is_none() {
             let task_file = PathBuf::from(&project.repo_path).join(".antigravity_resume_task.json");
             if task_file.exists() {
                 if let Ok(c) = fs::read_to_string(&task_file) {
                     if let Ok(v) = serde_json::from_str::<serde_json::Value>(&c) {
-                        if let Some(txt) = v.get("prompt_content").and_then(|t| t.as_str()) {
-                            if !txt.trim().is_empty() {
-                                let pid = v
-                                    .get("prompt_id")
-                                    .and_then(|i| i.as_str())
-                                    .unwrap_or(&project.id)
-                                    .to_string();
-                                let m = v
-                                    .get("model")
-                                    .and_then(|m| m.as_str())
-                                    .map(|s| s.to_string());
-                                let img = v
-                                    .get("image_payload")
-                                    .and_then(|i| i.as_str())
-                                    .map(|s| s.to_string());
-                                maybe_prompt = Some((pid, txt.to_string(), m, img));
+                        let task_status = v.get("status").and_then(|s| s.as_str()).unwrap_or("");
+                        let is_pending_status = task_status == "queued" || task_status == "pending";
+                        if is_pending_status {
+                            if let Some(txt) = v.get("prompt_content").and_then(|t| t.as_str()) {
+                                if !txt.trim().is_empty() {
+                                    let pid = v
+                                        .get("prompt_id")
+                                        .and_then(|i| i.as_str())
+                                        .unwrap_or(&project.id)
+                                        .to_string();
+                                    let m = v
+                                        .get("model")
+                                        .and_then(|m| m.as_str())
+                                        .map(|s| s.to_string());
+                                    let img = v
+                                        .get("image_payload")
+                                        .and_then(|i| i.as_str())
+                                        .map(|s| s.to_string());
+                                    maybe_prompt = Some((pid, txt.to_string(), m, img));
+                                }
                             }
                         }
                     }
@@ -4787,7 +4766,8 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
     };
 
     let is_non_prompt = !has_real_user_prompt && !is_subagent;
-    let effective_recent_active = if is_terminal_done {
+    let terminal_done = is_terminal_done || is_completed_or_waiting;
+    let effective_recent_active = if terminal_done {
         false
     } else {
         is_recent_active
@@ -4803,7 +4783,7 @@ fn inspect_conversation_transcript(base_dir: &Path, conversation_id: &str) -> Tr
         is_subagent,
         is_recent_active: effective_recent_active,
         is_non_prompt,
-        is_terminal_done,
+        is_terminal_done: terminal_done,
     }
 }
 
@@ -5011,7 +4991,10 @@ fn compute_project_conversation_tree(
                 ))
             }) {
                 for item in rows.flatten() {
-                    let (ws_uris_raw, _last_time, status, not_fully_idle) = item;
+                    let (ws_uris_raw, last_time_str, status, not_fully_idle) = item;
+                    let last_time_epoch = parse_flexible_timestamp(&last_time_str);
+                    let is_recent = last_time_epoch > 0 && (now_fb - last_time_epoch <= 120);
+                    let is_running = status.contains("RUNNING") && not_fully_idle > 0 && is_recent;
                     let uris: Vec<String> = serde_json::from_str(&ws_uris_raw).unwrap_or_default();
                     for uri in uris {
                         let raw_path = decode_uri_to_path(&uri);
@@ -5034,7 +5017,6 @@ fn compute_project_conversation_tree(
                             .map(|n| n.to_string_lossy().to_string())
                             .unwrap_or_else(|| "unnamed".to_string());
                         let project_key = format!("{}__{}", repo_name.to_lowercase(), norm_inst);
-                        let is_running = status.contains("RUNNING") && not_fully_idle > 0;
                         projects.push(RunningProject {
                             id: project_key,
                             instance_id: norm_inst,
@@ -5042,7 +5024,11 @@ fn compute_project_conversation_tree(
                             repo_path: raw_path,
                             workspace_storage_path: None,
                             is_running,
-                            last_detected_at: now_fb,
+                            last_detected_at: if last_time_epoch > 0 {
+                                last_time_epoch
+                            } else {
+                                now_fb
+                            },
                         });
                     }
                 }
@@ -5320,7 +5306,15 @@ fn compute_project_conversation_tree(
                                         cid: cid.clone(),
                                         title: title.clone(),
                                         prompt: effective_prompt.clone(),
-                                        status: status.clone(),
+                                        status: if is_conv_running {
+                                            "RUNNING".to_string()
+                                        } else if is_queued {
+                                            "QUEUED".to_string()
+                                        } else if inspection.is_terminal_done || is_explicit_idle || status.contains("RUNNING") {
+                                            "IDLE".to_string()
+                                        } else {
+                                            status.clone()
+                                        },
                                         is_running: is_conv_running,
                                         steps,
                                         last_mod: last_time_str.clone(),
@@ -6387,10 +6381,9 @@ pub fn format_tree_view_cli(max_words: usize, only_running: bool) -> String {
             .unwrap_or_default();
 
         out.push_str(&format!(
-            "📁 [AGM:{} | {}] [ProjID: {}] {} ({}) — {} [Instance: {}{}{}]\n",
+            "📁 #{} ({}) · {} ({}) — {} [Instance: {}{}{}]\n",
             proj.seq_code,
             proj.gitmap_seq_code,
-            proj.project_id,
             label,
             proj_badge,
             proj.repo_path,
@@ -6417,7 +6410,7 @@ pub fn format_tree_view_cli(max_words: usize, only_running: bool) -> String {
             };
 
             out.push_str(&format!(
-                "   {} 💬 [AGM:{} | {}] \"{}\" ({} {}{})\n",
+                "   {} 💬 #{} ({}) · \"{}\" ({} {}{})\n",
                 branch,
                 conv.seq_code,
                 conv.gitmap_seq_code,
@@ -6429,7 +6422,7 @@ pub fn format_tree_view_cli(max_words: usize, only_running: bool) -> String {
 
             if !conv.prompt_preview_200w.is_empty() {
                 out.push_str(&format!(
-                    "   {} └─ 📝 [Prompt ≤{}w ({} words)]: \"{}\"\n",
+                    "   {} └─ 📝 Prompt ≤{}w ({} words): \"{}\"\n",
                     sub_pipe, word_cap, conv.prompt_word_count, conv.prompt_preview_200w
                 ));
             }
@@ -6489,10 +6482,9 @@ pub fn format_tree_view_telegram_html(max_words: usize, only_running: bool) -> S
             .unwrap_or_default();
 
         out.push_str(&format!(
-            "\n📁 <code>[AGM:{} | {}]</code> <code>[ProjID: {}]</code> {} <b>{}</b>\n   🖥️ <i>Instance: {}{}{}</i> · 📂 <code>{}</code>\n",
+            "\n📁 <b>#{}</b> (<code>{}</code>) · {} <b>{}</b>\n   🖥️ <i>Instance: {}{}{}</i> · 📂 <code>{}</code>\n",
             escape_tg_html_local(&proj.seq_code),
             escape_tg_html_local(&proj.gitmap_seq_code),
-            escape_tg_html_local(&proj.project_id),
             p_icon,
             escape_tg_html_local(&label),
             escape_tg_html_local(&inst_seq_str),
@@ -6519,7 +6511,7 @@ pub fn format_tree_view_telegram_html(max_words: usize, only_running: bool) -> S
             };
 
             out.push_str(&format!(
-                "   {} 💬 <code>[AGM:{} | {}]</code> <b>{}</b> ({} {}{})\n",
+                "   {} 💬 <b>#{}</b> (<code>{}</code>) · <b>{}</b> ({} {}{})\n",
                 branch,
                 escape_tg_html_local(&conv.seq_code),
                 escape_tg_html_local(&conv.gitmap_seq_code),
@@ -6531,7 +6523,7 @@ pub fn format_tree_view_telegram_html(max_words: usize, only_running: bool) -> S
 
             if !conv.prompt_preview_200w.is_empty() {
                 out.push_str(&format!(
-                    "   {} └─ 📝 <b>[Prompt ≤{}w ({}w)]:</b> <i>\"[{}]\"</i>\n",
+                    "   {} └─ 📝 <b>Prompt ≤{}w ({}w):</b> <i>\"{}\"</i>\n",
                     sub_pipe,
                     word_cap,
                     conv.prompt_word_count,

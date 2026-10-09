@@ -207,12 +207,12 @@ export default function InstanceTable({
                                     )}
                                 >
                                     {/* 1. Merged Profile & Account */}
-                                    <td className="px-2 py-1 min-w-[150px] max-w-[190px]">
+                                    <td className="px-2 py-1 min-w-[140px] max-w-[180px]">
                                         <div className="flex items-center gap-1.5 flex-wrap">
-                                            <span className="px-1.5 py-0.5 rounded-[5px] text-[10px] font-mono font-bold bg-slate-100 dark:bg-[#071a27] text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-[#15334d]">
+                                            <span className="px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold bg-slate-100 dark:bg-[#071a27] text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-[#15334d]">
                                                 #{seq}
                                             </span>
-                                            <span className="font-bold text-slate-800 dark:text-slate-100 text-xs truncate max-w-[120px]" title={inst.config.name}>
+                                            <span className="font-bold text-slate-800 dark:text-slate-100 text-xs truncate max-w-[110px]" title={inst.config.name}>
                                                 {inst.config.name}
                                             </span>
                                             <span
@@ -324,19 +324,19 @@ export default function InstanceTable({
                                     </td>
 
                                     {/* 3. Status & PID */}
-                                    <td className="px-2 py-1 whitespace-nowrap min-w-[90px] max-w-[110px]">
+                                    <td className="px-2 py-1 whitespace-nowrap min-w-[85px] max-w-[105px]">
                                         {isBusy ? (
-                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[5px] text-[11px] font-bold bg-blue-50 text-blue-700 dark:bg-cyan-950/60 dark:text-cyan-300 border border-blue-300/60 dark:border-cyan-500/40 animate-pulse shadow-2xs">
-                                                <RotateCw className="w-3 h-3 animate-spin text-blue-500 dark:text-cyan-400 shrink-0" />
+                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-cyan-950/60 dark:text-cyan-300 border border-blue-300/60 dark:border-cyan-500/40 animate-pulse shadow-2xs">
+                                                <RotateCw className="w-2.5 h-2.5 animate-spin text-blue-500 dark:text-cyan-400 shrink-0" />
                                                 <span>{getActionLabel(currentAction)}</span>
                                             </span>
                                         ) : inst.is_running ? (
-                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[5px] text-[11px] font-semibold bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-300/50 dark:border-teal-800/80">
+                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] text-[10px] font-semibold bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-300/50 dark:border-teal-800/80">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
-                                                Running {inst.pid ? `(${inst.pid})` : ''}
+                                                Running{inst.pid ? ` (${inst.pid})` : ''}
                                             </span>
                                         ) : (
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded-[5px] text-[11px] font-medium bg-slate-100 text-slate-600 dark:bg-[#071a27] dark:text-slate-400 border border-slate-200 dark:border-[#15334d]">
+                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-[4px] text-[10px] font-medium bg-slate-100 text-slate-600 dark:bg-[#071a27] dark:text-slate-400 border border-slate-200 dark:border-[#15334d]">
                                                 Idle
                                             </span>
                                         )}
