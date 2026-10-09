@@ -115,6 +115,10 @@ else
     write_success "Rustup installed successfully."
 fi
 
+# 3b. Ensure required components (clippy + rustfmt are project gates)
+write_step "Ensuring clippy + rustfmt components..."
+rustup component add clippy rustfmt 2>/dev/null && write_success "clippy + rustfmt ready." || write_warn "Could not add clippy/rustfmt (offline?)."
+
 # 4. Final Toolchain Verification
 echo ""
 echo -e "${CYAN}--- Toolchain Verification ---${NC}"
