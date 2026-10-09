@@ -1,4 +1,4 @@
-import { Gemini, Claude, OpenAI } from '@lobehub/icons';
+import { Gemini, Claude, OpenAI, DeepSeek, Qwen, Meta } from '@lobehub/icons';
 
 /**
  * 模型配置接口
@@ -20,6 +20,12 @@ export interface ModelConfig {
     group: string;
     /** 选填标签 (用于筛选) */
     tags?: string[];
+    /** 展示优先级 (数字越小越靠前) */
+    priority?: number;
+    /** 能力标签: 模型擅长什么 */
+    capabilities?: Array<'chat' | 'reasoning' | 'code' | 'image' | 'vision' | 'agent' | 'fast' | 'long-context'>;
+    /** 速度档位: 响应有多快 */
+    speed?: 'nano' | 'fast' | 'balanced' | 'powerful';
 }
 
 /**
@@ -37,7 +43,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.flash_preview',
         group: 'Gemini 3',
         tags: ['flash'],
+        priority: 10,
+        capabilities: ['chat', 'fast'],
+        speed: 'fast',
     },
+
     'gemini-3.8-flash-tiered': {
         label: 'Gemini 3.8 Flash',
         shortLabel: 'G3.8 Flash',
@@ -47,7 +57,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.flash_preview',
         group: 'Gemini 3',
         tags: ['flash', 'tiered'],
+        priority: 11,
+        capabilities: ['chat', 'fast'],
+        speed: 'fast',
     },
+
     'gemini-3.8-flash-high': {
         label: 'Gemini 3.8 Flash (High)',
         shortLabel: 'G3.8 High',
@@ -57,7 +71,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.flash_preview',
         group: 'Gemini 3',
         tags: ['flash', 'high'],
+        priority: 12,
+        capabilities: ['chat', 'reasoning', 'fast'],
+        speed: 'fast',
     },
+
     'gemini-3.8-flash-medium': {
         label: 'Gemini 3.8 Flash (Medium)',
         shortLabel: 'G3.8 Med',
@@ -67,7 +85,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.flash_preview',
         group: 'Gemini 3',
         tags: ['flash', 'medium'],
+        priority: 13,
+        capabilities: ['chat', 'fast'],
+        speed: 'fast',
     },
+
     'gemini-3.8-flash-low': {
         label: 'Gemini 3.8 Flash (Low)',
         shortLabel: 'G3.8 Low',
@@ -77,7 +99,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.flash_preview',
         group: 'Gemini 3',
         tags: ['flash', 'low'],
+        priority: 14,
+        capabilities: ['chat', 'fast'],
+        speed: 'fast',
     },
+
     'gemini-3.7-flash-high': {
         label: 'Gemini 3.7 Flash (High)',
         shortLabel: 'G3.7 High',
@@ -87,7 +113,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.flash_preview',
         group: 'Gemini 3',
         tags: ['flash', 'high'],
+        priority: 20,
+        capabilities: ['chat', 'reasoning', 'fast'],
+        speed: 'fast',
     },
+
     'gemini-3.7-flash-medium': {
         label: 'Gemini 3.7 Flash (Medium)',
         shortLabel: 'G3.7 Med',
@@ -97,7 +127,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.flash_preview',
         group: 'Gemini 3',
         tags: ['flash', 'medium'],
+        priority: 21,
+        capabilities: ['chat', 'fast'],
+        speed: 'fast',
     },
+
     'gemini-3.7-flash-low': {
         label: 'Gemini 3.7 Flash (Low)',
         shortLabel: 'G3.7 Low',
@@ -107,7 +141,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.flash_preview',
         group: 'Gemini 3',
         tags: ['flash', 'low'],
+        priority: 22,
+        capabilities: ['chat', 'fast'],
+        speed: 'fast',
     },
+
     'gemini-3.7-flash-tiered': {
         label: 'Gemini 3.7 Flash (Tiered)',
         shortLabel: 'G3.7 Tiered',
@@ -117,7 +155,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.flash_preview',
         group: 'Gemini 3',
         tags: ['flash', 'tiered'],
+        priority: 23,
+        capabilities: ['chat', 'fast'],
+        speed: 'fast',
     },
+
     'gemini-3.1-pro-high': {
         label: 'Gemini 3.1 Pro High',
         shortLabel: 'G3.1 Pro',
@@ -127,7 +169,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.pro_high',
         group: 'Gemini 3',
         tags: ['pro', 'high'],
+        priority: 30,
+        capabilities: ['chat', 'reasoning', 'code'],
+        speed: 'balanced',
     },
+
     'gemini-3-flash': {
         label: 'Gemini 3 Flash',
         shortLabel: 'G3 Flash',
@@ -137,7 +183,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.flash_preview',
         group: 'Gemini 3',
         tags: ['flash'],
+        priority: 40,
+        capabilities: ['chat', 'fast'],
+        speed: 'fast',
     },
+
     'gemini-3.1-flash-image': {
         label: 'Gemini 3.1 Flash Image',
         shortLabel: 'G3.1 Image',
@@ -147,7 +197,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.pro_image_1_1',
         group: 'Gemini 3',
         tags: ['image', 'flash'],
+        priority: 70,
+        capabilities: ['image', 'vision'],
+        speed: 'balanced',
     },
+
     'gemini-3-pro-image': {
         label: 'Gemini 3 Image',
         shortLabel: 'G3 Image',
@@ -157,7 +211,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.pro_image_1_1',
         group: 'Gemini 3',
         tags: ['image'],
+        priority: 71,
+        capabilities: ['image', 'vision'],
+        speed: 'balanced',
     },
+
     'gemini-3.5-flash': {
         label: 'Gemini 3.5 Flash',
         shortLabel: 'G3.5 Flash',
@@ -167,7 +225,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.flash_preview',
         group: 'Gemini 3',
         tags: ['flash'],
+        priority: 41,
+        capabilities: ['chat', 'fast'],
+        speed: 'fast',
     },
+
     'gemini-3.7-flash': {
         label: 'Gemini 3.7 Flash',
         shortLabel: 'G3.7 Flash',
@@ -177,7 +239,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.flash_preview',
         group: 'Gemini 3',
         tags: ['flash'],
+        priority: 24,
+        capabilities: ['chat', 'fast'],
+        speed: 'fast',
     },
+
     'gemini-3.1-flash-lite': {
         label: 'Gemini 3.1 Flash Lite',
         shortLabel: 'G3.1 Lite',
@@ -187,7 +253,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.flash_lite',
         group: 'Gemini 3',
         tags: ['flash', 'lite'],
+        priority: 90,
+        capabilities: ['chat', 'fast'],
+        speed: 'nano',
     },
+
     'gemini-3.1-pro': {
         label: 'Gemini 3.1 Pro',
         shortLabel: 'G3.1 Pro',
@@ -197,7 +267,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.pro_high',
         group: 'Gemini 3',
         tags: ['pro'],
+        priority: 32,
+        capabilities: ['chat', 'reasoning', 'code'],
+        speed: 'balanced',
     },
+
     'gemini-3-flash-agent': {
         label: 'Gemini 3.5 Flash (High)',
         shortLabel: 'G3.5 Flash',
@@ -207,7 +281,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.flash_preview',
         group: 'Gemini 3',
         tags: ['flash', 'high'],
+        priority: 42,
+        capabilities: ['chat', 'agent', 'fast'],
+        speed: 'fast',
     },
+
     'gemini-pro-agent': {
         label: 'Gemini 3.1 Pro (High)',
         shortLabel: 'G3.1 Pro',
@@ -217,7 +295,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.pro_high',
         group: 'Gemini 3',
         tags: ['pro', 'high'],
+        priority: 31,
+        capabilities: ['chat', 'reasoning', 'code', 'agent'],
+        speed: 'balanced',
     },
+
     'gemini-3.1-pro-low': {
         label: 'Gemini 3.1 Pro Low',
         shortLabel: 'G3.1 Low',
@@ -227,49 +309,12 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.pro_low',
         group: 'Gemini 3',
         tags: ['pro', 'low'],
+        priority: 33,
+        capabilities: ['chat', 'code'],
+        speed: 'balanced',
     },
 
-    // Gemini 2.5 系列
-    'gemini-2.5-flash': {
-        label: 'Gemini 2.5 Flash',
-        shortLabel: 'G2.5 Flash',
-        protectedKey: 'gemini-flash',
-        Icon: Gemini.Color,
-        i18nKey: 'proxy.model.gemini_2_5_flash',
-        i18nDescKey: 'proxy.model.gemini_2_5_flash',
-        group: 'Gemini 2.5',
-        tags: ['flash'],
-    },
-    'gemini-2.5-flash-lite': {
-        label: 'Gemini 2.5 Flash Lite',
-        shortLabel: 'G2.5 Lite',
-        protectedKey: 'gemini-flash',
-        Icon: Gemini.Color,
-        i18nKey: 'proxy.model.flash_lite',
-        i18nDescKey: 'proxy.model.flash_lite',
-        group: 'Gemini 2.5',
-        tags: ['flash', 'lite'],
-    },
-    'gemini-2.5-flash-thinking': {
-        label: 'Gemini 2.5 Flash Think',
-        shortLabel: 'G2.5 Think',
-        protectedKey: 'gemini-flash',
-        Icon: Gemini.Color,
-        i18nKey: 'proxy.model.flash_thinking',
-        i18nDescKey: 'proxy.model.flash_thinking',
-        group: 'Gemini 2.5',
-        tags: ['flash', 'thinking'],
-    },
-    'gemini-2.5-pro': {
-        label: 'Gemini 2.5 Pro',
-        shortLabel: 'G2.5 Pro',
-        protectedKey: 'gemini-pro',
-        Icon: Gemini.Color,
-        i18nKey: 'proxy.model.gemini_2_5_pro',
-        i18nDescKey: 'proxy.model.gemini_2_5_pro',
-        group: 'Gemini 2.5',
-        tags: ['pro'],
-    },
+
 
     // Claude 系列
     'claude-sonnet-4-6': {
@@ -281,7 +326,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.claude_sonnet',
         group: 'Claude',
         tags: ['sonnet'],
+        priority: 50,
+        capabilities: ['chat', 'reasoning', 'code'],
+        speed: 'balanced',
     },
+
     'claude-sonnet-4-6-thinking': {
         label: 'Claude 4.6 TK',
         shortLabel: 'Claude 4.6 TK',
@@ -291,7 +340,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.claude_sonnet_thinking',
         group: 'Claude',
         tags: ['sonnet', 'thinking'],
+        priority: 53,
+        capabilities: ['chat', 'reasoning', 'code'],
+        speed: 'balanced',
     },
+
     'claude-opus-4-6': {
         label: 'Claude Opus 4.6',
         shortLabel: 'Claude Opus 4.6',
@@ -301,7 +354,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.claude_opus',
         group: 'Claude',
         tags: ['opus'],
+        priority: 52,
+        capabilities: ['chat', 'reasoning', 'code'],
+        speed: 'powerful',
     },
+
     'claude-opus-4-6-thinking': {
         label: 'Claude Opus 4.6 TK',
         shortLabel: 'Claude Opus 4.6 TK',
@@ -311,7 +368,11 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.claude_opus_thinking',
         group: 'Claude',
         tags: ['opus', 'thinking'],
+        priority: 51,
+        capabilities: ['chat', 'reasoning', 'code'],
+        speed: 'powerful',
     },
+
 
     // OpenAI / Outros modelos
     'gpt-oss-120b-medium': {
@@ -323,7 +384,77 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         i18nDescKey: 'proxy.model.gpt_oss',
         group: 'Other',
         tags: ['openai'],
+        priority: 60,
+        capabilities: ['chat', 'reasoning', 'code'],
+        speed: 'balanced',
     },
+    // Open Source 系列 (newer open-source models)
+    'gpt-oss-20b': {
+        label: 'GPT-OSS 20B',
+        shortLabel: 'GPT-OSS 20B',
+        protectedKey: 'gpt-oss',
+        Icon: OpenAI.Avatar,
+        i18nKey: 'proxy.model.gpt_oss',
+        i18nDescKey: 'proxy.model.gpt_oss',
+        group: 'Open Source',
+        tags: ['openai', 'open-source', 'small'],
+        priority: 91,
+        capabilities: ['chat', 'fast', 'code'],
+        speed: 'nano',
+    },
+    'deepseek-v4': {
+        label: 'DeepSeek V4',
+        shortLabel: 'DeepSeek V4',
+        protectedKey: 'deepseek',
+        Icon: DeepSeek.Color,
+        i18nKey: 'proxy.model.deepseek',
+        i18nDescKey: 'proxy.model.deepseek',
+        group: 'Open Source',
+        tags: ['open-source', 'reasoning'],
+        priority: 61,
+        capabilities: ['reasoning', 'code', 'chat'],
+        speed: 'balanced',
+    },
+    'qwen3-max': {
+        label: 'Qwen3 Max',
+        shortLabel: 'Qwen3 Max',
+        protectedKey: 'qwen',
+        Icon: Qwen.Color,
+        i18nKey: 'proxy.model.qwen',
+        i18nDescKey: 'proxy.model.qwen',
+        group: 'Open Source',
+        tags: ['open-source', 'flagship'],
+        priority: 62,
+        capabilities: ['chat', 'code', 'reasoning'],
+        speed: 'balanced',
+    },
+    'qwen3-8b': {
+        label: 'Qwen3 8B',
+        shortLabel: 'Qwen3 8B',
+        protectedKey: 'qwen',
+        Icon: Qwen.Color,
+        i18nKey: 'proxy.model.qwen',
+        i18nDescKey: 'proxy.model.qwen',
+        group: 'Open Source',
+        tags: ['open-source', 'small'],
+        priority: 92,
+        capabilities: ['chat', 'fast'],
+        speed: 'nano',
+    },
+    'llama-4-maverick': {
+        label: 'Llama 4 Maverick',
+        shortLabel: 'Llama 4',
+        protectedKey: 'llama',
+        Icon: Meta.Color,
+        i18nKey: 'proxy.model.llama',
+        i18nDescKey: 'proxy.model.llama',
+        group: 'Open Source',
+        tags: ['open-source', 'multimodal'],
+        priority: 63,
+        capabilities: ['chat', 'vision', 'code'],
+        speed: 'balanced',
+    },
+
 };
 
 /**
@@ -360,6 +491,9 @@ export function getGroupPriority(group: string): number {
     if (s.includes('openai') || s.includes('gpt')) {
         return 300;
     }
+    if (s.includes('open source') || s.includes('opensource')) {
+        return 310;
+    }
     return 500;
 }
 
@@ -394,7 +528,7 @@ export function inferModelGroup(modelIdOrName: string): string {
 /**
  * 组排序权威优先级 (保留向后兼容导出)
  */
-export const CANONICAL_GROUP_ORDER = ['Gemini 3', 'Gemini 2.5', 'Gemini', 'Claude', 'OpenAI', 'Other', 'Dynamic'];
+export const CANONICAL_GROUP_ORDER = ['Gemini 3', 'Gemini 2.5', 'Gemini', 'Claude', 'OpenAI', 'Open Source', 'Other', 'Dynamic'];
 
 /**
  * 从模型名称或 ID 中提取数字代号版本 (用于降序排列)
