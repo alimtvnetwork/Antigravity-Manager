@@ -152,6 +152,10 @@ pub(crate) async fn handle_generate_success(
         let image_success_manager = token_manager.clone();
         let image_success_account = account_id.clone();
         let image_success_model = mapped_model.clone();
+        // Clone borrowed params to owned Strings so the async stream is 'static
+        let mapped_model = mapped_model.to_string();
+        let session_id = session_id.to_string();
+        let account_id = account_id.to_string();
         let stream = async_stream::stream! {
             let _image_permit = image_permit_for_stream;
             let mut first_data = first_chunk;

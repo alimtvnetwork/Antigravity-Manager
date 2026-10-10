@@ -228,10 +228,10 @@ pub(crate) async fn handle_generate_error(
     {
         if matches!(strategy, RetryStrategy::GraceRetry(_)) {
             *retry_credentials = Some((
-                access_token.clone(),
-                project_id.clone(),
-                email.clone(),
-                account_id.clone(),
+                access_token.to_string(),
+                project_id.to_string(),
+                email.to_string(),
+                account_id.to_string(),
                 0,
             ));
         }
