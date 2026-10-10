@@ -6,7 +6,7 @@ const MAX_RETRY_ATTEMPTS: usize = 3;
 pub(crate) const MAX_INPUT_IMAGES: usize = 16;
 pub(crate) const MAX_INPUT_IMAGE_BYTES: usize = 20 * 1024 * 1024;
 pub(crate) const MAX_TOTAL_INPUT_IMAGE_BYTES: usize = 32 * 1024 * 1024;
-const CODEX_VISIBLE_THOUGHT_MESSAGE_PREFIX: &str = "msg_thought_";
+pub(crate) const CODEX_VISIBLE_THOUGHT_MESSAGE_PREFIX: &str = "msg_thought_";
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct NormalizedInputImage {
     mime_type: String,

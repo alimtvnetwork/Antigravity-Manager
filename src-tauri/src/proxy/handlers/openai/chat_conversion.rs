@@ -1,7 +1,11 @@
 // Chat <-> Responses conversion helpers and Codex ledger helpers.
+use std::collections::VecDeque;
+
 use serde_json::{json, Value};
 
-use crate::proxy::mappers::openai::{OpenAIContent, OpenAIResponse};
+use crate::proxy::mappers::openai::{OpenAIContent, OpenAIContentBlock, OpenAIResponse};
+use super::responses_media::responses_input_item_type;
+use super::image_input::CODEX_VISIBLE_THOUGHT_MESSAGE_PREFIX;
 
 fn openai_content_text(content: &OpenAIContent) -> String {
     match content {

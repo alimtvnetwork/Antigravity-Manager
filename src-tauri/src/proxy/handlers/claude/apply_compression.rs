@@ -97,7 +97,7 @@ pub(crate) async fn apply_compression(
                 &request_with_mapped,
                 &st.trace_id,
                 &token_manager_clone,
-                &state.st.upstream,
+                &st.upstream,
             )
             .await
             {

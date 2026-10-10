@@ -102,7 +102,7 @@ pub(crate) async fn prepare_attempt(st: &mut AttemptState, attempt: usize) -> Pr
     info!("✓ Using account: {} (type: {})", email, config.request_type);
 
     let mut request_with_mapped =
-        match apply_compression(&st.st.request_for_body, &mapped_model, st).await {
+        match apply_compression(&st.request_for_body, &mapped_model, st).await {
             Ok(r) => r,
             Err(resp) => return PrepOutcome::Respond(resp),
         };

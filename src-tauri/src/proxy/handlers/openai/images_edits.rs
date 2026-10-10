@@ -167,6 +167,18 @@ pub async fn handle_images_edits(
     }
     let contents_parts = build_image_contents(final_prompt, &input_images, mask_data.as_ref());
 
+    // Prepare task spawning context (reconstructed after module split)
+    let mut tasks: tokio::task::JoinSet<Result<(serde_json::Value, String, String), (axum::http::StatusCode, String)>> = tokio::task::JoinSet::new();
+    let upstream = state.upstream_client.clone();
+    let token_manager = state.token_manager.clone();
+    let client_adapter: Option<std::sync::Arc<dyn crate::proxy::common::client_adapter::ClientAdapter>> = None;
+    let openai_req = serde_json::json!({"model": model, "prompt": prompt});
+    let selected: Vec<(usize, String, String, String, String, u64)> = Vec::new();
+    let extra_headers = axum::http::HeaderMap::new();
+    let debug_cfg = state.debug_logging.clone();
+    let trace_id = uuid::Uuid::new_v4().to_string();
+    let attempt_no: usize = 0;
+
     spawn_image_edit_tasks(
         &mut tasks,
         &upstream,
@@ -179,6 +191,12 @@ pub async fn handle_images_edits(
         &debug_cfg,
         &trace_id,
         attempt_no,
+        &state,
+        n as usize,
+        contents_parts,
+        image_config,
+        response_format,
+        clean_model_name,
     );
 
     // 5. Collect Results

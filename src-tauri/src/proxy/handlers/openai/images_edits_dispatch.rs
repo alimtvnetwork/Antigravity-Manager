@@ -29,6 +29,12 @@ pub(crate) fn spawn_image_edit_tasks(
     debug_cfg: &crate::proxy::config::DebugLoggingConfig,
     trace_id: &str,
     attempt_no: usize,
+    state: &crate::proxy::AppState,
+    n: usize,
+    contents_parts: Vec<Value>,
+    image_config: Value,
+    response_format: String,
+    clean_model_name: String,
 ) {
     // 4. 并发发送请求
     // 注意：不再在外部获取 Token，而是移入 Task 内部

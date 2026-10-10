@@ -60,4 +60,6 @@ mod warmup_tests;
 pub use handler::{handle_count_tokens, handle_list_models, handle_messages};
 pub(crate) use attempt::{AttemptCall, AttemptState, ErrorOutcome, PrepOutcome, StreamOutcome};
 pub(crate) use attempt_setup::prepare_attempt;
+pub(crate) use apply_compression::apply_compression;
+pub(crate) use compression::try_compress_with_summary;
 pub(crate) use setup_phase::preprocess_request;
