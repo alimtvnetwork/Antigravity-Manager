@@ -103,6 +103,23 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.181.0 (2026-10-10)**:
+        -   **Quota UI Compaction & Stronger Progress Bars**:
+            -   **Description**: Compacted the Accounts table quota columns (tighter cell padding, narrower info column) and strengthened `QuotaProgressBar` (compact bar `h-2` → `h-3`, standard bar `h-3` → `h-3.5`, larger checkpoint nodes, tighter gaps); instance cards on the Instances page got the same whitespace tightening. (Thanks to @aukgit)
+        -   **Tauri Window ACL Fix**:
+            -   **Description**: Granted `core:window:allow-set-decorations` and `core:window:allow-set-background-color` in `src-tauri/capabilities/default.json`, fixing the `plugin:window|set_decorations` / `set_background_color not allowed by ACL` warnings on startup and theme changes; `enterMiniMode` failures are now also tracked in the error module instead of only `console.error`. (Thanks to @aukgit)
+        -   **Supabase Connectivity Diagnostics**:
+            -   **Description**: `test_connection` now classifies transport failures into actionable messages (timeout → possibly paused project, DNS/connect → wrong or deleted project URL) instead of raw reqwest text, and endpoint cards show an honest red `Unreachable` badge instead of a misleading green `Active` when the last test failed. (Thanks to @aukgit)
+        -   **Settings General Tab Redesign**:
+            -   **Description**: Compacted the General settings tab (tighter spacing, smaller controls); Theme select became a segmented pill control and Launch at Startup became a toggle row, per the repo's segmented-capsule UI convention. Zero behavior change. (Thanks to @aukgit)
+        -   **Prompt Tree View Send/Queue Hardening**:
+            -   **Description**: The previously silent no-op guards in `handleResendPrompt` / `handleEnqueuePrompt` now surface a visible error and track a warning in the error module, so the Send/Queue buttons can never appear dead without explanation. (Thanks to @aukgit)
+        -   **Windows Instance Executable Staleness Refresh**:
+            -   **Description**: `clone_instance_executable` now compares an existing Windows clone against the base binary (size + mtime) at launch and re-links/re-copies when the updater has replaced the base file, instead of silently reusing a stale binary. (Thanks to @aukgit)
+        -   **Navbar Segmented Capsule & Update Shortcut**:
+            -   **Description**: The Accounts/Instances/Settings nav buttons now form one contiguous segmented capsule (circular outer edges, rectangular middles, subtle dividers); the hamburger dropdown gained a pinned `Check for Updates` section that runs the update check and surfaces the update card or a toast. (Thanks to @aukgit)
+
+
     *   **v4.180.0 (2026-10-10)**:
         -   **Release Pipeline Completion & CI Green Confirmation**:
             -   **Description**: No code changes since v4.179.0. Re-ran the v4.179.0 macOS universal artifact upload after a transient GitHub artifact-service timeout (`CreateArtifact` request timeout ×5) so the release carries the complete asset set; CI is green across all platforms on the record_ignored type-error fixes. (Thanks to @aukgit)
