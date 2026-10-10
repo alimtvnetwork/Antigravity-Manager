@@ -27,6 +27,8 @@ use crate::proxy::handlers::openai::websocket_normalize::should_handle_prewarm_l
 use crate::proxy::handlers::openai::websocket_normalize::handle_prewarm_locally;
 use axum::http::HeaderMap;
 use uuid::Uuid;
+use super::websocket_normalize::normalize_responses_websocket_request;
+use super::chat_completions::handle_chat_completions;
 
 #[derive(Debug, Clone)]
 pub(crate) struct WebsocketSessionState {

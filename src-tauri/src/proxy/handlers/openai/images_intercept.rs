@@ -1,11 +1,13 @@
 // Chat->image redirection: `handle_chat_redirection` + `intercept_chat_to_image`.
 use axum::{
-    body::Body, extract::State, http::StatusCode, response::IntoResponse, response::Response,
+    body::Body, extract::State, http::{HeaderMap, StatusCode}, response::IntoResponse, response::Response, Json,
 };
 use serde_json::{json, Value};
 use tracing::{debug, error};
 
 use crate::proxy::server::AppState;
+use super::chat_completions::handle_chat_completions;
+use super::images_generations::handle_images_generations_internal;
 
 pub async fn handle_chat_redirection(
     State(state): State<AppState>,

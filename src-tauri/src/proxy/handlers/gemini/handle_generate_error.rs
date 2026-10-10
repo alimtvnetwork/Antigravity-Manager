@@ -20,7 +20,7 @@ pub(crate) async fn handle_generate_error(
     pool_size: usize,
     token_manager: &std::sync::Arc<crate::proxy::TokenManager>,
     headers: &axum::http::HeaderMap,
-    client_adapter: &Option<crate::proxy::common::client_adapter::ClientAdapter>,
+    client_adapter: &Option<std::sync::Arc<dyn crate::proxy::common::client_adapter::ClientAdapter>>,
     failure_statuses: &mut crate::proxy::handlers::common::FailureStatusTracker,
     last_error: &mut String,
     force_rotate: &mut bool,
@@ -40,7 +40,7 @@ pub(crate) async fn handle_generate_error(
         .text()
         .await
         .unwrap_or_else(|_| format!("HTTP {}", status_code));
-    last_error = format!("HTTP {}: {}", status_code, error_text);
+    *last_error = format!("HTTP {}: {}", status_code, error_text);
     if debug_logger::is_enabled(&debug_cfg) {
         let payload = json!({
             "kind": "upstream_response_error",

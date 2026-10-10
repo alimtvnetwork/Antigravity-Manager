@@ -87,7 +87,7 @@ pub(crate) fn handle_prewarm_locally(
     (created_ev, completed_ev)
 }
 
-fn normalize_responses_websocket_request(
+pub(crate) fn normalize_responses_websocket_request(
     mut payload: Value,
     state: &mut WebsocketSessionState,
 ) -> Result<Value, String> {
