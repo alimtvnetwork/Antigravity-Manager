@@ -8,6 +8,7 @@ use serde_json::{json, Value};
 
 use super::session_setup::SetupState;
 use super::helpers::flatten_tools;
+use crate::proxy::mappers::openai::request::transform::enforce_uppercase_types;
 
 pub(crate) fn phase_tools(
     request: &super::models::OpenAIRequest,

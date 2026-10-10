@@ -27,6 +27,7 @@ static TEST_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 #[cfg(test)]
 mod test_fixes {
     use serde_json::json;
+use crate::proxy::mappers::gemini::wrapper::request_v2::wrap_request_v2;
 
     #[test]
     fn test_wrap_request_with_signature() {
