@@ -5,6 +5,7 @@ use super::models::{AgmConversationNode, RunningProject};
 use super::project_queries::normalize_path_for_compare;
 use super::state::{get_active_agy_workers, get_memory_prompts_map};
 use std::collections::HashSet;
+use std::path::PathBuf;
 
 pub(crate) fn evaluate_project_liveness(
     ctx: &super::tree_nodes::TreeNodeCtx,
