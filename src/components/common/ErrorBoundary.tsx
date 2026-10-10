@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertCircle, RefreshCw, Home, Copy, Check } from 'lucide-react';
+import { useErrorStore } from '../../stores/error-store';
 
 interface Props {
   children: ReactNode;
@@ -31,6 +32,12 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public override componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     console.error('[ErrorBoundary] Uncaught UI exception caught:', error, errorInfo);
+    // Tracked in the error module (no modal: the boundary already renders its own fallback UI).
+    useErrorStore.getState().trackWarning(error, {
+      source: 'ErrorBoundary.componentDidCatch',
+      triggerAction: 'uncaught_ui_exception',
+      context: { componentStack: errorInfo.componentStack?.slice(0, 500) ?? null },
+    });
     this.setState({ errorInfo });
   }
 

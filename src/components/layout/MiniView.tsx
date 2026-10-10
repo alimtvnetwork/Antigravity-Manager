@@ -15,6 +15,7 @@ import { listen } from '@tauri-apps/api/event';
 
 import { useConfigStore } from '../../stores/useConfigStore';
 import versionData from '../../../version.json';
+import { useErrorStore } from '../../stores/error-store';
 
 interface ProxyRequestLog {
     id: string;
@@ -52,6 +53,11 @@ export default function MiniView() {
                 });
             } catch (e) {
                 console.error('Failed to setup log listener:', e);
+                // Tracked in the error module; live log tail simply won't stream, app remains functional.
+                useErrorStore.getState().trackWarning(e, {
+                  source: 'MiniView.setupListener',
+                  triggerAction: 'setup_log_listener',
+                });
             }
         };
 
@@ -75,6 +81,11 @@ export default function MiniView() {
                     }
                 } catch (error) {
                     console.error('Failed to get app version:', error);
+                    // Tracked in the error module; version label falls back to bundled version.json below.
+                    useErrorStore.getState().trackWarning(error, {
+                      source: 'MiniView.fetchVersion',
+                      triggerAction: 'get_app_version',
+                    });
                 }
             } else {
                 setAppVersion(versionData.version || versionData.Version || '4.177.0');

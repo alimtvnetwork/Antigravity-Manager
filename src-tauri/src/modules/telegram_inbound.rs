@@ -162,7 +162,11 @@ pub async fn test_telegram_connection(bot_token: &str) -> Result<String, AppErro
         .unwrap_or("UnknownBot")
         .to_string();
 
-    let _ = register_telegram_bot_commands(clean_token).await;
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(
+        register_telegram_bot_commands(clean_token).await,
+        "register_telegram_bot_commands",
+    );
 
     Ok(username)
 }
@@ -208,7 +212,11 @@ pub async fn register_telegram_bot_commands(bot_token: &str) -> Result<(), AppEr
         ]
     });
 
-    let _ = client.post(&url).json(&payload).send().await;
+    // Justification: best-effort send; failure logged without changing control flow
+    crate::error::record_ignored(
+        client.post(&url).json(&payload).send().await,
+        "send via post",
+    );
     Ok(())
 }
 
@@ -1352,7 +1360,11 @@ pub fn execute_backup_command(args_str: &str) -> String {
         };
 
         let repo_resent = repo_db::resend_all_running_commands(20).unwrap_or_default();
-        let _ = repo_db::dispatch_running_prompts("default");
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            repo_db::dispatch_running_prompts("default"),
+            "dispatch_running_prompts",
+        );
         match backup_prompts_db::restore_running_prompts(Some("default"), false, None) {
             Ok(records) => format!(
                 "♻️ <b>Prompt Restoration Complete:</b>\n\n\
@@ -1382,7 +1394,11 @@ pub fn execute_backup_command(args_str: &str) -> String {
             "Antigravity-Manager".to_string()
         };
 
-        let _ = repo_db::backup_running_prompts("default");
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            repo_db::backup_running_prompts("default"),
+            "backup_running_prompts",
+        );
         match backup_prompts_db::backup_active_running_prompts(Some("default"), None) {
             Ok((batch, records)) => format!(
                 "🎒 <b>Running Prompts Backed Up Successfully!</b>\n\n\
@@ -2727,7 +2743,11 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
             };
 
             let backup_count = repo_db::backup_running_prompts("default").unwrap_or(0);
-            let _ = backup_prompts_db::backup_active_running_prompts(Some("default"), None);
+            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+            crate::error::record_ignored(
+                backup_prompts_db::backup_active_running_prompts(Some("default"), None),
+                "backup_active_running_prompts",
+            );
             let rotate_res = auto_switcher::check_and_rotate_if_needed().await;
             let resent = repo_db::resend_all_running_commands(20).unwrap_or_default();
             let disp = repo_db::dispatch_running_prompts("default").unwrap_or(0);
@@ -2786,7 +2806,11 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                 };
 
                 let backup_count = repo_db::backup_running_prompts("default").unwrap_or(0);
-                let _ = backup_prompts_db::backup_active_running_prompts(Some("default"), None);
+                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                crate::error::record_ignored(
+                    backup_prompts_db::backup_active_running_prompts(Some("default"), None),
+                    "backup_active_running_prompts",
+                );
                 let rotate_res = auto_switcher::check_and_rotate_if_needed().await;
                 let resent = repo_db::resend_all_running_commands(20).unwrap_or_default();
                 let disp = repo_db::dispatch_running_prompts("default").unwrap_or(0);
@@ -2956,7 +2980,8 @@ pub async fn download_telegram_photo(bot_token: &str, msg: &Value) -> Option<Pat
     let target_dir = PathBuf::from(home)
         .join(".antigravity_tools")
         .join("saved_images");
-    let _ = fs::create_dir_all(&target_dir);
+    // Justification: best-effort directory creation; later file ops fail loudly if the directory is actually needed
+    crate::error::record_ignored(fs::create_dir_all(&target_dir), "create_dir_all");
 
     let ext = PathBuf::from(file_path)
         .extension()
@@ -3036,7 +3061,8 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
             if config.allowed_chat_id.is_none() {
                 config.allowed_chat_id = Some(chat_id);
                 config.is_enabled = true;
-                let _ = save_config(&config);
+                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                crate::error::record_ignored(save_config(&config), "save_config");
             }
 
             if let Some(allowed) = config.allowed_chat_id {
@@ -3068,7 +3094,11 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
             };
 
             if let Some(reply) = reply_opt {
-                let _ = send_telegram_message(&clean_token, chat_id, &reply).await;
+                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                crate::error::record_ignored(
+                    send_telegram_message(&clean_token, chat_id, &reply).await,
+                    "send_telegram_message",
+                );
                 processed.push((chat_id, text_raw.to_string(), reply));
             }
         }
@@ -3081,7 +3111,8 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
             clean_token,
             last_id + 1
         );
-        let _ = client.get(&ack_url).send().await;
+        // Justification: best-effort send; failure logged without changing control flow
+        crate::error::record_ignored(client.get(&ack_url).send().await, "send via get");
     }
 
     Ok(processed)
@@ -3178,7 +3209,11 @@ pub fn start_telegram_daemon() {
                                     // Auto-bind allowed_chat_id on first private message if not set
                                     if config.allowed_chat_id.is_none() {
                                         config.allowed_chat_id = Some(chat_id);
-                                        let _ = save_config(&config);
+                                        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                                        crate::error::record_ignored(
+                                            save_config(&config),
+                                            "save_config",
+                                        );
                                     }
 
                                     // Filter by allowed_chat_id if set
@@ -3218,12 +3253,16 @@ pub fn start_telegram_daemon() {
                                     };
 
                                     if let Some(reply) = reply_opt {
-                                        let _ = send_telegram_message(
-                                            &config.bot_token,
-                                            chat_id,
-                                            &reply,
-                                        )
-                                        .await;
+                                        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                                        crate::error::record_ignored(
+                                            send_telegram_message(
+                                                &config.bot_token,
+                                                chat_id,
+                                                &reply,
+                                            )
+                                            .await,
+                                            "send_telegram_message",
+                                        );
                                     }
                                 }
                             }

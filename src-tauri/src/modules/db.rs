@@ -134,7 +134,8 @@ pub fn get_db_path(target_ide: Option<&str>) -> Result<PathBuf, String> {
         .ok_or_else(|| "Failed to locate database path".to_string())?;
 
     if let Some(parent) = chosen.parent() {
-        let _ = std::fs::create_dir_all(parent);
+        // Justification: best-effort directory creation; later file ops fail loudly if the directory is actually needed
+        crate::error::record_ignored(std::fs::create_dir_all(parent), "create_dir_all");
     }
     Ok(chosen)
 }
@@ -195,7 +196,8 @@ fn inject_new_format(
     id_token: Option<&str>,
 ) -> Result<String, String> {
     if let Some(parent) = db_path.parent() {
-        let _ = std::fs::create_dir_all(parent);
+        // Justification: best-effort directory creation; later file ops fail loudly if the directory is actually needed
+        crate::error::record_ignored(std::fs::create_dir_all(parent), "create_dir_all");
     }
     let conn = Connection::open(db_path).map_err(|e| format!("Failed to open database: {}", e))?;
     conn.execute(
@@ -271,19 +273,27 @@ fn inject_new_format(
         "email": email,
         "username": email
     });
-    let _ = conn.execute(
-        "INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)",
-        [
-            "antigravityAuth.token",
-            &serde_json::to_string(&auth_token_json).unwrap_or_default(),
-        ],
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(
+        conn.execute(
+            "INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)",
+            [
+                "antigravityAuth.token",
+                &serde_json::to_string(&auth_token_json).unwrap_or_default(),
+            ],
+        ),
+        "db execute",
     );
 
     // Fix for missing history: Delete the old format state to prevent the IDE from reading a stale UserID
     // which causes history fetching to fail.
-    let _ = conn.execute(
-        "DELETE FROM ItemTable WHERE key = ?",
-        ["jetskiStateSync.agentManagerInitState"],
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(
+        conn.execute(
+            "DELETE FROM ItemTable WHERE key = ?",
+            ["jetskiStateSync.agentManagerInitState"],
+        ),
+        "db execute",
     );
 
     Ok("Token injection successful (new format)".to_string())
@@ -359,13 +369,21 @@ pub fn sanitize_session(db_path: &std::path::Path) -> Result<(), String> {
         return Ok(());
     }
     let conn = Connection::open(db_path).map_err(|e| format!("Failed to open database: {}", e))?;
-    let _ = conn.busy_timeout(std::time::Duration::from_millis(2000));
-    let _ = conn.execute(
-        "DELETE FROM ItemTable WHERE key IN (?, ?)",
-        [
-            "antigravityUnifiedStateSync.oauthToken",
-            "antigravityUnifiedStateSync.userStatus",
-        ],
+    // Justification: best-effort SQLite pragma; the connection remains usable without it
+    crate::error::record_ignored(
+        conn.busy_timeout(std::time::Duration::from_millis(2000)),
+        "busy_timeout",
+    );
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(
+        conn.execute(
+            "DELETE FROM ItemTable WHERE key IN (?, ?)",
+            [
+                "antigravityUnifiedStateSync.oauthToken",
+                "antigravityUnifiedStateSync.userStatus",
+            ],
+        ),
+        "db execute",
     );
     crate::modules::logger::log_info(&format!(
         "[DB] Sanitized session in isolated database: {}",
@@ -382,7 +400,11 @@ pub fn read_injected_email(db_path: &std::path::Path) -> Option<String> {
     }
     let conn =
         Connection::open_with_flags(db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).ok()?;
-    let _ = conn.busy_timeout(std::time::Duration::from_millis(500));
+    // Justification: best-effort SQLite pragma; the connection remains usable without it
+    crate::error::record_ignored(
+        conn.busy_timeout(std::time::Duration::from_millis(500)),
+        "busy_timeout",
+    );
 
     // 1. Try direct userStatus key
     let mut stmt = conn

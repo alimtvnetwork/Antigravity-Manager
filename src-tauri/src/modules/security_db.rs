@@ -168,7 +168,11 @@ pub fn init_db() -> Result<(), String> {
     .map_err(|e| e.to_string())?;
 
     // Migration: Add username column to ip_access_logs
-    let _ = conn.execute("ALTER TABLE ip_access_logs ADD COLUMN username TEXT", []);
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(
+        conn.execute("ALTER TABLE ip_access_logs ADD COLUMN username TEXT", []),
+        "db execute",
+    );
 
     Ok(())
 }
@@ -483,9 +487,13 @@ pub fn get_blacklist_entry_for_ip(ip: &str) -> Result<Option<IpBlacklistEntry>, 
     let now = chrono::Utc::now().timestamp();
 
     // 清理过期的黑名单条目
-    let _ = conn.execute(
-        "DELETE FROM ip_blacklist WHERE expires_at IS NOT NULL AND expires_at < ?1",
-        [now],
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(
+        conn.execute(
+            "DELETE FROM ip_blacklist WHERE expires_at IS NOT NULL AND expires_at < ?1",
+            [now],
+        ),
+        "db execute",
     );
 
     // 精确匹配
@@ -508,9 +516,13 @@ pub fn get_blacklist_entry_for_ip(ip: &str) -> Result<Option<IpBlacklistEntry>, 
 
     if let Ok(entry) = entry_result {
         // 增加命中计数
-        let _ = conn.execute(
-            "UPDATE ip_blacklist SET hit_count = hit_count + 1 WHERE ip_pattern = ?1",
-            [ip],
+        // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+        crate::error::record_ignored(
+            conn.execute(
+                "UPDATE ip_blacklist SET hit_count = hit_count + 1 WHERE ip_pattern = ?1",
+                [ip],
+            ),
+            "db execute",
         );
         return Ok(Some(entry));
     }
@@ -521,9 +533,13 @@ pub fn get_blacklist_entry_for_ip(ip: &str) -> Result<Option<IpBlacklistEntry>, 
         if entry.ip_pattern.contains('/') {
             if cidr_match(ip, &entry.ip_pattern) {
                 // 增加命中计数
-                let _ = conn.execute(
-                    "UPDATE ip_blacklist SET hit_count = hit_count + 1 WHERE id = ?1",
-                    [&entry.id],
+                // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+                crate::error::record_ignored(
+                    conn.execute(
+                        "UPDATE ip_blacklist SET hit_count = hit_count + 1 WHERE id = ?1",
+                        [&entry.id],
+                    ),
+                    "db execute",
                 );
                 return Ok(Some(entry));
             }
@@ -540,9 +556,13 @@ pub fn get_blacklist_entry_for_ip(ip: &str) -> Result<Option<IpBlacklistEntry>, 
                 .parse::<std::net::IpAddr>(),
         ) {
             if client_addr == entry_addr {
-                let _ = conn.execute(
-                    "UPDATE ip_blacklist SET hit_count = hit_count + 1 WHERE id = ?1",
-                    [&entry.id],
+                // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+                crate::error::record_ignored(
+                    conn.execute(
+                        "UPDATE ip_blacklist SET hit_count = hit_count + 1 WHERE id = ?1",
+                        [&entry.id],
+                    ),
+                    "db execute",
                 );
                 return Ok(Some(entry));
             }

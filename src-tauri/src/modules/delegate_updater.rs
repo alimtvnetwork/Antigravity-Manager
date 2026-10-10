@@ -247,15 +247,18 @@ pub fn prepare_isolated_update_cli(caller_pid: u32) -> Result<PathBuf, String> {
     #[cfg(target_os = "windows")]
     if let Ok(local) = env::var("LOCALAPPDATA") {
         let cli_dir = PathBuf::from(local).join("agm-cli");
-        let _ = fs::create_dir_all(&cli_dir);
+        // Justification: best-effort directory creation; later file ops fail loudly if the directory is actually needed
+        crate::error::record_ignored(fs::create_dir_all(&cli_dir), "create_dir_all");
         let dedicated_cli = cli_dir.join("agm-update-cli.exe");
         if updater_src != dedicated_cli && updater_src.exists() {
-            let _ = fs::copy(&updater_src, &dedicated_cli);
+            // Justification: best-effort file copy; logged for diagnosis
+            crate::error::record_ignored(fs::copy(&updater_src, &dedicated_cli), "fs::copy");
         }
         let sibling_agm = current_dir.join("agm.exe");
         let global_agm = cli_dir.join("agm.exe");
         if sibling_agm.exists() && sibling_agm != global_agm {
-            let _ = fs::copy(&sibling_agm, &global_agm);
+            // Justification: best-effort file copy; logged for diagnosis
+            crate::error::record_ignored(fs::copy(&sibling_agm, &global_agm), "fs::copy");
         }
     }
 
@@ -295,7 +298,11 @@ pub fn prepare_isolated_update_cli(caller_pid: u32) -> Result<PathBuf, String> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let _ = fs::set_permissions(&temp_cli_path, fs::Permissions::from_mode(0o755));
+        // Justification: best-effort permission hardening; logged
+        crate::error::record_ignored(
+            fs::set_permissions(&temp_cli_path, fs::Permissions::from_mode(0o755)),
+            "set_permissions",
+        );
     }
 
     Ok(temp_cli_path)
@@ -649,12 +656,25 @@ pub fn run_cli_update(args: &[String]) -> bool {
         let installed_ui = resolved_install_dir.join("agm-alim.exe");
         if let Ok(local) = env::var("LOCALAPPDATA") {
             let cli_dir = PathBuf::from(local).join("agm-cli");
-            let _ = fs::create_dir_all(&cli_dir);
+            // Justification: best-effort directory creation; later file ops fail loudly if the directory is actually needed
+            crate::error::record_ignored(fs::create_dir_all(&cli_dir), "create_dir_all");
             if installed_agm.exists() {
-                let _ = fs::copy(&installed_agm, cli_dir.join("agm.exe"));
-                let _ = fs::copy(&installed_agm, cli_dir.join("agm-update-cli.exe"));
+                // Justification: best-effort file copy; logged for diagnosis
+                crate::error::record_ignored(
+                    fs::copy(&installed_agm, cli_dir.join("agm.exe")),
+                    "fs::copy",
+                );
+                // Justification: best-effort file copy; logged for diagnosis
+                crate::error::record_ignored(
+                    fs::copy(&installed_agm, cli_dir.join("agm-update-cli.exe")),
+                    "fs::copy",
+                );
             } else if installed_ui.exists() {
-                let _ = fs::copy(&installed_ui, cli_dir.join("agm-update-cli.exe"));
+                // Justification: best-effort file copy; logged for diagnosis
+                crate::error::record_ignored(
+                    fs::copy(&installed_ui, cli_dir.join("agm-update-cli.exe")),
+                    "fs::copy",
+                );
             }
         }
     }
@@ -720,9 +740,13 @@ pub fn open_ui(args: &[String]) {
                     exe_to_launch.to_string_lossy().replace('\'', "''"),
                     resolved_install_dir.to_string_lossy().replace('\'', "''")
                 );
-                let _ = Command::new("powershell.exe")
-                    .args(["-NoProfile", "-Command", &ps_launch])
-                    .spawn();
+                // Justification: best-effort process spawn; failure logged
+                crate::error::record_ignored(
+                    Command::new("powershell.exe")
+                        .args(["-NoProfile", "-Command", &ps_launch])
+                        .spawn(),
+                    "spawn powershell.exe",
+                );
             }
         }
     }
@@ -751,7 +775,8 @@ pub fn open_ui(args: &[String]) {
                     );
 
                     eprintln!("[RECOVERY] LaunchServices error or trash conflict detected. Purging stale trash references, resetting LaunchServices, and re-registering...");
-                    let _ = Command::new("bash")
+                    // Justification: best-effort process spawn; failure logged
+                    crate::error::record_ignored(Command::new("bash")
                         .arg("-c")
                         .arg(r#"
                             rm -rf /private/tmp/*[Aa]ntigravity* /private/tmp/*[Aa]gm* /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
@@ -788,7 +813,7 @@ pub fn open_ui(args: &[String]) {
                         "#)
                         .arg("bash")
                         .arg(&exe_to_launch)
-                        .status();
+                        .status(), "spawn bash");
 
                     std::thread::sleep(Duration::from_millis(800));
                     if let Ok(retry_out) =
@@ -826,7 +851,11 @@ pub fn open_ui(args: &[String]) {
                     if let Ok(home) = std::env::var("HOME") {
                         let log_dir =
                             std::path::PathBuf::from(home).join("Library/Logs/AntigravityManager");
-                        let _ = std::fs::create_dir_all(&log_dir);
+                        // Justification: best-effort directory creation; later file ops fail loudly if the directory is actually needed
+                        crate::error::record_ignored(
+                            std::fs::create_dir_all(&log_dir),
+                            "create_dir_all",
+                        );
                         if let Ok(f) = std::fs::OpenOptions::new()
                             .create(true)
                             .append(true)
@@ -865,7 +894,8 @@ pub fn open_ui(args: &[String]) {
         if resolved_install_dir.exists() {
             cmd.current_dir(&resolved_install_dir);
         }
-        let _ = cmd.spawn();
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(cmd.spawn(), "spawn");
         println!("[OK] Antigravity Manager UI launched.");
     }
 }
@@ -897,13 +927,21 @@ pub fn is_pid_alive(pid: u32) -> bool {
 pub fn force_kill_pid(pid: u32) {
     #[cfg(target_os = "windows")]
     {
-        let _ = Command::new("taskkill.exe")
-            .args(["/F", "/PID", &pid.to_string()])
-            .output();
+        // Justification: best-effort process spawn; failure logged
+        crate::error::record_ignored(
+            Command::new("taskkill.exe")
+                .args(["/F", "/PID", &pid.to_string()])
+                .output(),
+            "spawn taskkill.exe",
+        );
     }
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = Command::new("kill").args(["-9", &pid.to_string()]).output();
+        // Justification: best-effort process spawn; failure logged
+        crate::error::record_ignored(
+            Command::new("kill").args(["-9", &pid.to_string()]).output(),
+            "spawn kill",
+        );
     }
 }
 
@@ -965,17 +1003,30 @@ pub fn kill_other_ui_processes(exclude_pid: u32) {
         } else {
             "PID gt 0".to_string()
         };
-        let _ = Command::new("taskkill.exe")
-            .args(["/F", "/IM", "agm-alim.exe", "/FI", &filter])
-            .output();
-        let _ = Command::new("taskkill.exe")
-            .args(["/F", "/IM", "antigravity-tools.exe", "/FI", &filter])
-            .output();
+        // Justification: best-effort process spawn; failure logged
+        crate::error::record_ignored(
+            Command::new("taskkill.exe")
+                .args(["/F", "/IM", "agm-alim.exe", "/FI", &filter])
+                .output(),
+            "spawn taskkill.exe",
+        );
+        // Justification: best-effort process spawn; failure logged
+        crate::error::record_ignored(
+            Command::new("taskkill.exe")
+                .args(["/F", "/IM", "antigravity-tools.exe", "/FI", &filter])
+                .output(),
+            "spawn taskkill.exe",
+        );
     }
     #[cfg(not(target_os = "windows"))]
     {
+        // Justification: intentionally unused on non-Windows (only the Windows branch consumes it); suppresses the unused-variable warning.
         let _ = exclude_pid;
-        let _ = Command::new("pkill").args(["-f", "agm-alim"]).output();
+        // Justification: best-effort process spawn; failure logged
+        crate::error::record_ignored(
+            Command::new("pkill").args(["-f", "agm-alim"]).output(),
+            "spawn pkill",
+        );
     }
 }
 
@@ -1065,6 +1116,7 @@ mod tests {
         let path = res.unwrap();
         assert!(path.exists());
         assert!(path.to_string_lossy().contains("agm-update-cli-987654"));
-        let _ = fs::remove_file(&path);
+        // Justification: best-effort cleanup; a leftover file is harmless
+        crate::error::record_ignored(fs::remove_file(&path), "remove_file");
     }
 }

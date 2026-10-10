@@ -305,6 +305,13 @@ export async function request<T>(cmd: string, args?: any): Promise<T> {
     try {
       return JSON.parse(text) as T;
     } catch (e) {
+      // Plain-text (non-JSON) response; tracked in the error module, returned as-is for callers that accept text.
+      useErrorStore.getState().trackWarning(e, {
+        source: `web.${cmd}`,
+        endpoint: url,
+        method: mapping.method,
+        triggerAction: 'parse_json_response',
+      });
       console.warn(`Failed to parse JSON response for [${cmd}]:`, text);
       return text as unknown as T; // Fallback for plain text responses
     }

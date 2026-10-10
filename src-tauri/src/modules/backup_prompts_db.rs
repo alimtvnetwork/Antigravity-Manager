@@ -113,7 +113,8 @@ pub fn get_backup_prompts_db_path(custom_file: Option<&str>) -> Result<PathBuf, 
 pub fn connect_backup_db(custom_file: Option<&str>) -> Result<Connection, String> {
     let db_path = get_backup_prompts_db_path(custom_file)?;
     if let Some(parent) = db_path.parent() {
-        let _ = fs::create_dir_all(parent);
+        // Justification: best-effort directory creation; later file ops fail loudly if the directory is actually needed
+        crate::error::record_ignored(fs::create_dir_all(parent), "create_dir_all");
     }
 
     let conn = Connection::open(&db_path).map_err(|e| {
@@ -172,13 +173,21 @@ pub fn connect_backup_db(custom_file: Option<&str>) -> Result<Connection, String
     .map_err(|e| format!("Failed to initialize backup prompts tables: {}", e))?;
 
     // Migrate existing DB if instance_id is missing
-    let _ = conn.execute(
-        "ALTER TABLE prompt_backups ADD COLUMN instance_id TEXT DEFAULT 'default'",
-        [],
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(
+        conn.execute(
+            "ALTER TABLE prompt_backups ADD COLUMN instance_id TEXT DEFAULT 'default'",
+            [],
+        ),
+        "db execute",
     );
-    let _ = conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_prompt_backups_instance ON prompt_backups(instance_id)",
-        [],
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_prompt_backups_instance ON prompt_backups(instance_id)",
+            [],
+        ),
+        "db execute",
     );
 
     Ok(conn)
@@ -200,10 +209,11 @@ pub fn auto_cleanup_expired(
         .map_err(|e| format!("Failed to delete expired prompt backups: {}", e))?;
 
     // Also clean up empty fully-restored batches
-    let _ = conn.execute(
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(conn.execute(
         "DELETE FROM backup_batches WHERE is_fully_restored = 1 AND id NOT IN (SELECT DISTINCT backup_batch_id FROM prompt_backups)",
         [],
-    );
+    ), "db execute");
 
     Ok(removed)
 }
@@ -214,7 +224,8 @@ pub fn force_clean_all(custom_file: Option<&str>) -> Result<usize, String> {
     let count = conn
         .execute("DELETE FROM prompt_backups", [])
         .map_err(|e| format!("Failed to clear prompt backups: {}", e))?;
-    let _ = conn.execute("DELETE FROM backup_batches", []);
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(conn.execute("DELETE FROM backup_batches", []), "db execute");
     Ok(count)
 }
 
@@ -232,7 +243,11 @@ pub fn backup_active_running_prompts_for_instance(
     custom_file: Option<&str>,
 ) -> Result<(BackupBatchInfo, Vec<PromptBackupRecord>), String> {
     let target_inst = instance_id.unwrap_or("default");
-    let _ = auto_cleanup_expired(custom_file, 86400);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        auto_cleanup_expired(custom_file, 86400),
+        "auto_cleanup_expired",
+    );
 
     let all_prompts = repo_db::list_all_prompts().unwrap_or_default();
     let running_prompts = repo_db::discover_running_prompts_from_antigravity(target_inst);
@@ -349,10 +364,11 @@ pub fn backup_active_running_prompts_for_instance(
             .ok();
 
         if let Some(existing_rec_id) = existing_unrestored {
-            let _ = conn.execute(
+            // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+            crate::error::record_ignored(conn.execute(
                 "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, is_restored = 0 WHERE id = ?4",
                 params![record.backup_batch_id, now, target_inst, existing_rec_id],
-            );
+            ), "db execute");
             records.push(record);
             continue;
         }
@@ -367,10 +383,11 @@ pub fn backup_active_running_prompts_for_instance(
             .ok();
 
         if let Some(existing_rec_id) = existing_restored {
-            let _ = conn.execute(
+            // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+            crate::error::record_ignored(conn.execute(
                 "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, is_restored = 0, restored_at = NULL WHERE id = ?4",
                 params![record.backup_batch_id, now, target_inst, existing_rec_id],
-            );
+            ), "db execute");
             records.push(record);
             continue;
         }
@@ -411,7 +428,11 @@ pub fn backup_active_running_prompts_for_instance(
 
 /// List all backup batches and total counts
 pub fn list_backup_batches(custom_file: Option<&str>) -> Result<Vec<BackupBatchInfo>, String> {
-    let _ = auto_cleanup_expired(custom_file, 86400);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        auto_cleanup_expired(custom_file, 86400),
+        "auto_cleanup_expired",
+    );
     let conn = connect_backup_db(custom_file)?;
 
     let mut stmt = conn
@@ -444,7 +465,11 @@ pub fn list_prompt_backups(
     batch_id: Option<&str>,
     custom_file: Option<&str>,
 ) -> Result<Vec<PromptBackupRecord>, String> {
-    let _ = auto_cleanup_expired(custom_file, 86400);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        auto_cleanup_expired(custom_file, 86400),
+        "auto_cleanup_expired",
+    );
     let conn = connect_backup_db(custom_file)?;
 
     let (query, has_param) = if batch_id.is_some() {
@@ -593,26 +618,44 @@ pub fn restore_running_prompts_for_instance(
             updated_at: now,
             image_payload: rec.images_payload.clone(),
         };
-        let _ = repo_db::save_or_requeue_prompt(&active_p);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            repo_db::save_or_requeue_prompt(&active_p),
+            "save_or_requeue_prompt",
+        );
     }
 
     if !keep_backup && !records.is_empty() {
         if is_target_default {
-            let _ = conn.execute(update_query, params![now]);
+            // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+            crate::error::record_ignored(conn.execute(update_query, params![now]), "db execute");
         } else {
-            let _ = conn.execute(update_query, params![now, target_inst]);
+            // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+            crate::error::record_ignored(
+                conn.execute(update_query, params![now, target_inst]),
+                "db execute",
+            );
         }
-        let _ = conn.execute(
+        // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+        crate::error::record_ignored(conn.execute(
             "UPDATE backup_batches SET is_fully_restored = 1 WHERE id IN (
                 SELECT backup_batch_id FROM prompt_backups GROUP BY backup_batch_id HAVING min(is_restored) = 1
              )",
             [],
-        );
+        ), "db execute");
     }
 
     // Automatically trigger resend and execute restored prompts via CLI scoped to this instance
-    let _ = repo_db::resend_running_commands_for_instance(Some(target_inst), 20);
-    let _ = repo_db::ensure_prompt_goals_running_for_instance(target_inst);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        repo_db::resend_running_commands_for_instance(Some(target_inst), 20),
+        "resend_running_commands_for_instance",
+    );
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        repo_db::ensure_prompt_goals_running_for_instance(target_inst),
+        "ensure_prompt_goals_running_for_instance",
+    );
 
     Ok(records)
 }
@@ -778,6 +821,7 @@ mod tests {
         let removed = auto_cleanup_expired(Some(custom_file), -10).unwrap();
         assert_eq!(removed, 1);
 
-        let _ = fs::remove_dir_all(temp_dir);
+        // Justification: best-effort cleanup; a leftover directory is harmless
+        crate::error::record_ignored(fs::remove_dir_all(temp_dir), "remove_dir_all");
     }
 }

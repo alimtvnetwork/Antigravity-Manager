@@ -29,7 +29,8 @@ pub fn get_log_dir() -> Result<PathBuf, String> {
 /// Initialize the log system
 pub fn init_logger() {
     // Capture log macro logs
-    let _ = tracing_log::LogTracer::init();
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(tracing_log::LogTracer::init(), "init");
 
     let log_dir = match get_log_dir() {
         Ok(dir) => dir,
@@ -66,12 +67,16 @@ pub fn init_logger() {
     let bridge_layer = crate::modules::log_bridge::TauriLogBridgeLayer::new();
 
     // 5. Initialize global subscriber (use try_init to avoid crash on repeated initialization)
-    let _ = tracing_subscriber::registry()
-        .with(filter_layer)
-        .with(console_layer)
-        .with(file_layer)
-        .with(bridge_layer)
-        .try_init();
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(
+        tracing_subscriber::registry()
+            .with(filter_layer)
+            .with(console_layer)
+            .with(file_layer)
+            .with(bridge_layer)
+            .try_init(),
+        "registry",
+    );
 
     // Leak _guard to ensure its lifetime lasts until program exit
     // Recommended practice when using tracing_appender::non_blocking (if manual flushing is not needed)
@@ -101,14 +106,19 @@ pub fn init_logger() {
         eprintln!("{}", err_msg);
         tracing::error!("{}", err_msg);
         if let Ok(log_dir) = get_log_dir() {
-            let _ = std::fs::write(log_dir.join("panic.log"), &err_msg);
+            // Justification: best-effort file write; failure is logged and surfaces on the next read
+            crate::error::record_ignored(
+                std::fs::write(log_dir.join("panic.log"), &err_msg),
+                "fs::write",
+            );
             use std::io::Write;
             if let Ok(mut f) = std::fs::OpenOptions::new()
                 .create(true)
                 .append(true)
                 .open(log_dir.join("crash_stacktrace.log"))
             {
-                let _ = writeln!(f, "{err_msg}");
+                // Justification: best-effort call; failure logged without changing control flow
+                crate::error::record_ignored(writeln!(f, "{err_msg}"), "operation");
             }
         }
         #[cfg(target_os = "macos")]
@@ -116,15 +126,24 @@ pub fn init_logger() {
             if let Ok(home) = std::env::var("HOME") {
                 let mac_log_dir =
                     std::path::PathBuf::from(home).join("Library/Logs/AntigravityManager");
-                let _ = std::fs::create_dir_all(&mac_log_dir);
-                let _ = std::fs::write(mac_log_dir.join("panic.log"), &err_msg);
+                // Justification: best-effort directory creation; later file ops fail loudly if the directory is actually needed
+                crate::error::record_ignored(
+                    std::fs::create_dir_all(&mac_log_dir),
+                    "create_dir_all",
+                );
+                // Justification: best-effort file write; failure is logged and surfaces on the next read
+                crate::error::record_ignored(
+                    std::fs::write(mac_log_dir.join("panic.log"), &err_msg),
+                    "fs::write",
+                );
                 use std::io::Write;
                 if let Ok(mut f) = std::fs::OpenOptions::new()
                     .create(true)
                     .append(true)
                     .open(mac_log_dir.join("crash_stacktrace.log"))
                 {
-                    let _ = writeln!(f, "{err_msg}");
+                    // Justification: best-effort call; failure logged without changing control flow
+                    crate::error::record_ignored(writeln!(f, "{err_msg}"), "operation");
                 }
             }
         }
@@ -257,7 +276,11 @@ pub fn clear_logs() -> Result<(), String> {
                 let path = entry.path();
                 if path.is_file() {
                     // Open file in truncation mode, set size to 0
-                    let _ = fs::OpenOptions::new().write(true).truncate(true).open(path);
+                    // Justification: best-effort call; failure logged without changing control flow
+                    crate::error::record_ignored(
+                        fs::OpenOptions::new().write(true).truncate(true).open(path),
+                        "new",
+                    );
                 }
             }
         }

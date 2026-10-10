@@ -21,6 +21,7 @@ import { isTauri } from '../../utils/env';
 import { cn } from '../../utils/cn';
 import { showToast } from '../common/ToastContainer';
 import * as instanceService from '../../services/instanceService';
+import { useErrorStore } from '../../stores/error-store';
 import type { InstanceStatus } from '../../services/instanceService';
 
 interface InstanceClipboardBuffer {
@@ -101,7 +102,13 @@ export function InstanceSettingsModal({
                 if (raw) {
                     setClipboardBuffer(JSON.parse(raw));
                 }
-            } catch {}
+            } catch (e) {
+                // Best-effort clipboard restore; localStorage may throw in restricted contexts. Tracked, buffer stays empty.
+                useErrorStore.getState().trackWarning(e, {
+                  source: 'InstanceSettingsModal.syncClipboardBuffer',
+                  triggerAction: 'read_clipboard_buffer',
+                });
+            }
 
             loadSettings(initialId);
         }
@@ -145,6 +152,11 @@ export function InstanceSettingsModal({
             setHistoryIndex(0);
         } catch (err: any) {
             console.warn('Failed to load instance settings:', err);
+            // Tracked in the error module; safe default settings applied, user can still edit and save.
+            useErrorStore.getState().trackWarning(err, {
+              source: 'InstanceSettingsModal.loadSettings',
+              triggerAction: 'load_instance_settings',
+            });
             setJsonContent('{\n  "antigravity.turboMode": true,\n  "antigravity.planReviewAlwaysProceed": true\n}');
         } finally {
             setIsLoading(false);
@@ -259,7 +271,13 @@ export function InstanceSettingsModal({
                 try {
                     localStorage.setItem('agm_instance_clipboard_buffer', JSON.stringify(buf));
                     setClipboardBuffer(buf);
-                } catch {}
+                } catch (e) {
+                    // Best-effort clipboard persist; localStorage may throw in restricted contexts. Tracked, in-memory buffer still set.
+                    useErrorStore.getState().trackWarning(e, {
+                      source: 'InstanceSettingsModal.copySettings',
+                      triggerAction: 'persist_clipboard_buffer',
+                    });
+                }
             }
             showToast(`Settings synchronized from source to ${selectedTargetId}`, 'success');
             await loadSettings(selectedTargetId);
@@ -289,7 +307,13 @@ export function InstanceSettingsModal({
                 try {
                     localStorage.setItem('agm_instance_clipboard_buffer', JSON.stringify(buf));
                     setClipboardBuffer(buf);
-                } catch {}
+                } catch (e) {
+                    // Best-effort clipboard persist; localStorage may throw in restricted contexts. Tracked, in-memory buffer still set.
+                    useErrorStore.getState().trackWarning(e, {
+                      source: 'InstanceSettingsModal.copyWorkspaces',
+                      triggerAction: 'persist_clipboard_buffer',
+                    });
+                }
             }
             showToast(`Successfully copied ${copiedCount} workspace folder(s) & project states`, 'success');
             onInstancesUpdated?.();
@@ -321,7 +345,13 @@ export function InstanceSettingsModal({
                 try {
                     localStorage.setItem('agm_instance_clipboard_buffer', JSON.stringify(buf));
                     setClipboardBuffer(buf);
-                } catch {}
+                } catch (e) {
+                    // Best-effort clipboard persist; localStorage may throw in restricted contexts. Tracked, in-memory buffer still set.
+                    useErrorStore.getState().trackWarning(e, {
+                      source: 'InstanceSettingsModal.copySettingsAndWorkspaces',
+                      triggerAction: 'persist_clipboard_buffer',
+                    });
+                }
             }
 
             const { projectsCount } = await instanceService.copyInstanceBoth(sourceId, selectedTargetId);

@@ -99,7 +99,8 @@ fn try_fetch_remote_version() -> Option<String> {
             None
         })();
 
-        let _ = tx.send(result);
+        // Justification: best-effort channel notification; the receiver may already be gone during shutdown
+        crate::error::record_ignored(tx.send(result), "channel send");
     });
 
     // Wait up to 6 seconds (slightly over the client timeout) for the thread

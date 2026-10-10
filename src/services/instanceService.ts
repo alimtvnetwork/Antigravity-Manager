@@ -955,14 +955,26 @@ export function getPromptTreeSyncInterval(): SyncInterval {
         if (val === '15s' || val === '30s' || val === '1m' || val === '2m' || val === 'off') {
             return val;
         }
-    } catch {}
+    } catch (e) {
+        // Best-effort UI preference read; localStorage may throw in restricted contexts. Tracked, safe default applied.
+        useErrorStore.getState().trackWarning(e, {
+          source: 'instanceService.getPromptTreeSyncInterval',
+          triggerAction: 'read_sync_interval_preference',
+        });
+    }
     return '30s';
 }
 
 export function setPromptTreeSyncInterval(interval: SyncInterval): void {
     try {
         localStorage.setItem('agm_prompt_tree_sync_interval', interval);
-    } catch {}
+    } catch (e) {
+        // Best-effort UI preference write; localStorage may throw in restricted contexts. Tracked, preference not persisted.
+        useErrorStore.getState().trackWarning(e, {
+          source: 'instanceService.setPromptTreeSyncInterval',
+          triggerAction: 'write_sync_interval_preference',
+        });
+    }
 }
 
 export function getArchivedProjectsForInstance(instanceId: string): string[] {
@@ -972,7 +984,12 @@ export function getArchivedProjectsForInstance(instanceId: string): string[] {
         if (!raw) return [];
         const parsed = JSON.parse(raw);
         return Array.isArray(parsed) ? parsed : [];
-    } catch {
+    } catch (e) {
+        // Best-effort UI state read; corrupt or unavailable storage falls back to empty. Tracked.
+        useErrorStore.getState().trackWarning(e, {
+          source: 'instanceService.getArchivedProjectsForInstance',
+          triggerAction: 'read_archived_projects',
+        });
         return [];
     }
 }
@@ -981,7 +998,13 @@ export function setArchivedProjectsForInstance(instanceId: string, projectIds: s
     try {
         const key = `agm_archived_projects_${instanceId || 'default'}`;
         localStorage.setItem(key, JSON.stringify(projectIds));
-    } catch {}
+    } catch (e) {
+        // Best-effort UI state write; localStorage may throw in restricted contexts. Tracked, archive state not persisted.
+        useErrorStore.getState().trackWarning(e, {
+          source: 'instanceService.setArchivedProjectsForInstance',
+          triggerAction: 'write_archived_projects',
+        });
+    }
 }
 
 export interface AutoSwitcherDaemonStatus {
@@ -1015,13 +1038,25 @@ export function getInstanceCardDensity(): 'normal' | 'compact' {
         if (val === 'compact' || val === 'normal') {
             return val;
         }
-    } catch {}
+    } catch {
+        // Best-effort UI preference read; localStorage may throw in restricted contexts. Tracked, safe default applied.
+        useErrorStore.getState().trackWarning('localStorage.getItem failed for agm_instance_card_density', {
+          source: 'instanceService.getInstanceCardDensity',
+          triggerAction: 'read_density_preference',
+        });
+    }
     return 'normal';
 }
 
 export function setInstanceCardDensity(density: 'normal' | 'compact'): void {
     try {
         localStorage.setItem('agm_instance_card_density', density);
-    } catch {}
+    } catch (e) {
+        // Best-effort UI preference write; localStorage may throw in restricted contexts. Tracked, preference not persisted.
+        useErrorStore.getState().trackWarning(e, {
+          source: 'instanceService.setInstanceCardDensity',
+          triggerAction: 'write_density_preference',
+        });
+    }
 }
 

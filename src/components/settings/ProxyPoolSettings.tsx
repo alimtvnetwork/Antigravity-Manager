@@ -9,6 +9,7 @@ import ProxyEditModal from './proxy/ProxyEditModal';
 import BatchImportModal from './proxy/BatchImportModal';
 import ProxyBindingManager from './proxy/ProxyBindingManager';
 import { useAccountStore } from '../../stores/useAccountStore';
+import { useErrorStore } from '../../stores/error-store';
 
 interface ProxyPoolSettingsProps {
     config: ProxyPoolConfig;
@@ -69,7 +70,11 @@ export default function ProxyPoolSettings({ config, onChange }: ProxyPoolSetting
                         }
                     }
                 } catch (e) {
-                    // Ignore if service not running or other errors
+                    // Ignore if service not running or other errors; tracked in the error module, retried on next 5s poll.
+                    useErrorStore.getState().trackWarning(e, {
+                      source: 'ProxyPoolSettings.pollConfig',
+                      triggerAction: 'poll_proxy_pool_config',
+                    });
                     console.error('Failed to poll proxy pool config:', e);
                 }
             }, 5000); // Poll every 5s
@@ -83,6 +88,12 @@ export default function ProxyPoolSettings({ config, onChange }: ProxyPoolSetting
             if (bindings) setAccountBindings(bindings);
         } catch (e) {
             console.error('Fetch bindings failed:', e);
+            // Tracked in the error module; bindings list keeps previous values.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'ProxyPoolSettings.fetchBindings',
+              endpoint: 'get_all_account_bindings',
+              triggerAction: 'fetch_bindings',
+            });
         }
     };
 
@@ -163,6 +174,11 @@ export default function ProxyPoolSettings({ config, onChange }: ProxyPoolSetting
             showToast(t('settings.proxy_pool.test_completed', 'Health check completed'), 'success');
         } catch (error) {
             console.error('Test all failed:', error);
+            // Tracked in the error module; user already notified via error toast.
+            useErrorStore.getState().trackWarning(error, {
+              source: 'ProxyPoolSettings.testAll',
+              triggerAction: 'test_all_proxies',
+            });
             showToast(t('settings.proxy_pool.test_failed', 'Health check failed'), 'error');
         } finally {
             setIsTesting(false);

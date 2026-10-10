@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { request as invoke } from '../../utils/request';
 import { Search, AlertTriangle } from 'lucide-react';
+import { useErrorStore } from '../../stores/error-store';
 
 interface IpAccessLog {
     id: string;
@@ -56,6 +57,11 @@ export const IpAccessLogs: React.FC<Props> = ({ refreshKey }) => {
             setTotal(res.total);
         } catch (e) {
             console.error('Failed to load logs', e);
+            // Tracked in the error module; empty table shown, retried on next load.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'IpAccessLogs.loadLogs',
+              triggerAction: 'load_access_logs',
+            });
         } finally {
             setLoading(false);
         }

@@ -37,10 +37,18 @@ pub async fn prune_secondary_endpoint(
         for item in arr {
             if let Some(id) = item.get("id").and_then(|v| v.as_str()) {
                 let del_query = format!("id=eq.{}", id);
-                let _ = client.delete("command_queue", &del_query).await;
+                // Justification: best-effort call; failure logged without changing control flow
+                crate::error::record_ignored(
+                    client.delete("command_queue", &del_query).await,
+                    "delete",
+                );
 
                 let tel_query = format!("command_id=eq.{}", id);
-                let _ = client.delete("command_telemetry", &tel_query).await;
+                // Justification: best-effort call; failure logged without changing control flow
+                crate::error::record_ignored(
+                    client.delete("command_telemetry", &tel_query).await,
+                    "delete",
+                );
                 deleted_count += 1;
             }
         }
@@ -56,13 +64,21 @@ pub async fn prune_root_endpoint(endpoint: &SupabaseEndpoint) -> Result<(), AppE
 
     // 1. Delete expired leases
     let lease_query = format!("expires_at=lt.{}", now);
-    let _ = client.delete("workspace_leases", &lease_query).await;
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(
+        client.delete("workspace_leases", &lease_query).await,
+        "delete",
+    );
 
     // 2. Mark nodes inactive if no heartbeat in 10 minutes
     let stale_time = now - 600;
     let stale_query = format!("last_heartbeat_at=lt.{}&status=eq.online", stale_time);
     let status_payload = json!({ "status": "offline" });
-    let _ = client.update("nodes", &stale_query, status_payload).await;
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(
+        client.update("nodes", &stale_query, status_payload).await,
+        "update",
+    );
 
     Ok(())
 }
@@ -93,11 +109,19 @@ pub fn start_pruner_worker() {
                     continue;
                 }
                 if ep.role == "root" {
-                    let _ = prune_root_endpoint(ep).await;
+                    // Justification: best-effort call; failure logged without changing control flow
+                    crate::error::record_ignored(
+                        prune_root_endpoint(ep).await,
+                        "prune_root_endpoint",
+                    );
                 } else if ep.role == "secondary" {
                     // Approximate records to keep based on threshold: 1000 records ~ 100MB
                     let keep_limit = (ep.prune_threshold_mb * 10) as usize;
-                    let _ = prune_secondary_endpoint(ep, keep_limit).await;
+                    // Justification: best-effort call; failure logged without changing control flow
+                    crate::error::record_ignored(
+                        prune_secondary_endpoint(ep, keep_limit).await,
+                        "prune_secondary_endpoint",
+                    );
                 }
             }
         }

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { request as invoke } from '../../utils/request';
 import { Save, AlertTriangle, Shield, ShieldCheck } from 'lucide-react';
 import { showToast } from '../common/ToastContainer';
+import { useErrorStore } from '../../stores/error-store';
 
 interface IpBlacklistConfig {
     enabled: boolean;
@@ -36,6 +37,12 @@ export const SecurityConfig: React.FC = () => {
             setConfig(data);
         } catch (e) {
             console.error('Failed to load security config', e);
+            // Tracked in the error module; user already notified via error toast.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'SecurityConfig.loadConfig',
+              endpoint: 'get_security_config',
+              triggerAction: 'load_security_config',
+            });
             showToast(t('security.config.load_error'), 'error');
         } finally {
             setLoading(false);
@@ -50,6 +57,12 @@ export const SecurityConfig: React.FC = () => {
             showToast(t('security.config.save_success'), 'success');
         } catch (e) {
             console.error('Failed to save security config', e);
+            // Tracked in the error module; user already notified via error toast.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'SecurityConfig.saveConfig',
+              endpoint: 'update_security_config',
+              triggerAction: 'save_security_config',
+            });
             showToast(t('security.config.save_error'), 'error');
         } finally {
             setSaving(false);

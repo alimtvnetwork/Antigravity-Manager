@@ -790,10 +790,14 @@ impl TokenManager {
             {
                 if !arr.is_empty() {
                     arr.clear();
-                    let _ = update_account_json(account_path, |latest| {
-                        latest["protected_models"] = serde_json::Value::Array(Vec::new());
-                    })
-                    .await;
+                    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                    crate::error::record_ignored(
+                        update_account_json(account_path, |latest| {
+                            latest["protected_models"] = serde_json::Value::Array(Vec::new());
+                        })
+                        .await,
+                        "update_account_json",
+                    );
                 }
             }
             return false; // 配额保护未启用
@@ -1240,13 +1244,17 @@ impl TokenManager {
 
         account_json["protected_models"] = serde_json::Value::Array(protected_list.clone());
 
-        let _ = update_account_json(account_path, |latest| {
-            latest["proxy_disabled"] = serde_json::Value::Bool(false);
-            latest["proxy_disabled_reason"] = serde_json::Value::Null;
-            latest["proxy_disabled_at"] = serde_json::Value::Null;
-            latest["protected_models"] = serde_json::Value::Array(protected_list);
-        })
-        .await;
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            update_account_json(account_path, |latest| {
+                latest["proxy_disabled"] = serde_json::Value::Bool(false);
+                latest["proxy_disabled_reason"] = serde_json::Value::Null;
+                latest["proxy_disabled_at"] = serde_json::Value::Null;
+                latest["protected_models"] = serde_json::Value::Array(protected_list);
+            })
+            .await,
+            "update_account_json",
+        );
 
         false // 返回 false 表示现在已可以尝试加载该账号（模型级过滤会在 get_token 时发生）
     }
@@ -1848,7 +1856,11 @@ impl TokenManager {
                                                         if let Ok(s) =
                                                             serde_json::to_string_pretty(&val)
                                                         {
-                                                            let _ = std::fs::write(&write_path, s);
+                                                            // Justification: best-effort file write; failure is logged and surfaces on the next read
+                                                            crate::error::record_ignored(
+                                                                std::fs::write(&write_path, s),
+                                                                "fs::write",
+                                                            );
                                                         }
                                                     });
                                                 }
@@ -1906,7 +1918,11 @@ impl TokenManager {
                                                 };
                                                 val["token"]["project_id"] = pid_clone.into();
                                                 if let Ok(s) = serde_json::to_string_pretty(&val) {
-                                                    let _ = std::fs::write(&write_path, s);
+                                                    // Justification: best-effort file write; failure is logged and surfaces on the next read
+                                                    crate::error::record_ignored(
+                                                        std::fs::write(&write_path, s),
+                                                        "fs::write",
+                                                    );
                                                 }
                                             });
                                         }
@@ -2343,7 +2359,11 @@ impl TokenManager {
                                             val["token"]["refresh_token"] = rt.into();
                                         }
                                         if let Ok(s) = serde_json::to_string_pretty(&val) {
-                                            let _ = std::fs::write(&write_path, s);
+                                            // Justification: best-effort file write; failure is logged and surfaces on the next read
+                                            crate::error::record_ignored(
+                                                std::fs::write(&write_path, s),
+                                                "fs::write",
+                                            );
                                         }
                                     });
                                 }
@@ -2369,12 +2389,15 @@ impl TokenManager {
                                             token.email,
                                             current_fails
                                         );
-                                        let _ = self
-                                            .disable_account(
+                                        // Justification: best-effort call; failure logged without changing control flow
+                                        crate::error::record_ignored(
+                                            self.disable_account(
                                                 &token.account_id,
                                                 &format!("invalid_grant: {}", e),
                                             )
-                                            .await;
+                                            .await,
+                                            "operation",
+                                        );
                                         self.invalid_grant_failures.remove(&token.account_id);
                                     } else {
                                         tracing::warn!(
@@ -2439,7 +2462,11 @@ impl TokenManager {
                                 if let Some(mut entry) = self.tokens.get_mut(&token.account_id) {
                                     entry.project_id = Some(pid.clone());
                                 }
-                                let _ = self.save_project_id(&token.account_id, &pid).await;
+                                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                                crate::error::record_ignored(
+                                    self.save_project_id(&token.account_id, &pid).await,
+                                    "save_project_id",
+                                );
                                 Ok(pid)
                             }
                             Err(e) => Err(e),
@@ -2513,7 +2540,11 @@ impl TokenManager {
                                             };
                                             val["token"]["project_id"] = pid_clone.into();
                                             if let Ok(s) = serde_json::to_string_pretty(&val) {
-                                                let _ = std::fs::write(&write_path, s);
+                                                // Justification: best-effort file write; failure is logged and surfaces on the next read
+                                                crate::error::record_ignored(
+                                                    std::fs::write(&write_path, s),
+                                                    "fs::write",
+                                                );
                                             }
                                         });
                                     }
@@ -2725,9 +2756,12 @@ impl TokenManager {
                 }
 
                 // 保存到磁盘
-                let _ = self
-                    .save_refreshed_token(&account_id, &token_response)
-                    .await;
+                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                crate::error::record_ignored(
+                    self.save_refreshed_token(&account_id, &token_response)
+                        .await,
+                    "operation",
+                );
 
                 Ok((
                     token_response.access_token,
@@ -4438,7 +4472,8 @@ mod tests {
             .rate_limit_tracker
             .is_rate_limited(account_id, Some(model)));
 
-        let _ = std::fs::remove_dir_all(&tmp_root);
+        // Justification: best-effort cleanup; a leftover directory is harmless
+        crate::error::record_ignored(std::fs::remove_dir_all(&tmp_root), "remove_dir_all");
     }
 
     #[tokio::test]
@@ -4541,7 +4576,8 @@ mod tests {
             serde_json::json!(["gemini-3-flash"])
         );
 
-        let _ = std::fs::remove_dir_all(&tmp_root);
+        // Justification: best-effort cleanup; a leftover directory is harmless
+        crate::error::record_ignored(std::fs::remove_dir_all(&tmp_root), "remove_dir_all");
     }
 
     #[tokio::test]
@@ -4621,7 +4657,8 @@ mod tests {
         assert_eq!(selected.3, account_id);
         assert!(!manager.is_rate_limited(account_id, Some(model)).await);
 
-        let _ = std::fs::remove_dir_all(&tmp_root);
+        // Justification: best-effort cleanup; a leftover directory is harmless
+        crate::error::record_ignored(std::fs::remove_dir_all(&tmp_root), "remove_dir_all");
     }
 
     #[tokio::test]
@@ -4727,7 +4764,8 @@ mod tests {
                 .is_rate_limited(account_id, Some("gemini-3-pro-image"))
         );
 
-        let _ = std::fs::remove_dir_all(&tmp_root);
+        // Justification: best-effort cleanup; a leftover directory is harmless
+        crate::error::record_ignored(std::fs::remove_dir_all(&tmp_root), "remove_dir_all");
     }
 
     #[tokio::test]
@@ -4798,7 +4836,8 @@ mod tests {
         assert!(manager.tokens.get("acc1").is_none());
         assert!(manager.get_preferred_account().await.is_none());
 
-        let _ = std::fs::remove_dir_all(&tmp_root);
+        // Justification: best-effort cleanup; a leftover directory is harmless
+        crate::error::record_ignored(std::fs::remove_dir_all(&tmp_root), "remove_dir_all");
     }
 
     #[tokio::test]
@@ -4845,7 +4884,8 @@ mod tests {
         // Keep the normalized quota bucket too; it is used for quota/protection checks.
         assert!(collected_models.contains("gemini-3-flash"));
 
-        let _ = std::fs::remove_dir_all(&tmp_root);
+        // Justification: best-effort cleanup; a leftover directory is harmless
+        crate::error::record_ignored(std::fs::remove_dir_all(&tmp_root), "remove_dir_all");
     }
 
     #[tokio::test]
@@ -4920,7 +4960,8 @@ mod tests {
             Some("acc1".to_string())
         );
 
-        let _ = std::fs::remove_dir_all(&tmp_root);
+        // Justification: best-effort cleanup; a leftover directory is harmless
+        crate::error::record_ignored(std::fs::remove_dir_all(&tmp_root), "remove_dir_all");
     }
 
     /// 创建测试用的 ProxyToken

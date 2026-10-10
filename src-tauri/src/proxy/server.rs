@@ -1238,7 +1238,8 @@ impl AxumServer {
                                             // Global shutdown signal: notify Hyper to gracefully terminate connections
                                             conn.as_mut().graceful_shutdown();
                                             // Allow up to 500ms grace period before closing socket
-                                            let _ = tokio::time::timeout(std::time::Duration::from_millis(500), conn).await;
+                                            // Justification: best-effort guarded wait; a timeout or inner failure is logged
+                                            crate::error::record_ignored(tokio::time::timeout(std::time::Duration::from_millis(500), conn).await, "timeout wait");
                                         }
                                     }
                                 });
@@ -1284,10 +1285,12 @@ fn bind_single_socket(
         .map_err(|e| format!("Failed to create socket ({}): {}", socket_addr, e))?;
 
     // Enable SO_REUSEADDR on Windows/Unix to prevent WSAEADDRINUSE (10048) on restarts
-    let _ = socket.set_reuse_address(true);
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(socket.set_reuse_address(true), "set_reuse_address");
 
     #[cfg(unix)]
-    let _ = socket.set_reuse_port(true);
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(socket.set_reuse_port(true), "set_reuse_port");
 
     socket
         .set_nonblocking(true)
@@ -1329,10 +1332,12 @@ fn bind_dual_stack_socket(port: u16) -> Result<tokio::net::TcpListener, String> 
         ));
     }
 
-    let _ = socket.set_reuse_address(true);
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(socket.set_reuse_address(true), "set_reuse_address");
 
     #[cfg(unix)]
-    let _ = socket.set_reuse_port(true);
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(socket.set_reuse_port(true), "set_reuse_port");
 
     socket
         .set_nonblocking(true)
@@ -2187,7 +2192,11 @@ async fn admin_start_proxy_service(State(state): State<AppState>) -> impl IntoRe
     // 1. Persistence  (  #1166)
     if let Ok(mut config) = crate::modules::config::load_app_config() {
         config.proxy.auto_start = true;
-        let _ = crate::modules::config::save_app_config(&config);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::config::save_app_config(&config),
+            "save_app_config",
+        );
     }
 
     // 2.   ( )
@@ -2228,7 +2237,11 @@ async fn admin_stop_proxy_service(State(state): State<AppState>) -> impl IntoRes
     // 1. Persistence  (  #1166)
     if let Ok(mut config) = crate::modules::config::load_app_config() {
         config.proxy.auto_start = false;
-        let _ = crate::modules::config::save_app_config(&config);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::config::save_app_config(&config),
+            "save_app_config",
+        );
     }
 
     let mut running = state.is_running.write().await;
@@ -2442,12 +2455,16 @@ async fn admin_get_proxy_logs_count_filtered(
 }
 
 async fn admin_clear_proxy_logs() -> impl IntoResponse {
-    let _ = tokio::task::spawn_blocking(|| {
-        if let Err(e) = proxy_db::clear_logs() {
-            logger::log_error(&format!("[API] Failed to clear proxy logs: {}", e));
-        }
-    })
-    .await;
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(
+        tokio::task::spawn_blocking(|| {
+            if let Err(e) = proxy_db::clear_logs() {
+                logger::log_error(&format!("[API] Failed to clear proxy logs: {}", e));
+            }
+        })
+        .await,
+        "spawn_blocking",
+    );
     logger::log_info("[API] Cleared all proxy logs");
     StatusCode::OK
 }
@@ -3022,9 +3039,11 @@ async fn admin_clear_token_stats() -> impl IntoResponse {
     let res = tokio::task::spawn_blocking(|| {
         // Clear databases (brute force)
         if let Ok(path) = token_stats::get_db_path() {
-            let _ = std::fs::remove_file(path);
+            // Justification: best-effort cleanup; a leftover file is harmless
+            crate::error::record_ignored(std::fs::remove_file(path), "remove_file");
         }
-        let _ = token_stats::init_db();
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(token_stats::init_db(), "init_db");
     })
     .await;
 
@@ -3079,7 +3098,11 @@ async fn admin_save_update_settings(Json(settings): Json<serde_json::Value>) -> 
     if let Ok(s) =
         serde_json::from_value::<crate::modules::update_checker::UpdateSettings>(settings)
     {
-        let _ = crate::modules::update_checker::save_update_settings(&s);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::update_checker::save_update_settings(&s),
+            "save_update_settings",
+        );
         StatusCode::OK
     } else {
         StatusCode::BAD_REQUEST
@@ -3230,7 +3253,11 @@ async fn admin_toggle_proxy_status(
     })?;
 
     //
-    let _ = state.token_manager.reload_account(&account_id).await;
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        state.token_manager.reload_account(&account_id).await,
+        "reload_account",
+    );
 
     Ok(StatusCode::OK)
 }
@@ -3564,7 +3591,8 @@ async fn admin_import_v1_accounts(
     })?;
 
     // [FIX #1166]
-    let _ = state.token_manager.load_accounts().await;
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(state.token_manager.load_accounts().await, "load_accounts");
 
     let current_id = state.account_service.get_current_id().map_err(|e| {
         (
@@ -3593,7 +3621,8 @@ async fn admin_import_from_db(
     state.token_manager.clear_all_sessions();
 
     // [FIX #1166]
-    let _ = state.token_manager.load_accounts().await;
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(state.token_manager.load_accounts().await, "load_accounts");
 
     let current_id = state.account_service.get_current_id().map_err(|e| {
         (
@@ -3636,7 +3665,8 @@ async fn admin_import_custom_db(
     state.token_manager.clear_all_sessions();
 
     // [FIX #1166]
-    let _ = state.token_manager.load_accounts().await;
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(state.token_manager.load_accounts().await, "load_accounts");
 
     let current_id = state.account_service.get_current_id().map_err(|e| {
         (
@@ -3704,7 +3734,8 @@ async fn admin_sync_account_from_db(
     state.token_manager.clear_all_sessions();
 
     // [FIX #1166]   TokenManager
-    let _ = state.token_manager.load_accounts().await;
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(state.token_manager.load_accounts().await, "load_accounts");
 
     let current_id = state.account_service.get_current_id().map_err(|e| {
         (
@@ -4905,7 +4936,11 @@ fn log_admin_audit(endpoint: &str, method: &str, status_code: i32) {
         block_reason: None,
         username: Some("admin".to_string()),
     };
-    let _ = crate::modules::security_db::save_ip_access_log(&log);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        crate::modules::security_db::save_ip_access_log(&log),
+        "save_ip_access_log",
+    );
 }
 
 // ── Instance Handlers ──
@@ -5124,7 +5159,11 @@ async fn admin_restart_instance(
     log_admin_audit(&format!("/api/instances/{}/restart", id), "POST", 200);
     let resolved =
         crate::modules::instance::resolve_instance_id(&id).unwrap_or_else(|_| id.clone());
-    let _ = crate::modules::instance::stop_instance(&resolved);
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(
+        crate::modules::instance::stop_instance(&resolved),
+        "stop_instance",
+    );
     match crate::modules::instance::launch_instance(&resolved) {
         Ok(_) => Ok(Json(serde_json::json!({
             "success": true,
@@ -5634,6 +5673,7 @@ mod image_scheduler_tests {
         let cancelled_accounts = account_ids.clone();
         let cancelled = tokio::spawn(async move {
             let _permit = acquire(&cancelled_scheduler, &cancelled_accounts).await;
+            // Justification: oneshot::Sender::send returns Result<(), ()> — the unit error carries no information to log; a dropped receiver is benign here.
             let _ = acquired_tx.send(());
             std::future::pending::<()>().await;
         });

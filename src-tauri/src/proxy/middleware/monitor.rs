@@ -298,14 +298,18 @@ fn record_user_token_usage(
     user_agent: Option<String>,
 ) {
     if let Some(identity) = user_token_identity {
-        let _ = crate::modules::user_token_db::record_token_usage_and_ip(
-            &identity.token_id,
-            log.client_ip.as_deref().unwrap_or("127.0.0.1"),
-            log.model.as_deref().unwrap_or("unknown"),
-            log.input_tokens.unwrap_or(0) as i32,
-            log.output_tokens.unwrap_or(0) as i32,
-            log.status as u16,
-            user_agent,
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::user_token_db::record_token_usage_and_ip(
+                &identity.token_id,
+                log.client_ip.as_deref().unwrap_or("127.0.0.1"),
+                log.model.as_deref().unwrap_or("unknown"),
+                log.input_tokens.unwrap_or(0) as i32,
+                log.output_tokens.unwrap_or(0) as i32,
+                log.status as u16,
+                user_agent,
+            ),
+            "record_token_usage_and_ip",
         );
     }
 }
@@ -1689,8 +1693,10 @@ mod tests {
         let task = tokio::spawn(async move {
             let mut polled_tx = Some(polled_tx);
             let mut source = stream::poll_fn(move |_| {
+                // Justification: forces the closure to capture drop_flag, keeping the DropFlag alive for the stream's lifetime; not a fallible operation.
                 let _ = &drop_flag;
                 if let Some(polled_tx) = polled_tx.take() {
+                    // Justification: oneshot::Sender::send returns Result<(), ()> — the unit error carries no information to log; a dropped receiver is benign here.
                     let _ = polled_tx.send(());
                 }
                 Poll::<Option<()>>::Pending

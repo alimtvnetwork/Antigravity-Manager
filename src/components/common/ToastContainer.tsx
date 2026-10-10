@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Toast, { ToastType } from './Toast';
+import { useErrorStore } from '../../stores/error-store';
 
 export interface ToastItem {
     id: string;
@@ -17,6 +18,12 @@ export const showToast = (message: string, type: ToastType = 'info', duration: n
         addToastExternal(message, type, duration);
     } else {
         console.warn('ToastContainer not mounted');
+        // Tracked in the error module; toast requested before container mounted (dev-time ordering issue).
+        useErrorStore.getState().trackWarning('ToastContainer not mounted when showToast called', {
+          source: 'ToastContainer.showToast',
+          triggerAction: 'show_toast',
+          context: { message: String(message).slice(0, 200) },
+        });
     }
 };
 

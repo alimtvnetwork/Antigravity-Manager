@@ -162,8 +162,12 @@ fn apply_account_credentials(
                         keyring_err, db_path
                     ));
                     let backup_path = db_path.with_extension("vscdb.backup");
-                    let _ = fs::copy(&db_path, &backup_path);
-                    let _ = db::inject_token(
+                    // Justification: pre-injection database backup is best-effort; the injection proceeds regardless
+                    crate::error::record_ignored(
+                        fs::copy(&db_path, &backup_path),
+                        "back up state.vscdb before fallback token injection",
+                    );
+                    db::inject_token(
                         &db_path,
                         &account.token.access_token,
                         &account.token.refresh_token,
@@ -174,9 +178,18 @@ fn apply_account_credentials(
                         account.token.id_token.as_deref(),
                         account.token.oauth_client_key.as_deref(),
                         effective_target,
-                    );
+                    )
+                    .map_err(|e| {
+                        format!(
+                            "Keyring write failed ({keyring_err}); SQLite fallback injection also failed: {e}"
+                        )
+                    })?;
                     if let Some(ref profile) = account.device_profile {
-                        let _ = db::write_service_machine_id(&db_path, &profile.mac_machine_id);
+                        // Justification: service machine ID sync is auxiliary; the token injection already succeeded
+                        crate::error::record_ignored(
+                            db::write_service_machine_id(&db_path, &profile.mac_machine_id),
+                            "sync service machine ID after fallback injection",
+                        );
                     }
                     true
                 } else {
@@ -194,33 +207,53 @@ fn apply_account_credentials(
         // 2.2 同步写入 storage.json 与 state.vscdb（若存在），确保新版客户端与本地扩展状态完全一致
         if let Ok(storage_path) = device::get_storage_path(effective_target) {
             if let Some(ref profile) = account.device_profile {
-                let _ = device::write_profile(&storage_path, profile);
+                // Justification: device profile sync keeps local state consistent; the account is already in the system keyring
+                crate::error::record_ignored(
+                    device::write_profile(&storage_path, profile),
+                    "sync device profile after keyring write",
+                );
             }
         }
         if let Ok(db_path) = db::get_db_path(effective_target) {
             if db_path.exists() {
                 let backup_path = db_path.with_extension("vscdb.backup");
-                let _ = fs::copy(&db_path, &backup_path);
-                let _ = db::inject_token(
-                    &db_path,
-                    &account.token.access_token,
-                    &account.token.refresh_token,
-                    account.token.expiry_timestamp,
-                    &account.email,
-                    account.token.is_gcp_tos,
-                    account.token.project_id.as_deref(),
-                    account.token.id_token.as_deref(),
-                    account.token.oauth_client_key.as_deref(),
-                    effective_target,
+                // Justification: pre-injection database backup is best-effort; the injection proceeds regardless
+                crate::error::record_ignored(
+                    fs::copy(&db_path, &backup_path),
+                    "back up state.vscdb before token injection",
+                );
+                // Justification: secondary SQLite sync after a successful keyring write; the account is already injected
+                crate::error::record_ignored(
+                    db::inject_token(
+                        &db_path,
+                        &account.token.access_token,
+                        &account.token.refresh_token,
+                        account.token.expiry_timestamp,
+                        &account.email,
+                        account.token.is_gcp_tos,
+                        account.token.project_id.as_deref(),
+                        account.token.id_token.as_deref(),
+                        account.token.oauth_client_key.as_deref(),
+                        effective_target,
+                    ),
+                    "inject token into state.vscdb",
                 );
                 if let Some(ref profile) = account.device_profile {
-                    let _ = db::write_service_machine_id(&db_path, &profile.mac_machine_id);
+                    // Justification: service machine ID sync is auxiliary; the keyring write already succeeded
+                    crate::error::record_ignored(
+                        db::write_service_machine_id(&db_path, &profile.mac_machine_id),
+                        "sync service machine ID",
+                    );
                 }
             }
         }
     } else {
         // ================== 原有 Antigravity 旧版或定制 IDE 逻辑 (< 2.0.0) ==================
-        let _ = write_to_system_keyring(account);
+        // Justification: opportunistic keyring write for old IDEs; the SQLite injection below is the authoritative path
+        crate::error::record_ignored(
+            write_to_system_keyring(account),
+            "write account to system keyring",
+        );
 
         // 2.1 获取存储路径
         let storage_path = device::get_storage_path(effective_target)?;
@@ -234,7 +267,11 @@ fn apply_account_credentials(
         let db_path = db::get_db_path(effective_target)?;
         if db_path.exists() {
             let backup_path = db_path.with_extension("vscdb.backup");
-            let _ = fs::copy(&db_path, &backup_path);
+            // Justification: pre-injection database backup is best-effort; the injection proceeds regardless
+            crate::error::record_ignored(
+                fs::copy(&db_path, &backup_path),
+                "back up state.vscdb before token injection",
+            );
         }
 
         db::inject_token(
@@ -252,7 +289,11 @@ fn apply_account_credentials(
 
         // 2.4 同步 Service Machine ID 到数据库
         if let Some(ref profile) = account.device_profile {
-            let _ = db::write_service_machine_id(&db_path, &profile.mac_machine_id);
+            // Justification: service machine ID sync is auxiliary; the token injection already succeeded
+            crate::error::record_ignored(
+                db::write_service_machine_id(&db_path, &profile.mac_machine_id),
+                "sync service machine ID",
+            );
         }
     }
 
@@ -279,6 +320,7 @@ impl SystemIntegration for DesktopIntegration {
                 ))
                 .await;
                 if let Some(ref h) = self.app_handle {
+                    // Justification: update_tray_menus returns (); there is no error to surface
                     let _ = crate::modules::tray::update_tray_menus(h);
                 }
                 return res;
@@ -290,7 +332,11 @@ impl SystemIntegration for DesktopIntegration {
 
             if let Ok(storage_path) = device::get_storage_path(target_ide) {
                 if let Some(ref profile) = account.device_profile {
-                    let _ = device::write_profile(&storage_path, profile);
+                    // Justification: device profile sync is auxiliary; the keyring write above is the authoritative op
+                    crate::error::record_ignored(
+                        device::write_profile(&storage_path, profile),
+                        "sync device profile for agy",
+                    );
                 }
             }
 
@@ -338,10 +384,18 @@ impl SystemIntegration for DesktopIntegration {
         crate::modules::logger::log_info(
             "[Desktop] [Step 1/5] Backing up running prompts via AGM before closing Antigravity IDE...",
         );
-        let _ = crate::modules::repo_db::backup_running_prompts("default");
-        let _ = crate::modules::backup_prompts_db::backup_active_running_prompts_for_instance(
-            Some("default"),
-            None,
+        // Justification: prompt backup is best-effort; the switch proceeds and the reinject decision below is recomputed from the actual backed-up count
+        crate::error::record_ignored(
+            crate::modules::repo_db::backup_running_prompts("default"),
+            "back up running prompts before account switch",
+        );
+        // Justification: prompt backup is best-effort; the switch proceeds and the reinject decision below is recomputed from the actual backed-up count
+        crate::error::record_ignored(
+            crate::modules::backup_prompts_db::backup_active_running_prompts_for_instance(
+                Some("default"),
+                None,
+            ),
+            "back up active running prompts before account switch",
         );
         let needs_reinject = crate::modules::repo_db::needs_prompt_channel_wait(
             crate::modules::repo_db::count_backed_up_prompts("default"),
@@ -353,7 +407,11 @@ impl SystemIntegration for DesktopIntegration {
         crate::modules::logger::log_info(
             "[Desktop] [Step 2/5] Closing running Antigravity IDE processes...",
         );
-        let _ = crate::modules::instance::close_instance("default");
+        // Justification: IDE close is best-effort; the credential injection and relaunch below drive the outcome
+        crate::error::record_ignored(
+            crate::modules::instance::close_instance("default"),
+            "close Antigravity IDE before account switch",
+        );
 
         // =========================================================================
         // STEP 3: Switch the Account Credentials (OS Keyring + state.vscdb + storage.json)
@@ -368,10 +426,14 @@ impl SystemIntegration for DesktopIntegration {
             is_ide,
             active_exe_path.as_deref(),
         )?;
-        let _ = crate::modules::instance::bind_account_to_instance(
-            "default",
-            &account.id,
-            &account.email,
+        // Justification: instance binding is bookkeeping; the credentials were already injected
+        crate::error::record_ignored(
+            crate::modules::instance::bind_account_to_instance(
+                "default",
+                &account.id,
+                &account.email,
+            ),
+            "bind account to default instance",
         );
 
         // Purge stale lockfiles in data_dir before process restart
@@ -393,7 +455,11 @@ impl SystemIntegration for DesktopIntegration {
             for lock in &["lockfile", "code.lock", "DevToolsActivePort"] {
                 let lock_file = dir.join(lock);
                 if lock_file.exists() {
-                    let _ = fs::remove_file(&lock_file);
+                    // Justification: stale lockfile removal is best-effort; the relaunch tolerates leftovers
+                    crate::error::record_ignored(
+                        fs::remove_file(&lock_file),
+                        "purge stale lockfile",
+                    );
                     crate::modules::logger::log_info(&format!(
                         "[Desktop] Purged stale lockfile: {:?}",
                         lock_file
@@ -425,16 +491,28 @@ impl SystemIntegration for DesktopIntegration {
                 );
                 let workspace_roots =
                     crate::modules::instance::get_instance_workspace_paths("default");
-                let _ = crate::modules::instance::restore_and_inject_prompts_for_instance(
-                    "default",
-                    &workspace_roots,
+                // Justification: post-launch prompt restore runs detached; failures are logged and retried by the scheduler
+                crate::error::record_ignored(
+                    crate::modules::instance::restore_and_inject_prompts_for_instance(
+                        "default",
+                        &workspace_roots,
+                    ),
+                    "restore and inject prompts after relaunch",
                 );
-                let _ = crate::modules::backup_prompts_db::restore_running_prompts_for_instance(
-                    Some("default"),
-                    false,
-                    None,
+                // Justification: post-launch prompt restore runs detached; failures are logged and retried by the scheduler
+                crate::error::record_ignored(
+                    crate::modules::backup_prompts_db::restore_running_prompts_for_instance(
+                        Some("default"),
+                        false,
+                        None,
+                    ),
+                    "restore running prompts from backup after relaunch",
                 );
-                let _ = crate::modules::repo_db::dispatch_running_prompts("default");
+                // Justification: post-launch prompt restore runs detached; failures are logged and retried by the scheduler
+                crate::error::record_ignored(
+                    crate::modules::repo_db::dispatch_running_prompts("default"),
+                    "dispatch running prompts after relaunch",
+                );
             });
             note_prompt_reinjected(true);
         } else {
@@ -443,9 +521,11 @@ impl SystemIntegration for DesktopIntegration {
             );
             note_prompt_reinjected(false);
         }
+        // Justification: focus returns a found-flag, not a Result; false is expected on headless and there is no recovery
         let _ = crate::modules::process::focus_antigravity_window(effective_target);
 
         if let Some(ref h) = self.app_handle {
+            // Justification: update_tray_menus returns (); there is no error to surface
             let _ = crate::modules::tray::update_tray_menus(h);
         }
 
@@ -454,6 +534,7 @@ impl SystemIntegration for DesktopIntegration {
 
     fn update_tray(&self) {
         if let Some(ref h) = self.app_handle {
+            // Justification: update_tray_menus returns (); there is no error to surface
             let _ = crate::modules::tray::update_tray_menus(h);
         }
     }
@@ -510,15 +591,19 @@ pub fn write_to_system_keyring(account: &crate::models::Account) -> Result<(), S
 
         // 2.1 macOS Keychain Access
         // 删除旧的
-        let _ = Command::new("security")
-            .args([
-                "delete-generic-password",
-                "-s",
-                "gemini",
-                "-a",
-                "antigravity",
-            ])
-            .output();
+        // Justification: deletes a possibly-nonexistent old keychain entry; failure is expected when no entry exists
+        crate::error::record_ignored(
+            Command::new("security")
+                .args([
+                    "delete-generic-password",
+                    "-s",
+                    "gemini",
+                    "-a",
+                    "antigravity",
+                ])
+                .output(),
+            "delete old macOS keychain entry",
+        );
 
         // 写入新的 (-A 参数允许所有本地应用免密码、无感直接读取凭据)
         let output = Command::new("security")
@@ -609,6 +694,7 @@ pub fn write_to_system_keyring(account: &crate::models::Account) -> Result<(), S
 
         unsafe {
             // Delete first to ensure we write clean
+            // Justification: CredDeleteW returns BOOL, not a Result; a missing entry fails harmlessly and CredWriteW below overwrites anyway (its result is checked)
             let _ = CredDeleteW(target_wide.as_ptr(), 1, 0);
 
             let res = CredWriteW(&cred, 0);
@@ -671,7 +757,11 @@ pub fn write_to_system_keyring(account: &crate::models::Account) -> Result<(), S
             let child_pid = child.id();
             let (tx, rx) = mpsc::channel::<Result<std::process::Output, std::io::Error>>();
             std::thread::spawn(move || {
-                let _ = tx.send(child.wait_with_output());
+                // Justification: channel send fails only if the receiver already timed out and killed the child; the timeout path is handled
+                crate::error::record_ignored(
+                    tx.send(child.wait_with_output()),
+                    "forward secret-tool output to channel",
+                );
             });
 
             let output = match rx.recv_timeout(std::time::Duration::from_secs(10)) {
@@ -679,9 +769,13 @@ pub fn write_to_system_keyring(account: &crate::models::Account) -> Result<(), S
                     result.map_err(|e| format!("Failed to wait for secret-tool: {}", e))?
                 }
                 Err(_) => {
-                    let _ = Command::new("kill")
-                        .args(["-9", &child_pid.to_string()])
-                        .output();
+                    // Justification: killing the hung secret-tool child is best-effort cleanup; the timeout error is returned regardless
+                    crate::error::record_ignored(
+                        Command::new("kill")
+                            .args(["-9", &child_pid.to_string()])
+                            .output(),
+                        "kill hung secret-tool child",
+                    );
                     crate::modules::logger::log_error(
                         "[Desktop] secret-tool store blocked for >10s — D-Bus session bus unreachable.",
                     );
@@ -707,7 +801,11 @@ pub fn write_to_system_keyring(account: &crate::models::Account) -> Result<(), S
         let default_res = store_to_collection(None, payload_json.as_bytes());
 
         // 尝试优先同步写入本地文件凭据 (~/.gemini/oauth_creds.json)
-        let _ = write_to_file_credentials(account);
+        // Justification: file-credential mirror is opportunistic; the keyring writes are the authoritative path
+        crate::error::record_ignored(
+            write_to_file_credentials(account),
+            "mirror credentials to file",
+        );
 
         // 若两者均失败，则返回错误；若至少一个成功，则记录并继续
         if login_res.is_err() && default_res.is_err() {
@@ -765,10 +863,18 @@ pub fn write_to_file_credentials_at(
             .join("installation_id");
         if global_inst_id.exists() {
             let target_antigravity = gemini_dir.join("antigravity");
-            let _ = std::fs::create_dir_all(&target_antigravity);
+            // Justification: installation_id mirror directory is best-effort; the credential files below are the authoritative output
+            crate::error::record_ignored(
+                std::fs::create_dir_all(&target_antigravity),
+                "create antigravity directory for installation_id mirror",
+            );
             let target_inst_id = target_antigravity.join("installation_id");
             if !target_inst_id.exists() {
-                let _ = std::fs::copy(&global_inst_id, &target_inst_id);
+                // Justification: installation_id copy is a nicety; a missing copy does not affect credentials
+                crate::error::record_ignored(
+                    std::fs::copy(&global_inst_id, &target_inst_id),
+                    "mirror installation_id",
+                );
             }
         }
     }
@@ -818,7 +924,8 @@ pub fn write_to_file_credentials_at(
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(&creds_path, std::fs::Permissions::from_mode(0o600));
+        std::fs::set_permissions(&creds_path, std::fs::Permissions::from_mode(0o600))
+            .map_err(|e| format!("Failed to set 0600 permissions on oauth_creds.json: {e}"))?;
     }
 
     #[derive(serde::Serialize)]
@@ -834,12 +941,19 @@ pub fn write_to_file_credentials_at(
 
     let accounts_path = gemini_dir.join("google_accounts.json");
     if let Ok(accounts_json_str) = serde_json::to_string_pretty(&accounts_info) {
-        let _ = std::fs::write(&accounts_path, accounts_json_str);
+        // Justification: google_accounts.json is a mirror; oauth_creds.json is the authoritative credential file
+        crate::error::record_ignored(
+            std::fs::write(&accounts_path, accounts_json_str),
+            "write google_accounts.json mirror",
+        );
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let _ =
-                std::fs::set_permissions(&accounts_path, std::fs::Permissions::from_mode(0o600));
+            // Justification: permission hardening on a best-effort mirror file
+            crate::error::record_ignored(
+                std::fs::set_permissions(&accounts_path, std::fs::Permissions::from_mode(0o600)),
+                "set 0600 permissions on google_accounts.json",
+            );
         }
     }
 
@@ -859,11 +973,19 @@ pub fn write_to_file_credentials_at(
     });
     let jetski_path = gemini_dir.join("jetski-standalone-oauth-token");
     if let Ok(jetski_json) = serde_json::to_string(&jetski_payload) {
-        let _ = std::fs::write(&jetski_path, jetski_json);
+        // Justification: jetski token file is a fallback for the Go language_server worker; best-effort
+        crate::error::record_ignored(
+            std::fs::write(&jetski_path, jetski_json),
+            "write jetski standalone oauth token",
+        );
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let _ = std::fs::set_permissions(&jetski_path, std::fs::Permissions::from_mode(0o600));
+            // Justification: permission hardening on a best-effort mirror file
+            crate::error::record_ignored(
+                std::fs::set_permissions(&jetski_path, std::fs::Permissions::from_mode(0o600)),
+                "set 0600 permissions on jetski token file",
+            );
         }
     }
 
@@ -871,21 +993,45 @@ pub fn write_to_file_credentials_at(
     for sub in &["antigravity", "antigravity-ide", "antigravity-cli", "cache"] {
         let target_sub = gemini_dir.join(sub);
         if std::fs::create_dir_all(&target_sub).is_ok() {
-            let _ = std::fs::copy(&creds_path, target_sub.join("oauth_creds.json"));
-            let _ = std::fs::copy(&accounts_path, target_sub.join("google_accounts.json"));
-            let _ = std::fs::copy(
-                &jetski_path,
-                target_sub.join("jetski-standalone-oauth-token"),
+            // Justification: credential mirror to IDE subdirectories is best-effort; the primary .gemini files are authoritative
+            crate::error::record_ignored(
+                std::fs::copy(&creds_path, target_sub.join("oauth_creds.json")),
+                "mirror oauth_creds.json to IDE subdir",
+            );
+            // Justification: credential mirror to IDE subdirectories is best-effort; the primary .gemini files are authoritative
+            crate::error::record_ignored(
+                std::fs::copy(&accounts_path, target_sub.join("google_accounts.json")),
+                "mirror google_accounts.json to IDE subdir",
+            );
+            // Justification: credential mirror to IDE subdirectories is best-effort; the primary .gemini files are authoritative
+            crate::error::record_ignored(
+                std::fs::copy(
+                    &jetski_path,
+                    target_sub.join("jetski-standalone-oauth-token"),
+                ),
+                "mirror jetski token to IDE subdir",
             );
         }
     }
 
     if !base_home.ends_with(".gemini") {
-        let _ = std::fs::copy(&creds_path, base_home.join("oauth_creds.json"));
-        let _ = std::fs::copy(&accounts_path, base_home.join("google_accounts.json"));
-        let _ = std::fs::copy(
-            &jetski_path,
-            base_home.join("jetski-standalone-oauth-token"),
+        // Justification: credential mirror to the base home is best-effort; the primary .gemini files are authoritative
+        crate::error::record_ignored(
+            std::fs::copy(&creds_path, base_home.join("oauth_creds.json")),
+            "mirror oauth_creds.json to base home",
+        );
+        // Justification: credential mirror to the base home is best-effort; the primary .gemini files are authoritative
+        crate::error::record_ignored(
+            std::fs::copy(&accounts_path, base_home.join("google_accounts.json")),
+            "mirror google_accounts.json to base home",
+        );
+        // Justification: credential mirror to the base home is best-effort; the primary .gemini files are authoritative
+        crate::error::record_ignored(
+            std::fs::copy(
+                &jetski_path,
+                base_home.join("jetski-standalone-oauth-token"),
+            ),
+            "mirror jetski token to base home",
         );
     }
 
@@ -894,13 +1040,37 @@ pub fn write_to_file_credentials_at(
         "antigravity-ide-keyring-unavailable",
         "antigravity-cli-keyring-unavailable",
     ] {
-        let _ = std::fs::write(gemini_dir.join(marker_name), b"1\n");
-        let _ = std::fs::write(gemini_dir.join("antigravity").join(marker_name), b"1\n");
-        let _ = std::fs::write(gemini_dir.join("antigravity-ide").join(marker_name), b"1\n");
-        let _ = std::fs::write(gemini_dir.join("antigravity-cli").join(marker_name), b"1\n");
-        let _ = std::fs::write(gemini_dir.join("cache").join(marker_name), b"1\n");
+        // Justification: keyring-unavailable marker is informational; the credential sync already succeeded
+        crate::error::record_ignored(
+            std::fs::write(gemini_dir.join(marker_name), b"1\n"),
+            "write keyring-unavailable marker",
+        );
+        // Justification: keyring-unavailable marker is informational; the credential sync already succeeded
+        crate::error::record_ignored(
+            std::fs::write(gemini_dir.join("antigravity").join(marker_name), b"1\n"),
+            "write keyring-unavailable marker (antigravity subdir)",
+        );
+        // Justification: keyring-unavailable marker is informational; the credential sync already succeeded
+        crate::error::record_ignored(
+            std::fs::write(gemini_dir.join("antigravity-ide").join(marker_name), b"1\n"),
+            "write keyring-unavailable marker (antigravity-ide subdir)",
+        );
+        // Justification: keyring-unavailable marker is informational; the credential sync already succeeded
+        crate::error::record_ignored(
+            std::fs::write(gemini_dir.join("antigravity-cli").join(marker_name), b"1\n"),
+            "write keyring-unavailable marker (antigravity-cli subdir)",
+        );
+        // Justification: keyring-unavailable marker is informational; the credential sync already succeeded
+        crate::error::record_ignored(
+            std::fs::write(gemini_dir.join("cache").join(marker_name), b"1\n"),
+            "write keyring-unavailable marker (cache subdir)",
+        );
         if !base_home.ends_with(".gemini") {
-            let _ = std::fs::write(base_home.join(marker_name), b"1\n");
+            // Justification: keyring-unavailable marker is informational; the credential sync already succeeded
+            crate::error::record_ignored(
+                std::fs::write(base_home.join(marker_name), b"1\n"),
+                "write keyring-unavailable marker (base home)",
+            );
         }
     }
 

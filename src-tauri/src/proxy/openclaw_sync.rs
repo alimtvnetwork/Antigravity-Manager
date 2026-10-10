@@ -273,12 +273,14 @@ fn atomically_write_config(path: &PathBuf, config: &Value) -> Result<(), String>
     drop(file);
 
     if let Err(e) = write_res {
-        let _ = fs::remove_file(&tmp_path);
+        // Justification: best-effort cleanup; a leftover file is harmless
+        crate::error::record_ignored(fs::remove_file(&tmp_path), "remove_file");
         return Err(format!("Failed to write config: {e}"));
     }
 
     fs::rename(&tmp_path, path).map_err(|e| {
-        let _ = fs::remove_file(&tmp_path);
+        // Justification: best-effort cleanup; a leftover file is harmless
+        crate::error::record_ignored(fs::remove_file(&tmp_path), "remove_file");
         format!("Failed to rename config file: {e}")
     })
 }

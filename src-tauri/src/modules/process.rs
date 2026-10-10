@@ -754,7 +754,8 @@ pub fn clean_antigravity_lockfiles(target_ide: Option<&str>) {
 
         let lockfile = dir.join("lockfile");
         if lockfile.exists() {
-            let _ = std::fs::remove_file(&lockfile);
+            // Justification: best-effort cleanup; a leftover file is harmless
+            crate::error::record_ignored(std::fs::remove_file(&lockfile), "remove_file");
             crate::modules::logger::log_info(&format!(
                 "[Lockfile] Cleaned stale Electron lockfile: {:?}",
                 lockfile
@@ -763,7 +764,8 @@ pub fn clean_antigravity_lockfiles(target_ide: Option<&str>) {
 
         let code_lock = dir.join("code.lock");
         if code_lock.exists() {
-            let _ = std::fs::remove_file(&code_lock);
+            // Justification: best-effort cleanup; a leftover file is harmless
+            crate::error::record_ignored(std::fs::remove_file(&code_lock), "remove_file");
             crate::modules::logger::log_info(&format!(
                 "[Lockfile] Cleaned stale code.lock: {:?}",
                 code_lock
@@ -778,7 +780,8 @@ pub fn clean_antigravity_lockfiles(target_ide: Option<&str>) {
                     || fname.ends_with(".lock")
                     || fname == "code.lock";
                 if is_lock {
-                    let _ = std::fs::remove_file(entry.path());
+                    // Justification: best-effort cleanup; a leftover file is harmless
+                    crate::error::record_ignored(std::fs::remove_file(entry.path()), "remove_file");
                 }
             }
         }
@@ -817,17 +820,25 @@ pub fn sweep_orphan_language_servers() {
             ));
             #[cfg(target_os = "windows")]
             {
-                let _ = Command::new("taskkill")
-                    .args(["/F", "/PID", &pid_u32.to_string()])
-                    .creation_flags(0x08000000)
-                    .output();
+                // Justification: best-effort process spawn; failure logged
+                crate::error::record_ignored(
+                    Command::new("taskkill")
+                        .args(["/F", "/PID", &pid_u32.to_string()])
+                        .creation_flags(0x08000000)
+                        .output(),
+                    "spawn taskkill",
+                );
             }
 
             #[cfg(not(target_os = "windows"))]
             {
-                let _ = Command::new("kill")
-                    .args(["-9", &pid_u32.to_string()])
-                    .output();
+                // Justification: best-effort process spawn; failure logged
+                crate::error::record_ignored(
+                    Command::new("kill")
+                        .args(["-9", &pid_u32.to_string()])
+                        .output(),
+                    "spawn kill",
+                );
             }
         }
     }
@@ -848,15 +859,23 @@ pub(crate) fn is_language_server_process(name: &str, exe_path: &str) -> bool {
 fn force_kill_pid(pid: u32) {
     #[cfg(target_os = "windows")]
     {
-        let _ = Command::new("taskkill")
-            .args(["/F", "/PID", &pid.to_string()])
-            .creation_flags(0x08000000)
-            .output();
+        // Justification: best-effort process spawn; failure logged
+        crate::error::record_ignored(
+            Command::new("taskkill")
+                .args(["/F", "/PID", &pid.to_string()])
+                .creation_flags(0x08000000)
+                .output(),
+            "spawn taskkill",
+        );
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = Command::new("kill").args(["-9", &pid.to_string()]).output();
+        // Justification: best-effort process spawn; failure logged
+        crate::error::record_ignored(
+            Command::new("kill").args(["-9", &pid.to_string()]).output(),
+            "spawn kill",
+        );
     }
 }
 
@@ -975,10 +994,14 @@ pub fn close_antigravity(timeout_secs: u64, target_ide: Option<&str>) -> Result<
                 pids.len()
             ));
             for pid in &pids {
-                let _ = Command::new("taskkill")
-                    .args(["/F", "/T", "/PID", &pid.to_string()])
-                    .creation_flags(0x08000000) // CREATE_NO_WINDOW
-                    .output();
+                // Justification: best-effort process spawn; failure logged
+                crate::error::record_ignored(
+                    Command::new("taskkill")
+                        .args(["/F", "/T", "/PID", &pid.to_string()])
+                        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                        .output(),
+                    "spawn taskkill",
+                );
             }
             thread::sleep(Duration::from_millis(300));
         }
@@ -992,10 +1015,14 @@ pub fn close_antigravity(timeout_secs: u64, target_ide: Option<&str>) -> Result<
         // Safety fallback: re-sweep any lingering target PIDs if needed
         let remaining_pids = get_antigravity_pids(target_ide);
         for pid in remaining_pids {
-            let _ = Command::new("taskkill")
-                .args(["/F", "/T", "/PID", &pid.to_string()])
-                .creation_flags(0x08000000)
-                .output();
+            // Justification: best-effort process spawn; failure logged
+            crate::error::record_ignored(
+                Command::new("taskkill")
+                    .args(["/F", "/T", "/PID", &pid.to_string()])
+                    .creation_flags(0x08000000)
+                    .output(),
+                "spawn taskkill",
+            );
         }
 
         // Drain verification loop: wait up to 2500ms for all processes to completely exit
@@ -1122,17 +1149,25 @@ pub fn close_antigravity(timeout_secs: u64, target_ide: Option<&str>) -> Result<
                     "Sending SIGTERM to main process PID: {}",
                     pid
                 ));
-                let _ = Command::new("kill")
-                    .args(["-15", &pid.to_string()])
-                    .output();
+                // Justification: best-effort process spawn; failure logged
+                crate::error::record_ignored(
+                    Command::new("kill")
+                        .args(["-15", &pid.to_string()])
+                        .output(),
+                    "spawn kill",
+                );
             } else {
                 crate::modules::logger::log_warn(
                     "No main process identified, sending SIGTERM to all associated processes",
                 );
                 for pid in &pids {
-                    let _ = Command::new("kill")
-                        .args(["-15", &pid.to_string()])
-                        .output();
+                    // Justification: best-effort process spawn; failure logged
+                    crate::error::record_ignored(
+                        Command::new("kill")
+                            .args(["-15", &pid.to_string()])
+                            .output(),
+                        "spawn kill",
+                    );
                 }
             }
 
@@ -1230,17 +1265,25 @@ pub fn close_antigravity(timeout_secs: u64, target_ide: Option<&str>) -> Result<
 
             // Phase 1: SIGTERM
             if let Some(pid) = main_pid {
-                let _ = Command::new("kill")
-                    .args(["-15", &pid.to_string()])
-                    .output();
+                // Justification: best-effort process spawn; failure logged
+                crate::error::record_ignored(
+                    Command::new("kill")
+                        .args(["-15", &pid.to_string()])
+                        .output(),
+                    "spawn kill",
+                );
             } else {
                 crate::modules::logger::log_warn(
                     "No clear Linux main process identified, sending SIGTERM to all associated processes",
                 );
                 for pid in &pids {
-                    let _ = Command::new("kill")
-                        .args(["-15", &pid.to_string()])
-                        .output();
+                    // Justification: best-effort process spawn; failure logged
+                    crate::error::record_ignored(
+                        Command::new("kill")
+                            .args(["-15", &pid.to_string()])
+                            .output(),
+                        "spawn kill",
+                    );
                 }
             }
 
@@ -1264,7 +1307,11 @@ pub fn close_antigravity(timeout_secs: u64, target_ide: Option<&str>) -> Result<
                         remaining_pids.len()
                     ));
                     for pid in &remaining_pids {
-                        let _ = Command::new("kill").args(["-9", &pid.to_string()]).output();
+                        // Justification: best-effort process spawn; failure logged
+                        crate::error::record_ignored(
+                            Command::new("kill").args(["-9", &pid.to_string()]).output(),
+                            "spawn kill",
+                        );
                     }
                     thread::sleep(Duration::from_secs(1));
                 }
@@ -1297,13 +1344,21 @@ pub fn close_antigravity(timeout_secs: u64, target_ide: Option<&str>) -> Result<
         ));
         for pid in &remaining_pids {
             #[cfg(target_os = "windows")]
-            let _ = Command::new("taskkill")
-                .args(["/F", "/T", "/PID", &pid.to_string()])
-                .creation_flags(0x08000000)
-                .output();
+            // Justification: best-effort process spawn; failure logged
+            crate::error::record_ignored(
+                Command::new("taskkill")
+                    .args(["/F", "/T", "/PID", &pid.to_string()])
+                    .creation_flags(0x08000000)
+                    .output(),
+                "spawn taskkill",
+            );
 
             #[cfg(not(target_os = "windows"))]
-            let _ = Command::new("kill").args(["-9", &pid.to_string()]).output();
+            // Justification: best-effort process spawn; failure logged
+            crate::error::record_ignored(
+                Command::new("kill").args(["-9", &pid.to_string()]).output(),
+                "spawn kill",
+            );
         }
         thread::sleep(Duration::from_millis(300));
     }
@@ -1685,17 +1740,22 @@ pub fn clean_and_restart_workspace(target_ide: Option<&str>) -> Result<String, S
     );
 
     // 1. Force tree-kill all Antigravity processes
-    let _ = close_antigravity(5, target_ide);
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(close_antigravity(5, target_ide), "close_antigravity");
 
     // 2. Extra safety sweep: purge any remaining target PIDs on Windows
     #[cfg(target_os = "windows")]
     {
         let remaining_pids = get_antigravity_pids(target_ide);
         for pid in remaining_pids {
-            let _ = Command::new("taskkill")
-                .args(["/F", "/T", "/PID", &pid.to_string()])
-                .creation_flags(0x08000000)
-                .output();
+            // Justification: best-effort process spawn; failure logged
+            crate::error::record_ignored(
+                Command::new("taskkill")
+                    .args(["/F", "/T", "/PID", &pid.to_string()])
+                    .creation_flags(0x08000000)
+                    .output(),
+                "spawn taskkill",
+            );
         }
     }
 
@@ -3141,7 +3201,11 @@ mod tests {
 
     #[test]
     fn test_discover_and_persist_initial_ide_info_runs_without_panic() {
-        let _ = discover_and_persist_initial_ide_info();
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            discover_and_persist_initial_ide_info(),
+            "discover_and_persist_initial_ide_info",
+        );
     }
 
     #[test]

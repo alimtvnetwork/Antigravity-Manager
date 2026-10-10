@@ -357,7 +357,8 @@ pub fn send_via_account_credentials_with_reply(
     read_smtp_response(&mut stream)?;
 
     // QUIT
-    let _ = send_smtp_cmd(&mut stream, "QUIT", false);
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(send_smtp_cmd(&mut stream, "QUIT", false), "send_smtp_cmd");
     Ok(())
 }
 

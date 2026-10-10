@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { request as invoke } from '../../utils/request';
 import { Trash2, AlertCircle, Plus, Search, X } from 'lucide-react';
+import { useErrorStore } from '../../stores/error-store';
 
 interface IpBlacklistEntry {
     ip_pattern: string;
@@ -34,6 +35,12 @@ export const BlacklistManager: React.FC<Props> = ({ refreshKey }) => {
             setEntries(data);
         } catch (e) {
             console.error('Failed to load blacklist', e);
+            // Tracked in the error module; empty list shown, retried on next load.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'BlacklistManager.loadBlacklist',
+              endpoint: 'get_ip_blacklist',
+              triggerAction: 'load_blacklist',
+            });
         } finally {
             setLoading(false);
         }
@@ -69,6 +76,11 @@ export const BlacklistManager: React.FC<Props> = ({ refreshKey }) => {
             loadBlacklist();
         } catch (e) {
             console.error('Failed to add to blacklist', e);
+            // Tracked in the error module; user notified via alert below with the specific reason.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'BlacklistManager.addToBlacklist',
+              triggerAction: 'add_to_blacklist',
+            });
             const errorMsg = String(e);
             if (errorMsg.includes('UNIQUE constraint')) {
                 alert(t('security.blacklist.error_duplicate') || 'This IP is already in the blacklist');
@@ -88,6 +100,12 @@ export const BlacklistManager: React.FC<Props> = ({ refreshKey }) => {
             await invoke('remove_ip_from_blacklist', { ipPattern: ipPattern });
         } catch (e) {
             console.error('Failed to remove from blacklist', e);
+            // Tracked in the error module; list reloaded below to restore UI consistency.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'BlacklistManager.removeFromBlacklist',
+              endpoint: 'remove_ip_from_blacklist',
+              triggerAction: 'remove_from_blacklist',
+            });
             // 如果删除失败，重新加载数据恢复UI
             loadBlacklist();
         }

@@ -11,6 +11,7 @@ import { useAccountStore } from '../../stores/useAccountStore';
 import { isTauri } from '../../utils/env';
 import { copyToClipboard } from '../../utils/clipboard';
 import { VirtualizedPayloadViewer } from './VirtualizedPayloadViewer';
+import { useErrorStore } from '../../stores/error-store';
 
 
 interface ProxyRequestLog {
@@ -90,7 +91,13 @@ const LogTable: React.FC<LogTableProps> = ({
             if (saved) {
                 return { ...DEFAULT_COL_WIDTHS, ...JSON.parse(saved) };
             }
-        } catch {}
+        } catch (e) {
+            // Best-effort column-width restore; corrupt or unavailable storage falls back to defaults. Tracked.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'ProxyMonitor.colWidths',
+              triggerAction: 'restore_column_widths',
+            });
+        }
         return DEFAULT_COL_WIDTHS;
     });
 
@@ -127,7 +134,13 @@ const LogTable: React.FC<LogTableProps> = ({
                 const next = { ...prev, [colKey]: finalWidth };
                 try {
                     localStorage.setItem('proxy_log_col_widths', JSON.stringify(next));
-                } catch {}
+                } catch (e) {
+                    // Best-effort column-width persist; storage may throw in restricted contexts. Tracked, in-memory widths still applied.
+                    useErrorStore.getState().trackWarning(e, {
+                      source: 'ProxyMonitor.colWidths',
+                      triggerAction: 'persist_column_widths',
+                    });
+                }
                 return next;
             });
         };
@@ -917,7 +930,10 @@ function extractConcisePayload(
             if (typeof parsed === 'string') {
                 try {
                     parsed = JSON.parse(parsed);
-                } catch {}
+                } catch {
+                    // Justification: format probe — a non-JSON string here is the expected common case
+                    // (plain-text payloads), not an error; the original string is formatted as-is below.
+                }
             }
             return JSON.stringify(deepUnescapeJsonValue(parsed), null, 2);
         } catch {
@@ -974,7 +990,10 @@ const parseTimingFromHeadersAndBody = (
                 if (typeof t.total_s === 'number') totalSec = t.total_s;
                 else if (typeof t.total_ms === 'number') totalSec = t.total_ms / 1000;
             }
-        } catch {}
+        } catch {
+            // Justification: optional timing-header probe — absent or malformed x-timing-* headers
+            // are the expected common case (not an error); timing display simply stays unset.
+        }
     }
 
     // 2. Parse from headersJson if any are still missing
@@ -1025,7 +1044,10 @@ const parseTimingFromHeadersAndBody = (
                     if (ms !== undefined) totalSec = ms / 1000;
                 }
             }
-        } catch {}
+        } catch {
+            // Justification: optional timing-header probe — absent or malformed x-timing-* headers
+            // are the expected common case (not an error); timing display simply stays unset.
+        }
     }
 
     // 3. Fallback for totalSec if durationMs exists
@@ -1315,6 +1337,12 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
             setDbDiskSizeBytes(bytes);
         } catch (e) {
             console.error('Failed to get proxy db disk size', e);
+            // Tracked in the error module; disk-size label keeps previous value.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'ProxyMonitor.fetchDbDiskSize',
+              endpoint: 'get_proxy_db_disk_size',
+              triggerAction: 'fetch_db_disk_size',
+            });
         }
     }, []);
 
@@ -1479,6 +1507,12 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
             if (currentStats) setStats(currentStats);
         } catch (e: any) {
             console.error("Failed to load proxy data", e);
+            // Tracked in the error module; stale stats kept, retried on next poll.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'ProxyMonitor.loadProxyData',
+              triggerAction: 'load_proxy_data',
+              context: { isTimeout: e.message === 'Request timeout' },
+            });
             if (e.message === 'Request timeout') {
                 // Show timeout error to user
                 console.error('Loading monitor data timeout, please try again later');
@@ -1512,6 +1546,12 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
             }
         } catch (e) {
             console.error("Failed to toggle logging", e);
+            // Tracked in the error module; toggle reverts to previous state on next load.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'ProxyMonitor.toggleLogging',
+              endpoint: 'set_proxy_monitor_enabled',
+              triggerAction: 'toggle_logging',
+            });
         }
     };
 

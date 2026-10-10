@@ -13,6 +13,7 @@ import {
     EmailNotificationSettings as IEmailSettings,
 } from '../services/emailService';
 import { showToast } from '../components/common/ToastContainer';
+import { useErrorStore } from '../stores/error-store';
 
 /**
  * Email Management & Alerts Page
@@ -31,13 +32,34 @@ export default function Email() {
     useEffect(() => {
         getEmailWatcherStatus()
             .then(setWatcherStatus)
-            .catch(console.error);
+            .catch((e) => {
+                // Tracked in the error module; watcher status panel shows empty state.
+                useErrorStore.getState().trackWarning(e, {
+                  source: 'EmailPage.init',
+                  triggerAction: 'get_watcher_status',
+                });
+                console.error(e);
+            });
         listEmailAccounts()
             .then(setAccounts)
-            .catch(console.error);
+            .catch((e) => {
+                // Tracked in the error module; account list shows empty state.
+                useErrorStore.getState().trackWarning(e, {
+                  source: 'EmailPage.init',
+                  triggerAction: 'list_email_accounts',
+                });
+                console.error(e);
+            });
         getEmailSettings()
             .then(setEmailSettings)
-            .catch(console.error);
+            .catch((e) => {
+                // Tracked in the error module; settings form keeps defaults.
+                useErrorStore.getState().trackWarning(e, {
+                  source: 'EmailPage.init',
+                  triggerAction: 'get_email_settings',
+                });
+                console.error(e);
+            });
     }, []);
 
     const handleStartEditNode = () => {

@@ -846,9 +846,13 @@ pub async fn warm_up_all_accounts() -> Result<String, String> {
                             "[Warmup] Account {} returned 403 Forbidden during quota fetch, marking as forbidden",
                             email
                         ));
-                        let _ = crate::modules::account::mark_account_forbidden(
-                            &id,
-                            "Warmup: 403 Forbidden - quota fetch denied",
+                        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                        crate::error::record_ignored(
+                            crate::modules::account::mark_account_forbidden(
+                                &id,
+                                "Warmup: 403 Forbidden - quota fetch denied",
+                            ),
+                            "mark_account_forbidden",
                         );
                         continue;
                     }
@@ -962,7 +966,11 @@ pub async fn warm_up_all_accounts() -> Result<String, String> {
                     success, total
                 ));
                 tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-                let _ = crate::modules::account::refresh_all_quotas_logic().await;
+                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                crate::error::record_ignored(
+                    crate::modules::account::refresh_all_quotas_logic().await,
+                    "refresh_all_quotas_logic",
+                );
             });
             crate::modules::logger::log_info(&format!(
                 "[Warmup] Returning to frontend: Warmup task triggered for {} models",
@@ -1017,7 +1025,11 @@ pub async fn warm_up_account(account_id: &str) -> Result<String, String> {
             email
         ));
         let reason = "Warmup: 403 Forbidden - quota fetch denied";
-        let _ = crate::modules::account::mark_account_forbidden(account_id, reason);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::account::mark_account_forbidden(account_id, reason),
+            "mark_account_forbidden",
+        );
         return Err("Account is forbidden (403)".to_string());
     }
 
@@ -1054,7 +1066,11 @@ pub async fn warm_up_account(account_id: &str) -> Result<String, String> {
             }
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         }
-        let _ = crate::modules::account::refresh_all_quotas_logic().await;
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::account::refresh_all_quotas_logic().await,
+            "refresh_all_quotas_logic",
+        );
     });
 
     Ok(format!(

@@ -1,3 +1,5 @@
+import { useErrorStore } from '../stores/error-store';
+
 /**
  * Generates a UUID (Universally Unique Identifier) v4.
  *
@@ -13,7 +15,11 @@ export const generateUUID = (): string => {
         try {
             return crypto.randomUUID();
         } catch (e) {
-            // Fallback if native call fails for some reason
+            // Fallback if native call fails for some reason; tracked in the error module, custom implementation used.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'uuid.generateUUID',
+              triggerAction: 'randomUUID',
+            });
             console.warn('crypto.randomUUID() failed, falling back to custom implementation', e);
         }
     }

@@ -644,7 +644,8 @@ mod tests {
             }),
         );
         tokio::spawn(async move {
-            let _ = axum::serve(listener, app).await;
+            // Justification: best-effort server loop; abnormal termination is logged
+            crate::error::record_ignored(axum::serve(listener, app).await, "axum::serve");
         });
 
         let ep = SupabaseEndpoint {
@@ -682,7 +683,8 @@ mod tests {
             }),
         );
         tokio::spawn(async move {
-            let _ = axum::serve(listener, app).await;
+            // Justification: best-effort server loop; abnormal termination is logged
+            crate::error::record_ignored(axum::serve(listener, app).await, "axum::serve");
         });
 
         let ep = SupabaseEndpoint {
@@ -731,7 +733,8 @@ mod tests {
                 }),
             );
         tokio::spawn(async move {
-            let _ = axum::serve(listener, app).await;
+            // Justification: best-effort server loop; abnormal termination is logged
+            crate::error::record_ignored(axum::serve(listener, app).await, "axum::serve");
         });
 
         let ep = SupabaseEndpoint {
@@ -780,7 +783,8 @@ mod tests {
                 }),
             );
         tokio::spawn(async move {
-            let _ = axum::serve(listener, app).await;
+            // Justification: best-effort server loop; abnormal termination is logged
+            crate::error::record_ignored(axum::serve(listener, app).await, "axum::serve");
         });
 
         let ep = SupabaseEndpoint {
@@ -851,7 +855,8 @@ mod tests {
                 }),
             );
         tokio::spawn(async move {
-            let _ = axum::serve(listener, app).await;
+            // Justification: best-effort server loop; abnormal termination is logged
+            crate::error::record_ignored(axum::serve(listener, app).await, "axum::serve");
         });
 
         let ep = SupabaseEndpoint {
@@ -910,7 +915,8 @@ mod tests {
                 }),
             );
         tokio::spawn(async move {
-            let _ = axum::serve(listener, app).await;
+            // Justification: best-effort server loop; abnormal termination is logged
+            crate::error::record_ignored(axum::serve(listener, app).await, "axum::serve");
         });
 
         let ep = SupabaseEndpoint {

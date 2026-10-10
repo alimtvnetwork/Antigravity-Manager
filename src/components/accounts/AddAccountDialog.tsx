@@ -8,6 +8,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { request as invoke } from '../../utils/request';
 import { isTauri } from '../../utils/env';
 import { copyToClipboard } from '../../utils/clipboard';
+import { useErrorStore } from '../../stores/error-store';
 
 interface AddAccountDialogProps {
     onAdd: (email: string, refreshToken: string) => Promise<void>;
@@ -129,6 +130,11 @@ function AddAccountDialog({ onAdd, showText = true, triggerClassName }: AddAccou
             })
             .catch((e) => {
                 console.error('Failed to prepare OAuth URL:', e);
+                // Tracked in the error module; OAuth tab simply won't offer the prepared URL.
+                useErrorStore.getState().trackWarning(e, {
+                  source: 'AddAccountDialog.prepareOAuthUrl',
+                  triggerAction: 'prepare_oauth_url',
+                });
             });
     }, [isOpen, activeTab, oauthUrl]);
 
@@ -249,6 +255,12 @@ function AddAccountDialog({ onAdd, showText = true, triggerClassName }: AddAccou
                 successCount++;
             } catch (error) {
                 console.error(`Failed to add token ${i + 1}:`, error);
+                // Tracked in the error module; per-token failure counted and reported in the result summary.
+                useErrorStore.getState().trackWarning(error, {
+                  source: 'AddAccountDialog.importTokens',
+                  triggerAction: 'add_token',
+                  context: { tokenIndex: i + 1 },
+                });
                 failCount++;
             }
             // Small delay to avoid burst requests
@@ -338,6 +350,11 @@ function AddAccountDialog({ onAdd, showText = true, triggerClassName }: AddAccou
 
         } catch (error) {
             console.error('OAuth Web Error:', error);
+            // Tracked in the error module; dialog already shows the error status to the user.
+            useErrorStore.getState().trackWarning(error, {
+              source: 'AddAccountDialog.handleOAuthWeb',
+              triggerAction: 'oauth_web',
+            });
             setStatus('error');
             setMessage(`${t('common.error')}: ${error}`);
         }
@@ -439,6 +456,11 @@ function AddAccountDialog({ onAdd, showText = true, triggerClassName }: AddAccou
             }
         } catch (err) {
             console.error('Failed to open dialog:', err);
+            // Tracked in the error module; file-picker dialog failed to open, user can retry.
+            useErrorStore.getState().trackWarning(err, {
+              source: 'AddAccountDialog.openDialog',
+              triggerAction: 'open_file_dialog',
+            });
         }
     };
 

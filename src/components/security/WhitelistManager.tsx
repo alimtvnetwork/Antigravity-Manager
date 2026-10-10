@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { request as invoke } from '../../utils/request';
 import { Trash2, Check, Plus, Search, X, ShieldCheck } from 'lucide-react';
+import { useErrorStore } from '../../stores/error-store';
 
 interface IpWhitelistEntry {
     ip_pattern: string;
@@ -32,6 +33,12 @@ export const WhitelistManager: React.FC<Props> = ({ refreshKey }) => {
             setEntries(data);
         } catch (e) {
             console.error('Failed to load whitelist', e);
+            // Tracked in the error module; empty list shown, retried on next load.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'WhitelistManager.loadWhitelist',
+              endpoint: 'get_ip_whitelist',
+              triggerAction: 'load_whitelist',
+            });
         } finally {
             setLoading(false);
         }
@@ -55,6 +62,11 @@ export const WhitelistManager: React.FC<Props> = ({ refreshKey }) => {
             loadWhitelist();
         } catch (e) {
             console.error('Failed to add to whitelist', e);
+            // Tracked in the error module; user notified via alert below.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'WhitelistManager.addToWhitelist',
+              triggerAction: 'add_to_whitelist',
+            });
             alert('Failed to add IP: ' + e);
         }
     };
@@ -67,6 +79,12 @@ export const WhitelistManager: React.FC<Props> = ({ refreshKey }) => {
             await invoke('remove_ip_from_whitelist', { ipPattern: ipPattern });
         } catch (e) {
             console.error('Failed to remove from whitelist', e);
+            // Tracked in the error module; list reloaded below to restore UI consistency.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'WhitelistManager.removeFromWhitelist',
+              endpoint: 'remove_ip_from_whitelist',
+              triggerAction: 'remove_from_whitelist',
+            });
             // 如果删除失败，重新加载数据恢复UI
             loadWhitelist();
         }

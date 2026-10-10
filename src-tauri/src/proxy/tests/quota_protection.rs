@@ -917,7 +917,8 @@ mod tests {
         assert_eq!(unknown_quota, None, "不存在的模型应该返回 None");
 
         // 清理临时文件
-        let _ = std::fs::remove_file(&account_path);
+        // Justification: best-effort cleanup; a leftover file is harmless
+        crate::error::record_ignored(std::fs::remove_file(&account_path), "remove_file");
     }
 
     // ==================================================================================
@@ -1033,7 +1034,8 @@ mod tests {
         );
 
         // 清理临时目录
-        let _ = std::fs::remove_dir_all(&temp_dir);
+        // Justification: best-effort cleanup; a leftover directory is harmless
+        crate::error::record_ignored(std::fs::remove_dir_all(&temp_dir), "remove_dir_all");
     }
 
     // ==================================================================================
@@ -1078,7 +1080,8 @@ mod tests {
         );
 
         // 清理临时文件
-        let _ = std::fs::remove_file(&account_path);
+        // Justification: best-effort cleanup; a leftover file is harmless
+        crate::error::record_ignored(std::fs::remove_file(&account_path), "remove_file");
     }
 
     /// 辅助函数：创建带有自定义 account_path 的 mock token

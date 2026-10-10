@@ -21,6 +21,7 @@ pub fn get_global_proxy_pool() -> Option<Arc<ProxyPoolManager>> {
 /// Initialize global proxy pool manager
 pub fn init_global_proxy_pool(config: Arc<RwLock<ProxyPoolConfig>>) -> Arc<ProxyPoolManager> {
     let manager = Arc::new(ProxyPoolManager::new(config));
+    // Justification: OnceLock::set fails only if already initialized; double-init is a benign no-op by design.
     let _ = GLOBAL_PROXY_POOL.set(manager.clone());
     manager
 }
@@ -359,7 +360,9 @@ impl ProxyPoolManager {
                 let pass = u.password().map(|p| p.to_string());
 
                 // Strip credentials from URL to prevent underlying library parse errors
+                // Justification: Url::set_* returns Result<(), ()> — the unit error carries no information to log; keep the discard.
                 let _ = u.set_username("");
+                // Justification: Url::set_* returns Result<(), ()> — the unit error carries no information to log; keep the discard.
                 let _ = u.set_password(None);
 
                 let auth = if let (Some(user), Some(pass)) = (user, pass) {

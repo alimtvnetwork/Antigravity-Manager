@@ -3,6 +3,7 @@ import { X, Sparkles, Loader2, CheckCircle, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { relaunch as tauriRelaunch, exit as tauriExit } from '@tauri-apps/plugin-process';
 import { useUpdateStore } from '../stores/use-update-store';
+import { useErrorStore } from '../stores/error-store';
 
 interface UpdateInfo {
   has_update: boolean;
@@ -59,6 +60,11 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('Update check failed:', errorMsg);
+      // Tracked in the error module; dialog closes as the visible signal, no duplicate modal.
+      useErrorStore.getState().trackWarning(error, {
+        source: 'UpdateNotification.checkForUpdates',
+        triggerAction: 'check_for_updates',
+      });
       onClose();
     }
   };
@@ -85,6 +91,11 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
       }
     } catch (error) {
       console.error('Installer update failed:', error);
+      // Tracked in the error module; dialog already shows the error state to the user.
+      useErrorStore.getState().trackWarning(error, {
+        source: 'UpdateNotification.handleRunInstaller',
+        triggerAction: 'install_update',
+      });
       setUpdateState('error');
     } finally {
       setIsInstalling(false);
@@ -99,6 +110,11 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
         await tauriRelaunch();
       } catch (error) {
         console.error('Relaunch failed:', error);
+        // Tracked in the error module; both relaunch paths failed, user must relaunch manually.
+        useErrorStore.getState().trackWarning(error, {
+          source: 'UpdateNotification.handleRestart',
+          triggerAction: 'relaunch_app',
+        });
       }
     }
   };

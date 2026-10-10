@@ -293,7 +293,11 @@ fn valid_ssh_target(s: &str) -> bool {
 }
 
 fn emit_progress(app: &tauri::AppHandle, line: String, done: bool) {
-    let _ = app.emit("toolchain-progress", ToolchainProgressEvent { line, done });
+    // Justification: best-effort frontend event; a dropped event only skips a UI refresh
+    crate::error::record_ignored(
+        app.emit("toolchain-progress", ToolchainProgressEvent { line, done }),
+        "emit toolchain-progress",
+    );
 }
 
 #[tauri::command]
@@ -383,8 +387,10 @@ pub async fn toolchain_install(app: tauri::AppHandle, req: InstallRequest) -> Ap
     let status = child
         .wait()
         .map_err(|e| AppError::Process(format!("installer wait failed: {}", e)))?;
-    let _ = out_task.await;
-    let _ = err_task.await;
+    // Justification: best-effort task join; a panicked task is logged
+    crate::error::record_ignored(out_task.await, "join task");
+    // Justification: best-effort task join; a panicked task is logged
+    crate::error::record_ignored(err_task.await, "join task");
 
     let success = status.success();
     emit_progress(&app, String::new(), true);

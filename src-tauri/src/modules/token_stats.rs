@@ -121,14 +121,19 @@ pub fn init_db() -> Result<(), String> {
     )
     .map_err(|e| e.to_string())?;
 
-    let _ = conn.execute(
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_token_account_timestamp ON token_usage (account_email, timestamp DESC)",
         [],
-    );
+    ), "db execute");
 
-    let _ = conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_token_model ON token_usage (model)",
-        [],
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_token_model ON token_usage (model)",
+            [],
+        ),
+        "db execute",
     );
 
     // Create hourly aggregation table for fast queries
@@ -147,10 +152,11 @@ pub fn init_db() -> Result<(), String> {
     )
     .map_err(|e| e.to_string())?;
 
-    let _ = conn.execute(
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_hourly_account ON token_stats_hourly (account_email, hour_bucket)",
         [],
-    );
+    ), "db execute");
 
     add_column_if_missing(
         &conn,

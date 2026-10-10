@@ -384,7 +384,11 @@ pub fn notify_account_switched(
     match tokio::runtime::Handle::try_current() {
         Ok(handle) => {
             handle.spawn(async move {
-                let _ = notify_account_switched_details(details).await;
+                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                crate::error::record_ignored(
+                    notify_account_switched_details(details).await,
+                    "notify_account_switched_details",
+                );
             });
         }
         Err(_) => {
@@ -848,7 +852,11 @@ pub fn dispatch_self_json_in_use_broadcast(details: &SwitchNotificationDetails) 
 
     let json_text = serde_json::to_string_pretty(&payload).unwrap_or_default();
     let recipients = vec![default_acc.email.clone()];
-    let _ = email_sender::dispatch_email_with_failover(&subject, &json_text, &recipients);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        email_sender::dispatch_email_with_failover(&subject, &json_text, &recipients),
+        "dispatch_email_with_failover",
+    );
 }
 
 /// Helper to render and dispatch Telegram switch notification
@@ -1055,7 +1063,11 @@ fn dispatch_email_config_added_alert(title: &str, details: serde_json::Value) {
     );
 
     let json_pretty = serde_json::to_string_pretty(&details).unwrap_or_default();
-    let _ = email_sender::dispatch_email_with_failover(&subject, &json_pretty, &target_recipients);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        email_sender::dispatch_email_with_failover(&subject, &json_pretty, &target_recipients),
+        "dispatch_email_with_failover",
+    );
 }
 
 /// Dispatch post-switch prompt restoration status and emergency alert if prompts failed to resume
@@ -1150,9 +1162,12 @@ async fn dispatch_post_switch_prompt_telemetry(
                     )
                 };
 
-                let _ =
+                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                crate::error::record_ignored(
                     telegram_inbound::send_telegram_message(&config.bot_token, chat_id, &tg_text)
-                        .await;
+                        .await,
+                    "send_telegram_message",
+                );
             }
         }
     }
@@ -1245,7 +1260,11 @@ async fn dispatch_post_switch_prompt_telemetry(
         }
     );
 
-    let _ = email_sender::dispatch_email_with_failover(&subject, &html, &target_recipients);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        email_sender::dispatch_email_with_failover(&subject, &html, &target_recipients),
+        "dispatch_email_with_failover",
+    );
 }
 
 /// Dispatch rich update notifications across Email and Telegram when the system is updated
@@ -1309,7 +1328,11 @@ fn dispatch_email_update_alert(
         &m_ip,
     );
 
-    let _ = email_sender::dispatch_email_with_failover(&subject, &body, &target_recipients);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        email_sender::dispatch_email_with_failover(&subject, &body, &target_recipients),
+        "dispatch_email_with_failover",
+    );
 }
 
 /// Helper to render and dispatch Telegram system update notification
@@ -1388,7 +1411,11 @@ pub fn check_and_notify_system_updated() {
     if prev_ver.is_empty() {
         // Initial run with version tracking enabled -> record current version without sending spurious alert
         update_settings.last_known_version = current_ver.to_string();
-        let _ = crate::modules::update_checker::save_update_settings(&update_settings);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::update_checker::save_update_settings(&update_settings),
+            "save_update_settings",
+        );
         return;
     }
 
@@ -1400,7 +1427,11 @@ pub fn check_and_notify_system_updated() {
         ));
 
         update_settings.last_known_version = current_ver.to_string();
-        let _ = crate::modules::update_checker::save_update_settings(&update_settings);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::update_checker::save_update_settings(&update_settings),
+            "save_update_settings",
+        );
 
         notify_system_updated(
             &prev_ver,

@@ -34,11 +34,15 @@ impl AdminServerInstance {
     /// Gracefully stop admin server and wait for listening tasks to release port
     pub async fn stop(mut self) {
         self.axum_server.stop();
-        let _ = tokio::time::timeout(
-            std::time::Duration::from_millis(1000),
-            &mut self.server_handle,
-        )
-        .await;
+        // Justification: best-effort guarded wait; a timeout or inner failure is logged
+        crate::error::record_ignored(
+            tokio::time::timeout(
+                std::time::Duration::from_millis(1000),
+                &mut self.server_handle,
+            )
+            .await,
+            "timeout wait",
+        );
         if !self.server_handle.is_finished() {
             self.server_handle.abort();
         }
@@ -267,7 +271,8 @@ pub async fn ensure_admin_server(
     let app_data_dir = crate::modules::account::get_data_dir()?;
     let token_manager = Arc::new(TokenManager::new(app_data_dir));
     // [NEW] 加载账号数据，否则管理界面统计为 0
-    let _ = token_manager.load_accounts().await;
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(token_manager.load_accounts().await, "load_accounts");
 
     let (axum_server, server_handle) = match crate::proxy::AxumServer::start(
         config.get_bind_address().to_string(),
@@ -872,7 +877,11 @@ pub async fn check_proxy_health(
         let updated = pool_state.read().await.clone();
         if let Ok(mut app_cfg) = crate::modules::config::load_app_config() {
             app_cfg.proxy.proxy_pool = updated.clone();
-            let _ = crate::modules::config::save_app_config(&app_cfg);
+            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+            crate::error::record_ignored(
+                crate::modules::config::save_app_config(&app_cfg),
+                "save_app_config",
+            );
         }
         Ok(updated)
     }

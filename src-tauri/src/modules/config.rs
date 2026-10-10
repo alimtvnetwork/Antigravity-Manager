@@ -29,7 +29,8 @@ pub fn load_app_config() -> Result<AppConfig, String> {
         drop(_read_guard);
         let config = AppConfig::new();
         // [FIX #1460] Persist initial config to prevent new API Key on every refresh
-        let _ = save_app_config(&config);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(save_app_config(&config), "save_app_config");
         return Ok(config);
     }
 
@@ -69,14 +70,19 @@ pub fn load_app_config() -> Result<AppConfig, String> {
                 if !bak_trimmed.is_empty() {
                     if let Ok(mut bak_val) = serde_json::from_str::<serde_json::Value>(&bak_content)
                     {
-                        let _ = migrate_config_value(&mut bak_val);
+                        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                        crate::error::record_ignored(
+                            migrate_config_value(&mut bak_val),
+                            "migrate_config_value",
+                        );
                         if let Ok(cfg) = serde_json::from_value::<AppConfig>(bak_val) {
                             info!(
                                 "Successfully restored empty config from backup: {:?}",
                                 bak_path
                             );
                             drop(_read_guard);
-                            let _ = save_app_config(&cfg);
+                            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                            crate::error::record_ignored(save_app_config(&cfg), "save_app_config");
                             return Ok(cfg);
                         }
                     }
@@ -86,7 +92,8 @@ pub fn load_app_config() -> Result<AppConfig, String> {
 
         drop(_read_guard);
         let config = AppConfig::new();
-        let _ = save_app_config(&config);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(save_app_config(&config), "save_app_config");
         return Ok(config);
     }
 
@@ -106,14 +113,22 @@ pub fn load_app_config() -> Result<AppConfig, String> {
                         if let Ok(mut bak_val) =
                             serde_json::from_str::<serde_json::Value>(&bak_content)
                         {
-                            let _ = migrate_config_value(&mut bak_val);
+                            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                            crate::error::record_ignored(
+                                migrate_config_value(&mut bak_val),
+                                "migrate_config_value",
+                            );
                             if let Ok(cfg) = serde_json::from_value::<AppConfig>(bak_val) {
                                 info!(
                                     "Successfully recovered corrupted config from backup: {:?}",
                                     bak_path
                                 );
                                 drop(_read_guard);
-                                let _ = save_app_config(&cfg);
+                                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                                crate::error::record_ignored(
+                                    save_app_config(&cfg),
+                                    "save_app_config",
+                                );
                                 return Ok(cfg);
                             }
                         }
@@ -127,7 +142,8 @@ pub fn load_app_config() -> Result<AppConfig, String> {
                 .map(|d| d.as_secs())
                 .unwrap_or(0);
             let corrupt_path = data_dir.join(format!("gui_config.json.corrupt.{}", timestamp));
-            let _ = fs::copy(&config_path, &corrupt_path);
+            // Justification: best-effort file copy; logged for diagnosis
+            crate::error::record_ignored(fs::copy(&config_path, &corrupt_path), "fs::copy");
             warn!(
                 "Archived corrupted config to {:?}. Self-healing with default config.",
                 corrupt_path
@@ -135,7 +151,8 @@ pub fn load_app_config() -> Result<AppConfig, String> {
 
             drop(_read_guard);
             let config = AppConfig::new();
-            let _ = save_app_config(&config);
+            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+            crate::error::record_ignored(save_app_config(&config), "save_app_config");
             return Ok(config);
         }
     };
@@ -151,7 +168,8 @@ pub fn load_app_config() -> Result<AppConfig, String> {
     // If migration occurred, auto-save once to clean up the file
     if modified {
         drop(_read_guard);
-        let _ = save_app_config(&config);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(save_app_config(&config), "save_app_config");
     }
 
     Ok(config)
@@ -378,7 +396,8 @@ pub fn save_app_config(config: &AppConfig) -> Result<(), String> {
     if config_path.exists() {
         if let Ok(meta) = config_path.metadata() {
             if meta.len() > 0 {
-                let _ = fs::copy(&config_path, &bak_path);
+                // Justification: best-effort file copy; logged for diagnosis
+                crate::error::record_ignored(fs::copy(&config_path, &bak_path), "fs::copy");
             }
         }
     }
@@ -399,7 +418,8 @@ mod tests {
             .unwrap_or_else(|e| e.into_inner());
         let temp_dir =
             std::env::temp_dir().join(format!("test_config_empty_{}", uuid::Uuid::new_v4()));
-        let _ = fs::create_dir_all(&temp_dir);
+        // Justification: best-effort directory creation; later file ops fail loudly if the directory is actually needed
+        crate::error::record_ignored(fs::create_dir_all(&temp_dir), "create_dir_all");
         let orig_env = std::env::var("ABV_DATA_DIR").ok();
         std::env::set_var("ABV_DATA_DIR", temp_dir.to_str().unwrap());
 
@@ -416,7 +436,8 @@ mod tests {
         } else {
             std::env::remove_var("ABV_DATA_DIR");
         }
-        let _ = fs::remove_dir_all(&temp_dir);
+        // Justification: best-effort cleanup; a leftover directory is harmless
+        crate::error::record_ignored(fs::remove_dir_all(&temp_dir), "remove_dir_all");
     }
 
     #[test]
@@ -426,7 +447,8 @@ mod tests {
             .unwrap_or_else(|e| e.into_inner());
         let temp_dir =
             std::env::temp_dir().join(format!("test_config_bak_{}", uuid::Uuid::new_v4()));
-        let _ = fs::create_dir_all(&temp_dir);
+        // Justification: best-effort directory creation; later file ops fail loudly if the directory is actually needed
+        crate::error::record_ignored(fs::create_dir_all(&temp_dir), "create_dir_all");
         let orig_env = std::env::var("ABV_DATA_DIR").ok();
         std::env::set_var("ABV_DATA_DIR", temp_dir.to_str().unwrap());
 
@@ -449,7 +471,8 @@ mod tests {
         } else {
             std::env::remove_var("ABV_DATA_DIR");
         }
-        let _ = fs::remove_dir_all(&temp_dir);
+        // Justification: best-effort cleanup; a leftover directory is harmless
+        crate::error::record_ignored(fs::remove_dir_all(&temp_dir), "remove_dir_all");
     }
 
     #[test]

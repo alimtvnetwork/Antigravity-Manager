@@ -52,9 +52,21 @@ pub fn open_instance_db() -> Result<rusqlite::Connection, String> {
     let db_path = get_instance_db_path()?;
     let conn = rusqlite::Connection::open(db_path).map_err(|e| e.to_string())?;
 
-    let _ = conn.pragma_update(None, "journal_mode", "WAL");
-    let _ = conn.pragma_update(None, "busy_timeout", 5000);
-    let _ = conn.pragma_update(None, "synchronous", "NORMAL");
+    // Justification: pragma is performance/concurrency tuning; the connection stays usable without it
+    crate::error::record_ignored(
+        conn.pragma_update(None, "journal_mode", "WAL"),
+        "set sqlite pragma",
+    );
+    // Justification: pragma is performance/concurrency tuning; the connection stays usable without it
+    crate::error::record_ignored(
+        conn.pragma_update(None, "busy_timeout", 5000),
+        "set sqlite pragma",
+    );
+    // Justification: pragma is performance/concurrency tuning; the connection stays usable without it
+    crate::error::record_ignored(
+        conn.pragma_update(None, "synchronous", "NORMAL"),
+        "set sqlite pragma",
+    );
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS instance_processes (
@@ -211,15 +223,19 @@ pub fn record_instance_pid(instance_id: &str, pid: u32, data_dir: &str) -> Resul
     let canonical_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
     let now = chrono::Utc::now().timestamp();
     if let Ok(conn) = open_instance_db() {
-        let _ = conn.execute(
-            "INSERT INTO instance_processes (instance_id, pid, data_dir, launched_at, is_active)
-             VALUES (?1, ?2, ?3, ?4, 1)
-             ON CONFLICT(instance_id) DO UPDATE SET
-                pid = excluded.pid,
-                data_dir = excluded.data_dir,
-                launched_at = excluded.launched_at,
-                is_active = 1",
-            rusqlite::params![canonical_id, pid as i64, data_dir, now],
+        // Justification: non-critical sqlite bookkeeping write; read paths tolerate stale data
+        crate::error::record_ignored(
+            conn.execute(
+                "INSERT INTO instance_processes (instance_id, pid, data_dir, launched_at, is_active)
+                 VALUES (?1, ?2, ?3, ?4, 1)
+                 ON CONFLICT(instance_id) DO UPDATE SET
+                    pid = excluded.pid,
+                    data_dir = excluded.data_dir,
+                    launched_at = excluded.launched_at,
+                    is_active = 1",
+                rusqlite::params![canonical_id, pid as i64, data_dir, now],
+            ),
+            "run sqlite statement",
         );
     }
 
@@ -231,7 +247,8 @@ pub fn record_instance_pid(instance_id: &str, pid: u32, data_dir: &str) -> Resul
         {
             inst.pid = Some(pid);
             inst.last_used = now;
-            let _ = save_registry(&registry);
+            // Justification: registry persistence is a write-through cache of already-updated in-memory state; retried on the next registry touch
+            crate::error::record_ignored(save_registry(&registry), "persist instance registry");
         }
     }
 
@@ -288,9 +305,13 @@ pub fn get_instance_saved_pid(instance_id: &str) -> Option<u32> {
 pub fn mark_instance_stopped(instance_id: &str) -> Result<(), String> {
     let canonical_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
     if let Ok(conn) = open_instance_db() {
-        let _ = conn.execute(
-            "UPDATE instance_processes SET is_active = 0 WHERE instance_id = ?1 OR instance_id = ?2",
-            rusqlite::params![canonical_id, instance_id],
+        // Justification: non-critical sqlite bookkeeping write; read paths tolerate stale data
+        crate::error::record_ignored(
+            conn.execute(
+                "UPDATE instance_processes SET is_active = 0 WHERE instance_id = ?1 OR instance_id = ?2",
+                rusqlite::params![canonical_id, instance_id],
+            ),
+            "run sqlite statement",
         );
     }
 
@@ -301,7 +322,8 @@ pub fn mark_instance_stopped(instance_id: &str) -> Result<(), String> {
             .find(|i| i.id == canonical_id || i.id == instance_id)
         {
             inst.pid = None;
-            let _ = save_registry(&registry);
+            // Justification: registry persistence is a write-through cache of already-updated in-memory state; retried on the next registry touch
+            crate::error::record_ignored(save_registry(&registry), "persist instance registry");
         }
     }
 
@@ -340,7 +362,8 @@ pub fn update_instance_app_storage(
 
     for target in targets {
         if let Some(p) = target.parent() {
-            let _ = fs::create_dir_all(p);
+            // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+            crate::error::record_ignored(fs::create_dir_all(p), "create directory");
         }
         let mut map: serde_json::Map<String, serde_json::Value> = if target.exists() {
             fs::read_to_string(&target)
@@ -368,7 +391,8 @@ pub fn update_instance_app_storage(
         }
 
         if let Ok(content) = serde_json::to_string_pretty(&map) {
-            let _ = fs::write(&target, content);
+            // Justification: best-effort file write; the target is regenerated or re-derived on the next relevant operation
+            crate::error::record_ignored(fs::write(&target, content), "write file");
         }
     }
 
@@ -379,7 +403,8 @@ pub fn update_instance_app_storage(
         .is_some()
     {
         let user_dir = data_dir.join("User");
-        let _ = fs::create_dir_all(&user_dir);
+        // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+        crate::error::record_ignored(fs::create_dir_all(&user_dir), "create directory");
         let settings_path = user_dir.join("settings.json");
         let mut settings_map: serde_json::Map<String, serde_json::Value> = if settings_path.exists()
         {
@@ -407,7 +432,8 @@ pub fn update_instance_app_storage(
         }
         if modified {
             if let Ok(pretty) = serde_json::to_string_pretty(&settings_map) {
-                let _ = fs::write(&settings_path, pretty);
+                // Justification: best-effort file write; the target is regenerated or re-derived on the next relevant operation
+                crate::error::record_ignored(fs::write(&settings_path, pretty), "write file");
             }
         }
     }
@@ -424,10 +450,19 @@ pub fn update_instance_app_storage(
             .join("state.vscdb");
         if default_db.exists() && default_db != inst_db {
             if let Some(p) = inst_db.parent() {
-                let _ = fs::create_dir_all(p);
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(fs::create_dir_all(p), "create directory");
             }
-            let _ = safe_clone_sqlite_db(&default_db, &inst_db);
-            let _ = crate::modules::db::sanitize_session(&inst_db);
+            // Justification: best-effort db clone; the instance re-derives state if the clone is missing
+            crate::error::record_ignored(
+                safe_clone_sqlite_db(&default_db, &inst_db),
+                "clone sqlite db",
+            );
+            // Justification: defensive session cleanup; leftover session data is tolerated
+            crate::error::record_ignored(
+                crate::modules::db::sanitize_session(&inst_db),
+                "sanitize session db",
+            );
         }
     }
 
@@ -468,13 +503,15 @@ pub fn purge_volatile_instance_sessions(data_dir: &Path) {
         for folder in &folders_to_purge {
             let target = root.join(folder);
             if target.exists() {
-                let _ = fs::remove_dir_all(&target);
+                // Justification: cleanup of an optional directory tree; absence is the normal case
+                crate::error::record_ignored(fs::remove_dir_all(&target), "remove directory tree");
             }
         }
         for lock in &["lockfile", "code.lock"] {
             let p = root.join(lock);
             if p.exists() {
-                let _ = fs::remove_file(&p);
+                // Justification: cleanup of an optional file; absence is the normal case
+                crate::error::record_ignored(fs::remove_file(&p), "remove file");
             }
         }
     }
@@ -513,10 +550,12 @@ pub fn write_keyring_bypass_markers(target_data_path: &Path, inst_home: Option<&
     ];
 
     for dir in marker_dirs {
-        let _ = fs::create_dir_all(&dir);
+        // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+        crate::error::record_ignored(fs::create_dir_all(&dir), "create directory");
         for name in &marker_names {
             let marker_path = dir.join(name);
-            let _ = fs::write(&marker_path, b"1\n");
+            // Justification: best-effort file write; the target is regenerated or re-derived on the next relevant operation
+            crate::error::record_ignored(fs::write(&marker_path, b"1\n"), "write file");
         }
     }
 }
@@ -594,8 +633,13 @@ pub fn load_registry() -> Result<InstanceRegistry, String> {
             instances: vec![default_instance],
         };
         save_registry(&registry)?;
-        let _ = inject_instance_settings(&registry.instances[0]);
-        let _ = ensure_default_instance_exists();
+        // Justification: settings injection is best-effort; the instance still launches with defaults
+        crate::error::record_ignored(
+            inject_instance_settings(&registry.instances[0]),
+            "inject instance settings",
+        );
+        // Justification: idempotent ensure step; the next launch or lookup re-runs it if the default is missing
+        crate::error::record_ignored(ensure_default_instance_exists(), "ensure default instance");
         return Ok(registry);
     }
 
@@ -626,8 +670,10 @@ pub fn load_registry() -> Result<InstanceRegistry, String> {
             seq_num: Some(1),
         };
         registry.instances.insert(0, default_instance);
-        let _ = save_registry(&registry);
-        let _ = ensure_default_instance_exists();
+        // Justification: registry persistence is a write-through cache of already-updated in-memory state; retried on the next registry touch
+        crate::error::record_ignored(save_registry(&registry), "persist instance registry");
+        // Justification: idempotent ensure step; the next launch or lookup re-runs it if the default is missing
+        crate::error::record_ignored(ensure_default_instance_exists(), "ensure default instance");
     }
 
     let mut modified = false;
@@ -647,14 +693,19 @@ pub fn load_registry() -> Result<InstanceRegistry, String> {
     }
 
     if modified {
-        let _ = save_registry(&registry);
+        // Justification: registry persistence is a write-through cache of already-updated in-memory state; retried on the next registry touch
+        crate::error::record_ignored(save_registry(&registry), "persist instance registry");
     }
 
     static SYNCED_TITLES_ONCE: std::sync::atomic::AtomicBool =
         std::sync::atomic::AtomicBool::new(false);
     if !SYNCED_TITLES_ONCE.swap(true, std::sync::atomic::Ordering::Relaxed) {
         for inst in &registry.instances {
-            let _ = inject_instance_settings(inst);
+            // Justification: settings injection is best-effort; the instance still launches with defaults
+            crate::error::record_ignored(
+                inject_instance_settings(inst),
+                "inject instance settings",
+            );
         }
     }
 
@@ -1072,24 +1123,34 @@ pub fn create_instance_with_account(
     {
         let roaming = instance_home_dir.join("AppData").join("Roaming");
         let local = instance_home_dir.join("AppData").join("Local");
-        let _ = fs::create_dir_all(&roaming);
-        let _ = fs::create_dir_all(&local);
+        // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+        crate::error::record_ignored(fs::create_dir_all(&roaming), "create directory");
+        // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+        crate::error::record_ignored(fs::create_dir_all(&local), "create directory");
     }
     let gemini_ide_dir = instance_home_dir.join(".gemini").join("antigravity-ide");
     let gemini_dir = instance_home_dir.join(".gemini").join("antigravity");
-    let _ = fs::create_dir_all(&gemini_ide_dir);
-    let _ = fs::create_dir_all(&gemini_dir);
+    // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+    crate::error::record_ignored(fs::create_dir_all(&gemini_ide_dir), "create directory");
+    // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+    crate::error::record_ignored(fs::create_dir_all(&gemini_dir), "create directory");
 
     // Pre-seed app_storage.json with ide-install-wizard-shown: true to skip onboarding wizard
-    let _ = update_instance_app_storage(&instance_data_dir, None, false);
+    // Justification: best-effort storage sync; re-synced on every launch and account switch
+    crate::error::record_ignored(
+        update_instance_app_storage(&instance_data_dir, None, false),
+        "sync app_storage.json",
+    );
 
     let user_dir = instance_data_dir.join("User");
-    let _ = fs::create_dir_all(&user_dir);
+    // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+    crate::error::record_ignored(fs::create_dir_all(&user_dir), "create directory");
     let default_dir = get_default_antigravity_data_dir();
     let default_settings = default_dir.join("User").join("settings.json");
     let dest_settings = user_dir.join("settings.json");
     if default_settings.exists() && !dest_settings.exists() {
-        let _ = fs::copy(default_settings, dest_settings);
+        // Justification: best-effort file copy; downstream code regenerates or tolerates the missing copy
+        crate::error::record_ignored(fs::copy(default_settings, dest_settings), "copy file");
     }
 
     // Also copy security_presets.json and antigravity_policies.json from default directory if they exist
@@ -1097,7 +1158,8 @@ pub fn create_instance_with_account(
         let default_file = default_dir.join("User").join(file_name);
         let dest_file = user_dir.join(file_name);
         if default_file.exists() && !dest_file.exists() {
-            let _ = fs::copy(&default_file, &dest_file);
+            // Justification: best-effort file copy; downstream code regenerates or tolerates the missing copy
+            crate::error::record_ignored(fs::copy(&default_file, &dest_file), "copy file");
         }
         #[cfg(target_os = "windows")]
         {
@@ -1106,10 +1168,12 @@ pub fn create_instance_with_account(
                 .join("Roaming")
                 .join("Antigravity")
                 .join("User");
-            let _ = fs::create_dir_all(&roaming_user);
+            // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+            crate::error::record_ignored(fs::create_dir_all(&roaming_user), "create directory");
             let roaming_dest = roaming_user.join(file_name);
             if default_file.exists() && !roaming_dest.exists() {
-                let _ = fs::copy(&default_file, &roaming_dest);
+                // Justification: best-effort file copy; downstream code regenerates or tolerates the missing copy
+                crate::error::record_ignored(fs::copy(&default_file, &roaming_dest), "copy file");
             }
         }
     }
@@ -1152,33 +1216,48 @@ pub fn create_instance_with_account(
             bound_acc_id = Some(acc.id.clone());
             bound_acc_email = Some(acc.email.clone());
 
-            let _ = update_instance_app_storage(
-                &instance_data_dir,
-                Some(&acc.email),
-                acc.token.is_gcp_tos,
+            // Justification: best-effort storage sync; re-synced on every launch and account switch
+            crate::error::record_ignored(
+                update_instance_app_storage(
+                    &instance_data_dir,
+                    Some(&acc.email),
+                    acc.token.is_gcp_tos,
+                ),
+                "sync app_storage.json",
             );
             purge_volatile_instance_sessions(&instance_data_dir);
             write_keyring_bypass_markers(&instance_data_dir, Some(&instance_home_dir));
 
-            let _ =
-                crate::modules::integration::write_to_file_credentials_at(&instance_home_dir, acc);
-            let _ =
-                crate::modules::integration::write_to_file_credentials_at(&instance_data_dir, acc);
+            // Justification: credential seeding is best-effort; the account flow re-derives credentials on demand
+            crate::error::record_ignored(
+                crate::modules::integration::write_to_file_credentials_at(&instance_home_dir, acc),
+                "write file credentials",
+            );
+            // Justification: credential seeding is best-effort; the account flow re-derives credentials on demand
+            crate::error::record_ignored(
+                crate::modules::integration::write_to_file_credentials_at(&instance_data_dir, acc),
+                "write file credentials",
+            );
 
             let db_dir = instance_data_dir.join("User").join("globalStorage");
-            let _ = fs::create_dir_all(&db_dir);
+            // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+            crate::error::record_ignored(fs::create_dir_all(&db_dir), "create directory");
             let db_path = db_dir.join("state.vscdb");
-            let _ = crate::modules::db::inject_token(
-                &db_path,
-                &acc.token.access_token,
-                &acc.token.refresh_token,
-                acc.token.expiry_timestamp,
-                &acc.email,
-                acc.token.is_gcp_tos,
-                acc.token.project_id.as_deref(),
-                acc.token.id_token.as_deref(),
-                acc.token.oauth_client_key.as_deref(),
-                None,
+            // Justification: best-effort token injection; auth state is re-injected on the next launch
+            crate::error::record_ignored(
+                crate::modules::db::inject_token(
+                    &db_path,
+                    &acc.token.access_token,
+                    &acc.token.refresh_token,
+                    acc.token.expiry_timestamp,
+                    &acc.email,
+                    acc.token.is_gcp_tos,
+                    acc.token.project_id.as_deref(),
+                    acc.token.id_token.as_deref(),
+                    acc.token.oauth_client_key.as_deref(),
+                    None,
+                ),
+                "inject token into db",
             );
 
             let profile = acc
@@ -1186,8 +1265,16 @@ pub fn create_instance_with_account(
                 .clone()
                 .unwrap_or_else(crate::modules::device::generate_profile);
             let storage_path = db_dir.join("storage.json");
-            let _ = crate::modules::device::write_profile(&storage_path, &profile);
-            let _ = crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id);
+            // Justification: device-profile bookkeeping; the existing profile persists if this fails
+            crate::error::record_ignored(
+                crate::modules::device::write_profile(&storage_path, &profile),
+                "write device profile",
+            );
+            // Justification: device-identity bookkeeping; the existing identity persists if this fails
+            crate::error::record_ignored(
+                crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id),
+                "write machine id",
+            );
 
             #[cfg(target_os = "windows")]
             {
@@ -1197,25 +1284,41 @@ pub fn create_instance_with_account(
                     .join("Antigravity")
                     .join("User")
                     .join("globalStorage");
-                let _ = fs::create_dir_all(&appdata_db_dir);
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(
+                    fs::create_dir_all(&appdata_db_dir),
+                    "create directory",
+                );
                 let appdata_db_path = appdata_db_dir.join("state.vscdb");
-                let _ = crate::modules::db::inject_token(
-                    &appdata_db_path,
-                    &acc.token.access_token,
-                    &acc.token.refresh_token,
-                    acc.token.expiry_timestamp,
-                    &acc.email,
-                    acc.token.is_gcp_tos,
-                    acc.token.project_id.as_deref(),
-                    acc.token.id_token.as_deref(),
-                    acc.token.oauth_client_key.as_deref(),
-                    None,
+                // Justification: best-effort token injection; auth state is re-injected on the next launch
+                crate::error::record_ignored(
+                    crate::modules::db::inject_token(
+                        &appdata_db_path,
+                        &acc.token.access_token,
+                        &acc.token.refresh_token,
+                        acc.token.expiry_timestamp,
+                        &acc.email,
+                        acc.token.is_gcp_tos,
+                        acc.token.project_id.as_deref(),
+                        acc.token.id_token.as_deref(),
+                        acc.token.oauth_client_key.as_deref(),
+                        None,
+                    ),
+                    "inject token into db",
                 );
                 let storage_path = appdata_db_dir.join("storage.json");
-                let _ = crate::modules::device::write_profile(&storage_path, &profile);
-                let _ = crate::modules::db::write_service_machine_id(
-                    &appdata_db_path,
-                    &profile.mac_machine_id,
+                // Justification: device-profile bookkeeping; the existing profile persists if this fails
+                crate::error::record_ignored(
+                    crate::modules::device::write_profile(&storage_path, &profile),
+                    "write device profile",
+                );
+                // Justification: device-identity bookkeeping; the existing identity persists if this fails
+                crate::error::record_ignored(
+                    crate::modules::db::write_service_machine_id(
+                        &appdata_db_path,
+                        &profile.mac_machine_id,
+                    ),
+                    "write machine id",
                 );
 
                 let home_appdata_db_dir = instance_home_dir
@@ -1224,25 +1327,41 @@ pub fn create_instance_with_account(
                     .join("Antigravity")
                     .join("User")
                     .join("globalStorage");
-                let _ = fs::create_dir_all(&home_appdata_db_dir);
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(
+                    fs::create_dir_all(&home_appdata_db_dir),
+                    "create directory",
+                );
                 let home_appdata_db_path = home_appdata_db_dir.join("state.vscdb");
-                let _ = crate::modules::db::inject_token(
-                    &home_appdata_db_path,
-                    &acc.token.access_token,
-                    &acc.token.refresh_token,
-                    acc.token.expiry_timestamp,
-                    &acc.email,
-                    acc.token.is_gcp_tos,
-                    acc.token.project_id.as_deref(),
-                    acc.token.id_token.as_deref(),
-                    acc.token.oauth_client_key.as_deref(),
-                    None,
+                // Justification: best-effort token injection; auth state is re-injected on the next launch
+                crate::error::record_ignored(
+                    crate::modules::db::inject_token(
+                        &home_appdata_db_path,
+                        &acc.token.access_token,
+                        &acc.token.refresh_token,
+                        acc.token.expiry_timestamp,
+                        &acc.email,
+                        acc.token.is_gcp_tos,
+                        acc.token.project_id.as_deref(),
+                        acc.token.id_token.as_deref(),
+                        acc.token.oauth_client_key.as_deref(),
+                        None,
+                    ),
+                    "inject token into db",
                 );
                 let home_storage_path = home_appdata_db_dir.join("storage.json");
-                let _ = crate::modules::device::write_profile(&home_storage_path, &profile);
-                let _ = crate::modules::db::write_service_machine_id(
-                    &home_appdata_db_path,
-                    &profile.mac_machine_id,
+                // Justification: device-profile bookkeeping; the existing profile persists if this fails
+                crate::error::record_ignored(
+                    crate::modules::device::write_profile(&home_storage_path, &profile),
+                    "write device profile",
+                );
+                // Justification: device-identity bookkeeping; the existing identity persists if this fails
+                crate::error::record_ignored(
+                    crate::modules::db::write_service_machine_id(
+                        &home_appdata_db_path,
+                        &profile.mac_machine_id,
+                    ),
+                    "write machine id",
                 );
             }
         }
@@ -1275,7 +1394,11 @@ pub fn create_instance_with_account(
         config
     };
 
-    let _ = inject_instance_settings(&config);
+    // Justification: settings injection is best-effort; the instance still launches with defaults
+    crate::error::record_ignored(
+        inject_instance_settings(&config),
+        "inject instance settings",
+    );
     sync_instance_ide_parity(&instance_id).map_err(|e| e.to_string())?;
 
     Ok(config)
@@ -1300,7 +1423,8 @@ pub fn restart_instance(instance_id: &str) -> AppResult<InstanceStatus> {
     ));
 
     // 1. Terminate current running process(es)
-    let _ = stop_instance(&resolved_id);
+    // Justification: best-effort shutdown; the stop path is idempotent and re-attempted on the next action
+    crate::error::record_ignored(stop_instance(&resolved_id), "stop instance");
 
     // 2. Poll up to 1500ms for process cleanup and lockfile release
     let start_wait = std::time::Instant::now();
@@ -1386,7 +1510,8 @@ pub fn copy_instance_with_options(
         if let Ok(mut reg) = load_registry() {
             if let Some(inst) = reg.instances.iter_mut().find(|i| i.id == new_instance.id) {
                 inst.extensions_dir = source.extensions_dir.clone();
-                let _ = save_registry(&reg);
+                // Justification: registry persistence is a write-through cache of already-updated in-memory state; retried on the next registry touch
+                crate::error::record_ignored(save_registry(&reg), "persist instance registry");
             }
         }
     }
@@ -1405,7 +1530,11 @@ pub fn copy_instance_with_options(
             let has_user_dir = user_settings_src.exists();
             if has_user_dir {
                 let user_settings_dst = dst_path.join("User");
-                let _ = copy_dir_recursive(&user_settings_src, &user_settings_dst);
+                // Justification: best-effort tree copy; parity sync completes it on launch
+                crate::error::record_ignored(
+                    copy_dir_recursive(&user_settings_src, &user_settings_dst),
+                    "copy directory tree",
+                );
             }
         } else {
             // Full directory copy (default): copies entire instance data tree while skipping volatile locks/caches
@@ -1446,7 +1575,11 @@ pub fn copy_instance_with_options(
                 .join("globalStorage")
                 .join("state.vscdb");
             if default_vscdb.exists() {
-                let _ = safe_clone_sqlite_db(&default_vscdb, &dst_vscdb);
+                // Justification: best-effort db clone; the instance re-derives state if the clone is missing
+                crate::error::record_ignored(
+                    safe_clone_sqlite_db(&default_vscdb, &dst_vscdb),
+                    "clone sqlite db",
+                );
             }
         }
 
@@ -1460,7 +1593,11 @@ pub fn copy_instance_with_options(
                     .join("Roaming")
                     .join("Antigravity")
                     .join("User");
-                let _ = fs::create_dir_all(&dst_appdata_user);
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(
+                    fs::create_dir_all(&dst_appdata_user),
+                    "create directory",
+                );
                 dst_user_targets.push(dst_appdata_user);
             }
         }
@@ -1486,8 +1623,16 @@ pub fn copy_instance_with_options(
 
             if let Some(found_src) = candidate_srcs.iter().find(|p| p.is_file()) {
                 for target_dir in &dst_user_targets {
-                    let _ = fs::create_dir_all(target_dir);
-                    let _ = fs::copy(found_src, target_dir.join(file_name));
+                    // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                    crate::error::record_ignored(
+                        fs::create_dir_all(target_dir),
+                        "create directory",
+                    );
+                    // Justification: best-effort file copy; downstream code regenerates or tolerates the missing copy
+                    crate::error::record_ignored(
+                        fs::copy(found_src, target_dir.join(file_name)),
+                        "copy file",
+                    );
                 }
                 crate::modules::logger::log_info(&format!(
                     "[Instance] Copied {} from {} to {} target user directories",
@@ -1506,8 +1651,16 @@ pub fn copy_instance_with_options(
             .and_then(|id| crate::modules::account::load_account(id).ok())
             .map(|a| a.token.is_gcp_tos)
             .unwrap_or(false);
-        let _ = update_instance_app_storage(&dst_path, new_instance.bound_email.as_deref(), is_tos);
-        let _ = clone_instance_executable(&new_instance.id);
+        // Justification: best-effort storage sync; re-synced on every launch and account switch
+        crate::error::record_ignored(
+            update_instance_app_storage(&dst_path, new_instance.bound_email.as_deref(), is_tos),
+            "sync app_storage.json",
+        );
+        // Justification: best-effort executable clone; launch falls back to the base executable
+        crate::error::record_ignored(
+            clone_instance_executable(&new_instance.id),
+            "clone instance executable",
+        );
 
         // Sanitize cloned session and reseed with newly bound account credentials
         let cloned_db = dst_path
@@ -1516,31 +1669,46 @@ pub fn copy_instance_with_options(
             .join("state.vscdb");
         let has_cloned_db = cloned_db.exists();
         if has_cloned_db {
-            let _ = crate::modules::db::sanitize_session(&cloned_db);
+            // Justification: defensive session cleanup; leftover session data is tolerated
+            crate::error::record_ignored(
+                crate::modules::db::sanitize_session(&cloned_db),
+                "sanitize session db",
+            );
             if let Some(ref acc_id) = new_instance.bound_account_id {
                 if let Ok(acc) = crate::modules::account::load_account(acc_id) {
                     if let Ok(new_home) = get_instance_home_dir(&new_instance.id) {
-                        let _ = crate::modules::integration::write_to_file_credentials_at(
-                            &new_home, &acc,
+                        // Justification: credential seeding is best-effort; the account flow re-derives credentials on demand
+                        crate::error::record_ignored(
+                            crate::modules::integration::write_to_file_credentials_at(
+                                &new_home, &acc,
+                            ),
+                            "write file credentials",
                         );
                         write_keyring_bypass_markers(&dst_path, Some(&new_home));
                     } else {
                         write_keyring_bypass_markers(&dst_path, None);
                     }
-                    let _ =
-                        crate::modules::integration::write_to_file_credentials_at(&dst_path, &acc);
+                    // Justification: credential seeding is best-effort; the account flow re-derives credentials on demand
+                    crate::error::record_ignored(
+                        crate::modules::integration::write_to_file_credentials_at(&dst_path, &acc),
+                        "write file credentials",
+                    );
 
-                    let _ = crate::modules::db::inject_token(
-                        &cloned_db,
-                        &acc.token.access_token,
-                        &acc.token.refresh_token,
-                        acc.token.expiry_timestamp,
-                        &acc.email,
-                        acc.token.is_gcp_tos,
-                        acc.token.project_id.as_deref(),
-                        acc.token.id_token.as_deref(),
-                        acc.token.oauth_client_key.as_deref(),
-                        None,
+                    // Justification: best-effort token injection; auth state is re-injected on the next launch
+                    crate::error::record_ignored(
+                        crate::modules::db::inject_token(
+                            &cloned_db,
+                            &acc.token.access_token,
+                            &acc.token.refresh_token,
+                            acc.token.expiry_timestamp,
+                            &acc.email,
+                            acc.token.is_gcp_tos,
+                            acc.token.project_id.as_deref(),
+                            acc.token.id_token.as_deref(),
+                            acc.token.oauth_client_key.as_deref(),
+                            None,
+                        ),
+                        "inject token into db",
                     );
                     let profile = acc
                         .device_profile
@@ -1550,10 +1718,18 @@ pub fn copy_instance_with_options(
                         .join("User")
                         .join("globalStorage")
                         .join("storage.json");
-                    let _ = crate::modules::device::write_profile(&storage_path, &profile);
-                    let _ = crate::modules::db::write_service_machine_id(
-                        &cloned_db,
-                        &profile.mac_machine_id,
+                    // Justification: device-profile bookkeeping; the existing profile persists if this fails
+                    crate::error::record_ignored(
+                        crate::modules::device::write_profile(&storage_path, &profile),
+                        "write device profile",
+                    );
+                    // Justification: device-identity bookkeeping; the existing identity persists if this fails
+                    crate::error::record_ignored(
+                        crate::modules::db::write_service_machine_id(
+                            &cloned_db,
+                            &profile.mac_machine_id,
+                        ),
+                        "write machine id",
                     );
 
                     #[cfg(target_os = "windows")]
@@ -1564,38 +1740,16 @@ pub fn copy_instance_with_options(
                             .join("Antigravity")
                             .join("User")
                             .join("globalStorage");
-                        let _ = fs::create_dir_all(&appdata_db_dir);
+                        // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                        crate::error::record_ignored(
+                            fs::create_dir_all(&appdata_db_dir),
+                            "create directory",
+                        );
                         let appdata_db_path = appdata_db_dir.join("state.vscdb");
-                        let _ = crate::modules::db::inject_token(
-                            &appdata_db_path,
-                            &acc.token.access_token,
-                            &acc.token.refresh_token,
-                            acc.token.expiry_timestamp,
-                            &acc.email,
-                            acc.token.is_gcp_tos,
-                            acc.token.project_id.as_deref(),
-                            acc.token.id_token.as_deref(),
-                            acc.token.oauth_client_key.as_deref(),
-                            None,
-                        );
-                        let storage_path = appdata_db_dir.join("storage.json");
-                        let _ = crate::modules::device::write_profile(&storage_path, &profile);
-                        let _ = crate::modules::db::write_service_machine_id(
-                            &appdata_db_path,
-                            &profile.mac_machine_id,
-                        );
-
-                        if let Ok(new_home) = get_instance_home_dir(&new_instance.id) {
-                            let home_appdata_db_dir = new_home
-                                .join("AppData")
-                                .join("Roaming")
-                                .join("Antigravity")
-                                .join("User")
-                                .join("globalStorage");
-                            let _ = fs::create_dir_all(&home_appdata_db_dir);
-                            let home_appdata_db_path = home_appdata_db_dir.join("state.vscdb");
-                            let _ = crate::modules::db::inject_token(
-                                &home_appdata_db_path,
+                        // Justification: best-effort token injection; auth state is re-injected on the next launch
+                        crate::error::record_ignored(
+                            crate::modules::db::inject_token(
+                                &appdata_db_path,
                                 &acc.token.access_token,
                                 &acc.token.refresh_token,
                                 acc.token.expiry_timestamp,
@@ -1605,13 +1759,66 @@ pub fn copy_instance_with_options(
                                 acc.token.id_token.as_deref(),
                                 acc.token.oauth_client_key.as_deref(),
                                 None,
+                            ),
+                            "inject token into db",
+                        );
+                        let storage_path = appdata_db_dir.join("storage.json");
+                        // Justification: device-profile bookkeeping; the existing profile persists if this fails
+                        crate::error::record_ignored(
+                            crate::modules::device::write_profile(&storage_path, &profile),
+                            "write device profile",
+                        );
+                        // Justification: device-identity bookkeeping; the existing identity persists if this fails
+                        crate::error::record_ignored(
+                            crate::modules::db::write_service_machine_id(
+                                &appdata_db_path,
+                                &profile.mac_machine_id,
+                            ),
+                            "write machine id",
+                        );
+
+                        if let Ok(new_home) = get_instance_home_dir(&new_instance.id) {
+                            let home_appdata_db_dir = new_home
+                                .join("AppData")
+                                .join("Roaming")
+                                .join("Antigravity")
+                                .join("User")
+                                .join("globalStorage");
+                            // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                            crate::error::record_ignored(
+                                fs::create_dir_all(&home_appdata_db_dir),
+                                "create directory",
+                            );
+                            let home_appdata_db_path = home_appdata_db_dir.join("state.vscdb");
+                            // Justification: best-effort token injection; auth state is re-injected on the next launch
+                            crate::error::record_ignored(
+                                crate::modules::db::inject_token(
+                                    &home_appdata_db_path,
+                                    &acc.token.access_token,
+                                    &acc.token.refresh_token,
+                                    acc.token.expiry_timestamp,
+                                    &acc.email,
+                                    acc.token.is_gcp_tos,
+                                    acc.token.project_id.as_deref(),
+                                    acc.token.id_token.as_deref(),
+                                    acc.token.oauth_client_key.as_deref(),
+                                    None,
+                                ),
+                                "inject token into db",
                             );
                             let home_storage_path = home_appdata_db_dir.join("storage.json");
-                            let _ =
-                                crate::modules::device::write_profile(&home_storage_path, &profile);
-                            let _ = crate::modules::db::write_service_machine_id(
-                                &home_appdata_db_path,
-                                &profile.mac_machine_id,
+                            // Justification: device-profile bookkeeping; the existing profile persists if this fails
+                            crate::error::record_ignored(
+                                crate::modules::device::write_profile(&home_storage_path, &profile),
+                                "write device profile",
+                            );
+                            // Justification: device-identity bookkeeping; the existing identity persists if this fails
+                            crate::error::record_ignored(
+                                crate::modules::db::write_service_machine_id(
+                                    &home_appdata_db_path,
+                                    &profile.mac_machine_id,
+                                ),
+                                "write machine id",
                             );
                         }
                     }
@@ -1635,7 +1842,11 @@ pub fn copy_instance_with_options(
     }
 
     if copy_projects {
-        let _ = crate::modules::repo_db::detect_running_projects(&source.id);
+        // Justification: background detection; re-runs on the next refresh tick
+        crate::error::record_ignored(
+            crate::modules::repo_db::detect_running_projects(&source.id),
+            "detect running projects",
+        );
         if let Err(err) =
             crate::modules::repo_db::clone_instance_repo_rows(&source.id, &new_instance.id)
         {
@@ -1654,7 +1865,8 @@ pub fn copy_instance_with_options(
         let ws_main = dst_path.join("User").join("workspaceStorage");
         let has_ws = ws_main.exists();
         if has_ws {
-            let _ = fs::remove_dir_all(&ws_main);
+            // Justification: cleanup of an optional directory tree; absence is the normal case
+            crate::error::record_ignored(fs::remove_dir_all(&ws_main), "remove directory tree");
         }
         #[cfg(target_os = "windows")]
         {
@@ -1665,7 +1877,11 @@ pub fn copy_instance_with_options(
                 .join("User")
                 .join("workspaceStorage");
             if ws_appdata.exists() {
-                let _ = fs::remove_dir_all(&ws_appdata);
+                // Justification: cleanup of an optional directory tree; absence is the normal case
+                crate::error::record_ignored(
+                    fs::remove_dir_all(&ws_appdata),
+                    "remove directory tree",
+                );
             }
             if let Ok(dst_home) = get_instance_home_dir(&new_instance.id) {
                 let ws_home = dst_home
@@ -1675,15 +1891,27 @@ pub fn copy_instance_with_options(
                     .join("User")
                     .join("workspaceStorage");
                 if ws_home.exists() {
-                    let _ = fs::remove_dir_all(&ws_home);
+                    // Justification: cleanup of an optional directory tree; absence is the normal case
+                    crate::error::record_ignored(
+                        fs::remove_dir_all(&ws_home),
+                        "remove directory tree",
+                    );
                 }
             }
         }
         purge_recent_project_paths(&new_instance);
     }
 
-    let _ = sanitize_cloned_instance_summaries(&new_instance.id);
-    let _ = inject_instance_settings(&new_instance);
+    // Justification: post-clone hygiene; stale summaries are regenerated on demand
+    crate::error::record_ignored(
+        sanitize_cloned_instance_summaries(&new_instance.id),
+        "sanitize cloned summaries",
+    );
+    // Justification: settings injection is best-effort; the instance still launches with defaults
+    crate::error::record_ignored(
+        inject_instance_settings(&new_instance),
+        "inject instance settings",
+    );
     sync_instance_ide_parity(&new_instance.id).map_err(|e| e.to_string())?;
 
     Ok(new_instance)
@@ -1747,7 +1975,11 @@ pub fn sanitize_cloned_instance_summaries(target_id: &str) -> Result<(), String>
     for db_path in candidates {
         if db_path.exists() {
             if let Ok(conn) = rusqlite::Connection::open(&db_path) {
-                let _ = conn.pragma_update(None, "busy_timeout", 3000);
+                // Justification: pragma is performance/concurrency tuning; the connection stays usable without it
+                crate::error::record_ignored(
+                    conn.pragma_update(None, "busy_timeout", 3000),
+                    "set sqlite pragma",
+                );
                 let has_table = conn
                     .query_row(
                         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='conversation_summaries'",
@@ -1807,7 +2039,11 @@ pub fn rename_instance(instance_id: &str, new_name: String) -> Result<InstanceCo
     let updated = registry.instances[pos].clone();
     save_registry(&registry)?;
 
-    let _ = inject_instance_settings(&updated);
+    // Justification: settings injection is best-effort; the instance still launches with defaults
+    crate::error::record_ignored(
+        inject_instance_settings(&updated),
+        "inject instance settings",
+    );
 
     Ok(updated)
 }
@@ -1874,7 +2110,11 @@ fn source_profile_home(source: &InstanceConfig) -> Option<PathBuf> {
 pub fn copy_source_ide_trees(source: &InstanceConfig, dest: &InstanceConfig) -> Result<(), String> {
     if let Some(src_home) = source_profile_home(source) {
         if let Ok(dst_home) = get_instance_home_dir(&dest.id) {
-            let _ = copy_gemini_trees(&src_home, &dst_home);
+            // Justification: best-effort config seeding; missing files fall back to defaults
+            crate::error::record_ignored(
+                copy_gemini_trees(&src_home, &dst_home),
+                "copy gemini config trees",
+            );
         }
     } else if let Ok(dst_home) = get_instance_home_dir(&dest.id) {
         if let Some(sys_home) = std::env::var("USERPROFILE")
@@ -1882,7 +2122,11 @@ pub fn copy_source_ide_trees(source: &InstanceConfig, dest: &InstanceConfig) -> 
             .ok()
             .map(PathBuf::from)
         {
-            let _ = copy_gemini_trees(&sys_home, &dst_home);
+            // Justification: best-effort config seeding; missing files fall back to defaults
+            crate::error::record_ignored(
+                copy_gemini_trees(&sys_home, &dst_home),
+                "copy gemini config trees",
+            );
         }
     }
 
@@ -1902,7 +2146,11 @@ pub fn copy_source_ide_trees(source: &InstanceConfig, dest: &InstanceConfig) -> 
             }
         }
         if let Some(src_p) = src_opt.filter(|p| p.exists()) {
-            let _ = copy_dir_recursive(&src_p, &dst_data_gemini.join(name));
+            // Justification: best-effort tree copy; parity sync completes it on launch
+            crate::error::record_ignored(
+                copy_dir_recursive(&src_p, &dst_data_gemini.join(name)),
+                "copy directory tree",
+            );
         }
     }
 
@@ -1918,7 +2166,8 @@ pub fn copy_source_user_settings(
 ) -> Result<(), String> {
     let dst_data_dir = PathBuf::from(&dest.data_dir);
     let dst_user_dir = dst_data_dir.join("User");
-    let _ = fs::create_dir_all(&dst_user_dir);
+    // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+    crate::error::record_ignored(fs::create_dir_all(&dst_user_dir), "create directory");
 
     let mut dst_dirs = vec![dst_user_dir];
 
@@ -1930,7 +2179,8 @@ pub fn copy_source_user_settings(
                 .join("Roaming")
                 .join("Antigravity")
                 .join("User");
-            let _ = fs::create_dir_all(&dst_appdata_user);
+            // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+            crate::error::record_ignored(fs::create_dir_all(&dst_appdata_user), "create directory");
             dst_dirs.push(dst_appdata_user);
         }
     }
@@ -1992,11 +2242,19 @@ pub fn copy_source_user_settings(
                 if let Ok(file_type) = entry.file_type() {
                     if file_type.is_file() {
                         for dst in &dst_dirs {
-                            let _ = fs::copy(entry.path(), dst.join(&file_name));
+                            // Justification: best-effort file copy; downstream code regenerates or tolerates the missing copy
+                            crate::error::record_ignored(
+                                fs::copy(entry.path(), dst.join(&file_name)),
+                                "copy file",
+                            );
                         }
                     } else if file_type.is_dir() && name_str == "snippets" {
                         for dst in &dst_dirs {
-                            let _ = copy_dir_recursive(&entry.path(), &dst.join(&file_name));
+                            // Justification: best-effort tree copy; parity sync completes it on launch
+                            crate::error::record_ignored(
+                                copy_dir_recursive(&entry.path(), &dst.join(&file_name)),
+                                "copy directory tree",
+                            );
                         }
                     }
                 }
@@ -2019,9 +2277,11 @@ pub fn copy_source_user_settings(
         for dst in &dst_dirs {
             let target_settings = dst.join("settings.json");
             if let Some(parent) = target_settings.parent() {
-                let _ = fs::create_dir_all(parent);
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(fs::create_dir_all(parent), "create directory");
             }
-            let _ = fs::copy(best_settings, target_settings);
+            // Justification: best-effort file copy; downstream code regenerates or tolerates the missing copy
+            crate::error::record_ignored(fs::copy(best_settings, target_settings), "copy file");
         }
         crate::modules::logger::log_info(&format!(
             "[Instance] Cloned best source settings from {} into {} user targets",
@@ -2036,7 +2296,8 @@ pub fn copy_source_user_settings(
             let p = src_user.join(file_name);
             if p.is_file() {
                 for dst in &dst_dirs {
-                    let _ = fs::copy(&p, dst.join(file_name));
+                    // Justification: best-effort file copy; downstream code regenerates or tolerates the missing copy
+                    crate::error::record_ignored(fs::copy(&p, dst.join(file_name)), "copy file");
                 }
                 break;
             }
@@ -2164,9 +2425,11 @@ pub fn sync_directory_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
             };
             if has_change {
                 if let Some(parent) = child_dst.parent() {
-                    let _ = fs::create_dir_all(parent);
+                    // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                    crate::error::record_ignored(fs::create_dir_all(parent), "create directory");
                 }
-                let _ = fs::copy(entry.path(), &child_dst);
+                // Justification: best-effort file copy; downstream code regenerates or tolerates the missing copy
+                crate::error::record_ignored(fs::copy(entry.path(), &child_dst), "copy file");
             }
         }
     }
@@ -2236,13 +2499,22 @@ pub fn sync_instance_ide_parity(target_instance_id: &str) -> AppResult<()> {
                     .unwrap_or_else(|| serde_json::json!({}));
                 deep_merge_json(&mut target_val, &src_val);
                 if let Ok(formatted) = serde_json::to_string_pretty(&target_val) {
-                    let _ = fs::write(&target_config_json, formatted);
+                    // Justification: best-effort file write; the target is regenerated or re-derived on the next relevant operation
+                    crate::error::record_ignored(
+                        fs::write(&target_config_json, formatted),
+                        "write file",
+                    );
                 }
             } else {
-                let _ = fs::copy(&src_cfg_path, &target_config_json);
+                // Justification: best-effort file copy; downstream code regenerates or tolerates the missing copy
+                crate::error::record_ignored(
+                    fs::copy(&src_cfg_path, &target_config_json),
+                    "copy file",
+                );
             }
         } else if !target_config_json.exists() {
-            let _ = fs::copy(&src_cfg_path, &target_config_json);
+            // Justification: best-effort file copy; downstream code regenerates or tolerates the missing copy
+            crate::error::record_ignored(fs::copy(&src_cfg_path, &target_config_json), "copy file");
         }
     }
 
@@ -2274,7 +2546,8 @@ pub fn sync_instance_ide_parity(target_instance_id: &str) -> AppResult<()> {
             }
         });
         if let Ok(formatted) = serde_json::to_string_pretty(&fallback_config) {
-            let _ = fs::write(&target_config_json, formatted);
+            // Justification: best-effort file write; the target is regenerated or re-derived on the next relevant operation
+            crate::error::record_ignored(fs::write(&target_config_json, formatted), "write file");
         }
     }
 
@@ -2286,7 +2559,11 @@ pub fn sync_instance_ide_parity(target_instance_id: &str) -> AppResult<()> {
         .find(|p| p.is_dir());
 
     if let Some(src_plugins) = source_plugins_dir {
-        let _ = sync_directory_recursive(&src_plugins, &target_plugins_dir);
+        // Justification: best-effort tree sync; re-synced on the next parity pass
+        crate::error::record_ignored(
+            sync_directory_recursive(&src_plugins, &target_plugins_dir),
+            "sync directory tree",
+        );
     }
 
     // 3. Synchronize .gemini/antigravity/builtin/skills/
@@ -2300,7 +2577,11 @@ pub fn sync_instance_ide_parity(target_instance_id: &str) -> AppResult<()> {
         .find(|p| p.is_dir());
 
     if let Some(src_skills) = source_skills_dir {
-        let _ = sync_directory_recursive(&src_skills, &target_skills_dir);
+        // Justification: best-effort tree sync; re-synced on the next parity pass
+        crate::error::record_ignored(
+            sync_directory_recursive(&src_skills, &target_skills_dir),
+            "sync directory tree",
+        );
     }
 
     // 4. Synchronize .gemini/ keyring bypass marker files
@@ -2317,9 +2598,11 @@ pub fn sync_instance_ide_parity(target_instance_id: &str) -> AppResult<()> {
             .find(|p| p.is_file());
 
         if let Some(src_marker) = found_marker {
-            let _ = fs::copy(&src_marker, &target_marker);
+            // Justification: best-effort file copy; downstream code regenerates or tolerates the missing copy
+            crate::error::record_ignored(fs::copy(&src_marker, &target_marker), "copy file");
         } else if !target_marker.exists() {
-            let _ = fs::write(&target_marker, b"1\n");
+            // Justification: best-effort file write; the target is regenerated or re-derived on the next relevant operation
+            crate::error::record_ignored(fs::write(&target_marker, b"1\n"), "write file");
         }
     }
     write_keyring_bypass_markers(&target_data, Some(&target_home));
@@ -2404,15 +2687,21 @@ pub fn sync_instance_ide_parity(target_instance_id: &str) -> AppResult<()> {
     }
 
     if let Some(parent) = target_settings_path.parent() {
-        let _ = fs::create_dir_all(parent);
+        // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+        crate::error::record_ignored(fs::create_dir_all(parent), "create directory");
     }
     if let Ok(formatted) = serde_json::to_string_pretty(&target_settings_val) {
-        let _ = fs::write(&target_settings_path, &formatted);
+        // Justification: best-effort file write; the target is regenerated or re-derived on the next relevant operation
+        crate::error::record_ignored(fs::write(&target_settings_path, &formatted), "write file");
 
         // Also write to data/User/settings.json if data dir exists
         let target_data_user = target_data.join("User");
         if target_data_user.exists() {
-            let _ = fs::write(target_data_user.join("settings.json"), &formatted);
+            // Justification: best-effort file write; the target is regenerated or re-derived on the next relevant operation
+            crate::error::record_ignored(
+                fs::write(target_data_user.join("settings.json"), &formatted),
+                "write file",
+            );
         }
     }
 
@@ -2431,10 +2720,12 @@ pub fn ensure_default_instance_exists() -> AppResult<()> {
     let default_data = instances_root.join("default").join("data");
 
     if !default_home.exists() {
-        let _ = fs::create_dir_all(&default_home);
+        // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+        crate::error::record_ignored(fs::create_dir_all(&default_home), "create directory");
     }
     if !default_data.exists() {
-        let _ = fs::create_dir_all(&default_data);
+        // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+        crate::error::record_ignored(fs::create_dir_all(&default_data), "create directory");
     }
 
     sync_instance_ide_parity("default")?;
@@ -2501,24 +2792,43 @@ pub fn safe_clone_sqlite_db(src_db: &Path, dst_db: &Path) -> Result<(), String> 
         })
         .map_err(|e| format!("Failed to open source SQLite db in read-only mode: {}", e))?;
 
-        let _ = src_conn.pragma_update(None, "busy_timeout", 2500);
-        let _ = src_conn.pragma_update(None, "journal_mode", "WAL");
+        // Justification: pragma is performance/concurrency tuning; the connection stays usable without it
+        crate::error::record_ignored(
+            src_conn.pragma_update(None, "busy_timeout", 2500),
+            "set sqlite pragma",
+        );
+        // Justification: pragma is performance/concurrency tuning; the connection stays usable without it
+        crate::error::record_ignored(
+            src_conn.pragma_update(None, "journal_mode", "WAL"),
+            "set sqlite pragma",
+        );
 
         if dst_db.exists() {
-            let _ = fs::remove_file(dst_db);
+            // Justification: cleanup of an optional file; absence is the normal case
+            crate::error::record_ignored(fs::remove_file(dst_db), "remove file");
         }
         let mut sidecar_wal = dst_db.as_os_str().to_os_string();
         sidecar_wal.push("-wal");
-        let _ = fs::remove_file(PathBuf::from(sidecar_wal));
+        // Justification: cleanup of an optional file; absence is the normal case
+        crate::error::record_ignored(fs::remove_file(PathBuf::from(sidecar_wal)), "remove file");
         let mut sidecar_shm = dst_db.as_os_str().to_os_string();
         sidecar_shm.push("-shm");
-        let _ = fs::remove_file(PathBuf::from(sidecar_shm));
+        // Justification: cleanup of an optional file; absence is the normal case
+        crate::error::record_ignored(fs::remove_file(PathBuf::from(sidecar_shm)), "remove file");
 
         let mut dst_conn = rusqlite::Connection::open(dst_db)
             .map_err(|e| format!("Failed to open destination SQLite db: {}", e))?;
 
-        let _ = dst_conn.pragma_update(None, "busy_timeout", 2500);
-        let _ = dst_conn.pragma_update(None, "journal_mode", "WAL");
+        // Justification: pragma is performance/concurrency tuning; the connection stays usable without it
+        crate::error::record_ignored(
+            dst_conn.pragma_update(None, "busy_timeout", 2500),
+            "set sqlite pragma",
+        );
+        // Justification: pragma is performance/concurrency tuning; the connection stays usable without it
+        crate::error::record_ignored(
+            dst_conn.pragma_update(None, "journal_mode", "WAL"),
+            "set sqlite pragma",
+        );
 
         let backup = rusqlite::backup::Backup::new(&src_conn, &mut dst_conn)
             .map_err(|e| format!("Failed to initialize SQLite backup: {}", e))?;
@@ -2592,7 +2902,11 @@ pub fn safe_clone_sqlite_db(src_db: &Path, dst_db: &Path) -> Result<(), String> 
             let dst_sidecar_path = PathBuf::from(dst_sidecar);
 
             if src_sidecar_path.exists() {
-                let _ = copy_shared(&src_sidecar_path, &dst_sidecar_path);
+                // Justification: best-effort sidecar copy; the destination db re-creates its WAL/SHM sidecars on open
+                crate::error::record_ignored(
+                    copy_shared(&src_sidecar_path, &dst_sidecar_path),
+                    "copy db sidecar file",
+                );
             }
         }
     }
@@ -2655,7 +2969,11 @@ pub fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 
         let dest_child = dst.join(&file_name);
         if file_type.is_dir() {
-            let _ = copy_dir_recursive(&entry.path(), &dest_child);
+            // Justification: best-effort tree copy; parity sync completes it on launch
+            crate::error::record_ignored(
+                copy_dir_recursive(&entry.path(), &dest_child),
+                "copy directory tree",
+            );
         } else if name_str.ends_with(".vscdb") || name_str.ends_with(".db") {
             if let Err(e) = safe_clone_sqlite_db(&entry.path(), &dest_child) {
                 crate::modules::logger::log_warn(&format!(
@@ -2767,6 +3085,7 @@ fn force_refresh_process_cache() {
         cache.0 = std::time::Instant::now() - std::time::Duration::from_secs(3600);
         cache.1.clear();
     }
+    // Justification: intentionally discards the cached Vec; the call's only purpose is its side effect of refreshing the process cache
     let _ = get_cached_antigravity_processes();
 }
 
@@ -2784,7 +3103,11 @@ pub fn refresh_saved_instance_pids() {
         let is_default = inst.is_default || inst.id == "default";
         let pids = find_pids_for_data_dir(&inst.data_dir, is_default);
         if let Some(pid) = pids.first().copied() {
-            let _ = record_instance_pid(&inst.id, pid, &inst.data_dir);
+            // Justification: PID cache bookkeeping; staleness is tolerated via the OS-level re-detect fallback
+            crate::error::record_ignored(
+                record_instance_pid(&inst.id, pid, &inst.data_dir),
+                "record instance pid",
+            );
         }
     }
 }
@@ -2816,7 +3139,11 @@ pub fn resolve_instance_pid_for_switch(
     }
     let pids = find_pids_for_data_dir(data_dir, is_default);
     let pid = pids.first().copied()?;
-    let _ = record_instance_pid(instance_id, pid, data_dir);
+    // Justification: PID cache bookkeeping; staleness is tolerated via the OS-level re-detect fallback
+    crate::error::record_ignored(
+        record_instance_pid(instance_id, pid, data_dir),
+        "record instance pid",
+    );
     Some(pid)
 }
 
@@ -2838,7 +3165,11 @@ pub fn is_instance_running(instance_id: &str, data_dir: &str, config_pid: Option
     let Some(pid) = pids.first().copied() else {
         return false;
     };
-    let _ = record_instance_pid(instance_id, pid, data_dir);
+    // Justification: PID cache bookkeeping; staleness is tolerated via the OS-level re-detect fallback
+    crate::error::record_ignored(
+        record_instance_pid(instance_id, pid, data_dir),
+        "record instance pid",
+    );
     true
 }
 
@@ -2849,7 +3180,8 @@ pub fn delete_instance(instance_id: &str) -> Result<(), String> {
     }
 
     // Automatically close the instance if it is running so delete never fails
-    let _ = close_instance(instance_id);
+    // Justification: best-effort close; close is idempotent and re-attempted on the next action
+    crate::error::record_ignored(close_instance(instance_id), "close instance");
     std::thread::sleep(std::time::Duration::from_millis(200));
 
     let mut registry = load_registry()?;
@@ -2861,7 +3193,11 @@ pub fn delete_instance(instance_id: &str) -> Result<(), String> {
             if let Ok(instances_root) = get_instances_dir() {
                 let instance_folder = instances_root.join(instance_id);
                 if instance_folder.exists() {
-                    let _ = fs::remove_dir_all(&instance_folder);
+                    // Justification: cleanup of an optional directory tree; absence is the normal case
+                    crate::error::record_ignored(
+                        fs::remove_dir_all(&instance_folder),
+                        "remove directory tree",
+                    );
                 }
             }
             return Ok(());
@@ -2886,18 +3222,24 @@ pub fn delete_instance(instance_id: &str) -> Result<(), String> {
     if let Ok(instances_root) = get_instances_dir() {
         let instance_folder = instances_root.join(instance_id);
         if instance_folder.exists() {
-            let _ = fs::remove_dir_all(&instance_folder);
+            // Justification: cleanup of an optional directory tree; absence is the normal case
+            crate::error::record_ignored(
+                fs::remove_dir_all(&instance_folder),
+                "remove directory tree",
+            );
         }
     }
     if !data_dir_to_remove.is_empty() {
         let data_pb = PathBuf::from(&data_dir_to_remove);
         if data_pb.exists() && data_dir_to_remove.contains("instances") {
-            let _ = fs::remove_dir_all(&data_pb);
+            // Justification: cleanup of an optional directory tree; absence is the normal case
+            crate::error::record_ignored(fs::remove_dir_all(&data_pb), "remove directory tree");
         }
     }
     if let Some(custom_exe) = custom_exe_to_remove {
         if custom_exe.contains(&format!("Antigravity-{}", instance_id)) {
-            let _ = fs::remove_file(custom_exe);
+            // Justification: cleanup of an optional file; absence is the normal case
+            crate::error::record_ignored(fs::remove_file(custom_exe), "remove file");
         }
     }
 
@@ -2924,7 +3266,8 @@ pub fn wipe_instance_session(instance_id: &str) -> Result<(), String> {
         .join("state.vscdb");
 
     if state_db.exists() {
-        let _ = fs::remove_file(&state_db);
+        // Justification: cleanup of an optional file; absence is the normal case
+        crate::error::record_ignored(fs::remove_file(&state_db), "remove file");
     }
 
     #[cfg(target_os = "windows")]
@@ -2937,7 +3280,8 @@ pub fn wipe_instance_session(instance_id: &str) -> Result<(), String> {
             .join("globalStorage")
             .join("state.vscdb");
         if appdata_db.exists() {
-            let _ = fs::remove_file(&appdata_db);
+            // Justification: cleanup of an optional file; absence is the normal case
+            crate::error::record_ignored(fs::remove_file(&appdata_db), "remove file");
         }
 
         if let Ok(inst_home) = get_instance_home_dir(instance_id) {
@@ -2949,13 +3293,18 @@ pub fn wipe_instance_session(instance_id: &str) -> Result<(), String> {
                 .join("globalStorage")
                 .join("state.vscdb");
             if home_db.exists() {
-                let _ = fs::remove_file(&home_db);
+                // Justification: cleanup of an optional file; absence is the normal case
+                crate::error::record_ignored(fs::remove_file(&home_db), "remove file");
             }
         }
     }
 
     purge_volatile_instance_sessions(&target_data_path);
-    let _ = update_instance_app_storage(&target_data_path, None, false);
+    // Justification: best-effort storage sync; re-synced on every launch and account switch
+    crate::error::record_ignored(
+        update_instance_app_storage(&target_data_path, None, false),
+        "sync app_storage.json",
+    );
 
     Ok(())
 }
@@ -3048,12 +3397,16 @@ pub fn restore_and_inject_prompts_for_instance(
     instance_id: &str,
     _workspace_roots: &[String],
 ) -> Result<usize, String> {
-    let _ =
-        crate::modules::backup_prompts_db::restore_running_prompts(Some(instance_id), false, None);
+    // Justification: background restore; prompts are re-restored on the next launch
+    crate::error::record_ignored(
+        crate::modules::backup_prompts_db::restore_running_prompts(Some(instance_id), false, None),
+        "restore running prompts",
+    );
     let resent =
         crate::modules::repo_db::resend_running_commands_for_instance(Some(instance_id), 20)
             .unwrap_or_default();
     let dispatched = crate::modules::repo_db::dispatch_running_prompts(instance_id).unwrap_or(0);
+    // Justification: intentionally discards the ensured-goals count; the function is infallible and the scheduler re-verifies on its next tick
     let _ = crate::modules::repo_db::ensure_prompt_goals_running_for_instance(instance_id);
     Ok(resent.len() + dispatched)
 }
@@ -3123,7 +3476,11 @@ pub fn migrate_instance_workspaces(
     ));
 
     for ws_path in &workspaces {
-        let _ = assign_project_to_instance(to_instance_id, ws_path);
+        // Justification: workspace-assignment bookkeeping; re-attempted on the next dispatch
+        crate::error::record_ignored(
+            assign_project_to_instance(to_instance_id, ws_path),
+            "assign project to instance",
+        );
     }
 
     Ok(workspaces)
@@ -3194,7 +3551,11 @@ pub fn assign_project_to_instance(instance_spec: &str, repo_path: &str) -> Resul
             .join("workspaceStorage")
             .join(&ws_id);
         if fs::create_dir_all(&appdata_ws_dir).is_ok() {
-            let _ = fs::write(appdata_ws_dir.join("workspace.json"), &ws_content);
+            // Justification: best-effort file write; the target is regenerated or re-derived on the next relevant operation
+            crate::error::record_ignored(
+                fs::write(appdata_ws_dir.join("workspace.json"), &ws_content),
+                "write file",
+            );
         }
 
         if let Ok(inst_home) = get_instance_home_dir(&inst.id) {
@@ -3206,13 +3567,21 @@ pub fn assign_project_to_instance(instance_spec: &str, repo_path: &str) -> Resul
                 .join("workspaceStorage")
                 .join(&ws_id);
             if fs::create_dir_all(&home_ws_dir).is_ok() {
-                let _ = fs::write(home_ws_dir.join("workspace.json"), &ws_content);
+                // Justification: best-effort file write; the target is regenerated or re-derived on the next relevant operation
+                crate::error::record_ignored(
+                    fs::write(home_ws_dir.join("workspace.json"), &ws_content),
+                    "write file",
+                );
             }
         }
     }
 
     // 2. Register in repo_db running_projects & sequence table
-    let _ = crate::modules::repo_db::detect_running_projects(&inst.id);
+    // Justification: background detection; re-runs on the next refresh tick
+    crate::error::record_ignored(
+        crate::modules::repo_db::detect_running_projects(&inst.id),
+        "detect running projects",
+    );
 
     Ok(format!(
         "✅ Assigned project '{}' ({}) to instance '{}' (#{} {})",
@@ -3389,7 +3758,11 @@ fn check_cached_pid_alive(
                 cache.insert(instance_id.to_string(), entry.clone());
             }
         }
-        let _ = record_instance_pid(canonical_id, promoted_pid, &entry.data_dir);
+        // Justification: PID cache bookkeeping; staleness is tolerated via the OS-level re-detect fallback
+        crate::error::record_ignored(
+            record_instance_pid(canonical_id, promoted_pid, &entry.data_dir),
+            "record instance pid",
+        );
         return Some((true, Some(promoted_pid), surviving_pids));
     }
 
@@ -3448,7 +3821,11 @@ fn cache_live_instance_process(
         }
     }
     if let Some(pid) = primary_pid {
-        let _ = record_instance_pid(canonical_id, pid, data_dir);
+        // Justification: PID cache bookkeeping; staleness is tolerated via the OS-level re-detect fallback
+        crate::error::record_ignored(
+            record_instance_pid(canonical_id, pid, data_dir),
+            "record instance pid",
+        );
     }
     (primary_pid, pids)
 }
@@ -3497,8 +3874,10 @@ fn focus_running_instance(pids: &[u32], workspace_path: Option<&str>) {
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or(clean_ws);
+        // Justification: intentionally discards the focus-success flag; focusing is a best-effort hint and a missed focus is immediately visible to the user
         let _ = crate::modules::process::focus_instance_workspace_window(pids, repo_name);
     } else {
+        // Justification: intentionally discards the focus-success flag; focusing is a best-effort hint and a missed focus is immediately visible to the user
         let _ = crate::modules::process::focus_instance_pids(pids);
     }
 }
@@ -3684,7 +4063,8 @@ fn launch_instance_inner_with_extra_workspaces(
         let has_other_alive = other_pids.iter().any(|&p| is_pid_alive_targeted(p));
         if !has_other_alive {
             // Close only the existing process for THIS target instance if running, allowing OS to unmap locks
-            let _ = close_instance(instance_id);
+            // Justification: best-effort close; close is idempotent and re-attempted on the next action
+            crate::error::record_ignored(close_instance(instance_id), "close instance");
             std::thread::sleep(std::time::Duration::from_millis(300));
         } else {
             crate::modules::logger::log_info(&format!(
@@ -3692,18 +4072,19 @@ fn launch_instance_inner_with_extra_workspaces(
                 instance_id
             ));
         }
-
         // Clean any orphaned lock files in the target instance data directory
         let has_target_dir = target_data_path.exists();
         if has_target_dir {
             let lockfile = target_data_path.join("lockfile");
             if lockfile.exists() {
-                let _ = fs::remove_file(&lockfile);
+                // Justification: cleanup of an optional file; absence is the normal case
+                crate::error::record_ignored(fs::remove_file(&lockfile), "remove file");
             }
             let code_lock = target_data_path.join("code.lock");
             let has_code_lock = code_lock.exists();
             if has_code_lock {
-                let _ = fs::remove_file(&code_lock);
+                // Justification: cleanup of an optional file; absence is the normal case
+                crate::error::record_ignored(fs::remove_file(&code_lock), "remove file");
             }
             if let Ok(entries) = fs::read_dir(&target_data_path) {
                 for entry in entries.flatten() {
@@ -3713,7 +4094,8 @@ fn launch_instance_inner_with_extra_workspaces(
                         || fname.ends_with(".lock")
                         || fname == "code.lock";
                     if is_stale_lock {
-                        let _ = fs::remove_file(entry.path());
+                        // Justification: cleanup of an optional file; absence is the normal case
+                        crate::error::record_ignored(fs::remove_file(entry.path()), "remove file");
                     }
                 }
             }
@@ -3750,47 +4132,83 @@ fn launch_instance_inner_with_extra_workspaces(
 
     if let Some(account) = resolved_account.as_ref() {
         let is_tos = account.token.is_gcp_tos;
-        let _ = update_instance_app_storage(&target_data_path, Some(&account.email), is_tos);
+        // Justification: best-effort storage sync; re-synced on every launch and account switch
+        crate::error::record_ignored(
+            update_instance_app_storage(&target_data_path, Some(&account.email), is_tos),
+            "sync app_storage.json",
+        );
         purge_volatile_instance_sessions(&target_data_path);
 
         // Unconditionally sync credentials to system keyring and credential file so active Antigravity instance reads the bound account
-        let _ = crate::modules::integration::write_to_system_keyring(account);
-        let _ = crate::modules::integration::write_to_file_credentials(account);
+        // Justification: keyring seeding is best-effort; the file-credentials fallback covers failures
+        crate::error::record_ignored(
+            crate::modules::integration::write_to_system_keyring(account),
+            "write system keyring",
+        );
+        // Justification: credential seeding is best-effort; the account flow re-derives credentials on demand
+        crate::error::record_ignored(
+            crate::modules::integration::write_to_file_credentials(account),
+            "write file credentials",
+        );
         if is_default {
-            let _ = crate::modules::account::set_current_account_id(&account.id);
+            // Justification: account-state bookkeeping; in-memory state is already applied and re-persisted on next change
+            crate::error::record_ignored(
+                crate::modules::account::set_current_account_id(&account.id),
+                "set current account id",
+            );
         }
         if let Ok(inst_home) = get_instance_home_dir(instance_id) {
-            let _ = crate::modules::integration::write_to_file_credentials_at(&inst_home, account);
+            // Justification: credential seeding is best-effort; the account flow re-derives credentials on demand
+            crate::error::record_ignored(
+                crate::modules::integration::write_to_file_credentials_at(&inst_home, account),
+                "write file credentials",
+            );
             write_keyring_bypass_markers(&target_data_path, Some(&inst_home));
         } else {
             write_keyring_bypass_markers(&target_data_path, None);
         }
-        let _ =
-            crate::modules::integration::write_to_file_credentials_at(&target_data_path, account);
+        // Justification: credential seeding is best-effort; the account flow re-derives credentials on demand
+        crate::error::record_ignored(
+            crate::modules::integration::write_to_file_credentials_at(&target_data_path, account),
+            "write file credentials",
+        );
 
         let db_dir = target_data_path.join("User").join("globalStorage");
         let has_db_dir = db_dir.exists();
         if !has_db_dir {
-            let _ = fs::create_dir_all(&db_dir);
+            // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+            crate::error::record_ignored(fs::create_dir_all(&db_dir), "create directory");
         }
         let db_path = db_dir.join("state.vscdb");
-        let _ = crate::modules::db::inject_token(
-            &db_path,
-            &account.token.access_token,
-            &account.token.refresh_token,
-            account.token.expiry_timestamp,
-            &account.email,
-            account.token.is_gcp_tos,
-            account.token.project_id.as_deref(),
-            account.token.id_token.as_deref(),
-            account.token.oauth_client_key.as_deref(),
-            None,
+        // Justification: best-effort token injection; auth state is re-injected on the next launch
+        crate::error::record_ignored(
+            crate::modules::db::inject_token(
+                &db_path,
+                &account.token.access_token,
+                &account.token.refresh_token,
+                account.token.expiry_timestamp,
+                &account.email,
+                account.token.is_gcp_tos,
+                account.token.project_id.as_deref(),
+                account.token.id_token.as_deref(),
+                account.token.oauth_client_key.as_deref(),
+                None,
+            ),
+            "inject token into db",
         );
 
         if let Some(ref profile) = account.device_profile {
-            let _ = crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id);
+            // Justification: device-identity bookkeeping; the existing identity persists if this fails
+            crate::error::record_ignored(
+                crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id),
+                "write machine id",
+            );
             let storage_path = db_dir.join("storage.json");
-            let _ = crate::modules::device::write_profile(&storage_path, profile);
+            // Justification: device-profile bookkeeping; the existing profile persists if this fails
+            crate::error::record_ignored(
+                crate::modules::device::write_profile(&storage_path, profile),
+                "write device profile",
+            );
         }
 
         #[cfg(target_os = "windows")]
@@ -3801,40 +4219,13 @@ fn launch_instance_inner_with_extra_workspaces(
                 .join("Antigravity")
                 .join("User")
                 .join("globalStorage");
-            let _ = fs::create_dir_all(&appdata_db_dir);
+            // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+            crate::error::record_ignored(fs::create_dir_all(&appdata_db_dir), "create directory");
             let appdata_db_path = appdata_db_dir.join("state.vscdb");
-            let _ = crate::modules::db::inject_token(
-                &appdata_db_path,
-                &account.token.access_token,
-                &account.token.refresh_token,
-                account.token.expiry_timestamp,
-                &account.email,
-                account.token.is_gcp_tos,
-                account.token.project_id.as_deref(),
-                account.token.id_token.as_deref(),
-                account.token.oauth_client_key.as_deref(),
-                None,
-            );
-            if let Some(ref profile) = account.device_profile {
-                let _ = crate::modules::db::write_service_machine_id(
+            // Justification: best-effort token injection; auth state is re-injected on the next launch
+            crate::error::record_ignored(
+                crate::modules::db::inject_token(
                     &appdata_db_path,
-                    &profile.mac_machine_id,
-                );
-                let storage_path = appdata_db_dir.join("storage.json");
-                let _ = crate::modules::device::write_profile(&storage_path, profile);
-            }
-
-            if let Ok(inst_home) = get_instance_home_dir(instance_id) {
-                let home_appdata_db_dir = inst_home
-                    .join("AppData")
-                    .join("Roaming")
-                    .join("Antigravity")
-                    .join("User")
-                    .join("globalStorage");
-                let _ = fs::create_dir_all(&home_appdata_db_dir);
-                let home_appdata_db_path = home_appdata_db_dir.join("state.vscdb");
-                let _ = crate::modules::db::inject_token(
-                    &home_appdata_db_path,
                     &account.token.access_token,
                     &account.token.refresh_token,
                     account.token.expiry_timestamp,
@@ -3844,14 +4235,70 @@ fn launch_instance_inner_with_extra_workspaces(
                     account.token.id_token.as_deref(),
                     account.token.oauth_client_key.as_deref(),
                     None,
+                ),
+                "inject token into db",
+            );
+            if let Some(ref profile) = account.device_profile {
+                // Justification: device-identity bookkeeping; the existing identity persists if this fails
+                crate::error::record_ignored(
+                    crate::modules::db::write_service_machine_id(
+                        &appdata_db_path,
+                        &profile.mac_machine_id,
+                    ),
+                    "write machine id",
+                );
+                let storage_path = appdata_db_dir.join("storage.json");
+                // Justification: device-profile bookkeeping; the existing profile persists if this fails
+                crate::error::record_ignored(
+                    crate::modules::device::write_profile(&storage_path, profile),
+                    "write device profile",
+                );
+            }
+
+            if let Ok(inst_home) = get_instance_home_dir(instance_id) {
+                let home_appdata_db_dir = inst_home
+                    .join("AppData")
+                    .join("Roaming")
+                    .join("Antigravity")
+                    .join("User")
+                    .join("globalStorage");
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(
+                    fs::create_dir_all(&home_appdata_db_dir),
+                    "create directory",
+                );
+                let home_appdata_db_path = home_appdata_db_dir.join("state.vscdb");
+                // Justification: best-effort token injection; auth state is re-injected on the next launch
+                crate::error::record_ignored(
+                    crate::modules::db::inject_token(
+                        &home_appdata_db_path,
+                        &account.token.access_token,
+                        &account.token.refresh_token,
+                        account.token.expiry_timestamp,
+                        &account.email,
+                        account.token.is_gcp_tos,
+                        account.token.project_id.as_deref(),
+                        account.token.id_token.as_deref(),
+                        account.token.oauth_client_key.as_deref(),
+                        None,
+                    ),
+                    "inject token into db",
                 );
                 if let Some(ref profile) = account.device_profile {
-                    let _ = crate::modules::db::write_service_machine_id(
-                        &home_appdata_db_path,
-                        &profile.mac_machine_id,
+                    // Justification: device-identity bookkeeping; the existing identity persists if this fails
+                    crate::error::record_ignored(
+                        crate::modules::db::write_service_machine_id(
+                            &home_appdata_db_path,
+                            &profile.mac_machine_id,
+                        ),
+                        "write machine id",
                     );
                     let storage_path = home_appdata_db_dir.join("storage.json");
-                    let _ = crate::modules::device::write_profile(&storage_path, profile);
+                    // Justification: device-profile bookkeeping; the existing profile persists if this fails
+                    crate::error::record_ignored(
+                        crate::modules::device::write_profile(&storage_path, profile),
+                        "write device profile",
+                    );
                 }
             }
         }
@@ -3859,15 +4306,27 @@ fn launch_instance_inner_with_extra_workspaces(
         // Wipe stale Local Storage / Session Storage to prevent old cached sessions from persisting
         let local_storage = target_data_path.join("Local Storage");
         if local_storage.exists() {
-            let _ = fs::remove_dir_all(&local_storage);
+            // Justification: cleanup of an optional directory tree; absence is the normal case
+            crate::error::record_ignored(
+                fs::remove_dir_all(&local_storage),
+                "remove directory tree",
+            );
         }
         let session_storage = target_data_path.join("Session Storage");
         if session_storage.exists() {
-            let _ = fs::remove_dir_all(&session_storage);
+            // Justification: cleanup of an optional directory tree; absence is the normal case
+            crate::error::record_ignored(
+                fs::remove_dir_all(&session_storage),
+                "remove directory tree",
+            );
         }
     }
 
-    let _ = inject_instance_settings(&inst_config);
+    // Justification: settings injection is best-effort; the instance still launches with defaults
+    crate::error::record_ignored(
+        inject_instance_settings(&inst_config),
+        "inject instance settings",
+    );
 
     let exe_str = exe_path.to_string_lossy().to_string();
 
@@ -3908,26 +4367,38 @@ fn launch_instance_inner_with_extra_workspaces(
             let home_opt = get_instance_home_dir(instance_id).ok();
             write_keyring_bypass_markers(&target_data_path, home_opt.as_deref());
             if let Some(ref inst_home) = home_opt {
-                let _ = fs::create_dir_all(inst_home);
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(fs::create_dir_all(inst_home), "create directory");
                 let gemini_ide_dir = inst_home.join(".gemini").join("antigravity-ide");
                 let gemini_dir = inst_home.join(".gemini").join("antigravity");
-                let _ = fs::create_dir_all(&gemini_ide_dir);
-                let _ = fs::create_dir_all(&gemini_dir);
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(
+                    fs::create_dir_all(&gemini_ide_dir),
+                    "create directory",
+                );
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(fs::create_dir_all(&gemini_dir), "create directory");
 
                 // Ensure app_storage.json has ide-install-wizard-shown: true and reflects the bound account
                 let is_tos = resolved_account
                     .as_ref()
                     .map(|a| a.token.is_gcp_tos)
                     .unwrap_or(false);
-                let _ =
-                    update_instance_app_storage(&target_data_path, bound_email.as_deref(), is_tos);
+                // Justification: best-effort storage sync; re-synced on every launch and account switch
+                crate::error::record_ignored(
+                    update_instance_app_storage(&target_data_path, bound_email.as_deref(), is_tos),
+                    "sync app_storage.json",
+                );
             } else {
                 let is_tos = resolved_account
                     .as_ref()
                     .map(|a| a.token.is_gcp_tos)
                     .unwrap_or(false);
-                let _ =
-                    update_instance_app_storage(&target_data_path, bound_email.as_deref(), is_tos);
+                // Justification: best-effort storage sync; re-synced on every launch and account switch
+                crate::error::record_ignored(
+                    update_instance_app_storage(&target_data_path, bound_email.as_deref(), is_tos),
+                    "sync app_storage.json",
+                );
             }
             home_opt
         } else {
@@ -3962,7 +4433,11 @@ fn launch_instance_inner_with_extra_workspaces(
                 let mode = permissions.mode();
                 if mode & 0o111 == 0 {
                     permissions.set_mode(mode | 0o755);
-                    let _ = std::fs::set_permissions(&exe_path, permissions);
+                    // Justification: permission hardening; the file stays usable with its existing mode if this fails
+                    crate::error::record_ignored(
+                        std::fs::set_permissions(&exe_path, permissions),
+                        "set file permissions",
+                    );
                 }
             }
             let mut c = Command::new(&exe_str);
@@ -4072,19 +4547,36 @@ fn launch_instance_inner_with_extra_workspaces(
         std::thread::sleep(std::time::Duration::from_millis(500));
         let real_pids = find_pids_for_data_dir(&data_dir, is_default);
         let actual_pid = real_pids.first().copied().unwrap_or(child_pid);
-        let _ = record_instance_pid(instance_id, actual_pid, &data_dir);
+        // Justification: PID cache bookkeeping; staleness is tolerated via the OS-level re-detect fallback
+        crate::error::record_ignored(
+            record_instance_pid(instance_id, actual_pid, &data_dir),
+            "record instance pid",
+        );
         if reinject_prompts {
             wait_for_instance_prompt_channel(instance_id);
-            let _ = crate::modules::backup_prompts_db::restore_running_prompts(
-                Some(instance_id),
-                false,
-                None,
+            // Justification: background restore; prompts are re-restored on the next launch
+            crate::error::record_ignored(
+                crate::modules::backup_prompts_db::restore_running_prompts(
+                    Some(instance_id),
+                    false,
+                    None,
+                ),
+                "restore running prompts",
             );
-            let _ = crate::modules::repo_db::resend_running_commands_for_instance(
-                Some(instance_id),
-                20,
+            // Justification: background resend; the scheduler re-attempts on its next tick
+            crate::error::record_ignored(
+                crate::modules::repo_db::resend_running_commands_for_instance(
+                    Some(instance_id),
+                    20,
+                ),
+                "resend running commands",
             );
-            let _ = crate::modules::repo_db::dispatch_running_prompts(instance_id);
+            // Justification: background dispatch; the scheduler re-attempts on its next tick
+            crate::error::record_ignored(
+                crate::modules::repo_db::dispatch_running_prompts(instance_id),
+                "dispatch running prompts",
+            );
+            // Justification: intentionally discards the ensured-goals count; the function is infallible and the scheduler re-verifies on its next tick
             let _ = crate::modules::repo_db::ensure_prompt_goals_running_for_instance(instance_id);
         }
         crate::modules::repo_db::invalidate_prompt_tree_cache(Some(instance_id));
@@ -4105,19 +4597,28 @@ fn launch_instance_inner_with_extra_workspaces(
             write_keyring_bypass_markers(&target_data_path, inst_home_opt.as_deref());
 
             if let Some(ref inst_home) = inst_home_opt {
-                let _ = fs::create_dir_all(inst_home);
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(fs::create_dir_all(inst_home), "create directory");
                 let gemini_ide_dir = inst_home.join(".gemini").join("antigravity-ide");
                 let gemini_dir = inst_home.join(".gemini").join("antigravity");
-                let _ = fs::create_dir_all(&gemini_ide_dir);
-                let _ = fs::create_dir_all(&gemini_dir);
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(
+                    fs::create_dir_all(&gemini_ide_dir),
+                    "create directory",
+                );
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(fs::create_dir_all(&gemini_dir), "create directory");
 
                 // Ensure app_storage.json has ide-install-wizard-shown: true and reflects the bound account
                 let is_tos = resolved_account
                     .as_ref()
                     .map(|a| a.token.is_gcp_tos)
                     .unwrap_or(false);
-                let _ =
-                    update_instance_app_storage(&target_data_path, bound_email.as_deref(), is_tos);
+                // Justification: best-effort storage sync; re-synced on every launch and account switch
+                crate::error::record_ignored(
+                    update_instance_app_storage(&target_data_path, bound_email.as_deref(), is_tos),
+                    "sync app_storage.json",
+                );
 
                 #[cfg(not(target_os = "windows"))]
                 {
@@ -4167,29 +4668,54 @@ fn launch_instance_inner_with_extra_workspaces(
                 let mode = permissions.mode();
                 if mode & 0o111 == 0 {
                     permissions.set_mode(mode | 0o755);
-                    let _ = std::fs::set_permissions(&exe_path, permissions);
+                    // Justification: permission hardening; the file stays usable with its existing mode if this fails
+                    crate::error::record_ignored(
+                        std::fs::set_permissions(&exe_path, permissions),
+                        "set file permissions",
+                    );
                 }
             }
         }
 
-        let _ = inject_instance_settings(&inst_config);
+        // Justification: settings injection is best-effort; the instance still launches with defaults
+        crate::error::record_ignored(
+            inject_instance_settings(&inst_config),
+            "inject instance settings",
+        );
 
         let child = cmd.spawn().map_err(|e| {
             crate::error::AppError::Process(format!("Failed to spawn instance process: {}", e))
         })?;
-        let _ = record_instance_pid(instance_id, child.id(), &data_dir);
+        // Justification: PID cache bookkeeping; staleness is tolerated via the OS-level re-detect fallback
+        crate::error::record_ignored(
+            record_instance_pid(instance_id, child.id(), &data_dir),
+            "record instance pid",
+        );
         if reinject_prompts {
             wait_for_instance_prompt_channel(instance_id);
-            let _ = crate::modules::backup_prompts_db::restore_running_prompts(
-                Some(instance_id),
-                false,
-                None,
+            // Justification: background restore; prompts are re-restored on the next launch
+            crate::error::record_ignored(
+                crate::modules::backup_prompts_db::restore_running_prompts(
+                    Some(instance_id),
+                    false,
+                    None,
+                ),
+                "restore running prompts",
             );
-            let _ = crate::modules::repo_db::resend_running_commands_for_instance(
-                Some(instance_id),
-                20,
+            // Justification: background resend; the scheduler re-attempts on its next tick
+            crate::error::record_ignored(
+                crate::modules::repo_db::resend_running_commands_for_instance(
+                    Some(instance_id),
+                    20,
+                ),
+                "resend running commands",
             );
-            let _ = crate::modules::repo_db::dispatch_running_prompts(instance_id);
+            // Justification: background dispatch; the scheduler re-attempts on its next tick
+            crate::error::record_ignored(
+                crate::modules::repo_db::dispatch_running_prompts(instance_id),
+                "dispatch running prompts",
+            );
+            // Justification: intentionally discards the ensured-goals count; the function is infallible and the scheduler re-verifies on its next tick
             let _ = crate::modules::repo_db::ensure_prompt_goals_running_for_instance(instance_id);
         }
         crate::modules::repo_db::invalidate_prompt_tree_cache(Some(instance_id));
@@ -4221,7 +4747,8 @@ pub fn import_instances_json(json_str: &str) -> Result<Vec<InstanceConfig>, Stri
         let inst_dir = instances_root.join(&inst.id).join("data");
         let has_dir = inst_dir.exists();
         if !has_dir {
-            let _ = fs::create_dir_all(&inst_dir);
+            // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+            crate::error::record_ignored(fs::create_dir_all(&inst_dir), "create directory");
         }
         inst.data_dir = inst_dir.to_string_lossy().to_string();
 
@@ -4289,8 +4816,13 @@ pub fn clone_instance_executable(instance_id: &str) -> Result<String, crate::err
         if base_str.ends_with(".AppImage") {
             let appimage_target =
                 instance_bin_dir.join(format!("antigravity-{}.AppImage", instance_id));
-            let _ = std::fs::remove_file(&appimage_target);
-            let _ = std::os::unix::fs::symlink(&base_exe, &appimage_target);
+            // Justification: cleanup of an optional file; absence is the normal case
+            crate::error::record_ignored(std::fs::remove_file(&appimage_target), "remove file");
+            // Justification: optional symlink; the direct executable path works without it
+            crate::error::record_ignored(
+                std::os::unix::fs::symlink(&base_exe, &appimage_target),
+                "create symlink",
+            );
             if appimage_target.exists() {
                 appimage_target
             } else {
@@ -4298,14 +4830,22 @@ pub fn clone_instance_executable(instance_id: &str) -> Result<String, crate::err
                 fs::write(&launcher_sh, script_content)
                     .map_err(|e| crate::error::AppError::Io(e))?;
                 use std::os::unix::fs::PermissionsExt;
-                let _ = fs::set_permissions(&launcher_sh, fs::Permissions::from_mode(0o755));
+                // Justification: permission hardening; the file stays usable with its existing mode if this fails
+                crate::error::record_ignored(
+                    fs::set_permissions(&launcher_sh, fs::Permissions::from_mode(0o755)),
+                    "set file permissions",
+                );
                 launcher_sh
             }
         } else {
             let script_content = format!("#!/bin/sh\nexec \"{}\" \"$@\"\n", base_str);
             fs::write(&launcher_sh, script_content).map_err(|e| crate::error::AppError::Io(e))?;
             use std::os::unix::fs::PermissionsExt;
-            let _ = fs::set_permissions(&launcher_sh, fs::Permissions::from_mode(0o755));
+            // Justification: permission hardening; the file stays usable with its existing mode if this fails
+            crate::error::record_ignored(
+                fs::set_permissions(&launcher_sh, fs::Permissions::from_mode(0o755)),
+                "set file permissions",
+            );
             launcher_sh
         }
     };
@@ -4332,7 +4872,11 @@ pub fn clone_instance_executable(instance_id: &str) -> Result<String, crate::err
             crate::error::AppError::Io(e)
         })?;
         use std::os::unix::fs::PermissionsExt;
-        let _ = fs::set_permissions(&launcher_sh, fs::Permissions::from_mode(0o755));
+        // Justification: permission hardening; the file stays usable with its existing mode if this fails
+        crate::error::record_ignored(
+            fs::set_permissions(&launcher_sh, fs::Permissions::from_mode(0o755)),
+            "set file permissions",
+        );
         launcher_sh
     };
 
@@ -4588,6 +5132,7 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
         });
     }
 
+    // Justification: intentionally discards the stopped-worker count; the function is infallible and workers are re-stopped on the next stop pass
     let _ = crate::modules::repo_db::stop_prompt_goal_workers_for_instance(
         instance_id,
         &config.data_dir,
@@ -4631,7 +5176,8 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     });
 
     if pids.is_empty() {
-        let _ = mark_instance_stopped(instance_id);
+        // Justification: registry flag update; live state is re-derived from the OS on next refresh
+        crate::error::record_ignored(mark_instance_stopped(instance_id), "mark instance stopped");
         return Ok(());
     }
 
@@ -4645,17 +5191,25 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     for pid in &pids {
         #[cfg(target_os = "windows")]
         {
-            let _ = Command::new("taskkill")
-                .args(["/F", "/T", "/PID", &pid.to_string()])
-                .creation_flags(0x08000000)
-                .output();
+            // Justification: process termination is best-effort; the liveness check re-verifies
+            crate::error::record_ignored(
+                Command::new("taskkill")
+                    .args(["/F", "/T", "/PID", &pid.to_string()])
+                    .creation_flags(0x08000000)
+                    .output(),
+                "taskkill process tree",
+            );
         }
 
         #[cfg(not(target_os = "windows"))]
         {
-            let _ = Command::new("kill")
-                .args(["-15", &pid.to_string()])
-                .output();
+            // Justification: process termination is best-effort; the liveness check re-verifies
+            crate::error::record_ignored(
+                Command::new("kill")
+                    .args(["-15", &pid.to_string()])
+                    .output(),
+                "kill process",
+            );
         }
     }
 
@@ -4689,7 +5243,11 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
                 ));
                 for pid in &pids {
                     if system.process(sysinfo::Pid::from_u32(*pid)).is_some() {
-                        let _ = Command::new("kill").args(["-9", &pid.to_string()]).output();
+                        // Justification: process termination is best-effort; the liveness check re-verifies
+                        crate::error::record_ignored(
+                            Command::new("kill").args(["-9", &pid.to_string()]).output(),
+                            "kill process",
+                        );
                     }
                 }
                 std::thread::sleep(std::time::Duration::from_millis(300));
@@ -4705,15 +5263,18 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     if target_data_path.exists() {
         let lockfile = target_data_path.join("lockfile");
         if lockfile.exists() {
-            let _ = fs::remove_file(&lockfile);
+            // Justification: cleanup of an optional file; absence is the normal case
+            crate::error::record_ignored(fs::remove_file(&lockfile), "remove file");
         }
         let code_lock = target_data_path.join("code.lock");
         if code_lock.exists() {
-            let _ = fs::remove_file(&code_lock);
+            // Justification: cleanup of an optional file; absence is the normal case
+            crate::error::record_ignored(fs::remove_file(&code_lock), "remove file");
         }
         let dt_port = target_data_path.join("DevToolsActivePort");
         if dt_port.exists() {
-            let _ = fs::remove_file(&dt_port);
+            // Justification: cleanup of an optional file; absence is the normal case
+            crate::error::record_ignored(fs::remove_file(&dt_port), "remove file");
         }
         if let Ok(entries) = fs::read_dir(&target_data_path) {
             for entry in entries.flatten() {
@@ -4723,13 +5284,15 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
                     || fname.ends_with(".lock")
                     || fname == "code.lock";
                 if is_stale_lock {
-                    let _ = fs::remove_file(entry.path());
+                    // Justification: cleanup of an optional file; absence is the normal case
+                    crate::error::record_ignored(fs::remove_file(entry.path()), "remove file");
                 }
             }
         }
     }
 
-    let _ = mark_instance_stopped(instance_id);
+    // Justification: registry flag update; live state is re-derived from the OS on next refresh
+    crate::error::record_ignored(mark_instance_stopped(instance_id), "mark instance stopped");
     invalidate_instance_process_cache(instance_id);
     crate::modules::repo_db::invalidate_prompt_tree_cache(Some(instance_id));
 
@@ -4806,11 +5369,15 @@ pub fn set_active_instance_id(instance_id: &str) -> Result<(), String> {
 
     let now = chrono::Utc::now().timestamp();
     if let Ok(conn) = open_instance_db() {
-        let _ = conn.execute(
-            "INSERT INTO active_instance_selection (id, instance_id, updated_at)
-             VALUES (1, ?1, ?2)
-             ON CONFLICT(id) DO UPDATE SET instance_id = excluded.instance_id, updated_at = excluded.updated_at",
-            rusqlite::params![instance_id, now],
+        // Justification: non-critical sqlite bookkeeping write; read paths tolerate stale data
+        crate::error::record_ignored(
+            conn.execute(
+                "INSERT INTO active_instance_selection (id, instance_id, updated_at)
+                 VALUES (1, ?1, ?2)
+                 ON CONFLICT(id) DO UPDATE SET instance_id = excluded.instance_id, updated_at = excluded.updated_at",
+                rusqlite::params![instance_id, now],
+            ),
+            "run sqlite statement",
         );
     }
     Ok(())
@@ -5122,11 +5689,15 @@ pub async fn switch_account_to_instance(
     // Ensure account has a bound device fingerprint profile for isolation
     if account.device_profile.is_none() {
         let new_profile = crate::modules::device::generate_profile();
-        let _ = crate::modules::account::apply_profile_to_account(
-            &mut account,
-            new_profile,
-            Some("auto_generated".to_string()),
-            true,
+        // Justification: account bookkeeping; re-applied on the next account touch
+        crate::error::record_ignored(
+            crate::modules::account::apply_profile_to_account(
+                &mut account,
+                new_profile,
+                Some("auto_generated".to_string()),
+                true,
+            ),
+            "apply profile to account",
         );
     }
 
@@ -5143,31 +5714,55 @@ pub async fn switch_account_to_instance(
         let target_data_path = PathBuf::from(&instance.data_dir);
         let is_tos = acc.token.is_gcp_tos;
 
-        let _ = update_instance_app_storage(&target_data_path, Some(&acc.email), is_tos);
+        // Justification: best-effort storage sync; re-synced on every launch and account switch
+        crate::error::record_ignored(
+            update_instance_app_storage(&target_data_path, Some(&acc.email), is_tos),
+            "sync app_storage.json",
+        );
         purge_volatile_instance_sessions(&target_data_path);
 
         let inst_home_opt = get_instance_home_dir(&instance.id).ok();
         if let Some(ref inst_home) = inst_home_opt {
-            let _ = crate::modules::integration::write_to_file_credentials_at(inst_home, acc);
+            // Justification: credential seeding is best-effort; the account flow re-derives credentials on demand
+            crate::error::record_ignored(
+                crate::modules::integration::write_to_file_credentials_at(inst_home, acc),
+                "write file credentials",
+            );
             #[cfg(target_os = "windows")]
             {
                 let roaming = inst_home.join("AppData").join("Roaming");
                 let local = inst_home.join("AppData").join("Local");
-                let _ = fs::create_dir_all(&roaming);
-                let _ = fs::create_dir_all(&local);
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(fs::create_dir_all(&roaming), "create directory");
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(fs::create_dir_all(&local), "create directory");
             }
             let gemini_ide_dir = inst_home.join(".gemini").join("antigravity-ide");
             let gemini_dir = inst_home.join(".gemini").join("antigravity");
-            let _ = fs::create_dir_all(&gemini_ide_dir);
-            let _ = fs::create_dir_all(&gemini_dir);
+            // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+            crate::error::record_ignored(fs::create_dir_all(&gemini_ide_dir), "create directory");
+            // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+            crate::error::record_ignored(fs::create_dir_all(&gemini_dir), "create directory");
             write_keyring_bypass_markers(&target_data_path, Some(inst_home));
         } else {
             write_keyring_bypass_markers(&target_data_path, None);
         }
-        let _ = crate::modules::integration::write_to_file_credentials_at(&target_data_path, acc);
+        // Justification: credential seeding is best-effort; the account flow re-derives credentials on demand
+        crate::error::record_ignored(
+            crate::modules::integration::write_to_file_credentials_at(&target_data_path, acc),
+            "write file credentials",
+        );
         if is_default_inst {
-            let _ = crate::modules::integration::write_to_system_keyring(acc);
-            let _ = crate::modules::integration::write_to_file_credentials(acc);
+            // Justification: keyring seeding is best-effort; the file-credentials fallback covers failures
+            crate::error::record_ignored(
+                crate::modules::integration::write_to_system_keyring(acc),
+                "write system keyring",
+            );
+            // Justification: credential seeding is best-effort; the account flow re-derives credentials on demand
+            crate::error::record_ignored(
+                crate::modules::integration::write_to_file_credentials(acc),
+                "write file credentials",
+            );
         }
 
         crate::modules::db::inject_token(
@@ -5184,12 +5779,20 @@ pub async fn switch_account_to_instance(
         )?;
 
         if let Some(ref profile) = acc.device_profile {
-            let _ = crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id);
+            // Justification: device-identity bookkeeping; the existing identity persists if this fails
+            crate::error::record_ignored(
+                crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id),
+                "write machine id",
+            );
         }
 
         let instance_storage_path = db_dir.join("storage.json");
         if let Some(ref profile) = acc.device_profile {
-            let _ = crate::modules::device::write_profile(&instance_storage_path, profile);
+            // Justification: device-profile bookkeeping; the existing profile persists if this fails
+            crate::error::record_ignored(
+                crate::modules::device::write_profile(&instance_storage_path, profile),
+                "write device profile",
+            );
         }
 
         #[cfg(target_os = "windows")]
@@ -5200,40 +5803,13 @@ pub async fn switch_account_to_instance(
                 .join("Antigravity")
                 .join("User")
                 .join("globalStorage");
-            let _ = fs::create_dir_all(&appdata_db_dir);
+            // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+            crate::error::record_ignored(fs::create_dir_all(&appdata_db_dir), "create directory");
             let appdata_db_path = appdata_db_dir.join("state.vscdb");
-            let _ = crate::modules::db::inject_token(
-                &appdata_db_path,
-                &acc.token.access_token,
-                &acc.token.refresh_token,
-                acc.token.expiry_timestamp,
-                &acc.email,
-                acc.token.is_gcp_tos,
-                acc.token.project_id.as_deref(),
-                acc.token.id_token.as_deref(),
-                acc.token.oauth_client_key.as_deref(),
-                None,
-            );
-            if let Some(ref profile) = acc.device_profile {
-                let _ = crate::modules::db::write_service_machine_id(
+            // Justification: best-effort token injection; auth state is re-injected on the next launch
+            crate::error::record_ignored(
+                crate::modules::db::inject_token(
                     &appdata_db_path,
-                    &profile.mac_machine_id,
-                );
-                let storage_path = appdata_db_dir.join("storage.json");
-                let _ = crate::modules::device::write_profile(&storage_path, profile);
-            }
-
-            if let Some(ref inst_home) = inst_home_opt {
-                let home_appdata_db_dir = inst_home
-                    .join("AppData")
-                    .join("Roaming")
-                    .join("Antigravity")
-                    .join("User")
-                    .join("globalStorage");
-                let _ = fs::create_dir_all(&home_appdata_db_dir);
-                let home_appdata_db_path = home_appdata_db_dir.join("state.vscdb");
-                let _ = crate::modules::db::inject_token(
-                    &home_appdata_db_path,
                     &acc.token.access_token,
                     &acc.token.refresh_token,
                     acc.token.expiry_timestamp,
@@ -5243,14 +5819,70 @@ pub async fn switch_account_to_instance(
                     acc.token.id_token.as_deref(),
                     acc.token.oauth_client_key.as_deref(),
                     None,
+                ),
+                "inject token into db",
+            );
+            if let Some(ref profile) = acc.device_profile {
+                // Justification: device-identity bookkeeping; the existing identity persists if this fails
+                crate::error::record_ignored(
+                    crate::modules::db::write_service_machine_id(
+                        &appdata_db_path,
+                        &profile.mac_machine_id,
+                    ),
+                    "write machine id",
+                );
+                let storage_path = appdata_db_dir.join("storage.json");
+                // Justification: device-profile bookkeeping; the existing profile persists if this fails
+                crate::error::record_ignored(
+                    crate::modules::device::write_profile(&storage_path, profile),
+                    "write device profile",
+                );
+            }
+
+            if let Some(ref inst_home) = inst_home_opt {
+                let home_appdata_db_dir = inst_home
+                    .join("AppData")
+                    .join("Roaming")
+                    .join("Antigravity")
+                    .join("User")
+                    .join("globalStorage");
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(
+                    fs::create_dir_all(&home_appdata_db_dir),
+                    "create directory",
+                );
+                let home_appdata_db_path = home_appdata_db_dir.join("state.vscdb");
+                // Justification: best-effort token injection; auth state is re-injected on the next launch
+                crate::error::record_ignored(
+                    crate::modules::db::inject_token(
+                        &home_appdata_db_path,
+                        &acc.token.access_token,
+                        &acc.token.refresh_token,
+                        acc.token.expiry_timestamp,
+                        &acc.email,
+                        acc.token.is_gcp_tos,
+                        acc.token.project_id.as_deref(),
+                        acc.token.id_token.as_deref(),
+                        acc.token.oauth_client_key.as_deref(),
+                        None,
+                    ),
+                    "inject token into db",
                 );
                 if let Some(ref profile) = acc.device_profile {
-                    let _ = crate::modules::db::write_service_machine_id(
-                        &home_appdata_db_path,
-                        &profile.mac_machine_id,
+                    // Justification: device-identity bookkeeping; the existing identity persists if this fails
+                    crate::error::record_ignored(
+                        crate::modules::db::write_service_machine_id(
+                            &home_appdata_db_path,
+                            &profile.mac_machine_id,
+                        ),
+                        "write machine id",
                     );
                     let home_storage_path = home_appdata_db_dir.join("storage.json");
-                    let _ = crate::modules::device::write_profile(&home_storage_path, profile);
+                    // Justification: device-profile bookkeeping; the existing profile persists if this fails
+                    crate::error::record_ignored(
+                        crate::modules::device::write_profile(&home_storage_path, profile),
+                        "write device profile",
+                    );
                 }
             }
         }
@@ -5258,11 +5890,19 @@ pub async fn switch_account_to_instance(
         // Clean any stale Session Storage / Local Storage in the instance data directory
         let local_storage = PathBuf::from(&instance.data_dir).join("Local Storage");
         if local_storage.exists() {
-            let _ = fs::remove_dir_all(&local_storage);
+            // Justification: cleanup of an optional directory tree; absence is the normal case
+            crate::error::record_ignored(
+                fs::remove_dir_all(&local_storage),
+                "remove directory tree",
+            );
         }
         let session_storage = PathBuf::from(&instance.data_dir).join("Session Storage");
         if session_storage.exists() {
-            let _ = fs::remove_dir_all(&session_storage);
+            // Justification: cleanup of an optional directory tree; absence is the normal case
+            crate::error::record_ignored(
+                fs::remove_dir_all(&session_storage),
+                "remove directory tree",
+            );
         }
 
         // Only sync profile & token to global IDE storage when switching the default instance!
@@ -5270,29 +5910,41 @@ pub async fn switch_account_to_instance(
             for target_hint in [None, Some("ide")] {
                 if let Ok(storage_path) = crate::modules::device::get_storage_path(target_hint) {
                     if let Some(ref profile) = acc.device_profile {
-                        let _ = crate::modules::device::write_profile(&storage_path, profile);
+                        // Justification: device-profile bookkeeping; the existing profile persists if this fails
+                        crate::error::record_ignored(
+                            crate::modules::device::write_profile(&storage_path, profile),
+                            "write device profile",
+                        );
                     }
                 }
                 if let Ok(global_db_path) = crate::modules::db::get_db_path(target_hint) {
                     if global_db_path != db_path
                         && global_db_path.parent().map(|p| p.exists()).unwrap_or(false)
                     {
-                        let _ = crate::modules::db::inject_token(
-                            &global_db_path,
-                            &acc.token.access_token,
-                            &acc.token.refresh_token,
-                            acc.token.expiry_timestamp,
-                            &acc.email,
-                            acc.token.is_gcp_tos,
-                            acc.token.project_id.as_deref(),
-                            acc.token.id_token.as_deref(),
-                            acc.token.oauth_client_key.as_deref(),
-                            target_hint,
+                        // Justification: best-effort token injection; auth state is re-injected on the next launch
+                        crate::error::record_ignored(
+                            crate::modules::db::inject_token(
+                                &global_db_path,
+                                &acc.token.access_token,
+                                &acc.token.refresh_token,
+                                acc.token.expiry_timestamp,
+                                &acc.email,
+                                acc.token.is_gcp_tos,
+                                acc.token.project_id.as_deref(),
+                                acc.token.id_token.as_deref(),
+                                acc.token.oauth_client_key.as_deref(),
+                                target_hint,
+                            ),
+                            "inject token into db",
                         );
                         if let Some(ref profile) = acc.device_profile {
-                            let _ = crate::modules::db::write_service_machine_id(
-                                &global_db_path,
-                                &profile.mac_machine_id,
+                            // Justification: device-identity bookkeeping; the existing identity persists if this fails
+                            crate::error::record_ignored(
+                                crate::modules::db::write_service_machine_id(
+                                    &global_db_path,
+                                    &profile.mac_machine_id,
+                                ),
+                                "write machine id",
                             );
                         }
                     }
@@ -5334,8 +5986,11 @@ pub async fn switch_account_to_instance(
     // 1.5. [Step 1/5] Snapshot and re-enqueue running prompts scoped to THIS target instance BEFORE closing IDE
     let backed_up_count =
         crate::modules::repo_db::backup_running_prompts(&instance.id).unwrap_or(0);
-    let _ =
-        crate::modules::backup_prompts_db::backup_active_running_prompts(Some(&instance.id), None);
+    // Justification: opportunistic prompt backup; re-attempted on the next switch
+    crate::error::record_ignored(
+        crate::modules::backup_prompts_db::backup_active_running_prompts(Some(&instance.id), None),
+        "back up active prompts",
+    );
 
     let workspace_paths = get_instance_workspace_folders(&instance.id, &instance.data_dir);
     crate::modules::logger::log_info(&format!(
@@ -5374,7 +6029,8 @@ pub async fn switch_account_to_instance(
         instance.id,
         pids_to_kill
     ));
-    let _ = close_instance(&instance.id);
+    // Justification: best-effort close; close is idempotent and re-attempted on the next action
+    crate::error::record_ignored(close_instance(&instance.id), "close instance");
     std::thread::sleep(std::time::Duration::from_millis(300));
 
     // 3. [Step 3/5] Inject credentials into target instance's state.vscdb & storage.json (and OS keyring) AFTER process exit
@@ -5397,14 +6053,26 @@ pub async fn switch_account_to_instance(
     if registry_after.active_instance_id.is_empty()
         || registry_after.active_instance_id == instance.id
     {
-        let _ = set_active_instance_id(&instance.id);
+        // Justification: instance-state bookkeeping; in-memory state is already applied and re-persisted on next change
+        crate::error::record_ignored(
+            set_active_instance_id(&instance.id),
+            "set active instance id",
+        );
     }
     if is_default_inst {
-        let _ = crate::modules::account::set_current_account_id(&account.id);
+        // Justification: account-state bookkeeping; in-memory state is already applied and re-persisted on next change
+        crate::error::record_ignored(
+            crate::modules::account::set_current_account_id(&account.id),
+            "set current account id",
+        );
     }
 
     account.update_last_used();
-    let _ = crate::modules::account::save_account(&account);
+    // Justification: account persistence is write-through; re-persisted on the next account change
+    crate::error::record_ignored(
+        crate::modules::account::save_account(&account),
+        "save account",
+    );
 
     // Acquire distributed lease in Supabase Root DB for this instance profile
     let lease_acc_id = account.id.clone();
@@ -5412,14 +6080,22 @@ pub async fn switch_account_to_instance(
     let lease_inst_name = instance.name.clone();
     let ttl_secs = lease_ttl_secs;
     tauri::async_runtime::spawn(async move {
-        let _ = crate::modules::workspace_lease_manager::acquire_lease_with_details(
-            &lease_acc_id,
-            &lease_acc_email,
-            &lease_inst_name,
-            ttl_secs,
-        )
-        .await;
-        let _ = crate::modules::supabase_sync::sync_local_node_now().await;
+        // Justification: lease bookkeeping; lease state is re-validated on the next acquisition
+        crate::error::record_ignored(
+            crate::modules::workspace_lease_manager::acquire_lease_with_details(
+                &lease_acc_id,
+                &lease_acc_email,
+                &lease_inst_name,
+                ttl_secs,
+            )
+            .await,
+            "acquire workspace lease",
+        );
+        // Justification: opportunistic cloud sync; the next scheduled sync retries
+        crate::error::record_ignored(
+            crate::modules::supabase_sync::sync_local_node_now().await,
+            "sync local node",
+        );
     });
 
     // 5. [Step 4/5] Relaunch Antigravity preserving exact executable path and bound workspace folders
@@ -5462,16 +6138,28 @@ pub async fn switch_account_to_instance(
         ));
         let workspace_roots =
             crate::modules::instance::get_instance_workspace_paths(&target_inst_id);
-        let _ = crate::modules::instance::restore_and_inject_prompts_for_instance(
-            &target_inst_id,
-            &workspace_roots,
+        // Justification: background restore; prompts are re-restored on the next launch
+        crate::error::record_ignored(
+            crate::modules::instance::restore_and_inject_prompts_for_instance(
+                &target_inst_id,
+                &workspace_roots,
+            ),
+            "restore and inject prompts",
         );
-        let _ = crate::modules::backup_prompts_db::restore_running_prompts_for_instance(
-            Some(&target_inst_id),
-            false,
-            None,
+        // Justification: background restore; prompts are re-restored on the next launch
+        crate::error::record_ignored(
+            crate::modules::backup_prompts_db::restore_running_prompts_for_instance(
+                Some(&target_inst_id),
+                false,
+                None,
+            ),
+            "restore running prompts",
         );
-        let _ = crate::modules::repo_db::dispatch_running_prompts(&target_inst_id);
+        // Justification: background dispatch; the scheduler re-attempts on its next tick
+        crate::error::record_ignored(
+            crate::modules::repo_db::dispatch_running_prompts(&target_inst_id),
+            "dispatch running prompts",
+        );
     });
 
     let restore_step = crate::modules::task_history_db::SwitchRestoreStep {
@@ -5538,6 +6226,7 @@ pub async fn switch_account_to_instance(
         let unique_projs = crate::modules::notification_hub::deduplicate_names(
             running_projs.into_iter().map(|p| p.repo_name),
         );
+        // Justification: intentionally discards the notification id String; the function is infallible and a missed toast does not affect state
         let _ = crate::modules::notification_hub::notify_account_switched_details(
             crate::modules::notification_hub::SwitchNotificationDetails {
                 previous_email: followup_prev,
@@ -5625,7 +6314,11 @@ pub async fn sync_instance_pid_and_quota_logic(
 
     if let Some(pid) = live_pid {
         registry.instances[idx].pid = Some(pid);
-        let _ = record_instance_pid(&registry.instances[idx].id, pid, &data_dir);
+        // Justification: PID cache bookkeeping; staleness is tolerated via the OS-level re-detect fallback
+        crate::error::record_ignored(
+            record_instance_pid(&registry.instances[idx].id, pid, &data_dir),
+            "record instance pid",
+        );
     } else if !is_running {
         registry.instances[idx].pid = None;
     }
@@ -5689,7 +6382,11 @@ pub async fn sync_instance_pid_and_quota_logic(
         if let Ok(mut acc) = crate::modules::account::load_account(acc_id) {
             match crate::modules::account::fetch_quota_with_retry(&mut acc).await {
                 Ok(fresh_quota) => {
-                    let _ = crate::modules::account::update_account_quota(acc_id, fresh_quota);
+                    // Justification: quota bookkeeping; re-fetched on the next quota sync
+                    crate::error::record_ignored(
+                        crate::modules::account::update_account_quota(acc_id, fresh_quota),
+                        "update account quota",
+                    );
                 }
                 Err(err) => {
                     crate::modules::logger::log_warn(&format!(
@@ -5707,8 +6404,16 @@ pub async fn sync_instance_pid_and_quota_logic(
     // 6. Emit UI refresh events
     if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
         use tauri::Emitter;
-        let _ = handle.emit("instances://refreshed", ());
-        let _ = handle.emit("accounts://refreshed", ());
+        // Justification: frontend refresh hint; the UI re-polls state on its own cadence
+        crate::error::record_ignored(
+            handle.emit("instances://refreshed", ()),
+            "emit frontend event",
+        );
+        // Justification: frontend refresh hint; the UI re-polls state on its own cadence
+        crate::error::record_ignored(
+            handle.emit("accounts://refreshed", ()),
+            "emit frontend event",
+        );
     }
 
     // 7. Calculate memory usage
@@ -5759,8 +6464,16 @@ pub async fn sync_all_instances_and_quotas_logic() -> Result<Vec<InstanceStatus>
 
     if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
         use tauri::Emitter;
-        let _ = handle.emit("instances://refreshed", ());
-        let _ = handle.emit("accounts://refreshed", ());
+        // Justification: frontend refresh hint; the UI re-polls state on its own cadence
+        crate::error::record_ignored(
+            handle.emit("instances://refreshed", ()),
+            "emit frontend event",
+        );
+        // Justification: frontend refresh hint; the UI re-polls state on its own cadence
+        crate::error::record_ignored(
+            handle.emit("accounts://refreshed", ()),
+            "emit frontend event",
+        );
     }
 
     Ok(statuses)
@@ -5914,7 +6627,8 @@ pub fn inject_instance_settings(inst: &InstanceConfig) -> Result<(), String> {
 
     for target in targets {
         if let Some(parent) = target.parent() {
-            let _ = fs::create_dir_all(parent);
+            // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+            crate::error::record_ignored(fs::create_dir_all(parent), "create directory");
         }
 
         let mut settings_map: serde_json::Map<String, serde_json::Value> = if target.exists() {
@@ -5937,7 +6651,8 @@ pub fn inject_instance_settings(inst: &InstanceConfig) -> Result<(), String> {
                 serde_json::Value::String(title.clone()),
             );
             if let Ok(pretty) = serde_json::to_string_pretty(&settings_map) {
-                let _ = fs::write(&target, pretty);
+                // Justification: best-effort file write; the target is regenerated or re-derived on the next relevant operation
+                crate::error::record_ignored(fs::write(&target, pretty), "write file");
             }
         }
     }
@@ -6049,7 +6764,8 @@ pub fn merge_storage_json_recent_paths(from_inst: &InstanceConfig, to_inst: &Ins
 
             for dst_storage in dst_storage_targets {
                 if let Some(parent) = dst_storage.parent() {
-                    let _ = fs::create_dir_all(parent);
+                    // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                    crate::error::record_ignored(fs::create_dir_all(parent), "create directory");
                 }
                 let mut dst_map: serde_json::Map<String, serde_json::Value> =
                     if dst_storage.exists() {
@@ -6078,7 +6794,8 @@ pub fn merge_storage_json_recent_paths(from_inst: &InstanceConfig, to_inst: &Ins
                 if let Ok(pretty) =
                     serde_json::to_string_pretty(&serde_json::Value::Object(dst_map))
                 {
-                    let _ = fs::write(dst_storage, pretty);
+                    // Justification: best-effort file write; the target is regenerated or re-derived on the next relevant operation
+                    crate::error::record_ignored(fs::write(dst_storage, pretty), "write file");
                 }
             }
         }
@@ -6152,7 +6869,11 @@ pub fn merge_state_vscdb_recent_paths(from_inst: &InstanceConfig, to_inst: &Inst
         });
 
         if let Ok(conn_src) = conn_src_res {
-            let _ = conn_src.pragma_update(None, "busy_timeout", 2500);
+            // Justification: pragma is performance/concurrency tuning; the connection stays usable without it
+            crate::error::record_ignored(
+                conn_src.pragma_update(None, "busy_timeout", 2500),
+                "set sqlite pragma",
+            );
             let mut stmt = match conn_src.prepare(
                 "SELECT key, value FROM ItemTable \
                  WHERE key LIKE '%recentlyOpened%' \
@@ -6208,18 +6929,31 @@ pub fn merge_state_vscdb_recent_paths(from_inst: &InstanceConfig, to_inst: &Inst
 
             for dst_db in dst_vscdb_targets {
                 if let Some(parent) = dst_db.parent() {
-                    let _ = fs::create_dir_all(parent);
+                    // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                    crate::error::record_ignored(fs::create_dir_all(parent), "create directory");
                 }
                 if let Ok(conn_dst) = rusqlite::Connection::open(&dst_db) {
-                    let _ = conn_dst.pragma_update(None, "busy_timeout", 2500);
-                    let _ = conn_dst.execute(
-                        "CREATE TABLE IF NOT EXISTS ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)",
-                        [],
+                    // Justification: pragma is performance/concurrency tuning; the connection stays usable without it
+                    crate::error::record_ignored(
+                        conn_dst.pragma_update(None, "busy_timeout", 2500),
+                        "set sqlite pragma",
+                    );
+                    // Justification: non-critical sqlite bookkeeping write; read paths tolerate stale data
+                    crate::error::record_ignored(
+                        conn_dst.execute(
+                            "CREATE TABLE IF NOT EXISTS ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)",
+                            [],
+                        ),
+                        "run sqlite statement",
                     );
                     for (k, v) in &rows {
-                        let _ = conn_dst.execute(
-                            "INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?1, ?2)",
-                            rusqlite::params![k, v],
+                        // Justification: non-critical sqlite bookkeeping write; read paths tolerate stale data
+                        crate::error::record_ignored(
+                            conn_dst.execute(
+                                "INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?1, ?2)",
+                                rusqlite::params![k, v],
+                            ),
+                            "run sqlite statement",
                         );
                     }
                 }
@@ -6286,7 +7020,8 @@ pub fn purge_recent_project_paths(inst: &InstanceConfig) {
                         map.remove("openedPathsList");
                         map.remove("backupWorkspaces");
                         if let Ok(pretty) = serde_json::to_string_pretty(&val) {
-                            let _ = fs::write(&st, pretty);
+                            // Justification: best-effort file write; the target is regenerated or re-derived on the next relevant operation
+                            crate::error::record_ignored(fs::write(&st, pretty), "write file");
                         }
                     }
                 }
@@ -6297,9 +7032,13 @@ pub fn purge_recent_project_paths(inst: &InstanceConfig) {
     for vt in vscdb_targets {
         if vt.exists() {
             if let Ok(conn) = rusqlite::Connection::open(&vt) {
-                let _ = conn.execute(
-                    "DELETE FROM ItemTable WHERE key LIKE '%recentlyOpened%' OR key LIKE '%history.%' OR key LIKE '%openedPaths%'",
-                    [],
+                // Justification: non-critical sqlite bookkeeping write; read paths tolerate stale data
+                crate::error::record_ignored(
+                    conn.execute(
+                        "DELETE FROM ItemTable WHERE key LIKE '%recentlyOpened%' OR key LIKE '%history.%' OR key LIKE '%openedPaths%'",
+                        [],
+                    ),
+                    "run sqlite statement",
                 );
             }
         }
@@ -6402,7 +7141,8 @@ pub fn copy_instance_projects(from_id: &str, to_id: &str) -> Result<usize, Strin
     }
 
     for d in &dst_ws_dirs {
-        let _ = fs::create_dir_all(d);
+        // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+        crate::error::record_ignored(fs::create_dir_all(d), "create directory");
     }
 
     let mut copied_count = 0usize;
@@ -6435,7 +7175,11 @@ pub fn copy_instance_projects(from_id: &str, to_id: &str) -> Result<usize, Strin
     }
 
     // 3. Clone repo rows in repo_db
-    let _ = crate::modules::repo_db::detect_running_projects(&from_inst.id);
+    // Justification: background detection; re-runs on the next refresh tick
+    crate::error::record_ignored(
+        crate::modules::repo_db::detect_running_projects(&from_inst.id),
+        "detect running projects",
+    );
     if let Ok(rows) = crate::modules::repo_db::clone_instance_repo_rows(&from_inst.id, &to_inst.id)
     {
         if copied_count == 0 && rows > 0 {
@@ -6449,7 +7193,11 @@ pub fn copy_instance_projects(from_id: &str, to_id: &str) -> Result<usize, Strin
     // 5. Merge recent paths from state.vscdb
     merge_state_vscdb_recent_paths(&from_inst, &to_inst);
 
-    let _ = sanitize_cloned_instance_summaries(&to_inst.id);
+    // Justification: post-clone hygiene; stale summaries are regenerated on demand
+    crate::error::record_ignored(
+        sanitize_cloned_instance_summaries(&to_inst.id),
+        "sanitize cloned summaries",
+    );
 
     crate::modules::logger::log_info(&format!(
         "[Instance] Copied {} workspace projects from '{}' to '{}'",
@@ -6601,7 +7349,11 @@ pub fn copy_instance_settings(from_id: &str, to_id: &str) -> Result<(), String> 
                 let dst_settings_paths = get_instance_settings_targets(&to_inst);
                 for dst_path in dst_settings_paths {
                     if let Some(parent) = dst_path.parent() {
-                        let _ = fs::create_dir_all(parent);
+                        // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                        crate::error::record_ignored(
+                            fs::create_dir_all(parent),
+                            "create directory",
+                        );
                     }
                     let mut target_json: serde_json::Value = if dst_path.exists() {
                         fs::read_to_string(&dst_path)
@@ -6640,7 +7392,8 @@ pub fn copy_instance_settings(from_id: &str, to_id: &str) -> Result<(), String> 
                     }
 
                     if let Ok(pretty) = serde_json::to_string_pretty(&target_json) {
-                        let _ = fs::write(&dst_path, pretty);
+                        // Justification: best-effort file write; the target is regenerated or re-derived on the next relevant operation
+                        crate::error::record_ignored(fs::write(&dst_path, pretty), "write file");
                     }
                 }
             }
@@ -6691,8 +7444,13 @@ pub fn copy_instance_settings(from_id: &str, to_id: &str) -> Result<(), String> 
 
         if let Some(found_src) = candidate_src {
             for dst_dir in &dst_user_dirs {
-                let _ = fs::create_dir_all(dst_dir);
-                let _ = fs::copy(&found_src, dst_dir.join(file_name));
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(fs::create_dir_all(dst_dir), "create directory");
+                // Justification: best-effort file copy; downstream code regenerates or tolerates the missing copy
+                crate::error::record_ignored(
+                    fs::copy(&found_src, dst_dir.join(file_name)),
+                    "copy file",
+                );
             }
             crate::modules::logger::log_info(&format!(
                 "[Instance] Copied {} from {} to {} destination directories",
@@ -6709,14 +7467,22 @@ pub fn copy_instance_settings(from_id: &str, to_id: &str) -> Result<(), String> 
         if src_snippets.is_dir() {
             for dst_dir in &dst_user_dirs {
                 let dst_snippets = dst_dir.join("snippets");
-                let _ = copy_dir_recursive(&src_snippets, &dst_snippets);
+                // Justification: best-effort tree copy; parity sync completes it on launch
+                crate::error::record_ignored(
+                    copy_dir_recursive(&src_snippets, &dst_snippets),
+                    "copy directory tree",
+                );
             }
             break;
         }
     }
 
     // 6. Ensure target window title is freshly injected
-    let _ = inject_instance_settings(&to_inst);
+    // Justification: settings injection is best-effort; the instance still launches with defaults
+    crate::error::record_ignored(
+        inject_instance_settings(&to_inst),
+        "inject instance settings",
+    );
 
     crate::modules::logger::log_info(&format!(
         "[Instance] Successfully synchronized full settings, keybindings, presets, and snippets from '{}' to '{}'",
@@ -6802,7 +7568,8 @@ pub fn enforce_default_settings(target_instance: Option<&str>) -> Result<usize, 
         let paths = get_instance_settings_targets(inst);
         for path in paths {
             if let Some(parent) = path.parent() {
-                let _ = fs::create_dir_all(parent);
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(fs::create_dir_all(parent), "create directory");
             }
             let mut current: serde_json::Value = if path.exists() {
                 fs::read_to_string(&path)
@@ -6820,7 +7587,8 @@ pub fn enforce_default_settings(target_instance: Option<&str>) -> Result<usize, 
             deep_merge_json(&mut current, &baseline_val);
 
             if let Ok(pretty) = serde_json::to_string_pretty(&current) {
-                let _ = fs::write(&path, pretty);
+                // Justification: best-effort file write; the target is regenerated or re-derived on the next relevant operation
+                crate::error::record_ignored(fs::write(&path, pretty), "write file");
             }
         }
         updated_count += 1;
@@ -6855,7 +7623,8 @@ pub fn set_instance_turbo_mode(
         let paths = get_instance_settings_targets(inst);
         for path in paths {
             if let Some(parent) = path.parent() {
-                let _ = fs::create_dir_all(parent);
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(fs::create_dir_all(parent), "create directory");
             }
             let mut json_val: serde_json::Value = if path.exists() {
                 fs::read_to_string(&path)
@@ -6874,7 +7643,8 @@ pub fn set_instance_turbo_mode(
                     serde_json::Value::Bool(enabled),
                 );
                 if let Ok(pretty) = serde_json::to_string_pretty(&json_val) {
-                    let _ = fs::write(&path, pretty);
+                    // Justification: best-effort file write; the target is regenerated or re-derived on the next relevant operation
+                    crate::error::record_ignored(fs::write(&path, pretty), "write file");
                 }
             }
         }
@@ -6905,7 +7675,8 @@ pub fn set_instance_plan_review(
         let paths = get_instance_settings_targets(inst);
         for path in paths {
             if let Some(parent) = path.parent() {
-                let _ = fs::create_dir_all(parent);
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(fs::create_dir_all(parent), "create directory");
             }
             let mut json_val: serde_json::Value = if path.exists() {
                 fs::read_to_string(&path)
@@ -6924,7 +7695,8 @@ pub fn set_instance_plan_review(
                     serde_json::Value::Bool(always_proceed),
                 );
                 if let Ok(pretty) = serde_json::to_string_pretty(&json_val) {
-                    let _ = fs::write(&path, pretty);
+                    // Justification: best-effort file write; the target is regenerated or re-derived on the next relevant operation
+                    crate::error::record_ignored(fs::write(&path, pretty), "write file");
                 }
             }
         }
@@ -6952,7 +7724,8 @@ pub fn set_instance_theme(target_instance: Option<&str>, theme_id: &str) -> Resu
         let paths = get_instance_settings_targets(inst);
         for path in paths {
             if let Some(parent) = path.parent() {
-                let _ = fs::create_dir_all(parent);
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(fs::create_dir_all(parent), "create directory");
             }
             let mut json_val: serde_json::Value = if path.exists() {
                 fs::read_to_string(&path)
@@ -6971,7 +7744,8 @@ pub fn set_instance_theme(target_instance: Option<&str>, theme_id: &str) -> Resu
                     serde_json::Value::String(theme_id.to_string()),
                 );
                 if let Ok(pretty) = serde_json::to_string_pretty(&json_val) {
-                    let _ = fs::write(&path, pretty);
+                    // Justification: best-effort file write; the target is regenerated or re-derived on the next relevant operation
+                    crate::error::record_ignored(fs::write(&path, pretty), "write file");
                 }
             }
         }
@@ -7074,7 +7848,8 @@ pub fn import_instance_settings(
         let paths = get_instance_settings_targets(inst);
         for path in paths {
             if let Some(parent) = path.parent() {
-                let _ = fs::create_dir_all(parent);
+                // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+                crate::error::record_ignored(fs::create_dir_all(parent), "create directory");
             }
             let mut current: serde_json::Value = if path.exists() {
                 fs::read_to_string(&path)
@@ -7092,7 +7867,8 @@ pub fn import_instance_settings(
             deep_merge_json(&mut current, &settings_to_apply);
 
             if let Ok(pretty) = serde_json::to_string_pretty(&current) {
-                let _ = fs::write(&path, pretty);
+                // Justification: best-effort file write; the target is regenerated or re-derived on the next relevant operation
+                crate::error::record_ignored(fs::write(&path, pretty), "write file");
             }
         }
         updated_count += 1;
@@ -7290,18 +8066,23 @@ mod tests {
             "agm_pid_test_{}",
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
         ));
-        let _ = std::fs::create_dir_all(&temp_dir);
+        // Justification: test fixture setup; a real failure fails the test at the next step
+        crate::error::record_ignored(std::fs::create_dir_all(&temp_dir), "create test dir");
         let test_db_path = temp_dir.join("test_instances.db");
         let conn = rusqlite::Connection::open(&test_db_path).unwrap();
-        let _ = conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS instance_processes (
-                instance_id TEXT PRIMARY KEY,
-                pid INTEGER NOT NULL,
-                data_dir TEXT,
-                status TEXT NOT NULL,
-                started_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL
-            );",
+        // Justification: test fixture seeding; a real failure fails the test at the next assertion
+        crate::error::record_ignored(
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS instance_processes (
+                    instance_id TEXT PRIMARY KEY,
+                    pid INTEGER NOT NULL,
+                    data_dir TEXT,
+                    status TEXT NOT NULL,
+                    started_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );",
+            ),
+            "seed test db",
         );
 
         let now = chrono::Utc::now().timestamp();
@@ -7336,7 +8117,8 @@ mod tests {
             .unwrap();
         assert_eq!(updated_status, "stopped");
 
-        let _ = std::fs::remove_dir_all(&temp_dir);
+        // Justification: test cleanup; absence is the normal case
+        crate::error::record_ignored(std::fs::remove_dir_all(&temp_dir), "clean test dir");
     }
 
     #[test]
@@ -7372,7 +8154,8 @@ mod tests {
         let clean = normalized.trim_end_matches('/');
         assert!(clean.contains("ubuntu-inst"));
 
-        let _ = std::fs::remove_dir_all(&temp_dir);
+        // Justification: test cleanup; absence is the normal case
+        crate::error::record_ignored(std::fs::remove_dir_all(&temp_dir), "clean test dir");
     }
 
     #[test]
@@ -7495,9 +8278,12 @@ mod tests {
         let proj_a = temp_root.join("project-alpha");
         let proj_b = temp_root.join("project-beta");
         let proj_c = temp_root.join("project-gamma");
-        let _ = std::fs::create_dir_all(&proj_a);
-        let _ = std::fs::create_dir_all(&proj_b);
-        let _ = std::fs::create_dir_all(&proj_c);
+        // Justification: test fixture setup; a real failure fails the test at the next step
+        crate::error::record_ignored(std::fs::create_dir_all(&proj_a), "create test dir");
+        // Justification: test fixture setup; a real failure fails the test at the next step
+        crate::error::record_ignored(std::fs::create_dir_all(&proj_b), "create test dir");
+        // Justification: test fixture setup; a real failure fails the test at the next step
+        crate::error::record_ignored(std::fs::create_dir_all(&proj_c), "create test dir");
 
         // Assign Project Alpha + Project Beta to Instance 1, and Project Gamma to Instance 2
         let ws1_a = inst1_data
@@ -7512,24 +8298,39 @@ mod tests {
             .join("User")
             .join("workspaceStorage")
             .join("ws-gamma");
-        let _ = std::fs::create_dir_all(&ws1_a);
-        let _ = std::fs::create_dir_all(&ws1_b);
-        let _ = std::fs::create_dir_all(&ws2_c);
+        // Justification: test fixture setup; a real failure fails the test at the next step
+        crate::error::record_ignored(std::fs::create_dir_all(&ws1_a), "create test dir");
+        // Justification: test fixture setup; a real failure fails the test at the next step
+        crate::error::record_ignored(std::fs::create_dir_all(&ws1_b), "create test dir");
+        // Justification: test fixture setup; a real failure fails the test at the next step
+        crate::error::record_ignored(std::fs::create_dir_all(&ws2_c), "create test dir");
 
         let uri_a = format!("file:///{}", proj_a.to_string_lossy().replace('\\', "/"));
         let uri_b = format!("file:///{}", proj_b.to_string_lossy().replace('\\', "/"));
         let uri_c = format!("file:///{}", proj_c.to_string_lossy().replace('\\', "/"));
-        let _ = std::fs::write(
-            ws1_a.join("workspace.json"),
-            serde_json::json!({ "folder": uri_a }).to_string(),
+        // Justification: test fixture seeding; a real failure fails the test at the next assertion
+        crate::error::record_ignored(
+            std::fs::write(
+                ws1_a.join("workspace.json"),
+                serde_json::json!({ "folder": uri_a }).to_string(),
+            ),
+            "write test fixture",
         );
-        let _ = std::fs::write(
-            ws1_b.join("workspace.json"),
-            serde_json::json!({ "folder": uri_b }).to_string(),
+        // Justification: test fixture seeding; a real failure fails the test at the next assertion
+        crate::error::record_ignored(
+            std::fs::write(
+                ws1_b.join("workspace.json"),
+                serde_json::json!({ "folder": uri_b }).to_string(),
+            ),
+            "write test fixture",
         );
-        let _ = std::fs::write(
-            ws2_c.join("workspace.json"),
-            serde_json::json!({ "folder": uri_c }).to_string(),
+        // Justification: test fixture seeding; a real failure fails the test at the next assertion
+        crate::error::record_ignored(
+            std::fs::write(
+                ws2_c.join("workspace.json"),
+                serde_json::json!({ "folder": uri_c }).to_string(),
+            ),
+            "write test fixture",
         );
 
         let inst1_folders =
@@ -7548,7 +8349,8 @@ mod tests {
             "Instance 2 must restore only its bound project workspace (gamma)"
         );
 
-        let _ = std::fs::remove_dir_all(&temp_root);
+        // Justification: test cleanup; absence is the normal case
+        crate::error::record_ignored(std::fs::remove_dir_all(&temp_root), "clean test dir");
     }
 
     #[test]
@@ -7619,74 +8421,90 @@ mod tests {
 
         if let Ok(conn) = crate::modules::repo_db::connect_db() {
             let now = chrono::Utc::now().timestamp();
-            let _ = conn.execute(
-                "INSERT OR REPLACE INTO running_projects 
-                 (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                rusqlite::params![
-                    "gitmap-1",
-                    unique_id,
-                    "Gitmap",
-                    proj_dir.to_string_lossy().to_string(),
-                    ws_storage.to_string_lossy().to_string(),
-                    1,
-                    now,
-                    now,
-                ],
+            // Justification: test fixture seeding; a real failure fails the test at the next assertion
+            crate::error::record_ignored(
+                conn.execute(
+                    "INSERT OR REPLACE INTO running_projects
+                     (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                    rusqlite::params![
+                        "gitmap-1",
+                        unique_id,
+                        "Gitmap",
+                        proj_dir.to_string_lossy().to_string(),
+                        ws_storage.to_string_lossy().to_string(),
+                        1,
+                        now,
+                        now,
+                    ],
+                ),
+                "seed test db",
             );
-            let _ = conn.execute(
-                "INSERT OR REPLACE INTO active_prompts 
-                 (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-                rusqlite::params![
-                    format!("prompt-{}-1", unique_id),
-                    "gitmap-1",
-                    unique_id,
-                    proj_dir.to_string_lossy().to_string(),
-                    running_text,
-                    "gemini-2.5-pro",
-                    "sess-1",
-                    "running",
-                    now,
-                    now,
-                    None::<String>,
-                ],
+            // Justification: test fixture seeding; a real failure fails the test at the next assertion
+            crate::error::record_ignored(
+                conn.execute(
+                    "INSERT OR REPLACE INTO active_prompts
+                     (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                    rusqlite::params![
+                        format!("prompt-{}-1", unique_id),
+                        "gitmap-1",
+                        unique_id,
+                        proj_dir.to_string_lossy().to_string(),
+                        running_text,
+                        "gemini-2.5-pro",
+                        "sess-1",
+                        "running",
+                        now,
+                        now,
+                        None::<String>,
+                    ],
+                ),
+                "seed test db",
             );
-            let _ = conn.execute(
-                "INSERT OR REPLACE INTO active_prompts 
-                 (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-                rusqlite::params![
-                    format!("prompt-{}-2", unique_id),
-                    "gitmap-1",
-                    unique_id,
-                    proj_dir.to_string_lossy().to_string(),
-                    queued_text_1,
-                    "gemini-2.5-pro",
-                    "sess-2",
-                    "queued",
-                    now,
-                    now,
-                    None::<String>,
-                ],
+            // Justification: test fixture seeding; a real failure fails the test at the next assertion
+            crate::error::record_ignored(
+                conn.execute(
+                    "INSERT OR REPLACE INTO active_prompts
+                     (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                    rusqlite::params![
+                        format!("prompt-{}-2", unique_id),
+                        "gitmap-1",
+                        unique_id,
+                        proj_dir.to_string_lossy().to_string(),
+                        queued_text_1,
+                        "gemini-2.5-pro",
+                        "sess-2",
+                        "queued",
+                        now,
+                        now,
+                        None::<String>,
+                    ],
+                ),
+                "seed test db",
             );
-            let _ = conn.execute(
-                "INSERT OR REPLACE INTO active_prompts 
-                 (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-                rusqlite::params![
-                    format!("prompt-{}-3", unique_id),
-                    "gitmap-1",
-                    unique_id,
-                    proj_dir.to_string_lossy().to_string(),
-                    queued_text_2,
-                    "gemini-2.5-pro",
-                    "sess-3",
-                    "queued",
-                    now,
-                    now,
-                    None::<String>,
-                ],
+            // Justification: test fixture seeding; a real failure fails the test at the next assertion
+            crate::error::record_ignored(
+                conn.execute(
+                    "INSERT OR REPLACE INTO active_prompts
+                     (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                    rusqlite::params![
+                        format!("prompt-{}-3", unique_id),
+                        "gitmap-1",
+                        unique_id,
+                        proj_dir.to_string_lossy().to_string(),
+                        queued_text_2,
+                        "gemini-2.5-pro",
+                        "sess-3",
+                        "queued",
+                        now,
+                        now,
+                        None::<String>,
+                    ],
+                ),
+                "seed test db",
             );
         }
 
@@ -7755,9 +8573,13 @@ mod tests {
 
         // Clean up seeded prompts in repo_db
         if let Ok(conn) = crate::modules::repo_db::connect_db() {
-            let _ = conn.execute(
-                "DELETE FROM active_prompts WHERE instance_id = ?1",
-                rusqlite::params![unique_id],
+            // Justification: test fixture seeding; a real failure fails the test at the next assertion
+            crate::error::record_ignored(
+                conn.execute(
+                    "DELETE FROM active_prompts WHERE instance_id = ?1",
+                    rusqlite::params![unique_id],
+                ),
+                "seed test db",
             );
         }
 
@@ -7773,7 +8595,8 @@ mod tests {
             );
         }
 
-        let _ = std::fs::remove_dir_all(&temp_base);
+        // Justification: test cleanup; absence is the normal case
+        crate::error::record_ignored(std::fs::remove_dir_all(&temp_base), "clean test dir");
         println!("[TEMP E2E] Local-only E2E test completed successfully with 100% clean teardown.");
     }
 }
@@ -7785,7 +8608,8 @@ mod clone_tree_tests {
     #[test]
     fn clone_copies_settings_workspace_db_and_gemini_repo() {
         let root = std::env::temp_dir().join(format!("agm-clone-trees-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&root);
+        // Justification: test cleanup; absence is the normal case
+        crate::error::record_ignored(fs::remove_dir_all(&root), "clean test dir");
         let src_data = root.join("src-data");
         let dst_data = root.join("dst-data");
         let src_home = root.join("src-home");
@@ -7855,13 +8679,15 @@ mod clone_tree_tests {
             fs::read(dst_home.join(".gemini").join("antigravity").join("repo.db")).unwrap(),
             b"gemini-repo-db"
         );
-        let _ = fs::remove_dir_all(&root);
+        // Justification: test cleanup; absence is the normal case
+        crate::error::record_ignored(fs::remove_dir_all(&root), "clean test dir");
     }
 
     #[test]
     fn test_copy_source_user_settings_copies_to_data_and_appdata() {
         let root = std::env::temp_dir().join(format!("agm-user-settings-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&root);
+        // Justification: test cleanup; absence is the normal case
+        crate::error::record_ignored(fs::remove_dir_all(&root), "clean test dir");
 
         let src_data = root.join("src-inst").join("data");
         let dst_data = root.join("dst-inst").join("data");
@@ -7916,7 +8742,11 @@ mod clone_tree_tests {
             seq_num: Some(2),
         };
 
-        let _ = copy_source_user_settings(&source, &dest);
+        // Justification: the unit under test; assertions below verify the outcome
+        crate::error::record_ignored(
+            copy_source_user_settings(&source, &dest),
+            "run copy under test",
+        );
 
         assert_eq!(
             fs::read(dst_data.join("User").join("settings.json")).unwrap(),
@@ -7931,7 +8761,8 @@ mod clone_tree_tests {
             b"{\"prefix\": \"custom\"}"
         );
 
-        let _ = fs::remove_dir_all(&root);
+        // Justification: test cleanup; absence is the normal case
+        crate::error::record_ignored(fs::remove_dir_all(&root), "clean test dir");
     }
 
     #[test]
@@ -8055,7 +8886,8 @@ mod clone_tree_tests {
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
         ));
         let user_dir = temp_dir.join("User");
-        let _ = fs::create_dir_all(&user_dir);
+        // Justification: test fixture setup; a real failure fails the test at the next step
+        crate::error::record_ignored(fs::create_dir_all(&user_dir), "create test dir");
 
         let inst = InstanceConfig {
             id: "inst-settings-test".to_string(),
@@ -8083,7 +8915,8 @@ mod clone_tree_tests {
             Some("#5 Settings Test - antigravity-settings-test${separator}${dirty}${activeEditorShort}${separator}${rootName}")
         );
 
-        let _ = fs::remove_dir_all(&temp_dir);
+        // Justification: test cleanup; absence is the normal case
+        crate::error::record_ignored(fs::remove_dir_all(&temp_dir), "clean test dir");
     }
 
     #[test]
@@ -8135,7 +8968,11 @@ mod clone_tree_tests {
         assert_eq!(idle, 0);
         assert_eq!(status, "IDLE");
 
-        let _ = fs::remove_dir_all(instances_dir.join(&test_inst_id));
+        // Justification: test cleanup; absence is the normal case
+        crate::error::record_ignored(
+            fs::remove_dir_all(instances_dir.join(&test_inst_id)),
+            "clean test dir",
+        );
     }
 
     #[test]

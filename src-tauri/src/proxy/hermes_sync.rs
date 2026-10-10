@@ -370,11 +370,13 @@ fn atomically_write_source(path: &PathBuf, source: &str) -> Result<(), String> {
     })();
     drop(file);
     if let Err(error) = result {
-        let _ = fs::remove_file(&temp);
+        // Justification: best-effort cleanup; a leftover file is harmless
+        crate::error::record_ignored(fs::remove_file(&temp), "remove_file");
         return Err(format!("Failed to write temp file: {error}"));
     }
     fs::rename(&temp, path).map_err(|error| {
-        let _ = fs::remove_file(&temp);
+        // Justification: best-effort cleanup; a leftover file is harmless
+        crate::error::record_ignored(fs::remove_file(&temp), "remove_file");
         format!("Failed to rename config file: {error}")
     })
 }

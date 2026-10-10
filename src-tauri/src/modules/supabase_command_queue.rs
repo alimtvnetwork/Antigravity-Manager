@@ -82,7 +82,11 @@ pub async fn execute_and_report_command(
         "started_at": now
     });
     let query = format!("id=eq.{}", cmd.id);
-    let _ = client.update("command_queue", &query, run_payload).await;
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(
+        client.update("command_queue", &query, run_payload).await,
+        "update",
+    );
 
     // 2. Execute command
     #[cfg(target_os = "windows")]
@@ -126,14 +130,22 @@ pub async fn execute_and_report_command(
         "exit_code": exit_code,
         "created_at": finish_time
     });
-    let _ = client.insert("command_telemetry", telemetry_payload).await;
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(
+        client.insert("command_telemetry", telemetry_payload).await,
+        "insert",
+    );
 
     // 4. Update command queue status
     let finish_payload = json!({
         "status": final_status,
         "completed_at": finish_time
     });
-    let _ = client.update("command_queue", &query, finish_payload).await;
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(
+        client.update("command_queue", &query, finish_payload).await,
+        "update",
+    );
 
     Ok(())
 }

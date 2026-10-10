@@ -6,6 +6,7 @@ import { request } from '../../../utils/request';
 import { showToast } from '../../common/ToastContainer';
 import { useAccountStore } from '../../../stores/useAccountStore';
 import { ProxyEntry } from '../../../types/config';
+import { useErrorStore } from '../../../stores/error-store';
 
 interface ProxyBindingManagerProps {
     isOpen: boolean;
@@ -37,6 +38,12 @@ export default function ProxyBindingManager({ isOpen, onClose, proxies }: ProxyB
             setBindings(currentBindings || {});
         } catch (error) {
             console.error('Failed to load bindings:', error);
+            // Tracked in the error module; user already notified via error toast.
+            useErrorStore.getState().trackWarning(error, {
+              source: 'ProxyBindingManager.loadBindings',
+              endpoint: 'get_all_account_bindings',
+              triggerAction: 'load_bindings',
+            });
             showToast(t('settings.proxy_pool.binding.load_failed', 'Failed to load bindings'), 'error');
         } finally {
             setIsLoading(false);
@@ -61,6 +68,11 @@ export default function ProxyBindingManager({ isOpen, onClose, proxies }: ProxyB
             }
         } catch (error) {
             console.error('Failed to update binding:', error);
+            // Tracked in the error module; user already notified via error toast.
+            useErrorStore.getState().trackWarning(error, {
+              source: 'ProxyBindingManager.handleBind',
+              triggerAction: 'update_binding',
+            });
             showToast(t('settings.proxy_pool.binding.update_failed', 'Failed to update binding'), 'error');
         } finally {
             setIsSaving(null);

@@ -52,7 +52,8 @@ async fn ensure_oauth_flow_prepared(
         if let Some(s) = state.as_mut() {
             if let Some(requested_key) = requested_client_key.as_ref() {
                 if s.client_key != requested_key.to_ascii_lowercase() {
-                    let _ = s.cancel_tx.send(true);
+                    // Justification: best-effort channel notification; the receiver may already be gone during shutdown
+                    crate::error::record_ignored(s.cancel_tx.send(true), "channel send");
                     *state = None;
                 }
             }
@@ -67,7 +68,8 @@ async fn ensure_oauth_flow_prepared(
             } else {
                 // Flow is already "in progress" (rx taken), but user requested a NEW one.
                 // Force cancel the old one to allow a new attempt.
-                let _ = s.cancel_tx.send(true);
+                // Justification: best-effort channel notification; the receiver may already be gone during shutdown
+                crate::error::record_ignored(s.cancel_tx.send(true), "channel send");
                 *state = None;
             }
         }
@@ -238,14 +240,24 @@ async fn ensure_oauth_flow_prepared(
                     ),
                 };
 
-                let _ = stream.write_all(response_html.as_bytes()).await;
-                let _ = stream.flush().await;
+                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                crate::error::record_ignored(
+                    stream.write_all(response_html.as_bytes()).await,
+                    "write_all",
+                );
+                // Justification: best-effort stream flush; buffered output is lost only on abnormal exit
+                crate::error::record_ignored(stream.flush().await, "flush");
 
                 if let Some(h) = app_handle {
                     use tauri::Emitter;
-                    let _ = h.emit("oauth-callback-received", ());
+                    // Justification: best-effort frontend event; a dropped event only skips a UI refresh
+                    crate::error::record_ignored(
+                        h.emit("oauth-callback-received", ()),
+                        "emit oauth-callback-received",
+                    );
                 }
-                let _ = tx.send(result).await;
+                // Justification: best-effort channel notification; the receiver may already be gone during shutdown
+                crate::error::record_ignored(tx.send(result).await, "channel send");
             }
         });
     }
@@ -332,14 +344,24 @@ async fn ensure_oauth_flow_prepared(
                     ),
                 };
 
-                let _ = stream.write_all(response_html.as_bytes()).await;
-                let _ = stream.flush().await;
+                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                crate::error::record_ignored(
+                    stream.write_all(response_html.as_bytes()).await,
+                    "write_all",
+                );
+                // Justification: best-effort stream flush; buffered output is lost only on abnormal exit
+                crate::error::record_ignored(stream.flush().await, "flush");
 
                 if let Some(h) = app_handle {
                     use tauri::Emitter;
-                    let _ = h.emit("oauth-callback-received", ());
+                    // Justification: best-effort frontend event; a dropped event only skips a UI refresh
+                    crate::error::record_ignored(
+                        h.emit("oauth-callback-received", ()),
+                        "emit oauth-callback-received",
+                    );
                 }
-                let _ = tx.send(result).await;
+                // Justification: best-effort channel notification; the receiver may already be gone during shutdown
+                crate::error::record_ignored(tx.send(result).await, "channel send");
             }
         });
     }
@@ -360,7 +382,11 @@ async fn ensure_oauth_flow_prepared(
     // Send event to frontend (for display/copying link)
     if let Some(h) = app_handle {
         use tauri::Emitter;
-        let _ = h.emit("oauth-url-generated", &auth_url);
+        // Justification: best-effort frontend event; a dropped event only skips a UI refresh
+        crate::error::record_ignored(
+            h.emit("oauth-url-generated", &auth_url),
+            "emit oauth-url-generated",
+        );
     }
 
     Ok(auth_url)
@@ -378,7 +404,8 @@ pub async fn prepare_oauth_url(
 pub fn cancel_oauth_flow() {
     if let Ok(mut state) = get_oauth_flow_state().lock() {
         if let Some(s) = state.take() {
-            let _ = s.cancel_tx.send(true);
+            // Justification: best-effort channel notification; the receiver may already be gone during shutdown
+            crate::error::record_ignored(s.cancel_tx.send(true), "channel send");
             crate::modules::logger::log_info("Sent OAuth cancellation signal");
         }
     }
@@ -529,7 +556,8 @@ pub fn prepare_oauth_flow_manually(
             // If we already have a code_rx, we can't easily "steal" it again because it's already returned.
             // But if this is a NEW request (different state), we should overwrite.
             // For now, let's just clear and restart to be safe.
-            let _ = s.cancel_tx.send(true);
+            // Justification: best-effort channel notification; the receiver may already be gone during shutdown
+            crate::error::record_ignored(s.cancel_tx.send(true), "channel send");
             *lock = None;
         }
     }

@@ -4,6 +4,7 @@ import { useAccountStore } from '../../stores/useAccountStore';
 import { useInstanceStore } from '../../stores/useInstanceStore';
 import { showToast } from './ToastContainer';
 import { isTauri } from '../../utils/env';
+import { useErrorStore } from '../../stores/error-store';
 
 function getAccountRemainingQuota(account: any, targetModel: string): number {
     if (!account?.quota) return 100;
@@ -216,6 +217,11 @@ function BackgroundTaskRunner() {
                 }
             } catch (err) {
                 console.error('[AutoSwitcher] Smart Fast-Forward error:', err);
+                // Tracked in the error module; background rotation continues on next tick, no modal for background tasks.
+                useErrorStore.getState().trackWarning(err, {
+                  source: 'BackgroundTaskRunner.autoSwitcher',
+                  triggerAction: 'smart_fast_forward',
+                });
             } finally {
                 isRotatingRef.current = false;
             }

@@ -155,7 +155,11 @@ pub fn get_ssh_dir() -> Result<PathBuf, String> {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let _ = fs::set_permissions(&ssh_dir, fs::Permissions::from_mode(0o700));
+            // Justification: best-effort permission hardening; logged
+            crate::error::record_ignored(
+                fs::set_permissions(&ssh_dir, fs::Permissions::from_mode(0o700)),
+                "set_permissions",
+            );
         }
     }
     Ok(ssh_dir)
@@ -230,7 +234,11 @@ pub fn load_ssh_connections() -> Result<Vec<SshConnectionRecord>, String> {
                         for c in &mut conns {
                             c.key_path = resolve_usable_key_path(&c.key_path);
                         }
-                        let _ = save_ssh_connections(&conns);
+                        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                        crate::error::record_ignored(
+                            save_ssh_connections(&conns),
+                            "save_ssh_connections",
+                        );
                         return Ok(conns);
                     }
                 }
@@ -248,7 +256,8 @@ pub fn save_ssh_connections(
     let envelope = build_envelope_from_connections(conns);
     let store_path = get_ssh_nodes_store_path()?;
     if let Some(parent) = store_path.parent() {
-        let _ = fs::create_dir_all(parent);
+        // Justification: best-effort directory creation; later file ops fail loudly if the directory is actually needed
+        crate::error::record_ignored(fs::create_dir_all(parent), "create_dir_all");
     }
     let json_str = serde_json::to_string_pretty(&envelope)
         .map_err(|e| format!("Failed to serialize SSH nodes envelope: {}", e))?;
@@ -482,7 +491,8 @@ pub fn sync_ssh_connections_locally(
     }
 
     save_ssh_connections(&existing)?;
-    let _ = update_ssh_config(false);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(update_ssh_config(false), "update_ssh_config");
     Ok(stats)
 }
 
@@ -499,7 +509,8 @@ pub fn export_nodes_json(
 
     if let Some(parent) = target_file.parent() {
         if !parent.as_os_str().is_empty() {
-            let _ = fs::create_dir_all(parent);
+            // Justification: best-effort directory creation; later file ops fail loudly if the directory is actually needed
+            crate::error::record_ignored(fs::create_dir_all(parent), "create_dir_all");
         }
     }
 
@@ -647,12 +658,14 @@ pub fn ensure_default_ssh_key() -> Result<SshKeyRecord, String> {
     let keys = discover_local_ssh_keys()?;
     for pref in &["id_ed25519", "id_rsa"] {
         if let Some(found) = keys.iter().find(|k| k.name == *pref) {
-            let _ = update_ssh_config(false);
+            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+            crate::error::record_ignored(update_ssh_config(false), "update_ssh_config");
             return Ok(found.clone());
         }
     }
     if let Some(first) = keys.first() {
-        let _ = update_ssh_config(false);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(update_ssh_config(false), "update_ssh_config");
         return Ok(first.clone());
     }
     create_ssh_key("id_ed25519", None)
@@ -708,7 +721,8 @@ pub fn create_ssh_key(name: &str, comment: Option<&str>) -> Result<SshKeyRecord,
         ));
     }
 
-    let _ = update_ssh_config(false);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(update_ssh_config(false), "update_ssh_config");
     let keys = discover_local_ssh_keys()?;
     keys.into_iter()
         .find(|k| k.name == clean_name)
@@ -745,7 +759,8 @@ pub fn delete_ssh_key(name: &str) -> Result<String, String> {
         fs::remove_file(&pub_path)
             .map_err(|e| format!("Failed to delete {}: {}", pub_path.display(), e))?;
     }
-    let _ = update_ssh_config(false);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(update_ssh_config(false), "update_ssh_config");
     Ok(clean.to_string())
 }
 
@@ -771,18 +786,28 @@ pub fn copy_ssh_public_key(name: Option<&str>) -> Result<SshKeyRecord, String> {
     {
         if let Ok(mut child) = Command::new("clip").stdin(Stdio::piped()).spawn() {
             if let Some(ref mut stdin) = child.stdin {
-                let _ = stdin.write_all(target_key.public_key.as_bytes());
+                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                crate::error::record_ignored(
+                    stdin.write_all(target_key.public_key.as_bytes()),
+                    "write_all",
+                );
             }
-            let _ = child.wait();
+            // Justification: best-effort call; failure logged without changing control flow
+            crate::error::record_ignored(child.wait(), "wait");
         }
     }
     #[cfg(target_os = "macos")]
     {
         if let Ok(mut child) = Command::new("pbcopy").stdin(Stdio::piped()).spawn() {
             if let Some(ref mut stdin) = child.stdin {
-                let _ = stdin.write_all(target_key.public_key.as_bytes());
+                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                crate::error::record_ignored(
+                    stdin.write_all(target_key.public_key.as_bytes()),
+                    "write_all",
+                );
             }
-            let _ = child.wait();
+            // Justification: best-effort call; failure logged without changing control flow
+            crate::error::record_ignored(child.wait(), "wait");
         }
     }
     #[cfg(target_os = "linux")]
@@ -793,9 +818,14 @@ pub fn copy_ssh_public_key(name: Option<&str>) -> Result<SshKeyRecord, String> {
             .spawn()
         {
             if let Some(ref mut stdin) = child.stdin {
-                let _ = stdin.write_all(target_key.public_key.as_bytes());
+                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                crate::error::record_ignored(
+                    stdin.write_all(target_key.public_key.as_bytes()),
+                    "write_all",
+                );
             }
-            let _ = child.wait();
+            // Justification: best-effort call; failure logged without changing control flow
+            crate::error::record_ignored(child.wait(), "wait");
         }
     }
 
@@ -827,7 +857,11 @@ pub fn update_ssh_config(sanitize_only: bool) -> Result<String, String> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let _ = fs::set_permissions(&config_path, fs::Permissions::from_mode(0o600));
+        // Justification: best-effort permission hardening; logged
+        crate::error::record_ignored(
+            fs::set_permissions(&config_path, fs::Permissions::from_mode(0o600)),
+            "set_permissions",
+        );
     }
 
     Ok(managed_block)
@@ -1021,7 +1055,8 @@ fn append_key_if_missing(
     is_win_admin: bool,
 ) -> Result<bool, String> {
     if let Some(parent) = path.parent() {
-        let _ = fs::create_dir_all(parent);
+        // Justification: best-effort directory creation; later file ops fail loudly if the directory is actually needed
+        crate::error::record_ignored(fs::create_dir_all(parent), "create_dir_all");
     }
     let existing = if path.exists() {
         fs::read_to_string(path).unwrap_or_default()
@@ -1051,7 +1086,12 @@ fn append_key_if_missing(
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o600));
+        // Justification: best-effort permission hardening; logged
+        crate::error::record_ignored(
+            fs::set_permissions(path, fs::Permissions::from_mode(0o600)),
+            "set_permissions",
+        );
+        // Justification: intentionally unused on Unix (only the Windows branch consumes it); suppresses the unused-variable warning.
         let _ = is_win_admin;
     }
 
@@ -1059,25 +1099,33 @@ fn append_key_if_missing(
     {
         let path_str = path.to_string_lossy().to_string();
         if is_win_admin {
-            let _ = Command::new("icacls")
-                .args([
-                    &path_str,
-                    "/inheritance:r",
-                    "/grant",
-                    "SYSTEM:(F)",
-                    "BUILTIN\\Administrators:(F)",
-                ])
-                .output();
+            // Justification: best-effort process spawn; failure logged
+            crate::error::record_ignored(
+                Command::new("icacls")
+                    .args([
+                        &path_str,
+                        "/inheritance:r",
+                        "/grant",
+                        "SYSTEM:(F)",
+                        "BUILTIN\\Administrators:(F)",
+                    ])
+                    .output(),
+                "spawn icacls",
+            );
         } else if let Ok(user) = std::env::var("USERNAME") {
-            let _ = Command::new("icacls")
-                .args([
-                    &path_str,
-                    "/inheritance:r",
-                    "/grant",
-                    &format!("{}:(F)", user),
-                    "SYSTEM:(F)",
-                ])
-                .output();
+            // Justification: best-effort process spawn; failure logged
+            crate::error::record_ignored(
+                Command::new("icacls")
+                    .args([
+                        &path_str,
+                        "/inheritance:r",
+                        "/grant",
+                        &format!("{}:(F)", user),
+                        "SYSTEM:(F)",
+                    ])
+                    .output(),
+                "spawn icacls",
+            );
         }
     }
 
@@ -1493,7 +1541,8 @@ pub fn deploy_mesh_keys(
     except: Option<&str>,
     dry_run: bool,
 ) -> Result<MeshDeploySummary, String> {
-    let _ = ensure_default_ssh_key();
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(ensure_default_ssh_key(), "ensure_default_ssh_key");
     let local_keys = discover_local_ssh_keys().unwrap_or_default();
     let mut gathered: Vec<DiscoveredPublicKey> = Vec::new();
     let mut seen_blobs: HashSet<String> = HashSet::new();
@@ -1699,7 +1748,8 @@ pub fn export_all_bundle(dir_opt: Option<&str>) -> Result<(PathBuf, usize, usize
 
     for k in &keys {
         let dest = keys_dir.join(format!("{}.pub", k.name));
-        let _ = fs::write(dest, format!("{}\n", k.public_key));
+        // Justification: best-effort file write; failure is logged and surfaces on the next read
+        crate::error::record_ignored(fs::write(dest, format!("{}\n", k.public_key)), "fs::write");
     }
 
     Ok((base_dir, keys.len(), env.total_nodes))

@@ -68,6 +68,7 @@ import {
 } from '../../services/emailService';
 import ModalDialog from '../common/ModalDialog';
 import { showToast } from '../common/ToastContainer';
+import { useErrorStore } from '../../stores/error-store';
 
 export default function EmailNotificationSettings() {
     const [accounts, setAccounts] = useState<EmailAccount[]>([]);
@@ -239,6 +240,11 @@ ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL & SYNTAX GUIDE
             if (tgStat) setTelegramStatus(tgStat);
         } catch (e: any) {
             console.error('Failed to load email settings:', e);
+            // Tracked in the error module; user already notified via error toast.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'EmailNotificationSettings.loadAll',
+              triggerAction: 'load_email_settings',
+            });
             showToast('Failed to load email configurations', 'error');
         }
     };
