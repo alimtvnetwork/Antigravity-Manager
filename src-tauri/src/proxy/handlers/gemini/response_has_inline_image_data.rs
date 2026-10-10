@@ -61,17 +61,17 @@ pub(crate) async fn handle_generate_success(
     debug_cfg: &crate::proxy::config::DebugLoggingConfig,
     trace_id: &str,
     model_name: &str,
-    mapped_model: &str,
+    mapped_model: String,
     request_type: &str,
     attempt: usize,
     status: StatusCode,
     upstream_url: &str,
-    session_id: &str,
+    session_id: String,
     client_session_id: &str,
     cloud_code_trace_id: Option<String>,
     upstream_req_start: std::time::Instant,
     token_manager: &std::sync::Arc<crate::proxy::TokenManager>,
-    account_id: &str,
+    account_id: String,
     email: &str,
     clean_ms: f64,
     norm_ms: f64,
@@ -152,15 +152,7 @@ pub(crate) async fn handle_generate_success(
         let image_success_manager = token_manager.clone();
         let image_success_account = account_id.clone();
         let image_success_model = mapped_model.clone();
-        // Clone borrowed params to owned Strings so the async stream is 'static
-        let mapped_model_owned: String = mapped_model.to_string();
-        let session_id_owned: String = session_id.to_string();
-        let account_id_owned: String = account_id.to_string();
         let stream = async_stream::stream! {
-            // Move owned clones into the stream's environment
-            let _mm = mapped_model_owned.clone();
-            let _sid = session_id_owned.clone();
-            let _aid = account_id_owned.clone();
             let _image_permit = image_permit_for_stream;
             let mut first_data = first_chunk;
             let mut meta_sent = false;

@@ -19,7 +19,7 @@ pub(crate) async fn handle_generate_error(
     max_attempts: usize,
     pool_size: usize,
     token_manager: &std::sync::Arc<crate::proxy::TokenManager>,
-    headers: &axum::http::HeaderMap,
+    _headers: &axum::http::HeaderMap,
     client_adapter: &Option<std::sync::Arc<dyn crate::proxy::common::client_adapter::ClientAdapter>>,
     failure_statuses: &mut crate::proxy::handlers::common::FailureStatusTracker,
     last_error: &mut String,
