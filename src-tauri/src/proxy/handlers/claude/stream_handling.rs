@@ -7,6 +7,7 @@ use super::*;
 pub(crate) async fn handle_stream_success(
     st: &mut AttemptState,
     call: AttemptCall,
+    attempt: usize,
 ) -> StreamOutcome {
     let AttemptCall {
         response,
@@ -18,6 +19,8 @@ pub(crate) async fn handle_stream_success(
         raw_estimated,
         client_wants_stream,
         upstream_req_start,
+        upstream_url,
+        status,
         ..
     } = call;
     let meta = json!({
@@ -39,6 +42,11 @@ pub(crate) async fn handle_stream_success(
     );
 
     let current_message_count = request_with_mapped.messages.len();
+
+    // Determine context limit based on model
+    let context_limit = crate::proxy::mappers::claude::utils::get_context_limit_for_model(
+        &request_with_mapped.model,
+    );
 
     // [FIX #MCP] Extract registered tool names for MCP fuzzy matching
     let registered_tool_names: Vec<String> = request_with_mapped

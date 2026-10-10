@@ -66,6 +66,7 @@ pub(crate) async fn completions_success_stream(
     gemini_body_for_debug: &Option<Value>,
     attempt: usize,
 ) -> CompletionsStreamOutcome {
+    let is_responses_api = uri.path() == "/v1/responses";
     use axum::body::Body;
     use axum::response::Response;
     use futures::StreamExt;
@@ -338,8 +339,6 @@ pub(crate) async fn completions_success_stream(
 use bytes::Bytes;
         match collect_stream_to_json(combined_stream).await {
             Ok(chat_resp) => {
-                let is_responses_api = uri.path() == "/v1/responses";
-
                 if is_responses_api {
                     let mut resp = convert_chat_response_to_responses(&chat_resp);
                     resp["id"] = json!(response_id_for_save.clone());

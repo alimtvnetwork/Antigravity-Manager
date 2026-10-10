@@ -106,6 +106,7 @@ pub async fn handle_completions(
             &mut setup.failure_statuses,
             &mut setup.norm_ms,
             &mut setup.think_fill_ms,
+            &uri,
         )
         .await
         {
