@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.174.0 (2026-10-10)**:
+        -   **CI Green: Stale CliContext Field Fix & Fork Actions Re-enable**:
+            -   **Description**: Fixed `error[E0609]: no field 'instance' on type 'CliContext'` at two call sites in `src-tauri/src/bin/agm.rs` (`cmd_prompts_send`, `cmd_prompts_queue`) — the instance-process-cache refactor had renamed the field to `instance_id` but missed these sites; corrected to `ctx.instance_id.is_none()`, restoring compilation. Re-enabled GitHub Actions on the fork (GitHub had auto-disabled workflows because it is a fork) via the Actions-page attestation; CI now green across all 7 jobs (Check Rust Code and Build Tauri App on ubuntu/macos/windows, plus Build Frontend). (Thanks to @aukgit)
+
     *   **v4.173.0 (2026-10-10)**:
         -   **Updater Download Link & Release Manifest Honesty Fix**:
             -   **Description**: Fixed the in-app update checker's download URL, which pointed at the upstream `lbjlaq/Antigravity-Manager` releases instead of the `alimtvnetwork` fork — fork users were sent to the wrong repo's release page; removed phantom binary-asset URLs from `releases-manifest.json` for the notes-only releases v4.168.0–v4.172.0 (zero assets published) so the installer no longer chases dead download links. (Thanks to @aukgit)
