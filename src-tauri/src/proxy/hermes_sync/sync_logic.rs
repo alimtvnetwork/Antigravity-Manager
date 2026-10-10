@@ -263,13 +263,13 @@ pub fn read_provider_entry(doc: &YamlDoc) -> Option<(Option<String>, Option<Stri
 
 #[derive(Default)]
 struct HermesConfigState {
-    is_synced: bool,
-    has_backup: bool,
-    current_base_url: Option<String>,
-    discover_models: bool,
-    configured_models: Vec<String>,
-    is_active: bool,
-    default_model: Option<String>,
+    pub(crate) is_synced: bool,
+    pub(crate) has_backup: bool,
+    pub(crate) current_base_url: Option<String>,
+    pub(crate) discover_models: bool,
+    pub(crate) configured_models: Vec<String>,
+    pub(crate) is_active: bool,
+    pub(crate) default_model: Option<String>,
 }
 
 pub fn read_config_state(proxy_url: Option<String>) -> HermesConfigState {
