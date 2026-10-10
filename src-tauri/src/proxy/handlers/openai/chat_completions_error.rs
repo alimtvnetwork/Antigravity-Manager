@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use axum::http::StatusCode;
 use axum::Json;
+use axum::response::IntoResponse;
 use serde_json::{json, Value};
 use tracing::{debug, error};
 

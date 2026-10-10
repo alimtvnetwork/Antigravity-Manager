@@ -123,7 +123,7 @@ pub(crate) async fn chat_completions_send(
             match token_manager
                 .get_token(
                     &config.request_type,
-                    force_rotate,
+                    *force_rotate,
                     Some(&session_id),
                     &mapped_model,
                 )
