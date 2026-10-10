@@ -181,7 +181,8 @@ fn get_default_storage_candidate_path(target_ide: Option<&str>) -> Result<PathBu
 fn auto_heal_storage_json(target_ide: Option<&str>) -> Result<PathBuf, String> {
     let fallback_path = get_default_storage_candidate_path(target_ide)?;
     if let Some(parent) = fallback_path.parent() {
-        let _ = fs::create_dir_all(parent);
+        // Justification: best-effort directory creation; later file ops fail loudly if the directory is actually needed
+        crate::error::record_ignored(fs::create_dir_all(parent), "create_dir_all");
     }
 
     let default_profile = generate_profile();
@@ -344,7 +345,11 @@ pub fn write_profile(storage_path: &Path, profile: &DeviceProfile) -> Result<(),
     logger::log_info(&format!("device_profile_written to {:?}", storage_path));
 
     // Sync ItemTable.storage.serviceMachineId in state.vscdb
-    let _ = sync_state_service_machine_id_value(&profile.dev_device_id);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        sync_state_service_machine_id_value(&profile.dev_device_id),
+        "sync_state_service_machine_id_value",
+    );
     Ok(())
 }
 
@@ -367,7 +372,11 @@ pub fn sync_service_machine_id(storage_path: &Path, service_id: &str) -> Result<
     fs::write(storage_path, updated).map_err(|e| format!("write_failed: {}", e))?;
     logger::log_info("service_machine_id_synced");
 
-    let _ = sync_state_service_machine_id_value(service_id);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        sync_state_service_machine_id_value(service_id),
+        "sync_state_service_machine_id_value",
+    );
     Ok(())
 }
 

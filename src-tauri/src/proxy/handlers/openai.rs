@@ -673,6 +673,7 @@ async fn save_session_unless_response_cancelled<F>(
         _ = save => true,
     };
     if saved {
+        // Justification: oneshot::Sender::send returns Result<(), ()> — the unit error carries no information to log; a dropped receiver is benign here.
         let _ = ack_tx.send(());
     }
 }
@@ -2251,11 +2252,14 @@ pub async fn handle_chat_completions(
         let norm_total_micros = norm_start.elapsed().as_micros() as u64;
         norm_ms = norm_total_micros.saturating_sub(tf_micros) as f64 / 1000.0;
         think_fill_ms = tf_micros as f64 / 1000.0;
-        let _ =
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
             crate::proxy::mappers::context_manager::ContextManager::apply_post_transit_context_mgmt(
                 &mut gemini_body,
                 &mapped_model,
-            );
+            ),
+            "apply_post_transit_context_mgmt",
+        );
         crate::proxy::mappers::prompt_sanitizer::PromptSanitizer::sanitize_gemini_payload(
             &mut gemini_body,
         );
@@ -4111,11 +4115,14 @@ pub async fn handle_completions(
         let norm_total_micros = norm_start.elapsed().as_micros() as u64;
         norm_ms = norm_total_micros.saturating_sub(tf_micros) as f64 / 1000.0;
         think_fill_ms = tf_micros as f64 / 1000.0;
-        let _ =
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
             crate::proxy::mappers::context_manager::ContextManager::apply_post_transit_context_mgmt(
                 &mut gemini_body,
                 &mapped_model,
-            );
+            ),
+            "apply_post_transit_context_mgmt",
+        );
         crate::proxy::mappers::prompt_sanitizer::PromptSanitizer::sanitize_gemini_payload(
             &mut gemini_body,
         );
@@ -5580,7 +5587,11 @@ pub async fn handle_images_generations_internal(
 
     // [FIX] 图像生成成功后触发配额刷新 (Issue #1995)
     tokio::spawn(async move {
-        let _ = account::refresh_all_quotas_logic().await;
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            account::refresh_all_quotas_logic().await,
+            "refresh_all_quotas_logic",
+        );
     });
 
     let email_header = used_email.unwrap_or_default();
@@ -6046,7 +6057,11 @@ pub async fn handle_images_edits(
     });
 
     tokio::spawn(async move {
-        let _ = account::refresh_all_quotas_logic().await;
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            account::refresh_all_quotas_logic().await,
+            "refresh_all_quotas_logic",
+        );
     });
 
     let email_header = used_email.unwrap_or_default();
@@ -6165,7 +6180,11 @@ async fn handle_websocket_session(mut socket: WebSocket, headers: HeaderMap, sta
                         "type": "invalid_request_error"
                     }
                 });
-                let _ = socket.send(Message::Text(error_ev.to_string())).await;
+                // Justification: best-effort send; failure logged without changing control flow
+                crate::error::record_ignored(
+                    socket.send(Message::Text(error_ev.to_string())).await,
+                    "send via send",
+                );
                 continue;
             }
         };
@@ -6190,8 +6209,16 @@ async fn handle_websocket_session(mut socket: WebSocket, headers: HeaderMap, sta
 
         if should_handle_prewarm_locally(&payload, &session_state) {
             let (created, completed) = handle_prewarm_locally(&payload, &mut session_state);
-            let _ = socket.send(Message::Text(created.to_string())).await;
-            let _ = socket.send(Message::Text(completed.to_string())).await;
+            // Justification: best-effort send; failure logged without changing control flow
+            crate::error::record_ignored(
+                socket.send(Message::Text(created.to_string())).await,
+                "send via send",
+            );
+            // Justification: best-effort send; failure logged without changing control flow
+            crate::error::record_ignored(
+                socket.send(Message::Text(completed.to_string())).await,
+                "send via send",
+            );
             if debug_logger::is_enabled(&debug_cfg) {
                 let payload_log = json!({
                     "kind": "codex_websocket_local_response",
@@ -6220,7 +6247,11 @@ async fn handle_websocket_session(mut socket: WebSocket, headers: HeaderMap, sta
                         "type": "invalid_request_error"
                     }
                 });
-                let _ = socket.send(Message::Text(error_ev.to_string())).await;
+                // Justification: best-effort send; failure logged without changing control flow
+                crate::error::record_ignored(
+                    socket.send(Message::Text(error_ev.to_string())).await,
+                    "send via send",
+                );
                 continue;
             }
         };
@@ -6245,7 +6276,11 @@ async fn handle_websocket_session(mut socket: WebSocket, headers: HeaderMap, sta
                         "code": status.as_u16().to_string()
                     }
                 });
-                let _ = socket.send(Message::Text(error_ev.to_string())).await;
+                // Justification: best-effort send; failure logged without changing control flow
+                crate::error::record_ignored(
+                    socket.send(Message::Text(error_ev.to_string())).await,
+                    "send via send",
+                );
                 continue;
             }
         };
@@ -6258,7 +6293,11 @@ async fn handle_websocket_session(mut socket: WebSocket, headers: HeaderMap, sta
                     "type": "server_error"
                 }
             });
-            let _ = socket.send(Message::Text(error_ev.to_string())).await;
+            // Justification: best-effort send; failure logged without changing control flow
+            crate::error::record_ignored(
+                socket.send(Message::Text(error_ev.to_string())).await,
+                "send via send",
+            );
             continue;
         }
 
@@ -6983,7 +7022,11 @@ struct TranslationState {
 
 async fn send_ws_event(socket: &mut WebSocket, ws_events: &mut Vec<Value>, event: &Value) {
     ws_events.push(event.clone());
-    let _ = socket.send(Message::Text(event.to_string())).await;
+    // Justification: best-effort send; failure logged without changing control flow
+    crate::error::record_ignored(
+        socket.send(Message::Text(event.to_string())).await,
+        "send via send",
+    );
 }
 
 async fn translate_openai_chunk_to_ws(

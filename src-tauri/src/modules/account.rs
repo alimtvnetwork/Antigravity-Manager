@@ -64,7 +64,8 @@ mod tests {
 
     impl Drop for TestDataDir {
         fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.path);
+            // Justification: best-effort cleanup; a leftover directory is harmless
+            crate::error::record_ignored(fs::remove_dir_all(&self.path), "remove_dir_all");
         }
     }
 
@@ -136,10 +137,12 @@ mod tests {
             }
             match &previous_pointer {
                 Some(value) => {
-                    let _ = fs::write(&pointer_path, value);
+                    // Justification: best-effort file write; failure is logged and surfaces on the next read
+                    crate::error::record_ignored(fs::write(&pointer_path, value), "fs::write");
                 }
                 None => {
-                    let _ = fs::remove_file(&pointer_path);
+                    // Justification: best-effort cleanup; a leftover file is harmless
+                    crate::error::record_ignored(fs::remove_file(&pointer_path), "remove_file");
                 }
             }
             if let Ok(mut guard) = data_dir_override_slot().write() {
@@ -805,7 +808,8 @@ fn read_location_pointer() -> Option<PathBuf> {
     }
     let cleaned = normalize_data_dir_path(trimmed);
     if format_data_dir_path(&cleaned) != trimmed {
-        let _ = write_location_pointer(&cleaned);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(write_location_pointer(&cleaned), "write_location_pointer");
     }
     Some(cleaned)
 }
@@ -859,7 +863,8 @@ fn apply_data_dir(dir: &Path) -> Result<(), String> {
     ensure_dir(&dir)?;
     if is_default_data_dir(&dir) {
         if let Ok(pointer) = location_pointer_path() {
-            let _ = fs::remove_file(pointer);
+            // Justification: best-effort cleanup; a leftover file is harmless
+            crate::error::record_ignored(fs::remove_file(pointer), "remove_file");
         }
     } else {
         write_location_pointer(&dir)?;
@@ -943,7 +948,8 @@ pub fn migrate_data_dir(new_dir: PathBuf) -> Result<PathBuf, String> {
             );
         }
         copy_dir_recursive(&old_dir, &new_dir)?;
-        let _ = fs::remove_dir_all(&old_dir);
+        // Justification: best-effort cleanup; a leftover directory is harmless
+        crate::error::record_ignored(fs::remove_dir_all(&old_dir), "remove_dir_all");
     } else if let Some(parent) = new_dir.parent() {
         fs::create_dir_all(parent)
             .map_err(|e| format!("Failed to create target parent directory: {}", e))?;
@@ -951,7 +957,8 @@ pub fn migrate_data_dir(new_dir: PathBuf) -> Result<PathBuf, String> {
             Ok(()) => {}
             Err(_) => {
                 copy_dir_recursive(&old_dir, &new_dir)?;
-                let _ = fs::remove_dir_all(&old_dir);
+                // Justification: best-effort cleanup; a leftover directory is harmless
+                crate::error::record_ignored(fs::remove_dir_all(&old_dir), "remove_dir_all");
             }
         }
     } else {
@@ -1137,7 +1144,11 @@ fn load_account_at_path(account_path: &PathBuf) -> Result<Account, String> {
                         "Self-healing account JSON at {:?}: recovered valid account data from trailing characters, saving clean file",
                         account_path
                     ));
-                    let _ = save_account_at_path(account_path, &account);
+                    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                    crate::error::record_ignored(
+                        save_account_at_path(account_path, &account),
+                        "save_account_at_path",
+                    );
                     return Ok(account);
                 }
             }
@@ -1507,7 +1518,8 @@ pub fn delete_accounts(account_ids: &[String]) -> Result<(), String> {
         // Delete account file
         let account_path = accounts_dir.join(format!("{}.json", account_id));
         if account_path.exists() {
-            let _ = fs::remove_file(&account_path);
+            // Justification: best-effort cleanup; a leftover file is harmless
+            crate::error::record_ignored(fs::remove_file(&account_path), "remove_file");
         }
 
         // [FIX #1477] Trigger TokenManager cache cleanup signal
@@ -1707,14 +1719,22 @@ pub async fn switch_account(
     let lease_acc_email = account.email.clone();
     let lease_profile = target_ide.unwrap_or("default").to_string();
     tauri::async_runtime::spawn(async move {
-        let _ = crate::modules::workspace_lease_manager::acquire_lease_with_details(
-            &lease_acc_id,
-            &lease_acc_email,
-            &lease_profile,
-            90,
-        )
-        .await;
-        let _ = crate::modules::supabase_sync::sync_local_node_now().await;
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::workspace_lease_manager::acquire_lease_with_details(
+                &lease_acc_id,
+                &lease_acc_email,
+                &lease_profile,
+                90,
+            )
+            .await,
+            "acquire_lease_with_details",
+        );
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::supabase_sync::sync_local_node_now().await,
+            "sync_local_node_now",
+        );
     });
 
     crate::modules::logger::log_info(&format!(
@@ -1751,32 +1771,37 @@ pub async fn switch_account(
                     .unwrap_or(true)
         })
         .map(|c| c.email);
-        let _ = crate::modules::notification_hub::notify_account_switched_details(
-            crate::modules::notification_hub::SwitchNotificationDetails {
-                previous_email: followup_prev,
-                previous_quota_4h: prev_4h,
-                previous_quota_weekly: prev_weekly,
-                predicted_next_email,
-                selected_email: followup_email,
-                target_quota_4h: target_4h,
-                target_quota_weekly: target_weekly,
-                credit_before_switch: prev_4h,
-                threshold_activated: None,
-                instance_id: followup_target.clone(),
-                instance_name: followup_target,
-                instance_mode: String::new(),
-                reason: "Manual account switch".to_string(),
-                is_auto: false,
-                backed_up_projects: Vec::new(),
-                backed_up_prompts_count: None,
-                restored_prompts_count: None,
-            },
-        )
-        .await;
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::notification_hub::notify_account_switched_details(
+                crate::modules::notification_hub::SwitchNotificationDetails {
+                    previous_email: followup_prev,
+                    previous_quota_4h: prev_4h,
+                    previous_quota_weekly: prev_weekly,
+                    predicted_next_email,
+                    selected_email: followup_email,
+                    target_quota_4h: target_4h,
+                    target_quota_weekly: target_weekly,
+                    credit_before_switch: prev_4h,
+                    threshold_activated: None,
+                    instance_id: followup_target.clone(),
+                    instance_name: followup_target,
+                    instance_mode: String::new(),
+                    reason: "Manual account switch".to_string(),
+                    is_auto: false,
+                    backed_up_projects: Vec::new(),
+                    backed_up_prompts_count: None,
+                    restored_prompts_count: None,
+                },
+            )
+            .await,
+            "notify_account_switched_details",
+        );
         if let Ok(mut refreshed) = load_account(&followup_id) {
             if let Ok(fresh_quota) = fetch_quota_with_retry(&mut refreshed).await {
                 refreshed.quota = Some(fresh_quota);
-                let _ = save_account(&refreshed);
+                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                crate::error::record_ignored(save_account(&refreshed), "save_account");
             }
         }
     });
@@ -2026,7 +2051,11 @@ pub fn bind_device_profile(account_id: &str, mode: &str) -> Result<DeviceProfile
     };
 
     let mut account = load_account(account_id)?;
-    let _ = device::save_global_original(&profile);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        device::save_global_original(&profile),
+        "save_global_original",
+    );
     apply_profile_to_account(&mut account, profile.clone(), Some(mode.to_string()), true)?;
 
     Ok(profile)
@@ -2039,7 +2068,11 @@ pub fn bind_device_profile_with_profile(
     label: Option<String>,
 ) -> Result<DeviceProfile, String> {
     let mut account = load_account(account_id)?;
-    let _ = crate::modules::device::save_global_original(&profile);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        crate::modules::device::save_global_original(&profile),
+        "save_global_original",
+    );
     apply_profile_to_account(&mut account, profile.clone(), label, true)?;
 
     Ok(profile)
@@ -2299,7 +2332,8 @@ pub fn update_account_quota(account_id: &str, quota: QuotaData) -> Result<(), St
         if let Ok(mut index) = load_account_index() {
             if let Some(summary) = index.accounts.iter_mut().find(|a| a.id == account_id) {
                 summary.protected_models = account.protected_models.clone();
-                let _ = save_account_index(&index);
+                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                crate::error::record_ignored(save_account_index(&index), "save_account_index");
             }
         }
     }
@@ -2447,7 +2481,8 @@ pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppR
                 account.disabled = true;
                 account.disabled_at = Some(chrono::Utc::now().timestamp());
                 account.disabled_reason = Some(format!("invalid_grant: {}", e));
-                let _ = save_account(account);
+                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                crate::error::record_ignored(save_account(account), "save_account");
                 crate::proxy::server::trigger_account_reload(&account.id);
             }
             return Err(AppError::OAuth(e));
@@ -2558,7 +2593,8 @@ pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppR
                             account.disabled = true;
                             account.disabled_at = Some(chrono::Utc::now().timestamp());
                             account.disabled_reason = Some(format!("invalid_grant: {}", e));
-                            let _ = save_account(account);
+                            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                            crate::error::record_ignored(save_account(account), "save_account");
                             crate::proxy::server::trigger_account_reload(&account.id);
                         }
                         return Err(AppError::OAuth(e));
@@ -2618,10 +2654,14 @@ pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppR
                             account.email
                         ));
                         account.token.project_id = project_id.clone();
-                        let _ = upsert_account(
-                            account.email.clone(),
-                            account.name.clone(),
-                            account.token.clone(),
+                        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                        crate::error::record_ignored(
+                            upsert_account(
+                                account.email.clone(),
+                                account.name.clone(),
+                                account.token.clone(),
+                            ),
+                            "upsert_account",
                         );
                     }
                 }

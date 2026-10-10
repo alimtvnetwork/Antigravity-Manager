@@ -174,6 +174,7 @@ impl ThinkingStore {
             .map(|e| !e.l2_loaded)
             .unwrap_or(true);
         if needs_l2 {
+            // Justification: load_turns hydrates the in-memory session as a side effect; the returned Vec is intentionally unused here.
             let _ = self.load_turns(store_key);
         }
 
@@ -233,14 +234,18 @@ impl ThinkingStore {
         };
 
         if let Some(saved) = persist {
-            let _ = crate::modules::proxy_db::save_thinking_record(
-                store_key,
-                &saved.fingerprint,
-                &saved.thought,
-                saved.signature.as_deref(),
-                &saved.tool_ids,
-                &saved.tool_names,
-                &saved.visible,
+            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+            crate::error::record_ignored(
+                crate::modules::proxy_db::save_thinking_record(
+                    store_key,
+                    &saved.fingerprint,
+                    &saved.thought,
+                    saved.signature.as_deref(),
+                    &saved.tool_ids,
+                    &saved.tool_names,
+                    &saved.visible,
+                ),
+                "save_thinking_record",
             );
         }
     }
@@ -260,7 +265,11 @@ impl ThinkingStore {
             }
         }
         if persist {
-            let _ = crate::modules::proxy_db::touch_thinking_session(store_key);
+            // Justification: best-effort call; failure logged without changing control flow
+            crate::error::record_ignored(
+                crate::modules::proxy_db::touch_thinking_session(store_key),
+                "touch_thinking_session",
+            );
         }
     }
 
@@ -310,7 +319,11 @@ impl ThinkingStore {
         let turns = entry.turns.clone();
         drop(entry);
         if loaded_len > 0 {
-            let _ = crate::modules::proxy_db::touch_thinking_session(store_key);
+            // Justification: best-effort call; failure logged without changing control flow
+            crate::error::record_ignored(
+                crate::modules::proxy_db::touch_thinking_session(store_key),
+                "touch_thinking_session",
+            );
         }
         turns
     }
@@ -383,14 +396,18 @@ impl ThinkingStore {
             }
             if let Some((idx, rec)) = to_upgrade.last() {
                 if *idx + 1 == existing.len() {
-                    let _ = crate::modules::proxy_db::save_thinking_record(
-                        store_key,
-                        &rec.fingerprint,
-                        &rec.thought,
-                        rec.signature.as_deref(),
-                        &rec.tool_ids,
-                        &rec.tool_names,
-                        &rec.visible,
+                    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                    crate::error::record_ignored(
+                        crate::modules::proxy_db::save_thinking_record(
+                            store_key,
+                            &rec.fingerprint,
+                            &rec.thought,
+                            rec.signature.as_deref(),
+                            &rec.tool_ids,
+                            &rec.tool_names,
+                            &rec.visible,
+                        ),
+                        "save_thinking_record",
                     );
                 }
             }
@@ -961,7 +978,11 @@ impl ThinkingStore {
         let (deleted_turns, deleted_bytes) = removed
             .map(|(_, e)| (e.turns.len(), e.bytes))
             .unwrap_or((0, 0));
-        let _ = crate::modules::proxy_db::delete_thinking_records_for_session(store_key);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::delete_thinking_records_for_session(store_key),
+            "delete_thinking_records_for_session",
+        );
         EndSessionResult {
             session_id: client_id_from_store_key(store_key).to_string(),
             deleted_turns,
@@ -1008,9 +1029,13 @@ impl ThinkingStore {
         }
 
         // 2. 精准净化持久化数据库 (SQLite)
-        let _ = crate::modules::proxy_db::purge_foreign_signatures_for_session_with_model(
-            store_key,
-            target_model,
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            crate::modules::proxy_db::purge_foreign_signatures_for_session_with_model(
+                store_key,
+                target_model,
+            ),
+            "purge_foreign_signatures_for_session_with_model",
         );
 
         if purged_count > 0 {
@@ -1133,8 +1158,12 @@ impl ThinkingStore {
         };
 
         // Delete orphans by fingerprint. Never DELETE+re-INSERT the kept blobs.
-        let _ = crate::modules::proxy_db::delete_thinking_records_except_fingerprints(
-            store_key, &keep_fps,
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::delete_thinking_records_except_fingerprints(
+                store_key, &keep_fps,
+            ),
+            "delete_thinking_records_except_fingerprints",
         );
     }
 
@@ -3106,7 +3135,11 @@ mod tests {
         assert_eq!(rows[0].thought, "thought-1-longer");
         assert_eq!(rows[1].thought, "thought-tool");
         assert_eq!(rows[2].thought, "thought-3");
-        let _ = crate::modules::proxy_db::delete_thinking_records_for_session(store_key);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::delete_thinking_records_for_session(store_key),
+            "delete_thinking_records_for_session",
+        );
     }
 
     #[test]
@@ -3462,7 +3495,11 @@ mod tests {
             after, 20,
             "placeholder history must not be appended as new turns"
         );
-        let _ = crate::modules::proxy_db::delete_thinking_records_for_session(key);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::delete_thinking_records_for_session(key),
+            "delete_thinking_records_for_session",
+        );
     }
 
     #[test]
@@ -3481,7 +3518,11 @@ mod tests {
         store.ingest_from_contents(key, &contents);
         let (turns, _) = store.session_stats(key).unwrap();
         assert_eq!(turns, 1);
-        let _ = crate::modules::proxy_db::delete_thinking_records_for_session(key);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::delete_thinking_records_for_session(key),
+            "delete_thinking_records_for_session",
+        );
     }
 
     #[test]
@@ -3510,7 +3551,11 @@ mod tests {
             elapsed.as_millis() < 800,
             "restore of ~1.2MB visible text took {elapsed:?}; matching must not be quadratic"
         );
-        let _ = crate::modules::proxy_db::delete_thinking_records_for_session(key);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::delete_thinking_records_for_session(key),
+            "delete_thinking_records_for_session",
+        );
     }
 
     #[test]
@@ -3559,7 +3604,11 @@ mod tests {
         store.prune_orphaned_records(key, &contents);
         let (turns, _) = store.session_stats(key).unwrap();
         assert_eq!(turns, 12, "placeholder fill must not prune live tool turns");
-        let _ = crate::modules::proxy_db::delete_thinking_records_for_session(key);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::delete_thinking_records_for_session(key),
+            "delete_thinking_records_for_session",
+        );
     }
 
     #[test]
@@ -3830,7 +3879,11 @@ mod tests {
         assert!(parts[0].get("thoughtSignature").is_none());
         assert_eq!(parts[1]["thoughtSignature"], real_sig);
 
-        let _ = crate::modules::proxy_db::delete_thinking_records_for_session(key);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::delete_thinking_records_for_session(key),
+            "delete_thinking_records_for_session",
+        );
     }
 
     #[test]
@@ -3862,7 +3915,11 @@ mod tests {
     #[test]
     fn test_gemini_native_consecutive_identical_tools_do_not_overwrite() {
         let key = "t:test_identical_tools";
-        let _ = crate::modules::proxy_db::delete_thinking_records_for_session(key);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::delete_thinking_records_for_session(key),
+            "delete_thinking_records_for_session",
+        );
         let store = ThinkingStore::new();
 
         // Turn 1: user text -> model tool call
@@ -3895,13 +3952,21 @@ mod tests {
             "Must store two distinct turns, not overwrite via collision"
         );
 
-        let _ = crate::modules::proxy_db::delete_thinking_records_for_session(key);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::delete_thinking_records_for_session(key),
+            "delete_thinking_records_for_session",
+        );
     }
 
     #[test]
     fn test_prune_orphaned_records_zero_phase_shift() {
         let key = "t:test_phase_shift_prune";
-        let _ = crate::modules::proxy_db::delete_thinking_records_for_session(key);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::delete_thinking_records_for_session(key),
+            "delete_thinking_records_for_session",
+        );
         let store = ThinkingStore::new();
 
         for i in 0..6 {
@@ -3957,13 +4022,21 @@ mod tests {
             );
         }
 
-        let _ = crate::modules::proxy_db::delete_thinking_records_for_session(key);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::delete_thinking_records_for_session(key),
+            "delete_thinking_records_for_session",
+        );
     }
 
     #[test]
     fn test_phase0_signature_direct_matching_recovers_truncated_text() {
         let key = "t:test_phase0_sig";
-        let _ = crate::modules::proxy_db::delete_thinking_records_for_session(key);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::delete_thinking_records_for_session(key),
+            "delete_thinking_records_for_session",
+        );
         let store = ThinkingStore::new();
         let real_sig = "s".repeat(60);
 
@@ -3996,7 +4069,11 @@ mod tests {
             "Phase 0 must recover truncated thought using real signature"
         );
 
-        let _ = crate::modules::proxy_db::delete_thinking_records_for_session(key);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::delete_thinking_records_for_session(key),
+            "delete_thinking_records_for_session",
+        );
     }
 
     #[test]
@@ -4005,14 +4082,18 @@ mod tests {
         let real_sig = format!("sig_l2_{}", "x".repeat(53));
         let tool_id = "call_bash_anchor123_hash456_0";
 
-        let _ = crate::modules::proxy_db::save_thinking_record(
-            key,
-            "fp_l2_sig_test",
-            "Rescued thought from SQLite via signature",
-            Some(&real_sig),
-            &[tool_id.to_string()],
-            &["bash".to_string()],
-            "",
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::save_thinking_record(
+                key,
+                "fp_l2_sig_test",
+                "Rescued thought from SQLite via signature",
+                Some(&real_sig),
+                &[tool_id.to_string()],
+                &["bash".to_string()],
+                "",
+            ),
+            "save_thinking_record",
         );
 
         let store = ThinkingStore::new();
@@ -4040,7 +4121,11 @@ mod tests {
             "Rescued thought from SQLite via signature"
         );
 
-        let _ = crate::modules::proxy_db::delete_thinking_records_for_session(key);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::delete_thinking_records_for_session(key),
+            "delete_thinking_records_for_session",
+        );
     }
 
     #[test]
@@ -4366,14 +4451,18 @@ mod tests {
         let visible_answer = "Here is the exact file path you requested.";
 
         // 1. 模拟旧轮次入库（开思考时发生的思维记录）
-        let _ = crate::modules::proxy_db::save_thinking_record(
-            key,
-            "fp_dedup_001",
-            thought_text,
-            Some(real_sig),
-            &[tool_id.to_string()],
-            &["grep".to_string()],
-            visible_answer,
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::save_thinking_record(
+                key,
+                "fp_dedup_001",
+                thought_text,
+                Some(real_sig),
+                &[tool_id.to_string()],
+                &["grep".to_string()],
+                visible_answer,
+            ),
+            "save_thinking_record",
         );
 
         // 2. 模拟客户端发上来的历史：之前关思考时降级的思考文本变成了普通正文部件，残留或与正文拼接在一起
@@ -4424,7 +4513,11 @@ mod tests {
         assert_eq!(model_parts[2]["functionCall"]["id"], tool_id);
         assert_eq!(model_parts[2]["thoughtSignature"], real_sig);
 
-        let _ = crate::modules::proxy_db::delete_thinking_records_for_session(key);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::delete_thinking_records_for_session(key),
+            "delete_thinking_records_for_session",
+        );
     }
 
     #[test]
@@ -4583,7 +4676,11 @@ mod tests {
             "Synthetic ID must remain internal and not leak to client"
         );
 
-        let _ = crate::modules::proxy_db::delete_thinking_records_for_session(key);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::delete_thinking_records_for_session(key),
+            "delete_thinking_records_for_session",
+        );
     }
 }
 

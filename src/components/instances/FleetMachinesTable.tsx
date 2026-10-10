@@ -15,6 +15,7 @@ import {
 import { invoke } from '@tauri-apps/api/core';
 import { supabaseService } from '../../services/supabaseService';
 import { cn } from '../../utils/cn';
+import { useErrorStore } from '../../stores/error-store';
 
 export interface FleetInstanceSummary {
     profile_id: string;
@@ -86,6 +87,12 @@ export function FleetMachinesTable() {
             return await invoke<FleetMachineInfo[]>('get_fleet_machines');
         } catch (err) {
             console.warn('[FleetMachinesTable] get_fleet_machines invoke failed:', err);
+            // Tracked in the error module; empty list shown, retried on next refresh.
+            useErrorStore.getState().trackWarning(err, {
+              source: 'FleetMachinesTable.fetchFleetMachinesApi',
+              endpoint: 'get_fleet_machines',
+              triggerAction: 'fetch_fleet_machines',
+            });
             return [];
         }
     }, []);
@@ -119,6 +126,11 @@ export function FleetMachinesTable() {
                 setMachines(filtered);
             } catch (err) {
                 console.warn('[FleetMachinesTable] fetchMachines error:', err);
+                // Tracked in the error module; stale list kept, retried on next refresh.
+                useErrorStore.getState().trackWarning(err, {
+                  source: 'FleetMachinesTable.fetchMachines',
+                  triggerAction: 'fetch_machines',
+                });
             } finally {
                 setIsRefreshing(false);
             }
@@ -158,6 +170,11 @@ export function FleetMachinesTable() {
                 }
             } catch (err) {
                 console.warn('[FleetMachinesTable] init error:', err);
+                // Tracked in the error module; loading spinner cleared, empty state shown.
+                useErrorStore.getState().trackWarning(err, {
+                  source: 'FleetMachinesTable.init',
+                  triggerAction: 'init_machines',
+                });
             } finally {
                 if (isMounted) {
                     setIsLoading(false);
@@ -203,6 +220,11 @@ export function FleetMachinesTable() {
             }, 2000);
         } catch (err) {
             console.warn('[FleetMachinesTable] Failed to copy IP:', err);
+            // Tracked in the error module; copy feedback simply won't show, user can copy manually.
+            useErrorStore.getState().trackWarning(err, {
+              source: 'FleetMachinesTable.copyIp',
+              triggerAction: 'copy_ip',
+            });
         }
     };
 

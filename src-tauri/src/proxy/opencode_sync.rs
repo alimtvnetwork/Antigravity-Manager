@@ -74,12 +74,14 @@ fn atomically_write_config(config_path: &std::path::Path, config: &Value) -> Res
     })();
     drop(file);
     if let Err(e) = write_result {
-        let _ = fs::remove_file(&tmp_path);
+        // Justification: best-effort cleanup; a leftover file is harmless
+        crate::error::record_ignored(fs::remove_file(&tmp_path), "remove_file");
         return Err(format!("Failed to write temp file: {}", e));
     }
 
     fs::rename(&tmp_path, config_path).map_err(|e| {
-        let _ = fs::remove_file(&tmp_path);
+        // Justification: best-effort cleanup; a leftover file is harmless
+        crate::error::record_ignored(fs::remove_file(&tmp_path), "remove_file");
         format!("Failed to rename config file: {}", e)
     })?;
     Ok(())

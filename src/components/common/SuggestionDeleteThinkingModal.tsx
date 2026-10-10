@@ -4,6 +4,7 @@ import ModalDialog from './ModalDialog';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { request } from '../../utils/request';
 import { showToast } from './ToastContainer';
+import { useErrorStore } from '../../stores/error-store';
 
 // ============================================================================
 // 开发者发版控制项 (Release Control Configuration)
@@ -69,6 +70,11 @@ export const SuggestionDeleteThinkingModal: React.FC = () => {
         }, 1200);
       } catch (err) {
         console.warn('[SuggestionDeleteThinking] Failed to query thinking count:', err);
+        // Tracked in the error module; suggestion prompt simply won't appear, safe to continue.
+        useErrorStore.getState().trackWarning(err, {
+          source: 'SuggestionDeleteThinkingModal.checkSuggestion',
+          triggerAction: 'query_thinking_count',
+        });
       }
     };
 
@@ -93,6 +99,11 @@ export const SuggestionDeleteThinkingModal: React.FC = () => {
       setIsOpen(false);
     } catch (err: any) {
       console.error('[SuggestionDeleteThinking] Clear error:', err);
+      // Tracked in the error module; user already notified via error toast.
+      useErrorStore.getState().trackWarning(err, {
+        source: 'SuggestionDeleteThinkingModal.handleClear',
+        triggerAction: 'clear_thinking_store',
+      });
       showToast(String(err), 'error');
     } finally {
       setIsDeleting(false);
@@ -114,6 +125,11 @@ export const SuggestionDeleteThinkingModal: React.FC = () => {
       );
     } catch (err) {
       console.warn('[SuggestionDeleteThinking] Save dismissed state error:', err);
+      // Tracked in the error module; dismissal simply won't persist, safe to continue.
+      useErrorStore.getState().trackWarning(err, {
+        source: 'SuggestionDeleteThinkingModal.handleDismiss',
+        triggerAction: 'save_dismissed_state',
+      });
     }
     setIsOpen(false);
   };

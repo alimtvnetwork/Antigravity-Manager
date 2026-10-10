@@ -28,6 +28,7 @@ import { useProxyModels } from '../../hooks/useProxyModels';
 import GroupedSelect from '../common/GroupedSelect';
 import { Claude, OpenAI, Gemini, Grok, Github as LobeGithub, OpenClaw } from '@lobehub/icons';
 import { JeikCodeIcon } from '../common/JeikCodeIcon';
+import { useErrorStore } from '../../stores/error-store';
 
 interface CliSyncCardProps {
     proxyUrl: string;
@@ -155,6 +156,12 @@ export const CliSyncCard = ({ proxyUrl, apiKey, className }: CliSyncCardProps) =
             setStatuses(prev => ({ ...prev, [app]: status }));
         } catch (error) {
             console.error(`Failed to check ${app} status:`, error);
+            // Tracked in the error module; status chip keeps previous/unknown state, retried on next check.
+            useErrorStore.getState().trackWarning(error, {
+              source: 'CliSyncCard.checkStatus',
+              triggerAction: 'check_cli_status',
+              context: { app },
+            });
         } finally {
             setLoading(prev => ({ ...prev, [app]: false }));
         }

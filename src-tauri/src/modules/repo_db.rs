@@ -150,12 +150,15 @@ pub fn get_repo_db_path() -> Result<PathBuf, String> {
 pub fn connect_db() -> Result<Connection, String> {
     let path = get_repo_db_path()?;
     if let Some(parent) = path.parent() {
-        let _ = fs::create_dir_all(parent);
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create repo database directory: {}", e))?;
     }
     let conn =
         Connection::open(&path).map_err(|e| format!("Failed to open repo database: {}", e))?;
-    let _ = conn.pragma_update(None, "journal_mode", "WAL");
-    let _ = conn.pragma_update(None, "busy_timeout", 5000);
+    conn.pragma_update(None, "journal_mode", "WAL")
+        .map_err(|e| format!("Failed to set WAL mode on repo database: {}", e))?;
+    conn.pragma_update(None, "busy_timeout", 5000)
+        .map_err(|e| format!("Failed to set busy timeout on repo database: {}", e))?;
     init_tables(&conn)?;
     Ok(conn)
 }
@@ -197,9 +200,13 @@ fn init_tables(conn: &Connection) -> Result<(), String> {
     .map_err(|e| format!("Failed to create active_prompts table: {}", e))?;
 
     // Migration: add image_payload column if it doesn't exist yet
-    let _ = conn.execute(
-        "ALTER TABLE active_prompts ADD COLUMN image_payload TEXT",
-        [],
+    // Justification: idempotent schema migration; failure is expected when the column already exists
+    crate::error::record_ignored(
+        conn.execute(
+            "ALTER TABLE active_prompts ADD COLUMN image_payload TEXT",
+            [],
+        ),
+        "add image_payload column migration",
     );
 
     conn.execute(
@@ -256,17 +263,29 @@ fn init_tables(conn: &Connection) -> Result<(), String> {
     )
     .map_err(|e| format!("Failed to create failed_commands table: {}", e))?;
 
-    let _ = conn.execute(
+    // Justification: lookup index is a performance accelerator; queries work without it
+    crate::error::record_ignored(
+        conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_failed_commands_cmd ON failed_commands(command, domain)",
         [],
+    ),
+        "create idx_failed_commands_cmd index",
     );
-    let _ = conn.execute(
+    // Justification: lookup index is a performance accelerator; queries work without it
+    crate::error::record_ignored(
+        conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_failed_commands_hits ON failed_commands(hit_count DESC)",
         [],
+    ),
+        "create idx_failed_commands_hits index",
     );
-    let _ = conn.execute(
-        "CREATE VIEW IF NOT EXISTS failed_to_detect_commands AS SELECT * FROM failed_commands",
-        [],
+    // Justification: legacy convenience view; nothing queries it and creation is idempotent
+    crate::error::record_ignored(
+        conn.execute(
+            "CREATE VIEW IF NOT EXISTS failed_to_detect_commands AS SELECT * FROM failed_commands",
+            [],
+        ),
+        "create failed_to_detect_commands view",
     );
 
     conn.execute(
@@ -283,10 +302,14 @@ fn init_tables(conn: &Connection) -> Result<(), String> {
     )
     .map_err(|e| format!("Failed to create prompt_tree_cache table: {}", e))?;
 
-    let _ = conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_running_projects_inst_running 
+    // Justification: lookup index is a performance accelerator; queries work without it
+    crate::error::record_ignored(
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_running_projects_inst_running
          ON running_projects(instance_id, is_running)",
-        [],
+            [],
+        ),
+        "create idx_running_projects_inst_running index",
     );
 
     STARTUP_PURGE_ONCE.call_once(|| {
@@ -334,7 +357,8 @@ pub fn purge_corrupted_running_projects(conn: &Connection) -> Result<(usize, usi
         )
         .map_err(|e| format!("Failed to purge corrupted running_projects: {}", e))?;
 
-    let _ = conn.execute("UPDATE running_projects SET is_running = 0", []);
+    conn.execute("UPDATE running_projects SET is_running = 0", [])
+        .map_err(|e| format!("Failed to reset running flags during purge: {}", e))?;
 
     let deleted_cache = conn
         .execute("DELETE FROM prompt_tree_cache", [])
@@ -637,17 +661,25 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
     // Persist discovered projects into repo database safely without wiping fallback entries
     if let Ok(conn) = connect_db() {
         // Prune stale projects that have not been detected within the last 120 seconds
-        let _ = conn.execute(
-            "DELETE FROM running_projects WHERE last_detected_at < (?1 - 120)",
-            params![now],
+        // Justification: persistence of discovery scan results is best-effort; the scan results are returned regardless
+        crate::error::record_ignored(
+            conn.execute(
+                "DELETE FROM running_projects WHERE last_detected_at < (?1 - 120)",
+                params![now],
+            ),
+            "prune stale running projects",
         );
 
         // Only delete corrupted entries where BOTH workspace_storage_path is NULL AND the repo_path does not exist on disk
-        let _ = conn.execute(
-            "DELETE FROM running_projects 
-             WHERE instr(id, '__') = 0 
+        // Justification: persistence of discovery scan results is best-effort; the scan results are returned regardless
+        crate::error::record_ignored(
+            conn.execute(
+                "DELETE FROM running_projects
+             WHERE instr(id, '__') = 0
                 OR (workspace_storage_path IS NULL AND (repo_path IS NULL OR repo_path = ''))",
-            [],
+                [],
+            ),
+            "delete corrupted running projects",
         );
 
         let discovered_ids: std::collections::HashSet<String> =
@@ -667,17 +699,23 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
                 let repo_exists = Path::new(&repo_path).exists();
                 let is_valid_fallback = wspath_opt.is_none() && repo_exists;
                 if !discovered_ids.contains(&old_id) && !ws_exists && !is_valid_fallback {
-                    let _ = conn.execute(
+                    // Justification: persistence of discovery scan results is best-effort; the scan results are returned regardless
+                    crate::error::record_ignored(
+                        conn.execute(
                         "DELETE FROM running_projects WHERE id = ?1",
                         params![&old_id],
+                    ),
+                        "delete undiscovered running project",
                     );
                 }
             }
         }
         for p in &projects {
             let running_int = if p.is_running { 1 } else { 0 };
-            let _ = conn.execute(
-                "INSERT INTO running_projects 
+            // Justification: persistence of discovery scan results is best-effort; the scan results are returned regardless
+            crate::error::record_ignored(
+                conn.execute(
+                "INSERT INTO running_projects
                  (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
                  ON CONFLICT(id) DO UPDATE SET
@@ -698,20 +736,30 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
                     p.last_detected_at,
                     now,
                 ],
+            ),
+                "upsert discovered running project",
             );
             if !p.is_running {
-                let _ = conn.execute(
-                    "UPDATE running_projects SET is_running = 0, updated_at = ?1 WHERE id = ?2",
-                    params![now, &p.id],
+                // Justification: persistence of discovery scan results is best-effort; the scan results are returned regardless
+                crate::error::record_ignored(
+                    conn.execute(
+                        "UPDATE running_projects SET is_running = 0, updated_at = ?1 WHERE id = ?2",
+                        params![now, &p.id],
+                    ),
+                    "mark non-running project",
                 );
             }
         }
 
         // If instance is not active, ensure all projects belonging to this instance are marked is_running = 0
         if !is_instance_active {
-            let _ = conn.execute(
+            // Justification: persistence of discovery scan results is best-effort; the scan results are returned regardless
+            crate::error::record_ignored(
+                conn.execute(
                 "UPDATE running_projects SET is_running = 0, updated_at = ?1 WHERE instance_id = ?2",
                 params![now, target_id],
+            ),
+                "mark instance projects not running",
             );
         }
     }
@@ -1163,9 +1211,13 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
 
     // Step 0: Retire stale 'running' prompts older than 2 hours to 'dispatched' so they don't shadow active prompts
     let stale_cutoff = now - 7200;
-    let _ = conn.execute(
+    // Justification: stale-row retirement is housekeeping; the backup transition proceeds regardless
+    crate::error::record_ignored(
+        conn.execute(
         "UPDATE active_prompts SET status = 'dispatched', updated_at = ? WHERE status = 'running' AND updated_at < ?",
         params![now, stale_cutoff],
+    ),
+        "retire stale running prompts",
     );
 
     // Step 0.5: Clear dispatched prompts cache so that any prompt backed up can be cleanly re-dispatched upon switch completion
@@ -1222,11 +1274,15 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| p.project_id.clone());
-        let _ = conn.execute(
-            "INSERT OR REPLACE INTO running_projects 
+        // Justification: project-row scaffolding is auxiliary; the prompt upsert result is checked separately
+        crate::error::record_ignored(
+            conn.execute(
+            "INSERT OR REPLACE INTO running_projects
              (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
              VALUES (?, ?, ?, ?, NULL, 0, ?, ?)",
             params![&p.project_id, &p.instance_id, &clean_repo_name, &p.repo_path, now, now],
+        ),
+            "upsert running project for backed-up prompt",
         );
 
         let res = conn.execute(
@@ -1264,7 +1320,11 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                 payload["image_payload"] = serde_json::json!(final_img);
             }
             if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
-                let _ = fs::write(&task_file, json_str);
+                // Justification: resume snapshot is a convenience file for the IDE; the database row is the source of truth
+                crate::error::record_ignored(
+                    fs::write(&task_file, json_str),
+                    "write resume task snapshot",
+                );
             }
             if let Ok(mut map) = get_memory_prompts_map().lock() {
                 map.insert(p.id.clone(), p);
@@ -1436,7 +1496,11 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                     payload["image_payload"] = serde_json::json!(final_img);
                 }
                 if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
-                    let _ = fs::write(&task_file, json_str);
+                    // Justification: resume snapshot is a convenience file for the IDE; the database row is the source of truth
+                    crate::error::record_ignored(
+                        fs::write(&task_file, json_str),
+                        "write resume task snapshot",
+                    );
                 }
 
                 if let Ok(mut map) = get_memory_prompts_map().lock() {
@@ -1614,9 +1678,13 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
                 "[RepoDB] Skipping duplicate dispatch for prompt '{}' in '{}'",
                 prompt.id, prompt.repo_path
             ));
-            let _ = conn.execute(
-                "UPDATE active_prompts SET status = 'dispatched', updated_at = ? WHERE id = ?",
-                rusqlite::params![now, &prompt.id],
+            // Justification: duplicate-suppression state update; a missed update leaves the prompt backed_up for retry on the next dispatch
+            crate::error::record_ignored(
+                conn.execute(
+                    "UPDATE active_prompts SET status = 'dispatched', updated_at = ? WHERE id = ?",
+                    rusqlite::params![now, &prompt.id],
+                ),
+                "mark duplicate prompt dispatched",
             );
             continue;
         }
@@ -1946,7 +2014,11 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
         });
 
         if let Ok(conn) = conn_res {
-            let _ = conn.pragma_update(None, "busy_timeout", 3000);
+            // Justification: busy_timeout on a third-party read-only database is a nicety; reads continue with the default
+            crate::error::record_ignored(
+                conn.pragma_update(None, "busy_timeout", 3000),
+                "set busy_timeout on Antigravity summaries database",
+            );
             if let Ok(mut stmt) = conn.prepare(
                 "SELECT status, not_fully_idle, workspace_uris, last_modified_time, title, preview 
                  FROM conversation_summaries 
@@ -2220,19 +2292,25 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
         if final_img.is_some() {
             payload["image_payload"] = serde_json::json!(final_img);
         }
-        let _ = if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
-            fs::write(&task_file, json_str).is_ok()
-        } else {
-            false
-        };
+        // Justification: resume snapshot is a convenience file for the IDE; dispatch proceeds via agy regardless
+        if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
+            crate::error::record_ignored(
+                fs::write(&task_file, json_str),
+                "write resume task snapshot",
+            );
+        }
 
         // Spawn prompt via agy
         let sent = spawn_prompt_via_agy(&prompt);
 
         // Update active_prompts status to 'dispatched'
-        let _ = conn.execute(
-            "UPDATE active_prompts SET status = 'dispatched', updated_at = ?1 WHERE id = ?2",
-            params![now, &prompt.id],
+        // Justification: dispatch state update; a missed update leaves the prompt backed_up so it is retried on the next dispatch
+        crate::error::record_ignored(
+            conn.execute(
+                "UPDATE active_prompts SET status = 'dispatched', updated_at = ?1 WHERE id = ?2",
+                params![now, &prompt.id],
+            ),
+            "mark prompt dispatched after agy send",
         );
 
         if let Ok(mut map) = get_memory_prompts_map().lock() {
@@ -2273,7 +2351,11 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
             timestamp: now,
         };
 
-        let _ = crate::modules::task_history_db::record_scheduler_event(&facts);
+        // Justification: audit-trail write is observability; the dispatch already succeeded
+        crate::error::record_ignored(
+            crate::modules::task_history_db::record_scheduler_event(&facts),
+            "record scheduler event in audit trail",
+        );
         dispatched_count += 1;
     }
 
@@ -2373,12 +2455,16 @@ pub fn requeue_running_conversations_for_instance(instance_id: &str) -> Result<u
                     prompt_content
                 };
                 let reason = "In-flight conversation re-enqueued for restart/switch continuity";
-                let _ = crate::modules::task_history_db::record_requeue_event(
-                    &project_name,
-                    &inst_id,
-                    &cid,
-                    reason,
-                    &preview,
+                // Justification: audit-trail write is observability; the requeue already completed
+                crate::error::record_ignored(
+                    crate::modules::task_history_db::record_requeue_event(
+                        &project_name,
+                        &inst_id,
+                        &cid,
+                        reason,
+                        &preview,
+                    ),
+                    "record requeue event in audit trail",
                 );
             }
         }
@@ -2493,13 +2579,19 @@ pub fn restore_prompts_from_backup_json(backup_json: &str) -> Result<usize, Stri
             let created_at = p.get("created_at").and_then(|v| v.as_i64()).unwrap_or(now);
             let img = p.get("image_payload").and_then(|v| v.as_str());
 
-            let _ = conn.execute(
+            // Justification: restore-from-backup insert is best-effort; the loop continues with the remaining entries
+            crate::error::record_ignored(
+                conn.execute(
                 "INSERT OR IGNORE INTO running_projects (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at)
                  VALUES (?1, ?2, ?3, ?4, NULL, 0, ?5)",
                 rusqlite::params![project_id, instance_id, project_id, repo_path, now],
+            ),
+                "restore running project from backup",
             );
 
-            let _ = conn.execute(
+            // Justification: restore-from-backup insert is best-effort; the loop continues with the remaining entries
+            crate::error::record_ignored(
+                conn.execute(
                 "INSERT INTO active_prompts (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'backed_up', ?8, ?9, ?10)
                  ON CONFLICT(id) DO UPDATE SET
@@ -2507,6 +2599,8 @@ pub fn restore_prompts_from_backup_json(backup_json: &str) -> Result<usize, Stri
                     status = 'backed_up',
                     updated_at = excluded.updated_at",
                 rusqlite::params![id, project_id, instance_id, repo_path, content, model, session_id, created_at, now, img],
+            ),
+                "restore backed-up prompt from backup",
             );
             restored_count += 1;
         }
@@ -2526,10 +2620,14 @@ pub fn restore_prompts_from_backup_json(backup_json: &str) -> Result<usize, Stri
                 .and_then(|v| v.as_str())
                 .unwrap_or("default");
 
-            let _ = conn.execute(
+            // Justification: restore-from-backup insert is best-effort; the loop continues with the remaining entries
+            crate::error::record_ignored(
+                conn.execute(
                 "INSERT OR IGNORE INTO running_projects (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at)
                  VALUES (?1, ?2, ?3, ?4, NULL, 0, ?5)",
                 rusqlite::params![proj_id, inst_id, repo_name, repo_path, now],
+            ),
+                "restore running project from backup",
             );
 
             if let Some(convs) = proj.get("conversations").and_then(|v| v.as_array()) {
@@ -2563,7 +2661,9 @@ pub fn restore_prompts_from_backup_json(backup_json: &str) -> Result<usize, Stri
                         .map(|s| parse_flexible_timestamp(s))
                         .unwrap_or(now);
 
-                    let _ = conn.execute(
+                    // Justification: restore-from-backup insert is best-effort; the loop continues with the remaining entries
+                    crate::error::record_ignored(
+                        conn.execute(
                         "INSERT INTO active_prompts (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at)
                          VALUES (?1, ?2, ?3, ?4, ?5, 'gemini', ?6, 'backed_up', ?7, ?8)
                          ON CONFLICT(id) DO UPDATE SET
@@ -2571,6 +2671,8 @@ pub fn restore_prompts_from_backup_json(backup_json: &str) -> Result<usize, Stri
                             status = 'backed_up',
                             updated_at = excluded.updated_at",
                         rusqlite::params![prompt_id, proj_id, inst_id, repo_path, prompt_text, cid, conv_time, now],
+                    ),
+                        "restore backed-up prompt from backup",
                     );
                     restored_count += 1;
                 }
@@ -2705,7 +2807,11 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
         });
 
         if let Ok(conn) = conn {
-            let _ = conn.pragma_update(None, "busy_timeout", 3000);
+            // Justification: busy_timeout on a third-party read-only database is a nicety; reads continue with the default
+            crate::error::record_ignored(
+                conn.pragma_update(None, "busy_timeout", 3000),
+                "set busy_timeout on Antigravity summaries database",
+            );
             if let Ok(mut stmt) = conn.prepare(
                 "SELECT conversation_id, title, preview, status, not_fully_idle, workspace_uris, last_modified_time 
                  FROM conversation_summaries 
@@ -2943,7 +3049,11 @@ pub fn is_any_prompt_actively_running() -> bool {
             });
 
             if let Ok(conn) = conn {
-                let _ = conn.pragma_update(None, "busy_timeout", 3000);
+                // Justification: busy_timeout on a third-party read-only database is a nicety; reads continue with the default
+                crate::error::record_ignored(
+                    conn.pragma_update(None, "busy_timeout", 3000),
+                    "set busy_timeout on Antigravity summaries database",
+                );
                 let count: i32 = conn
                     .query_row(
                         "SELECT COUNT(*) FROM conversation_summaries 
@@ -3046,15 +3156,17 @@ pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
         .unwrap_or_default();
 
     if !ws_path.trim().is_empty() {
-        let _ = conn.execute(
-            "INSERT INTO running_projects 
+        // Justification: project-row scaffolding is auxiliary; the prompt row insert below is the authoritative op
+        crate::error::record_ignored(
+            conn.execute(
+            "INSERT INTO running_projects
              (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
              ON CONFLICT(id) DO UPDATE SET
-                workspace_storage_path = CASE 
-                    WHEN excluded.workspace_storage_path IS NOT NULL AND trim(excluded.workspace_storage_path) != '' 
-                    THEN excluded.workspace_storage_path 
-                    ELSE running_projects.workspace_storage_path 
+                workspace_storage_path = CASE
+                    WHEN excluded.workspace_storage_path IS NOT NULL AND trim(excluded.workspace_storage_path) != ''
+                    THEN excluded.workspace_storage_path
+                    ELSE running_projects.workspace_storage_path
                 END,
                 is_running = excluded.is_running,
                 updated_at = excluded.updated_at",
@@ -3068,6 +3180,8 @@ pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
                 now,
                 now
             ],
+        ),
+            "upsert running project for prompt",
         );
     }
 
@@ -3250,7 +3364,11 @@ pub fn lookup_conversation_title(prefix_or_id: &str) -> Option<String> {
         )
     })
     .ok()?;
-    let _ = conn.pragma_update(None, "busy_timeout", 2000);
+    // Justification: busy_timeout on a third-party read-only database is a nicety; reads continue with the default
+    crate::error::record_ignored(
+        conn.pragma_update(None, "busy_timeout", 2000),
+        "set busy_timeout on Antigravity summaries database",
+    );
 
     let pattern = format!("%{}%", clean);
     let mut stmt = conn
@@ -3459,9 +3577,14 @@ pub fn copy_to_system_clipboard(content: &str) {
             .spawn()
         {
             if let Some(ref mut stdin) = child.stdin {
-                let _ = std::io::Write::write_all(stdin, content.as_bytes());
+                // Justification: clipboard copy is fire-and-forget; the caller has no recovery path
+                crate::error::record_ignored(
+                    std::io::Write::write_all(stdin, content.as_bytes()),
+                    "write clipboard stdin (clip)",
+                );
             }
-            let _ = child.wait();
+            // Justification: clipboard copy is fire-and-forget; the caller has no recovery path
+            crate::error::record_ignored(child.wait(), "wait for clipboard helper (clip)");
         }
     }
     #[cfg(target_os = "macos")]
@@ -3471,9 +3594,14 @@ pub fn copy_to_system_clipboard(content: &str) {
             .spawn()
         {
             if let Some(ref mut stdin) = child.stdin {
-                let _ = std::io::Write::write_all(stdin, content.as_bytes());
+                // Justification: clipboard copy is fire-and-forget; the caller has no recovery path
+                crate::error::record_ignored(
+                    std::io::Write::write_all(stdin, content.as_bytes()),
+                    "write clipboard stdin (pbcopy)",
+                );
             }
-            let _ = child.wait();
+            // Justification: clipboard copy is fire-and-forget; the caller has no recovery path
+            crate::error::record_ignored(child.wait(), "wait for clipboard helper (pbcopy)");
         }
     }
     #[cfg(target_os = "linux")]
@@ -3486,7 +3614,11 @@ pub fn copy_to_system_clipboard(content: &str) {
                 .spawn()
             {
                 if let Some(ref mut stdin) = child.stdin {
-                    let _ = std::io::Write::write_all(stdin, content.as_bytes());
+                    // Justification: clipboard copy is fire-and-forget; the caller has no recovery path
+                    crate::error::record_ignored(
+                        std::io::Write::write_all(stdin, content.as_bytes()),
+                        "write clipboard stdin (wl-copy)",
+                    );
                 }
                 if let Ok(status) = child.wait() {
                     has_copied = status.success();
@@ -3500,7 +3632,11 @@ pub fn copy_to_system_clipboard(content: &str) {
                 .spawn()
             {
                 if let Some(ref mut stdin) = child.stdin {
-                    let _ = std::io::Write::write_all(stdin, content.as_bytes());
+                    // Justification: clipboard copy is fire-and-forget; the caller has no recovery path
+                    crate::error::record_ignored(
+                        std::io::Write::write_all(stdin, content.as_bytes()),
+                        "write clipboard stdin (xclip)",
+                    );
                 }
                 if let Ok(status) = child.wait() {
                     has_copied = status.success();
@@ -3514,9 +3650,14 @@ pub fn copy_to_system_clipboard(content: &str) {
                 .spawn()
             {
                 if let Some(ref mut stdin) = child.stdin {
-                    let _ = std::io::Write::write_all(stdin, content.as_bytes());
+                    // Justification: clipboard copy is fire-and-forget; the caller has no recovery path
+                    crate::error::record_ignored(
+                        std::io::Write::write_all(stdin, content.as_bytes()),
+                        "write clipboard stdin (xsel)",
+                    );
                 }
-                let _ = child.wait();
+                // Justification: clipboard copy is fire-and-forget; the caller has no recovery path
+                crate::error::record_ignored(child.wait(), "wait for clipboard helper (xsel)");
             }
         }
     }
@@ -3587,10 +3728,18 @@ pub fn send_prompt_now_for_instance(
                 payload["image_payload"] = serde_json::json!(final_img);
             }
             let serialized = serde_json::to_string_pretty(&payload).unwrap_or_default();
-            let _ = fs::write(ws_dir.join(".antigravity_resume_task.json"), &serialized);
-            let _ = fs::write(
-                ws_dir.join(format!(".antigravity_resume_task.{}.json", canonical_inst)),
-                &serialized,
+            // Justification: resume snapshot is a convenience file; the agy dispatch result below is the authoritative outcome
+            crate::error::record_ignored(
+                fs::write(ws_dir.join(".antigravity_resume_task.json"), &serialized),
+                "write resume task snapshot",
+            );
+            // Justification: resume snapshot is a convenience file; the agy dispatch result below is the authoritative outcome
+            crate::error::record_ignored(
+                fs::write(
+                    ws_dir.join(format!(".antigravity_resume_task.{}.json", canonical_inst)),
+                    &serialized,
+                ),
+                "write per-instance resume task snapshot",
             );
         }
     }
@@ -3668,10 +3817,18 @@ pub fn enqueue_prompt_for_instance(
             }
             payload["auto_boot"] = serde_json::json!(false);
             let serialized = serde_json::to_string_pretty(&payload).unwrap_or_default();
-            let _ = fs::write(ws_dir.join(".antigravity_resume_task.json"), &serialized);
-            let _ = fs::write(
-                ws_dir.join(format!(".antigravity_resume_task.{}.json", canonical_inst)),
-                &serialized,
+            // Justification: resume snapshot is a convenience file; the queued state is already recorded
+            crate::error::record_ignored(
+                fs::write(ws_dir.join(".antigravity_resume_task.json"), &serialized),
+                "write resume task snapshot",
+            );
+            // Justification: resume snapshot is a convenience file; the queued state is already recorded
+            crate::error::record_ignored(
+                fs::write(
+                    ws_dir.join(format!(".antigravity_resume_task.{}.json", canonical_inst)),
+                    &serialized,
+                ),
+                "write per-instance resume task snapshot",
             );
         }
     }
@@ -3781,9 +3938,13 @@ pub fn resend_running_commands_for_instance(
                 prompt.id, prompt.repo_path
             ));
             if prompt.status != "queued" {
-                let _ = conn.execute(
-                    "UPDATE active_prompts SET status = 'queued', updated_at = ? WHERE id = ?",
-                    rusqlite::params![now, &prompt.id],
+                // Justification: queue-state update is best-effort; the prompt keeps its current status and is reconsidered on the next resend
+                crate::error::record_ignored(
+                    conn.execute(
+                        "UPDATE active_prompts SET status = 'queued', updated_at = ? WHERE id = ?",
+                        rusqlite::params![now, &prompt.id],
+                    ),
+                    "re-queue preserved prompt",
                 );
             }
             continue;
@@ -3791,9 +3952,13 @@ pub fn resend_running_commands_for_instance(
 
         if resent.len() >= limit {
             if prompt.status != "queued" {
-                let _ = conn.execute(
-                    "UPDATE active_prompts SET status = 'queued', updated_at = ? WHERE id = ?",
-                    rusqlite::params![now, &prompt.id],
+                // Justification: queue-state update is best-effort; the prompt keeps its current status and is reconsidered on the next resend
+                crate::error::record_ignored(
+                    conn.execute(
+                        "UPDATE active_prompts SET status = 'queued', updated_at = ? WHERE id = ?",
+                        rusqlite::params![now, &prompt.id],
+                    ),
+                    "re-queue prompt over resend limit",
                 );
             }
             continue;
@@ -3819,9 +3984,13 @@ pub fn resend_running_commands_for_instance(
                 "[RepoDB] Skipping duplicate dispatch for prompt '{}' in '{}'",
                 prompt.id, prompt.repo_path
             ));
-            let _ = conn.execute(
-                "UPDATE active_prompts SET status = 'dispatched', updated_at = ? WHERE id = ?",
-                rusqlite::params![now, &prompt.id],
+            // Justification: duplicate-suppression state update; a missed update leaves the prompt backed_up for retry on the next resend
+            crate::error::record_ignored(
+                conn.execute(
+                    "UPDATE active_prompts SET status = 'dispatched', updated_at = ? WHERE id = ?",
+                    rusqlite::params![now, &prompt.id],
+                ),
+                "mark duplicate prompt dispatched",
             );
             continue;
         }
@@ -3850,7 +4019,11 @@ pub fn resend_running_commands_for_instance(
         });
 
         if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
-            let _ = fs::write(&task_file, json_str);
+            // Justification: resume snapshot is a convenience file for the IDE; the database row is the source of truth
+            crate::error::record_ignored(
+                fs::write(&task_file, json_str),
+                "write resume task snapshot",
+            );
         }
 
         let sent = spawn_prompt_via_agy(&prompt);
@@ -3862,9 +4035,13 @@ pub fn resend_running_commands_for_instance(
             continue;
         }
 
-        let _ = conn.execute(
+        // Justification: dispatch already succeeded via agy; a missed status update only causes a retry on the next resend
+        crate::error::record_ignored(
+            conn.execute(
             "UPDATE active_prompts SET status = 'dispatched', updated_at = ?, image_payload = ? WHERE id = ?",
             rusqlite::params![now, &prompt.image_payload, &prompt.id],
+        ),
+            "mark prompt dispatched after agy send",
         );
         if prompt.status == "running" {
             let inst_suffix =
@@ -3878,9 +4055,13 @@ pub fn resend_running_commands_for_instance(
             } else {
                 format!("{}__{}", prompt.project_id, inst_suffix)
             };
-            let _ = conn.execute(
+            // Justification: liveness flag is recomputed on every resend scan; best-effort
+            crate::error::record_ignored(
+                conn.execute(
                 "UPDATE running_projects SET is_running = 1, last_detected_at = ?1, updated_at = ?2 WHERE id = ?3",
                 rusqlite::params![now, now, &composite_id],
+            ),
+                "mark project running after resend",
             );
         }
 
@@ -4070,12 +4251,18 @@ pub fn auto_resume_recent_prompts(
         };
         let payload = resume_task_document(&prompt_obj, "dispatched", now, &[]);
         if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
-            let _ = fs::write(&task_file, json_str);
+            // Justification: resume snapshot is a convenience file for the IDE; the database row is the source of truth
+            crate::error::record_ignored(
+                fs::write(&task_file, json_str),
+                "write resume task snapshot",
+            );
         }
 
         // Mark / update status in active_prompts as dispatched
-        let _ = conn.execute(
-            "INSERT OR REPLACE INTO active_prompts 
+        // Justification: dispatch state record; the agy send already happened and re-reads tolerate a stale row
+        crate::error::record_ignored(
+            conn.execute(
+            "INSERT OR REPLACE INTO active_prompts
              (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
              VALUES (?, ?, ?, ?, ?, ?, ?, 'dispatched', ?, ?, ?)",
             params![
@@ -4090,6 +4277,8 @@ pub fn auto_resume_recent_prompts(
                 now,
                 &image_payload,
             ],
+        ),
+            "record dispatched prompt",
         );
 
         let prompt_obj = ActivePrompt {
@@ -4240,9 +4429,13 @@ fn ensure_project_sequence_in_conn(
         params![project_key],
         |row| row.get::<_, i64>(0),
     ) {
-        let _ = conn.execute(
+        // Justification: metadata refresh on an existing sequence row; the sequence id is returned regardless
+        crate::error::record_ignored(
+            conn.execute(
             "UPDATE agm_project_sequences SET project_id = ?2, repo_name = ?3, repo_path = ?4, instance_id = ?5, updated_at = ?6 WHERE project_key = ?1",
             params![project_key, project_id, repo_name, repo_path, instance_id, now],
+        ),
+            "refresh project sequence metadata",
         );
         return existing;
     }
@@ -4255,10 +4448,14 @@ fn ensure_project_sequence_in_conn(
         )
         .unwrap_or(1);
 
-    let _ = conn.execute(
+    // Justification: INSERT OR IGNORE is race-safe; the follow-up SELECT re-reads the row
+    crate::error::record_ignored(
+        conn.execute(
         "INSERT OR IGNORE INTO agm_project_sequences (project_key, seq_id, project_id, repo_name, repo_path, instance_id, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![project_key, next_seq, project_id, repo_name, repo_path, instance_id, now],
+    ),
+        "insert project sequence row",
     );
 
     conn.query_row(
@@ -4282,9 +4479,13 @@ fn ensure_conversation_sequence_in_conn(
         params![conversation_id],
         |row| row.get::<_, i64>(0),
     ) {
-        let _ = conn.execute(
+        // Justification: metadata refresh on an existing sequence row; the sequence id is returned regardless
+        crate::error::record_ignored(
+            conn.execute(
             "UPDATE agm_conversation_sequences SET project_key = ?2, title = ?3, instance_id = ?4, updated_at = ?5 WHERE conversation_id = ?1",
             params![conversation_id, project_key, title, instance_id, now],
+        ),
+            "refresh conversation sequence metadata",
         );
         return existing;
     }
@@ -4297,10 +4498,14 @@ fn ensure_conversation_sequence_in_conn(
         )
         .unwrap_or(1);
 
-    let _ = conn.execute(
+    // Justification: INSERT OR IGNORE is race-safe; the follow-up SELECT re-reads the row
+    crate::error::record_ignored(
+        conn.execute(
         "INSERT OR IGNORE INTO agm_conversation_sequences (conversation_id, seq_id, project_key, title, instance_id, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         params![conversation_id, next_seq, project_key, title, instance_id, now],
+    ),
+        "insert conversation sequence row",
     );
 
     conn.query_row(
@@ -4875,7 +5080,9 @@ pub fn get_project_conversation_tree_cached(
     let conversation_count: usize = tree_nodes.iter().map(|p| p.conversations.len()).sum();
     if let Ok(json_str) = serde_json::to_string(&tree_nodes) {
         if let Ok(conn) = connect_db() {
-            let _ = conn.execute(
+            // Justification: prompt-tree cache write has a 5-second TTL; the computed tree is returned regardless
+            crate::error::record_ignored(
+                conn.execute(
                 "INSERT INTO prompt_tree_cache (cache_key, instance_id, tree_json, project_count, conversation_count, updated_at, ttl_seconds)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, 5)
                  ON CONFLICT(cache_key) DO UPDATE SET
@@ -4893,6 +5100,8 @@ pub fn get_project_conversation_tree_cached(
                     conversation_count as i64,
                     now,
                 ],
+            ),
+                "cache computed prompt tree",
             );
         }
     }
@@ -4907,13 +5116,21 @@ pub fn invalidate_prompt_tree_cache(instance_id: Option<&str>) {
         Some(id) if id != "all" => {
             let norm = crate::modules::instance::resolve_instance_id(id)
                 .unwrap_or_else(|_| id.to_string());
-            let _ = conn.execute(
-                "DELETE FROM prompt_tree_cache WHERE instance_id = ?1 OR instance_id = 'all'",
-                rusqlite::params![&norm],
+            // Justification: cache invalidation is best-effort; stale entries expire via TTL anyway
+            crate::error::record_ignored(
+                conn.execute(
+                    "DELETE FROM prompt_tree_cache WHERE instance_id = ?1 OR instance_id = 'all'",
+                    rusqlite::params![&norm],
+                ),
+                "invalidate prompt tree cache for instance",
             );
         }
         _ => {
-            let _ = conn.execute("DELETE FROM prompt_tree_cache", []);
+            // Justification: cache invalidation is best-effort; stale entries expire via TTL anyway
+            crate::error::record_ignored(
+                conn.execute("DELETE FROM prompt_tree_cache", []),
+                "invalidate all prompt tree cache",
+            );
         }
     }
 }
@@ -4930,27 +5147,49 @@ fn compute_project_conversation_tree(
 
     // Automatically transition stale in-flight prompts (> 45s without update) to completed
     if let Ok(conn) = connect_db() {
-        let _ = conn.execute(
-            "UPDATE active_prompts 
-             SET status = 'completed', updated_at = ?1 
-             WHERE status IN ('running', 'in_flight', 'dispatched') 
+        // Justification: stale-status sweep is housekeeping; rows are re-evaluated on the next scan
+        crate::error::record_ignored(
+            conn.execute(
+                "UPDATE active_prompts
+             SET status = 'completed', updated_at = ?1
+             WHERE status IN ('running', 'in_flight', 'dispatched')
                AND (?1 - updated_at > 45)",
-            rusqlite::params![now],
+                rusqlite::params![now],
+            ),
+            "transition stale in-flight prompts to completed",
         );
     }
 
     if let Some(target_id) = target {
         if target_id == "default" || target_id == "__default__" {
+            // Justification: discovered prompts are consumed via the in-memory prompts map side effect; the returned Vec is intentionally unused here
             let _ = discover_running_prompts_from_antigravity("__default__");
-            let _ = detect_running_projects("__default__");
+            // Justification: discovery scan is best-effort; the tree computation proceeds with available data
+            crate::error::record_ignored(
+                detect_running_projects("__default__"),
+                "detect running projects for default instance",
+            );
         } else {
-            let _ = detect_running_projects(target_id);
+            // Justification: discovery scan is best-effort; the tree computation proceeds with available data
+            crate::error::record_ignored(
+                detect_running_projects(target_id),
+                "detect running projects for target instance",
+            );
         }
     } else {
+        // Justification: discovered prompts are consumed via the in-memory prompts map side effect; the returned Vec is intentionally unused here
         let _ = discover_running_prompts_from_antigravity("__default__");
-        let _ = detect_running_projects("__default__");
+        // Justification: discovery scan is best-effort; the tree computation proceeds with available data
+        crate::error::record_ignored(
+            detect_running_projects("__default__"),
+            "detect running projects for default instance",
+        );
         for inst in &registry.instances {
-            let _ = detect_running_projects(&inst.id);
+            // Justification: discovery scan is best-effort; the tree computation proceeds with available data
+            crate::error::record_ignored(
+                detect_running_projects(&inst.id),
+                "detect running projects for registry instance",
+            );
         }
     }
 
@@ -5038,7 +5277,11 @@ fn compute_project_conversation_tree(
             Ok(c) => c,
             Err(_) => continue,
         };
-        let _ = s_conn.pragma_update(None, "busy_timeout", 3000);
+        // Justification: busy_timeout on a third-party read-only database is a nicety; reads continue with the default
+        crate::error::record_ignored(
+            s_conn.pragma_update(None, "busy_timeout", 3000),
+            "set busy_timeout on Antigravity summaries database",
+        );
         let sql = "SELECT workspace_uris, last_modified_time, status, not_fully_idle \
                    FROM conversation_summaries \
                    WHERE workspace_uris IS NOT NULL AND workspace_uris != '[]' \
@@ -5233,7 +5476,11 @@ fn compute_project_conversation_tree(
                     crate::modules::process::is_antigravity_running(None)
                 };
 
-                let _ = s_conn.pragma_update(None, "busy_timeout", 3000);
+                // Justification: busy_timeout on a third-party read-only database is a nicety; reads continue with the default
+                crate::error::record_ignored(
+                    s_conn.pragma_update(None, "busy_timeout", 3000),
+                    "set busy_timeout on Antigravity summaries database",
+                );
                 if let Ok(mut stmt) = s_conn.prepare(
                     "SELECT conversation_id, title, preview, status, not_fully_idle, workspace_uris, last_modified_time 
                      FROM conversation_summaries 
@@ -5665,7 +5912,11 @@ fn compute_project_conversation_tree(
                                     rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
                                         | rusqlite::OpenFlags::SQLITE_OPEN_URI,
                                 ) {
-                                    let _ = s_conn.pragma_update(None, "busy_timeout", 1000);
+                                    // Justification: busy_timeout on a third-party read-only database is a nicety; reads continue with the default
+                                    crate::error::record_ignored(
+                                        s_conn.pragma_update(None, "busy_timeout", 1000),
+                                        "set busy_timeout on Antigravity summaries database",
+                                    );
                                     let query = "SELECT status, not_fully_idle FROM conversation_summaries WHERE conversation_id = ?1 LIMIT 1";
                                     if let Ok((sum_status, not_idle)) =
                                         s_conn.query_row(query, [session_id], |row| {
@@ -6387,7 +6638,11 @@ pub fn prompt_target_by_sequence_scoped(
         image_payload: None,
     };
 
-    let _ = save_or_requeue_prompt(&active_prompt);
+    // Justification: prompt tracking save is auxiliary; the agy spawn result below drives the return
+    crate::error::record_ignored(
+        save_or_requeue_prompt(&active_prompt),
+        "save prompt before agy spawn",
+    );
     let spawned = spawn_prompt_via_agy(&active_prompt);
 
     let conv_label = resolved
@@ -6640,7 +6895,8 @@ pub fn start_prompt_goal_heartbeat(
 ) -> Result<PromptGoalHeartbeatConfig, String> {
     let ws_dir = PathBuf::from(repo_path);
     if !ws_dir.exists() {
-        let _ = fs::create_dir_all(&ws_dir);
+        // Justification: workspace directory creation is best-effort; subsequent writes surface their own errors
+        crate::error::record_ignored(fs::create_dir_all(&ws_dir), "create workspace directory");
     }
 
     let interval = if interval_secs == 0 { 5 } else { interval_secs };
@@ -6665,7 +6921,8 @@ pub fn start_prompt_goal_heartbeat(
         ws_dir.join(heartbeat_file)
     };
     if let Some(p) = hb_target.parent() {
-        let _ = fs::create_dir_all(p);
+        // Justification: heartbeat parent directory creation is best-effort; the heartbeat write below surfaces failures
+        crate::error::record_ignored(fs::create_dir_all(p), "create heartbeat parent directory");
     }
     let hb_str = hb_target.to_string_lossy().to_string();
 
@@ -6718,7 +6975,11 @@ pub fn start_prompt_goal_heartbeat(
         updated_at: now,
         image_payload: None,
     };
-    let _ = save_or_requeue_prompt(&active_p);
+    // Justification: prompt tracking save is auxiliary; the goal worker spawn is the authoritative outcome
+    crate::error::record_ignored(
+        save_or_requeue_prompt(&active_p),
+        "save prompt goal before worker spawn",
+    );
 
     // Spawn detached goal worker process
     if let Ok(cur_exe) = std::env::current_exe() {
@@ -6751,9 +7012,13 @@ pub fn start_prompt_goal_heartbeat(
         if let Ok(child) = cmd.spawn() {
             let pid = child.id();
             cfg.worker_pid = Some(pid);
-            let _ = fs::write(
-                &config_path,
-                serde_json::to_string_pretty(&cfg).unwrap_or_default(),
+            // Justification: goal-config PID write is auxiliary bookkeeping; the worker is already spawned
+            crate::error::record_ignored(
+                fs::write(
+                    &config_path,
+                    serde_json::to_string_pretty(&cfg).unwrap_or_default(),
+                ),
+                "persist goal worker PID to config",
             );
             crate::modules::logger::log_info(&format!(
                 "[PromptGoal] Spawned goal worker PID {} for instance '{}' (interval: {}s, file: {})",
@@ -6798,9 +7063,13 @@ pub fn run_prompt_goal_worker_loop(
                 cfg.account_email = current_email.clone();
                 cfg.worker_pid = Some(my_pid);
                 cfg.last_heartbeat_at = Some(now);
-                let _ = fs::write(
-                    &config_path,
-                    serde_json::to_string_pretty(&cfg).unwrap_or_default(),
+                // Justification: heartbeat config rewrite is best-effort; the heartbeat line below is the authoritative signal
+                crate::error::record_ignored(
+                    fs::write(
+                        &config_path,
+                        serde_json::to_string_pretty(&cfg).unwrap_or_default(),
+                    ),
+                    "rewrite goal heartbeat config",
                 );
             }
         }
@@ -6836,8 +7105,13 @@ fn append_goal_heartbeat_line(
         .append(true)
         .open(file_path)
     {
-        let _ = file.write_all(line.as_bytes());
-        let _ = file.flush();
+        // Justification: heartbeat line write is best-effort; the worker loop continues and retries on the next interval
+        crate::error::record_ignored(
+            file.write_all(line.as_bytes()),
+            "append goal heartbeat line",
+        );
+        // Justification: heartbeat flush is best-effort; the worker loop continues and retries on the next interval
+        crate::error::record_ignored(file.flush(), "flush goal heartbeat line");
     }
 }
 
@@ -6865,7 +7139,11 @@ fn update_workspace_status_file(
         *This file is updated every 5 seconds by the active AGM prompt goal watchdog.*\n",
         instance_id, email, status, prompt, heartbeat_file, now
     );
-    let _ = fs::write(&status_file, content);
+    // Justification: workspace status file is informational; the heartbeat line is the authoritative signal
+    crate::error::record_ignored(
+        fs::write(&status_file, content),
+        "write workspace status file",
+    );
 }
 
 /// Stop any running prompt goal worker processes for an instance
@@ -6904,16 +7182,24 @@ pub fn stop_prompt_goal_workers_for_instance(instance_id: &str, data_dir: &str) 
             let pid_u32 = pid.as_u32();
             #[cfg(target_os = "windows")]
             {
-                let _ = Command::new("taskkill")
-                    .args(["/F", "/T", "/PID", &pid_u32.to_string()])
-                    .creation_flags(0x08000000)
-                    .output();
+                // Justification: killing the worker is best-effort; the process may already be gone and the registry entry was already removed
+                crate::error::record_ignored(
+                    Command::new("taskkill")
+                        .args(["/F", "/T", "/PID", &pid_u32.to_string()])
+                        .creation_flags(0x08000000)
+                        .output(),
+                    "kill goal worker process (taskkill)",
+                );
             }
             #[cfg(not(target_os = "windows"))]
             {
-                let _ = Command::new("kill")
-                    .args(["-9", &pid_u32.to_string()])
-                    .output();
+                // Justification: killing the worker is best-effort; the process may already be gone and the registry entry was already removed
+                crate::error::record_ignored(
+                    Command::new("kill")
+                        .args(["-9", &pid_u32.to_string()])
+                        .output(),
+                    "kill goal worker process (kill)",
+                );
             }
             stopped += 1;
         }
@@ -7166,6 +7452,7 @@ mod tests {
     #[test]
     fn test_repo_db_schema_initialization() {
         let conn = Connection::open_in_memory().unwrap();
+        // Justification: test fixture on an in-memory database; the WAL pragma is a no-op here and init_tables is asserted below
         let _ = conn.pragma_update(None, "journal_mode", "WAL");
         assert!(init_tables(&conn).is_ok());
 
@@ -7426,6 +7713,7 @@ mod tests {
     #[test]
     fn test_prompt_backup_and_direct_dispatch_lifecycle() {
         let conn = Connection::open_in_memory().unwrap();
+        // Justification: test fixture on an in-memory database; the WAL pragma is a no-op here and init_tables is asserted below
         let _ = conn.pragma_update(None, "journal_mode", "WAL");
         assert!(init_tables(&conn).is_ok());
 
@@ -7480,12 +7768,14 @@ mod tests {
     #[test]
     fn test_auto_resume_recency_filter() {
         let conn = Connection::open_in_memory().unwrap();
+        // Justification: test fixture on an in-memory database; the WAL pragma is a no-op here and init_tables is asserted below
         let _ = conn.pragma_update(None, "journal_mode", "WAL");
         assert!(init_tables(&conn).is_ok());
 
         let now = Utc::now().timestamp();
 
         // 1. Insert recent project (active 10 minutes ago)
+        // Justification: test fixture insert; the assertions below fail loudly if the row is missing
         let _ = conn.execute(
             "INSERT INTO running_projects 
              (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
@@ -7494,6 +7784,7 @@ mod tests {
         );
 
         // 2. Insert old project (active 2 hours ago)
+        // Justification: test fixture insert; the assertions below fail loudly if the row is missing
         let _ = conn.execute(
             "INSERT INTO running_projects 
              (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)

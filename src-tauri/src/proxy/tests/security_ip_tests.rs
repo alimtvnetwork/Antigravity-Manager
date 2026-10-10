@@ -37,7 +37,8 @@ mod security_db_tests {
         let lock = crate::modules::security_db::TEST_SECURITY_DB_MUTEX
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        let _ = init_db();
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(init_db(), "init_db");
         cleanup_test_data();
         (env_lock, lock)
     }
@@ -47,17 +48,26 @@ mod security_db_tests {
         // 清理黑名单
         if let Ok(entries) = get_blacklist() {
             for entry in entries {
-                let _ = remove_from_blacklist(&entry.id);
+                // Justification: best-effort call; failure logged without changing control flow
+                crate::error::record_ignored(
+                    remove_from_blacklist(&entry.id),
+                    "remove_from_blacklist",
+                );
             }
         }
         // 清理白名单
         if let Ok(entries) = get_whitelist() {
             for entry in entries {
-                let _ = remove_from_whitelist(&entry.id);
+                // Justification: best-effort call; failure logged without changing control flow
+                crate::error::record_ignored(
+                    remove_from_whitelist(&entry.id),
+                    "remove_from_whitelist",
+                );
             }
         }
         // 清理访问日志
-        let _ = clear_ip_access_logs();
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(clear_ip_access_logs(), "clear_ip_access_logs");
     }
 
     // ============================================================================
@@ -150,11 +160,15 @@ mod security_db_tests {
         let _lock = setup_test();
 
         // 添加带有详细信息的条目
-        let _ = add_to_blacklist(
-            "172.16.0.50",
-            Some("Abuse detected"),
-            Some(now_timestamp() + 3600), // 1小时后过期
-            "admin",
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            add_to_blacklist(
+                "172.16.0.50",
+                Some("Abuse detected"),
+                Some(now_timestamp() + 3600), // 1小时后过期
+                "admin",
+            ),
+            "add_to_blacklist",
         );
 
         // 获取条目详情
@@ -182,7 +196,11 @@ mod security_db_tests {
         let _lock = setup_test();
 
         // 添加 CIDR 范围到黑名单
-        let _ = add_to_blacklist("192.168.1.0/24", Some("Block subnet"), None, "test");
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            add_to_blacklist("192.168.1.0/24", Some("Block subnet"), None, "test"),
+            "add_to_blacklist",
+        );
 
         // 验证该子网内的 IP 都被阻止
         assert!(
@@ -216,7 +234,11 @@ mod security_db_tests {
         let _lock = setup_test();
 
         // 测试 /16 掩码
-        let _ = add_to_blacklist("10.10.0.0/16", Some("Block /16"), None, "test");
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            add_to_blacklist("10.10.0.0/16", Some("Block /16"), None, "test"),
+            "add_to_blacklist",
+        );
 
         assert!(is_ip_in_blacklist("10.10.0.1").unwrap(), "Should match /16");
         assert!(
@@ -231,7 +253,11 @@ mod security_db_tests {
         cleanup_test_data();
 
         // 测试 /32 掩码 (单个 IP)
-        let _ = add_to_blacklist("8.8.8.8/32", Some("Block single"), None, "test");
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            add_to_blacklist("8.8.8.8/32", Some("Block single"), None, "test"),
+            "add_to_blacklist",
+        );
 
         assert!(is_ip_in_blacklist("8.8.8.8").unwrap(), "Should match /32");
         assert!(
@@ -247,7 +273,11 @@ mod security_db_tests {
         let _lock = setup_test();
 
         // 测试 /0 (所有 IP) - 边界情况
-        let _ = add_to_blacklist("0.0.0.0/0", Some("Block all"), None, "test");
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            add_to_blacklist("0.0.0.0/0", Some("Block all"), None, "test"),
+            "add_to_blacklist",
+        );
 
         assert!(
             is_ip_in_blacklist("1.2.3.4").unwrap(),
@@ -261,7 +291,11 @@ mod security_db_tests {
         cleanup_test_data();
 
         // 测试 /8 掩码
-        let _ = add_to_blacklist("10.0.0.0/8", Some("Block /8"), None, "test");
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            add_to_blacklist("10.0.0.0/8", Some("Block /8"), None, "test"),
+            "add_to_blacklist",
+        );
 
         assert!(
             is_ip_in_blacklist("10.255.255.255").unwrap(),
@@ -284,11 +318,15 @@ mod security_db_tests {
         let _lock = setup_test();
 
         // 添加一个已过期的条目
-        let _ = add_to_blacklist(
-            "expired.test.ip",
-            Some("Already expired"),
-            Some(now_timestamp() - 60), // 1分钟前过期
-            "test",
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            add_to_blacklist(
+                "expired.test.ip",
+                Some("Already expired"),
+                Some(now_timestamp() - 60), // 1分钟前过期
+                "test",
+            ),
+            "add_to_blacklist",
         );
 
         // 过期条目应该被自动清理
@@ -305,11 +343,15 @@ mod security_db_tests {
         let _lock = setup_test();
 
         // 添加一个未过期的条目
-        let _ = add_to_blacklist(
-            "not.expired.ip",
-            Some("Will expire later"),
-            Some(now_timestamp() + 3600), // 1小时后过期
-            "test",
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            add_to_blacklist(
+                "not.expired.ip",
+                Some("Will expire later"),
+                Some(now_timestamp() + 3600), // 1小时后过期
+                "test",
+            ),
+            "add_to_blacklist",
         );
 
         // 未过期条目应该仍然生效
@@ -323,11 +365,15 @@ mod security_db_tests {
         let _lock = setup_test();
 
         // 添加永久封禁 (无过期时间)
-        let _ = add_to_blacklist(
-            "permanent.block.ip",
-            Some("Permanent ban"),
-            None, // 无过期时间
-            "test",
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            add_to_blacklist(
+                "permanent.block.ip",
+                Some("Permanent ban"),
+                None, // 无过期时间
+                "test",
+            ),
+            "add_to_blacklist",
         );
 
         // 永久封禁应该始终生效
@@ -360,7 +406,11 @@ mod security_db_tests {
         let _lock = setup_test();
 
         // 添加 CIDR 范围到白名单
-        let _ = add_to_whitelist("192.168.0.0/16", Some("Internal network"));
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            add_to_whitelist("192.168.0.0/16", Some("Internal network")),
+            "add_to_whitelist",
+        );
 
         // 验证子网内的 IP 都被允许
         assert!(is_ip_in_whitelist("192.168.1.1").unwrap());
@@ -433,7 +483,8 @@ mod security_db_tests {
             block_reason: None,
             username: None,
         };
-        let _ = save_ip_access_log(&normal_log);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(save_ip_access_log(&normal_log), "save_ip_access_log");
 
         // 保存被阻止的日志
         let blocked_log = IpAccessLog {
@@ -450,7 +501,8 @@ mod security_db_tests {
             block_reason: Some("IP in blacklist".to_string()),
             username: None,
         };
-        let _ = save_ip_access_log(&blocked_log);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(save_ip_access_log(&blocked_log), "save_ip_access_log");
 
         // 只检索被阻止的日志
         let blocked_only = get_ip_access_logs(10, 0, None, true).unwrap();
@@ -489,13 +541,23 @@ mod security_db_tests {
                 },
                 username: None,
             };
-            let _ = save_ip_access_log(&log);
+            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+            crate::error::record_ignored(save_ip_access_log(&log), "save_ip_access_log");
         }
 
         // 添加黑名单和白名单条目
-        let _ = add_to_blacklist("stats.black.1", None, None, "test");
-        let _ = add_to_blacklist("stats.black.2", None, None, "test");
-        let _ = add_to_whitelist("stats.white.1", None);
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            add_to_blacklist("stats.black.1", None, None, "test"),
+            "add_to_blacklist",
+        );
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            add_to_blacklist("stats.black.2", None, None, "test"),
+            "add_to_blacklist",
+        );
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(add_to_whitelist("stats.white.1", None), "add_to_whitelist");
 
         // 获取统计
         let stats = get_ip_stats();
@@ -537,7 +599,8 @@ mod security_db_tests {
             block_reason: None,
             username: None,
         };
-        let _ = save_ip_access_log(&old_log);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(save_ip_access_log(&old_log), "save_ip_access_log");
 
         // 添加一条新日志
         let new_log = IpAccessLog {
@@ -554,7 +617,8 @@ mod security_db_tests {
             block_reason: None,
             username: None,
         };
-        let _ = save_ip_access_log(&new_log);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(save_ip_access_log(&new_log), "save_ip_access_log");
 
         // 清理 1 天前的日志
         let deleted = cleanup_old_ip_logs(1);
@@ -587,7 +651,11 @@ mod security_db_tests {
                 thread::spawn(move || {
                     // 每个线程添加不同的 IP
                     let ip = format!("concurrent.test.{}", i);
-                    let _ = add_to_blacklist(&ip, Some("Concurrent test"), None, "test");
+                    // Justification: best-effort call; failure logged without changing control flow
+                    crate::error::record_ignored(
+                        add_to_blacklist(&ip, Some("Concurrent test"), None, "test"),
+                        "add_to_blacklist",
+                    );
 
                     // 验证自己添加的 IP
                     is_ip_in_blacklist(&ip).unwrap_or(false)
@@ -633,7 +701,8 @@ mod security_db_tests {
         // 这里只测试不会 panic
         let result = add_to_blacklist("", Some("Empty IP"), None, "test");
         // 结果可能成功或失败，但不应该 panic
-        let _ = result;
+        // Justification: test asserts no-panic only; either outcome is acceptable, failure is logged.
+        crate::error::record_ignored(result, "add_to_blacklist empty ip");
 
         cleanup_test_data();
     }
@@ -660,11 +729,19 @@ mod security_db_tests {
         let _lock = setup_test();
 
         // 添加一个黑名单条目
-        let _ = add_to_blacklist("hit.count.test", Some("Count test"), None, "test");
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            add_to_blacklist("hit.count.test", Some("Count test"), None, "test"),
+            "add_to_blacklist",
+        );
 
         // 多次查询应该增加 hit_count
         for _ in 0..5 {
-            let _ = get_blacklist_entry_for_ip("hit.count.test");
+            // Justification: best-effort call; failure logged without changing control flow
+            crate::error::record_ignored(
+                get_blacklist_entry_for_ip("hit.count.test"),
+                "get_blacklist_entry_for_ip",
+            );
         }
 
         // 检查 hit_count
@@ -725,24 +802,34 @@ mod performance_benchmarks {
         let _lock = crate::modules::security_db::TEST_SECURITY_DB_MUTEX
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        let _ = init_db();
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(init_db(), "init_db");
 
         // 清理并添加 100 个黑名单条目
         if let Ok(entries) = get_blacklist() {
             for entry in entries {
-                let _ = crate::modules::security_db::remove_from_blacklist(&entry.id);
+                // Justification: best-effort call; failure logged without changing control flow
+                crate::error::record_ignored(
+                    crate::modules::security_db::remove_from_blacklist(&entry.id),
+                    "remove_from_blacklist",
+                );
             }
         }
 
         for i in 0..20 {
-            let _ = add_to_blacklist(&format!("bench.ip.{}", i), Some("Benchmark"), None, "test");
+            // Justification: best-effort call; failure logged without changing control flow
+            crate::error::record_ignored(
+                add_to_blacklist(&format!("bench.ip.{}", i), Some("Benchmark"), None, "test"),
+                "add_to_blacklist",
+            );
         }
 
         // 执行 20 次查找
         let iterations = 20;
         let start = Instant::now();
         for _ in 0..iterations {
-            let _ = is_ip_in_blacklist("bench.ip.10");
+            // Justification: best-effort call; failure logged without changing control flow
+            crate::error::record_ignored(is_ip_in_blacklist("bench.ip.10"), "is_ip_in_blacklist");
         }
         let duration = start.elapsed();
 
@@ -758,7 +845,11 @@ mod performance_benchmarks {
         // 清理
         if let Ok(entries) = get_blacklist() {
             for entry in entries {
-                let _ = crate::modules::security_db::remove_from_blacklist(&entry.id);
+                // Justification: best-effort call; failure logged without changing control flow
+                crate::error::record_ignored(
+                    crate::modules::security_db::remove_from_blacklist(&entry.id),
+                    "remove_from_blacklist",
+                );
             }
         }
     }
@@ -769,22 +860,31 @@ mod performance_benchmarks {
         let _lock = crate::modules::security_db::TEST_SECURITY_DB_MUTEX
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        let _ = init_db();
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(init_db(), "init_db");
 
         // 清理并添加 CIDR 规则
         if let Ok(entries) = get_blacklist() {
             for entry in entries {
-                let _ = crate::modules::security_db::remove_from_blacklist(&entry.id);
+                // Justification: best-effort call; failure logged without changing control flow
+                crate::error::record_ignored(
+                    crate::modules::security_db::remove_from_blacklist(&entry.id),
+                    "remove_from_blacklist",
+                );
             }
         }
 
         // 添加 10 个 CIDR 规则
         for i in 0..10 {
-            let _ = add_to_blacklist(
-                &format!("10.{}.0.0/16", i),
-                Some("CIDR Benchmark"),
-                None,
-                "test",
+            // Justification: best-effort call; failure logged without changing control flow
+            crate::error::record_ignored(
+                add_to_blacklist(
+                    &format!("10.{}.0.0/16", i),
+                    Some("CIDR Benchmark"),
+                    None,
+                    "test",
+                ),
+                "add_to_blacklist",
             );
         }
 
@@ -793,7 +893,8 @@ mod performance_benchmarks {
         let start = Instant::now();
         for _ in 0..iterations {
             // 测试需要遍历 CIDR 的 IP
-            let _ = is_ip_in_blacklist("10.5.100.50");
+            // Justification: best-effort call; failure logged without changing control flow
+            crate::error::record_ignored(is_ip_in_blacklist("10.5.100.50"), "is_ip_in_blacklist");
         }
         let duration = start.elapsed();
 
@@ -809,7 +910,11 @@ mod performance_benchmarks {
         // 清理
         if let Ok(entries) = get_blacklist() {
             for entry in entries {
-                let _ = crate::modules::security_db::remove_from_blacklist(&entry.id);
+                // Justification: best-effort call; failure logged without changing control flow
+                crate::error::record_ignored(
+                    crate::modules::security_db::remove_from_blacklist(&entry.id),
+                    "remove_from_blacklist",
+                );
             }
         }
     }

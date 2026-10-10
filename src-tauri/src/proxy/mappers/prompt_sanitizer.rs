@@ -771,7 +771,11 @@ mod tests {
             }
         });
 
-        let _ = PromptSanitizer::sanitize_gemini_payload(&mut payload);
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            PromptSanitizer::sanitize_gemini_payload(&mut payload),
+            "sanitize_gemini_payload",
+        );
 
         let parts = payload["request"]["contents"][0]["parts"]
             .as_array()

@@ -286,9 +286,13 @@ pub async fn handle_warmup(
                             "[Warmup-API] 403 Forbidden detected for {}, marking account as forbidden",
                             req.email
                         );
-                        let _ = crate::modules::account::mark_account_forbidden(
-                            &resolved_account_id,
-                            &error_text,
+                        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                        crate::error::record_ignored(
+                            crate::modules::account::mark_account_forbidden(
+                                &resolved_account_id,
+                                &error_text,
+                            ),
+                            "mark_account_forbidden",
                         );
                     } else {
                         warn!(

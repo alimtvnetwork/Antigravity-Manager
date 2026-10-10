@@ -3,6 +3,7 @@ import { MODEL_CONFIG, compareModelsDesc, inferModelGroup } from '../config/mode
 import { useAccountStore } from '../stores/useAccountStore';
 import { Bot, Sparkles } from 'lucide-react';
 import { request } from '../utils/request';
+import { useErrorStore } from '../stores/error-store';
 
 export interface CanonicalFamilyDto {
     canonical_id: string;
@@ -77,7 +78,14 @@ export const useProxyModels = () => {
                     setCanonicalFamilies(data);
                 }
             })
-            .catch(err => console.error('Failed to fetch canonical families:', err));
+            .catch(err => {
+                console.error('Failed to fetch canonical families:', err);
+                // Tracked in the error module; model list falls back to static families.
+                useErrorStore.getState().trackWarning(err, {
+                  source: 'useProxyModels.fetchFamilies',
+                  triggerAction: 'fetch_canonical_families',
+                });
+            });
 
         return () => { cancelled = true; };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps

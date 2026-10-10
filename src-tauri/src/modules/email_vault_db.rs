@@ -176,14 +176,27 @@ pub fn get_email_passwords_db_path() -> Result<PathBuf, String> {
 pub fn connect_vault_db() -> Result<Connection, String> {
     let path = get_email_vault_db_path()?;
     if let Some(parent) = path.parent() {
-        let _ = fs::create_dir_all(parent);
+        // Justification: best-effort directory creation; later file ops fail loudly if the directory is actually needed
+        crate::error::record_ignored(fs::create_dir_all(parent), "create_dir_all");
     }
     let conn = Connection::open(&path)
         .map_err(|e| format!("Failed to open email vault database: {}", e))?;
 
-    let _ = conn.pragma_update(None, "journal_mode", "WAL");
-    let _ = conn.pragma_update(None, "busy_timeout", 5000);
-    let _ = conn.pragma_update(None, "synchronous", "NORMAL");
+    // Justification: best-effort SQLite pragma; logged
+    crate::error::record_ignored(
+        conn.pragma_update(None, "journal_mode", "WAL"),
+        "pragma_update",
+    );
+    // Justification: best-effort SQLite pragma; the connection remains usable without it
+    crate::error::record_ignored(
+        conn.pragma_update(None, "busy_timeout", 5000),
+        "busy_timeout",
+    );
+    // Justification: best-effort SQLite pragma; logged
+    crate::error::record_ignored(
+        conn.pragma_update(None, "synchronous", "NORMAL"),
+        "pragma_update",
+    );
 
     init_vault_tables(&conn)?;
     Ok(conn)
@@ -193,14 +206,27 @@ pub fn connect_vault_db() -> Result<Connection, String> {
 pub fn connect_passwords_db() -> Result<Connection, String> {
     let path = get_email_passwords_db_path()?;
     if let Some(parent) = path.parent() {
-        let _ = fs::create_dir_all(parent);
+        // Justification: best-effort directory creation; later file ops fail loudly if the directory is actually needed
+        crate::error::record_ignored(fs::create_dir_all(parent), "create_dir_all");
     }
     let conn = Connection::open(&path)
         .map_err(|e| format!("Failed to open email passwords database: {}", e))?;
 
-    let _ = conn.pragma_update(None, "journal_mode", "WAL");
-    let _ = conn.pragma_update(None, "busy_timeout", 5000);
-    let _ = conn.pragma_update(None, "synchronous", "NORMAL");
+    // Justification: best-effort SQLite pragma; logged
+    crate::error::record_ignored(
+        conn.pragma_update(None, "journal_mode", "WAL"),
+        "pragma_update",
+    );
+    // Justification: best-effort SQLite pragma; the connection remains usable without it
+    crate::error::record_ignored(
+        conn.pragma_update(None, "busy_timeout", 5000),
+        "busy_timeout",
+    );
+    // Justification: best-effort SQLite pragma; logged
+    crate::error::record_ignored(
+        conn.pragma_update(None, "synchronous", "NORMAL"),
+        "pragma_update",
+    );
 
     init_passwords_table(&conn)?;
     Ok(conn)
@@ -263,18 +289,21 @@ pub fn init_vault_tables(conn: &Connection) -> Result<(), String> {
     )
     .map_err(|e| format!("Failed to create email_notification_settings table: {}", e))?;
 
-    let _ = conn.execute(
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(conn.execute(
         "ALTER TABLE email_notification_settings ADD COLUMN baseline_polling_interval_minutes INTEGER NOT NULL DEFAULT 4",
         [],
-    );
-    let _ = conn.execute(
+    ), "db execute");
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(conn.execute(
         "ALTER TABLE email_notification_settings ADD COLUMN active_awaiting_interval_seconds INTEGER NOT NULL DEFAULT 10",
         [],
-    );
-    let _ = conn.execute(
+    ), "db execute");
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(conn.execute(
         "ALTER TABLE email_notification_settings ADD COLUMN notify_on_system_update INTEGER NOT NULL DEFAULT 1",
         [],
-    );
+    ), "db execute");
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS email_inbound_audit_log (
@@ -442,7 +471,11 @@ pub fn upsert_email_account(input: EmailAccountInput) -> Result<EmailAccount, St
     let account_id = input.id.unwrap_or_else(|| Uuid::new_v4().to_string());
 
     if input.is_default {
-        let _ = vault_conn.execute("UPDATE email_accounts SET is_default = 0", []);
+        // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+        crate::error::record_ignored(
+            vault_conn.execute("UPDATE email_accounts SET is_default = 0", []),
+            "db execute",
+        );
     }
 
     let def_int = if input.is_default { 1 } else { 0 };
@@ -512,9 +545,13 @@ pub fn delete_email_account(account_id: &str) -> Result<(), String> {
         .map_err(|e| format!("Failed to delete email account: {}", e))?;
 
     if let Ok(pass_conn) = connect_passwords_db() {
-        let _ = pass_conn.execute(
-            "DELETE FROM email_credentials WHERE account_id = ?",
-            params![account_id],
+        // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+        crate::error::record_ignored(
+            pass_conn.execute(
+                "DELETE FROM email_credentials WHERE account_id = ?",
+                params![account_id],
+            ),
+            "db execute",
         );
     }
     Ok(())

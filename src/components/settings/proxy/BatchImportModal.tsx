@@ -4,6 +4,7 @@ import { X, Upload, FileText, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ProxyEntry } from '../../../types/config';
 import { generateUUID } from '../../../utils/uuid';
+import { useErrorStore } from '../../../stores/error-store';
 
 interface BatchImportModalProps {
     isOpen: boolean;
@@ -63,6 +64,12 @@ export default function BatchImportModal({ isOpen, onClose, onImport }: BatchImp
                     new URL(url);
                 } catch (e) {
                     console.warn(`Line ${index + 1} invalid URL: ${url}`);
+                    // Tracked in the error module; invalid line skipped, remaining lines still import.
+                    useErrorStore.getState().trackWarning(`Line ${index + 1} invalid URL: ${url}`, {
+                      source: 'BatchImportModal.parseProxies',
+                      triggerAction: 'parse_proxy_line',
+                      context: { line: index + 1 },
+                    });
                     return;
                 }
 
@@ -79,6 +86,12 @@ export default function BatchImportModal({ isOpen, onClose, onImport }: BatchImp
                 });
             } catch (e) {
                 console.error("Failed to parse line", line, e);
+                // Tracked in the error module; unparsable line skipped, remaining lines still import.
+                useErrorStore.getState().trackWarning(e, {
+                  source: 'BatchImportModal.parseProxies',
+                  triggerAction: 'parse_proxy_line',
+                  context: { line: String(line).slice(0, 100) },
+                });
             }
         });
 

@@ -550,9 +550,13 @@ fn prune_internal(keep_count: usize, clear_caches: bool) -> Result<PruneResult, 
                     let summaries_db = conv_base.join("conversation_summaries.db");
                     if summaries_db.is_file() {
                         if let Ok(conn) = Connection::open(&summaries_db) {
-                            let _ = conn.execute(
-                                "DELETE FROM conversation_summaries WHERE conversation_id = ?",
-                                [&conv.conversation_id],
+                            // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+                            crate::error::record_ignored(
+                                conn.execute(
+                                    "DELETE FROM conversation_summaries WHERE conversation_id = ?",
+                                    [&conv.conversation_id],
+                                ),
+                                "db execute",
                             );
                         }
                     }
@@ -598,11 +602,15 @@ fn prune_internal(keep_count: usize, clear_caches: bool) -> Result<PruneResult, 
                     if let Ok(entries) = fs::read_dir(eph) {
                         for item in entries.flatten() {
                             let path = item.path();
-                            let _ = if path.is_dir() {
-                                fs::remove_dir_all(&path)
-                            } else {
-                                fs::remove_file(&path)
-                            };
+                            // Justification: best-effort conditional filesystem cleanup; a leftover file is harmless
+                            crate::error::record_ignored(
+                                if path.is_dir() {
+                                    fs::remove_dir_all(&path)
+                                } else {
+                                    fs::remove_file(&path)
+                                },
+                                "conditional fs remove",
+                            );
                         }
                     }
                 }
@@ -623,7 +631,8 @@ fn prune_internal(keep_count: usize, clear_caches: bool) -> Result<PruneResult, 
 
     if let Ok(manifest_json) = serde_json::to_string_pretty(&manifest) {
         let manifest_path = tx_dir.join("manifest.json");
-        let _ = fs::write(manifest_path, manifest_json);
+        // Justification: best-effort file write; failure is logged and surfaces on the next read
+        crate::error::record_ignored(fs::write(manifest_path, manifest_json), "fs::write");
     }
 
     let preserved_count = convs.iter().filter(|c| c.is_preserved).count();
@@ -730,14 +739,19 @@ pub fn undo_prune(target_tx_id: Option<&str>) -> Result<UndoResult, String> {
             let b_staged_p = PathBuf::from(b_staged);
             let b_orig_p = PathBuf::from(b_orig);
             if b_staged_p.exists() {
-                let _ = safe_move_path(&b_staged_p, &b_orig_p);
+                // Justification: best-effort file move; logged for diagnosis
+                crate::error::record_ignored(
+                    safe_move_path(&b_staged_p, &b_orig_p),
+                    "safe_move_path",
+                );
             }
         }
     }
 
     // Rename manifest to mark transaction as reverted
     let reverted_manifest_path = target_dir.join("manifest.json.reverted");
-    let _ = fs::rename(&manifest_path, reverted_manifest_path);
+    // Justification: best-effort file move; logged for diagnosis
+    crate::error::record_ignored(fs::rename(&manifest_path, reverted_manifest_path), "rename");
 
     logger::log_info(&format!(
         "[AgyCleaner] Reverted transaction {}: restored {} conversations ({:.2} MB)",

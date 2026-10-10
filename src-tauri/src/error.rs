@@ -219,3 +219,21 @@ impl Serialize for AppError {
 
 // Implement alias for Result to simplify usage
 pub type AppResult<T> = Result<T, AppError>;
+
+/// Records a best-effort fallible operation's failure to the tracing log sink
+/// (rolling file log + console + Tauri frontend bridge) without altering
+/// control flow.
+///
+/// Use ONLY where the operation is genuinely best-effort — i.e. the caller
+/// has no meaningful recovery and must continue (event emission, idempotent
+/// directory creation, cache cleanup, opportunistic refreshes). If the caller
+/// can fail, propagate the `AppError` with `?` instead of calling this.
+///
+/// Every call site must also carry a one-line `//` comment justifying why it
+/// is safe to continue; the `context` string names the operation in the log.
+#[inline]
+pub fn record_ignored<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) {
+    if let Err(e) = result {
+        tracing::warn!(target: "best_effort", "{context}: {e}");
+    }
+}

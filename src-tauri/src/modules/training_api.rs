@@ -24,12 +24,21 @@ pub fn get_training_db_path() -> Result<PathBuf, String> {
 pub fn connect_training_db() -> Result<Connection, String> {
     let path = get_training_db_path()?;
     if let Some(parent) = path.parent() {
-        let _ = fs::create_dir_all(parent);
+        // Justification: best-effort directory creation; later file ops fail loudly if the directory is actually needed
+        crate::error::record_ignored(fs::create_dir_all(parent), "create_dir_all");
     }
     let conn =
         Connection::open(&path).map_err(|e| format!("Failed to open training database: {}", e))?;
-    let _ = conn.pragma_update(None, "journal_mode", "WAL");
-    let _ = conn.pragma_update(None, "busy_timeout", 5000);
+    // Justification: best-effort SQLite pragma; logged
+    crate::error::record_ignored(
+        conn.pragma_update(None, "journal_mode", "WAL"),
+        "pragma_update",
+    );
+    // Justification: best-effort SQLite pragma; the connection remains usable without it
+    crate::error::record_ignored(
+        conn.pragma_update(None, "busy_timeout", 5000),
+        "busy_timeout",
+    );
     init_tables(&conn)?;
     Ok(conn)
 }
@@ -358,7 +367,11 @@ pub fn ingest_learning(req: LearnRequest) -> Result<LearnResponse, String> {
         if let Some(ref target_model) = req.model {
             if let Ok(mut app_cfg) = crate::modules::config::load_app_config() {
                 app_cfg.auto_profile_switcher.target_model = target_model.clone();
-                let _ = crate::modules::config::save_app_config(&app_cfg);
+                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                crate::error::record_ignored(
+                    crate::modules::config::save_app_config(&app_cfg),
+                    "save_app_config",
+                );
                 updated_routing = true;
                 crate::modules::logger::log_info(&format!(
                     "[TrainingAPI] Feedback dynamically updated auto-switcher target model to '{}'",

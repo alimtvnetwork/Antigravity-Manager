@@ -5,6 +5,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 
 import { isLinux } from '../../utils/env';
 import { findPalette, THEME_PALETTES } from './themePalettes';
+import { useErrorStore } from '../../stores/error-store';
 
 export default function ThemeManager() {
     const { config, loadConfig } = useConfigStore();
@@ -76,17 +77,31 @@ export default function ThemeManager() {
             // Skip on Linux due to crash with transparent windows + softbuffer
             try {
                 if (!isLinux() && (window as any).__TAURI_INTERNALS__) {
-                    getCurrentWindow().setBackgroundColor(palette.bg).catch(e =>
-                        console.error('Failed to set window background color:', e)
-                    );
+                    getCurrentWindow().setBackgroundColor(palette.bg).catch(e => {
+                        console.error('Failed to set window background color:', e);
+                        // Tracked in the error module; cosmetic only, theme still applied to DOM.
+                        useErrorStore.getState().trackWarning(e, {
+                          source: 'ThemeManager.applyTheme',
+                          triggerAction: 'set_window_background',
+                        });
+                    });
 
                     const { invoke } = await import('@tauri-apps/api/core');
-                    invoke('set_window_theme', { theme: isDark ? 'dark' : 'light' }).catch(() => {
-                        // Ignore errors on non-Windows platforms
+                    invoke('set_window_theme', { theme: isDark ? 'dark' : 'light' }).catch((e) => {
+                        // Ignore errors on non-Windows platforms; tracked in the error module, theme still applied to DOM.
+                        useErrorStore.getState().trackWarning(e, {
+                          source: 'ThemeManager.applyTheme',
+                          triggerAction: 'set_window_theme',
+                        });
                     });
                 }
             } catch (e) {
                 console.error('Window background sync failed:', e);
+                // Tracked in the error module; theme still applied to DOM below.
+                useErrorStore.getState().trackWarning(e, {
+                  source: 'ThemeManager.applyTheme',
+                  triggerAction: 'sync_window_background',
+                });
             }
 
             root.setAttribute('data-theme', isDark ? 'dark' : 'light');

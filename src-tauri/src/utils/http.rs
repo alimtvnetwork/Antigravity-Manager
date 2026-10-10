@@ -163,6 +163,7 @@ mod tests {
             .unwrap_or_else(|p| p.into_inner());
         invalidate_shared_clients();
 
+        // Justification: warms the shared-client cache; the returned client handle is intentionally unused.
         let _ = get_client();
         assert!(
             shared_client_keys().contains(&emulated_15_key()),
@@ -170,6 +171,7 @@ mod tests {
         );
 
         // 同一 key 只应存在一份（HashMap 语义），重复获取不得新建实例。
+        // Justification: warms the shared-client cache; the returned client handle is intentionally unused.
         let _ = get_client();
         let count = shared_client_keys()
             .iter()
@@ -186,6 +188,7 @@ mod tests {
             .lock()
             .unwrap_or_else(|p| p.into_inner());
 
+        // Justification: warms the shared-client cache; the returned client handle is intentionally unused.
         let _ = get_client();
         assert!(shared_client_keys().contains(&emulated_15_key()));
 
@@ -196,6 +199,7 @@ mod tests {
         );
 
         // 下次访问按当前配置重建
+        // Justification: warms the shared-client cache; the returned client handle is intentionally unused.
         let _ = get_client();
         assert!(
             shared_client_keys().contains(&emulated_15_key()),

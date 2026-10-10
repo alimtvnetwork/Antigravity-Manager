@@ -45,6 +45,7 @@ pub struct LogEntry {
 
 /// Initialize the log bridge with app handle (call from setup)
 pub fn init_log_bridge(app_handle: tauri::AppHandle) {
+    // Justification: OnceLock::set fails only if already initialized; double-init is a benign no-op by design.
     let _ = APP_HANDLE.set(app_handle);
     tracing::debug!("[LogBridge] Initialized with app handle");
 }
@@ -62,7 +63,8 @@ pub fn enable_log_bridge() {
     if let Some(handle) = APP_HANDLE.get() {
         let buffer = get_log_buffer().read();
         for entry in buffer.iter() {
-            let _ = handle.emit("log-event", entry.clone());
+            // Justification: best-effort frontend event; a dropped event only skips a UI refresh
+            crate::error::record_ignored(handle.emit("log-event", entry.clone()), "emit log-event");
         }
     }
 
@@ -94,7 +96,11 @@ pub fn clear_log_buffer() {
 /// This is used by background tasks (e.g. warmup 403 handling) that cannot access AppHandle directly.
 pub fn emit_accounts_refreshed() {
     if let Some(handle) = APP_HANDLE.get() {
-        let _ = handle.emit("accounts://refreshed", ());
+        // Justification: best-effort frontend event; a dropped event only skips a UI refresh
+        crate::error::record_ignored(
+            handle.emit("accounts://refreshed", ()),
+            "emit accounts://refreshed",
+        );
         tracing::debug!("[LogBridge] Emitted accounts://refreshed event to frontend");
     }
 }
@@ -217,7 +223,8 @@ where
 
         // Emit to frontend
         if let Some(handle) = APP_HANDLE.get() {
-            let _ = handle.emit("log-event", entry);
+            // Justification: best-effort frontend event; a dropped event only skips a UI refresh
+            crate::error::record_ignored(handle.emit("log-event", entry), "emit log-event");
         }
     }
 }

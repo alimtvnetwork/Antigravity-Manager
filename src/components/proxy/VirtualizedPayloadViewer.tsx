@@ -415,7 +415,10 @@ export const VirtualizedPayloadViewer: React.FC<VirtualizedPayloadViewerProps> =
             if (typeof obj === 'string') {
                 try {
                     obj = JSON.parse(obj);
-                } catch {}
+                } catch {
+                    // Justification: format probe — a non-JSON string here is the expected common case
+                    // (plain-text payloads), not an error; the original string is formatted as-is below.
+                }
             }
             const unescaped = deepUnescapeJsonValue(obj);
             return JSON.stringify(unescaped, null, 2);

@@ -2,6 +2,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { LogicalSize, PhysicalSize, PhysicalPosition } from '@tauri-apps/api/dpi';
 import { isTauri } from './env';
 import { useViewStore } from '../stores/useViewStore';
+import { useErrorStore } from '../stores/error-store';
 
 let priorBounds: { x: number; y: number; width: number; height: number } | null = null;
 
@@ -69,6 +70,11 @@ export const exitMiniMode = async () => {
         await win.setResizable(true);
     } catch (error) {
         console.error('Failed to exit mini mode:', error);
+        // Tracked in the error module; window keeps mini-mode state, user can toggle manually.
+        useErrorStore.getState().trackWarning(error, {
+          source: 'windowManager.exitMiniMode',
+          triggerAction: 'exit_mini_mode',
+        });
     }
 };
 
@@ -82,14 +88,20 @@ export const ensureFullViewState = async () => {
         const win = getCurrentWindow();
         const isMin = await win.isMinimized().catch(() => false);
         if (isMin) {
-            await win.unminimize().catch(() => {});
+            await win.unminimize().catch((e) => {
+                // Best-effort startup self-heal; tracked in the error module, remaining checks still run.
+                useErrorStore.getState().trackWarning(e, { source: 'windowManager.ensureFullViewState', triggerAction: 'unminimize_window' });
+            });
         }
         const pos = await win.outerPosition().catch(() => null);
         if (pos) {
             const isOffscreenX = pos.x < -1000;
             const isOffscreenY = pos.y < -1000;
             if (isOffscreenX || isOffscreenY) {
-                await win.center().catch(() => {});
+                await win.center().catch((e) => {
+                    // Best-effort startup self-heal; tracked in the error module, remaining checks still run.
+                    useErrorStore.getState().trackWarning(e, { source: 'windowManager.ensureFullViewState', triggerAction: 'center_window' });
+                });
             }
         }
         const size = await win.outerSize().catch(() => null);
@@ -97,8 +109,14 @@ export const ensureFullViewState = async () => {
             const isTooNarrow = size.width < 500;
             const isTooShort = size.height < 400;
             if (isTooNarrow || isTooShort) {
-                await win.setSize(new LogicalSize(1200, 800)).catch(() => {});
-                await win.center().catch(() => {});
+                await win.setSize(new LogicalSize(1200, 800)).catch((e) => {
+                    // Best-effort window op; tracked in the error module, window keeps current size.
+                    useErrorStore.getState().trackWarning(e, { source: 'windowManager.ensureSaneBounds', triggerAction: 'set_window_size' });
+                });
+                await win.center().catch((e) => {
+                    // Best-effort window op; tracked in the error module.
+                    useErrorStore.getState().trackWarning(e, { source: 'windowManager.ensureSaneBounds', triggerAction: 'center_window' });
+                });
             }
         }
         // Enforce custom title bar (frameless) for Full View
@@ -107,6 +125,11 @@ export const ensureFullViewState = async () => {
         await win.setAlwaysOnTop(false);
     } catch (error) {
         console.error('Failed to ensure full view state:', error);
+        // Tracked in the error module; startup self-heal is best-effort, app continues regardless.
+        useErrorStore.getState().trackWarning(error, {
+          source: 'windowManager.ensureFullViewState',
+          triggerAction: 'ensure_full_view_state',
+        });
     }
 };
 
@@ -117,18 +140,35 @@ export const unminimizeAndFocusWindow = async () => {
     if (!isTauri()) return;
     try {
         const win = getCurrentWindow();
-        await win.show().catch(() => {});
-        await win.unminimize().catch(() => {});
+        await win.show().catch((e) => {
+            // Best-effort window op; tracked in the error module, remaining ops still attempted.
+            useErrorStore.getState().trackWarning(e, { source: 'windowManager.unminimizeAndFocusWindow', triggerAction: 'show_window' });
+        });
+        await win.unminimize().catch((e) => {
+            // Best-effort window op; tracked in the error module, remaining ops still attempted.
+            useErrorStore.getState().trackWarning(e, { source: 'windowManager.unminimizeAndFocusWindow', triggerAction: 'unminimize_window' });
+        });
         const pos = await win.outerPosition().catch(() => null);
         if (pos) {
             const isOffscreenX = pos.x < -1000;
             const isOffscreenY = pos.y < -1000;
             if (isOffscreenX || isOffscreenY) {
-                await win.center().catch(() => {});
+                await win.center().catch((e) => {
+                    // Best-effort window op; tracked in the error module, focus still attempted.
+                    useErrorStore.getState().trackWarning(e, { source: 'windowManager.unminimizeAndFocusWindow', triggerAction: 'center_window' });
+                });
             }
         }
-        await win.setFocus().catch(() => {});
+        await win.setFocus().catch((e) => {
+            // Best-effort window op; tracked in the error module.
+            useErrorStore.getState().trackWarning(e, { source: 'windowManager.unminimizeAndFocusWindow', triggerAction: 'focus_window' });
+        });
     } catch (error) {
         console.error('Failed to unminimize and focus window:', error);
+        // Tracked in the error module; window restore is best-effort, user can focus the window manually.
+        useErrorStore.getState().trackWarning(error, {
+          source: 'windowManager.unminimizeAndFocusWindow',
+          triggerAction: 'unminimize_and_focus',
+        });
     }
 };

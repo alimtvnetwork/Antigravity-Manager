@@ -762,10 +762,14 @@ fn handle_instance_create(args: &[String]) {
                                 || a.email.to_lowercase() == q_lower
                                 || a.email.to_lowercase().contains(&q_lower)
                         }) {
-                            let _ = rt.block_on(instance::switch_account_to_instance(
-                                &target.id,
-                                Some(&cfg.id),
-                            ));
+                            // Justification: best-effort blocking wait on an async op; failure logged
+                            crate::error::record_ignored(
+                                rt.block_on(instance::switch_account_to_instance(
+                                    &target.id,
+                                    Some(&cfg.id),
+                                )),
+                                "block_on",
+                            );
                             cfg.bound_account_id = Some(target.id.clone());
                             cfg.bound_email = Some(target.email.clone());
                         }
@@ -774,7 +778,8 @@ fn handle_instance_create(args: &[String]) {
             }
 
             if should_launch {
-                let _ = instance::launch_instance(&cfg.id);
+                // Justification: best-effort call; failure logged without changing control flow
+                crate::error::record_ignored(instance::launch_instance(&cfg.id), "launch_instance");
             }
 
             if is_json {
@@ -1225,7 +1230,11 @@ fn handle_supabase_subcommand(args: &[String]) {
             // Auto-discover endpoints from repo-secrets if available
             let seeded = crate::modules::supabase_sync::auto_seed_from_repo_secrets(&mut cfg);
             if seeded {
-                let _ = crate::modules::supabase_sync::save_config(&cfg);
+                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                crate::error::record_ignored(
+                    crate::modules::supabase_sync::save_config(&cfg),
+                    "save_config",
+                );
             }
 
             let node_id = crate::modules::supabase_sync::get_local_node_id();
@@ -1842,7 +1851,8 @@ fn execute_agy_clear(keep_count: usize, is_preflight: bool, is_yes: bool) {
         );
         print!("  Proceed with pruning? [y/N]: ");
         use std::io::{self, Write};
-        let _ = io::stdout().flush();
+        // Justification: best-effort stream flush; buffered output is lost only on abnormal exit
+        crate::error::record_ignored(io::stdout().flush(), "flush");
         let mut input = String::new();
         if io::stdin().read_line(&mut input).is_err() {
             println!("Aborted.");

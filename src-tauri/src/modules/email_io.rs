@@ -148,7 +148,11 @@ pub fn import_from_json(payload: &str) -> Result<ImportSummary, String> {
     // Restore multi-pass encoded secrets into vault
     for cred in bundle.credentials {
         if let Ok(plain_secret) = base64_decode_multi(&cred.multi_encoded_secret, cred.passes) {
-            let _ = email_vault_db::save_account_secret(&cred.account_id, &plain_secret);
+            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+            crate::error::record_ignored(
+                email_vault_db::save_account_secret(&cred.account_id, &plain_secret),
+                "save_account_secret",
+            );
         }
     }
 
@@ -578,7 +582,8 @@ pub fn backup_vault_db(target_path: &Path) -> Result<(), String> {
         let is_pass_exists = pass_src.exists();
         if is_pass_exists {
             let pass_target = target_path.with_extension("passwords.db");
-            let _ = fs::copy(&pass_src, &pass_target);
+            // Justification: best-effort file copy; logged for diagnosis
+            crate::error::record_ignored(fs::copy(&pass_src, &pass_target), "fs::copy");
         }
     }
 
@@ -601,7 +606,8 @@ pub fn restore_vault_db(source_path: &Path) -> Result<(), String> {
     let is_pass_src_exists = pass_src.exists();
     if is_pass_src_exists {
         if let Ok(pass_target) = email_vault_db::get_email_passwords_db_path() {
-            let _ = fs::copy(&pass_src, &pass_target);
+            // Justification: best-effort file copy; logged for diagnosis
+            crate::error::record_ignored(fs::copy(&pass_src, &pass_target), "fs::copy");
         }
     }
 

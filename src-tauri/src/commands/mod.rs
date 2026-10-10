@@ -104,13 +104,21 @@ pub async fn add_account(
     let mut account = service.add_account(&refresh_token).await?;
 
     // 自动刷新配额
-    let _ = internal_refresh_account_quota(&app, &mut account).await;
+    // Justification: quota auto-refresh after account add is opportunistic; the account was already added
+    crate::error::record_ignored(
+        internal_refresh_account_quota(&app, &mut account).await,
+        "auto-refresh quota after account add",
+    );
 
     // 重载账号池
-    let _ = crate::commands::proxy::reload_proxy_accounts(
-        app.state::<crate::commands::proxy::ProxyServiceState>(),
-    )
-    .await;
+    // Justification: proxy pool reload after account add is best-effort sync; the account was already added
+    crate::error::record_ignored(
+        crate::commands::proxy::reload_proxy_accounts(
+            app.state::<crate::commands::proxy::ProxyServiceState>(),
+        )
+        .await,
+        "reload proxy accounts after account add",
+    );
 
     Ok(account)
 }
@@ -129,7 +137,11 @@ pub async fn delete_account(
     service.delete_account(&account_id)?;
 
     // Reload token pool
-    let _ = crate::commands::proxy::reload_proxy_accounts(proxy_state).await;
+    // Justification: proxy pool reload after account delete is best-effort sync; the delete already succeeded
+    crate::error::record_ignored(
+        crate::commands::proxy::reload_proxy_accounts(proxy_state).await,
+        "reload proxy accounts after account delete",
+    );
 
     Ok(())
 }
@@ -154,7 +166,11 @@ pub async fn delete_accounts(
     crate::modules::tray::update_tray_menus(&app);
 
     // Reload token pool
-    let _ = crate::commands::proxy::reload_proxy_accounts(proxy_state).await;
+    // Justification: proxy pool reload after batch delete is best-effort sync; the delete already succeeded
+    crate::error::record_ignored(
+        crate::commands::proxy::reload_proxy_accounts(proxy_state).await,
+        "reload proxy accounts after batch delete",
+    );
 
     Ok(())
 }
@@ -176,7 +192,11 @@ pub async fn reorder_accounts(
     })?;
 
     // Reload pool to reflect new order if running
-    let _ = crate::commands::proxy::reload_proxy_accounts(proxy_state).await;
+    // Justification: proxy pool reload after reorder is best-effort sync; the reorder already succeeded
+    crate::error::record_ignored(
+        crate::commands::proxy::reload_proxy_accounts(proxy_state).await,
+        "reload proxy accounts after reorder",
+    );
     Ok(())
 }
 
@@ -220,7 +240,11 @@ pub async fn switch_account(
             .await?;
 
         if let Ok(acc) = modules::account::load_account(&account_id) {
-            let _ = modules::instance::bind_account_to_instance("default", &acc.id, &acc.email);
+            // Justification: instance binding is bookkeeping; the account switch already succeeded
+            crate::error::record_ignored(
+                modules::instance::bind_account_to_instance("default", &acc.id, &acc.email),
+                "bind account to default instance after switch",
+            );
             if !acc.email.is_empty() {
                 modules::notification_hub::notify_account_switched(
                     &acc.email,
@@ -236,7 +260,11 @@ pub async fn switch_account(
     crate::modules::tray::update_tray_menus(&app);
 
     // [FIX #820] Notify proxy to clear stale session bindings and reload accounts
-    let _ = crate::commands::proxy::reload_proxy_accounts(proxy_state).await;
+    // Justification: proxy pool reload after account switch is best-effort sync; the switch already succeeded
+    crate::error::record_ignored(
+        crate::commands::proxy::reload_proxy_accounts(proxy_state).await,
+        "reload proxy accounts after account switch",
+    );
 
     Ok(())
 }
@@ -272,9 +300,13 @@ pub async fn get_current_account() -> Result<Option<Account>, String> {
                             "   Auto-bound current account from editor DB: {}",
                             matching.email
                         ));
-                        let _ = modules::account::set_current_account_id_with_target(
-                            &matching.id,
-                            current_target,
+                        // Justification: current-account persistence is best-effort; the account is returned to the caller regardless
+                        crate::error::record_ignored(
+                            modules::account::set_current_account_id_with_target(
+                                &matching.id,
+                                current_target,
+                            ),
+                            "persist auto-bound current account",
                         );
                         return Ok(Some(matching));
                     }
@@ -308,7 +340,11 @@ async fn internal_refresh_account_quota(
     match modules::account::fetch_quota_with_retry(account).await {
         Ok(quota) => {
             // 更新账号配额
-            let _ = modules::update_account_quota(&account.id, quota.clone());
+            // Justification: quota cache write is auxiliary; the fetched quota is returned to the caller
+            crate::error::record_ignored(
+                modules::update_account_quota(&account.id, quota.clone()),
+                "cache refreshed account quota",
+            );
             // 更新托盘菜单
             crate::modules::tray::update_tray_menus(app);
             Ok(quota)
@@ -346,7 +382,11 @@ pub async fn fetch_account_quota(
         if quota.models.iter().any(|model| model.percentage > 0) {
             instance.token_manager.clear_rate_limit_memory(&account_id);
         }
-        let _ = instance.token_manager.reload_account(&account_id).await;
+        // Justification: proxy token-manager reload is best-effort sync; the quota was already fetched and stored
+        crate::error::record_ignored(
+            instance.token_manager.reload_account(&account_id).await,
+            "reload account in proxy token manager",
+        );
 
         // Blend TokenManager lockout state only for models that are still 0%
         if let Some(reset_secs) = instance
@@ -385,13 +425,21 @@ pub async fn refresh_all_quotas_internal(
     // 同步到运行中的反代服务（如果已启动）
     let instance_lock = proxy_state.instance.read().await;
     if let Some(instance) = instance_lock.as_ref() {
-        let _ = instance.token_manager.reload_all_accounts().await;
+        // Justification: proxy reload is best-effort sync; the refresh stats are returned regardless
+        crate::error::record_ignored(
+            instance.token_manager.reload_all_accounts().await,
+            "reload all accounts in proxy token manager",
+        );
     }
 
     // 发送全局刷新事件给 UI (如果需要)
     if let Some(handle) = app_handle {
         use tauri::Emitter;
-        let _ = handle.emit("accounts://refreshed", ());
+        // Justification: UI event emission; a missing listener is expected and harmless
+        crate::error::record_ignored(
+            handle.emit("accounts://refreshed", ()),
+            "emit accounts refreshed event",
+        );
     }
 
     Ok(stats)
@@ -503,7 +551,11 @@ pub async fn save_config(
     modules::save_app_config(&config)?;
 
     // 通知托盘配置已更新
-    let _ = app.emit("config://updated", ());
+    // Justification: UI event emission; the config was already saved
+    crate::error::record_ignored(
+        app.emit("config://updated", ()),
+        "emit config updated event",
+    );
 
     // Sync global in-memory config regardless of proxy runtime state
     crate::proxy::update_thinking_budget_config(config.proxy.thinking_budget.clone());
@@ -601,7 +653,11 @@ pub async fn save_config(
 
     if config.auto_profile_switcher.is_enabled {
         tauri::async_runtime::spawn(async move {
-            let _ = crate::modules::auto_switcher::check_and_rotate_if_needed().await;
+            // Justification: opportunistic rotation check runs detached; it logs its own errors
+            crate::error::record_ignored(
+                crate::modules::auto_switcher::check_and_rotate_if_needed().await,
+                "trigger auto-switcher rotation check",
+            );
         });
     }
 
@@ -642,13 +698,21 @@ pub async fn start_oauth_login(
     let mut account = service.start_oauth_login(oauth_client_key).await?;
 
     // 自动触发刷新额度
-    let _ = internal_refresh_account_quota(&app_handle, &mut account).await;
+    // Justification: quota auto-refresh after OAuth login is opportunistic; the login already succeeded
+    crate::error::record_ignored(
+        internal_refresh_account_quota(&app_handle, &mut account).await,
+        "auto-refresh quota after OAuth login",
+    );
 
     // Reload token pool
-    let _ = crate::commands::proxy::reload_proxy_accounts(
-        app_handle.state::<crate::commands::proxy::ProxyServiceState>(),
-    )
-    .await;
+    // Justification: proxy pool reload after OAuth login is best-effort sync; the login already succeeded
+    crate::error::record_ignored(
+        crate::commands::proxy::reload_proxy_accounts(
+            app_handle.state::<crate::commands::proxy::ProxyServiceState>(),
+        )
+        .await,
+        "reload proxy accounts after OAuth login",
+    );
 
     Ok(account)
 }
@@ -664,13 +728,21 @@ pub async fn complete_oauth_login(app_handle: tauri::AppHandle) -> Result<Accoun
     let mut account = service.complete_oauth_login().await?;
 
     // 自动触发刷新额度
-    let _ = internal_refresh_account_quota(&app_handle, &mut account).await;
+    // Justification: quota auto-refresh after manual OAuth completion is opportunistic; the login already succeeded
+    crate::error::record_ignored(
+        internal_refresh_account_quota(&app_handle, &mut account).await,
+        "auto-refresh quota after manual OAuth completion",
+    );
 
     // Reload token pool
-    let _ = crate::commands::proxy::reload_proxy_accounts(
-        app_handle.state::<crate::commands::proxy::ProxyServiceState>(),
-    )
-    .await;
+    // Justification: proxy pool reload after manual OAuth completion is best-effort sync; the login already succeeded
+    crate::error::record_ignored(
+        crate::commands::proxy::reload_proxy_accounts(
+            app_handle.state::<crate::commands::proxy::ProxyServiceState>(),
+        )
+        .await,
+        "reload proxy accounts after manual OAuth completion",
+    );
 
     Ok(account)
 }
@@ -727,11 +799,19 @@ pub async fn import_v1_accounts(
 
     // 对导入的账号尝试刷新一波
     for mut account in accounts.clone() {
-        let _ = internal_refresh_account_quota(&app, &mut account).await;
+        // Justification: quota auto-refresh after v1 import is opportunistic; the import already succeeded
+        crate::error::record_ignored(
+            internal_refresh_account_quota(&app, &mut account).await,
+            "auto-refresh quota after v1 import",
+        );
     }
 
     // Reload token pool
-    let _ = crate::commands::proxy::reload_proxy_accounts(proxy_state).await;
+    // Justification: proxy pool reload after v1 import is best-effort sync; the import already succeeded
+    crate::error::record_ignored(
+        crate::commands::proxy::reload_proxy_accounts(proxy_state).await,
+        "reload proxy accounts after v1 import",
+    );
 
     Ok(accounts)
 }
@@ -747,18 +827,30 @@ pub async fn import_from_db(
 
     if let Some(first_acc) = imported_accounts.first() {
         let account_id = first_acc.id.clone();
-        let _ = modules::account::set_current_account_id_with_target(
-            &account_id,
-            target_ide.as_deref(),
+        // Justification: current-account persistence is best-effort; the import already succeeded
+        crate::error::record_ignored(
+            modules::account::set_current_account_id_with_target(
+                &account_id,
+                target_ide.as_deref(),
+            ),
+            "set current account after DB import",
         );
     }
 
     for mut account in imported_accounts.clone() {
-        let _ = internal_refresh_account_quota(&app, &mut account).await;
+        // Justification: quota auto-refresh after DB import is opportunistic; the import already succeeded
+        crate::error::record_ignored(
+            internal_refresh_account_quota(&app, &mut account).await,
+            "auto-refresh quota after DB import",
+        );
     }
 
     crate::modules::tray::update_tray_menus(&app);
-    let _ = crate::commands::proxy::reload_proxy_accounts(proxy_state).await;
+    // Justification: proxy pool reload after DB import is best-effort sync; the import already succeeded
+    crate::error::record_ignored(
+        crate::commands::proxy::reload_proxy_accounts(proxy_state).await,
+        "reload proxy accounts after DB import",
+    );
 
     Ok(imported_accounts)
 }
@@ -778,13 +870,21 @@ pub async fn import_custom_db(
     modules::account::set_current_account_id(&account_id)?;
 
     // 自动触发刷新额度
-    let _ = internal_refresh_account_quota(&app, &mut account).await;
+    // Justification: quota auto-refresh after custom DB import is opportunistic; the import already succeeded
+    crate::error::record_ignored(
+        internal_refresh_account_quota(&app, &mut account).await,
+        "auto-refresh quota after custom DB import",
+    );
 
     // 刷新托盘图标展示
     crate::modules::tray::update_tray_menus(&app);
 
     // Reload token pool
-    let _ = crate::commands::proxy::reload_proxy_accounts(proxy_state).await;
+    // Justification: proxy pool reload after custom DB import is best-effort sync; the import already succeeded
+    crate::error::record_ignored(
+        crate::commands::proxy::reload_proxy_accounts(proxy_state).await,
+        "reload proxy accounts after custom DB import",
+    );
 
     Ok(account)
 }
@@ -862,13 +962,21 @@ pub async fn sync_account_from_db(
     modules::account::set_current_account_id_with_target(&account_id, current_target)?;
 
     // 自动触发刷新额度
-    let _ = internal_refresh_account_quota(&app, &mut account).await;
+    // Justification: quota auto-refresh after DB sync is opportunistic; the sync already succeeded
+    crate::error::record_ignored(
+        internal_refresh_account_quota(&app, &mut account).await,
+        "auto-refresh quota after account DB sync",
+    );
 
     // 刷新托盘图标展示
     crate::modules::tray::update_tray_menus(&app);
 
     // Reload token pool
-    let _ = crate::commands::proxy::reload_proxy_accounts(proxy_state).await;
+    // Justification: proxy pool reload after DB sync is best-effort sync; the sync already succeeded
+    crate::error::record_ignored(
+        crate::commands::proxy::reload_proxy_accounts(proxy_state).await,
+        "reload proxy accounts after account DB sync",
+    );
 
     Ok(Some(account))
 }
@@ -1164,7 +1272,8 @@ pub async fn migrate_data_dir(new_path: String, clean_source: bool) -> Result<()
     // Write persistent bootstrap pointer file
     if let Some(pointer_file) = modules::account::get_data_dir_pointer_file() {
         if let Some(parent) = pointer_file.parent() {
-            let _ = std::fs::create_dir_all(parent);
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create pointer file directory: {}", e))?;
         }
         std::fs::write(&pointer_file, target_dir.to_string_lossy().trim())
             .map_err(|e| format!("Failed to save data directory configuration: {}", e))?;
@@ -1196,7 +1305,8 @@ pub async fn show_main_window(window: tauri::WebviewWindow) -> Result<(), String
         let rgba = img.to_rgba8();
         let (width, height) = rgba.dimensions();
         let icon = tauri::image::Image::new_owned(rgba.into_raw(), width, height);
-        let _ = window.set_icon(icon);
+        // Justification: window icon is cosmetic; the window is shown regardless
+        crate::error::record_ignored(window.set_icon(icon), "set main window icon");
     }
     crate::restore_and_focus_window(&window);
     Ok(())
@@ -1515,7 +1625,11 @@ pub async fn toggle_proxy_status(
                     if let Ok(mut cfg) = crate::modules::config::load_app_config() {
                         if cfg.proxy.preferred_account_id.as_deref() == Some(&account_id) {
                             cfg.proxy.preferred_account_id = None;
-                            let _ = crate::modules::config::save_app_config(&cfg);
+                            // Justification: config persistence of the cleared preferred-account; the in-memory token manager was already updated
+                            crate::error::record_ignored(
+                                crate::modules::config::save_app_config(&cfg),
+                                "persist cleared preferred account to config",
+                            );
                         }
                     }
                 }

@@ -39,6 +39,7 @@ import {
 import { maskEmail } from '../../utils/maskEmail';
 import ModalDialog from '../common/ModalDialog';
 import { showToast } from '../common/ToastContainer';
+import { useErrorStore } from '../../stores/error-store';
 
 export default function SupabaseSyncSettings() {
     const [config, setConfig] = useState<SupabaseConfig | null>(null);
@@ -108,6 +109,11 @@ export default function SupabaseSyncSettings() {
             setLeases(loadedLeases || []);
         } catch (e) {
             console.warn('Failed to load active workspace leases:', e);
+            // Tracked in the error module; empty lease list shown, retried on next load.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'SupabaseSyncSettings.loadLeases',
+              triggerAction: 'load_active_leases',
+            });
             setLeases([]);
         } finally {
             setIsLoadingLeases(false);
@@ -131,6 +137,11 @@ export default function SupabaseSyncSettings() {
             if (loadedLeases) setLeases(loadedLeases);
         } catch (e) {
             console.error('Failed to load Supabase / Telegram settings:', e);
+            // Tracked in the error module; settings form keeps defaults, user can retry.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'SupabaseSyncSettings.loadAll',
+              triggerAction: 'load_supabase_settings',
+            });
         } finally {
             setIsLoading(false);
         }
@@ -970,7 +981,14 @@ Here are my Supabase details:
                                 onChange={(e) => {
                                     const updated = { ...telegramConfig, is_enabled: e.target.checked };
                                     setTelegramConfig(updated);
-                                    telegramService.saveConfig(updated).catch(console.error);
+                                    telegramService.saveConfig(updated).catch((e) => {
+                                        // Tracked in the error module; toggle already applied locally, persisted on next save.
+                                        useErrorStore.getState().trackWarning(e, {
+                                          source: 'SupabaseSyncSettings.telegramToggle',
+                                          triggerAction: 'save_telegram_config',
+                                        });
+                                        console.error(e);
+                                    });
                                 }}
                                 className="sr-only peer"
                             />
@@ -1037,7 +1055,14 @@ Here are my Supabase details:
                                             notify_on_system_update: e.target.checked,
                                         };
                                         setTelegramConfig(updated);
-                                        telegramService.saveConfig(updated).catch(console.error);
+                                        telegramService.saveConfig(updated).catch((e) => {
+                                            // Tracked in the error module; toggle already applied locally, persisted on next save.
+                                            useErrorStore.getState().trackWarning(e, {
+                                              source: 'SupabaseSyncSettings.telegramToggle',
+                                              triggerAction: 'save_telegram_config',
+                                            });
+                                            console.error(e);
+                                        });
                                     }}
                                     className="w-3.5 h-3.5 rounded text-sky-600 focus:ring-sky-500 border-slate-700 bg-slate-950"
                                 />

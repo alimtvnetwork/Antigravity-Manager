@@ -29,6 +29,7 @@ import {
 import { useAccountStore } from '../../stores/useAccountStore';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useInstanceStore } from '../../stores/useInstanceStore';
+import { useErrorStore } from '../../stores/error-store';
 import {
     createBackupEnvelope,
     isEncryptedBackup,
@@ -405,6 +406,12 @@ export function UnifiedBackupModal({ isOpen, onClose, initialTab = 'export' }: U
                     await invoke('save_app_config', { config: payload.config });
                 } catch (e) {
                     console.warn('Config restore non-fatal warning:', e);
+                    // Tracked in the error module; config section skipped, remaining backup sections still restore.
+                    useErrorStore.getState().trackWarning(e, {
+                      source: 'UnifiedBackupModal.restoreBackup',
+                      endpoint: 'save_app_config',
+                      triggerAction: 'restore_config_section',
+                    });
                 }
             }
 

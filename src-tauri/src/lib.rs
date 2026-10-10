@@ -185,35 +185,48 @@ pub fn force_restore_and_focus_win32(window: &tauri::WebviewWindow) {
 }
 
 pub fn restore_and_focus_window(window: &tauri::WebviewWindow) {
-    let _ = window.show();
-    let _ = window.unminimize();
+    // Justification: best-effort window operation; the UI continues without it
+    crate::error::record_ignored(window.show(), "window.show");
+    // Justification: best-effort window operation; the UI continues without it
+    crate::error::record_ignored(window.unminimize(), "window.unminimize");
     if let Ok(is_min) = window.is_minimized() {
         if is_min {
-            let _ = window.unminimize();
+            // Justification: best-effort window operation; the UI continues without it
+            crate::error::record_ignored(window.unminimize(), "window.unminimize");
         }
     }
     if let Ok(pos) = window.outer_position() {
         let is_offscreen_x = pos.x < -1000;
         let is_offscreen_y = pos.y < -1000;
         if is_offscreen_x || is_offscreen_y {
-            let _ = window.center();
+            // Justification: best-effort window operation; the UI continues without it
+            crate::error::record_ignored(window.center(), "window.center");
         }
     }
     if let Ok(size) = window.outer_size() {
         let is_too_narrow = size.width < 500;
         let is_too_short = size.height < 400;
         if is_too_narrow || is_too_short {
-            let _ = window.set_size(tauri::LogicalSize::new(1200, 800));
-            let _ = window.center();
+            // Justification: best-effort window operation; the UI continues without it
+            crate::error::record_ignored(
+                window.set_size(tauri::LogicalSize::new(1200, 800)),
+                "window.set_size",
+            );
+            // Justification: best-effort window operation; the UI continues without it
+            crate::error::record_ignored(window.center(), "window.center");
         }
     }
-    let _ = window.set_focus();
+    // Justification: best-effort window operation; the UI continues without it
+    crate::error::record_ignored(window.set_focus(), "window.set_focus");
     #[cfg(target_os = "windows")]
     {
         force_restore_and_focus_win32(window);
-        let _ = window.set_always_on_top(true);
-        let _ = window.set_always_on_top(false);
-        let _ = window.set_focus();
+        // Justification: best-effort window operation; the UI continues without it
+        crate::error::record_ignored(window.set_always_on_top(true), "window.set_always_on_top");
+        // Justification: best-effort window operation; the UI continues without it
+        crate::error::record_ignored(window.set_always_on_top(false), "window.set_always_on_top");
+        // Justification: best-effort window operation; the UI continues without it
+        crate::error::record_ignored(window.set_focus(), "window.set_focus");
     }
     #[cfg(target_os = "macos")]
     {
@@ -223,10 +236,12 @@ pub fn restore_and_focus_window(window: &tauri::WebviewWindow) {
             .set_activation_policy(tauri::ActivationPolicy::Regular)
             .unwrap_or(());
     }
-    let _ = window.eval(
+    // Justification: best-effort window operation; the UI continues without it
+    crate::error::record_ignored(window.eval(
         "window.dispatchEvent(new Event('resize')); if (document.body) { document.body.style.transform = 'translateZ(0)'; }",
-    );
-    let _ = window.emit("window-restored", ());
+    ), "window.eval");
+    // Justification: best-effort frontend event; a dropped event only skips a UI refresh
+    crate::error::record_ignored(window.emit("window-restored", ()), "emit window-restored");
 }
 
 #[cfg(target_os = "linux")]
@@ -610,7 +625,9 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            let _ = modules::lightweight::exit_lightweight_mode(app);
+            // Justification: best-effort call; failure logged without changing control flow
+            crate::error::record_ignored(modules::lightweight::exit_lightweight_mode(app), "exit_lightweight_mode");
+            // Justification: runs only when the main window exists; the Option result is intentionally unused.
             let _ = app.get_webview_window("main").map(|window| {
                 restore_and_focus_window(&window);
             });
@@ -659,7 +676,8 @@ pub fn run() {
             // Explicitly set window icon and version title for main window on Windows/Linux and heal restored offscreen coordinates
             if let Some(window) = app.get_webview_window("main") {
                 let window_title = format!("Antigravity Manager Tools v{}", env!("CARGO_PKG_VERSION"));
-                let _ = window.set_title(&window_title);
+                // Justification: best-effort window operation; the UI continues without it
+                crate::error::record_ignored(window.set_title(&window_title), "window.set_title");
                 #[cfg(target_os = "windows")]
                 {
                     if let Ok(hwnd) = window.hwnd() {
@@ -682,7 +700,8 @@ pub fn run() {
                     let rgba = img.to_rgba8();
                     let (width, height) = rgba.dimensions();
                     let icon = tauri::image::Image::new_owned(rgba.into_raw(), width, height);
-                    let _ = window.set_icon(icon);
+                    // Justification: best-effort window operation; the UI continues without it
+                    crate::error::record_ignored(window.set_icon(icon), "window.set_icon");
                 }
                 let is_minimized_arg = std::env::args().any(|arg| arg == "--minimized");
                 if !is_minimized_arg {
@@ -702,7 +721,8 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             {
                 std::thread::spawn(|| {
-                    let _ = std::process::Command::new("bash")
+                    // Justification: best-effort process spawn; failure logged
+                    crate::error::record_ignored(std::process::Command::new("bash")
                         .arg("-c")
                         .arg(r#"
                             rm -rf /private/tmp/*[Aa]ntigravity* /private/tmp/*[Aa]gm* /tmp/*[Aa]ntigravity* /tmp/*[Aa]gm* 2>/dev/null || true
@@ -734,7 +754,7 @@ pub fn run() {
                                 "$lsregister" -gc -R -v -apps u,s,l 2>/dev/null || "$lsregister" -gc 2>/dev/null || true
                             fi
                         "#)
-                        .status();
+                        .status(), "spawn bash");
                 });
             }
 
@@ -841,7 +861,8 @@ pub fn run() {
                     crate::modules::logger::log_info(
                         "Starting background startup backfill for accounts with missing subscription tier...",
                     );
-                    let _ = crate::modules::account::refresh_missing_tiers(Some(2)).await;
+                    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                    crate::error::record_ignored(crate::modules::account::refresh_missing_tiers(Some(2)).await, "refresh_missing_tiers");
                 }
             });
             info!("Account subscription tier startup backfill task spawned.");
@@ -865,9 +886,11 @@ pub fn run() {
                             .unwrap_or(false);
 
                         if is_lightweight {
-                            let _ = modules::lightweight::enter_lightweight_mode(window.app_handle());
+                            // Justification: best-effort call; failure logged without changing control flow
+                            crate::error::record_ignored(modules::lightweight::enter_lightweight_mode(window.app_handle()), "enter_lightweight_mode");
                         } else {
-                            let _ = window.hide();
+                            // Justification: best-effort window operation; the UI continues without it
+                            crate::error::record_ignored(window.hide(), "window.hide");
                             #[cfg(target_os = "macos")]
                             {
                                 use tauri::Manager;
@@ -881,7 +904,8 @@ pub fn run() {
                 }
                 tauri::WindowEvent::Focused(focused) => {
                     if *focused {
-                        let _ = window.emit("window-restored", ());
+                        // Justification: best-effort frontend event; a dropped event only skips a UI refresh
+                        crate::error::record_ignored(window.emit("window-restored", ()), "emit window-restored");
                     }
                 }
                 _ => {}
@@ -1230,7 +1254,8 @@ pub fn run() {
                         tauri::async_runtime::block_on(async {
                             // 1. Stop cloudflared tunnel
                             if let Some(cf) = cf_state {
-                                let _ = tokio::time::timeout(std::time::Duration::from_millis(500), cf.stop()).await;
+                                // Justification: best-effort guarded wait; a timeout or inner failure is logged
+                                crate::error::record_ignored(tokio::time::timeout(std::time::Duration::from_millis(500), cf.stop()).await, "timeout wait");
                             }
 
                             // 2. Stop Admin Server (release TCP listener and socket)
@@ -1243,10 +1268,11 @@ pub fn run() {
                             // 3. Stop proxy instances and background tasks
                             if let Ok(mut lock) = tokio::time::timeout(std::time::Duration::from_millis(1000), state.instance.write()).await {
                                 if let Some(instance) = lock.take() {
-                                    let _ = tokio::time::timeout(
+                                    // Justification: best-effort guarded wait; a timeout or inner failure is logged
+                                    crate::error::record_ignored(tokio::time::timeout(
                                         std::time::Duration::from_millis(500),
                                         instance.token_manager.graceful_shutdown(std::time::Duration::from_millis(400)),
-                                    ).await;
+                                    ).await, "timeout wait");
                                     instance.axum_server.set_running(false).await;
                                     instance.axum_server.stop();
                                 }
@@ -1257,11 +1283,15 @@ pub fn run() {
                 // Handle macOS dock icon click to reopen window
                 #[cfg(target_os = "macos")]
                 tauri::RunEvent::Reopen { .. } => {
-                    let _ = modules::lightweight::exit_lightweight_mode(app_handle);
+                    // Justification: best-effort call; failure logged without changing control flow
+                    crate::error::record_ignored(modules::lightweight::exit_lightweight_mode(app_handle), "exit_lightweight_mode");
                     if let Some(window) = app_handle.get_webview_window("main") {
-                        let _ = window.unminimize();
-                        let _ = window.show();
-                        let _ = window.set_focus();
+                        // Justification: best-effort window operation; the UI continues without it
+                        crate::error::record_ignored(window.unminimize(), "window.unminimize");
+                        // Justification: best-effort window operation; the UI continues without it
+                        crate::error::record_ignored(window.show(), "window.show");
+                        // Justification: best-effort window operation; the UI continues without it
+                        crate::error::record_ignored(window.set_focus(), "window.set_focus");
                         app_handle
                             .set_activation_policy(tauri::ActivationPolicy::Regular)
                             .unwrap_or(());

@@ -419,7 +419,11 @@ impl ProxyMonitor {
         }
 
         if let Some(app) = &self.app_handle {
-            let _ = app.emit("proxy://request", &summary);
+            // Justification: best-effort frontend event; a dropped event only skips a UI refresh
+            crate::error::record_ignored(
+                app.emit("proxy://request", &summary),
+                "emit proxy://request",
+            );
         }
 
         let Ok(permit) = LOG_WRITERS.try_acquire() else {
@@ -541,11 +545,15 @@ impl ProxyMonitor {
         let mut stats = self.stats.write().await;
         *stats = ProxyStats::default();
 
-        let _ = tokio::task::spawn_blocking(|| {
-            if let Err(e) = crate::modules::proxy_db::clear_logs() {
-                tracing::error!("Failed to clear logs in DB: {}", e);
-            }
-        })
-        .await;
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            tokio::task::spawn_blocking(|| {
+                if let Err(e) = crate::modules::proxy_db::clear_logs() {
+                    tracing::error!("Failed to clear logs in DB: {}", e);
+                }
+            })
+            .await,
+            "spawn_blocking",
+        );
     }
 }

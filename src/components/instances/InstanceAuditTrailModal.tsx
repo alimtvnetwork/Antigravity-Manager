@@ -22,6 +22,7 @@ import {
 import { cn } from '../../utils/cn';
 import { maskEmail } from '../../utils/maskEmail';
 import { getInstanceSwitchHistory } from '../../services/instanceService';
+import { useErrorStore } from '../../stores/error-store';
 import type {
     InstanceSwitchHistoryResponse,
     SwitchAuditSteps
@@ -79,6 +80,11 @@ export default function InstanceAuditTrailModal({
             setExpandedCards(initialExpanded);
         } catch (err: any) {
             console.error('[InstanceAuditTrailModal] Failed to fetch switch history:', err);
+            // Tracked in the error module; modal already shows the error state to the user.
+            useErrorStore.getState().trackWarning(err, {
+              source: 'InstanceAuditTrailModal.fetchHistory',
+              triggerAction: 'fetch_switch_history',
+            });
             setError(err?.message || err?.toString() || 'Failed to fetch audit trail history');
         } finally {
             setIsLoading(false);

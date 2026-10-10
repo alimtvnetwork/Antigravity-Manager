@@ -18,6 +18,7 @@ import ThemeManager from './components/common/ThemeManager';
 import UserToken from './pages/UserToken';
 import { ApiKeyFun } from './pages/ApiKeyFun';
 import { UpdateNotification } from './components/UpdateNotification';
+import { useErrorStore } from './stores/error-store';
 import SuggestionDeleteThinkingModal from './components/common/SuggestionDeleteThinkingModal';
 import DebugConsole from './components/debug/DebugConsole';
 import { useEffect, startTransition } from 'react';
@@ -210,10 +211,22 @@ function App() {
         const shouldCheck = await invoke<boolean>('should_check_updates_on_startup').catch(() => true);
         if (shouldCheck) {
           await checkForUpdates();
-          await invoke('update_last_check_time').catch(() => {});
+          await invoke('update_last_check_time').catch((e) => {
+            // Best-effort timestamp write; failure doesn't affect the update check itself. Tracked, not fatal.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'App.checkUpdates',
+              endpoint: 'update_last_check_time',
+              triggerAction: 'update_last_check_time',
+            });
+          });
         }
       } catch (error) {
         console.error('Failed to check update settings:', error);
+        // Tracked in the error module; update check is best-effort on startup, no modal for background failures.
+        useErrorStore.getState().trackWarning(error, {
+          source: 'App.checkUpdates',
+          triggerAction: 'check_update_settings',
+        });
       }
     };
 

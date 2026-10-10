@@ -11,6 +11,7 @@ import { ensureFullViewState } from '../../utils/windowManager';
 import { useAccountStore } from '../../stores/useAccountStore';
 import { useInstanceStore } from '../../stores/useInstanceStore';
 import { useFastForwardShortcut } from '../../hooks/useFastForwardShortcut';
+import { useErrorStore } from '../../stores/error-store';
 
 function Layout() {
     const { isMiniView } = useViewStore();
@@ -46,6 +47,11 @@ function Layout() {
                 instanceStore.fetchInstances();
             } catch (err) {
                 console.error('[Layout] Failed to refresh stores on restore:', err);
+                // Tracked in the error module; window-focus refresh is best-effort, stores retry on next focus.
+                useErrorStore.getState().trackWarning(err, {
+                  source: 'Layout.handleRestore',
+                  triggerAction: 'refresh_stores_on_restore',
+                });
             }
         };
 

@@ -530,7 +530,8 @@ pub fn load_config() -> Result<SupabaseConfig, AppError> {
                         for ep in &mut cfg.endpoints {
                             ep.url = normalize_supabase_url(&ep.url);
                         }
-                        let _ = save_config(&cfg);
+                        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                        crate::error::record_ignored(save_config(&cfg), "save_config");
                         loaded = Some(cfg);
                     }
                 }
@@ -561,7 +562,8 @@ pub fn load_config() -> Result<SupabaseConfig, AppError> {
 
     if config.endpoints.is_empty() {
         if auto_seed_from_repo_secrets(&mut config) {
-            let _ = save_config(&config);
+            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+            crate::error::record_ignored(save_config(&config), "save_config");
         } else {
             for seed_path in candidate_seed_config_paths() {
                 if seed_path.exists() {
@@ -580,7 +582,8 @@ pub fn load_config() -> Result<SupabaseConfig, AppError> {
                                 for ep in &mut cfg.endpoints {
                                     ep.url = normalize_supabase_url(&ep.url);
                                 }
-                                let _ = save_config(&cfg);
+                                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                                crate::error::record_ignored(save_config(&cfg), "save_config");
                                 return Ok(cfg);
                             }
                         }
@@ -600,7 +603,11 @@ pub fn load_config() -> Result<SupabaseConfig, AppError> {
 /// Auto-discover Supabase credentials from repo-secrets, normalize URLs (stripping /rest/v1), enable sync, save, and return updated config.
 pub fn auto_discover_supabase_credentials() -> crate::error::AppResult<SupabaseConfig> {
     let mut config = load_config().unwrap_or_default();
-    let _ = auto_seed_from_repo_secrets(&mut config);
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(
+        auto_seed_from_repo_secrets(&mut config),
+        "auto_seed_from_repo_secrets",
+    );
 
     for seed_path in candidate_seed_config_paths() {
         if seed_path.exists() {
@@ -666,7 +673,11 @@ pub fn save_config(config: &SupabaseConfig) -> Result<(), AppError> {
     if let Ok(appdata) = std::env::var("APPDATA") {
         let alt_dir = PathBuf::from(appdata).join("antigravity-manager");
         if alt_dir.exists() {
-            let _ = fs::write(alt_dir.join("supabase_config.json"), &data);
+            // Justification: best-effort file write; failure is logged and surfaces on the next read
+            crate::error::record_ignored(
+                fs::write(alt_dir.join("supabase_config.json"), &data),
+                "fs::write",
+            );
         }
     }
 
@@ -795,9 +806,13 @@ pub async fn send_heartbeat(endpoint: &SupabaseEndpoint, node_alias: &str) -> Re
             "running_prompts_count": running_prompts_count,
             "updated_at": now
         });
-        let _ = client
-            .upsert("instance_profiles", profile_payload, "id")
-            .await;
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            client
+                .upsert("instance_profiles", profile_payload, "id")
+                .await,
+            "operation",
+        );
     }
 
     Ok(())
@@ -977,7 +992,11 @@ pub async fn sync_local_node_now() -> Result<(), AppError> {
     let config = load_config()?;
     for ep in &config.endpoints {
         if ep.is_enabled && ep.role == "root" {
-            let _ = send_heartbeat(ep, &config.node_alias).await;
+            // Justification: best-effort call; failure logged without changing control flow
+            crate::error::record_ignored(
+                send_heartbeat(ep, &config.node_alias).await,
+                "send_heartbeat",
+            );
         }
     }
     Ok(())
@@ -1364,7 +1383,11 @@ pub fn start_sync_worker() {
                     continue;
                 }
                 if ep.role == "root" {
-                    let _ = send_heartbeat(ep, &config.node_alias).await;
+                    // Justification: best-effort call; failure logged without changing control flow
+                    crate::error::record_ignored(
+                        send_heartbeat(ep, &config.node_alias).await,
+                        "send_heartbeat",
+                    );
                 }
             }
         }

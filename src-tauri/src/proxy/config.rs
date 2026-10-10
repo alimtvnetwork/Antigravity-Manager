@@ -73,6 +73,7 @@ pub fn update_thinking_budget_config(config: ThinkingBudgetConfig) {
         }
     } else {
         // Initial setup
+        // Justification: OnceLock::set fails only if already initialized; double-init is a benign no-op by design.
         let _ = GLOBAL_THINKING_BUDGET_CONFIG.set(RwLock::new(config.clone()));
         tracing::info!(
             "[Thinking-Budget] Global config initialized: source={:?}, flash_mode={:?} (L:{}, M:{}, H:{}, T:{}), pro_mode={:?} (L:{}, H:{}), claude_mode={:?} (L:{}, M:{}, H:{})",
@@ -121,6 +122,7 @@ pub fn update_global_system_prompt_config(config: GlobalSystemPromptConfig) {
         }
     } else {
         // 首次初始化
+        // Justification: OnceLock::set fails only if already initialized; double-init is a benign no-op by design.
         let _ = GLOBAL_SYSTEM_PROMPT_CONFIG.set(RwLock::new(config.clone()));
         tracing::info!(
             "[Global-System-Prompt] Config initialized: enabled={}, content_len={}",
@@ -153,6 +155,7 @@ pub fn update_image_thinking_mode(mode: Option<String>) {
             }
         }
     } else {
+        // Justification: OnceLock::set fails only if already initialized; double-init is a benign no-op by design.
         let _ = GLOBAL_IMAGE_THINKING_MODE.set(RwLock::new(val.clone()));
     }
 }
@@ -177,6 +180,7 @@ fn write_or_init<T: Clone>(slot: &OnceLock<RwLock<T>>, value: T) {
             *cfg = value;
         }
     } else {
+        // Justification: OnceLock::set fails only if already initialized; double-init is a benign no-op by design.
         let _ = slot.set(RwLock::new(value));
     }
 }
@@ -311,6 +315,7 @@ pub fn update_global_compression_level(level: String, scaling: bool) {
             *cfg = level;
         }
     } else {
+        // Justification: OnceLock::set fails only if already initialized; double-init is a benign no-op by design.
         let _ = GLOBAL_COMPRESSION_LEVEL.set(RwLock::new(level));
     }
 
@@ -319,6 +324,7 @@ pub fn update_global_compression_level(level: String, scaling: bool) {
             *cfg = scaling;
         }
     } else {
+        // Justification: OnceLock::set fails only if already initialized; double-init is a benign no-op by design.
         let _ = GLOBAL_USAGE_SCALING.set(RwLock::new(scaling));
     }
 }
@@ -329,6 +335,7 @@ pub fn update_global_thresholds(l1: f32, l2: f32, l3: f32) {
             *cfg = l1;
         }
     } else {
+        // Justification: OnceLock::set fails only if already initialized; double-init is a benign no-op by design.
         let _ = GLOBAL_THRESHOLD_L1.set(RwLock::new(l1));
     }
 
@@ -337,6 +344,7 @@ pub fn update_global_thresholds(l1: f32, l2: f32, l3: f32) {
             *cfg = l2;
         }
     } else {
+        // Justification: OnceLock::set fails only if already initialized; double-init is a benign no-op by design.
         let _ = GLOBAL_THRESHOLD_L2.set(RwLock::new(l2));
     }
 
@@ -345,6 +353,7 @@ pub fn update_global_thresholds(l1: f32, l2: f32, l3: f32) {
             *cfg = l3;
         }
     } else {
+        // Justification: OnceLock::set fails only if already initialized; double-init is a benign no-op by design.
         let _ = GLOBAL_THRESHOLD_L3.set(RwLock::new(l3));
     }
 }

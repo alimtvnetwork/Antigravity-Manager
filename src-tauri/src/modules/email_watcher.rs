@@ -259,7 +259,11 @@ async fn poll_inbox_cycle(m_name: &str, m_ip: &str) {
             }
 
             let action = email_inbound::parse_email_command(&msg.subject, &msg.body);
-            let _ = email_inbound::execute_inbound_action(&msg, action, m_ip, m_name);
+            // Justification: best-effort call; failure logged without changing control flow
+            crate::error::record_ignored(
+                email_inbound::execute_inbound_action(&msg, action, m_ip, m_name),
+                "execute_inbound_action",
+            );
         }
     }
 }
@@ -366,10 +370,14 @@ async fn check_quota_drop_sensor(
                             m_name,
                             m_ip,
                         );
-                        let _ = email_sender::dispatch_email_with_failover(
-                            &subj,
-                            &html,
-                            &active_recipients,
+                        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                        crate::error::record_ignored(
+                            email_sender::dispatch_email_with_failover(
+                                &subj,
+                                &html,
+                                &active_recipients,
+                            ),
+                            "dispatch_email_with_failover",
                         );
                         *last_alert = Utc::now().timestamp();
                         let mut st = LAST_STATUS.lock().await;
@@ -425,7 +433,11 @@ async fn check_idle_projects_sensor(m_name: &str, m_ip: &str, last_alert: &mut i
 
     if !active_recipients.is_empty() {
         let (subj, html) = email_sender::render_idle_projects_email(&idle_projects, m_name, m_ip);
-        let _ = email_sender::dispatch_email_with_failover(&subj, &html, &active_recipients);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            email_sender::dispatch_email_with_failover(&subj, &html, &active_recipients),
+            "dispatch_email_with_failover",
+        );
         *last_alert = Utc::now().timestamp();
     }
 }
@@ -472,7 +484,11 @@ pub fn notify_workspace_switched(from_instance: &str, to_instance: &str, reason:
         &m_ip,
     );
 
-    let _ = email_sender::dispatch_email_with_failover(&subj, &html, &active_recipients);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        email_sender::dispatch_email_with_failover(&subj, &html, &active_recipients),
+        "dispatch_email_with_failover",
+    );
 }
 
 #[cfg(test)]

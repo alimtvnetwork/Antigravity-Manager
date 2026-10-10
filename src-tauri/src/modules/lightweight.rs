@@ -36,11 +36,15 @@ pub fn ensure_main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
         if let Ok(img) = image::load_from_memory(icon_bytes) {
             let rgba = img.to_rgba8();
             let (width, height) = rgba.dimensions();
-            let _ = window.set_icon(tauri::image::Image::new_owned(
-                rgba.into_raw(),
-                width,
-                height,
-            ));
+            // Justification: best-effort window operation; the UI continues without it
+            crate::error::record_ignored(
+                window.set_icon(tauri::image::Image::new_owned(
+                    rgba.into_raw(),
+                    width,
+                    height,
+                )),
+                "window.set_icon",
+            );
         }
     }
 
@@ -60,7 +64,11 @@ pub fn ensure_main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
     }
 
     // 5. Restore window state (remembered positions and dimensions)
-    let _ = window.restore_state(StateFlags::all().difference(StateFlags::VISIBLE));
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(
+        window.restore_state(StateFlags::all().difference(StateFlags::VISIBLE)),
+        "restore_state",
+    );
 
     tracing::info!("[Lightweight] Main window rebuilt successfully");
     Ok(window)
@@ -87,10 +95,15 @@ pub fn enter_lightweight_mode(app: &AppHandle) -> Result<(), String> {
         tracing::info!("[Lightweight] Entering lightweight mode, saving window state and destroying WebView...");
 
         // 1. Save window state
-        let _ = app.save_window_state(StateFlags::all().difference(StateFlags::VISIBLE));
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            app.save_window_state(StateFlags::all().difference(StateFlags::VISIBLE)),
+            "save_window_state",
+        );
 
         // 2. Destroy window and webview renderer
-        let _ = window.destroy();
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(window.destroy(), "destroy");
 
         // 3. Switch macOS activation policy to Accessory to remove from Dock
         #[cfg(target_os = "macos")]

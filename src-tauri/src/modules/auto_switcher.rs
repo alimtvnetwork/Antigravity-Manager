@@ -1260,7 +1260,11 @@ pub async fn select_and_verify_next_best_profile(
     excluded_account_ids: &[String],
 ) -> Result<Option<ProfileCandidate>, String> {
     // 1. Proactively hydrate active remote leases from Supabase Root DB
-    let _ = crate::modules::workspace_lease_manager::list_active_leases().await;
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(
+        crate::modules::workspace_lease_manager::list_active_leases().await,
+        "list_active_leases",
+    );
 
     let candidates = select_candidate_profiles(
         current_instance_id,
@@ -1336,7 +1340,8 @@ pub async fn select_and_verify_next_best_profile(
         let fresh_4h_quota = match fetch_res {
             Ok(fresh_q) => {
                 cand_acc.quota = Some(fresh_q);
-                let _ = account::save_account(&cand_acc);
+                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                crate::error::record_ignored(account::save_account(&cand_acc), "save_account");
                 let q_val = calculate_candidate_quota(&cand_acc, target_model).unwrap_or(0.0);
                 logger::log_info(&format!(
                     "[AutoSwitcher] Candidate '{}' refreshed from Google API: {:.1}% (candidate quota)",
@@ -1430,9 +1435,13 @@ pub async fn execute_profile_rotation_with_context(
     // Step 0: Ensure all running and queued prompts are snapshotted and backed up before profile switch
     let backup_res = crate::modules::repo_db::backup_running_prompts(&current_instance_id);
     let backed_up_count = backup_res.as_ref().copied().unwrap_or(0);
-    let _ = crate::modules::backup_prompts_db::backup_active_running_prompts(
-        Some(&current_instance_id),
-        None,
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        crate::modules::backup_prompts_db::backup_active_running_prompts(
+            Some(&current_instance_id),
+            None,
+        ),
+        "backup_active_running_prompts",
     );
     match &backup_res {
         Ok(c) => {
@@ -1450,7 +1459,11 @@ pub async fn execute_profile_rotation_with_context(
     }
 
     if has_auto_resume {
-        let _ = snapshot_task_state(&current_instance_id, &target.account_id, &reason);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            snapshot_task_state(&current_instance_id, &target.account_id, &reason),
+            "snapshot_task_state",
+        );
     }
 
     logger::log_info(&format!(
@@ -1592,28 +1605,56 @@ pub async fn execute_profile_rotation_with_context(
             current_instance_id, target.instance_id, target.account_id, target.email
         ));
         // a) Save in-flight prompts
-        let _ = crate::modules::repo_db::requeue_running_conversations_for_instance(
-            &current_instance_id,
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::repo_db::requeue_running_conversations_for_instance(
+                &current_instance_id,
+            ),
+            "requeue_running_conversations_for_instance",
         );
         // b) Inherit/copy workspace projects from depleted instance to target instance
-        let _ = crate::modules::instance::copy_instance_projects(
-            &current_instance_id,
-            &target.instance_id,
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::instance::copy_instance_projects(
+                &current_instance_id,
+                &target.instance_id,
+            ),
+            "copy_instance_projects",
         );
         for ws in &active_workspaces {
-            let _ = crate::modules::instance::assign_project_to_instance(&target.instance_id, ws);
+            // Justification: best-effort call; failure logged without changing control flow
+            crate::error::record_ignored(
+                crate::modules::instance::assign_project_to_instance(&target.instance_id, ws),
+                "assign_project_to_instance",
+            );
         }
         // c) Close the depleted instance
-        let _ = crate::modules::instance::close_instance(&current_instance_id);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::instance::close_instance(&current_instance_id),
+            "close_instance",
+        );
         // d) Update active instance pointer
-        let _ = crate::modules::instance::set_active_instance_id(&target.instance_id);
-        let _ = crate::modules::instance::bind_account_to_instance(
-            &target.instance_id,
-            &target.account_id,
-            &target.email,
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            crate::modules::instance::set_active_instance_id(&target.instance_id),
+            "set_active_instance_id",
+        );
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::instance::bind_account_to_instance(
+                &target.instance_id,
+                &target.account_id,
+                &target.email,
+            ),
+            "bind_account_to_instance",
         );
         if target.instance_id == "default" {
-            let _ = crate::modules::account::set_current_account_id(&target.account_id);
+            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+            crate::error::record_ignored(
+                crate::modules::account::set_current_account_id(&target.account_id),
+                "set_current_account_id",
+            );
         }
         // e) Ensure target instance credentials are fully injected and instance is launched
         let _ = crate::modules::instance::switch_account_to_instance(
@@ -1623,7 +1664,11 @@ pub async fn execute_profile_rotation_with_context(
         .await?;
 
         if !app_config.auto_profile_switcher.auto_reopen_on_switch {
-            let _ = crate::modules::instance::close_instance(&target.instance_id);
+            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+            crate::error::record_ignored(
+                crate::modules::instance::close_instance(&target.instance_id),
+                "close_instance",
+            );
         }
     } else {
         logger::log_info(&format!(
@@ -1633,17 +1678,25 @@ pub async fn execute_profile_rotation_with_context(
         if inst_id == "default" {
             let service = crate::modules::account_service::AccountService::new(integration);
             service.switch_account(&target.account_id, None).await?;
-            let _ = crate::modules::instance::bind_account_to_instance(
-                "default",
-                &target.account_id,
-                &target.email,
+            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+            crate::error::record_ignored(
+                crate::modules::instance::bind_account_to_instance(
+                    "default",
+                    &target.account_id,
+                    &target.email,
+                ),
+                "bind_account_to_instance",
             );
         } else {
             instance::switch_account_to_instance(&target.account_id, Some(inst_id)).await?;
         }
 
         if !app_config.auto_profile_switcher.auto_reopen_on_switch {
-            let _ = crate::modules::instance::close_instance(&current_instance_id);
+            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+            crate::error::record_ignored(
+                crate::modules::instance::close_instance(&current_instance_id),
+                "close_instance",
+            );
         }
     }
 
@@ -1656,16 +1709,28 @@ pub async fn execute_profile_rotation_with_context(
             instance_id: String,
         }
         use tauri::Emitter;
-        let _ = handle.emit(
-            "account://auto-switched",
-            AutoSwitchPayload {
-                account_id: target.account_id.clone(),
-                email: target.email.clone(),
-                instance_id: inst_id.clone(),
-            },
+        // Justification: best-effort frontend event; a dropped event only skips a UI refresh
+        crate::error::record_ignored(
+            handle.emit(
+                "account://auto-switched",
+                AutoSwitchPayload {
+                    account_id: target.account_id.clone(),
+                    email: target.email.clone(),
+                    instance_id: inst_id.clone(),
+                },
+            ),
+            "emit event",
         );
-        let _ = handle.emit("accounts://refreshed", ());
-        let _ = handle.emit("instances://refreshed", ());
+        // Justification: best-effort frontend event; a dropped event only skips a UI refresh
+        crate::error::record_ignored(
+            handle.emit("accounts://refreshed", ()),
+            "emit accounts://refreshed",
+        );
+        // Justification: best-effort frontend event; a dropped event only skips a UI refresh
+        crate::error::record_ignored(
+            handle.emit("instances://refreshed", ()),
+            "emit instances://refreshed",
+        );
     }
 
     // Step 2.5: Acquire distributed lease in Supabase Root DB (prevent other nodes from selecting it)
@@ -1673,12 +1738,16 @@ pub async fn execute_profile_rotation_with_context(
     let target_inst_id = target.instance_id.clone();
     let lease_ttl = crate::modules::workspace_lease_manager::get_default_lease_ttl_secs();
     tauri::async_runtime::spawn(async move {
-        let _ = crate::modules::workspace_lease_manager::acquire_lease(
-            &target_acc_id,
-            &target_inst_id,
-            lease_ttl,
-        )
-        .await;
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::workspace_lease_manager::acquire_lease(
+                &target_acc_id,
+                &target_inst_id,
+                lease_ttl,
+            )
+            .await,
+            "acquire_lease",
+        );
     });
 
     // Step 3: Asynchronous 5-second post-launch prompt re-injection and status notification
@@ -1734,7 +1803,11 @@ pub async fn execute_profile_rotation_with_context(
         let threshold = app_config
             .auto_profile_switcher
             .prompt_recency_threshold_seconds as i64;
-        let _ = crate::modules::repo_db::auto_resume_recent_prompts(inst_id, threshold);
+        // Justification: best-effort call; failure logged without changing control flow
+        crate::error::record_ignored(
+            crate::modules::repo_db::auto_resume_recent_prompts(inst_id, threshold),
+            "auto_resume_recent_prompts",
+        );
     }
 
     let now = chrono::Utc::now().timestamp();
@@ -1844,7 +1917,8 @@ pub async fn check_and_rotate_with_options(
         // Live Quota Refresh from Google API before threshold evaluation
         if let Ok(fresh_quota) = account::fetch_quota_with_retry(&mut bound_acc).await {
             bound_acc.quota = Some(fresh_quota);
-            let _ = account::save_account(&bound_acc);
+            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+            crate::error::record_ignored(account::save_account(&bound_acc), "save_account");
         }
 
         let period_status = evaluate_account_period_status(
@@ -1868,10 +1942,14 @@ pub async fn check_and_rotate_with_options(
             || quota_percent <= effective_low_threshold
             || quota_percent <= switcher_cfg.critical_threshold_percent;
         if below_threshold || force {
-            let _ = instance::resolve_instance_pid_for_switch(
-                &inst.id,
-                &inst.data_dir,
-                inst.is_default || inst.id == "default",
+            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+            crate::error::record_ignored(
+                instance::resolve_instance_pid_for_switch(
+                    &inst.id,
+                    &inst.data_dir,
+                    inst.is_default || inst.id == "default",
+                ),
+                "resolve_instance_pid_for_switch",
             );
         }
 
@@ -2208,8 +2286,16 @@ pub async fn trigger_manual_rotation_for_instance(
     };
 
     // Step 0: Ensure running prompts are snapshotted and backed up before rotation starts
-    let _ = crate::modules::repo_db::backup_running_prompts(&inst_id);
-    let _ = crate::modules::backup_prompts_db::backup_active_running_prompts(Some(&inst_id), None);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        crate::modules::repo_db::backup_running_prompts(&inst_id),
+        "backup_running_prompts",
+    );
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        crate::modules::backup_prompts_db::backup_active_running_prompts(Some(&inst_id), None),
+        "backup_active_running_prompts",
+    );
     let in_use_account_ids = get_active_in_use_account_ids();
 
     let registry = instance::load_registry()?;
@@ -2438,8 +2524,16 @@ pub fn emit_daemon_status() {
     if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
         use tauri::Emitter;
         let daemon_status = get_daemon_status();
-        let _ = handle.emit("auto-switcher://status-tick", &daemon_status);
-        let _ = handle.emit("auto-switcher://daemon-status", &daemon_status);
+        // Justification: best-effort frontend event; a dropped event only skips a UI refresh
+        crate::error::record_ignored(
+            handle.emit("auto-switcher://status-tick", &daemon_status),
+            "emit auto-switcher://status-tick",
+        );
+        // Justification: best-effort frontend event; a dropped event only skips a UI refresh
+        crate::error::record_ignored(
+            handle.emit("auto-switcher://daemon-status", &daemon_status),
+            "emit auto-switcher://daemon-status",
+        );
     }
 }
 
@@ -2559,7 +2653,11 @@ pub fn start_auto_switcher() {
                 }
             }
 
-            let _ = instance::refresh_pid_cache_if_due(switcher_cfg.pid_refresh_seconds);
+            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+            crate::error::record_ignored(
+                instance::refresh_pid_cache_if_due(switcher_cfg.pid_refresh_seconds),
+                "refresh_pid_cache_if_due",
+            );
 
             if let Err(e) = check_and_rotate_if_needed().await {
                 logger::log_warn(&format!("[AutoSwitcher] Error during check cycle: {}", e));

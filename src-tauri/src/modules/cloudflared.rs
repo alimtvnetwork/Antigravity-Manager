@@ -204,7 +204,8 @@ impl CloudflaredManager {
                 return Err("Failed to extract cloudflared archive".to_string());
             }
 
-            let _ = std::fs::remove_file(&archive_path);
+            // Justification: best-effort cleanup; a leftover file is harmless
+            crate::error::record_ignored(std::fs::remove_file(&archive_path), "remove_file");
         } else {
             std::fs::write(&bin_path, &bytes)
                 .map_err(|e| format!("Failed to write binary: {}", e))?;
@@ -243,6 +244,7 @@ impl CloudflaredManager {
 
         // 停止之前的监控任务
         if let Some(tx) = self.shutdown_tx.write().await.take() {
+            // Justification: oneshot::Sender::send returns Result<(), ()> — the unit error carries no information to log; a dropped receiver is benign here.
             let _ = tx.send(());
         }
 
@@ -395,12 +397,14 @@ impl CloudflaredManager {
     /// 停止隧道
     pub async fn stop(&self) -> Result<CloudflaredStatus, String> {
         if let Some(tx) = self.shutdown_tx.write().await.take() {
+            // Justification: oneshot::Sender::send returns Result<(), ()> — the unit error carries no information to log; a dropped receiver is benign here.
             let _ = tx.send(());
         }
 
         let mut proc_lock = self.process.write().await;
         if let Some(mut child) = proc_lock.take() {
-            let _ = child.kill().await;
+            // Justification: best-effort process termination; the OS reaps the child regardless
+            crate::error::record_ignored(child.kill().await, "kill child");
             info!("[cloudflared] Tunnel stopped");
         }
 

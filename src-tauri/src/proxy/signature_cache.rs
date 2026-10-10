@@ -99,7 +99,11 @@ impl SignatureCache {
         let id_str = norm_id.to_string();
 
         // 1. 持久化到 SQLite L2 数据库 (支持代理重启后秒级恢复)
-        let _ = crate::modules::proxy_db::save_tool_signature(&id_str, &signature);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            crate::modules::proxy_db::save_tool_signature(&id_str, &signature),
+            "save_tool_signature",
+        );
 
         // 2. 写入内存 L1 缓存
         if let Ok(mut cache) = self.tool_signatures.lock() {

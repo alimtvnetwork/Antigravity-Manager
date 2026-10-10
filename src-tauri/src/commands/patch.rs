@@ -167,9 +167,13 @@ pub async fn patch_agy_binary(file_path: String) -> Result<String, String> {
     #[cfg(target_os = "macos")]
     {
         if !is_pe_x64 {
-            let _ = Command::new("codesign")
-                .args(&["--remove-signature", &actual_path])
-                .output();
+            // Justification: best-effort process spawn; failure logged
+            crate::error::record_ignored(
+                Command::new("codesign")
+                    .args(&["--remove-signature", &actual_path])
+                    .output(),
+                "spawn codesign",
+            );
             let output = Command::new("codesign")
                 .args(&["--sign", "-", &actual_path])
                 .output();

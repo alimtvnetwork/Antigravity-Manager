@@ -48,6 +48,7 @@ import {
     sendPromptNow,
 } from '../../services/instanceService';
 import { cn } from '../../utils/cn';
+import { useErrorStore } from '../../stores/error-store';
 
 export interface AgmConversationNode {
     seq_id: number;
@@ -1143,7 +1144,13 @@ export default function PromptTreeViewModal({
             const next = prev.includes(projectId) ? prev.filter((id) => id !== projectId) : [...prev, projectId];
             try {
                 localStorage.setItem(`agm_pinned_projects_${instanceId || 'default'}`, JSON.stringify(next));
-            } catch {}
+            } catch (e) {
+                // Best-effort pin persist; localStorage may throw in restricted contexts. Tracked, in-memory pins still applied.
+                useErrorStore.getState().trackWarning(e, {
+                  source: 'PromptTreeViewModal.togglePinProject',
+                  triggerAction: 'persist_pinned_projects',
+                });
+            }
             return next;
         });
     };
@@ -1162,7 +1169,13 @@ export default function PromptTreeViewModal({
                 setPinnedProjectIds(nextPinned);
                 try {
                     localStorage.setItem(`agm_pinned_projects_${instanceId || 'default'}`, JSON.stringify(nextPinned));
-                } catch {}
+                } catch (e) {
+                    // Best-effort pin persist on archive; localStorage may throw in restricted contexts. Tracked, in-memory state still applied.
+                    useErrorStore.getState().trackWarning(e, {
+                      source: 'PromptTreeViewModal.toggleArchiveProject',
+                      triggerAction: 'persist_pinned_projects',
+                    });
+                }
             }
         }
         setArchivedProjectIds(nextArchived);
@@ -1744,7 +1757,13 @@ export default function PromptTreeViewModal({
             // 2. Copy prompt content to clipboard so user can paste immediately (manual fallback)
             try {
                 await navigator.clipboard.writeText(promptContent);
-            } catch {}
+            } catch (clipErr) {
+                // Tracked in the error module; send dispatch already attempted above, user pastes manually if needed.
+                useErrorStore.getState().trackWarning(clipErr, {
+                  source: 'PromptTreeViewModal.handleSend',
+                  triggerAction: 'copy_prompt_fallback',
+                });
+            }
 
             if (dispatchOk) {
                 setActionMsg("Prompt dispatched to IDE & copied to clipboard!");

@@ -29,7 +29,8 @@ fn load_warmup_history() -> HashMap<String, i64> {
 fn save_warmup_history(history: &HashMap<String, i64>) {
     if let Ok(path) = get_warmup_history_path() {
         if let Ok(content) = serde_json::to_string_pretty(history) {
-            let _ = std::fs::write(&path, content);
+            // Justification: best-effort file write; failure is logged and surfaces on the next read
+            crate::error::record_ignored(std::fs::write(&path, content), "fs::write");
         }
     }
 }
@@ -289,11 +290,15 @@ pub fn start_scheduler(
 
                     // Refresh UI
                     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-                    let _ = crate::commands::refresh_all_quotas_internal(
-                        &state_for_warmup,
-                        handle_for_warmup,
-                    )
-                    .await;
+                    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                    crate::error::record_ignored(
+                        crate::commands::refresh_all_quotas_internal(
+                            &state_for_warmup,
+                            handle_for_warmup,
+                        )
+                        .await,
+                        "refresh_all_quotas_internal",
+                    );
                 });
             }
 

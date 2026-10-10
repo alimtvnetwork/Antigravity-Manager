@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { isTauri, isMacOS } from '../../utils/env';
 import versionData from '../../../version.json';
+import { useErrorStore } from '../../stores/error-store';
 
 export default function TitleBar() {
     const { t } = useTranslation();
@@ -57,6 +58,11 @@ export default function TitleBar() {
                 await getCurrentWindow().minimize();
             } catch (e) {
                 console.error('Failed to minimize window:', e);
+                // Tracked in the error module; both minimize paths failed, user can minimize via OS chrome.
+                useErrorStore.getState().trackWarning(e, {
+                  source: 'TitleBar.handleMinimize',
+                  triggerAction: 'minimize_window',
+                });
             }
         }
     };
@@ -73,6 +79,11 @@ export default function TitleBar() {
                 setIsMaximized(max);
             } catch (e) {
                 console.error('Failed to toggle maximize window:', e);
+                // Tracked in the error module; both maximize paths failed, user can maximize via OS chrome.
+                useErrorStore.getState().trackWarning(e, {
+                  source: 'TitleBar.handleToggleMaximize',
+                  triggerAction: 'toggle_maximize_window',
+                });
             }
         }
     };
@@ -85,6 +96,11 @@ export default function TitleBar() {
                 await getCurrentWindow().close();
             } catch (e) {
                 console.error('Failed to close window:', e);
+                // Tracked in the error module; both close paths failed, user can close via OS chrome.
+                useErrorStore.getState().trackWarning(e, {
+                  source: 'TitleBar.handleClose',
+                  triggerAction: 'close_window',
+                });
             }
         }
     };

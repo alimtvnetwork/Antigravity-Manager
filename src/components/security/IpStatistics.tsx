@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { request as invoke } from '../../utils/request';
 import { Activity, ShieldAlert, Users, Globe } from 'lucide-react';
 import { formatCompactNumber } from '../../utils/format';
+import { useErrorStore } from '../../stores/error-store';
 
 interface IpRanking {
     client_ip: string;
@@ -49,6 +50,11 @@ export const IpStatistics: React.FC<Props> = ({ refreshKey }) => {
             setTokenStats(tokenData || []);
         } catch (e) {
             console.error('Failed to load stats', e);
+            // Tracked in the error module; empty stats shown, retried on next load.
+            useErrorStore.getState().trackWarning(e, {
+              source: 'IpStatistics.loadStats',
+              triggerAction: 'load_ip_stats',
+            });
         } finally {
             setLoading(false);
         }

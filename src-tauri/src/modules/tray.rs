@@ -90,7 +90,8 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
             let app_handle = app.clone();
             match event.id().as_ref() {
                 "show" => {
-                    let _ = modules::lightweight::exit_lightweight_mode(&app_handle);
+                    // Justification: best-effort call; failure logged without changing control flow
+                    crate::error::record_ignored(modules::lightweight::exit_lightweight_mode(&app_handle), "exit_lightweight_mode");
                     if let Some(window) = app.get_webview_window("main") {
                         crate::restore_and_focus_window(&window);
                     }
@@ -109,7 +110,8 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
                                     "Lightweight mode toggled to {}",
                                     config.lightweight_mode
                                 ));
-                                let _ = app_handle.emit("config://updated", ());
+                                // Justification: best-effort frontend event; a dropped event only skips a UI refresh
+                                crate::error::record_ignored(app_handle.emit("config://updated", ()), "emit config://updated");
                             }
                         }
                     });
@@ -124,11 +126,12 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
                             app_handle.state::<crate::commands::cloudflared::CloudflaredState>();
 
                         // 1. Terminate cloudflared tunnel subprocess
-                        let _ = tokio::time::timeout(
+                        // Justification: best-effort guarded wait; a timeout or inner failure is logged
+                        crate::error::record_ignored(tokio::time::timeout(
                             std::time::Duration::from_millis(500),
                             cf_state.stop(),
                         )
-                        .await;
+                        .await, "timeout wait");
 
                         // 2. Stop Admin Server (close TCP listener and active connections)
                         if let Ok(mut lock) = tokio::time::timeout(
@@ -150,12 +153,13 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
                         .await
                         {
                             if let Some(inst) = lock.take() {
-                                let _ = tokio::time::timeout(
+                                // Justification: best-effort guarded wait; a timeout or inner failure is logged
+                                crate::error::record_ignored(tokio::time::timeout(
                                     std::time::Duration::from_millis(500),
                                     inst.token_manager
                                         .graceful_shutdown(std::time::Duration::from_millis(400)),
                                 )
-                                .await;
+                                .await, "timeout wait");
                                 inst.axum_server.set_running(false).await;
                                 inst.axum_server.stop();
                             }
@@ -171,7 +175,8 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
                     tauri::async_runtime::spawn(async move {
                         if let Ok(Some(account_id)) = modules::get_current_account_id() {
                             // Notify frontend to start
-                            let _ = app_handle.emit("tray://refresh-current", ());
+                            // Justification: best-effort frontend event; a dropped event only skips a UI refresh
+                            crate::error::record_ignored(app_handle.emit("tray://refresh-current", ()), "emit tray://refresh-current");
 
                             // Execute refresh logic
                             if let Ok(mut account) = modules::load_account(&account_id) {
@@ -179,7 +184,8 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
                                 match modules::account::fetch_quota_with_retry(&mut account).await {
                                     Ok(quota) => {
                                         // Save
-                                        let _ = modules::update_account_quota(&account.id, quota);
+                                        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                                        crate::error::record_ignored(modules::update_account_quota(&account.id, quota), "update_account_quota");
                                         // Update tray display
                                         update_tray_menus(&app_handle);
                                     }
@@ -220,8 +226,9 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
                                 modules::switch_account(&next_account.id, None, &integration).await
                             {
                                 // 3. Notify frontend
-                                let _ = app_handle
-                                    .emit("tray://account-switched", next_account.id.clone());
+                                // Justification: best-effort frontend event; a dropped event only skips a UI refresh
+                                crate::error::record_ignored(app_handle
+                                    .emit("tray://account-switched", next_account.id.clone()), "emit event");
                                 // 4. Update tray
                                 update_tray_menus(&app_handle);
                             }
@@ -241,7 +248,8 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
                 ..
             } => {
                 let app = tray.app_handle();
-                let _ = modules::lightweight::exit_lightweight_mode(app);
+                // Justification: best-effort call; failure logged without changing control flow
+                crate::error::record_ignored(modules::lightweight::exit_lightweight_mode(app), "exit_lightweight_mode");
                 if let Some(window) = app.get_webview_window("main") {
                     crate::restore_and_focus_window(&window);
                 }
@@ -401,7 +409,8 @@ pub fn update_tray_menus(app: &tauri::AppHandle) {
 
             if let Ok(menu) = Menu::with_items(&app_clone, &items) {
                 if let Some(tray) = app_clone.tray_by_id("main") {
-                    let _ = tray.set_menu(Some(menu));
+                    // Justification: best-effort call; failure logged without changing control flow
+                    crate::error::record_ignored(tray.set_menu(Some(menu)), "set_menu");
                 }
             }
         }

@@ -256,7 +256,8 @@ pub async fn release_lease(account_id: &str) -> Result<(), AppError> {
 
     let node_id = supabase_sync::get_local_node_id();
     let query = format!("account_id=eq.{}&node_id=eq.{}", account_id, node_id);
-    let _ = client.delete("workspace_leases", &query).await;
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(client.delete("workspace_leases", &query).await, "delete");
     Ok(())
 }
 

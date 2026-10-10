@@ -100,9 +100,21 @@ fn apply_fast_pragmas(conn: &Connection) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     conn.pragma_update(None, "synchronous", "NORMAL")
         .map_err(|e| e.to_string())?;
-    let _ = conn.pragma_update(None, "cache_size", -64000);
-    let _ = conn.pragma_update(None, "temp_store", "MEMORY");
-    let _ = conn.pragma_update(None, "mmap_size", 268435456);
+    // Justification: performance hint; the database opens and works with defaults
+    crate::error::record_ignored(
+        conn.pragma_update(None, "cache_size", -64000),
+        "apply cache_size pragma",
+    );
+    // Justification: performance hint; the database opens and works with defaults
+    crate::error::record_ignored(
+        conn.pragma_update(None, "temp_store", "MEMORY"),
+        "apply temp_store pragma",
+    );
+    // Justification: performance hint; the database opens and works with defaults
+    crate::error::record_ignored(
+        conn.pragma_update(None, "mmap_size", 268435456),
+        "apply mmap_size pragma",
+    );
     Ok(())
 }
 
@@ -136,51 +148,91 @@ fn init_thinking_schema(conn: &Connection) -> Result<(), String> {
     .map_err(|e| e.to_string())?;
 
     // 动态升级：增加 primary_tool_id 列用于旧版兼容点查
-    let _ = conn.execute(
-        "ALTER TABLE thinking_records ADD COLUMN primary_tool_id TEXT",
-        [],
+    // Justification: idempotent schema migration; failure is expected when the column already exists
+    crate::error::record_ignored(
+        conn.execute(
+            "ALTER TABLE thinking_records ADD COLUMN primary_tool_id TEXT",
+            [],
+        ),
+        "add primary_tool_id column migration",
     );
 
     // 动态升级：增加 causal_tool_id 列用于确定性因果伪哈希 ID 极速穿透点查
-    let _ = conn.execute(
-        "ALTER TABLE thinking_records ADD COLUMN causal_tool_id TEXT",
-        [],
+    // Justification: idempotent schema migration; failure is expected when the column already exists
+    crate::error::record_ignored(
+        conn.execute(
+            "ALTER TABLE thinking_records ADD COLUMN causal_tool_id TEXT",
+            [],
+        ),
+        "add causal_tool_id column migration",
     );
 
     // 1. 覆盖 load_thinking_records 的正向序列扫描 (ORDER BY id ASC)，同时完美承接逆序扫描 (ORDER BY id DESC)
-    let _ = conn.execute(
+    // Justification: lookup index is a performance accelerator; queries work without it
+    crate::error::record_ignored(
+        conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_thinking_rec_seq ON thinking_records (session_key, id ASC)",
         [],
+    ),
+        "create idx_thinking_rec_seq index",
     );
     // 2. 覆盖基于 causal_tool_id 的快速穿透点查 (极简 Partial Index，极致纳秒响应)
-    let _ = conn.execute(
+    // Justification: lookup index is a performance accelerator; queries work without it
+    crate::error::record_ignored(
+        conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_thinking_rec_causal ON thinking_records (session_key, causal_tool_id) WHERE causal_tool_id IS NOT NULL",
         [],
+    ),
+        "create idx_thinking_rec_causal index",
     );
     // 3. 覆盖基于 primary_tool_id 的快速穿透点查 (兼容旧版数据)
-    let _ = conn.execute(
+    // Justification: lookup index is a performance accelerator; queries work without it
+    crate::error::record_ignored(
+        conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_thinking_rec_tool ON thinking_records (session_key, primary_tool_id) WHERE primary_tool_id IS NOT NULL",
         [],
+    ),
+        "create idx_thinking_rec_tool index",
     );
     // 4. 覆盖基于 fingerprint 的指纹点查
-    let _ = conn.execute(
+    // Justification: lookup index is a performance accelerator; queries work without it
+    crate::error::record_ignored(
+        conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_thinking_rec_fp ON thinking_records (session_key, fingerprint)",
         [],
+    ),
+        "create idx_thinking_rec_fp index",
     );
     // 5. 覆盖历史清理时间索引
-    let _ = conn.execute(
+    // Justification: lookup index is a performance accelerator; queries work without it
+    crate::error::record_ignored(
+        conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_thinking_rec_accessed ON thinking_records (last_accessed ASC)",
         [],
+    ),
+        "create idx_thinking_rec_accessed index",
     );
     // 6. 覆盖基于 signature 的精准穿透点查 (极简 Partial Index，WHERE signature IS NOT NULL)
-    let _ = conn.execute(
+    // Justification: lookup index is a performance accelerator; queries work without it
+    crate::error::record_ignored(
+        conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_thinking_rec_sig ON thinking_records (session_key, signature) WHERE signature IS NOT NULL",
         [],
+    ),
+        "create idx_thinking_rec_sig index",
     );
 
     // 7. 索引大瘦身：安全清理物理冗余的重复索引，削减写放大开销
-    let _ = conn.execute("DROP INDEX IF EXISTS idx_thinking_rec_latest", []);
-    let _ = conn.execute("DROP INDEX IF EXISTS idx_thinking_rec_session", []);
+    // Justification: removes a redundant legacy index; failure leaves a harmless duplicate
+    crate::error::record_ignored(
+        conn.execute("DROP INDEX IF EXISTS idx_thinking_rec_latest", []),
+        "drop legacy idx_thinking_rec_latest index",
+    );
+    // Justification: removes a redundant legacy index; failure leaves a harmless duplicate
+    crate::error::record_ignored(
+        conn.execute("DROP INDEX IF EXISTS idx_thinking_rec_session", []),
+        "drop legacy idx_thinking_rec_session index",
+    );
     conn.execute(
         "CREATE TABLE IF NOT EXISTS thinking_sessions (
             session_key TEXT PRIMARY KEY,
@@ -244,9 +296,13 @@ fn thinking_db() -> Result<ThinkingDbGuard, String> {
 }
 
 fn mark_thinking_imported(conn: &Connection) {
-    let _ = conn.execute(
-        "INSERT OR REPLACE INTO thinking_meta (k, v) VALUES ('imported_from_proxy_logs', '1')",
-        [],
+    // Justification: session-row backfill after log import; best-effort
+    crate::error::record_ignored(
+        conn.execute(
+            "INSERT OR REPLACE INTO thinking_meta (k, v) VALUES ('imported_from_proxy_logs', '1')",
+            [],
+        ),
+        "backfill thinking_sessions after import",
     );
 }
 
@@ -291,7 +347,11 @@ fn migrate_thinking_from_logs() -> Result<(), String> {
         .unwrap_or(0);
 
     if has_table == 0 {
-        let _ = conn.execute("DETACH DATABASE logs", []);
+        // Justification: releases the attached logs database; cleanup
+        crate::error::record_ignored(
+            conn.execute("DETACH DATABASE logs", []),
+            "detach logs database",
+        );
         mark_thinking_imported(&conn);
         return Ok(());
     }
@@ -323,19 +383,31 @@ fn migrate_thinking_from_logs() -> Result<(), String> {
             match conn.execute(copy_basic, []) {
                 Ok(n) => n,
                 Err(e) => {
-                    let _ = conn.execute("DETACH DATABASE logs", []);
+                    // Justification: releases the attached logs database after a failed import; cleanup
+                    crate::error::record_ignored(
+                        conn.execute("DETACH DATABASE logs", []),
+                        "detach logs database after failed import",
+                    );
                     tracing::warn!("[ThinkingStore] Import from proxy_logs.db failed (will retry next start): {e}");
                     return Ok(());
                 }
             }
         }
     };
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO thinking_sessions (session_key, last_accessed)
+    // Justification: session-row backfill after log import; best-effort
+    crate::error::record_ignored(
+        conn.execute(
+            "INSERT OR IGNORE INTO thinking_sessions (session_key, last_accessed)
          SELECT session_key, MAX(created_at) FROM thinking_records GROUP BY session_key",
-        [],
+            [],
+        ),
+        "backfill thinking_sessions after import",
     );
-    let _ = conn.execute("DETACH DATABASE logs", []);
+    // Justification: releases the attached logs database after import; cleanup
+    crate::error::record_ignored(
+        conn.execute("DETACH DATABASE logs", []),
+        "detach logs database after import",
+    );
     mark_thinking_imported(&conn);
     if copied > 0 {
         tracing::info!(
@@ -353,8 +425,16 @@ pub fn init_db() -> Result<(), String> {
         .pragma_query_value(None, "auto_vacuum", |r| r.get(0))
         .unwrap_or(0);
     if auto_vacuum == 0 {
-        let _ = conn.pragma_update(None, "auto_vacuum", "INCREMENTAL");
-        let _ = conn.execute("VACUUM", []);
+        // Justification: legacy auto_vacuum upgrade is opportunistic; the database opens either way
+        crate::error::record_ignored(
+            conn.pragma_update(None, "auto_vacuum", "INCREMENTAL"),
+            "set auto_vacuum INCREMENTAL on legacy database",
+        );
+        // Justification: legacy auto_vacuum upgrade is opportunistic; the database opens either way
+        crate::error::record_ignored(
+            conn.execute("VACUUM", []),
+            "vacuum legacy database after auto_vacuum upgrade",
+        );
     }
     apply_fast_pragmas(&conn)?;
 
@@ -374,42 +454,102 @@ pub fn init_db() -> Result<(), String> {
     .map_err(|e| e.to_string())?;
 
     // Try to add new columns (ignore errors if they exist)
-    let _ = conn.execute("ALTER TABLE request_logs ADD COLUMN request_body TEXT", []);
-    let _ = conn.execute(
-        "ALTER TABLE request_logs ADD COLUMN upstream_request_body TEXT",
-        [],
+    // Justification: idempotent schema migration; failure is expected when the column already exists
+    crate::error::record_ignored(
+        conn.execute("ALTER TABLE request_logs ADD COLUMN request_body TEXT", []),
+        "add request_body column migration",
     );
-    let _ = conn.execute("ALTER TABLE request_logs ADD COLUMN response_body TEXT", []);
-    let _ = conn.execute(
-        "ALTER TABLE request_logs ADD COLUMN input_tokens INTEGER",
-        [],
+    // Justification: idempotent schema migration; failure is expected when the column already exists
+    crate::error::record_ignored(
+        conn.execute(
+            "ALTER TABLE request_logs ADD COLUMN upstream_request_body TEXT",
+            [],
+        ),
+        "add upstream_request_body column migration",
     );
-    let _ = conn.execute(
-        "ALTER TABLE request_logs ADD COLUMN output_tokens INTEGER",
-        [],
+    // Justification: idempotent schema migration; failure is expected when the column already exists
+    crate::error::record_ignored(
+        conn.execute("ALTER TABLE request_logs ADD COLUMN response_body TEXT", []),
+        "add response_body column migration",
     );
-    let _ = conn.execute(
-        "ALTER TABLE request_logs ADD COLUMN cached_tokens INTEGER",
-        [],
+    // Justification: idempotent schema migration; failure is expected when the column already exists
+    crate::error::record_ignored(
+        conn.execute(
+            "ALTER TABLE request_logs ADD COLUMN input_tokens INTEGER",
+            [],
+        ),
+        "add input_tokens column migration",
     );
-    let _ = conn.execute("ALTER TABLE request_logs ADD COLUMN account_email TEXT", []);
-    let _ = conn.execute("ALTER TABLE request_logs ADD COLUMN mapped_model TEXT", []);
-    let _ = conn.execute("ALTER TABLE request_logs ADD COLUMN protocol TEXT", []);
-    let _ = conn.execute("ALTER TABLE request_logs ADD COLUMN client_ip TEXT", []);
-    let _ = conn.execute("ALTER TABLE request_logs ADD COLUMN username TEXT", []);
-    let _ = conn.execute(
-        "ALTER TABLE request_logs ADD COLUMN request_headers TEXT",
-        [],
+    // Justification: idempotent schema migration; failure is expected when the column already exists
+    crate::error::record_ignored(
+        conn.execute(
+            "ALTER TABLE request_logs ADD COLUMN output_tokens INTEGER",
+            [],
+        ),
+        "add output_tokens column migration",
     );
-    let _ = conn.execute(
-        "ALTER TABLE request_logs ADD COLUMN upstream_request_headers TEXT",
-        [],
+    // Justification: idempotent schema migration; failure is expected when the column already exists
+    crate::error::record_ignored(
+        conn.execute(
+            "ALTER TABLE request_logs ADD COLUMN cached_tokens INTEGER",
+            [],
+        ),
+        "add cached_tokens column migration",
     );
-    let _ = conn.execute(
-        "ALTER TABLE request_logs ADD COLUMN response_headers TEXT",
-        [],
+    // Justification: idempotent schema migration; failure is expected when the column already exists
+    crate::error::record_ignored(
+        conn.execute("ALTER TABLE request_logs ADD COLUMN account_email TEXT", []),
+        "add account_email column migration",
     );
-    let _ = conn.execute("ALTER TABLE request_logs ADD COLUMN session_id TEXT", []);
+    // Justification: idempotent schema migration; failure is expected when the column already exists
+    crate::error::record_ignored(
+        conn.execute("ALTER TABLE request_logs ADD COLUMN mapped_model TEXT", []),
+        "add mapped_model column migration",
+    );
+    // Justification: idempotent schema migration; failure is expected when the column already exists
+    crate::error::record_ignored(
+        conn.execute("ALTER TABLE request_logs ADD COLUMN protocol TEXT", []),
+        "add protocol column migration",
+    );
+    // Justification: idempotent schema migration; failure is expected when the column already exists
+    crate::error::record_ignored(
+        conn.execute("ALTER TABLE request_logs ADD COLUMN client_ip TEXT", []),
+        "add client_ip column migration",
+    );
+    // Justification: idempotent schema migration; failure is expected when the column already exists
+    crate::error::record_ignored(
+        conn.execute("ALTER TABLE request_logs ADD COLUMN username TEXT", []),
+        "add username column migration",
+    );
+    // Justification: idempotent schema migration; failure is expected when the column already exists
+    crate::error::record_ignored(
+        conn.execute(
+            "ALTER TABLE request_logs ADD COLUMN request_headers TEXT",
+            [],
+        ),
+        "add request_headers column migration",
+    );
+    // Justification: idempotent schema migration; failure is expected when the column already exists
+    crate::error::record_ignored(
+        conn.execute(
+            "ALTER TABLE request_logs ADD COLUMN upstream_request_headers TEXT",
+            [],
+        ),
+        "add upstream_request_headers column migration",
+    );
+    // Justification: idempotent schema migration; failure is expected when the column already exists
+    crate::error::record_ignored(
+        conn.execute(
+            "ALTER TABLE request_logs ADD COLUMN response_headers TEXT",
+            [],
+        ),
+        "add response_headers column migration",
+    );
+    // Justification: idempotent schema migration; failure is expected when the column already exists
+    crate::error::record_ignored(
+        conn.execute("ALTER TABLE request_logs ADD COLUMN session_id TEXT", []),
+        "add session_id column migration",
+    );
 
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_timestamp ON request_logs (timestamp DESC)",
@@ -425,51 +565,83 @@ pub fn init_db() -> Result<(), String> {
     .map_err(|e| e.to_string())?;
 
     // 高效复合索引：状态与时间戳倒序（针对错误筛选与分页排序，极大提升大数据量下的响应速度）
-    let _ = conn.execute(
+    // Justification: lookup index is a performance accelerator; queries work without it
+    crate::error::record_ignored(
+        conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_status_timestamp ON request_logs (status, timestamp DESC)",
         [],
+    ),
+        "create idx_status_timestamp index",
     );
 
     // 复合索引：模型与时间戳倒序（针对模型级日志过滤与排序）
-    let _ = conn.execute(
+    // Justification: lookup index is a performance accelerator; queries work without it
+    crate::error::record_ignored(
+        conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_model_timestamp ON request_logs (model, timestamp DESC)",
         [],
+    ),
+        "create idx_model_timestamp index",
     );
 
     // 复合索引：账号邮箱与时间戳倒序（针对多用户/多账号过滤）
-    let _ = conn.execute(
+    // Justification: lookup index is a performance accelerator; queries work without it
+    crate::error::record_ignored(
+        conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_account_timestamp ON request_logs (account_email, timestamp DESC)",
         [],
+    ),
+        "create idx_account_timestamp index",
     );
 
     // 复合索引：客户端IP与时间戳倒序（针对安全审计与IP过滤）
-    let _ = conn.execute(
+    // Justification: lookup index is a performance accelerator; queries work without it
+    crate::error::record_ignored(
+        conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_client_ip_timestamp ON request_logs (client_ip, timestamp DESC)",
         [],
+    ),
+        "create idx_client_ip_timestamp index",
     );
 
     // 复合索引：用户名与时间戳倒序
-    let _ = conn.execute(
+    // Justification: lookup index is a performance accelerator; queries work without it
+    crate::error::record_ignored(
+        conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_username_timestamp ON request_logs (username, timestamp DESC)",
         [],
+    ),
+        "create idx_username_timestamp index",
     );
 
     // 复合索引：会话与时间戳倒序（针对会话粒度运维分析）
-    let _ = conn.execute(
+    // Justification: lookup index is a performance accelerator; queries work without it
+    crate::error::record_ignored(
+        conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_session_timestamp ON request_logs (session_id, timestamp DESC)",
         [],
+    ),
+        "create idx_session_timestamp index",
     );
 
     // 单列索引：协议类型
-    let _ = conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_protocol ON request_logs (protocol)",
-        [],
+    // Justification: lookup index is a performance accelerator; queries work without it
+    crate::error::record_ignored(
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_protocol ON request_logs (protocol)",
+            [],
+        ),
+        "create idx_protocol index",
     );
 
     // 单列索引：请求方法
-    let _ = conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_method ON request_logs (method)",
-        [],
+    // Justification: lookup index is a performance accelerator; queries work without it
+    crate::error::record_ignored(
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_method ON request_logs (method)",
+            [],
+        ),
+        "create idx_method index",
     );
 
     // 持久化工具签名表 (支持代理重启后根据 tool_id 秒级恢复真实加密签名)
@@ -482,9 +654,13 @@ pub fn init_db() -> Result<(), String> {
         [],
     )
     .map_err(|e| e.to_string())?;
-    let _ = conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_tool_sig_created ON tool_signatures (created_at DESC)",
-        [],
+    // Justification: lookup index is a performance accelerator; queries work without it
+    crate::error::record_ignored(
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tool_sig_created ON tool_signatures (created_at DESC)",
+            [],
+        ),
+        "create idx_tool_sig_created index",
     );
 
     drop(conn);
@@ -593,7 +769,11 @@ pub fn load_tool_signature(tool_id: &str) -> Result<Option<String>, String> {
     if let Some(sig) = found {
         if let Some(healed) = normalize_and_heal_signature(&sig) {
             if healed != sig {
-                let _ = save_tool_signature(norm_id.as_ref(), &healed);
+                // Justification: signature heal write-back is a cache repair; the healed value is returned regardless
+                crate::error::record_ignored(
+                    save_tool_signature(norm_id.as_ref(), &healed),
+                    "persist healed tool signature",
+                );
             }
             return Ok(Some(healed));
         }
@@ -777,7 +957,11 @@ pub fn save_thinking_record(
              ON CONFLICT(session_key) DO UPDATE SET last_accessed = excluded.last_accessed",
         )
         .map_err(|e| e.to_string())?;
-    let _ = session_stmt.execute(params![session_key, now]);
+    // Justification: auxiliary session touch-up; the thinking record itself was already persisted
+    crate::error::record_ignored(
+        session_stmt.execute(params![session_key, now]),
+        "touch thinking session last_accessed",
+    );
 
     Ok(())
 }
@@ -880,9 +1064,13 @@ pub fn load_thinking_by_tool_id(
             // 反向写回优化：若数据库中存储了损坏/非标准签名，命中后自愈并写回更新 SQLite
             if let Some(ref h_sig) = healed_sig {
                 if raw_signature.as_ref() != Some(h_sig) {
-                    let _ = conn.execute(
-                        "UPDATE thinking_records SET signature = ?1 WHERE id = ?2",
-                        params![h_sig, rec_id],
+                    // Justification: in-place self-healing write-back is a cache repair; the healed value is returned to the caller
+                    crate::error::record_ignored(
+                        conn.execute(
+                            "UPDATE thinking_records SET signature = ?1 WHERE id = ?2",
+                            params![h_sig, rec_id],
+                        ),
+                        "heal thinking record signature",
                     );
                 }
             }
@@ -925,16 +1113,24 @@ pub fn load_thinking_by_tool_id(
 
             // 3. Track 3 (In-Place Self-Healing): 若当前请求使用的是因果伪哈希 ID，顺手静默修复老数据
             if is_synthetic_tool_id(candidate) {
-                let _ = conn.execute(
+                // Justification: causal_tool_id backfill on a legacy record is a cache repair; the loaded record is returned regardless
+                crate::error::record_ignored(
+                    conn.execute(
                     "UPDATE thinking_records SET causal_tool_id = ?1 WHERE id = ?2 AND causal_tool_id IS NULL",
                     params![candidate, rec_id],
+                ),
+                    "backfill causal_tool_id on legacy record",
                 );
             }
             if let Some(ref h_sig) = healed_sig {
                 if raw_signature.as_ref() != Some(h_sig) {
-                    let _ = conn.execute(
-                        "UPDATE thinking_records SET signature = ?1 WHERE id = ?2",
-                        params![h_sig, rec_id],
+                    // Justification: in-place self-healing write-back is a cache repair; the healed value is returned to the caller
+                    crate::error::record_ignored(
+                        conn.execute(
+                            "UPDATE thinking_records SET signature = ?1 WHERE id = ?2",
+                            params![h_sig, rec_id],
+                        ),
+                        "heal thinking record signature",
                     );
                 }
             }
@@ -977,16 +1173,24 @@ pub fn load_thinking_by_tool_id(
             let healed_sig = persist_signature(raw_signature.as_deref());
 
             if is_synthetic_tool_id(candidate) {
-                let _ = conn.execute(
+                // Justification: causal_tool_id backfill on a legacy record is a cache repair; the loaded record is returned regardless
+                crate::error::record_ignored(
+                    conn.execute(
                     "UPDATE thinking_records SET causal_tool_id = ?1 WHERE id = ?2 AND causal_tool_id IS NULL",
                     params![candidate, rec_id],
+                ),
+                    "backfill causal_tool_id on legacy record",
                 );
             }
             if let Some(ref h_sig) = healed_sig {
                 if raw_signature.as_ref() != Some(h_sig) {
-                    let _ = conn.execute(
-                        "UPDATE thinking_records SET signature = ?1 WHERE id = ?2",
-                        params![h_sig, rec_id],
+                    // Justification: in-place self-healing write-back is a cache repair; the healed value is returned to the caller
+                    crate::error::record_ignored(
+                        conn.execute(
+                            "UPDATE thinking_records SET signature = ?1 WHERE id = ?2",
+                            params![h_sig, rec_id],
+                        ),
+                        "heal thinking record signature",
                     );
                 }
             }
@@ -1041,9 +1245,13 @@ pub fn load_thinking_by_signature(
 
         if let Some(ref h_sig) = healed_sig {
             if raw_signature.as_ref() != Some(h_sig) {
-                let _ = conn.execute(
-                    "UPDATE thinking_records SET signature = ?1 WHERE id = ?2",
-                    params![h_sig, rec_id],
+                // Justification: in-place self-healing write-back is a cache repair; the healed value is returned to the caller
+                crate::error::record_ignored(
+                    conn.execute(
+                        "UPDATE thinking_records SET signature = ?1 WHERE id = ?2",
+                        params![h_sig, rec_id],
+                    ),
+                    "heal thinking record signature",
                 );
             }
         }
@@ -1081,9 +1289,13 @@ pub fn lookup_latest_thinking_signature(session_id: &str) -> Option<String> {
     let healed = normalize_and_heal_signature(&raw_sig);
     if let Some(ref h) = healed {
         if h != &raw_sig {
-            let _ = conn.execute(
-                "UPDATE thinking_records SET signature = ?1 WHERE id = ?2",
-                rusqlite::params![h, id],
+            // Justification: in-place self-healing write-back is a cache repair; the healed value is returned to the caller
+            crate::error::record_ignored(
+                conn.execute(
+                    "UPDATE thinking_records SET signature = ?1 WHERE id = ?2",
+                    rusqlite::params![h, id],
+                ),
+                "heal thinking record signature",
             );
         }
     }
@@ -1110,9 +1322,13 @@ pub fn lookup_signature_by_thought_snippet(snippet: &str) -> Option<String> {
     let healed = normalize_and_heal_signature(&raw_sig);
     if let Some(ref h) = healed {
         if h != &raw_sig {
-            let _ = conn.execute(
-                "UPDATE thinking_records SET signature = ?1 WHERE id = ?2",
-                rusqlite::params![h, id],
+            // Justification: in-place self-healing write-back is a cache repair; the healed value is returned to the caller
+            crate::error::record_ignored(
+                conn.execute(
+                    "UPDATE thinking_records SET signature = ?1 WHERE id = ?2",
+                    rusqlite::params![h, id],
+                ),
+                "heal thinking record signature",
             );
         }
     }
@@ -1155,9 +1371,13 @@ pub fn load_thinking_by_fingerprint(
 
         if let Some(ref h_sig) = healed_sig {
             if raw_signature.as_ref() != Some(h_sig) {
-                let _ = conn.execute(
-                    "UPDATE thinking_records SET signature = ?1 WHERE id = ?2",
-                    params![h_sig, rec_id],
+                // Justification: in-place self-healing write-back is a cache repair; the healed value is returned to the caller
+                crate::error::record_ignored(
+                    conn.execute(
+                        "UPDATE thinking_records SET signature = ?1 WHERE id = ?2",
+                        params![h_sig, rec_id],
+                    ),
+                    "heal thinking record signature",
                 );
             }
         }
@@ -1211,9 +1431,13 @@ pub fn delete_thinking_records_except_fingerprints(
 
 pub fn delete_thinking_records_for_session(session_key: &str) -> Result<usize, String> {
     let conn = thinking_db()?;
-    let _ = conn.execute(
-        "DELETE FROM thinking_sessions WHERE session_key = ?1",
-        params![session_key],
+    // Justification: session-row cleanup is auxiliary; the records delete is the authoritative op
+    crate::error::record_ignored(
+        conn.execute(
+            "DELETE FROM thinking_sessions WHERE session_key = ?1",
+            params![session_key],
+        ),
+        "delete thinking session row",
     );
     conn.execute(
         "DELETE FROM thinking_records WHERE session_key = ?1",
@@ -1290,14 +1514,34 @@ pub fn clear_all_thinking_data() -> Result<usize, String> {
         .execute("DELETE FROM thinking_records", [])
         .map_err(|e| e.to_string())?;
     total_deleted += deleted;
-    let _ = conn.execute("DELETE FROM thinking_sessions", []);
-    let _ = conn.execute("VACUUM", []);
+    // Justification: cascade cleanup after the thinking records were deleted
+    crate::error::record_ignored(
+        conn.execute("DELETE FROM thinking_sessions", []),
+        "delete thinking sessions during full clear",
+    );
+    // Justification: space reclamation after a full clear; the data is already gone
+    crate::error::record_ignored(
+        conn.execute("VACUUM", []),
+        "vacuum thinking database after full clear",
+    );
 
     // 2. 清空 proxy_logs.db 中残留的历史工具签名表与陈旧思考表 (绝不触碰 request_logs)
     if let Ok(log_conn) = connect_db() {
-        let _ = log_conn.execute("DELETE FROM tool_signatures", []);
-        let _ = log_conn.execute("DELETE FROM thinking_records", []);
-        let _ = log_conn.execute("DELETE FROM thinking_sessions", []);
+        // Justification: residual cleanup in the legacy logs database
+        crate::error::record_ignored(
+            log_conn.execute("DELETE FROM tool_signatures", []),
+            "delete legacy tool signatures",
+        );
+        // Justification: residual cleanup in the legacy logs database
+        crate::error::record_ignored(
+            log_conn.execute("DELETE FROM thinking_records", []),
+            "delete legacy thinking records",
+        );
+        // Justification: residual cleanup in the legacy logs database
+        crate::error::record_ignored(
+            log_conn.execute("DELETE FROM thinking_sessions", []),
+            "delete legacy thinking sessions",
+        );
     }
 
     Ok(total_deleted)
@@ -1337,9 +1581,13 @@ pub fn cleanup_old_thinking_records(days: i64) -> Result<usize, String> {
             params![cutoff],
         )
         .unwrap_or(0);
-    let _ = conn.execute(
-        "DELETE FROM thinking_sessions WHERE last_accessed < ?1",
-        params![cutoff],
+    // Justification: auxiliary session cleanup; the deleted-record count drives the return
+    crate::error::record_ignored(
+        conn.execute(
+            "DELETE FROM thinking_sessions WHERE last_accessed < ?1",
+            params![cutoff],
+        ),
+        "delete stale thinking sessions",
     );
     Ok(deleted_tools + deleted_records)
 }
@@ -1412,7 +1660,8 @@ fn reclaim_space(conn: &Connection) -> Result<(), String> {
         }
     } else {
         // Non-incremental or legacy database: full VACUUM to shrink disk size
-        let _ = conn.execute("VACUUM", []);
+        // Justification: space reclamation only; rows were already deleted and the database stays usable
+        crate::error::record_ignored(conn.execute("VACUUM", []), "vacuum proxy logs database");
     }
 
     checkpoint()
@@ -2258,8 +2507,16 @@ pub fn clear_logs() -> Result<(), String> {
     conn.execute("DELETE FROM request_logs", [])
         .map_err(|e| e.to_string())?;
     // Full vacuum to reclaim all disk space immediately
-    let _ = conn.execute("VACUUM", []);
-    let _ = conn.pragma_update(None, "wal_checkpoint", "TRUNCATE");
+    // Justification: post-clear space reclamation; the logs were already deleted
+    crate::error::record_ignored(
+        conn.execute("VACUUM", []),
+        "vacuum logs database after clear",
+    );
+    // Justification: WAL checkpoint is space hygiene; the logs were already deleted
+    crate::error::record_ignored(
+        conn.pragma_update(None, "wal_checkpoint", "TRUNCATE"),
+        "checkpoint WAL after log clear",
+    );
     Ok(())
 }
 

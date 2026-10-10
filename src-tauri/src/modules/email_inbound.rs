@@ -1351,8 +1351,11 @@ pub fn send_ack_receipt(
         project,
         true,
     );
-    let _ =
-        email_sender::dispatch_reply_with_failover(&subject, &body, &[clean_sender], in_reply_to);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        email_sender::dispatch_reply_with_failover(&subject, &body, &[clean_sender], in_reply_to),
+        "dispatch_reply_with_failover",
+    );
 }
 
 /// Send Phase 2 Completion Result HTML Receipt
@@ -1387,8 +1390,11 @@ pub fn send_result_receipt(
         "-",
         false,
     );
-    let _ =
-        email_sender::dispatch_reply_with_failover(&subject, &body, &[clean_sender], in_reply_to);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        email_sender::dispatch_reply_with_failover(&subject, &body, &[clean_sender], in_reply_to),
+        "dispatch_reply_with_failover",
+    );
 }
 
 /// Process a parsed inbound email action and dispatch bidirectional 2-phase receipts
@@ -1415,7 +1421,11 @@ pub fn execute_inbound_action(
             execution_result: err_msg.clone(),
             received_at: now,
         };
-        let _ = email_vault_db::record_inbound_audit_log(audit);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            email_vault_db::record_inbound_audit_log(audit),
+            "record_inbound_audit_log",
+        );
         return Err(err_msg);
     }
 
@@ -1436,7 +1446,11 @@ pub fn execute_inbound_action(
             execution_result: debounced_msg.clone(),
             received_at: now,
         };
-        let _ = email_vault_db::record_inbound_audit_log(audit);
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            email_vault_db::record_inbound_audit_log(audit),
+            "record_inbound_audit_log",
+        );
         return Ok(debounced_msg);
     }
 
@@ -1465,7 +1479,11 @@ pub fn execute_inbound_action(
                 execution_result: rate_limited_msg.clone(),
                 received_at: now,
             };
-            let _ = email_vault_db::record_inbound_audit_log(audit);
+            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+            crate::error::record_ignored(
+                email_vault_db::record_inbound_audit_log(audit),
+                "record_inbound_audit_log",
+            );
             return Ok(rate_limited_msg);
         }
     }
@@ -1527,11 +1545,12 @@ pub fn execute_inbound_action(
             if let Some(proj) = target_proj {
                 let p_id = Uuid::new_v4().to_string();
                 if let Ok(conn) = crate::modules::repo_db::connect_db() {
-                    let _ = conn.execute(
+                    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+                    crate::error::record_ignored(conn.execute(
                         "INSERT INTO active_prompts (id, project_id, instance_id, repo_path, prompt_content, status, created_at, updated_at)
                          VALUES (?, ?, ?, ?, ?, 'running', ?, ?)",
                         rusqlite::params![&p_id, &proj.id, &proj.instance_id, &proj.repo_path, &effective_prompt, now, now],
-                    );
+                    ), "db execute");
                 }
                 result_summary = format!(
                     "Prompt injected into project '{}' (id: {})",
@@ -2585,7 +2604,11 @@ Node: {} ({}) | Version: {}
 
         InboundAction::InstanceCreate { profile_name } => {
             action_str = "instance_create".to_string();
-            let _ = crate::modules::instance::create_instance(profile_name.clone());
+            // Justification: best-effort call; failure logged without changing control flow
+            crate::error::record_ignored(
+                crate::modules::instance::create_instance(profile_name.clone()),
+                "create_instance",
+            );
             result_summary = format!("Spawned instance profile '{}'", profile_name);
         }
 
@@ -2693,7 +2716,11 @@ Node: {} ({}) | Version: {}
         execution_result: result_summary.clone(),
         received_at: now,
     };
-    let _ = email_vault_db::record_inbound_audit_log(audit);
+    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+    crate::error::record_ignored(
+        email_vault_db::record_inbound_audit_log(audit),
+        "record_inbound_audit_log",
+    );
 
     Ok(result_summary)
 }
@@ -2849,7 +2876,8 @@ pub fn poll_unread_messages(
         EmailStream::Plain(tcp_stream)
     };
 
-    let _ = read_imap_greeting(&mut stream);
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(read_imap_greeting(&mut stream), "read_imap_greeting");
 
     let is_starttls = is_starttls_imap(account.imap_port, &account.encryption_type);
     if is_starttls {
@@ -2872,7 +2900,11 @@ pub fn poll_unread_messages(
     }
 
     send_imap_cmd(&mut stream, "A02", "SELECT INBOX", false)?;
-    let _ = read_imap_tagged_response(&mut stream, "A02");
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(
+        read_imap_tagged_response(&mut stream, "A02"),
+        "read_imap_tagged_response",
+    );
 
     send_imap_cmd(&mut stream, "A03", "SEARCH UNSEEN", false)?;
     let search_resp = read_imap_tagged_response(&mut stream, "A03")?;
@@ -2907,8 +2939,16 @@ pub fn poll_unread_messages(
         }
     }
 
-    let _ = send_imap_cmd(&mut stream, "A99", "LOGOUT", false);
-    let _ = read_imap_tagged_response(&mut stream, "A99");
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(
+        send_imap_cmd(&mut stream, "A99", "LOGOUT", false),
+        "send_imap_cmd",
+    );
+    // Justification: best-effort call; failure logged without changing control flow
+    crate::error::record_ignored(
+        read_imap_tagged_response(&mut stream, "A99"),
+        "read_imap_tagged_response",
+    );
     Ok(messages)
 }
 

@@ -262,6 +262,14 @@ interface ErrorStoreState {
 
   captureError: (error: unknown, meta?: CaptureErrorMeta) => CapturedError;
   captureException: (error: Error | string, context?: ErrorContext) => CapturedError;
+  /**
+   * Quiet tracking for benign/best-effort failures (optional preference reads,
+   * background refresh failures, swallowed-but-recoverable errors). Records the
+   * error into the error module's history WITHOUT opening the modal, so it is
+   * tracked and visible in the error history drawer instead of vanishing.
+   * Use this — never a bare `catch {}` — for non-fatal failures.
+   */
+  trackWarning: (error: unknown, meta?: CaptureErrorMeta) => CapturedError;
   openErrorModal: (error: CapturedError, initialTab?: ErrorModalTab) => void;
   setActiveTab: (tab: ErrorModalTab) => void;
   openErrorQueue: (errors: CapturedError[], startIndex?: number) => void;
@@ -301,6 +309,15 @@ export const useErrorStore = create<ErrorStoreState>((set, get) => ({
       recentErrors: [captured, ...state.recentErrors].slice(0, 50),
       errorQueue: [captured, ...state.errorQueue],
       currentQueueIndex: 0,
+    }));
+    return captured;
+  },
+
+  trackWarning: (error: unknown, meta?: CaptureErrorMeta): CapturedError => {
+    const captured = buildCapturedError(error, meta);
+    captured.level = 'warn';
+    set((state) => ({
+      recentErrors: [captured, ...state.recentErrors].slice(0, 50),
     }));
     return captured;
   },

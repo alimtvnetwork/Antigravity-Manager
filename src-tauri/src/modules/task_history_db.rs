@@ -105,7 +105,11 @@ impl AuditTask {
 impl Drop for AuditTask {
     fn drop(&mut self) {
         if self.open {
-            let _ = complete(&self.id, "fail", "stopped before the task finished", None);
+            // Justification: best-effort call; failure logged without changing control flow
+            crate::error::record_ignored(
+                complete(&self.id, "fail", "stopped before the task finished", None),
+                "complete",
+            );
         }
     }
 }
@@ -120,7 +124,8 @@ pub fn record(
     match enqueue(action, subject, status, instance_id) {
         Ok(id) => {
             if status != "queued" && status != "running" {
-                let _ = complete(&id, status, detail, None);
+                // Justification: best-effort call; failure logged without changing control flow
+                crate::error::record_ignored(complete(&id, status, detail, None), "complete");
             }
         }
         Err(err) => {
@@ -301,7 +306,8 @@ fn enqueue(
 
     // Synchronously update hot_tasks_cache and cap at 200 entries
     let split_path_str = split_path.to_string_lossy().to_string();
-    let _ = index.execute(
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(index.execute(
         "INSERT OR REPLACE INTO hot_tasks_cache (id, action, action_code, status, subject, detail, instance_id, split_path, created_at, finished_at, from_email, to_email)
          VALUES (?1, ?2, ?3, ?4, ?5, '', ?6, ?7, ?8, NULL, '', '')",
         params![
@@ -314,11 +320,12 @@ fn enqueue(
             split_path_str,
             now
         ],
-    );
-    let _ = index.execute(
+    ), "db execute");
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(index.execute(
         "DELETE FROM hot_tasks_cache WHERE id NOT IN (SELECT id FROM hot_tasks_cache ORDER BY created_at DESC LIMIT 200)",
         [],
-    );
+    ), "db execute");
 
     Ok(id)
 }
@@ -1026,14 +1033,16 @@ fn complete(
     }
 
     // Synchronously update hot_tasks_cache and cap at 200 entries
-    let _ = index.execute(
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(index.execute(
         "UPDATE hot_tasks_cache SET status = ?1, detail = ?2, finished_at = ?3, from_email = ?4, to_email = ?5 WHERE id = ?6",
         params![status, detail, now, from_email, to_email, id],
-    );
-    let _ = index.execute(
+    ), "db execute");
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(index.execute(
         "DELETE FROM hot_tasks_cache WHERE id NOT IN (SELECT id FROM hot_tasks_cache ORDER BY created_at DESC LIMIT 200)",
         [],
-    );
+    ), "db execute");
 
     if updated_in_split {
         Ok(())
@@ -1106,25 +1115,45 @@ fn open_split(path: &Path) -> Result<Connection, String> {
         [],
     )
     .map_err(|err| err.to_string())?;
-    let _ = conn.execute("ALTER TABLE tasks ADD COLUMN action_code INTEGER", []);
-    let _ = conn.execute(
-        "ALTER TABLE tasks ADD COLUMN payload_json TEXT NOT NULL DEFAULT ''",
-        [],
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(
+        conn.execute("ALTER TABLE tasks ADD COLUMN action_code INTEGER", []),
+        "db execute",
     );
-    let _ = conn.execute(
-        "ALTER TABLE tasks ADD COLUMN from_email TEXT NOT NULL DEFAULT ''",
-        [],
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(
+        conn.execute(
+            "ALTER TABLE tasks ADD COLUMN payload_json TEXT NOT NULL DEFAULT ''",
+            [],
+        ),
+        "db execute",
     );
-    let _ = conn.execute(
-        "ALTER TABLE tasks ADD COLUMN to_email TEXT NOT NULL DEFAULT ''",
-        [],
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(
+        conn.execute(
+            "ALTER TABLE tasks ADD COLUMN from_email TEXT NOT NULL DEFAULT ''",
+            [],
+        ),
+        "db execute",
     );
-    let _ = conn.execute(
-        "UPDATE tasks
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(
+        conn.execute(
+            "ALTER TABLE tasks ADD COLUMN to_email TEXT NOT NULL DEFAULT ''",
+            [],
+        ),
+        "db execute",
+    );
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(
+        conn.execute(
+            "UPDATE tasks
          SET from_email = COALESCE(json_extract(payload_json, '$.from_email'), from_email),
              to_email = COALESCE(json_extract(payload_json, '$.to_email'), to_email)
          WHERE payload_json <> '' AND (from_email = '' OR to_email = '')",
-        [],
+            [],
+        ),
+        "db execute",
     );
     Ok(conn)
 }

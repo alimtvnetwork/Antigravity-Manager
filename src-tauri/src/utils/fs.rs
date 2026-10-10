@@ -40,7 +40,8 @@ fn atomic_replace_file(src: &Path, dst: &Path) -> Result<(), String> {
     let result = unsafe { MoveFileExW(src_wide.as_ptr(), dst_wide.as_ptr(), flags) };
     if result == 0 {
         let err = std::io::Error::last_os_error();
-        let _ = std::fs::remove_file(src);
+        // Justification: best-effort cleanup; a leftover file is harmless
+        crate::error::record_ignored(std::fs::remove_file(src), "remove_file");
         return Err(format!("MoveFileExW failed: {}", err));
     }
 
@@ -77,7 +78,8 @@ pub fn write_atomic<P: AsRef<Path>>(target_path: P, content: &[u8]) -> Result<()
         .map_err(|e| format!("Failed to create temporary file {:?}: {}", temp_path, e))?;
 
     if let Err(e) = file.write_all(content) {
-        let _ = std::fs::remove_file(&temp_path);
+        // Justification: best-effort cleanup; a leftover file is harmless
+        crate::error::record_ignored(std::fs::remove_file(&temp_path), "remove_file");
         return Err(format!(
             "Failed to write to temporary file {:?}: {}",
             temp_path, e
@@ -85,7 +87,8 @@ pub fn write_atomic<P: AsRef<Path>>(target_path: P, content: &[u8]) -> Result<()
     }
 
     if let Err(e) = file.sync_all() {
-        let _ = std::fs::remove_file(&temp_path);
+        // Justification: best-effort cleanup; a leftover file is harmless
+        crate::error::record_ignored(std::fs::remove_file(&temp_path), "remove_file");
         return Err(format!(
             "Failed to fsync temporary file {:?}: {}",
             temp_path, e
@@ -96,7 +99,8 @@ pub fn write_atomic<P: AsRef<Path>>(target_path: P, content: &[u8]) -> Result<()
     drop(file);
 
     if let Err(e) = atomic_replace_file(&temp_path, target) {
-        let _ = std::fs::remove_file(&temp_path);
+        // Justification: best-effort cleanup; a leftover file is harmless
+        crate::error::record_ignored(std::fs::remove_file(&temp_path), "remove_file");
         return Err(format!("Failed to atomically replace {:?}: {}", target, e));
     }
 
@@ -124,7 +128,8 @@ mod tests {
 
         assert_eq!(fs::read(&target_file).unwrap(), updated_data);
 
-        let _ = fs::remove_dir_all(&temp_dir);
+        // Justification: best-effort cleanup; a leftover directory is harmless
+        crate::error::record_ignored(fs::remove_dir_all(&temp_dir), "remove_dir_all");
     }
 
     #[test]
@@ -148,6 +153,7 @@ mod tests {
         write_atomic(&target_file, next_data).expect("Subsequent write should succeed");
         assert_eq!(fs::read(&target_file).unwrap(), next_data);
 
-        let _ = fs::remove_dir_all(&temp_dir);
+        // Justification: best-effort cleanup; a leftover directory is harmless
+        crate::error::record_ignored(fs::remove_dir_all(&temp_dir), "remove_dir_all");
     }
 }
