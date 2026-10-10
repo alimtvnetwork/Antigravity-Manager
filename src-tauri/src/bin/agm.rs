@@ -857,7 +857,7 @@ fn cmd_prompts_send(args: &[String]) {
         .clone()
         .unwrap_or_else(|| "scratch/test-repo".to_string());
 
-    let raw_prompt = if ctx.instance.is_none() && ctx.positional_args.len() >= 2 {
+    let raw_prompt = if ctx.instance_id.is_none() && ctx.positional_args.len() >= 2 {
         let first = &ctx.positional_args[0];
         if first.starts_with('#')
             || first.starts_with("inst-")
@@ -1039,7 +1039,7 @@ fn cmd_prompts_queue(args: &[String]) {
         .clone()
         .unwrap_or_else(|| "scratch/test-repo".to_string());
 
-    let raw_prompt = if ctx.instance.is_none() && ctx.positional_args.len() >= 2 {
+    let raw_prompt = if ctx.instance_id.is_none() && ctx.positional_args.len() >= 2 {
         let first = &ctx.positional_args[0];
         if first.starts_with('#')
             || first.starts_with("inst-")
