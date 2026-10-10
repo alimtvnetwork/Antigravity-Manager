@@ -46,7 +46,6 @@ import {
     focusOrLaunchInstance,
     focusInstanceWorkspace,
     sendPromptNow,
-    enqueuePrompt,
 } from '../../services/instanceService';
 import { cn } from '../../utils/cn';
 
@@ -1728,21 +1727,43 @@ export default function PromptTreeViewModal({
             }
             const repoPath = proj?.repo_path || '';
 
-            // 1. Dispatch prompt directly to running instance via sendPromptNow
+            // 1. Dispatch prompt directly to running instance via sendPromptNow.
+            // Track real dispatch outcome: the backend returns Err when the agy
+            // CLI spawn fails, and the success message must not show in that case.
             const targetInstId = proj?.instance_id || instanceId || 'default';
+            let dispatchOk = false;
+            let dispatchErr: unknown = null;
             try {
                 await sendPromptNow(targetInstId, repoPath, promptContent, conv?.conversation_id);
+                dispatchOk = true;
             } catch (sendErr) {
+                dispatchErr = sendErr;
                 console.warn('sendPromptNow error', sendErr);
             }
 
-            // 2. Copy prompt content to clipboard so user can paste immediately
+            // 2. Copy prompt content to clipboard so user can paste immediately (manual fallback)
             try {
                 await navigator.clipboard.writeText(promptContent);
             } catch {}
 
             setActionMsg("Prompt dispatched to IDE & copied to clipboard!");
             setTimeout(() => setActionMsg(null), 3000);
+            // 4. Focus IDE instance window if workspace is known (avoids secondary launch hazard)
+            try {
+                if (repoPath) {
+                    const repoName = repoPath.split(/[/\\]/).filter(Boolean).pop() || repoPath;
+                    await focusInstanceWorkspace(targetInstId, repoPath, repoName);
+                }
+            } catch (focusErr) {
+                console.warn('focusInstanceWorkspace error', focusErr);
+            }
+
+            if (dispatchOk) {
+                setActionMsg("Prompt Dispatched & Focused IDE (via Hotkey 'N' / Send Now)!");
+            } else {
+                setError(`Send failed: ${dispatchErr?.toString() || 'dispatch rejected'} — prompt copied to clipboard; paste it into the IDE manually.`);
+            }
+            setTimeout(() => setActionMsg(null), 3500);
         } catch (err: any) {
             setError(err?.toString() || 'Failed to dispatch prompt');
         } finally {
@@ -1848,52 +1869,15 @@ ${activePromptText}
             const promptContent = editedPromptText.trim() || activePromptText || selectedConversation.prompt_preview_200w || '';
             const repoPath = selectedProject?.repo_path || '';
             const targetInstId = selectedProject?.instance_id || instanceId || 'default';
-            try {
-                try {
-                    await invoke('enqueue_prompt', {
-                        instanceId: targetInstId,
-                        promptText: promptContent,
-                        workspacePath: repoPath,
-                        repoPath,
-                        promptContent,
-                        conversationId: selectedConversation.conversation_id,
-                    });
-                } catch {
-                    await enqueuePrompt(
-                        targetInstId,
-                        repoPath,
-                        promptContent,
-                        selectedConversation.conversation_id
-                    );
-                }
-            } catch (queueErr) {
-                // Fallback: write .antigravity_resume_task.json with queued status
-                if (repoPath) {
-                    const taskPath = `${repoPath.replace(/[\\/]+$/, '')}/.antigravity_resume_task.json`;
-                    const payload = {
-                        prompt_id: selectedConversation.conversation_id || `prompt-${Date.now()}`,
-                        project_id: selectedProject?.project_id || '',
-                        instance_id: targetInstId,
-                        repo_path: repoPath,
-                        prompt_content: promptContent,
-                        model: 'gemini-2.5-pro',
-                        auto_boot: false,
-                        status: 'queued',
-                        queued_at: Math.floor(Date.now() / 1000),
-                    };
-                    try {
-                        await invoke('save_text_file', {
-                            path: taskPath,
-                            content: JSON.stringify(payload, null, 2),
-                        });
-                    } catch (fsErr) {
-                        console.warn('save_text_file queue error', fsErr);
-                        throw queueErr;
-                    }
-                } else {
-                    throw queueErr;
-                }
-            }
+            // Single invoke against the registered backend command. Previous
+            // nested fallbacks (re-invoke + disconnected resume-file write)
+            // masked real failures while still reporting success.
+            await invoke('enqueue_prompt', {
+                instanceId: targetInstId,
+                repoPath,
+                promptContent,
+                conversationId: selectedConversation.conversation_id,
+            });
 
             setActionMsg('Prompt enqueued into FIFO scheduler queue!');
             setTimeout(() => setActionMsg(null), 3500);

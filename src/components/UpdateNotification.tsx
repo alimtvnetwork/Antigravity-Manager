@@ -128,11 +128,11 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
         border border-white/30 dark:border-white/10
         shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)]
         backdrop-blur-xl
-        bg-white/90 dark:bg-slate-900/90
+        bg-white/90 dark:bg-[var(--ui-surface-1)]/95
         group
       ">
-        <div className="absolute -top-8 -right-8 w-20 h-20 bg-blue-500/15 rounded-full blur-xl pointer-events-none group-hover:bg-blue-500/25 transition-colors duration-500" />
-        <div className="absolute -bottom-8 -left-8 w-20 h-20 bg-purple-500/15 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/25 transition-colors duration-500" />
+        <div className="absolute -top-8 -right-8 w-20 h-20 bg-blue-500/15 rounded-full blur-xl pointer-events-none transition-colors duration-500" />
+        <div className="absolute -bottom-8 -left-8 w-20 h-20 bg-purple-500/15 rounded-full blur-xl pointer-events-none transition-colors duration-500" />
 
         <div className="relative z-10">
           <div className="flex items-start justify-between mb-1.5">
@@ -305,7 +305,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                   }
                 }}
                 disabled={isInstalling}
-                className="text-[10px] text-gray-400 hover:text-blue-500 dark:text-gray-500 dark:hover:text-blue-400 text-center transition-colors py-0.5 cursor-pointer"
+                className="text-[10px] text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400 text-center transition-colors py-0.5 cursor-pointer"
               >
                 {t('update_notification.btn_view_github', 'View on GitHub')}
               </button>

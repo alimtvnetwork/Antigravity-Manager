@@ -19,6 +19,13 @@
  * 3. Amber Left Rail:
  *    - Color: Tailwind amber-400 (#fbbf24, relative luminance L = 0.5824)
  *    - Left rail width: 6px solid border on both light and dark backgrounds.
+ *    - Retained per the UI refinement spec's "one dominant active treatment"
+ *      (spec recommends 2px; the 6px rail is kept as established product
+ *      language with the AAA contrast evidence above).
+ *
+ * 3b. Remaining card edges (refinement spec):
+ *    - Subtle amber tint at 35% opacity (border-amber-400/35); no full
+ *      amber outline, no ring, no elevated shadow — edges stay quiet.
  *
  * 4. Active Pill (Dark Mode):
  *    - Background: Amber-950/80 (#451a03 with 80% opacity, L ~ 0.0208)
@@ -35,7 +42,7 @@ export const SELECTED_ROW_CLASSES =
   "bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-white border-l-[6px] border-l-amber-400 dark:border-l-amber-400 font-semibold shadow-xs";
 
 export const SELECTED_CARD_CLASSES =
-  "bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-white border-l-[6px] border-l-amber-400 dark:border-l-amber-400 font-semibold shadow-sm ring-1 ring-amber-400/30";
+  "bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-white border border-amber-400/35 border-l-[6px] border-l-amber-400 font-semibold shadow-xs";
 
 export const ACTIVE_PILL_CLASSES =
   "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950/80 dark:text-amber-300 dark:border-amber-400/50 shadow-xs";

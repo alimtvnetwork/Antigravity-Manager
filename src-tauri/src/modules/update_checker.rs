@@ -313,7 +313,7 @@ async fn check_updater_json_channel(channel: UpdateChannel) -> Result<UpdateInfo
     }
 
     let download_url = format!(
-        "https://github.com/lbjlaq/Antigravity-Manager/releases/tag/v{}",
+        "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v{}",
         latest_version
     );
 
