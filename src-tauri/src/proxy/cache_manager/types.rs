@@ -15,7 +15,7 @@ pub const LAYER_3_TTL: Duration = Duration::from_secs(3600);
 
 /// Layer 1 条目: raw system instructions → sanitized text
 #[derive(Debug, Clone)]
-struct SiCacheEntry {
+pub(crate) struct SiCacheEntry {
     /// 清洗后的 system instruction 文本
     pub(crate) sanitized_text: String,
     /// 创建/更新时间
@@ -28,7 +28,7 @@ struct SiCacheEntry {
 
 /// Layer 2 条目: raw tools JSON → processed tools
 #[derive(Debug, Clone)]
-struct ToolsCacheEntry {
+pub(crate) struct ToolsCacheEntry {
     /// 处理后的 tools JSON (序列化为字符串，使用时反序列化)
     pub(crate) tools_json: String,
     /// 创建/更新时间
@@ -41,15 +41,15 @@ struct ToolsCacheEntry {
 
 /// Layer 3 条目: 追踪 (Layer1_hash + Layer2_hash) 组合
 #[derive(Debug, Clone)]
-struct PrefixTrackingEntry {
+pub(crate) struct PrefixTrackingEntry {
     /// Layer 1 的 hash (用于关联)
-    si_hash: String,
+    pub(crate) si_hash: String,
     /// Layer 2 的 hash (用于关联)
-    tools_hash: String,
+    pub(crate) tools_hash: String,
     /// Gemini 缓存的资源名 (cachedContents/xxx)
     pub(crate) cache_name: String,
     /// 创建时间
-    created_at: Instant,
+    pub(crate) created_at: Instant,
     /// 过期时间
     pub(crate) expires_at: Instant,
     /// 隐式缓存命中次数 (cachedContentTokenCount > 0)
@@ -57,7 +57,7 @@ struct PrefixTrackingEntry {
     /// 显式缓存命中次数 (成功注入 cachedContent)
     pub(crate) explicit_hit_count: u64,
     /// 模型名
-    model: String,
+    pub(crate) model: String,
 }
 
 // ===== Stats =====

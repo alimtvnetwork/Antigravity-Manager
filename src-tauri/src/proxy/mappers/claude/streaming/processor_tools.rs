@@ -1,4 +1,5 @@
 // PartProcessor: tool-call handling (split from streaming.rs)
+use super::processor::PartProcessor;
 use super::state::StreamingState;
 use super::types::remap_function_call_args;
 use super::types::BlockType;
@@ -37,7 +38,7 @@ impl<'a> PartProcessor<'a> {
     /// Phase 1: standard `serde_json` parse (handles well-formed JSON).
     /// Phase 2: lenient key-quoting heuristic for unquoted keys (e.g. `{file_path:foo}`).
     /// Returns `None` (guard G6) if both phases fail.
-    fn parse_loose_json_args(args_str: &str) -> Option<serde_json::Value> {
+    pub(crate) fn parse_loose_json_args(args_str: &str) -> Option<serde_json::Value> {
         if args_str.is_empty() {
             // No-arg tool call → valid empty object
             return Some(serde_json::json!({}));

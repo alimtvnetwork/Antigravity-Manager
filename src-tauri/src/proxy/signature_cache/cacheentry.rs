@@ -15,15 +15,15 @@ const SESSION_CACHE_LIMIT: usize = 1000; // Layer 3: Session-based signatures (l
 /// Cache entry with timestamp for TTL
 #[derive(Clone, Debug)]
 pub(crate) struct CacheEntry<T> {
-    data: T,
-    timestamp: SystemTime,
+    pub(crate) data: T,
+    pub(crate) timestamp: SystemTime,
 }
 
 /// Specialized entry for session-based signatures to track message count
 #[derive(Clone, Debug)]
 pub(crate) struct SessionSignatureEntry {
-    signature: String,
-    message_count: usize,
+    pub(crate) signature: String,
+    pub(crate) message_count: usize,
 }
 
 impl<T> CacheEntry<T> {
@@ -47,27 +47,27 @@ pub struct SignatureCache {
     /// Layer 1: Tool Use ID -> Thinking Signature
     /// Key: tool_use_id (e.g., "toolu_01...")
     /// Value: The thought signature that generated this tool call
-    tool_signatures: Mutex<HashMap<String, CacheEntry<String>>>,
+    pub(crate) tool_signatures: Mutex<HashMap<String, CacheEntry<String>>>,
 
     /// Layer 2: Signature -> Model Family
     /// Key: thought signature string
     /// Value: Model family identifier (e.g., "claude-3-5-sonnet", "gemini-2.0-flash")
-    thinking_families: Mutex<HashMap<String, CacheEntry<String>>>,
+    pub(crate) thinking_families: Mutex<HashMap<String, CacheEntry<String>>>,
 
     /// Layer 3: Session ID -> Map of Message Count -> Thinking Signature (NEW)
     /// Key: session fingerprint (e.g., "sid-a1b2c3d4...")
     /// Value: A map of message count to thought signature
     /// This prevents signature pollution between different conversations and preserves history
-    session_signatures: Mutex<HashMap<String, CacheEntry<HashMap<usize, SessionSignatureEntry>>>>,
+    pub(crate) session_signatures: Mutex<HashMap<String, CacheEntry<HashMap<usize, SessionSignatureEntry>>>>,
 
     /// Layer 4: Session ID -> Assistant Reasoning Text History (NEW v4.2.0)
     /// Key: session fingerprint
     /// Value: A vector of reasoning contents (index corresponds to assistant turn index)
-    session_reasonings: Mutex<HashMap<String, CacheEntry<Vec<String>>>>,
+    pub(crate) session_reasonings: Mutex<HashMap<String, CacheEntry<Vec<String>>>>,
 }
 
 impl SignatureCache {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             tool_signatures: Mutex::new(HashMap::new()),
             thinking_families: Mutex::new(HashMap::new()),

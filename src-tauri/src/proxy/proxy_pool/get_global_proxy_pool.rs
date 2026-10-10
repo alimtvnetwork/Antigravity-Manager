@@ -29,13 +29,13 @@ pub struct ProxyPoolManager {
     pub(crate) config: Arc<RwLock<ProxyPoolConfig>>,
 
     /// Proxy usage count (proxy_id -> count)
-    usage_counter: Arc<DashMap<String, usize>>,
+    pub(crate) usage_counter: Arc<DashMap<String, usize>>,
 
     /// Account-to-proxy binding (account_id -> proxy_id)
     pub(crate) account_bindings: Arc<DashMap<String, String>>,
 
     /// Round-robin index (for RoundRobin strategy)
-    round_robin_index: Arc<AtomicUsize>,
+    pub(crate) round_robin_index: Arc<AtomicUsize>,
 }
 
 impl ProxyPoolManager {

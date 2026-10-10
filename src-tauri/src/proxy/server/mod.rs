@@ -40,3 +40,4 @@ pub use pending::{
     take_pending_delete_accounts, take_pending_reload_accounts, trigger_account_delete,
     trigger_account_reload,
 };
+pub use crate::proxy::upstream::client::UpstreamClient;

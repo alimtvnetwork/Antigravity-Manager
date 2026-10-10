@@ -86,15 +86,15 @@ const FAILURE_COUNT_EXPIRY_SECONDS: u64 = 3600;
 
 /// 限流跟踪器
 pub(crate) struct QuotaBucketLimit {
-    observed_at: i64,
-    reset_time: Option<SystemTime>,
-    weekly: bool,
+    pub(crate) observed_at: i64,
+    pub(crate) reset_time: Option<SystemTime>,
+    pub(crate) weekly: bool,
 }
 
 pub struct RateLimitTracker {
     pub(crate) limits: DashMap<String, RateLimitInfo>,
     // Independent official quota windows must survive transient-limit resets.
-    quota_limits: DashMap<(String, String), QuotaBucketLimit>,
+    pub(crate) quota_limits: DashMap<(String, String), QuotaBucketLimit>,
     /// 连续失败计数（用于智能指数退避），带时间戳用于自动过期
     pub(crate) failure_counts: DashMap<String, (u32, SystemTime)>,
 }

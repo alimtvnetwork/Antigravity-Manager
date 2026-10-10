@@ -6,10 +6,10 @@
 //! Responsible for estimating token usage and purifying context (stripping thinking blocks)
 //! to prevent "Prompt is too long" errors and avoid invalid signatures.
 
-use super::caveman_cleaner::CavemanCleaner;
-use super::claude::models::{ClaudeRequest, ContentBlock, Message, MessageContent, SystemPrompt};
-use super::openai::models::{OpenAIMessage, OpenAIRequest};
-use super::rtk_cleaner::RtkCleaner;
+pub use crate::proxy::mappers::caveman_cleaner::CavemanCleaner;
+pub use crate::proxy::mappers::claude::models::{ClaudeRequest, ContentBlock, Message, MessageContent, SystemPrompt};
+pub use crate::proxy::mappers::openai::models::{OpenAIMessage, OpenAIRequest};
+pub use crate::proxy::mappers::rtk_cleaner::RtkCleaner;
 use serde_json::{json, Value};
 use tracing::{debug, info};
 
@@ -47,7 +47,7 @@ pub(crate) fn estimate_tokens_from_str(s: &str) -> u32 {
 /// Handles both base64 data URLs and remote URLs.
 /// Gemini counts standard images at ~258 tokens. For very large images
 /// (>1MB base64 payload), we scale up since high-res images tokenize higher.
-fn estimate_image_tokens_from_url(url: &str) -> u32 {
+pub(crate) fn estimate_image_tokens_from_url(url: &str) -> u32 {
     const BASE_IMAGE_TOKENS: u32 = 258;
 
     if url.starts_with("data:") {
