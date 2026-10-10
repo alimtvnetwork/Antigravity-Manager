@@ -101,7 +101,7 @@ pub(crate) async fn chat_completions_send(
             drop(image_permit.take());
             match token_manager
                 .get_image_token(
-                    force_rotate,
+                    *force_rotate,
                     Some(&session_id),
                     &mapped_model,
                     &image_scheduler,

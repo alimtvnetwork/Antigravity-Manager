@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use axum::http::StatusCode;
+use axum::Json;
 use serde_json::{json, Value};
 use tracing::{debug, error};
 
@@ -110,7 +111,7 @@ pub(crate) async fn chat_completions_error(
         status_code,
         &error_text,
         retry_after.as_deref(),
-        retried_without_thinking,
+        *retried_without_thinking,
         attempt,
         pool_size,
     );
@@ -146,7 +147,7 @@ pub(crate) async fn chat_completions_error(
     }
 
     if classification.is_thought_signature_error() {
-        if !retried_without_thinking {
+        if !*retried_without_thinking {
             *retried_without_thinking = true;
             tracing::warn!(
                     "[{}] Pipeline: Thinking signature error detected on upstream (HTTP {}). Surgically purging corrupted signatures and retrying on same account.",
