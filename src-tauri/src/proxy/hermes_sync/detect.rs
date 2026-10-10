@@ -1,5 +1,4 @@
 use super::*;
-use crate::proxy::opencode_sync::lock::BACKUP_SUFFIX;
 
 pub fn get_hermes_dir() -> Option<PathBuf> {
     env::var_os("HERMES_HOME")
