@@ -92,6 +92,8 @@ pub(crate) fn collect_tree_conversation_items(
                 )
             });
 
+            let registry = crate::modules::instance::registry::load_registry()
+                .unwrap_or_default();
             if let Ok(s_conn) = s_conn {
                 let is_owning_inst_alive = if owning_inst_id == "default"
                     || owning_inst_id == "__default__"
