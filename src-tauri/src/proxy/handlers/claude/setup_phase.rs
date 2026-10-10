@@ -352,7 +352,7 @@ pub(crate) async fn preprocess_request(
             Ok(v) => v,
             Err(e) => {
                 tracing::error!("Failed to serialize fixed request for z.ai: {}", e);
-                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                return Err(StatusCode::INTERNAL_SERVER_ERROR.into_response());
             }
         };
 
