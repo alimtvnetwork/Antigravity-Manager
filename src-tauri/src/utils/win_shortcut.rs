@@ -191,13 +191,10 @@ pub fn heal_shortcuts_native() {
 
     let mut changed = false;
     unsafe {
-        // Justification: best-effort call; failure logged without changing control flow
-        crate::error::record_ignored(
-            CoInitializeEx(
-                std::ptr::null_mut(),
-                0x0, /* COINIT_MULTITHREADED / APARTMENT */
-            ),
-            "CoInitializeEx",
+        // Justification: non-Result return value intentionally discarded — no error channel to track
+        let _ = CoInitializeEx(
+            std::ptr::null_mut(),
+            0x0, /* COINIT_MULTITHREADED / APARTMENT */
         );
     }
 
@@ -284,29 +281,23 @@ fn heal_single_shortcut(lnk_path: &Path) -> bool {
         }
 
         let mut target_buf = [0u16; 512];
-        // Justification: best-effort call; failure logged without changing control flow
-        crate::error::record_ignored(
-            ((*sl_vtbl).get_path)(
-                shell_link_ptr,
-                target_buf.as_mut_ptr(),
-                512,
-                std::ptr::null_mut(),
-                0,
-            ),
-            "operation",
+        // Justification: non-Result return value intentionally discarded — no error channel to track
+        let _ = ((*sl_vtbl).get_path)(
+            shell_link_ptr,
+            target_buf.as_mut_ptr(),
+            512,
+            std::ptr::null_mut(),
+            0,
         );
 
         let mut icon_buf = [0u16; 512];
         let mut icon_idx = 0i32;
-        // Justification: best-effort call; failure logged without changing control flow
-        crate::error::record_ignored(
-            ((*sl_vtbl).get_icon_location)(
-                shell_link_ptr,
-                icon_buf.as_mut_ptr(),
-                512,
-                &mut icon_idx,
-            ),
-            "operation",
+        // Justification: non-Result return value intentionally discarded — no error channel to track
+        let _ = ((*sl_vtbl).get_icon_location)(
+            shell_link_ptr,
+            icon_buf.as_mut_ptr(),
+            512,
+            &mut icon_idx,
         );
 
         let icon_str = String::from_utf16_lossy(&icon_buf)
