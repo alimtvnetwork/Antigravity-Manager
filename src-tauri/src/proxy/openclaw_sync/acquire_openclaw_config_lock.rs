@@ -11,7 +11,7 @@ const OPENCLAW_CONFIG_FILE: &str = "openclaw.json";
 
 const BACKUP_SUFFIX: &str = ".antigravity-manager.bak";
 
-const PROVIDER_ID: &str = "antigravity-manager";
+pub(crate) const PROVIDER_ID: &str = "antigravity-manager";
 
 static OPENCLAW_CONFIG_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 

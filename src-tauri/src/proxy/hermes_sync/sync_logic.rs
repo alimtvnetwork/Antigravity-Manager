@@ -2,6 +2,7 @@ use super::*;
 use crate::proxy::hermes_sync::detect::get_backup_path;
 use crate::proxy::hermes_sync::detect::normalize_base_url;
 use crate::modules::supabase_sync::config_a::get_config_path;
+use crate::proxy::openclaw_sync::acquire_openclaw_config_lock::PROVIDER_ID;
 
 pub fn is_managed_provider(provider: &str) -> bool {
     matches!(provider, PROVIDER_REF | PROVIDER_ID)
