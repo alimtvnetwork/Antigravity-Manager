@@ -251,5 +251,5 @@ pub struct ProxyMonitor {
     pub max_logs: usize,
     pub enabled: Arc<AtomicBool>,
     pub capture_health_logs: Arc<AtomicBool>,
-    app_handle: Option<tauri::AppHandle>,
+    pub(crate) app_handle: Option<tauri::AppHandle>,
 }

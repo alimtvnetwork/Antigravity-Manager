@@ -17,7 +17,7 @@ pub struct StreamingState {
     pub message_stop_sent: bool,
     used_tool: bool,
     signatures: SignatureManager,
-    trailing_signature: Option<String>,
+    pub(crate) trailing_signature: Option<String>,
     pub web_search_query: Option<String>,
     pub grounding_chunks: Option<Vec<serde_json::Value>>,
     // [IMPROVED] Error recovery 状态追踪 (prepared for future use)

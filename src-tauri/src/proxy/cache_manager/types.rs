@@ -92,17 +92,17 @@ pub struct LayerStats {
 /// Context Cache Manager — 多层级缓存单例
 pub struct CacheManager {
     /// Layer 1: raw SI hash → sanitized text
-    si_cache: DashMap<String, SiCacheEntry>,
+    pub(crate) si_cache: DashMap<String, SiCacheEntry>,
     /// Layer 1 统计
-    si_stats: std::sync::RwLock<(u64, u64, u64)>, // (total, hits, misses)
+    pub(crate) si_stats: std::sync::RwLock<(u64, u64, u64)>, // (total, hits, misses)
 
     /// Layer 2: raw tools hash → processed tools JSON
-    tools_cache: DashMap<String, ToolsCacheEntry>,
+    pub(crate) tools_cache: DashMap<String, ToolsCacheEntry>,
     /// Layer 2 统计
-    tools_stats: std::sync::RwLock<(u64, u64, u64)>,
+    pub(crate) tools_stats: std::sync::RwLock<(u64, u64, u64)>,
 
     /// Layer 3: combined hash → tracking entry
-    prefix_tracker: DashMap<String, PrefixTrackingEntry>,
+    pub(crate) prefix_tracker: DashMap<String, PrefixTrackingEntry>,
     /// Layer 3 统计
-    prefix_stats: std::sync::RwLock<(u64, u64, u64)>,
+    pub(crate) prefix_stats: std::sync::RwLock<(u64, u64, u64)>,
 }

@@ -81,8 +81,8 @@ const V1_INTERNAL_BASE_URL_FALLBACKS: [&str; 3] = [
 ];
 
 pub struct UpstreamClient {
-    default_client: RwLock<Client>,
-    proxy_pool: Option<Arc<crate::proxy::proxy_pool::ProxyPoolManager>>,
-    client_cache: DashMap<String, Client>, // proxy_id -> Client
-    user_agent_override: RwLock<Option<String>>,
+    pub(crate) default_client: RwLock<Client>,
+    pub(crate) proxy_pool: Option<Arc<crate::proxy::proxy_pool::ProxyPoolManager>>,
+    pub(crate) client_cache: DashMap<String, Client>, // proxy_id -> Client
+    pub(crate) user_agent_override: RwLock<Option<String>>,
 }

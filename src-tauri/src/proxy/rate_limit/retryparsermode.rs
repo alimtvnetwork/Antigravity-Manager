@@ -92,11 +92,11 @@ pub(crate) struct QuotaBucketLimit {
 }
 
 pub struct RateLimitTracker {
-    limits: DashMap<String, RateLimitInfo>,
+    pub(crate) limits: DashMap<String, RateLimitInfo>,
     // Independent official quota windows must survive transient-limit resets.
     quota_limits: DashMap<(String, String), QuotaBucketLimit>,
     /// 连续失败计数（用于智能指数退避），带时间戳用于自动过期
-    failure_counts: DashMap<String, (u32, SystemTime)>,
+    pub(crate) failure_counts: DashMap<String, (u32, SystemTime)>,
 }
 
 impl RateLimitTracker {
