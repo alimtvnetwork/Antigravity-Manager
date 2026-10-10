@@ -31,7 +31,6 @@ use std::sync::{atomic::Ordering, Arc}; // [NEW]
 
 // ===== Task #6: OpenCode variants thinking config mapping =====
 // Helper structs for parsing thinking hints from raw JSON
-#[derive(Debug, Clone)]
 // Claude protocol handler — facade module.
 // The implementation is split into focused submodules; public paths are
 // preserved via re-exports below.

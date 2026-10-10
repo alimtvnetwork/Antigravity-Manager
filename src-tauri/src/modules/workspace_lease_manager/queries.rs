@@ -1,6 +1,7 @@
 use chrono::Utc;
 
 use super::*;
+use crate::modules::supabase_sync;
 
 /// Synchronously check if an account is currently leased by another active node
 pub fn is_account_leased_by_other(account_id: &str) -> bool {

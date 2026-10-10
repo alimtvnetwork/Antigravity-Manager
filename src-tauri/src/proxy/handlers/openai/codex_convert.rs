@@ -11,7 +11,7 @@ use super::responses_history::{
 use super::responses_media::{
     responses_input_item_type, responses_message_parts, responses_tool_output_parts,
 };
-use super::websocket::get_cached_tool_call;
+use super::tool_cache::get_cached_tool_call;
 
 pub(crate) fn convert_codex_to_openai_request(mut body: Value) -> Value {
     let instructions = body

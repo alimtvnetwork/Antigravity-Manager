@@ -1,21 +1,21 @@
 use super::*;
 
-fn fragment(source: &str) -> Result<YamlFragment, String> {
+pub fn fragment(source: &str) -> Result<YamlFragment, String> {
     YamlFragment::parse(source).map_err(|error| format!("Failed to build YAML fragment: {error}"))
 }
 
-fn string_fragment(value: &str) -> Result<YamlFragment, String> {
+pub fn string_fragment(value: &str) -> Result<YamlFragment, String> {
     fragment(
         &serde_json::to_string(value)
             .map_err(|error| format!("Failed to encode YAML string: {error}"))?,
     )
 }
 
-fn bool_fragment(value: bool) -> Result<YamlFragment, String> {
+pub fn bool_fragment(value: bool) -> Result<YamlFragment, String> {
     fragment(if value { "true" } else { "false" })
 }
 
-fn preferred_line_ending(source: &str) -> &'static str {
+pub fn preferred_line_ending(source: &str) -> &'static str {
     if source.contains("\r\n") {
         "\r\n"
     } else if source.contains('\r') {
@@ -25,7 +25,7 @@ fn preferred_line_ending(source: &str) -> &'static str {
     }
 }
 
-fn sequence_fragment(values: &[String], line_ending: &str) -> Result<YamlFragment, String> {
+pub fn sequence_fragment(values: &[String], line_ending: &str) -> Result<YamlFragment, String> {
     if values.is_empty() {
         return fragment("[]");
     }
@@ -41,7 +41,7 @@ fn sequence_fragment(values: &[String], line_ending: &str) -> Result<YamlFragmen
     fragment(&source)
 }
 
-fn provider_fragment(
+pub fn provider_fragment(
     base_url: &str,
     api_key: &str,
     discover_models: bool,
@@ -72,12 +72,12 @@ fn provider_fragment(
     fragment(&source)
 }
 
-fn commit(doc: &mut YamlDoc) -> Result<(), String> {
+pub fn commit(doc: &mut YamlDoc) -> Result<(), String> {
     doc.commit_edits()
         .map_err(|error| format!("Failed to apply Hermes YAML edit: {error}"))
 }
 
-fn upsert(doc: &mut YamlDoc, path: &str, value: &YamlFragment) -> Result<(), String> {
+pub fn upsert(doc: &mut YamlDoc, path: &str, value: &YamlFragment) -> Result<(), String> {
     let pointer = parse_pointer(path)?;
     if doc.resolve_pointer(0, &pointer).is_ok() {
         doc.replace_at(0, &pointer, value)
@@ -89,7 +89,7 @@ fn upsert(doc: &mut YamlDoc, path: &str, value: &YamlFragment) -> Result<(), Str
     commit(doc)
 }
 
-fn remove(doc: &mut YamlDoc, path: &str) -> Result<bool, String> {
+pub fn remove(doc: &mut YamlDoc, path: &str) -> Result<bool, String> {
     let pointer = parse_pointer(path)?;
     if doc.resolve_pointer(0, &pointer).is_err() {
         return Ok(false);
@@ -100,7 +100,7 @@ fn remove(doc: &mut YamlDoc, path: &str) -> Result<bool, String> {
     Ok(true)
 }
 
-fn ensure_root_mapping(doc: &mut YamlDoc) -> Result<(), String> {
+pub fn ensure_root_mapping(doc: &mut YamlDoc) -> Result<(), String> {
     let root = doc
         .document_root(0)
         .map_err(|error| format!("Failed to inspect Hermes YAML root: {error}"))?;
@@ -113,7 +113,7 @@ fn ensure_root_mapping(doc: &mut YamlDoc) -> Result<(), String> {
     }
 }
 
-fn ensure_mapping(doc: &mut YamlDoc, path: &str) -> Result<(), String> {
+pub fn ensure_mapping(doc: &mut YamlDoc, path: &str) -> Result<(), String> {
     if is_mapping_at(doc, path) {
         Ok(())
     } else {
@@ -121,7 +121,7 @@ fn ensure_mapping(doc: &mut YamlDoc, path: &str) -> Result<(), String> {
     }
 }
 
-fn sync_sequence(
+pub fn sync_sequence(
     doc: &mut YamlDoc,
     path: &str,
     values: &[String],
@@ -146,7 +146,7 @@ fn sync_sequence(
     Ok(())
 }
 
-fn extract_fragment(doc: &YamlDoc, path: &str) -> Result<Option<YamlFragment>, String> {
+pub fn extract_fragment(doc: &YamlDoc, path: &str) -> Result<Option<YamlFragment>, String> {
     let Some(node) = resolve_optional(doc, path) else {
         return Ok(None);
     };
@@ -157,11 +157,11 @@ fn extract_fragment(doc: &YamlDoc, path: &str) -> Result<Option<YamlFragment>, S
     .map(Some)
 }
 
-fn escape_pointer_token(token: &str) -> String {
+pub fn escape_pointer_token(token: &str) -> String {
     token.replace('~', "~0").replace('/', "~1")
 }
 
-fn mapping_keys(doc: &YamlDoc, path: &str) -> Vec<String> {
+pub fn mapping_keys(doc: &YamlDoc, path: &str) -> Vec<String> {
     let Some(node) = resolve_optional(doc, path) else {
         return Vec::new();
     };
@@ -170,7 +170,7 @@ fn mapping_keys(doc: &YamlDoc, path: &str) -> Vec<String> {
         .collect()
 }
 
-fn restore_mapping(current: &mut YamlDoc, backup: &YamlDoc, path: &str) -> Result<(), String> {
+pub fn restore_mapping(current: &mut YamlDoc, backup: &YamlDoc, path: &str) -> Result<(), String> {
     ensure_mapping(current, path)?;
     let backup_keys = mapping_keys(backup, path);
     for key in mapping_keys(current, path) {

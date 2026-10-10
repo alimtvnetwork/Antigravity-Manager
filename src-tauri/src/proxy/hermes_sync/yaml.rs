@@ -1,6 +1,6 @@
 use super::*;
 
-fn parse_pointer(path: &str) -> Result<JsonPointer, String> {
+pub fn parse_pointer(path: &str) -> Result<JsonPointer, String> {
     JsonPointer::parse(path).map_err(|error| format!("Invalid YAML path {path:?}: {error}"))
 }
 
@@ -11,22 +11,22 @@ struct IndentlessSequenceStyle {
     parent_indent: usize,
 }
 
-fn line_without_ending(line: &str) -> &str {
+pub fn line_without_ending(line: &str) -> &str {
     line.strip_suffix("\r\n")
         .or_else(|| line.strip_suffix('\n'))
         .unwrap_or(line)
 }
 
-fn leading_spaces(line: &str) -> usize {
+pub fn leading_spaces(line: &str) -> usize {
     line.bytes().take_while(|byte| *byte == b' ').count()
 }
 
-fn is_sequence_entry(line: &str) -> bool {
+pub fn is_sequence_entry(line: &str) -> bool {
     let trimmed = line.trim_start();
     trimmed == "-" || trimmed.starts_with("- ")
 }
 
-fn is_empty_mapping_value(line: &str) -> bool {
+pub fn is_empty_mapping_value(line: &str) -> bool {
     let trimmed = line.trim_start();
     if trimmed.starts_with('-') {
         return false;
@@ -37,7 +37,7 @@ fn is_empty_mapping_value(line: &str) -> bool {
     !key.trim().is_empty() && (value.trim().is_empty() || value.trim_start().starts_with('#'))
 }
 
-fn normalize_indentless_sequences(source: &str) -> (String, Vec<IndentlessSequenceStyle>) {
+pub fn normalize_indentless_sequences(source: &str) -> (String, Vec<IndentlessSequenceStyle>) {
     let lines = source.split_inclusive('\n').collect::<Vec<_>>();
     let mut extra_indent = vec![0_usize; lines.len()];
     let mut styles = Vec::new();
@@ -94,7 +94,7 @@ fn normalize_indentless_sequences(source: &str) -> (String, Vec<IndentlessSequen
     (normalized, styles)
 }
 
-fn restore_indentless_sequences(source: &str, styles: &[IndentlessSequenceStyle]) -> String {
+pub fn restore_indentless_sequences(source: &str, styles: &[IndentlessSequenceStyle]) -> String {
     let mut lines = source
         .split_inclusive('\n')
         .map(str::to_string)
@@ -128,7 +128,7 @@ fn restore_indentless_sequences(source: &str, styles: &[IndentlessSequenceStyle]
     lines.concat()
 }
 
-fn parse_doc(source: &str) -> Result<YamlDoc, String> {
+pub fn parse_doc(source: &str) -> Result<YamlDoc, String> {
     let source = if source.trim().is_empty() {
         EMPTY_CONFIG
     } else {
@@ -139,12 +139,12 @@ fn parse_doc(source: &str) -> Result<YamlDoc, String> {
         .map_err(|error| format!("Hermes config.yaml is not valid YAML: {error}"))
 }
 
-fn render_doc(doc: &YamlDoc, original_source: &str) -> String {
+pub fn render_doc(doc: &YamlDoc, original_source: &str) -> String {
     let (_, styles) = normalize_indentless_sequences(original_source);
     restore_indentless_sequences(doc.as_source(), &styles)
 }
 
-fn read_hermes_source(path: &PathBuf) -> Result<String, String> {
+pub fn read_hermes_source(path: &PathBuf) -> Result<String, String> {
     match fs::read_to_string(path) {
         Ok(source) if source.trim().is_empty() => Ok(EMPTY_CONFIG.to_string()),
         Ok(source) => {
@@ -156,7 +156,7 @@ fn read_hermes_source(path: &PathBuf) -> Result<String, String> {
     }
 }
 
-fn atomically_write_source(path: &PathBuf, source: &str) -> Result<(), String> {
+pub fn atomically_write_source(path: &PathBuf, source: &str) -> Result<(), String> {
     parse_doc(source)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
@@ -199,7 +199,7 @@ fn atomically_write_source(path: &PathBuf, source: &str) -> Result<(), String> {
     })
 }
 
-fn create_backup(path: &PathBuf) -> Result<(), String> {
+pub fn create_backup(path: &PathBuf) -> Result<(), String> {
     let backup = path.with_file_name(format!(
         "{}{}",
         path.file_name().unwrap_or_default().to_string_lossy(),
@@ -212,17 +212,17 @@ fn create_backup(path: &PathBuf) -> Result<(), String> {
     Ok(())
 }
 
-fn resolve_optional(doc: &YamlDoc, path: &str) -> Option<NodeId> {
+pub fn resolve_optional(doc: &YamlDoc, path: &str) -> Option<NodeId> {
     doc.resolve_pointer(0, &parse_pointer(path).ok()?).ok()
 }
 
-fn scalar_at(doc: &YamlDoc, path: &str) -> Option<String> {
+pub fn scalar_at(doc: &YamlDoc, path: &str) -> Option<String> {
     doc.scalar_value(resolve_optional(doc, path)?)
         .ok()
         .map(|value| value.into_owned())
 }
 
-fn bool_at(doc: &YamlDoc, path: &str) -> Option<bool> {
+pub fn bool_at(doc: &YamlDoc, path: &str) -> Option<bool> {
     match scalar_at(doc, path)?.to_ascii_lowercase().as_str() {
         "true" => Some(true),
         "false" => Some(false),
@@ -230,18 +230,18 @@ fn bool_at(doc: &YamlDoc, path: &str) -> Option<bool> {
     }
 }
 
-fn is_mapping_at(doc: &YamlDoc, path: &str) -> bool {
+pub fn is_mapping_at(doc: &YamlDoc, path: &str) -> bool {
     resolve_optional(doc, path)
         .is_some_and(|node| matches!(doc.semantic_kind(node), Some(SemanticKind::Mapping { .. })))
 }
 
-fn mapping_len_at(doc: &YamlDoc, path: &str) -> Option<usize> {
+pub fn mapping_len_at(doc: &YamlDoc, path: &str) -> Option<usize> {
     let node = resolve_optional(doc, path)?;
     matches!(doc.semantic_kind(node), Some(SemanticKind::Mapping { .. }))
         .then(|| doc.mapping_entries(node).count())
 }
 
-fn string_list_at(doc: &YamlDoc, path: &str) -> Vec<String> {
+pub fn string_list_at(doc: &YamlDoc, path: &str) -> Vec<String> {
     let Some(node) = resolve_optional(doc, path) else {
         return Vec::new();
     };

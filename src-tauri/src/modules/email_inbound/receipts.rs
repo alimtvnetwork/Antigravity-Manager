@@ -3,6 +3,7 @@ use chrono::Utc;
 use std::process::Command;
 
 use super::*;
+use crate::modules::email_sender;
 
 /// Render responsive HTML card layout for inbound execution ACK and Result receipts
 pub fn render_html_receipt(

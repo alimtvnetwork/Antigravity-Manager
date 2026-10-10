@@ -2,6 +2,7 @@ use crate::error::AppError;
 use chrono::Utc;
 
 use super::*;
+use crate::modules::supabase_sync;
 
 /// Release a lease when switching account or shutting down
 pub async fn release_lease(account_id: &str) -> Result<(), AppError> {

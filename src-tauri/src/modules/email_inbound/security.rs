@@ -1,6 +1,7 @@
 use base64::prelude::*;
 
 use super::*;
+use crate::modules::email_vault_db;
 
 /// Check sliding 10-second debounce stack
 /// Returns true if execution should proceed, false if throttled

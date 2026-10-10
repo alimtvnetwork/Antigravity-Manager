@@ -4,6 +4,7 @@ use rusqlite::{params, Connection};
 use uuid::Uuid;
 
 use super::*;
+use crate::modules::repo_db;
 
 /// Backward compatible wrapper with instance support
 pub fn backup_active_running_prompts(

@@ -14,3 +14,4 @@ pub use proxyrequestlog::ProxyMonitor;
 pub use proxyrequestlog::ProxyRequestLog;
 pub use proxyrequestlog::ProxyStats;
 pub use proxyrequestlog::UpstreamCapture;
+pub use proxyrequestlog::UpstreamRequestBodyHolder;

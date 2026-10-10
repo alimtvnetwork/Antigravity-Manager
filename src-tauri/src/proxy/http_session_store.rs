@@ -22,6 +22,7 @@ pub(crate) use httpsessionentry::store;
 pub use httpsessionentry::HttpSessionEntry;
 pub(crate) use httpsessionentry::HttpSessionStore;
 pub use httpsessionentry::PreparedSessionInput;
+pub use httpsessionentry::SessionParent;
 pub(crate) use httpsessionentry::SessionNode;
 pub(crate) use httpsessionentry::StoredSession;
 pub(crate) use tests::tests;
