@@ -3,11 +3,11 @@ use super::processor::PartProcessor;
 use super::state::StreamingState;
 use super::types::remap_function_call_args;
 use super::types::BlockType;
+use super::PartProcessor;
 use crate::proxy::mappers::claude::models::*;
+use crate::proxy::signature_cache::cacheentry::SignatureCache;
 use bytes::Bytes;
 use serde_json::{json, Value};
-use super::PartProcessor;
-use crate::proxy::signature_cache::cacheentry::SignatureCache;
 
 impl<'a> PartProcessor<'a> {
     // -------------------------------------------------------------------------
@@ -133,7 +133,10 @@ impl<'a> PartProcessor<'a> {
     ///
     /// Returns `Some(chunks)` when recovery succeeds, or `None` to let the caller
     /// fall through to the normal `text_delta` path.
-    pub(crate) fn try_recover_call_default_api_text(&mut self, text: &str) -> Option<Vec<bytes::Bytes>> {
+    pub(crate) fn try_recover_call_default_api_text(
+        &mut self,
+        text: &str,
+    ) -> Option<Vec<bytes::Bytes>> {
         // G1: Tools must have been registered for this request
         if self.state.registered_tool_names.is_empty() {
             return None;

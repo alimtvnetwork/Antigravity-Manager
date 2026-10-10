@@ -1,15 +1,17 @@
 use super::super::caveman_cleaner::CavemanCleaner;
-use super::super::claude::models::{ClaudeRequest, ContentBlock, Message, MessageContent, SystemPrompt};
+use super::super::claude::models::{
+    ClaudeRequest, ContentBlock, Message, MessageContent, SystemPrompt,
+};
 use super::super::openai::models::{OpenAIMessage, OpenAIRequest};
 use super::super::rtk_cleaner::RtkCleaner;
+use super::estimate_inline_data_tokens;
+use super::estimate_media_tokens_from_url;
+use super::estimate_tokens_from_str;
+use super::ContextManager;
+use super::OpenAIToolRound;
+use super::PurificationStrategy;
 use serde_json::{json, Value};
 use tracing::{debug, info};
-use super::ContextManager;
-use super::PurificationStrategy;
-use super::OpenAIToolRound;
-use super::estimate_tokens_from_str;
-use super::estimate_media_tokens_from_url;
-use super::estimate_inline_data_tokens;
 
 // OpenAI-side context management (split from context_manager.rs).
 impl ContextManager {

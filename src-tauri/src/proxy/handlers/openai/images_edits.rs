@@ -168,10 +168,14 @@ pub async fn handle_images_edits(
     let contents_parts = build_image_contents(final_prompt, &input_images, mask_data.as_ref());
 
     // Prepare task spawning context (reconstructed after module split)
-    let mut tasks: tokio::task::JoinSet<Result<(serde_json::Value, String, String), (axum::http::StatusCode, String)>> = tokio::task::JoinSet::new();
+    let mut tasks: tokio::task::JoinSet<
+        Result<(serde_json::Value, String, String), (axum::http::StatusCode, String)>,
+    > = tokio::task::JoinSet::new();
     let upstream = state.upstream_client.clone();
     let token_manager = state.token_manager.clone();
-    let client_adapter: Option<std::sync::Arc<dyn crate::proxy::common::client_adapter::ClientAdapter>> = None;
+    let client_adapter: Option<
+        std::sync::Arc<dyn crate::proxy::common::client_adapter::ClientAdapter>,
+    > = None;
     let openai_req = serde_json::json!({"model": model, "prompt": prompt});
     let selected: Vec<(usize, String, String, String, String, u64)> = Vec::new();
     let extra_headers = axum::http::HeaderMap::new();
@@ -330,11 +334,12 @@ use uuid::Uuid;
 
 use std::sync::OnceLock;
 
-use tokio::sync::RwLock as TokioRwLock;
 use crate::proxy::handlers::openai::image_input::build_image_contents;
-use crate::proxy::handlers::openai::image_input::is_edit_image_field;
 use crate::proxy::handlers::openai::image_input::edit_size_input;
+use crate::proxy::handlers::openai::image_input::is_edit_image_field;
 use crate::proxy::handlers::openai::image_input::normalized_image_from_bytes;
 use crate::proxy::handlers::openai::image_input::NormalizedInputImage;
+use tokio::sync::RwLock as TokioRwLock;
 
-pub(crate) static WEBSOCKET_TOOL_CALL_CACHE: OnceLock<TokioRwLock<HashMap<String, Value>>> = OnceLock::new();
+pub(crate) static WEBSOCKET_TOOL_CALL_CACHE: OnceLock<TokioRwLock<HashMap<String, Value>>> =
+    OnceLock::new();

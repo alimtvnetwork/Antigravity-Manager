@@ -1,6 +1,6 @@
 use super::*;
-use crate::proxy::mappers::gemini::wrapper::CONTEXT_SUMMARY_PROMPT;
 use crate::proxy::handlers::claude::consts::INTERNAL_BACKGROUND_TASK;
+use crate::proxy::mappers::gemini::wrapper::CONTEXT_SUMMARY_PROMPT;
 
 // ===== [Helper] Synchronous Upstream Call =====
 // Reusable function for making non-streaming calls to Gemini API

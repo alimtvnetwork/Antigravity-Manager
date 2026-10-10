@@ -3,14 +3,14 @@
 use super::discovery::discover_running_prompts_from_antigravity;
 use super::models::RunningProject;
 use super::schema::connect_db;
+use crate::commands::instance::list_running_projects;
+use crate::modules::repo_db::dispatch::parse_flexible_timestamp;
+use crate::modules::repo_db::failed_commands::decode_uri_to_path;
+use crate::modules::repo_db::gemini_dirs::gemini_dirs_tagged;
+use crate::modules::repo_db::project_queries::normalize_path_for_compare;
 use chrono::Utc;
 use rusqlite::params;
 use std::path::Path;
-use crate::modules::repo_db::project_queries::normalize_path_for_compare;
-use crate::commands::instance::list_running_projects;
-use crate::modules::repo_db::gemini_dirs::gemini_dirs_tagged;
-use crate::modules::repo_db::dispatch::parse_flexible_timestamp;
-use crate::modules::repo_db::failed_commands::decode_uri_to_path;
 
 pub(crate) fn transition_stale_inflight_prompts(now: i64) {
     if let Ok(conn) = connect_db() {

@@ -20,8 +20,8 @@ use crate::proxy::upstream::client::mask_email;
 use crate::proxy::TokenManager;
 
 use super::responses_history::{debug_value_without_inline_data, serialized_json_len};
-use axum::Json;
 use axum::response::IntoResponse;
+use axum::Json;
 
 /// Values produced by the send phase for the success/error phases.
 pub(crate) struct ChatSendOutput {

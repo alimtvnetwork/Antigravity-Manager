@@ -1,15 +1,15 @@
 // Convert Codex websocket payloads to OpenAI requests.
-use serde_json::{json, Value};
-use crate::proxy::handlers::openai::responses_media::responses_tool_output_parts;
-use crate::proxy::handlers::openai::responses_media::responses_message_parts;
-use crate::proxy::handlers::openai::tool_cache::get_cached_tool_call;
 use crate::proxy::handlers::openai::chat_conversion::codex_ledger_from_body;
-use crate::proxy::handlers::openai::responses_media::responses_input_item_type;
-use crate::proxy::handlers::openai::responses_history::rewrite_terminal_assistant_prefill;
-use crate::proxy::handlers::openai::chat_conversion::prefix_with_step_marker;
-use crate::proxy::handlers::openai::responses_history::drop_leading_orphan_tool_history;
-use crate::proxy::handlers::openai::responses_history::build_responses_tool_output_content;
 use crate::proxy::handlers::openai::chat_conversion::is_codex_transcript_only_assistant_message;
+use crate::proxy::handlers::openai::chat_conversion::prefix_with_step_marker;
+use crate::proxy::handlers::openai::responses_history::build_responses_tool_output_content;
+use crate::proxy::handlers::openai::responses_history::drop_leading_orphan_tool_history;
+use crate::proxy::handlers::openai::responses_history::rewrite_terminal_assistant_prefill;
+use crate::proxy::handlers::openai::responses_media::responses_input_item_type;
+use crate::proxy::handlers::openai::responses_media::responses_message_parts;
+use crate::proxy::handlers::openai::responses_media::responses_tool_output_parts;
+use crate::proxy::handlers::openai::tool_cache::get_cached_tool_call;
+use serde_json::{json, Value};
 
 pub(crate) fn convert_codex_to_openai_request(mut body: Value) -> Value {
     let instructions = body

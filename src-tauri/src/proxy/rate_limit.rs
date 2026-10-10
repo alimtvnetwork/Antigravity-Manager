@@ -8,7 +8,6 @@ mod retryparsermode;
 
 #[cfg(test)]
 pub(crate) use ratelimittracker_impl_2::tests;
-pub(crate) use retryparsermode::MAX_LOCKOUT_SECONDS;
 pub(crate) use retryparsermode::has_explicit_quota_exhausted;
 pub(crate) use retryparsermode::is_active_persisted_long_image_limit;
 pub(crate) use retryparsermode::is_active_persisted_long_limit;
@@ -18,3 +17,4 @@ pub use retryparsermode::RateLimitInfo;
 pub use retryparsermode::RateLimitReason;
 pub use retryparsermode::RateLimitTracker;
 pub(crate) use retryparsermode::RetryParserMode;
+pub(crate) use retryparsermode::MAX_LOCKOUT_SECONDS;

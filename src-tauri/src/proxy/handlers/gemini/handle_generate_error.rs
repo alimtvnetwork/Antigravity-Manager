@@ -20,7 +20,9 @@ pub(crate) async fn handle_generate_error(
     pool_size: usize,
     token_manager: &std::sync::Arc<crate::proxy::TokenManager>,
     _headers: &axum::http::HeaderMap,
-    client_adapter: &Option<std::sync::Arc<dyn crate::proxy::common::client_adapter::ClientAdapter>>,
+    client_adapter: &Option<
+        std::sync::Arc<dyn crate::proxy::common::client_adapter::ClientAdapter>,
+    >,
     failure_statuses: &mut crate::proxy::handlers::common::FailureStatusTracker,
     last_error: &mut String,
     force_rotate: &mut bool,
@@ -147,10 +149,7 @@ pub(crate) async fn handle_generate_error(
         return Ok(ErrorOutcome::Respond(
             (
                 StatusCode::from_u16(status_code).unwrap_or(StatusCode::NOT_FOUND),
-                [
-                    ("X-Account-Email", email),
-                    ("X-Mapped-Model", mapped_model),
-                ],
+                [("X-Account-Email", email), ("X-Mapped-Model", mapped_model)],
                 Json(dual_err),
             )
                 .into_response(),
@@ -274,10 +273,7 @@ pub(crate) async fn handle_generate_error(
     return Ok(ErrorOutcome::Respond(
         (
             status,
-            [
-                ("X-Account-Email", email),
-                ("X-Mapped-Model", mapped_model),
-            ],
+            [("X-Account-Email", email), ("X-Mapped-Model", mapped_model)],
             Json(dual_err),
         )
             .into_response(),

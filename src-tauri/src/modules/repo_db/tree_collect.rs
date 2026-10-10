@@ -23,14 +23,14 @@ use super::models::ActivePrompt;
 use super::project_queries::list_all_prompts;
 use super::schema::connect_db;
 use super::transcript::{inspect_conversation_transcript, resolve_transcript_path};
+use crate::modules::repo_db::dispatch::parse_flexible_timestamp;
+use crate::modules::repo_db::failed_commands::decode_uri_to_path;
+use crate::modules::repo_db::project_queries::normalize_path_for_compare;
+use crate::modules::repo_db::sequences::extract_prompt_words_preview;
 use chrono::Utc;
 use rusqlite::Connection;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use crate::modules::repo_db::project_queries::normalize_path_for_compare;
-use crate::modules::repo_db::sequences::extract_prompt_words_preview;
-use crate::modules::repo_db::dispatch::parse_flexible_timestamp;
-use crate::modules::repo_db::failed_commands::decode_uri_to_path;
 
 pub(crate) fn collect_tree_conversation_items(
     target: Option<&str>,
@@ -92,8 +92,7 @@ pub(crate) fn collect_tree_conversation_items(
                 )
             });
 
-            let registry = crate::modules::instance::registry::load_registry()
-                .unwrap_or_default();
+            let registry = crate::modules::instance::registry::load_registry().unwrap_or_default();
             if let Ok(s_conn) = s_conn {
                 let is_owning_inst_alive = if owning_inst_id == "default"
                     || owning_inst_id == "__default__"

@@ -1,5 +1,7 @@
 use super::*;
-use crate::proxy::handlers::claude::error_handling::{build_exhaustion_error, handle_upstream_error};
+use crate::proxy::handlers::claude::error_handling::{
+    build_exhaustion_error, handle_upstream_error,
+};
 use crate::proxy::handlers::claude::request_log::log_request_summary;
 use crate::proxy::handlers::claude::response_handling::handle_nonstream_success;
 use crate::proxy::handlers::claude::stream_handling::handle_stream_success;

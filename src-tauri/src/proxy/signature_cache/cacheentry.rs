@@ -58,7 +58,8 @@ pub struct SignatureCache {
     /// Key: session fingerprint (e.g., "sid-a1b2c3d4...")
     /// Value: A map of message count to thought signature
     /// This prevents signature pollution between different conversations and preserves history
-    pub(crate) session_signatures: Mutex<HashMap<String, CacheEntry<HashMap<usize, SessionSignatureEntry>>>>,
+    pub(crate) session_signatures:
+        Mutex<HashMap<String, CacheEntry<HashMap<usize, SessionSignatureEntry>>>>,
 
     /// Layer 4: Session ID -> Assistant Reasoning Text History (NEW v4.2.0)
     /// Key: session fingerprint

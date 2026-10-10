@@ -1,9 +1,9 @@
 // `handle_completions` success-path dispatcher: streaming arm vs
 // non-streaming arm. The streaming arm always diverges, so the trailing
 // non-streaming arm is only reached when `list_response` is false.
+use crate::proxy::TokenManager;
 use std::collections::HashSet;
 use std::sync::Arc;
-use crate::proxy::TokenManager;
 
 use axum::extract::OriginalUri;
 use serde_json::Value;

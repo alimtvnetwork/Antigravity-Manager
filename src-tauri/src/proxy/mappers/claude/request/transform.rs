@@ -389,8 +389,10 @@ pub fn transform_claude_request_in_timed(
     // 生成 requestId —— 官方 5 段形态，三适配器共用。
     // 必须含 unixMs：历史实现为 `agent/antigravity/{session[:8]}/{count}`，**不含时间戳**，
     // 同一会话同一轮次重试会拿到完全相同的 ID，从而 pin 到上一次的 429 / 旧缓存。
-    let request_id =
-        super::super::super::super::common_utils::build_official_request_id(&session_id, message_count as u64);
+    let request_id = super::super::super::super::common_utils::build_official_request_id(
+        &session_id,
+        message_count as u64,
+    );
 
     // 官方客户端指纹（企业 / GCP 账号为 jetski）—— 三适配器共用，避免指纹漂移
     let (official_user_agent, _official_ide_type) =

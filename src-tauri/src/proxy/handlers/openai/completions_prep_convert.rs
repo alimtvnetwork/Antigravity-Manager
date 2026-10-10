@@ -5,11 +5,11 @@ use super::chat_conversion::{
     codex_ledger_from_body, is_codex_transcript_only_assistant_message, prefix_with_step_marker,
 };
 use super::completions_prep_session::CompletionsSessionPrep;
+use super::responses_history::build_responses_tool_output_content;
 use super::responses_history::{
     drop_leading_orphan_tool_history, into_history_without_inline_media,
     rewrite_terminal_assistant_prefill,
 };
-use super::responses_history::build_responses_tool_output_content;
 use super::responses_media::{
     responses_input_item_type, responses_message_parts, responses_tool_output_parts,
 };

@@ -1,12 +1,14 @@
 use super::super::caveman_cleaner::CavemanCleaner;
-use super::super::claude::models::{ClaudeRequest, ContentBlock, Message, MessageContent, SystemPrompt};
+use super::super::claude::models::{
+    ClaudeRequest, ContentBlock, Message, MessageContent, SystemPrompt,
+};
 use super::super::openai::models::{OpenAIMessage, OpenAIRequest};
 use super::super::rtk_cleaner::RtkCleaner;
-use serde_json::{json, Value};
-use tracing::{debug, info};
+use super::estimate_tokens_from_str;
 use super::ContextManager;
 use super::PurificationStrategy;
-use super::estimate_tokens_from_str;
+use serde_json::{json, Value};
+use tracing::{debug, info};
 
 // Claude-side context management (split from context_manager.rs).
 impl ContextManager {

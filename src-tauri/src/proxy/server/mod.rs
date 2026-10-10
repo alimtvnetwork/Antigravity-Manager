@@ -32,12 +32,12 @@ mod router_admin_b;
 mod router_proxy;
 mod start;
 
+pub use crate::proxy::upstream::client::UpstreamClient;
+pub use crate::proxy::upstream::client::UpstreamClient;
 pub use app_state::AppState;
 pub use axum_server::AxumServer;
-pub use crate::proxy::upstream::client::UpstreamClient;
 pub use image_scheduler::{ImagePermit, ImageScheduler};
 pub use pending::{
     take_pending_delete_accounts, take_pending_reload_accounts, trigger_account_delete,
     trigger_account_reload,
 };
-pub use crate::proxy::upstream::client::UpstreamClient;

@@ -1,15 +1,15 @@
 // Session transform orchestrator (split from request.rs).
 // NOTE: transform_openai_request_with_session underwent behavior-preserving
 // phase extraction (setup/system/contents/body/tools/finalize) to bring files under 500 lines.
+use super::super::models::OpenAIRequest;
 use super::session_body::phase_body;
 use super::session_contents::phase_contents;
 use super::session_finalize::phase_finalize;
 use super::session_setup::{phase_setup, SetupState};
 use super::session_system::{phase_system, SystemState};
 use super::session_tools::phase_tools;
-use serde_json::Value;
-use super::super::models::OpenAIRequest;
 use crate::proxy::token_manager::ProxyToken;
+use serde_json::Value;
 
 pub fn transform_openai_request_with_session(
     request: &OpenAIRequest,

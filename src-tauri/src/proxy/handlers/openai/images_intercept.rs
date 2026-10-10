@@ -1,13 +1,18 @@
 // Chat->image redirection: `handle_chat_redirection` + `intercept_chat_to_image`.
 use axum::{
-    body::Body, extract::State, http::{HeaderMap, StatusCode}, response::IntoResponse, response::Response, Json,
+    body::Body,
+    extract::State,
+    http::{HeaderMap, StatusCode},
+    response::IntoResponse,
+    response::Response,
+    Json,
 };
 use serde_json::{json, Value};
 use tracing::{debug, error};
 
-use crate::proxy::server::AppState;
 use super::chat_completions::handle_chat_completions;
 use super::images_generations::handle_images_generations_internal;
+use crate::proxy::server::AppState;
 
 pub async fn handle_chat_redirection(
     State(state): State<AppState>,
@@ -83,7 +88,7 @@ pub(crate) async fn intercept_chat_to_image(
             // 3. Construct Chat Completion Response
             if is_stream {
                 use axum::body::Body;
-use axum::http::HeaderMap;
+                use axum::http::HeaderMap;
 
                 let chunk = json!({
                     "id": format!("chatcmpl-img-{}", uuid::Uuid::new_v4()),

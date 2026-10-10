@@ -1,11 +1,14 @@
 //! Admin route table, second half: OAuth, logs, stats, system, security, user tokens.
 //! (Split from the single admin route table to respect the 500-line file limit.)
 
+use super::{
+    admin_accounts, admin_accounts_ops, admin_cloudflared, admin_import, admin_logs, admin_oauth,
+    admin_proxy, admin_security, admin_stats, admin_system, admin_tokens,
+};
 use axum::{
     routing::{delete, get, post},
     Router,
 };
-use super::{admin_accounts, admin_accounts_ops, admin_cloudflared, admin_import, admin_logs, admin_oauth, admin_proxy, admin_security, admin_stats, admin_system, admin_tokens};
 
 pub(crate) fn admin_route_table_b() -> Router {
     let admin_routes = Router::new()

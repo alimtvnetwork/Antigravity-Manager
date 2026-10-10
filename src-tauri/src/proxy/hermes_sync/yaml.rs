@@ -178,8 +178,8 @@ pub fn atomically_write_source(path: &PathBuf, source: &str) -> Result<(), Strin
         .open(&temp)
         .map_err(|error| format!("Failed to create temp file: {error}"))?;
     let result = (|| -> std::io::Result<()> {
+        use crate::proxy::opencode_sync::lock::BACKUP_SUFFIX;
         use std::io::Write;
-use crate::proxy::opencode_sync::lock::BACKUP_SUFFIX;
         #[cfg(unix)]
         if let Ok(metadata) = fs::metadata(path) {
             file.set_permissions(metadata.permissions())?;

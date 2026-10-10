@@ -1,6 +1,6 @@
 use super::*;
-use crate::proxy::mappers::claude::models::ClaudeRequest;
 use crate::proxy::handlers::claude::attempt::AttemptState;
+use crate::proxy::mappers::claude::models::ClaudeRequest;
 
 /// Apply the 3-layer progressive compression to the request when the
 /// compression level is "high" (and thinking was not stripped for retry).

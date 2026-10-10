@@ -4,8 +4,8 @@ use super::super::models::*;
 use crate::proxy::model_specs;
 use crate::proxy::token_manager::ProxyToken;
 
-use serde_json::{json, Value};
 use super::helpers::flatten_tools;
+use serde_json::{json, Value};
 
 pub(crate) struct SystemState {
     pub system_instructions: Vec<String>,

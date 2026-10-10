@@ -1,6 +1,6 @@
 use super::*;
-use std::sync::Arc;
 use crate::proxy::monitor::CURRENT_UPSTREAM_CAPTURE;
+use std::sync::Arc;
 
 /// Build the initial `ProxyRequestLog` from response metadata and request context.
 ///

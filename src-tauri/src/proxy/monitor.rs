@@ -9,10 +9,10 @@ mod proxymonitor_impl;
 mod proxyrequestlog;
 
 pub(crate) use proxyrequestlog::prompt_log_tests;
-pub use proxyrequestlog::CURRENT_UPSTREAM_CAPTURE;
 pub(crate) use proxyrequestlog::sanitize_upstream_debug_value;
 pub use proxyrequestlog::ProxyMonitor;
 pub use proxyrequestlog::ProxyRequestLog;
 pub use proxyrequestlog::ProxyStats;
 pub(crate) use proxyrequestlog::UpstreamCapture;
 pub use proxyrequestlog::UpstreamRequestBodyHolder;
+pub use proxyrequestlog::CURRENT_UPSTREAM_CAPTURE;

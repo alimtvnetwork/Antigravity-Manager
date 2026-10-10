@@ -281,8 +281,8 @@ pub(crate) async fn chat_completions_success(
             // 客户端请求非流式，但内部强制转为流式
             // 收集流数据并聚合为 JSON
             use crate::proxy::mappers::openai::collector::collect_stream_to_json;
-use bytes::Bytes;
-use axum::response::{IntoResponse, Response};
+            use axum::response::{IntoResponse, Response};
+            use bytes::Bytes;
 
             match collect_stream_to_json(combined_stream).await {
                 Ok(full_response) => {

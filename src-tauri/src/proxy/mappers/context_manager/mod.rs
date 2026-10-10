@@ -7,7 +7,9 @@
 //! to prevent "Prompt is too long" errors and avoid invalid signatures.
 
 pub use crate::proxy::mappers::caveman_cleaner::CavemanCleaner;
-pub use crate::proxy::mappers::claude::models::{ClaudeRequest, ContentBlock, Message, MessageContent, SystemPrompt};
+pub use crate::proxy::mappers::claude::models::{
+    ClaudeRequest, ContentBlock, Message, MessageContent, SystemPrompt,
+};
 pub use crate::proxy::mappers::openai::models::{OpenAIMessage, OpenAIRequest};
 pub use crate::proxy::mappers::rtk_cleaner::RtkCleaner;
 use serde_json::{json, Value};

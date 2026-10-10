@@ -31,9 +31,7 @@ pub async fn get_valid_token_for_warmup(
     }
 
     // Fetch project_id
-    let project_id = fetch_project_id(&account.token.access_token)
-        .await
-        .ok();
+    let project_id = fetch_project_id(&account.token.access_token).await.ok();
     let final_pid = project_id.unwrap_or_else(|| "bamboo-precept-lgxtn".to_string());
 
     Ok((account.token.access_token, final_pid))

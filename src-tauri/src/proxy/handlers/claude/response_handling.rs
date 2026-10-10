@@ -1,6 +1,6 @@
 use super::*;
-use crate::proxy::handlers::claude::attempt::AttemptState;
 use crate::proxy::handlers::claude::attempt::AttemptCall;
+use crate::proxy::handlers::claude::attempt::AttemptState;
 
 /// Handle a successful upstream response for non-streaming requests:
 /// read body, parse, transform to Claude format and return JSON.

@@ -1,6 +1,6 @@
 // StreamingState (split from streaming.rs)
-use super::types::{BlockType, SignatureManager};
 use super::super::utils::to_claude_usage;
+use super::types::{BlockType, SignatureManager};
 use crate::proxy::common::client_adapter::{ClientAdapter, SignatureBufferStrategy};
 use crate::proxy::mappers::claude::models::*;
 use crate::proxy::mappers::estimation_calibrator::get_calibrator;

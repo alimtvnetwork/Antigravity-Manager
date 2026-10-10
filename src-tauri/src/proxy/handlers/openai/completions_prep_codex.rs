@@ -6,10 +6,10 @@ use serde_json::{json, Value};
 use crate::proxy::mappers::openai::OpenAIRequest;
 
 use super::completions_prep_session::CompletionsSessionPrep;
-use crate::proxy::handlers::openai::responses_media::responses_input_item_type;
 use super::responses_history::{
     drop_leading_orphan_tool_history, rewrite_terminal_assistant_prefill,
 };
+use crate::proxy::handlers::openai::responses_media::responses_input_item_type;
 
 pub(crate) struct CompletionsCodexPrep {
     pub previous_response_id: Option<String>,

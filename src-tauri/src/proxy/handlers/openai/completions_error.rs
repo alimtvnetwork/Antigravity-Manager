@@ -2,11 +2,11 @@
 // retry/backoff decisions.
 use std::sync::Arc;
 
+use axum::body::Body;
 use axum::http::StatusCode;
 use axum::response::Response;
 use serde_json::Value;
 use tracing::error;
-use axum::body::Body;
 
 use crate::proxy::handlers::common::{
     apply_retry_strategy, should_rotate_account, FailureStatusTracker, RequestRetryState,

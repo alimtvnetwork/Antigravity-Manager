@@ -1,7 +1,7 @@
 use super::*;
+use crate::modules::supabase_sync::config_a::get_config_path;
 use crate::proxy::hermes_sync::detect::get_backup_path;
 use crate::proxy::hermes_sync::detect::normalize_base_url;
-use crate::modules::supabase_sync::config_a::get_config_path;
 use crate::proxy::openclaw_sync::PROVIDER_ID;
 
 pub fn is_managed_provider(provider: &str) -> bool {
@@ -125,7 +125,10 @@ pub fn apply_sync_losslessly(
     Ok(render_doc(&doc, source))
 }
 
-pub fn apply_clear_losslessly(source: &str, backup: Option<&str>) -> Result<(String, bool), String> {
+pub fn apply_clear_losslessly(
+    source: &str,
+    backup: Option<&str>,
+) -> Result<(String, bool), String> {
     let mut doc = parse_doc(source)?;
     let backup_doc = backup.map(parse_doc).transpose()?;
     let mut changed = false;
@@ -249,7 +252,9 @@ pub fn redact_sensitive_source(source: &str) -> Result<String, String> {
     Ok(render_doc(&doc, source))
 }
 
-pub fn read_provider_entry(doc: &YamlDoc) -> Option<(Option<String>, Option<String>, Option<String>)> {
+pub fn read_provider_entry(
+    doc: &YamlDoc,
+) -> Option<(Option<String>, Option<String>, Option<String>)> {
     let provider = format!("/providers/{PROVIDER_ID}");
     is_mapping_at(doc, &provider).then_some((
         scalar_at(doc, &format!("{provider}/api"))

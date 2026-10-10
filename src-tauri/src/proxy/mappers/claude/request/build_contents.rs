@@ -3,11 +3,11 @@
 // 对应 transformClaudeRequestIn
 
 use super::super::models::*;
+use crate::proxy::mappers::common_utils::request::is_model_compatible;
 use crate::proxy::mappers::signature_store::get_thought_signature; // Deprecated, kept for fallback
 use crate::proxy::session_manager::SessionManager;
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use crate::proxy::mappers::common_utils::request::is_model_compatible;
 
 use super::build_parts::{
     build_google_content, empty_tool_result_fallback, inject_missing_tool_results,
