@@ -11,20 +11,20 @@ use serde_json::{json, Value};
 /// 流式状态机
 
 pub struct StreamingState {
-    block_type: BlockType,
+    pub(crate) block_type: BlockType,
     pub block_index: usize,
     pub message_start_sent: bool,
     pub message_stop_sent: bool,
-    used_tool: bool,
-    signatures: SignatureManager,
-    trailing_signature: Option<String>,
+    pub(crate) used_tool: bool,
+    pub(crate) signatures: SignatureManager,
+    pub(crate) trailing_signature: Option<String>,
     pub web_search_query: Option<String>,
     pub grounding_chunks: Option<Vec<serde_json::Value>>,
     // [IMPROVED] Error recovery 状态追踪 (prepared for future use)
     #[allow(dead_code)]
-    parse_error_count: usize,
+    pub(crate) parse_error_count: usize,
     #[allow(dead_code)]
-    last_valid_state: Option<BlockType>,
+    pub(crate) last_valid_state: Option<BlockType>,
     // [NEW] Model tracking for signature cache
     pub model_name: Option<String>,
     // [NEW v3.3.17] Session ID for session-based signature caching

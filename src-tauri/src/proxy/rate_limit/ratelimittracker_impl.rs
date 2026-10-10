@@ -299,7 +299,7 @@ impl RateLimitTracker {
     }
 
     /// 解析限流原因类型
-    fn parse_rate_limit_reason(&self, body: &str) -> RateLimitReason {
+    pub(crate) fn parse_rate_limit_reason(&self, body: &str) -> RateLimitReason {
         // 尝试从 JSON 中提取 reason 字段
         let trimmed = body.trim();
         if trimmed.starts_with('{') || trimmed.starts_with('[') {
@@ -363,7 +363,7 @@ impl RateLimitTracker {
     }
 
     /// 从错误消息 body 中解析重置时间
-    fn parse_retry_time_from_body(&self, body: &str) -> Option<u64> {
+    pub(crate) fn parse_retry_time_from_body(&self, body: &str) -> Option<u64> {
         crate::proxy::upstream::retry::parse_retry_delay(body, None)
             .map(|delay_ms| delay_ms.saturating_add(999) / 1000)
     }

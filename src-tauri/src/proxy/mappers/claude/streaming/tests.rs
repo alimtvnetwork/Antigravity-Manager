@@ -1,7 +1,7 @@
 // Streaming tests (split from streaming.rs).
 // Test-only module, declared #[cfg(test)] in mod.rs.
 use super::{PartProcessor, SignatureManager, StreamingState};
-use crate::proxy::mappers::claude::models::GeminiPart;
+use crate::proxy::mappers::claude::models::{FunctionCall, GeminiPart};
 use serde_json::json;
 
 #[test]

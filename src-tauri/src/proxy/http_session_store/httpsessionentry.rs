@@ -16,16 +16,16 @@ pub struct HttpSessionEntry {
 
 #[derive(Debug)]
 pub(crate) struct SessionNode {
-    parent: Option<Arc<SessionNode>>,
-    input_delta: Vec<Value>,
-    response_output: Vec<Value>,
-    instructions: String,
-    model: String,
-    routing_session_id: String,
+    pub(crate) parent: Option<Arc<SessionNode>>,
+    pub(crate) input_delta: Vec<Value>,
+    pub(crate) response_output: Vec<Value>,
+    pub(crate) instructions: String,
+    pub(crate) model: String,
+    pub(crate) routing_session_id: String,
 }
 
 #[derive(Debug, Clone)]
-pub struct SessionParent(Arc<SessionNode>);
+pub struct SessionParent(pub(crate) Arc<SessionNode>);
 
 impl SessionParent {
     pub fn routing_session_id(&self) -> &str {
@@ -34,22 +34,22 @@ impl SessionParent {
 }
 
 pub(crate) struct StoredSession {
-    node: Arc<SessionNode>,
-    last_accessed: Instant,
+    pub(crate) node: Arc<SessionNode>,
+    pub(crate) last_accessed: Instant,
 }
 
 pub(crate) struct HttpSessionStore {
-    sessions: HashMap<String, StoredSession>,
+    pub(crate) sessions: HashMap<String, StoredSession>,
 }
 
 impl HttpSessionStore {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             sessions: HashMap::new(),
         }
     }
 
-    fn get(&mut self, response_id: &str) -> Option<(HttpSessionEntry, SessionParent)> {
+    pub(crate) fn get(&mut self, response_id: &str) -> Option<(HttpSessionEntry, SessionParent)> {
         let stored = self.sessions.get_mut(response_id)?;
         stored.last_accessed = Instant::now();
         let node = stored.node.clone();
@@ -64,7 +64,7 @@ impl HttpSessionStore {
         ))
     }
 
-    fn insert(&mut self, response_id: String, entry: HttpSessionEntry) {
+    pub(crate) fn insert(&mut self, response_id: String, entry: HttpSessionEntry) {
         self.insert_delta(
             response_id,
             None,
@@ -76,7 +76,7 @@ impl HttpSessionStore {
         );
     }
 
-    fn insert_delta(
+    pub(crate) fn insert_delta(
         &mut self,
         response_id: String,
         parent: Option<SessionParent>,
@@ -105,7 +105,7 @@ impl HttpSessionStore {
         self.evict_expired();
     }
 
-    fn evict_expired(&mut self) {
+    pub(crate) fn evict_expired(&mut self) {
         let ttl = Duration::from_secs(SESSION_TTL_SECS);
         self.sessions
             .retain(|_, stored| stored.last_accessed.elapsed() < ttl);

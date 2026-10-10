@@ -2,7 +2,7 @@ use super::*;
 
 impl ProxyPoolManager {
     /// Build rquest::Proxy configuration
-    fn build_proxy_config(&self, entry: &ProxyEntry) -> Result<PoolProxyConfig, String> {
+    pub(crate) fn build_proxy_config(&self, entry: &ProxyEntry) -> Result<PoolProxyConfig, String> {
         let raw_url = crate::proxy::config::normalize_proxy_url(&entry.url);
 
         // Parse URL and extract embedded username and password if present

@@ -2,7 +2,7 @@ use super::*;
 
 impl UpstreamClient {
     /// Build v1internal URL
-    fn build_url(base_url: &str, method: &str, query_string: Option<&str>) -> String {
+    pub(crate) fn build_url(base_url: &str, method: &str, query_string: Option<&str>) -> String {
         if let Some(qs) = query_string {
             format!("{}:{}?{}", base_url, method, qs)
         } else {
@@ -11,7 +11,7 @@ impl UpstreamClient {
     }
 
     /// Determine if we should try next endpoint (fallback logic)
-    fn should_try_next_endpoint(status: StatusCode) -> bool {
+    pub(crate) fn should_try_next_endpoint(status: StatusCode) -> bool {
         status == StatusCode::REQUEST_TIMEOUT
             || status == StatusCode::NOT_FOUND
             || status.is_server_error()

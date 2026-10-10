@@ -20,8 +20,11 @@ mod proxy; // Proxy service module
 
 pub mod utils;
 
+#[path = "lib/appruntimeflags.rs"]
 mod appruntimeflags;
+#[path = "lib/run.rs"]
 mod run;
+#[path = "lib/setup_app.rs"]
 mod setup_app;
 
 pub(crate) use appruntimeflags::configure_linux_graphics;

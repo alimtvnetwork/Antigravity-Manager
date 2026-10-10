@@ -26,16 +26,16 @@ pub struct PoolProxyConfig {
 
 /// Proxy pool manager
 pub struct ProxyPoolManager {
-    config: Arc<RwLock<ProxyPoolConfig>>,
+    pub(crate) config: Arc<RwLock<ProxyPoolConfig>>,
 
     /// Proxy usage count (proxy_id -> count)
-    usage_counter: Arc<DashMap<String, usize>>,
+    pub(crate) usage_counter: Arc<DashMap<String, usize>>,
 
     /// Account-to-proxy binding (account_id -> proxy_id)
-    account_bindings: Arc<DashMap<String, String>>,
+    pub(crate) account_bindings: Arc<DashMap<String, String>>,
 
     /// Round-robin index (for RoundRobin strategy)
-    round_robin_index: Arc<AtomicUsize>,
+    pub(crate) round_robin_index: Arc<AtomicUsize>,
 }
 
 impl ProxyPoolManager {

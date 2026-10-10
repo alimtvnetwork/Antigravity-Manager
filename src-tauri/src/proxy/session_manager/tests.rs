@@ -1,7 +1,7 @@
 use super::*;
 
 #[cfg(test)]
-pub(crate) mod tests {
+mod tests {
     use super::*;
     use crate::proxy::mappers::claude::models::{Message, SystemPrompt, Tool};
 

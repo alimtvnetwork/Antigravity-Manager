@@ -162,7 +162,9 @@ pub(crate) struct UpstreamCapture {
 #[derive(Clone, Default)]
 pub struct UpstreamRequestBodyHolder(pub std::sync::Arc<std::sync::Mutex<UpstreamCapture>>);
 
-pub static CURRENT_UPSTREAM_CAPTURE: UpstreamRequestBodyHolder;
+tokio::task_local! {
+    pub static CURRENT_UPSTREAM_CAPTURE: UpstreamRequestBodyHolder;
+}
 
 impl UpstreamRequestBodyHolder {
     pub fn new() -> Self {
@@ -251,5 +253,5 @@ pub struct ProxyMonitor {
     pub max_logs: usize,
     pub enabled: Arc<AtomicBool>,
     pub capture_health_logs: Arc<AtomicBool>,
-    app_handle: Option<tauri::AppHandle>,
+    pub(crate) app_handle: Option<tauri::AppHandle>,
 }

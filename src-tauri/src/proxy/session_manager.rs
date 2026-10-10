@@ -7,4 +7,4 @@ mod sanitize_user_text_for_fingerprint;
 mod tests;
 
 pub use sanitize_user_text_for_fingerprint::sanitize_user_text_for_fingerprint;
-pub(crate) use tests::tests;
+pub use sanitize_user_text_for_fingerprint::SessionManager;
