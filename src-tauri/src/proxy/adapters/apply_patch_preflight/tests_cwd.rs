@@ -12,16 +12,6 @@ fn tmp_file(name: &str, content: &str) -> (tempfile::TempDir, String) {
     (dir, name.to_owned())
 }
 
-use serde_json::json;
-
-fn tmp_file(name: &str, content: &str) -> (tempfile::TempDir, String) {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join(name);
-    let mut f = std::fs::File::create(&path).unwrap();
-    f.write_all(content.as_bytes()).unwrap();
-    (dir, name.to_owned())
-}
-
 #[test]
 fn extract_cwd_from_env_block() {
     let req = json!({
