@@ -1,12 +1,12 @@
 // Request transform entry points (split from request.rs).
 // OpenAI → Gemini 请求转换
-use super::models::*;
+use super::super::models::*;
 use crate::proxy::model_specs;
 use crate::proxy::token_manager::ProxyToken;
 
 use serde_json::{json, Value};
 
-use super::request_v2::transform_openai_request_with_session;
+use super::session::transform_openai_request_with_session;
 
 pub fn transform_openai_request(
     request: &OpenAIRequest,

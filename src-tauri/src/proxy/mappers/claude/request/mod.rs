@@ -30,7 +30,7 @@ pub(crate) const CLAUDE_CODE_CLI_IDENTITY: &str =
 
 pub use build_config::clean_thinking_fields_recursive;
 pub use messages::{clean_cache_control_from_messages, merge_consecutive_messages};
-pub use safety::{build_safety_settings, SafetyThreshold};
+pub(crate) use safety::{build_safety_settings, SafetyThreshold};
 pub use transform::{
     transform_claude_request_in, transform_claude_request_in_timed, TransformTiming,
 };

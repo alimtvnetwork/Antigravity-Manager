@@ -4,7 +4,8 @@ use super::types::remap_function_call_args;
 use super::types::BlockType;
 use crate::proxy::mappers::claude::models::*;
 use bytes::Bytes;
-use serde_json::Value;
+use serde_json::{json, Value};
+use super::PartProcessor;
 
 impl<'a> PartProcessor<'a> {
     // -------------------------------------------------------------------------

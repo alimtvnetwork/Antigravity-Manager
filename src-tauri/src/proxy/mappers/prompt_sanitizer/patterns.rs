@@ -1,9 +1,6 @@
 // Regex / identity patterns (split from prompt_sanitizer.rs)
 use once_cell::sync::Lazy;
 use regex::Regex;
-
-use once_cell::sync::Lazy;
-use regex::Regex;
 use serde_json::Value;
 
 /// Code block protection regex: isolates multiline fenced blocks ```...``` and inline code `...`

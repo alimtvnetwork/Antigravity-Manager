@@ -35,4 +35,5 @@ pub use sync_openclaw_provider::get_openclaw_sync_status;
 pub use sync_openclaw_provider::read_openclaw_config_content;
 pub use sync_openclaw_provider::restore_openclaw_config;
 pub use sync_openclaw_provider::sync_openclaw_provider;
+#[cfg(test)]
 pub(crate) use sync_openclaw_provider::tests;

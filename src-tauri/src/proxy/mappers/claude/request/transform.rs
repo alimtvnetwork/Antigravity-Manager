@@ -2,7 +2,7 @@
 // Claude 请求转换 (Claude → Gemini v1internal)
 // 对应 transformClaudeRequestIn
 
-use super::models::*;
+use super::super::models::*;
 use crate::proxy::mappers::signature_store::get_thought_signature; // Deprecated, kept for fallback
 use crate::proxy::session_manager::SessionManager;
 use serde_json::{json, Value};
@@ -17,6 +17,7 @@ use super::messages::{
 use super::safety::build_safety_settings;
 use super::thinking::{model_supports_thinking, should_enable_thinking_by_default};
 
+#[derive(Default)]
 pub struct TransformTiming {
     pub think_fill_micros: u64,
 }

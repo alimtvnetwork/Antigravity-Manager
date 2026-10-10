@@ -22,4 +22,3 @@ pub use modelspec::resolve_gemini_3x_flash_tiered;
 pub use modelspec::ModelSpec;
 pub(crate) use modelspec::SpecsConfig;
 pub use resolve_custom_budget::resolve_custom_budget;
-pub(crate) use tests::tests;

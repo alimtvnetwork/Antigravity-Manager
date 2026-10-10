@@ -2,7 +2,7 @@
 // Claude 请求转换 (Claude → Gemini v1internal)
 // 对应 transformClaudeRequestIn
 
-use super::models::*;
+use super::super::models::*;
 use crate::proxy::mappers::signature_store::get_thought_signature; // Deprecated, kept for fallback
 use crate::proxy::session_manager::SessionManager;
 use serde_json::{json, Value};
@@ -22,7 +22,6 @@ fn normalize_claude_client_identity(text: &str) -> &str {
 
 /// Safety threshold levels for Gemini API
 /// Can be configured via GEMINI_SAFETY_THRESHOLD environment variable
-#[derive(Debug, Clone, Copy, PartialEq)]
 
 /// 清理消息中的 cache_control 字段
 ///

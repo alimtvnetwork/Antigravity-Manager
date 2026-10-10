@@ -9,7 +9,7 @@ mod tests_a;
 #[cfg(test)]
 mod tests_b;
 mod thinking;
-mod types;
+pub(crate) mod types;
 
 pub use align::*;
 pub use normalize::*;

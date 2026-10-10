@@ -1,4 +1,5 @@
 // V2 thinking phase (split from wrapper.rs).
+use serde_json::json;
 
 pub(crate) fn phase_thinking(
     inner_request: &mut serde_json::Value,

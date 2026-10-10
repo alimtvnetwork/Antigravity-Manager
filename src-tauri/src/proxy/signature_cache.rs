@@ -8,4 +8,3 @@ mod tests;
 pub(crate) use cacheentry::CacheEntry;
 pub(crate) use cacheentry::SessionSignatureEntry;
 pub use cacheentry::SignatureCache;
-pub(crate) use tests::tests;

@@ -2,7 +2,7 @@
 // Claude 请求转换 (Claude → Gemini v1internal)
 // 对应 transformClaudeRequestIn
 
-use super::models::*;
+use super::super::models::*;
 use crate::proxy::mappers::signature_store::get_thought_signature; // Deprecated, kept for fallback
 use crate::proxy::session_manager::SessionManager;
 use serde_json::{json, Value};

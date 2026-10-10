@@ -26,4 +26,3 @@ pub(crate) use storedtoolartifact::ArtifactStoreInner;
 pub use storedtoolartifact::StoredToolArtifact;
 pub use storedtoolartifact::ToolArtifactRecord;
 pub use storedtoolartifact::ToolArtifactStore;
-pub(crate) use tests::tests;

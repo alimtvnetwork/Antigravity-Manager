@@ -16,4 +16,5 @@ pub use get_global_proxy_pool::get_global_proxy_pool;
 pub use get_global_proxy_pool::init_global_proxy_pool;
 pub use get_global_proxy_pool::PoolProxyConfig;
 pub use get_global_proxy_pool::ProxyPoolManager;
+#[cfg(test)]
 pub(crate) use proxypoolmanager_impl::tests;

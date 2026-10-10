@@ -24,7 +24,6 @@ use std::sync::{Mutex, OnceLock};
 use serde_json::Value;
 
 /// 一条 pre-flight 处理记录(给诊断页 / 日志)。
-#[derive(Debug, Clone, PartialEq)]
 
 /// [MOC-263 P0] 在 `file[floor..]` 里找从 `anchors[0]` 起、能**唯一**匹配的最长连续块。
 /// 锚点用「忽略尾随空格」比较(段内字节漂移留给后续 repair_hunk 对齐)。返回 `(块长 = 匹配的锚点数,

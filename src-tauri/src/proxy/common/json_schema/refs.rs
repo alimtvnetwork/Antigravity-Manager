@@ -2,7 +2,7 @@
 use serde_json::Value;
 
 /// [NEW] 合并 allOf 数组中的所有子 Schema
-fn merge_all_of(map: &mut serde_json::Map<String, Value>) {
+pub(crate) fn merge_all_of(map: &mut serde_json::Map<String, Value>) {
     if let Some(Value::Array(all_of)) = map.remove("allOf") {
         let mut merged_properties = serde_json::Map::new();
         let mut merged_required = std::collections::HashSet::new();
@@ -98,7 +98,7 @@ fn score_schema_option(val: &Value) -> i32 {
 }
 
 /// 从 anyOf/oneOf 联合类型数组中选取最佳非 null Schema 分支
-fn extract_best_schema_from_union(union_array: &[Value]) -> Option<Value> {
+pub(crate) fn extract_best_schema_from_union(union_array: &[Value]) -> Option<Value> {
     let mut best_option: Option<&Value> = None;
     let mut best_score = -1;
 

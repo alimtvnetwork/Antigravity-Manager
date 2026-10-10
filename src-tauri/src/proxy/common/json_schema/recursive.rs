@@ -3,7 +3,7 @@ use super::refs::{extract_best_schema_from_union, merge_all_of};
 use super::MAX_RECURSION_DEPTH;
 use serde_json::{json, Value};
 
-fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, depth: usize) -> bool {
+pub fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, depth: usize) -> bool {
     if depth > MAX_RECURSION_DEPTH {
         debug_assert!(
             false,

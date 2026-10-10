@@ -5,8 +5,6 @@
 use serde_json::{json, Value};
 
 /// Request configuration after grounding resolution
-#[derive(Debug, Clone)]
-
 pub fn parse_image_config(model_name: &str) -> (Value, String) {
     parse_image_config_with_params(model_name, None, None, None)
 }
@@ -148,7 +146,7 @@ fn image_size_from_quality(quality: &str) -> Option<&'static str> {
 
 /// Helper function to clean image model names by removing resolution/aspect-ratio suffixes.
 /// E.g., "gemini-3.1-flash-image-16x9-4k" -> "gemini-3.1-flash-image"
-fn clean_image_model_name(model_name: &str) -> String {
+pub(crate) fn clean_image_model_name(model_name: &str) -> String {
     let mut clean_name = model_name.to_lowercase();
 
     // Ordered list of known suffixes to strip

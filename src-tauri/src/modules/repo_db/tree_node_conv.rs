@@ -1,6 +1,6 @@
 //! Repo DB: tree conversation node builders
 
-use super::liveness::parse_flexible_timestamp;
+use super::dispatch::parse_flexible_timestamp;
 use super::models::{ActivePrompt, AgmConversationNode, RunningProject};
 use super::project_queries::normalize_path_for_compare;
 use super::sequences::{

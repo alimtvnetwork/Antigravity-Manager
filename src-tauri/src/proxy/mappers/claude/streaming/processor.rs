@@ -3,7 +3,7 @@ use super::state::StreamingState;
 use super::types::BlockType;
 use crate::proxy::mappers::claude::models::*;
 use bytes::Bytes;
-use serde_json::Value;
+use serde_json::{json, Value};
 
 /// Part 处理器
 pub struct PartProcessor<'a> {

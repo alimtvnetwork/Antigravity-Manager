@@ -162,7 +162,9 @@ pub(crate) struct UpstreamCapture {
 #[derive(Clone, Default)]
 pub struct UpstreamRequestBodyHolder(pub std::sync::Arc<std::sync::Mutex<UpstreamCapture>>);
 
-pub static CURRENT_UPSTREAM_CAPTURE: UpstreamRequestBodyHolder;
+tokio::task_local! {
+    pub static CURRENT_UPSTREAM_CAPTURE: UpstreamRequestBodyHolder;
+}
 
 impl UpstreamRequestBodyHolder {
     pub fn new() -> Self {

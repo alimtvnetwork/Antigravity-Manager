@@ -23,7 +23,6 @@ use std::sync::{Mutex, OnceLock};
 use serde_json::Value;
 
 /// 一条 pre-flight 处理记录(给诊断页 / 日志)。
-#[derive(Debug, Clone, PartialEq)]
 
 pub(crate) fn read_patch_file(
     relpath: &str,
