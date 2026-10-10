@@ -22,7 +22,7 @@ async fn health() -> impl IntoResponse {
 }
 
 /// GET /accounts - Get all accounts
-async fn list_accounts() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+pub(crate) async fn list_accounts() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
     let accounts = account::list_accounts().map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -71,7 +71,7 @@ async fn list_accounts() -> Result<impl IntoResponse, (StatusCode, Json<ErrorRes
 }
 
 /// GET /accounts/current - Get current account
-async fn get_current_account() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+pub(crate) async fn get_current_account() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
     let current = account::get_current_account().map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -230,7 +230,7 @@ async fn bind_device(
 }
 
 /// GET /logs - Get proxy logs
-async fn get_logs(
+pub(crate) async fn get_logs(
     Query(params): Query<LogsRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
     let limit = if params.limit == 0 { 50 } else { params.limit };
