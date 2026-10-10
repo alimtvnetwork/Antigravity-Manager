@@ -1442,36 +1442,23 @@ pub fn restart_instance(instance_id: &str) -> AppResult<InstanceStatus> {
         .find(|i| i.id == resolved_id)
         .cloned()
         .ok_or_else(|| AppError::Config(format!("Instance '{}' not found", resolved_id)))?;
-    let is_default = config.is_default || resolved_id == "default";
 
     // 0. The bound/selected account's token is refreshed by the async command
     //    wrapper BEFORE this runs (see commands::instance::restart_instance),
     //    so the reopened IDE comes up with the same account on fresh credentials.
     //    (A sync fn must not block_on inside the Tokio runtime.)
 
-    // 1. Force-close the IDE. A close failure is a hard error now — the old
-    //    code swallowed it via record_ignored and relaunched into a broken state.
-    stop_instance(&resolved_id).map_err(AppError::Unknown)?;
-
-    // 2. Drop the stale smart-PID cache entry so launch cannot mistake the
-    //    dead process for a live one.
-    invalidate_instance_process_cache(&resolved_id);
-
-    // 3. VERIFY the process tree is actually gone before touching credentials.
-    let start_wait = std::time::Instant::now();
-    let max_wait = std::time::Duration::from_millis(5000);
-    loop {
-        let pids = find_pids_for_data_dir(&config.data_dir, is_default);
-        if pids.is_empty() {
-            break;
-        }
-        if start_wait.elapsed() >= max_wait {
-            return Err(AppError::Process(format!(
-                "Instance '{}' did not terminate (PIDs {:?} still alive); refusing to relaunch into a broken state",
-                resolved_id, pids
-            )));
-        }
-        std::thread::sleep(std::time::Duration::from_millis(100));
+    // 1-2. Force-close the IDE and VERIFY the process tree is actually gone
+    //    before touching credentials. close_instance_verified retries once
+    //    for stragglers; if orphans still survive it logs a warning and lets
+    //    the relaunch proceed instead of bricking the restart.
+    let closed = close_instance_verified(&resolved_id, std::time::Duration::from_millis(5000))
+        .map_err(AppError::Unknown)?;
+    if !closed {
+        crate::modules::logger::log_warn(&format!(
+            "[Instance] Restart of '{}' proceeding with surviving processes; relaunch will replace the session",
+            resolved_id
+        ));
     }
 
     // 4. Invalidate prompt tree cache so running status reflects fresh state
@@ -5089,6 +5076,72 @@ pub fn other_instance_protection(except_id: &str) -> (Vec<u32>, Vec<String>) {
     (pids, markers)
 }
 
+/// Close an instance's IDE processes and VERIFY they actually died.
+///
+/// Runs `close_instance`, then polls the OS process table until no PIDs
+/// remain for the instance's data dir (or the timeout expires). If stragglers
+/// survive the first pass, one more force-close is attempted before giving up.
+///
+/// Returns `Ok(true)` when the process tree is confirmed dead, `Ok(false)`
+/// when PIDs survived both passes. A `false` is NOT an error: on some systems
+/// (notably Windows) orphaned Electron child processes can outlive the
+/// platform kill, and bricking the user's switch/restart over them is worse
+/// than proceeding — the relaunch path removes stale lockfiles and re-injects
+/// credentials anyway. Survivors are logged as warnings so they stay visible.
+pub fn close_instance_verified(
+    instance_id: &str,
+    timeout: std::time::Duration,
+) -> Result<bool, String> {
+    let registry = load_registry()?;
+    let config = registry
+        .instances
+        .iter()
+        .find(|i| i.id == instance_id)
+        .ok_or_else(|| format!("Instance {} not found", instance_id))?;
+    let data_dir = config.data_dir.clone();
+    let is_default = config.is_default || instance_id == "default";
+
+    let live_pids = || {
+        find_pids_for_data_dir(&data_dir, is_default)
+            .into_iter()
+            .filter(|&pid| is_pid_alive_targeted(pid))
+            .collect::<Vec<u32>>()
+    };
+
+    for attempt in 0..2 {
+        // close_instance only errors on registry/instance problems (both
+        // validated above); the kill itself is best-effort per pass and the
+        // verification poll below is what decides success.
+        close_instance(instance_id)?;
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            let remaining = live_pids();
+            if remaining.is_empty() {
+                invalidate_instance_process_cache(instance_id);
+                return Ok(true);
+            }
+            if std::time::Instant::now() >= deadline {
+                if attempt == 0 {
+                    crate::modules::logger::log_warn(&format!(
+                        "[Instance] PIDs {:?} for instance '{}' survived close; retrying force-close once",
+                        remaining, instance_id
+                    ));
+                }
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(200));
+        }
+    }
+
+    let remaining = live_pids();
+    crate::modules::logger::log_warn(&format!(
+        "[Instance] PIDs {:?} for instance '{}' survived verified close; proceeding anyway — relaunch will replace the session",
+        remaining, instance_id
+    ));
+    invalidate_instance_process_cache(instance_id);
+    Ok(false)
+}
+
 /// Close only the process associated with this instance
 pub fn close_instance(instance_id: &str) -> Result<(), String> {
     let registry = load_registry()?;
@@ -5862,7 +5915,10 @@ pub async fn switch_account_to_instance(
             );
         }
 
-        crate::modules::db::inject_token(
+        // Retry the primary token injection: the dying IDE may still hold the
+        // SQLite lock on state.vscdb for a moment after the kill. A single
+        // attempt here used to fail the entire switch ("not working at all").
+        let mut inject_result = crate::modules::db::inject_token(
             &db_path,
             &acc.token.access_token,
             &acc.token.refresh_token,
@@ -5873,7 +5929,31 @@ pub async fn switch_account_to_instance(
             acc.token.id_token.as_deref(),
             acc.token.oauth_client_key.as_deref(),
             None,
-        )?;
+        );
+        for retry in 1..=3 {
+            if inject_result.is_ok() {
+                break;
+            }
+            crate::modules::logger::log_warn(&format!(
+                "[INSTANCE_SWITCH] Token injection attempt {} failed ({}); retrying after lock release",
+                retry,
+                inject_result.as_ref().err().map(|e| e.as_str()).unwrap_or("unknown"),
+            ));
+            std::thread::sleep(std::time::Duration::from_millis(400));
+            inject_result = crate::modules::db::inject_token(
+                &db_path,
+                &acc.token.access_token,
+                &acc.token.refresh_token,
+                acc.token.expiry_timestamp,
+                &acc.email,
+                acc.token.is_gcp_tos,
+                acc.token.project_id.as_deref(),
+                acc.token.id_token.as_deref(),
+                acc.token.oauth_client_key.as_deref(),
+                None,
+            );
+        }
+        inject_result?;
 
         if let Some(ref profile) = acc.device_profile {
             // Justification: device-identity bookkeeping; the existing identity persists if this fails
@@ -6121,6 +6201,9 @@ pub async fn switch_account_to_instance(
     //    prevents the exiting process from overwriting our newly injected credentials.
     //    The close is VERIFIED here: injecting credentials while the old IDE is still alive is
     //    the fast-forward/restart reliability bug (the exiting process overwrites state.vscdb).
+    //    close_instance_verified retries once for stragglers; surviving orphans only
+    //    produce a warning — the switch must not brick over them.
+    //    Snapshot the pre-kill PID set for the audit trail first.
     let pids_to_kill = find_pids_for_data_dir(&instance.data_dir, is_default_inst);
     crate::modules::logger::log_info(&format!(
         "[INSTANCE_SWITCH:STAGE_2_TERMINATE] Terminating {} PIDs for instance '{}': {:?}",
@@ -6128,29 +6211,18 @@ pub async fn switch_account_to_instance(
         instance.id,
         pids_to_kill
     ));
-    close_instance(&instance.id).map_err(|e| {
-        format!(
-            "Failed to close instance '{}' before account switch: {}",
-            instance.id, e
-        )
-    })?;
-    invalidate_instance_process_cache(&instance.id);
-    {
-        let start_wait = std::time::Instant::now();
-        let max_wait = std::time::Duration::from_millis(5000);
-        loop {
-            let remaining = find_pids_for_data_dir(&instance.data_dir, is_default_inst);
-            if remaining.is_empty() {
-                break;
-            }
-            if start_wait.elapsed() >= max_wait {
-                return Err(format!(
-                    "Instance '{}' did not terminate (PIDs {:?} still alive); refusing to inject credentials into a live process",
-                    instance.id, remaining
-                ));
-            }
-            std::thread::sleep(std::time::Duration::from_millis(100));
-        }
+    let closed = close_instance_verified(&instance.id, std::time::Duration::from_millis(5000))
+        .map_err(|e| {
+            format!(
+                "Failed to close instance '{}' before account switch: {}",
+                instance.id, e
+            )
+        })?;
+    if !closed {
+        crate::modules::logger::log_warn(&format!(
+            "[INSTANCE_SWITCH] Instance '{}' closed with surviving processes; continuing with credential injection",
+            instance.id
+        ));
     }
 
     // 3. [Step 3/5] Inject credentials into target instance's state.vscdb & storage.json (and OS keyring) AFTER process exit

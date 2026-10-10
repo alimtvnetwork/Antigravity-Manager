@@ -48,6 +48,7 @@ import {
     sendPromptNow,
 } from '../../services/instanceService';
 import { cn } from '../../utils/cn';
+import { copyToClipboard } from '../../utils/clipboard';
 import { useErrorStore } from '../../stores/error-store';
 
 export interface AgmConversationNode {
@@ -1763,9 +1764,16 @@ export default function PromptTreeViewModal({
                 console.warn('sendPromptNow error', sendErr);
             }
 
-            // 2. Copy prompt content to clipboard so user can paste immediately (manual fallback)
+            // 2. Copy prompt content to clipboard so user can paste immediately (manual fallback).
+            // Use the robust helper: navigator.clipboard.writeText throws
+            // NotAllowedError when the document is not focused (e.g. the IDE
+            // window stole focus during dispatch) — the execCommand fallback
+            // covers that case instead of just logging a warning.
             try {
-                await navigator.clipboard.writeText(promptContent);
+                const copied = await copyToClipboard(promptContent);
+                if (!copied) {
+                    throw new Error('clipboard copy returned false');
+                }
             } catch (clipErr) {
                 // Tracked in the error module; send dispatch already attempted above, user pastes manually if needed.
                 useErrorStore.getState().trackWarning(clipErr, {

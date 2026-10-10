@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.182.0)
+> Professional AI Account Management & Protocol Proxy System (v4.183.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.182.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.183.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,6 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
+> Latest version **v4.183.0**: Switch/fast-forward reliability hardening — new `close_instance_verified` kills, polls the OS process table and retries stragglers instead of bricking on surviving orphan PIDs; credential injection now retries over the dying IDE's SQLite-lock release window; fast-forward errors are captured into the Error Manager for diagnostics. Also fixed the clipboard `Document is not focused` warnings in the prompt send flow via the shared copy helper with execCommand fallback. (Thanks to @aukgit)
 > Latest version **v4.182.0**: Restart & fast-forward reliability fix — restart now hard-closes the IDE, verifies the kill, refreshes the bound account token and relaunches with the same account; fast-forward verifies the close before credential injection. Best-account tier multipliers are now configurable (Ultra ×4, Pro ×2, Free ×1 defaults) via a new Settings → Algorithm section; scoring spec updated; Remote Fleet section verified with tests. (Thanks to @aukgit)
 > Latest version **v4.181.0**: Quota UI compaction with stronger progress bars; Tauri window ACL fix for `set_decorations`/`set_background_color`; Supabase connectivity diagnostics with honest `Unreachable` badge; Settings General tab redesign (segmented Theme pill, Launch-at-Startup toggle); Send/Queue silent no-op hardening; Windows instance executable staleness refresh on base updates; navbar segmented capsule with a pinned Check-for-Updates section. (Thanks to @aukgit)
 > Latest version **v4.180.0**: Release pipeline completion — re-ran the v4.179.0 macOS universal artifact upload after a transient GitHub artifact-service timeout so the release carries the full asset set; CI green across all platforms. No code changes. (Thanks to @aukgit)

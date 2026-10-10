@@ -335,7 +335,18 @@ export async function restartInstance(instanceId: string): Promise<InstanceStatu
 }
 
 export async function fastForwardInstance(instanceId: string): Promise<string> {
-    return await invoke('fast_forward_instance', { instanceId });
+    try {
+        return await invoke('fast_forward_instance', { instanceId });
+    } catch (e: any) {
+        const captured = useErrorStore.getState().captureError(e, {
+            source: 'instanceService.fastForwardInstance',
+            endpoint: 'fast_forward_instance',
+            triggerAction: 'fast_forward_instance',
+            context: { instanceId },
+        });
+        useErrorStore.getState().openErrorModal(captured);
+        throw e;
+    }
 }
 
 export async function cleanAndRestartWorkspace(): Promise<string> {
