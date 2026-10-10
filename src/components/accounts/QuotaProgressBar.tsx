@@ -16,6 +16,8 @@ export interface QuotaProgressBarProps {
     showCheckpoints?: boolean;
     Icon?: React.ComponentType<{ size?: number; className?: string }>;
     liveLimit?: any;
+    /** Compact density mode for dense tables (thinner bar, smaller markers/labels). Defaults to false. */
+    compact?: boolean;
 }
 
 /**
@@ -39,7 +41,8 @@ export function QuotaProgressBar({
     isWeekly = false,
     isWeeklyConstrained = false,
     className,
-    heightClassName = "h-3",
+    compact = false,
+    heightClassName = compact ? "h-2" : "h-3",
     checkpoints = [100, 75, 50, 25, 0],
     showCheckpoints = true,
     Icon,
@@ -66,7 +69,7 @@ export function QuotaProgressBar({
     const sortedCheckpoints = [...activeCheckpoints].sort((a, b) => b - a);
 
     return (
-        <div className={cn("w-[82%] max-w-[82%] flex items-center gap-2", className)}>
+        <div className={cn("w-[82%] max-w-[82%] flex items-center", compact ? "gap-1.5" : "gap-2", className)}>
             {/* Optional Icon / Label on Left */}
             {(Icon || label) && (
                 <div className="flex items-center gap-1 shrink-0 max-w-[18%] min-w-0 text-slate-700 dark:text-slate-300">
@@ -120,7 +123,8 @@ export function QuotaProgressBar({
                         <div
                             key={cp}
                             className={cn(
-                                "absolute top-1/2 w-3.5 h-3.5 rounded-full flex items-center justify-center transition-all duration-300 z-10 pointer-events-none border-[1.5px]",
+                                "absolute top-1/2 rounded-full flex items-center justify-center transition-all duration-300 z-10 pointer-events-none border-[1.5px]",
+                                compact ? "w-2.5 h-2.5" : "w-3.5 h-3.5",
                                 isFilled
                                     ? (cp >= 50
                                         // Restrained glow only at the current endpoint in the healthy range
@@ -137,12 +141,12 @@ export function QuotaProgressBar({
                         >
                             {isFilled ? (
                                 isCritical && cp <= 25 ? (
-                                    <span className="text-[7.5px] font-black font-mono text-white leading-none tracking-tighter select-none">
+                                    <span className={cn("font-black font-mono text-white leading-none tracking-tighter select-none", compact ? "text-[6px]" : "text-[7.5px]")}>
                                         {Math.round(clamped)}%
                                     </span>
                                 ) : (
                                     <svg
-                                        className="w-2 h-2 fill-none stroke-current text-white stroke-[2.5]"
+                                        className={cn("fill-none stroke-current text-white stroke-[2.5]", compact ? "w-1.5 h-1.5" : "w-2 h-2")}
                                         viewBox="0 0 12 12"
                                         strokeLinecap="round"
                                         strokeLinejoin="round"
@@ -159,16 +163,17 @@ export function QuotaProgressBar({
             </div>
 
             {/* Single Column for Remaining Time and Percentage */}
-            <div className="flex flex-col items-end shrink-0 leading-tight w-[18%] max-w-[18%]">
+            <div className={cn("flex flex-col items-end shrink-0 w-[18%] max-w-[18%]", compact ? "leading-none" : "leading-tight")}>
                 {resetTime ? (
                     <span
                         className={cn(
-                            "text-[10px] font-bold flex items-center gap-0.5 font-mono",
+                            "font-bold flex items-center gap-0.5 font-mono",
+                            compact ? "text-[9px]" : "text-[10px]",
                             getTimeColorClass(resetTime)
                         )}
                         title={`Resets in ${formatTimeRemaining(resetTime)}`}
                     >
-                        <Clock className="w-2.5 h-2.5 shrink-0" />
+                        <Clock className={cn("shrink-0", compact ? "w-2 h-2" : "w-2.5 h-2.5")} />
                         {formatTimeRemaining(resetTime)}
                     </span>
                 ) : null}
@@ -176,7 +181,7 @@ export function QuotaProgressBar({
                 <div className="flex items-center gap-1 justify-end">
                     {isProtected && (
                         <span title="Quota protected">
-                            <Lock className="w-2.5 h-2.5 text-amber-500" />
+                            <Lock className={cn("text-amber-500", compact ? "w-2 h-2" : "w-2.5 h-2.5")} />
                         </span>
                     )}
 
@@ -189,7 +194,8 @@ export function QuotaProgressBar({
                     {/* Enlarge 30% and 50% weekly quota typography and badges */}
                     {isWeekly && (clamped === 50 || clamped === 30) ? (
                         <span className={cn(
-                            "text-[11px] font-black font-mono px-1 py-[0.5px] rounded border shadow-2xs",
+                            "font-black font-mono px-1 py-[0.5px] rounded border shadow-2xs",
+                            compact ? "text-[10px]" : "text-[11px]",
                             clamped === 50
                                 ? "bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700/60"
                                 : "bg-rose-100 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-700/60"
@@ -197,7 +203,7 @@ export function QuotaProgressBar({
                             {clamped}%
                         </span>
                     ) : (
-                        <span className={cn("text-[10px] font-black font-mono", getPercentColorClass(clamped))}>
+                        <span className={cn("font-black font-mono", compact ? "text-[9px]" : "text-[10px]", getPercentColorClass(clamped))}>
                             {clamped}%
                         </span>
                     )}

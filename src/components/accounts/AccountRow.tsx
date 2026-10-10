@@ -84,7 +84,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* 邮箱 */}
-            <td className="px-4 py-1">
+            <td className="px-4 py-0.5">
                 <div className="flex items-center gap-3">
                     <span className={cn(
                         "font-medium text-sm truncate max-w-[180px] xl:max-w-none transition-colors",
@@ -144,7 +144,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* 4H 模型配额 */}
-            <td className="px-2.5 py-1 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#15334d]">
+            <td className="px-2.5 py-0.5 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#15334d]">
                 {account.quota?.is_forbidden ? (
                     <div className="flex items-center gap-1.5 text-[10px] text-rose-600 dark:text-rose-400 bg-rose-500/10 p-1 rounded-[5px] border border-rose-400/20">
                         <Ban className="w-3 h-3 shrink-0" />
@@ -152,6 +152,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                     </div>
                 ) : (
                     <QuotaProgressBar
+                        compact
                         percentage={geminiProModel?.percentage ?? geminiFlashModel?.percentage ?? 0}
                         resetTime={geminiProModel?.reset_time ?? geminiFlashModel?.reset_time}
                         Icon={Gemini.Color}
@@ -160,11 +161,12 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* Weekly 配额 */}
-            <td className="px-2.5 py-1 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#15334d]">
+            <td className="px-2.5 py-0.5 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#15334d]">
                 {account.quota?.is_forbidden ? (
                     <span className="text-[10px] text-gray-400 italic">--</span>
                 ) : (
                     <QuotaProgressBar
+                        compact
                         isWeekly
                         percentage={(() => {
                             const groups = account.quota?.quota_groups || [];
@@ -203,7 +205,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* 操作 */}
-            <td className="px-4 py-1">
+            <td className="px-4 py-0.5">
                 <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
                     {/* 1. Refresh button (first) */}
                     <button

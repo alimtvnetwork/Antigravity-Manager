@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.179.0 (2026-10-10)**:
+        -   **Accounts Table Compact Density Pass**:
+            -   **Description**: Tightened the Accounts table density — row cell padding reduced (`py-1` → `py-0.5` on quota cells and header), `QuotaProgressBar` gained a `compact` mode (bar `h-3` → `h-2`, checkpoint markers `w-3.5` → `w-2.5` with proportionally smaller check glyphs, tighter gaps, smaller time/percentage labels) applied to the accounts table only; other views using the bar are untouched. Gradient, checkpoint positions, and behavior unchanged. (Thanks to @aukgit)
+
     *   **v4.178.0 (2026-10-10)**:
         -   **CI Fix: Duplicate Cargo.lock Version Entry Removed & Bump Script Hardened**:
             -   **Description**: Fixed `src-tauri/Cargo.lock` TOML parse failure — the `agm-alim` package entry carried two `version` lines (`4.177.0` + stale `4.175.0`), which broke cargo metadata parsing and failed all Rust CI/Release jobs. Removed the stale line and hardened `scripts/bump-version.mjs` so its Cargo.lock replacement collapses any run of duplicate version lines into exactly one instead of preserving them. (Thanks to @aukgit)

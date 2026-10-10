@@ -652,7 +652,7 @@ function AccountRowContent({
             </td>
 
             {/* 4H 模型配额列 */}
-            <td className="px-2.5 py-1 align-middle min-w-[210px] bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#15334d] border-b border-slate-200/90 dark:border-slate-800/90">
+            <td className="px-2.5 py-0.5 align-middle min-w-[210px] bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#15334d] border-b border-slate-200/90 dark:border-slate-800/90">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <div className={cn(
                         "flex items-center justify-center gap-1.5 py-0.5 px-2 rounded-md border group/error",
@@ -683,6 +683,7 @@ function AccountRowContent({
                     </div>
                 ) : (
                     <QuotaProgressBar
+                        compact
                         percentage={fourHourModel?.percentage ?? 0}
                         resetTime={fourHourModel?.resetTime}
                         isProtected={fourHourModel?.isProtected}
@@ -692,11 +693,12 @@ function AccountRowContent({
             </td>
 
             {/* Weekly 配额列 */}
-            <td className="px-2.5 py-1 align-middle min-w-[210px] bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#15334d] border-b border-slate-200/90 dark:border-slate-800/90">
+            <td className="px-2.5 py-0.5 align-middle min-w-[210px] bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#15334d] border-b border-slate-200/90 dark:border-slate-800/90">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <span className="text-[10px] text-gray-400 italic">--</span>
                 ) : (
                     <QuotaProgressBar
+                        compact
                         isWeekly
                         percentage={weeklyCell.percentage}
                         resetTime={weeklyCell.resetTime}
@@ -1068,10 +1070,10 @@ function AccountTable({
                 <table className="w-full">
                     <thead>
                         <tr className="border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/90 dark:bg-[#061220]">
-                            <th className="pl-2 py-1 text-left w-7">
+                            <th className="pl-2 py-0.5 text-left w-7">
                                 <span className="sr-only">{t('accounts.drag_to_reorder')}</span>
                             </th>
-                            <th className="px-1.5 py-1 text-left w-8">
+                            <th className="px-1.5 py-0.5 text-left w-8">
                                 <input
                                     type="checkbox"
                                     className="checkbox checkbox-xs rounded border-2 border-gray-400 dark:border-gray-500 checked:border-blue-600 checked:bg-blue-600 [--chkbg:theme(colors.blue.600)] [--chkfg:white]"
@@ -1079,9 +1081,9 @@ function AccountTable({
                                     onChange={onToggleAll}
                                 />
                             </th>
-                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[260px] whitespace-nowrap">{t('accounts.table.email')}</th>
+                            <th className="px-2 py-0.5 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[260px] whitespace-nowrap">{t('accounts.table.email')}</th>
                             {/* Column 1: 4H Quota with Gemini Icon and Model Toggle */}
-                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[220px] whitespace-nowrap bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#15334d]">
+                            <th className="px-2 py-0.5 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[220px] whitespace-nowrap bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#15334d]">
                                 <div className="flex items-center justify-between gap-1 w-full">
                                     <button
                                         type="button"
@@ -1134,7 +1136,7 @@ function AccountTable({
                             </th>
 
                             {/* Column 2: Weekly Quota Column */}
-                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[220px] whitespace-nowrap bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#15334d]">
+                            <th className="px-2 py-0.5 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[220px] whitespace-nowrap bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#15334d]">
                                 <div className="flex items-center gap-1.5">
                                     <Clock className="w-3.5 h-3.5 text-gray-400" />
                                     <span>{t('accounts.table.weekly_quota', 'Weekly Quota')}</span>
@@ -1142,7 +1144,7 @@ function AccountTable({
                             </th>
 
                             {/* Column 3: Reclaimed Whitespace for Date Column (Shrink to 95px) */}
-                            <th className="px-2 py-1 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[95px] whitespace-nowrap">
+                            <th className="px-2 py-0.5 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[95px] whitespace-nowrap">
                                 <button
                                     type="button"
                                     onClick={() => handleSortToggle('last_used')}
@@ -1160,7 +1162,7 @@ function AccountTable({
                                     )}
                                 </button>
                             </th>
-                            <th className="px-2 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap sticky right-0 w-[220px] xl:w-[280px] bg-slate-50/90 dark:bg-slate-900/90 z-20 shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center">{t('accounts.table.actions')}</th>
+                            <th className="px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap sticky right-0 w-[220px] xl:w-[280px] bg-slate-50/90 dark:bg-slate-900/90 z-20 shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center">{t('accounts.table.actions')}</th>
                         </tr>
                     </thead>
                     <SortableContext items={accountIds} strategy={verticalListSortingStrategy}>
