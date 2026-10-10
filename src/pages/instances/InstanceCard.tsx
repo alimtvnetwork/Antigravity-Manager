@@ -7,26 +7,15 @@ import {
     Mail,
     Folder,
     Cpu,
-    Layers,
-    SlidersHorizontal,
-    History,
-    MoreHorizontal,
-    KeyRound,
-    Square,
-    RotateCcw,
-    Play,
-    ArrowRightLeft,
-    FastForward,
     ArrowLeftRight,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
-import { Gemini } from '../../components/common/icons';
-import { TierBadge } from '../../components/accounts/TierBadge';
+import { Gemini } from '@lobehub/icons';
+import { TierBadge } from '../../components/common/TierBadge';
 import { QuotaProgressBar } from '../../components/accounts/QuotaProgressBar';
 import { SELECTED_CARD_CLASSES, ACTIVE_PILL_CLASSES } from '../../components/common/selectedState';
 import { showToast } from '../../components/common/ToastContainer';
 import type { InstanceStatus } from '../../services/instanceService';
-import type { AgmProjectTreeNode } from '../../components/instances/PromptTreeViewModal';
 import { truncatePath, getActionLabel, type InstanceTheme } from './instancePageUtils';
 import { useInstanceCardData } from './instanceCardData';
 import type { InstancePageApi } from './instancePageTypes';
@@ -49,8 +38,6 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
         actionState,
         runningTreeNodes,
         deletingId,
-        syncingInstanceIds,
-        cardMoreId,
         activeCardRef,
         setActiveInstance,
         setDefaultInstance,
@@ -58,18 +45,8 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
         setEditTargetId,
         setEditInstanceName,
         openCopyDialog,
+        openPromptTree,
         handleDelete,
-        handleLaunch,
-        handleStop,
-        handleRestart,
-        handleFastForward,
-        handleSync,
-        handleCloneExecutable,
-        handleWipeSession,
-        setPromptTreeInstance,
-        openSettingsDialog,
-        openAuditDialog,
-        setCardMoreId,
         refreshQuota,
     } = api;
 

@@ -1,20 +1,10 @@
-import React from 'react';
-import {
-  AlertCircle,
-  AlertTriangle,
-  Info,
-  Copy,
-  Check,
-  Terminal,
-  Layers,
-  Wrench,
-  Bot,
-} from 'lucide-react';
-import type { CapturedError } from '../../../stores/error-store';
+import React, { useState } from 'react';
+import { Wrench } from 'lucide-react';
+import type { CapturedError, ErrorModalTab } from '../../../stores/error-store';
 import { getSuggestedFixes } from '../../../lib/error-report-generator';
-import { cn } from '../../../utils/cn';
+import { ItemCopyButton } from './chrome';
 
-function OverviewTab({
+export function OverviewTab({
   error,
   onSelectTab,
 }: {
@@ -120,7 +110,7 @@ function OverviewTab({
   );
 }
 
-function BackendTab({ error }: { error: CapturedError }): React.ReactNode {
+export function BackendTab({ error }: { error: CapturedError }): React.ReactNode {
   const backendMsg = error.envelopeErrors?.BackendMessage || error.backendStackTrace || error.details || error.message;
   let backendStack: string[] = [];
   if (error.envelopeErrors?.Backend && error.envelopeErrors.Backend.length > 0) {
@@ -177,7 +167,7 @@ function BackendTab({ error }: { error: CapturedError }): React.ReactNode {
   );
 }
 
-function StackTab({ error }: { error: CapturedError }): React.ReactNode {
+export function StackTab({ error }: { error: CapturedError }): React.ReactNode {
   const frames = error.parsedFrames || [];
   const hasFrames = frames.length > 0;
   const [showRaw, setShowRaw] = useState(frames.length === 0);
@@ -236,7 +226,7 @@ function StackTab({ error }: { error: CapturedError }): React.ReactNode {
   );
 }
 
-function ContextTab({ error }: { error: CapturedError }): React.ReactNode {
+export function ContextTab({ error }: { error: CapturedError }): React.ReactNode {
   const json = JSON.stringify(
     {
       context: error.context,

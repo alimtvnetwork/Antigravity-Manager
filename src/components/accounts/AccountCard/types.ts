@@ -43,7 +43,7 @@ export interface WeeklyItem {
     id: string;
     label: string;
     percentage: number;
-    resetTime: number | undefined;
+    resetTime: string | undefined;
     cycleTokens: number | undefined;
     Icon: ComponentType;
 }

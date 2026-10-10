@@ -1,12 +1,13 @@
 import { SupabaseSyncState } from './useSupabaseSyncState';
+import { useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { showToast } from '../common/ToastContainer';
-import { useErrorStore } from '../../stores/error-store';
-import { supabaseService } from '../../services/supabaseService';
-import { telegramService } from '../../services/telegramService';
+import { showToast } from '../../common/ToastContainer';
+import { useErrorStore } from '../../../stores/error-store';
+import { supabaseService, SupabaseConfig, SupabaseEndpoint } from '../../../services/supabaseService';
+import { telegramService } from '../../../services/telegramService';
 
 export function useSupabaseSyncHandlers(s: SupabaseSyncState) {
-    const { config, setConfig, nodeInfo, setNodeInfo, isLoading, setIsLoading, setIsSaving, setTestingEndpointId, setTestResults, setVerifyingEndpointId, setTableVerification, setIsAutoDiscovering, setIsAddModalOpen, setIsSchemaModalOpen, setSchemaRole, setSchemaSql, setIsExportModalOpen, setExportContent, setExportFormat, exportRounds, setIsImportModalOpen, importText, setImportText, setIsMigrateModalOpen, sourceEpId, setSourceEpId, targetEpId, setTargetEpId, setIsMigrating, setMigrationResult, telegramConfig, setTelegramConfig, setTelegramStatus, setIsTestingTelegram, setTelegramBotUsername, setIsSavingTelegram, setIsSendingPing, leases, setLeases, setIsLoadingLeases, formEndpoint, setFormEndpoint } = s;
+    const { config, setConfig, nodeInfo, setNodeInfo, setIsLoading, setIsSaving, setTestingEndpointId, setTestResults, setVerifyingEndpointId, setTableVerification, setIsAutoDiscovering, setIsAddModalOpen, setIsSchemaModalOpen, setSchemaRole, setSchemaSql, setIsExportModalOpen, setExportContent, setExportFormat, exportRounds, setIsImportModalOpen, importText, setImportText, setIsMigrateModalOpen, sourceEpId, setSourceEpId, targetEpId, setTargetEpId, setIsMigrating, setMigrationResult, telegramConfig, setTelegramConfig, setTelegramStatus, setIsTestingTelegram, setTelegramBotUsername, setIsSavingTelegram, setIsSendingPing, setLeases, setIsLoadingLeases, formEndpoint, setFormEndpoint } = s;
 
     const fetchLeases = async () => {
         setIsLoadingLeases(true);
@@ -52,6 +53,10 @@ export function useSupabaseSyncHandlers(s: SupabaseSyncState) {
             setIsLoading(false);
         }
     };
+
+    useEffect(() => {
+        loadData();
+    }, []);
 
     const handleSaveConfig = async (newConfig: SupabaseConfig) => {
         setIsSaving(true);
@@ -386,32 +391,22 @@ Here are my Supabase details:
 
     return {
         fetchLeases,
-        loadedLeases,
         loadData,
         handleSaveConfig,
         normalizeSupabaseUrl,
         handleTestEndpoint,
-        res,
         handleCheckTables,
         handleAutoDiscover,
-        updatedConfig,
         handleOpenMigrateModal,
         handleMigrateSubmit,
         handleSaveTelegram,
-        st,
         handleTestTelegram,
-        username,
-        detected,
-        updated,
         handleDetectTelegramChatId,
         handleSendTelegramPing,
         handleOpenSchemaModal,
-        sql,
         handleOpenExport,
-        text,
         handleImportSubmit,
         handleAddEndpointSubmit,
-        cleanUrl,
         handleDeleteEndpoint,
         aiInstructionTemplate,
     };

@@ -1,5 +1,5 @@
-import { ModalDialog } from '../../components/common/ModalDialog';
-import InstanceSettingsModal from '../../components/instances/InstanceSettingsModal';
+import ModalDialog from '../../components/common/ModalDialog';
+import { InstanceSettingsModal } from '../../components/instances/InstanceSettingsModal';
 import PromptTreeViewModal from '../../components/instances/PromptTreeViewModal';
 import InstanceAuditTrailModal from '../../components/instances/InstanceAuditTrailModal';
 import type { InstancePageApi } from './instancePageTypes';

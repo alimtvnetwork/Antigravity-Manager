@@ -1,10 +1,11 @@
+import type { TFunction } from 'i18next';
 import type { InstanceStatus } from '../../../services/instanceService';
 
 export type CreateMode = 'clone-default' | 'new';
 export type CloneMode = 'full' | 'profile';
 
 export interface InstanceSelectorApi {
-    t: (key: string, fallback?: string) => string;
+    t: TFunction;
     instances: InstanceStatus[];
     activeInstance?: InstanceStatus;
     activeInstanceId?: string | null;

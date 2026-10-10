@@ -1,12 +1,12 @@
 import { SettingsPageApi } from '../useSettingsPage';
 import { startTransition } from 'react';
-import { Save, User, LayoutDashboard, Users, Network, Activity, BarChart3, Settings as SettingsIcon, Lock, CheckCircle2, Menu } from 'lucide-react';
-import { request as invoke } from '../utils/request';
-import { showToast } from '../components/common/ToastContainer';
-import { isTauri } from '../utils/env';
+import { LayoutDashboard, Users, Network, Activity, BarChart3, Settings as SettingsIcon, Lock, CheckCircle2 } from 'lucide-react';
+import { request as invoke } from '../../../utils/request';
+import { showToast } from '../../../components/common/ToastContainer';
+import { isTauri } from '../../../utils/env';
 
 export function GeneralTab(props: SettingsPageApi) {
-    const { t, i18n, saveConfig, updateLanguage, updateTheme, enable, formData, setFormData, path, saveUpdateSettingsHelper } = props;
+    const { t, i18n, saveConfig, updateLanguage, updateTheme, formData, setFormData, saveUpdateSettingsHelper } = props;
 
     return (
                         <div className="space-y-4">

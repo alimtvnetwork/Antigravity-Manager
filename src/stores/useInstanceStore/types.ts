@@ -3,9 +3,10 @@ import type {
     InstanceStatus,
     AutoProfileSwitcherConfig,
     AutoSwitcherStatus,
+    AutoResumeResult,
 } from '../../services/instanceService';
 
-interface InstanceState {
+export interface InstanceState {
     instances: InstanceStatus[];
     activeInstanceId: string;
     switcherStatus: AutoSwitcherStatus | null;
@@ -44,7 +45,7 @@ interface InstanceState {
         skippedProjectsCount?: number;
     }>;
     cleanAndRestartWorkspace: () => Promise<string>;
-    resumeRecentProjectPrompts: (instanceId?: string) => Promise<instanceService.AutoResumeResult>;
+    resumeRecentProjectPrompts: (instanceId?: string) => Promise<AutoResumeResult>;
     syncInstance: (instanceId: string) => Promise<void>;
     syncAllInstances: () => Promise<void>;
 }

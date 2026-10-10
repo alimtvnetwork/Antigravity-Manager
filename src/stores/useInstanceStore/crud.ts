@@ -1,25 +1,17 @@
 import * as instanceService from '../../services/instanceService';
-import * as accountService from '../../services/accountService';
 import { useErrorStore } from '../error-store';
-import { useConfigStore } from '../useConfigStore';
-import { showToast } from '../../components/common/ToastContainer';
-import type { Account } from '../../types/account';
-import type {
-    InstanceConfig,
-    InstanceStatus,
-    AutoProfileSwitcherConfig,
-    AutoSwitcherStatus,
-} from '../../services/instanceService';
 import type { InstanceState } from './types';
 import { instanceSelectionEpoch } from './shared';
 
 type SetState = (p: Partial<InstanceState> | ((s: InstanceState) => Partial<InstanceState>)) => void;
 type GetState = () => InstanceState;
 
-export function createCrudSlice(set: SetState, get: GetState): Partial<InstanceState> {
+export function createCrudSlice(set: SetState, get: GetState): Pick<InstanceState,
+    'fetchInstances' | 'createInstance' | 'copyInstance' | 'renameInstance' |
+    'deleteInstance' | 'wipeSession' | 'exportInstancesJson' | 'importInstancesJson'> {
     return {
     fetchInstances: async (silent: boolean = false) => {
-        const epochAtStart = instanceSelectionEpoch;
+        const epochAtStart = instanceSelectionEpoch.value;
         if (!silent) {
             set({ isLoading: true, error: null });
         }
@@ -28,7 +20,7 @@ export function createCrudSlice(set: SetState, get: GetState): Partial<InstanceS
                 instanceService.listInstances(),
                 instanceService.getActiveInstance(),
             ]);
-            if (epochAtStart !== instanceSelectionEpoch) {
+            if (epochAtStart !== instanceSelectionEpoch.value) {
                 set({ instances, isLoading: false });
                 return;
             }

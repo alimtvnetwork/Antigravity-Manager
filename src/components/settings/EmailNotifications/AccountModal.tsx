@@ -1,9 +1,10 @@
 import { EmailNotificationsApi } from './useEmailNotifications';
-import ModalDialog from '../common/ModalDialog';
-import { showToast } from '../common/ToastContainer';
+import ModalDialog from '../../common/ModalDialog';
+import { AlertCircle, CheckCircle2, Copy, FileCode, FileJson, FileText, Key, Loader2, RefreshCw, Send, Sparkles, Upload } from 'lucide-react';
+import { showToast } from '../../common/ToastContainer';
 
 export function AccountModal(props: EmailNotificationsApi) {
-    const { settings, isAccountModalOpen, setIsAccountModalOpen, editingAccount, setEditingAccount, isModalQuickImportOpen, setIsModalQuickImportOpen, modalQuickImportText, setModalQuickImportText, showAiJsonSyntax, setShowAiJsonSyntax, singleAccountFileInputRef, isTestingDirect, testResult, handleEmailChange, domain, handleTestDirectConnection, handleSaveAccount, handleExportSingleAccount, handleQuickImportSingle, target, handleSingleFileUpload, file, text } = props;
+    const { isAccountModalOpen, setIsAccountModalOpen, editingAccount, setEditingAccount, isModalQuickImportOpen, setIsModalQuickImportOpen, modalQuickImportText, setModalQuickImportText, showAiJsonSyntax, setShowAiJsonSyntax, singleAccountFileInputRef, isTestingDirect, testResult, handleEmailChange, handleTestDirectConnection, handleSaveAccount, handleExportSingleAccount, handleQuickImportSingle, handleSingleFileUpload, emailFormatStatus, testResultStatus } = props;
 
     return (
         <>

@@ -1,8 +1,9 @@
 import { EmailNotificationsApi } from './useEmailNotifications';
-import { showToast } from '../common/ToastContainer';
+import { showToast } from '../../common/ToastContainer';
+import { CheckCircle2, Copy, Eye, EyeOff, Loader2, MessageSquare, RefreshCw, Send, Sparkles, Terminal } from 'lucide-react';
 
 export function TelegramSection(props: EmailNotificationsApi) {
-    const { accounts, telegramConfig, setTelegramConfig, telegramStatus, isTestingTelegram, isDetectingChatId, isSavingTelegram, isSendingTelegramPing, telegramBotUsername, showBotToken, setShowBotToken, handleSaveTelegram, handleTestTelegram, handleDetectTelegramChatId, handleSendTelegramPing, parsed, target, text } = props;
+    const { telegramConfig, setTelegramConfig, telegramStatus, isTestingTelegram, isDetectingChatId, isSavingTelegram, isSendingTelegramPing, telegramBotUsername, showBotToken, setShowBotToken, handleSaveTelegram, handleTestTelegram, handleDetectTelegramChatId, handleSendTelegramPing } = props;
 
     return (
             <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100 dark:border-slate-800">

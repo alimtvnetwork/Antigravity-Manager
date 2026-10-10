@@ -27,7 +27,7 @@ export function usePayloadContent({
         if (viewMode === 'concise') {
             const trimmed = concisePayload ? concisePayload.trim() : '';
             if (trimmed && trimmed !== '{}') {
-                return concisePayload;
+                return concisePayload ?? '';
             }
             return rawPayload || '';
         }

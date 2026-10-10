@@ -2,7 +2,7 @@ import { BudgetSectionProps } from "./BudgetSectionProps";
 import { Check, Save } from "lucide-react";
 
 export function SaveBar(props: BudgetSectionProps) {
-    const { t, currentConfig, onChange, inputValues, setInputValues, handleInputChange, getPresetTooltip, controlSource, thinkingStoreEnabled, onThinkingStoreChange, thinkingMaxMemoryTurns, onThinkingMaxMemoryTurnsChange, thinkingRetentionDays, onThinkingRetentionDaysChange, isSaving, isSaved, handleSave, onSave, showClaudeAdvanced, setShowClaudeAdvanced, isClearingThinking, showClearThinkingConfirm, setShowClearThinkingConfirm, handleClearThinkingStore } = props;
+    const { t, isSaving, isSaved, handleSave, onSave } = props;
 
     return (
         <>

@@ -1,5 +1,7 @@
-import { showToast } from '../common/ToastContainer';
+import { showToast } from '../../common/ToastContainer';
 import { EmailNotificationsState } from './useEmailCore';
+import { telegramService } from '../../../services/telegramService';
+import { saveEmailSettings } from '../../../services/emailService';
 
 export function useTelegramHandlers(s: EmailNotificationsState) {
     const { settings, setIsSaving, telegramConfig, setTelegramConfig, setTelegramStatus, setIsTestingTelegram, setIsDetectingChatId, setIsSavingTelegram, setIsSendingTelegramPing, setTelegramBotUsername } = s;
@@ -96,11 +98,8 @@ export function useTelegramHandlers(s: EmailNotificationsState) {
 
     return {
         handleSaveTelegram,
-        st,
         handleTestTelegram,
-        username,
         handleDetectTelegramChatId,
-        res,
         handleSendTelegramPing,
         handleSaveSettings,
     };

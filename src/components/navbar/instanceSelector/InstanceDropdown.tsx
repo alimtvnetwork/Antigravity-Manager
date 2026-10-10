@@ -16,7 +16,6 @@ import {
 import { useAccountStore } from '../../../stores/useAccountStore';
 import { cn } from '../../../utils/cn';
 import { SELECTED_ROW_CLASSES } from '../../common/selectedState';
-import { showToast } from '../../common/ToastContainer';
 import type { InstanceSelectorApi } from './useInstanceSelector';
 
 export function InstanceDropdown({ api }: { api: InstanceSelectorApi }) {
@@ -24,31 +23,21 @@ export function InstanceDropdown({ api }: { api: InstanceSelectorApi }) {
         t,
         instances,
         activeInstance,
-        activeInstanceId,
         isOpen,
         setIsOpen,
         searchQuery,
         setSearchQuery,
         isIoOpen,
         setIsIoOpen,
-        activeItemRef,
         filteredInstances,
         launchingId,
-        isRotating,
         handleToggleLaunch,
-        handleSmartRotate,
         handleSmartPlay,
-        handleSetDefault,
         handleExportProfiles,
         handleImportProfiles,
         openCreate,
         openCopy,
-        openEdit,
-        openDelete,
     } = api;
-
-    const accounts = useAccountStore((state) => state.accounts);
-    const currentAccount = useAccountStore((state) => state.currentAccount);
 
     if (!isOpen) return null;
 
@@ -217,20 +206,12 @@ function InstanceDropdownItem({ api, instId }: { api: InstanceSelectorApi; instI
         openDelete,
     } = api;
 
-    const accounts = useAccountStore((state) => state.accounts);
-    const currentAccount = useAccountStore((state) => state.currentAccount);
-
     const inst = instances.find((i) => i.config.id === instId);
     if (!inst) return null;
 
     const isSelected = inst.config.id === activeInstanceId;
     const isDefault = Boolean(inst.config.is_default);
     const isRunning = Boolean(inst.is_running);
-    const linkedAccount = accounts.find(
-        (a) => a.id === inst.config.bound_account_id || (inst.config.bound_email && a.email === inst.config.bound_email)
-    );
-    const displayEmail =
-        inst.config.bound_email || linkedAccount?.email || (isSelected ? currentAccount?.email : undefined);
     const seqNum = instances.findIndex((i) => i.config.id === inst.config.id) + 1;
 
     return (

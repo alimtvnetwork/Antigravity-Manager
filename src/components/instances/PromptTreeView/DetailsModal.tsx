@@ -1,4 +1,4 @@
-import { X, Copy, Check, FileText } from 'lucide-react';
+import { X, FileText } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import type { AgmConversationNode, AgmProjectTreeNode } from './types';
 import { copyToClipboard } from '../../../utils/clipboard';
@@ -11,6 +11,7 @@ export interface DetailsModalProps {
     selectedProject: AgmProjectTreeNode | null;
     copiedField: string | null;
     setCopiedField: (v: string | null) => void;
+    instanceId: string;
 }
 
 export function DetailsModal(props: DetailsModalProps) {
@@ -18,6 +19,7 @@ export function DetailsModal(props: DetailsModalProps) {
         isOpen, onClose,
         selectedConversation, selectedProject,
         copiedField, setCopiedField,
+        instanceId,
     } = props;
     if (!isOpen) return null;
 

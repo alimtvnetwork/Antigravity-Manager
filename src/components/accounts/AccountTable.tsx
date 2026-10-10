@@ -3,7 +3,6 @@
  * 支持拖拽排序功能，用户可以通过拖拽行来调整账号顺序
  */
 import { useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
     DndContext,
@@ -12,18 +11,21 @@ import {
     PointerSensor,
     useSensor,
     useSensors,
+    DragOverlay,
 } from '@dnd-kit/core';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import {
     arrayMove,
     SortableContext,
+    sortableKeyboardCoordinates,
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, Clock, GripVertical } from 'lucide-react';
 import { cn } from '../../utils/cn';
-import { Gemini, Claude } from '@lobehub/icons';
+import { Gemini } from '@lobehub/icons';
 import type { Account } from '../../types/account';
 import { SortableAccountRow } from './AccountTable/SortableAccountRow';
+import { AccountRowContent } from './AccountTable/AccountRowContent';
 import { extractAccountResetTime, type AccountTableProps } from './AccountTable/types';
 
 export type { AccountTableProps } from './AccountTable/types';

@@ -1,8 +1,10 @@
 import { BudgetSectionProps } from "./BudgetSectionProps";
+import { Trans } from "react-i18next";
+import { CONCURRENCY_GUIDE_PRESETS } from "./budgetTypes";
 import { HardDrive, HelpCircle, Layers, Trash2 } from "lucide-react";
 
 export function MemorySection(props: BudgetSectionProps) {
-    const { t, currentConfig, onChange, inputValues, setInputValues, handleInputChange, getPresetTooltip, controlSource, thinkingStoreEnabled, onThinkingStoreChange, thinkingMaxMemoryTurns, onThinkingMaxMemoryTurnsChange, thinkingRetentionDays, onThinkingRetentionDaysChange, isSaving, isSaved, handleSave, onSave, showClaudeAdvanced, setShowClaudeAdvanced, isClearingThinking, showClearThinkingConfirm, setShowClearThinkingConfirm, handleClearThinkingStore } = props;
+    const { t, thinkingMaxMemoryTurns, onThinkingMaxMemoryTurnsChange, thinkingRetentionDays, onThinkingRetentionDaysChange, isClearingThinking, setShowClearThinkingConfirm } = props;
 
     return (
         <>

@@ -1,7 +1,8 @@
 import { EmailNotificationsApi } from './useEmailNotifications';
+import { Loader2, Play, Send, SlidersHorizontal, Terminal, Trash2 } from 'lucide-react';
 
 export function RecipientsSection(props: EmailNotificationsApi) {
-    const { recipients, settings, setSettings, developerTaskType, developerTargetRecipient, setDeveloperTargetRecipient, developerTaskPayload, setDeveloperTaskPayload, developerCustomSubject, setDeveloperCustomSubject, isDispatchingTask, newRecipientEmail, setNewRecipientEmail, newRecipientGroup, setNewRecipientGroup, domain, handleAddRecipient, handleDeleteRecipient, target, text, handleTaskTypeChange, handleDispatchDeveloperTask, handleSaveRecipientsIntervals } = props;
+    const { recipients, settings, setSettings, developerTaskType, developerTargetRecipient, setDeveloperTargetRecipient, developerTaskPayload, setDeveloperTaskPayload, developerCustomSubject, setDeveloperCustomSubject, isDispatchingTask, newRecipientEmail, setNewRecipientEmail, newRecipientGroup, setNewRecipientGroup, handleAddRecipient, handleDeleteRecipient, handleTaskTypeChange, handleDispatchDeveloperTask, handleSaveRecipientsIntervals } = props;
 
     return (
             <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100 dark:border-slate-800 space-y-6">

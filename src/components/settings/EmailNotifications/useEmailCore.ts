@@ -1,5 +1,20 @@
-import { showToast } from '../common/ToastContainer';
-import { useErrorStore } from '../../stores/error-store';
+import React, { useState, useEffect } from 'react';
+import { showToast } from '../../common/ToastContainer';
+import { useErrorStore } from '../../../stores/error-store';
+import {
+    EmailAccount,
+    EmailAccountInput,
+    NotifyRecipient,
+    EmailNotificationSettings as ISettings,
+    listEmailAccounts,
+    listNotifyRecipients,
+    getEmailSettings,
+} from '../../../services/emailService';
+import {
+    telegramService,
+    TelegramConfig,
+    TelegramWatcherStatus,
+} from '../../../services/telegramService';
 
 export function useEmailCore() {
     const [accounts, setAccounts] = useState<EmailAccount[]>([]);
@@ -257,7 +272,6 @@ ANTIGRAVITY-MANAGER EMAIL COMMAND MANUAL & SYNTAX GUIDE
         showAiJsonSyntax,
         setShowAiJsonSyntax,
         singleAccountFileInputRef,
-        handleClickOutside,
         loadAll,
         isTestingDirect,
         setIsTestingDirect,

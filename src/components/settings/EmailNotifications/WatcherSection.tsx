@@ -1,7 +1,8 @@
 import { EmailNotificationsApi } from './useEmailNotifications';
+import { Loader2, Send, Sparkles, Zap } from 'lucide-react';
 
 export function WatcherSection(props: EmailNotificationsApi) {
-    const { settings, setSettings, isSaving, isPinging, handleSaveSettings, target, text, handleTriggerManualCheck, handleDispatchPingTest } = props;
+    const { settings, setSettings, isSaving, isPinging, handleSaveSettings, handleTriggerManualCheck, handleDispatchPingTest } = props;
 
     return (
             <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100 dark:border-slate-800 space-y-4">

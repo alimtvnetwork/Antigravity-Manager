@@ -2,16 +2,8 @@ import { ArrowRightLeft, Search, RotateCw } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { showToast } from '../../components/common/ToastContainer';
 import { findQuotaModel } from '../../config/modelConfig';
+import type { Account } from '../../types/account';
 import type { InstancePageApi } from './instancePageTypes';
-
-interface SwitchAccount {
-    id: string;
-    email: string;
-    quota?: {
-        models?: unknown[];
-        subscription_tier?: string;
-    };
-}
 
 export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
     const {
@@ -35,13 +27,13 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
         setAccountSearchQuery('');
     };
 
-    const filtered = (accounts as SwitchAccount[]).filter((a) => {
+    const filtered = accounts.filter((a) => {
         const q = accountSearchQuery.toLowerCase().trim();
         if (!q) return true;
         return a.email.toLowerCase().includes(q) || a.id.toLowerCase().includes(q);
     });
 
-    const handleSelect = async (acc: SwitchAccount) => {
+    const handleSelect = async (acc: Account) => {
         const targetId = switchTargetInstance.config.id;
         setActionState((prev) => ({ ...prev, [targetId]: 'switch' }));
         setActionError(null);
@@ -103,8 +95,8 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                 switchTargetInstance.config.bound_account_id === acc.id ||
                                 (switchTargetInstance.config.bound_email &&
                                     switchTargetInstance.config.bound_email.toLowerCase() === acc.email.toLowerCase());
-                            const proModel = findQuotaModel(acc.quota?.models, 'gemini-pro') as { percentage: number } | null;
-                            const flashModel = findQuotaModel(acc.quota?.models, 'gemini-flash') as { percentage: number } | null;
+                            const proModel = findQuotaModel(acc.quota?.models, 'gemini-pro');
+                            const flashModel = findQuotaModel(acc.quota?.models, 'gemini-flash');
                             const model = proModel || flashModel;
                             const pct = model ? Math.min(100, Math.max(0, model.percentage)) : 0;
                             const tier = (acc.quota?.subscription_tier || 'FREE').toUpperCase();

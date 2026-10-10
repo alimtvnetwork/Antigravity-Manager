@@ -2,21 +2,15 @@ import * as instanceService from '../../services/instanceService';
 import * as accountService from '../../services/accountService';
 import { useErrorStore } from '../error-store';
 import { useConfigStore } from '../useConfigStore';
-import { showToast } from '../../components/common/ToastContainer';
 import type { Account } from '../../types/account';
-import type {
-    InstanceConfig,
-    InstanceStatus,
-    AutoProfileSwitcherConfig,
-    AutoSwitcherStatus,
-} from '../../services/instanceService';
 import type { InstanceState } from './types';
-import { instanceSelectionEpoch } from './shared';
 
 type SetState = (p: Partial<InstanceState> | ((s: InstanceState) => Partial<InstanceState>)) => void;
 type GetState = () => InstanceState;
 
-export function createSmartSlice(set: SetState, get: GetState): Partial<InstanceState> {
+export function createSmartSlice(set: SetState, get: GetState): Pick<InstanceState,
+    'smartPlayInstance' | 'rotateToNextBestProfile' | 'smartRotateProfileAccount' |
+    'cleanAndRestartWorkspace' | 'resumeRecentProjectPrompts'> {
     return {
     smartPlayInstance: async (instanceId?: string) => {
         set({ isLoading: true, error: null });
@@ -38,7 +32,7 @@ export function createSmartSlice(set: SetState, get: GetState): Partial<Instance
                 .instances.filter(i => i.is_running && i.config.bound_account_id)
                 .map(i => i.config.bound_account_id as string);
 
-            const { useAccountStore } = await import('./useAccountStore');
+            const { useAccountStore } = await import('../useAccountStore');
             let accounts = useAccountStore.getState().accounts;
             const hasAccounts = accounts.length > 0;
             if (!hasAccounts) {
@@ -120,7 +114,7 @@ export function createSmartSlice(set: SetState, get: GetState): Partial<Instance
             const instanceName = cur?.config.name || instId;
 
             // 1. Discover accounts (always fetch fresh from backend to prevent stale state)
-            const { useAccountStore } = await import('./useAccountStore');
+            const { useAccountStore } = await import('../useAccountStore');
             await useAccountStore.getState().fetchAccounts();
             const accounts = useAccountStore.getState().accounts;
             const currentAccountId = cur?.config.bound_account_id || useAccountStore.getState().currentAccount?.id;

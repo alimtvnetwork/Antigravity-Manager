@@ -1,7 +1,7 @@
 import { SettingsPageApi } from '../useSettingsPage';
 import { Bug, Terminal } from 'lucide-react';
-import { isTauri } from '../utils/env';
-import versionData from '../../version.json';
+import { isTauri } from '../../../utils/env';
+import versionData from '../../../../version.json';
 
 export function AdvancedMaintenanceSection(props: SettingsPageApi) {
     const { t, enable, disable, isEnabled, formData, setFormData, setIsClearLogsOpen, dataDirPath, handleSelectDebugLogDir, handleOpenClearCacheDialog } = props;

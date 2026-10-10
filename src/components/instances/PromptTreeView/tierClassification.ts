@@ -1,9 +1,9 @@
-import type { AgmConversationNode, TierClassificationResult, HierarchicalConversationNode, PromptTier, PromptCategory, PromptCategoryResult } from './types';
+import type { AgmConversationNode, TierClassificationResult, HierarchicalConversationNode } from './types';
 
 export function classifyPromptTier(
     text?: string,
     title?: string,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, any>
 ): TierClassificationResult {
     const raw = (text || '').trim();
     const cleanTitle = (title || '').trim().toLowerCase();

@@ -32,6 +32,8 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
     const [isClearCacheModalOpen, setIsClearCacheModalOpen] = useState(false);
 
     const [dbDiskSizeBytes, setDbDiskSizeBytes] = useState<number | null>(null);
+    const [cacheClearedSuccess, setCacheClearedSuccess] = useState(false);
+    const [loadingDetail, setLoadingDetail] = useState(false);
 
     const handleConfigLoaded = useCallback((config: AppConfig) => {
         setAppConfig(config);
@@ -41,6 +43,8 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
 
     const {
         stats,
+        setStats,
+        setLogs,
         loading,
         filter,
         setFilter,
@@ -50,6 +54,7 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
         setPageSize,
         currentPage,
         totalCount,
+        setTotalCount,
         totalPages,
         pageStart,
         pageEnd,

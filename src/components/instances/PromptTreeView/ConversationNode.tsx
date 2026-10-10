@@ -1,8 +1,8 @@
 import { Bot, User, Terminal, Wrench, Clock } from 'lucide-react';
 import { cn } from '../../../utils/cn';
-import type { AgmConversationNode, AgmProjectTreeNode } from './types';
+import type { AgmConversationNode, AgmProjectTreeNode, TierClassificationResult } from './types';
 import { isGhostConversation } from './conversationGuards';
-import { classifyPromptTier, type TierClassificationResult } from './tierClassification';
+import { classifyPromptTier } from './tierClassification';
 import { formatSeqBadge } from './formatters';
 
 export interface ConversationNodeProps {

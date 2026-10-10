@@ -5,7 +5,6 @@ import { showToast } from "../common/ToastContainer";
 import type { ThinkingBudgetConfig, ThinkingControlSource, ThinkingBudgetMode } from "../../types/config";
 import {
     ThinkingBudgetProps,
-    CONCURRENCY_GUIDE_PRESETS,
     DEFAULT_CONFIG,
     BudgetFieldKey,
     BUDGET_DEFAULTS,
@@ -253,6 +252,10 @@ export default function ThinkingBudget({
         setInputValues,
         handleInputChange,
         getPresetTooltip,
+        handleControlSourceChange,
+        handleFlashModeChange,
+        handleProModeChange,
+        handleClaudeModeChange,
         controlSource,
         thinkingStoreEnabled,
         onThinkingStoreChange,

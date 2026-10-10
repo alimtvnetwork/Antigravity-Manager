@@ -1,8 +1,9 @@
 import { EmailNotificationsApi } from './useEmailNotifications';
-import { showToast } from '../common/ToastContainer';
+import { showToast } from '../../common/ToastContainer';
+import { AlertCircle, CheckCircle2, Copy, Loader2, Play, Sparkles, Terminal } from 'lucide-react';
 
 export function RemoteCommandSection(props: EmailNotificationsApi) {
-    const { setIsSampleTemplatesOpen, target, text, testCliCommand, setTestCliCommand, isExecutingCli, cliExecResult, setCliExecResult, handleTestExecuteCli } = props;
+    const { setIsSampleTemplatesOpen, testCliCommand, setTestCliCommand, isExecutingCli, cliExecResult, setCliExecResult, handleTestExecuteCli } = props;
 
     return (
             <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100 dark:border-slate-800 space-y-4">

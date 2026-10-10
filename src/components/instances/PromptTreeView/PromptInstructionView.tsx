@@ -1,9 +1,7 @@
-import { Copy, Check } from 'lucide-react';
-import { cn } from '../../../utils/cn';
-import type { AgmConversationNode, ViewMode } from './types';
+import { Copy, Check, RotateCcw, ChevronUp, ChevronDown } from 'lucide-react';
+import type { AgmConversationNode, AgmProjectTreeNode, ViewMode } from './types';
 import { RichMarkdownRenderer } from './markdown';
-import { TruncatedContextCallout } from './TruncatedContextCallout';
-import { countWords } from './formatters';
+import { countWords, formatPromptForMarkdown } from './formatters';
 
 export interface PromptInstructionViewProps {
     selectedConversation: AgmConversationNode;
@@ -21,15 +19,22 @@ export interface PromptInstructionViewProps {
     formatByteSize: (bytes: number) => string;
     isCopied: boolean;
     setIsCopied: (v: boolean) => void;
+    openInspector: (conv: AgmConversationNode, repoPath: string) => void;
+    selectedProject: AgmProjectTreeNode | null;
+    activeByteCount: number;
+    setActivePromptText: (v: string) => void;
+    setActionMsg: (v: string | null) => void;
 }
 
 export function PromptInstructionView(props: PromptInstructionViewProps) {
     const {
-        selectedConversation, previewTab, viewMode,
+        selectedConversation, viewMode,
         activePromptText, editedPromptText, setEditedPromptText,
         displayedMarkdown, showAllWords, setShowAllWords,
         isTruncated, totalWords, activeWordCount, formatByteSize,
         isCopied, setIsCopied,
+        openInspector, selectedProject, activeByteCount,
+        setActivePromptText, setActionMsg,
     } = props;
     return (
 <div className="space-y-3">

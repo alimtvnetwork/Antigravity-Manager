@@ -1,15 +1,17 @@
 import type { InstanceStatus, AutoSwitcherDaemonStatus } from '../../services/instanceService';
 import type { AgmProjectTreeNode } from '../../components/instances/PromptTreeViewModal';
 import type { InstanceActionType } from './instancePageUtils';
+import type { TFunction } from 'i18next';
+import type { Account } from '../../types/account';
 
 export interface InstancePageApi {
-    t: (key: string, fallback?: string) => string;
+    t: TFunction;
     instances: InstanceStatus[];
     activeInstanceId?: string | null;
     switcherStatus: unknown;
     isLoading: boolean;
     storeError: string | null;
-    accounts: unknown[];
+    accounts: Account[];
     currentAccount: unknown;
     config: unknown;
     searchQuery: string;
@@ -25,6 +27,7 @@ export interface InstancePageApi {
     actionError: string | null;
     setActionError: (v: string | null) => void;
     actionState: Record<string, InstanceActionType>;
+    setActionState: React.Dispatch<React.SetStateAction<Record<string, InstanceActionType>>>;
     deletingId: string | null;
     isSyncingAll: boolean;
     syncingInstanceIds: Record<string, boolean>;
@@ -69,7 +72,7 @@ export interface InstancePageApi {
     setDeleteModalTarget: (v: InstanceStatus | null) => void;
     wipeModalTarget: InstanceStatus | null;
     setWipeModalTarget: (v: InstanceStatus | null) => void;
-    fetchInstances: () => Promise<void>;
+    fetchInstances: (silent?: boolean) => Promise<void>;
     fetchRunningTasks: () => Promise<void>;
     fetchSwitcherStatus: () => Promise<void>;
     handleSetViewMode: (mode: 'card' | 'list') => void;
@@ -99,7 +102,7 @@ export interface InstancePageApi {
     openPromptTree: (id: string) => void;
     setActiveInstance: (id: string) => Promise<void>;
     setDefaultInstance: (id: string) => Promise<void>;
-    switchAccountToInstance: (instanceId: string, accountId: string) => Promise<string>;
+    switchAccountToInstance: (accountId: string, instanceId?: string) => Promise<void>;
     hasActiveTaskFor: (inst: import('../../services/instanceService').InstanceStatus) => boolean;
-    refreshQuota: () => Promise<void>;
+    refreshQuota: (accountId: string) => Promise<void>;
 }

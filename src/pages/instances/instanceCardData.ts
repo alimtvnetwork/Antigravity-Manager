@@ -7,28 +7,10 @@ import { isGhostConversation } from '../../components/instances/PromptTreeViewMo
 import type { AgmProjectTreeNode } from '../../components/instances/PromptTreeViewModal';
 import { isNodeOwnedByInstance } from './instancePageUtils';
 import type { InstanceActionType } from './instancePageUtils';
-
-interface CardAccount {
-    id: string;
-    email: string;
-    quota?: {
-        models?: unknown[];
-        quota_groups?: Array<{
-            display_name?: string;
-            buckets?: Array<{
-                window?: string;
-                bucket_id?: string;
-                remaining_fraction?: number;
-                reset_time?: string;
-            }>;
-        }>;
-        subscription_tier?: string;
-        weekly?: { percentage: number; resetTime?: string } | null;
-    };
-}
+import type { Account } from '../../types/account';
 
 export interface InstanceCardData {
-    boundAccount: CardAccount | null;
+    boundAccount: Account | null;
     displayEmail: string | null;
     geminiModel: { display_name?: string; name?: string; percentage: number; reset_time?: string } | null;
     weeklyQuota: { percentage: number; resetTime?: string } | null;
@@ -49,7 +31,7 @@ export function useInstanceCardData(
 
     const isActive = inst.config.id === activeInstanceId;
 
-    const boundAccount = (accounts as CardAccount[]).find((a) => {
+    const boundAccount = accounts.find((a) => {
         if (inst.config.bound_account_id) {
             return a.id === inst.config.bound_account_id;
         }
@@ -69,8 +51,8 @@ export function useInstanceCardData(
     const displayEmail =
         inst.config.bound_email || boundAccount?.email || (isActive && curEmail ? curEmail : null);
 
-    const geminiPro = findQuotaModel(boundAccount?.quota?.models, 'gemini-pro') as InstanceCardData['geminiModel'];
-    const geminiFlash = findQuotaModel(boundAccount?.quota?.models, 'gemini-flash') as InstanceCardData['geminiModel'];
+    const geminiPro = findQuotaModel(boundAccount?.quota?.models, 'gemini-pro');
+    const geminiFlash = findQuotaModel(boundAccount?.quota?.models, 'gemini-flash');
     const geminiModel = geminiPro || geminiFlash || null;
 
     const weeklyBucket = (boundAccount?.quota?.quota_groups || [])

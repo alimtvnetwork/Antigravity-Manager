@@ -1,12 +1,12 @@
-import { SettingsState } from './useSettingsState';
-import { request as invoke } from '../utils/request';
+import { SettingsState, normalizeDataDirDisplay } from './useSettingsState';
+import { request as invoke } from '../../utils/request';
 import { open } from '@tauri-apps/plugin-dialog';
-import { showToast } from '../components/common/ToastContainer';
-import { isTauri } from '../utils/env';
+import { showToast } from '../../components/common/ToastContainer';
+import { isTauri } from '../../utils/env';
 import { exit } from '@tauri-apps/plugin-process';
 
 export function useSettingsHandlers(s: SettingsState) {
-    const { t, config, saveConfig, formData, setFormData, setIsClearLogsOpen, dataDirPath, setDataDirPath, pendingDataDir, setPendingDataDir, setIsMigrateDataDirOpen, isMigratingDataDir, setIsMigratingDataDir, setIsClearCacheOpen, setCachePaths, setIsClearingCache, setIsCheckingUpdate, setUpdateInfo, setIsInstallerUpdating, setIsBrewUpgrading, setIsBrewConfirmOpen, setIsBrewSuccessOpen } = s;
+    const { t, saveConfig, formData, setFormData, setIsClearLogsOpen, dataDirPath, setDataDirPath, pendingDataDir, setPendingDataDir, setIsMigrateDataDirOpen, isMigratingDataDir, setIsMigratingDataDir, setIsClearCacheOpen, setCachePaths, setIsClearingCache, setIsCheckingUpdate, setUpdateInfo, setIsInstallerUpdating, setIsBrewUpgrading, setIsBrewConfirmOpen, setIsBrewSuccessOpen } = s;
 
     const handleSave = async () => {
         try {
@@ -335,43 +335,23 @@ export function useSettingsHandlers(s: SettingsState) {
 
     return {
         handleSave,
-        proxyEnabled,
-        proxyUrl,
         confirmClearLogs,
         handleOpenDataDir,
         handleSelectDataDir,
-        selected,
         confirmMigrateDataDir,
-        newPath,
         handleSelectExportPath,
-        selected,
         handleSelectAntigravityPath,
-        selected,
         handleSelectAntigravityIdePath,
-        selected,
         handleSelectDebugLogDir,
-        selected,
         handleDetectAntigravityPath,
-        command,
-        path,
         handleSelectAntigravityCliPath,
-        selected,
         handleDetectAntigravityCliPath,
-        path,
         handleCheckUpdate,
-        result,
-        sourceMsg,
         saveUpdateSettingsHelper,
-        payload,
         handleRunInstallerUpdate,
         handleBrewUpgrade,
-        errKey,
-        errMsg,
         handleOpenClearCacheDialog,
-        paths,
         confirmClearAntigravityCache,
-        result,
-        sizeMB,
     };
 }
 

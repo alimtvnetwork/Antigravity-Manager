@@ -1,7 +1,7 @@
 import { BudgetSectionProps } from "./BudgetSectionProps";
 
 export function ServerSideSection(props: BudgetSectionProps) {
-    const { t, currentConfig, onChange, inputValues, setInputValues, handleInputChange, getPresetTooltip, controlSource, thinkingStoreEnabled, onThinkingStoreChange, thinkingMaxMemoryTurns, onThinkingMaxMemoryTurnsChange, thinkingRetentionDays, onThinkingRetentionDaysChange, isSaving, isSaved, handleSave, onSave, showClaudeAdvanced, setShowClaudeAdvanced, isClearingThinking, showClearThinkingConfirm, setShowClearThinkingConfirm, handleClearThinkingStore } = props;
+    const { t, thinkingStoreEnabled, onThinkingStoreChange } = props;
 
     return (
         <>

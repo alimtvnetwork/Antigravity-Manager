@@ -1,5 +1,7 @@
 import { showToast } from '../../components/common/ToastContainer';
-import type { InstanceStatus } from '../../services/instanceService';
+import { useInstanceStore } from '../../stores/useInstanceStore';
+import type { TFunction } from 'i18next';
+import type { InstanceStatus, InstanceConfig } from '../../services/instanceService';
 import type { InstanceActionType } from './instancePageUtils';
 
 function actionErrorMessage(e: unknown): string {
@@ -7,7 +9,7 @@ function actionErrorMessage(e: unknown): string {
 }
 
 export interface PageActionContext {
-    t: (key: string, fallback?: string) => string;
+    t: TFunction;
     instances: InstanceStatus[];
     actionState: Record<string, InstanceActionType>;
     newInstanceName: string;
@@ -31,6 +33,7 @@ export interface PageActionContext {
     setNewInstanceBoundAccount: (v: string) => void;
     setNewInstanceFromInstance: (v: string) => void;
     setNewInstanceLaunchImmediately: (v: boolean) => void;
+    setIsCreateOpen: (v: boolean) => void;
     setCopyInstanceName: (v: string) => void;
     setCopyTargetId: (v: string | null) => void;
     setEditInstanceName: (v: string) => void;
@@ -46,19 +49,19 @@ export interface PageActionContext {
     fetchInstances: (force?: boolean) => Promise<void>;
     createInstance: (name: string, boundAccountId?: string, fromInstanceId?: string) => Promise<{ id: string; name: string }>;
     copyInstance: (id: string, name: string, mode: 'full' | 'profile', copyProjects: boolean) => Promise<{ id: string }>;
-    renameInstance: (id: string, name: string) => Promise<void>;
+    renameInstance: (id: string, name: string) => Promise<InstanceConfig>;
     deleteInstance: (id: string) => Promise<void>;
     wipeSession: (id: string) => Promise<void>;
     launchInstance: (id: string) => Promise<void>;
     stopInstance: (id: string) => Promise<void>;
-    restartInstance: (id: string) => Promise<void>;
+    restartInstance: (id: string) => Promise<InstanceStatus>;
     fastForwardInstance: (id: string) => Promise<string>;
     syncInstance: (id: string) => Promise<void>;
     syncAllInstances: () => Promise<void>;
     cloneInstanceExecutable: (id: string) => Promise<string>;
     cleanAndRestartWorkspace: () => Promise<string>;
     toggleAutoSwitcher: () => Promise<void>;
-    triggerManualRotation: () => Promise<void>;
+    triggerManualRotation: () => Promise<string>;
     setActiveInstance: (id: string) => Promise<void>;
     getSwitcherStatus: () => unknown;
 }
@@ -90,6 +93,62 @@ export interface PageActions {
 }
 
 export function createPageActions(ctx: PageActionContext): PageActions {
+    const {
+        t,
+        instances,
+        actionState,
+        newInstanceName,
+        newInstanceBoundAccount,
+        newInstanceFromInstance,
+        newInstanceLaunchImmediately,
+        copyTargetId,
+        copyInstanceName,
+        cloneMode,
+        copyProjects,
+        editTargetId,
+        editInstanceName,
+        deleteModalTarget,
+        wipeModalTarget,
+        setActionError,
+        setActionState,
+        setDeletingId,
+        setIsSyncingAll,
+        setSyncingInstanceIds,
+        setNewInstanceName,
+        setNewInstanceBoundAccount,
+        setNewInstanceFromInstance,
+        setNewInstanceLaunchImmediately,
+        setIsCreateOpen,
+        setCopyInstanceName,
+        setCopyTargetId,
+        setEditInstanceName,
+        setEditTargetId,
+        setDeleteModalTarget,
+        setWipeModalTarget,
+        setSwitchTargetInstance,
+        setAuditModalInstance,
+        setSettingsModalTarget,
+        setIsSettingsModalOpen,
+        setCopyProjects,
+        setPromptTreeInstance,
+        fetchInstances,
+        createInstance,
+        copyInstance,
+        renameInstance,
+        deleteInstance,
+        wipeSession,
+        launchInstance,
+        stopInstance,
+        restartInstance,
+        fastForwardInstance,
+        syncInstance,
+        syncAllInstances,
+        cloneInstanceExecutable,
+        cleanAndRestartWorkspace,
+        toggleAutoSwitcher,
+        triggerManualRotation,
+        setActiveInstance,
+    } = ctx;
         const handleCreate = async () => {
             if (!newInstanceName.trim()) return;
             setActionError(null);
@@ -213,7 +272,7 @@ export function createPageActions(ctx: PageActionContext): PageActions {
         const runGuardedAction = async (
             id: string,
             action: Exclude<InstanceActionType, null>,
-            fn: () => Promise<void>,
+            fn: () => Promise<unknown>,
             successToast?: string
         ) => {
             if (actionState[id]) return;

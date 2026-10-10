@@ -6,23 +6,17 @@ import {
     Download,
     Fingerprint,
     Info,
-    Lock,
-    Ban,
     ToggleLeft,
     ToggleRight,
     Sparkles,
     Tag,
-    X,
-    Check,
-    Clock,
     Repeat2,
     Terminal,
     MoreHorizontal,
 } from 'lucide-react';
-import { cn } from '../../../utils/cn';
-import type { Account } from '../../../types/account';
-import type { AccountRowContentProps } from './types';
-import type { AccountRowState } from './useAccountRowState';
+import { cn } from '../../../../utils/cn';
+import type { AccountRowContentProps } from '../types';
+import type { AccountRowState } from '../useAccountRowState';
 
 interface ActionsCellProps extends Pick<AccountRowContentProps,
     'account' | 'selected' | 'isCurrent' | 'isFocused' | 'isRefreshing' | 'isSwitching' | 'isDisabled' |
@@ -38,20 +32,18 @@ interface ActionsCellProps extends Pick<AccountRowContentProps,
  */
 export function ActionsCell(props: ActionsCellProps) {
     const { account, selected, isCurrent, isFocused, isRefreshing, isSwitching, isDisabled } = props;
-    const { onSwitch, onRefresh, onViewDevice, onViewDetails, onExport, onDelete, onToggleProxy, onWarmup, onUpdateLabel, onUpdatePriority, onViewError } = props;
+    const { onSwitch, onRefresh, onViewDevice, onViewDetails, onExport, onDelete, onToggleProxy, onWarmup, onUpdateLabel } = props;
     const {
         t,
-        isEditingLabel, setIsEditingLabel,
-        labelInput, setLabelInput,
+        setIsEditingLabel,
         showInstanceMenu, setShowInstanceMenu,
         showMoreMenu, setShowMoreMenu,
+        showEmail, setShowEmail,
         moreMenuPos,
-        editingPriority, setEditingPriority,
-        instances,
+        instances, activeInstanceId,
         menuRef, moreBtnRef, moreMenuRef,
-        boundInstance,
-        handleSaveLabel, handleCancelLabel, handleKeyDown,
         openMoreMenu,
+        weeklyCell,
     } = props.rowState;
 
     return (

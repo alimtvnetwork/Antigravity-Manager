@@ -1,5 +1,3 @@
-import { copyToClipboard } from '../../../utils/clipboard';
-
 export async function copyPromptWithRichImages(markdownText: string): Promise<boolean> {
     try {
         if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {

@@ -1,6 +1,6 @@
-import { Terminal, Copy, Check, ExternalLink } from 'lucide-react';
-import { cn } from '../../../utils/cn';
+import { Terminal, Copy, Check, ExternalLink, Sparkles, Wrench } from 'lucide-react';
 import type { AgmConversationNode } from './types';
+import { RichMarkdownRenderer } from './markdown';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 
@@ -12,6 +12,7 @@ export interface ResultsViewProps {
     instancePid?: number;
     formatDuration: (secs: number) => string;
     onFocusIde: () => void;
+    elapsedSeconds: number;
 }
 
 export function ResultsView(props: ResultsViewProps) {
@@ -19,6 +20,7 @@ export function ResultsView(props: ResultsViewProps) {
         selectedConversation,
         isCopiedResults, setIsCopiedResults,
         isFocusing, instancePid, formatDuration, onFocusIde,
+        elapsedSeconds,
     } = props;
 
     const handleCopyResults = async () => {
@@ -163,7 +165,7 @@ export function ResultsView(props: ResultsViewProps) {
                 </div>
                 <button
                     type="button"
-                    onClick={handleFocusIde}
+                    onClick={onFocusIde}
                     disabled={isFocusing}
                     className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-all duration-150 cursor-pointer shadow-xs mt-2"
                     title="Open and focus the Antigravity main window"
@@ -184,7 +186,7 @@ export function ResultsView(props: ResultsViewProps) {
                 <div className="flex items-center gap-2 pt-2">
                     <button
                         type="button"
-                        onClick={handleFocusIde}
+                        onClick={onFocusIde}
                         disabled={isFocusing}
                         className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors cursor-pointer"
                     >

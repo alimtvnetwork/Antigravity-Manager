@@ -1,15 +1,13 @@
 import { useState, useEffect } from 'react';
-import { User, Menu } from 'lucide-react';
-import { request as invoke } from '../utils/request';
-import { open } from '@tauri-apps/plugin-dialog';
-import { useConfigStore } from '../stores/useConfigStore';
-import { AppConfig } from '../types/config';
-import { useDebugConsole } from '../stores/useDebugConsole';
+import { request as invoke } from '../../utils/request';
+import { useConfigStore } from '../../stores/useConfigStore';
+import { AppConfig } from '../../types/config';
+import { useDebugConsole } from '../../stores/useDebugConsole';
 import { useTranslation } from 'react-i18next';
-import { isTauri } from '../utils/env';
-import versionData from '../../version.json';
+import { isTauri } from '../../utils/env';
+import versionData from '../../../version.json';
 
-function normalizeDataDirDisplay(path: string): string {
+export function normalizeDataDirDisplay(path: string): string {
     const trimmed = path.trim();
     if (trimmed.startsWith('\\\\?\\UNC\\')) {
         return `\\\\${trimmed.slice('\\\\?\\UNC\\'.length)}`;
@@ -272,37 +270,6 @@ export function useSettingsState() {
         setIsBrewConfirmOpen,
         isBrewSuccessOpen,
         setIsBrewSuccessOpen,
-        handleSave,
-        proxyEnabled,
-        proxyUrl,
-        confirmClearLogs,
-        handleOpenDataDir,
-        handleSelectDataDir,
-        selected,
-        confirmMigrateDataDir,
-        newPath,
-        handleSelectExportPath,
-        handleSelectAntigravityPath,
-        handleSelectAntigravityIdePath,
-        handleSelectDebugLogDir,
-        handleDetectAntigravityPath,
-        command,
-        path,
-        handleSelectAntigravityCliPath,
-        handleDetectAntigravityCliPath,
-        handleCheckUpdate,
-        result,
-        sourceMsg,
-        saveUpdateSettingsHelper,
-        payload,
-        handleRunInstallerUpdate,
-        handleBrewUpgrade,
-        errKey,
-        errMsg,
-        handleOpenClearCacheDialog,
-        paths,
-        confirmClearAntigravityCache,
-        sizeMB,
     };
 }
 

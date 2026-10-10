@@ -147,7 +147,7 @@ export function useProxyConfig(): ProxyConfigState {
     }, [appConfig, saveConfig]);
 
     // 专门处理模型映射的热更新 (全量)
-    const handleMappingUpdate = useCallback(async (type: 'custom', key: string, value: string) => {
+    const handleMappingUpdate = useCallback(async (_type: 'custom', key: string, value: string) => {
         if (!appConfig) return;
 
         const trimmedKey = key.trim();

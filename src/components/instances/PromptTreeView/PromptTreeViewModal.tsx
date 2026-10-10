@@ -66,7 +66,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         expandedStaleGroups, setExpandedStaleGroups,
         selectedProject, setSelectedProject,
         selectedConversation,
-        activePromptText,
+        activePromptText, setActivePromptText,
         editedPromptText, setEditedPromptText,
         viewMode, setViewMode,
         showAllWords, setShowAllWords,
@@ -76,7 +76,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         isResending,
         isEnqueueing,
         isExportMenuOpen, setIsExportMenuOpen,
-        actionMsg,
+        actionMsg, setActionMsg,
         elapsedSeconds, setElapsedSeconds,
         inspectorPrompt, setInspectorPrompt,
     } = state;
@@ -244,7 +244,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
 
     const hasImages = useMemo(() => {
         const text = activePromptText || selectedConversation?.prompt_preview_200w || '';
-        return /!\[.*?\]\(https?:\/\/.*?|data:image\/.*?;base64,.*?)\)/.test(text);
+        return /!\[.*?\]\((?:https?:\/\/.*?|data:image\/.*?;base64,.*?|[^\s)]+)\)/.test(text);
     }, [activePromptText, selectedConversation]);
 
     const instanceSeqNum = selectedConversation?.instance_seq_num
@@ -409,17 +409,22 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                         formatByteSize={formatByteSize}
                                         isCopied={isCopied}
                                         setIsCopied={setIsCopied}
+                                        openInspector={promptActions.openInspector}
+                                        selectedProject={selectedProject}
+                                        activeByteCount={activeByteCount}
+                                        setActivePromptText={setActivePromptText}
+                                        setActionMsg={setActionMsg}
                                     />
                                 ) : (
                                     <ResultsView
                                         selectedConversation={selectedConversation}
-                                        previewTab={previewTab}
                                         isCopiedResults={isCopiedResults}
                                         setIsCopiedResults={setIsCopiedResults}
                                         isFocusing={false}
                                         instancePid={instancePid}
                                         formatDuration={formatDuration}
                                         onFocusIde={promptActions.handleFocusIde}
+                                        elapsedSeconds={elapsedSeconds}
                                     />
                                 )}
                             </div>
@@ -439,6 +444,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                 <InspectorModal
                     inspectorPrompt={inspectorPrompt}
                     showAllWords={showAllWords}
+                    setShowAllWords={setShowAllWords}
                     isCopied={isCopied}
                     setIsCopied={setIsCopied}
                     isCopiedRaw={false}
@@ -455,6 +461,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                 selectedProject={selectedProject}
                 copiedField={copiedField}
                 setCopiedField={setCopiedField}
+                instanceId={instanceId}
             />
 
             {isAutoSyncing && (

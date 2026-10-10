@@ -13,20 +13,12 @@ import {
 } from '../../services/instanceService';
 import { invoke } from '@tauri-apps/api/core';
 import { isTauri } from '../../utils/env';
-import { showToast } from '../../components/common/ToastContainer';
 import type { AgmProjectTreeNode } from '../../components/instances/PromptTreeViewModal';
 import { isGhostConversation } from '../../components/instances/PromptTreeViewModal';
 import { isNodeOwnedByInstance } from './instancePageUtils';
 import type { InstanceActionType } from './instancePageUtils';
 import type { InstancePageApi } from './instancePageTypes';
 import { createPageActions } from './instancePageActions';
-import { useInstanceStore } from '../../stores/useInstanceStore';
-import { useErrorStore } from '../../stores/error-store';
-
-function actionErrorMessage(e: unknown): string {
-    return e?.toString?.() || 'Operation failed';
-}
-
 
 export function useInstancePage(): InstancePageApi {
     const { t } = useTranslation();
@@ -38,7 +30,6 @@ export function useInstancePage(): InstancePageApi {
         error: storeError,
         fetchInstances,
         fetchSwitcherStatus,
-        fetchRunningTasks,
         triggerManualRotation,
         createInstance,
         copyInstance,
@@ -286,6 +277,7 @@ export function useInstancePage(): InstancePageApi {
         setNewInstanceBoundAccount,
         setNewInstanceFromInstance,
         setNewInstanceLaunchImmediately,
+        setIsCreateOpen,
         setCopyInstanceName,
         setCopyTargetId,
         setEditInstanceName,
@@ -342,6 +334,7 @@ export function useInstancePage(): InstancePageApi {
         actionError,
         setActionError,
         actionState,
+        setActionState,
         deletingId,
         isSyncingAll,
         syncingInstanceIds,

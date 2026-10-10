@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { showToast } from '../../common/ToastContainer';
 import * as instanceService from '../../../services/instanceService';
 import { useErrorStore } from '../../../stores/error-store';
@@ -14,7 +15,7 @@ export function errorMessage(e: unknown): string {
 }
 
 export interface SettingsCore {
-    t: (key: string, fallback?: string) => string;
+    t: TFunction;
     instances: InstanceStatus[];
     onInstancesUpdated?: () => Promise<void> | void;
     selectedTargetId: string;

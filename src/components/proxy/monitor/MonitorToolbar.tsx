@@ -1,5 +1,5 @@
 import React from 'react';
-import type { TFunction } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Search, Trash2, RefreshCw, User, Settings } from 'lucide-react';
 import { MonitorStats } from './MonitorStats';
 import type { QuickFilter } from './useProxyLogs';

@@ -1,8 +1,10 @@
 import { SupabaseSyncApi } from './useSupabaseSync';
-import { useErrorStore } from '../../stores/error-store';
+import { useErrorStore } from '../../../stores/error-store';
+import { telegramService } from '../../../services/telegramService';
+import { Send, HelpCircle, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
 
 export function TelegramSection(props: SupabaseSyncApi) {
-    const { telegramConfig, setTelegramConfig, telegramStatus, isTestingTelegram, telegramBotUsername, isSavingTelegram, isSendingPing, setIsTgGuideOpen, handleSaveTelegram, handleTestTelegram, updated, handleDetectTelegramChatId, handleSendTelegramPing, text } = props;
+    const { telegramConfig, setTelegramConfig, telegramStatus, isTestingTelegram, telegramBotUsername, isSavingTelegram, isSendingPing, setIsTgGuideOpen, handleSaveTelegram, handleTestTelegram, handleDetectTelegramChatId, handleSendTelegramPing } = props;
 
     return (
             <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-4">

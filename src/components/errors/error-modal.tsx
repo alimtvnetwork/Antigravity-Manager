@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { useErrorStore, type ErrorModalTab } from '../../stores/error-store';
+import { useErrorStore } from '../../stores/error-store';
 import {
   generateCompactReport,
   generateComprehensiveAllDataReport,
   generateJsonReport,
 } from '../../lib/error-report-generator';
+import { showToast } from '../common/ToastContainer';
 import { ModalHeader, TabNav, ModalFooter } from './error-modal/chrome';
 import { OverviewTab, BackendTab, StackTab, ContextTab } from './error-modal/tabs';
 

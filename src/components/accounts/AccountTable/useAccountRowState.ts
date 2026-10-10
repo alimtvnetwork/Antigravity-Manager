@@ -1,6 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Account } from '../../../types/account';
 import { useConfigStore } from '../../../stores/useConfigStore';
 import { useInstanceStore } from '../../../stores/useInstanceStore';
 import { useErrorStore } from '../../../stores/error-store';

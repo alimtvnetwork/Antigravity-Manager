@@ -1,13 +1,13 @@
 import { SettingsPageApi } from '../useSettingsPage';
-import { Save, User, RefreshCw, ChevronDown } from 'lucide-react';
-import { showToast } from '../components/common/ToastContainer';
-import QuotaProtection from '../components/settings/QuotaProtection';
-import SmartWarmup from '../components/settings/SmartWarmup';
-import PinnedQuotaModels from '../components/settings/PinnedQuotaModels';
-import AutoSwitcherSettings from '../components/settings/AutoSwitcherSettings';
+import { User, RefreshCw, ChevronDown } from 'lucide-react';
+import { showToast } from '../../../components/common/ToastContainer';
+import QuotaProtection from '../../../components/settings/QuotaProtection';
+import SmartWarmup from '../../../components/settings/SmartWarmup';
+import PinnedQuotaModels from '../../../components/settings/PinnedQuotaModels';
+import AutoSwitcherSettings from '../../../components/settings/AutoSwitcherSettings';
 
 export function AccountTab(props: SettingsPageApi) {
-    const { t, config, saveConfig, formData, setFormData } = props;
+    const { t, saveConfig, formData, setFormData } = props;
 
     return (
                         <div className="space-y-4 animate-in fade-in duration-500">

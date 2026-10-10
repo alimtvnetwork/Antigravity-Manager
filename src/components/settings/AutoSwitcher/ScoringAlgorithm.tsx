@@ -1,5 +1,6 @@
 import { AutoSwitcherApi } from './useAutoSwitcher';
-import { cn } from '../../utils/cn';
+import { SlidersHorizontal, RotateCcw } from 'lucide-react';
+import { cn } from '../../../utils/cn';
 
 export function ScoringAlgorithm(props: AutoSwitcherApi) {
     const { t, currentConfig, onChange } = props;

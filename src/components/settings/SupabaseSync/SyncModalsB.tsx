@@ -1,10 +1,11 @@
 import { SupabaseSyncApi } from './useSupabaseSync';
 import { UnifiedBackupModal } from '../../modals/UnifiedBackupModal';
-import ModalDialog from '../common/ModalDialog';
-import { showToast } from '../common/ToastContainer';
+import ModalDialog from '../../common/ModalDialog';
+import { Copy, Lock } from 'lucide-react';
+import { showToast } from '../../common/ToastContainer';
 
 export function SyncModalsB(props: SupabaseSyncApi) {
-    const { config, isSchemaModalOpen, setIsSchemaModalOpen, schemaRole, schemaSql, isExportModalOpen, setIsExportModalOpen, exportContent, exportFormat, exportRounds, setExportRounds, isImportModalOpen, setIsImportModalOpen, importText, setImportText, isAiPromptModalOpen, setIsAiPromptModalOpen, isTgGuideOpen, setIsTgGuideOpen, isBackupModalOpen, setIsBackupModalOpen, username, handleOpenExport, text, handleImportSubmit, aiInstructionTemplate } = props;
+    const { isSchemaModalOpen, setIsSchemaModalOpen, schemaRole, schemaSql, isExportModalOpen, setIsExportModalOpen, exportContent, exportFormat, exportRounds, setExportRounds, isImportModalOpen, setIsImportModalOpen, importText, setImportText, isAiPromptModalOpen, setIsAiPromptModalOpen, isTgGuideOpen, setIsTgGuideOpen, isBackupModalOpen, setIsBackupModalOpen, handleOpenExport, handleImportSubmit, aiInstructionTemplate } = props;
 
     return (
         <>

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { showToast } from '../common/ToastContainer';
-import { useInstanceStore } from '../../stores/useInstanceStore';
-import { getAutoSwitcherDaemonStatus, type AutoSwitcherDaemonStatus } from '../../services/instanceService';
+import { showToast } from '../../common/ToastContainer';
+import { useInstanceStore } from '../../../stores/useInstanceStore';
+import { getAutoSwitcherDaemonStatus, type AutoSwitcherDaemonStatus } from '../../../services/instanceService';
 import { DEFAULT_CONFIG } from './switcherTypes';
-import type { AutoProfileSwitcherConfig } from '../../types/config';
+import type { AutoProfileSwitcherConfig } from '../../../types/config';
 
-export function useAutoSwitcher(config?: AutoProfileSwitcherConfig, onChange?: (c: AutoProfileSwitcherConfig) => void) {
+export function useAutoSwitcher(config?: AutoProfileSwitcherConfig, onChange: (c: AutoProfileSwitcherConfig) => void = () => {}) {
     const { t } = useTranslation();
     const currentConfig = config || DEFAULT_CONFIG;
     const { smartRotateProfileAccount, activeInstanceId } = useInstanceStore();
@@ -152,6 +152,7 @@ export function useAutoSwitcher(config?: AutoProfileSwitcherConfig, onChange?: (
     return {
         t,
         currentConfig,
+        onChange,
         rotationFeedback,
         setRotationFeedback,
         isRotating,
@@ -164,27 +165,13 @@ export function useAutoSwitcher(config?: AutoProfileSwitcherConfig, onChange?: (
         setDaemonStatus,
         remainingSeconds,
         setRemainingSeconds,
-        fetchStatus,
-        pollTimer,
-        tickTimer,
-        handleClickOutside,
         handleExport,
-        dataStr,
-        downloadAnchor,
         handleImportFile,
-        file,
-        reader,
-        parsed,
         handleResetDefaults,
         handleToggleEnabled,
         handleIntervalChange,
-        check_interval_seconds,
         handleThresholdChange,
-        low_quota_threshold_percent,
         handleManualRotate,
-        targetId,
-        result,
-        resumeNote,
     };
 }
 

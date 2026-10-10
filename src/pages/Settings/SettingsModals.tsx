@@ -1,13 +1,12 @@
 import { SettingsPageApi } from './useSettingsPage';
 import { Coffee } from 'lucide-react';
-import { open } from '@tauri-apps/plugin-dialog';
-import ModalDialog from '../components/common/ModalDialog';
+import ModalDialog from '../../components/common/ModalDialog';
 import { UnifiedBackupModal } from '../../components/modals/UnifiedBackupModal';
-import { showToast } from '../components/common/ToastContainer';
+import { showToast } from '../../components/common/ToastContainer';
 import { relaunch } from '@tauri-apps/plugin-process';
 
 export function SettingsModals(props: SettingsPageApi) {
-    const { t, isBackupModalOpen, setIsBackupModalOpen, isClearLogsOpen, setIsClearLogsOpen, isSupportModalOpen, setIsSupportModalOpen, pendingDataDir, setPendingDataDir, isMigrateDataDirOpen, setIsMigrateDataDirOpen, isMigratingDataDir, isClearCacheOpen, setIsClearCacheOpen, cachePaths, isClearingCache, isBrewConfirmOpen, setIsBrewConfirmOpen, isBrewSuccessOpen, setIsBrewSuccessOpen, confirmClearLogs, confirmMigrateDataDir, path, handleBrewUpgrade, confirmClearAntigravityCache } = props;
+    const { t, isBackupModalOpen, setIsBackupModalOpen, isClearLogsOpen, setIsClearLogsOpen, isSupportModalOpen, setIsSupportModalOpen, pendingDataDir, setPendingDataDir, isMigrateDataDirOpen, setIsMigrateDataDirOpen, isMigratingDataDir, isClearCacheOpen, setIsClearCacheOpen, cachePaths, isClearingCache, isBrewConfirmOpen, setIsBrewConfirmOpen, isBrewSuccessOpen, setIsBrewSuccessOpen, confirmClearLogs, confirmMigrateDataDir, handleBrewUpgrade, confirmClearAntigravityCache } = props;
 
     return (
         <>

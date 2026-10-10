@@ -1,6 +1,6 @@
-import type { ThinkingBudgetConfig } from "../../types/config";
+import type { ThinkingBudgetConfig } from "../../../types/config";
 
-interface ThinkingBudgetProps {
+export interface ThinkingBudgetProps {
     config?: ThinkingBudgetConfig;
     onChange: (config: ThinkingBudgetConfig) => void;
     onSave?: () => Promise<void> | void;
@@ -21,7 +21,7 @@ interface ConcurrencyGuidePreset {
     descDefault: string;
 }
 
-const CONCURRENCY_GUIDE_PRESETS: ConcurrencyGuidePreset[] = [
+export const CONCURRENCY_GUIDE_PRESETS: ConcurrencyGuidePreset[] = [
     {
         key: "1g",
         icon: "🖥️",
@@ -64,7 +64,7 @@ const CONCURRENCY_GUIDE_PRESETS: ConcurrencyGuidePreset[] = [
     },
 ];
 
-const DEFAULT_CONFIG: ThinkingBudgetConfig = {
+export const DEFAULT_CONFIG: ThinkingBudgetConfig = {
     control_source: "gateway",
     flash_mode: "custom",
     flash_low: 1024,
@@ -90,7 +90,7 @@ const DEFAULT_CONFIG: ThinkingBudgetConfig = {
     custom_tiered: -1,
 };
 
-type BudgetFieldKey =
+export type BudgetFieldKey =
     | "flash_low"
     | "flash_medium"
     | "flash_high"
@@ -102,7 +102,7 @@ type BudgetFieldKey =
     | "claude_medium"
     | "claude_high";
 
-const BUDGET_DEFAULTS: Record<BudgetFieldKey, number> = {
+export const BUDGET_DEFAULTS: Record<BudgetFieldKey, number> = {
     flash_low: 1024,
     flash_medium: 4096,
     flash_high: 16384,

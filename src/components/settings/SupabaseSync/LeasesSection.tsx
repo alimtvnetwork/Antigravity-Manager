@@ -1,8 +1,9 @@
 import { SupabaseSyncApi } from './useSupabaseSync';
-import { maskEmail } from '../../utils/maskEmail';
+import { maskEmail } from '../../../utils/maskEmail';
+import { Layers, Loader2, RefreshCw } from 'lucide-react';
 
 export function LeasesSection(props: SupabaseSyncApi) {
-    const { leases, isLoadingLeases, revealedLeaseEmails, setRevealedLeaseEmails, fetchLeases, text } = props;
+    const { leases, isLoadingLeases, revealedLeaseEmails, setRevealedLeaseEmails, fetchLeases } = props;
 
     return (
             <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-4">

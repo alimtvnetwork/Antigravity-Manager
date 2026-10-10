@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { cn } from '../../utils/cn';
 import { useAccountStore } from '../../stores/useAccountStore';
 import { useErrorStore } from '../../stores/error-store';
-import type { InstanceTableProps, InstanceActionType } from './table/instanceTableTypes';
+import type { InstanceTableProps } from './table/instanceTableTypes';
 import { buildRowCellData, ProfileCell, QuotaCell, StatusCell, PathCell } from './table/InstanceRowCells';
 import { ActionsCell, MoreMenuPortal } from './table/InstanceRowActions';
 import { resolveDataDir } from './table/instanceTableUtils';

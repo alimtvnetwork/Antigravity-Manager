@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type React from 'react';
-import { copyToClipboard } from '../../../utils/clipboard';
-import { useErrorStore } from '../../../stores/error-store';
+import { Check, Copy } from 'lucide-react';
+import { TruncatedContextCallout } from './TruncatedContextCallout';
+import { formatPromptForMarkdown } from './formatters';
 
 function parseInlineMarkdown(text: string, onToggleExpand?: () => void): React.ReactNode[] {
     const rawNodes: React.ReactNode[] = [];
@@ -127,7 +128,7 @@ interface RichMarkdownRendererProps {
 }
 
 // Rich Markdown renderer component
-function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, isTruncated }: RichMarkdownRendererProps) {
+export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, isTruncated }: RichMarkdownRendererProps) {
     const [copiedBlockIndex, setCopiedBlockIndex] = useState<number | null>(null);
 
     const handleCopyCode = (code: string, index: number) => {

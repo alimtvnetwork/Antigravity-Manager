@@ -6,7 +6,6 @@ import {
     Tag,
     X,
     Check,
-    Sparkles,
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { maskEmail } from '../../../utils/maskEmail';
@@ -15,6 +14,7 @@ import { PriorityBadge } from '../PriorityBadge';
 import { QuotaProgressBar } from '../QuotaProgressBar';
 import { ACTIVE_PILL_CLASSES } from '../../common/selectedState';
 import { formatDateTimeShort } from './types';
+import { formatDateTime } from '../../../utils/date';
 import type { AccountRowContentProps } from './types';
 import { useAccountRowState } from './useAccountRowState';
 import { ActionsCell } from './cells/ActionsCell';
@@ -29,9 +29,9 @@ export function AccountRowContent(props: AccountRowContentProps) {
         selected = false,
         isCurrent,
         isFocused = false,
-        isRefreshing,
-        isSwitching,
         isDisabled,
+        onUpdatePriority,
+        onViewError,
         showPriority = false,
         showAllEmails = false,
     } = props;
@@ -40,16 +40,16 @@ export function AccountRowContent(props: AccountRowContentProps) {
     const { t } = useTranslation();
     const {
         validationBlockedLabel,
-        isEditingLabel, setIsEditingLabel,
+        isEditingLabel,
         labelInput, setLabelInput,
-        showEmail, setShowEmail,
+        showEmail,
         isHoverUnmasked, setIsHoverUnmasked,
         editingPriority, setEditingPriority,
         boundInstance,
         leaseInfo,
         handleSaveLabel, handleCancelLabel, handleKeyDown,
         openPriorityEditor,
-        displayModels, fourHourModel, weeklyCell,
+        fourHourModel, weeklyCell,
     } = rowState;
 
     return (

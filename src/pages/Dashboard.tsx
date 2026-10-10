@@ -20,7 +20,6 @@ import BestAccounts from '../components/dashboard/BestAccounts';
 import CurrentAccount from '../components/dashboard/CurrentAccount';
 import { useAccountStore } from '../stores/useAccountStore';
 import { useDashboardStats } from './dashboard/useDashboardStats';
-import { Account } from '../types/account';
 
 function Dashboard() {
     const { t } = useTranslation();

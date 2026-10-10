@@ -1,5 +1,5 @@
 import React from 'react';
-import type { TFunction } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Database, Check, X, Clock, HardDrive, Trash2 } from 'lucide-react';
 import type { AppConfig } from '../../../types/config';
 

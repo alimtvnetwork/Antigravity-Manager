@@ -1,10 +1,11 @@
 import { EmailNotificationsApi } from './useEmailNotifications';
-import AiSampleTemplatesModal from './ai-sample-templates-modal';
-import MailboxExportModal from './MailboxExportModal';
-import ModalDialog from '../common/ModalDialog';
+import AiSampleTemplatesModal from '../ai-sample-templates-modal';
+import MailboxExportModal from '../MailboxExportModal';
+import ModalDialog from '../../common/ModalDialog';
+import { Upload } from 'lucide-react';
 
 export function EmailDialogs(props: EmailNotificationsApi) {
-    const { isImportModalOpen, setIsImportModalOpen, importFormat, setImportFormat, importPayload, setImportPayload, fileInputRef, isSampleTemplatesOpen, setIsSampleTemplatesOpen, exportModalState, setExportModalState, target, file, text, handleImportSubmit, handleFileUpload } = props;
+    const { isImportModalOpen, setIsImportModalOpen, importFormat, setImportFormat, importPayload, setImportPayload, fileInputRef, isSampleTemplatesOpen, setIsSampleTemplatesOpen, exportModalState, setExportModalState, handleImportSubmit, handleFileUpload } = props;
 
     return (
         <>

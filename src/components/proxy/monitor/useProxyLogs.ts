@@ -27,7 +27,9 @@ export interface QuickFilter {
 
 export interface UseProxyLogsResult {
     logs: ProxyRequestLog[];
+    setLogs: React.Dispatch<React.SetStateAction<ProxyRequestLog[]>>;
     stats: ProxyStats;
+    setStats: React.Dispatch<React.SetStateAction<ProxyStats>>;
     loading: boolean;
     filter: string;
     setFilter: (value: string) => void;
@@ -37,6 +39,7 @@ export interface UseProxyLogsResult {
     setPageSize: (value: number) => void;
     currentPage: number;
     totalCount: number;
+    setTotalCount: React.Dispatch<React.SetStateAction<number>>;
     totalPages: number;
     pageStart: number;
     pageEnd: number;
@@ -62,7 +65,7 @@ export function useProxyLogs({ captureHealthLogs, onConfigLoaded }: UseProxyLogs
     const filterRef = useRef(filter);
     const accountFilterRef = useRef(accountFilter);
     const currentPageRef = useRef(1);
-    const globalFilterInputRef = useRef<HTMLInputElement>(null);
+    const filterInputRef = useRef<HTMLInputElement>(null);
 
     const { accounts, fetchAccounts } = useAccountStore();
 
@@ -71,7 +74,6 @@ export function useProxyLogs({ captureHealthLogs, onConfigLoaded }: UseProxyLogs
     const [currentPage, setCurrentPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
     const [loading, setLoading] = useState(false);
-    const [loadingDetail, setLoadingDetail] = useState(false);
 
     const uniqueAccounts = useMemo(() => {
         const emailSet = new Set<string>();
@@ -290,8 +292,8 @@ export function useProxyLogs({ captureHealthLogs, onConfigLoaded }: UseProxyLogs
                     return;
                 }
                 e.preventDefault();
-                globalFilterInputRef.current?.focus();
-                globalFilterInputRef.current?.select();
+                filterInputRef.current?.focus();
+                filterInputRef.current?.select();
             }
         };
         window.addEventListener('keydown', handleGlobalKeyDown);
@@ -344,7 +346,9 @@ export function useProxyLogs({ captureHealthLogs, onConfigLoaded }: UseProxyLogs
     ];
     return {
         logs,
+        setLogs,
         stats,
+        setStats,
         loading,
         filter,
         setFilter,
@@ -354,6 +358,7 @@ export function useProxyLogs({ captureHealthLogs, onConfigLoaded }: UseProxyLogs
         setPageSize,
         currentPage,
         totalCount,
+        setTotalCount,
         totalPages,
         pageStart,
         pageEnd,

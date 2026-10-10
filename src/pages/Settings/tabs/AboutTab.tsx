@@ -1,7 +1,7 @@
 import { SettingsPageApi } from '../useSettingsPage';
 import { Github, User, Sparkles, ExternalLink, RefreshCw, Heart, CheckCircle2, Send } from 'lucide-react';
-import { request as invoke } from '../utils/request';
-import { showToast } from '../components/common/ToastContainer';
+import { request as invoke } from '../../../utils/request';
+import { showToast } from '../../../components/common/ToastContainer';
 
 export function AboutTab(props: SettingsPageApi) {
     const { t, appVersion, formData, setFormData, setIsSupportModalOpen, isCheckingUpdate, updateInfo, setUpdateInfo, isInstallerUpdating, isBrewInstalled, isBrewUpgrading, setIsBrewConfirmOpen, handleCheckUpdate, handleRunInstallerUpdate } = props;

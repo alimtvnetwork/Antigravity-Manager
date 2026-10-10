@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useErrorStore } from '../../stores/error-store';
-import type { InstanceConfig, InstanceStatus } from './types';
+import type { InstanceStatus } from './types';
 
 export async function launchInstance(instanceId: string): Promise<void> {
     try {

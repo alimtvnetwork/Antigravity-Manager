@@ -39,6 +39,6 @@ pub(crate) use appruntimeflags::windows_api;
 pub(crate) use appruntimeflags::AppRuntimeFlags;
 pub use run::run;
 pub(crate) use setup_app::handle_window_event;
-pub(crate) use setup_app::run_headless;
 pub(crate) use setup_app::init_databases;
+pub(crate) use setup_app::run_headless;
 pub(crate) use setup_app::setup_app;

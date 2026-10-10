@@ -2,13 +2,23 @@ import { useMemo } from 'react';
 import type { Account } from '../../types/account';
 import { findQuotaModel, findImageQuotaModel } from '../../utils/modelCategory';
 
+interface QuotaMetrics {
+    avg5h: number;
+    avgWeekly: number;
+    weightedEffective: number;
+    zeroWeeklyCount: number;
+}
+
 interface DashboardStats {
+    total: number;
+    available: number;
+    disabled: number;
     abnormal: number;
     normalCount: number;
     basePoolCount: number;
-    gemini: { avg: number | null; count: number };
-    geminiImage: { avg: number | null; count: number };
-    claude: { avg: number | null; count: number };
+    gemini: QuotaMetrics;
+    geminiImage: QuotaMetrics;
+    claude: QuotaMetrics;
 }
 
 /**

@@ -1,7 +1,8 @@
 import { AutoSwitcherApi } from './useAutoSwitcher';
+import { RotateCw, SlidersHorizontal, ChevronDown, Download, Upload, RotateCcw } from 'lucide-react';
 
 export function SwitcherHeader(props: AutoSwitcherApi) {
-    const { t, currentConfig, isActionsOpen, setIsActionsOpen, actionsRef, fileInputRef, handleExport, handleImportFile, handleResetDefaults, handleToggleEnabled, onChange } = props;
+    const { t, currentConfig, isActionsOpen, setIsActionsOpen, actionsRef, fileInputRef, handleExport, handleImportFile, handleResetDefaults, handleToggleEnabled } = props;
 
     return (
         <>

@@ -1,11 +1,9 @@
-import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, Download, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code } from 'lucide-react';
+import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, Download, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import type { AgmConversationNode } from './types';
 import { formatSeqBadge, stripImagesFromPrompt } from './formatters';
 import { classifyPromptTier } from './tierClassification';
 import { isGhostConversation } from './conversationGuards';
-import { copyToClipboard } from '../../../utils/clipboard';
-import { useErrorStore } from '../../../stores/error-store';
 
 export interface DetailHeaderProps {
     selectedConversation: AgmConversationNode;
@@ -42,7 +40,7 @@ export function DetailHeader(props: DetailHeaderProps) {
     const {
         selectedConversation, activePromptText,
         confirmationSuffix, setConfirmationSuffix,
-        isCopiedText, setIsCopiedText, isCopiedRaw, isCopied, setIsCopied,
+        isCopiedText, setIsCopiedText, isCopiedRaw,
         isEnqueueing, isResending, isFocusing,
         isExportMenuOpen, setIsExportMenuOpen,
         hasImages, instancePid, instanceSeqNum, instanceExeName, instanceNameDisplay,

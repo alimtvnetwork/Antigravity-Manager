@@ -1,4 +1,5 @@
 import { AutoSwitcherApi } from './useAutoSwitcher';
+import { ShieldCheck, Clock, ChevronDown, FastForward } from 'lucide-react';
 
 export function TaskContinuitySettings(props: AutoSwitcherApi) {
     const { t, currentConfig, onChange } = props;

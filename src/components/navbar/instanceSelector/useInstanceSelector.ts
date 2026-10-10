@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useInstanceStore } from '../../../stores/useInstanceStore';
 import { useConfigStore } from '../../../stores/useConfigStore';
-import { useErrorStore } from '../../../stores/error-store';
+import { useErrorStore, type ErrorContext } from '../../../stores/error-store';
 import { isTauri } from '../../../utils/env';
 import { request as invoke } from '../../../utils/request';
 import { showToast } from '../../common/ToastContainer';
 import type { InstanceSelectorApi, CreateMode, CloneMode } from './instanceSelectorTypes';
+import { type InstanceStatus } from '../../../services/instanceService';
 
 export type { InstanceSelectorApi, CreateMode, CloneMode };
 
@@ -15,7 +16,7 @@ function errorMessage(e: unknown): string {
     return String(e);
 }
 
-function reportActionError(source: string, triggerAction: string, e: unknown, context?: Record<string, unknown>) {
+function reportActionError(source: string, triggerAction: string, e: unknown, context?: ErrorContext) {
     const captured = useErrorStore.getState().captureError(e, {
         source,
         triggerComponent: 'InstanceSelector',

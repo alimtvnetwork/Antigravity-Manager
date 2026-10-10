@@ -1,6 +1,6 @@
 import { SettingsPageApi } from '../useSettingsPage';
 import { Bug } from 'lucide-react';
-import DebugConsole from '../components/debug/DebugConsole';
+import DebugConsole from '../../../components/debug/DebugConsole';
 
 export function DebugTab(props: SettingsPageApi) {
     const { t, enable, disable, isEnabled } = props;

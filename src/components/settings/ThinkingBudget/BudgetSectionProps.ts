@@ -1,5 +1,5 @@
 import type * as React from "react";
-import type { ThinkingBudgetConfig } from "../../types/config";
+import type { ThinkingBudgetConfig, ThinkingControlSource, ThinkingBudgetMode } from "../../../types/config";
 import type { BudgetFieldKey } from "./budgetTypes";
 
 export interface BudgetSectionProps {
@@ -10,6 +10,10 @@ export interface BudgetSectionProps {
     setInputValues: React.Dispatch<React.SetStateAction<Record<string, string>>>;
     handleInputChange: (field: BudgetFieldKey, rawVal: string) => void;
     getPresetTooltip: (val: number) => string;
+    handleControlSourceChange: (source: ThinkingControlSource) => void;
+    handleFlashModeChange: (mode: ThinkingBudgetMode) => void;
+    handleProModeChange: (mode: ThinkingBudgetMode) => void;
+    handleClaudeModeChange: (mode: ThinkingBudgetMode) => void;
     controlSource: string;
     // Thinking store
     thinkingStoreEnabled?: boolean;

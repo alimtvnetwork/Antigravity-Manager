@@ -1,8 +1,9 @@
 import { SupabaseSyncApi } from './useSupabaseSync';
-import ModalDialog from '../common/ModalDialog';
+import ModalDialog from '../../common/ModalDialog';
+import { Loader2, ArrowRightLeft } from 'lucide-react';
 
 export function SyncModalsA(props: SupabaseSyncApi) {
-    const { config, isAddModalOpen, setIsAddModalOpen, isMigrateModalOpen, setIsMigrateModalOpen, sourceEpId, setSourceEpId, targetEpId, setTargetEpId, isMigrating, migrationResult, leases, formEndpoint, setFormEndpoint, normalizeSupabaseUrl, handleMigrateSubmit, text, handleAddEndpointSubmit } = props;
+    const { config, isAddModalOpen, setIsAddModalOpen, isMigrateModalOpen, setIsMigrateModalOpen, sourceEpId, setSourceEpId, targetEpId, setTargetEpId, isMigrating, migrationResult, formEndpoint, setFormEndpoint, normalizeSupabaseUrl, handleMigrateSubmit, handleAddEndpointSubmit } = props;
 
     return (
         <>

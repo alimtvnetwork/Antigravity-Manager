@@ -1,4 +1,5 @@
 import { AutoSwitcherApi } from './useAutoSwitcher';
+import { Cpu, ChevronDown, Sparkles, Clock } from 'lucide-react';
 
 export function ModelSettings(props: AutoSwitcherApi) {
     const { t, currentConfig, onChange } = props;

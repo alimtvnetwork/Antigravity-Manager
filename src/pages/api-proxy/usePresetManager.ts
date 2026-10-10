@@ -22,7 +22,7 @@ export function usePresetManager({ appConfig, setAppConfig, loadConfig }: UsePre
     const [newPresetName, setNewPresetName] = useState('');
 
     // 定义多个预设方案
-    const defaultPresets = useMemo(() => [
+    const defaultPresets = useMemo((): CustomPreset[] => [
         {
             id: 'default',
             name: t('proxy.router.preset_default'),

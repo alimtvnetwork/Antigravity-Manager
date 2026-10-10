@@ -1,5 +1,18 @@
-import { showToast } from '../common/ToastContainer';
+import { showToast } from '../../common/ToastContainer';
 import { EmailNotificationsState } from './useEmailCore';
+import {
+    EmailAccount,
+    testDirectEmailConnection,
+    updateEmailAccount,
+    addEmailAccount,
+    listEmailAccounts,
+    deleteEmailAccount,
+    setDefaultEmailAccount,
+    testSmtpConnection,
+    testImapConnection,
+    addNotifyRecipient,
+    deleteNotifyRecipient,
+} from '../../../services/emailService';
 
 export function useAccountHandlers(s: EmailNotificationsState) {
     const { accounts, setAccounts, recipients, setRecipients, setIsAccountModalOpen, editingAccount, setEditingAccount, newRecipientEmail, setNewRecipientEmail, newRecipientGroup, setTestingAccountId, setIsModalQuickImportOpen, setModalQuickImportText, setShowAiJsonSyntax, setIsTestingDirect, testResult, setTestResult } = s;
@@ -233,23 +246,13 @@ export function useAccountHandlers(s: EmailNotificationsState) {
         handleOpenAddAccount,
         handleOpenEditAccount,
         handleEmailChange,
-        trimmed,
-        parts,
-        userPart,
-        domain,
         handleTestDirectConnection,
-        isEmailFormatValid,
-        hasMissingPassword,
-        res,
-        err,
         handleSaveAccount,
-        accs,
         handleDeleteAccount,
         handleSetDefault,
         handleTestSmtp,
         handleTestImap,
         handleAddRecipient,
-        added,
         handleDeleteRecipient,
     };
 }

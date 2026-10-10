@@ -1,11 +1,11 @@
-import type { AutoProfileSwitcherConfig } from "../../types/config";
+import type { AutoProfileSwitcherConfig } from "../../../types/config";
 
 export interface AutoSwitcherSettingsProps {
     config?: AutoProfileSwitcherConfig;
     onChange: (config: AutoProfileSwitcherConfig) => void;
 }
 
-const DEFAULT_CONFIG: AutoProfileSwitcherConfig = {
+export const DEFAULT_CONFIG: AutoProfileSwitcherConfig = {
     is_enabled: true,
     check_interval_seconds: 300,
     low_quota_threshold_percent: 15.0,

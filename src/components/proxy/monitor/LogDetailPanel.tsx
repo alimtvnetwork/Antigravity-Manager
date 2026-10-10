@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { TFunction } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { X, Sparkles, FileCode2, Eye, EyeOff } from 'lucide-react';
 import { formatCompactNumber } from '../../../utils/format';
 import { copyToClipboard } from '../../../utils/clipboard';

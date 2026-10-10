@@ -479,19 +479,19 @@ pub(crate) fn run_headless() {
 }
 
 pub(crate) fn init_databases() {
-// Initialize token stats database
-if let Err(e) = modules::token_stats::init_db() {
-    error!("Failed to initialize token stats database: {}", e);
-}
+    // Initialize token stats database
+    if let Err(e) = modules::token_stats::init_db() {
+        error!("Failed to initialize token stats database: {}", e);
+    }
 
-// Initialize security database
-if let Err(e) = modules::security_db::init_db() {
-    error!("Failed to initialize security database: {}", e);
-}
+    // Initialize security database
+    if let Err(e) = modules::security_db::init_db() {
+        error!("Failed to initialize security database: {}", e);
+    }
 
-// Initialize user token database
-if let Err(e) = modules::user_token_db::init_db() {
-    error!("Failed to initialize user token database: {}", e);
-}
+    // Initialize user token database
+    if let Err(e) = modules::user_token_db::init_db() {
+        error!("Failed to initialize user token database: {}", e);
+    }
 
 }

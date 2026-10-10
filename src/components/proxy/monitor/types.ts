@@ -1,4 +1,4 @@
-import type { TFunction } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 export interface ProxyRequestLog {
     id: string;

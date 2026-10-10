@@ -1,8 +1,28 @@
-import { showToast } from '../common/ToastContainer';
+import { useState } from 'react';
+import { showToast } from '../../common/ToastContainer';
 import { EmailNotificationsState } from './useEmailCore';
+import {
+    EmailAccount,
+    EmailAccountInput,
+    addEmailAccount,
+    importEmailData,
+    exportEmailData,
+    backupEmailDb,
+    restoreEmailDb,
+    triggerManualEmailCheck,
+    dispatchEmailTestPing,
+    dispatchCustomEmailTask,
+    testExecuteCliCommand,
+    CliExecResult,
+    saveEmailSettings,
+} from '../../../services/emailService';
+import {
+    downloadOrSaveFile,
+    parseAccountsFromText,
+} from '../../../utils/emailFormatters';
 
 export function useEmailUtilities(s: EmailNotificationsState) {
-    const { accounts, recipients, settings, setIsPinging, HELP_COMMAND_PAYLOAD, developerTaskType, setDeveloperTaskType, developerTargetRecipient, developerTaskPayload, setDeveloperTaskPayload, developerCustomSubject, setDeveloperCustomSubject, setIsDispatchingTask, editingAccount, setEditingAccount, setIsImportModalOpen, importFormat, setImportFormat, importPayload, setImportPayload, setExportModalState, setIsModalQuickImportOpen, setModalQuickImportText, loadAll, testResult, err } = s;
+    const { accounts, settings, setIsPinging, HELP_COMMAND_PAYLOAD, developerTaskType, setDeveloperTaskType, developerTargetRecipient, developerTaskPayload, setDeveloperTaskPayload, developerCustomSubject, setDeveloperCustomSubject, setIsDispatchingTask, editingAccount, setEditingAccount, setIsImportModalOpen, importFormat, setImportFormat, importPayload, setImportPayload, setExportModalState, setIsModalQuickImportOpen, setModalQuickImportText, loadAll, testResult } = s;
 
     const handleExport = (format: 'json' | 'yaml' | 'csv' | 'xlsx') => {
         if (format === 'xlsx') {
@@ -343,23 +363,12 @@ export function useEmailUtilities(s: EmailNotificationsState) {
         handleExport,
         handleExportSingleAccount,
         handleQuickImportSingle,
-        parsed,
-        target,
         handleSingleFileUpload,
-        file,
-        reader,
-        text,
         handleImportSubmit,
-        summary,
         handleFileUpload,
-        lowerName,
         handleLoadSampleMailboxes,
         handleBackupDb,
-        defaultFilename,
-        targetPath,
-        res,
         handleRestoreDb,
-        sourcePath,
         handleTriggerManualCheck,
         handleDispatchPingTest,
         testCliCommand,
@@ -373,5 +382,7 @@ export function useEmailUtilities(s: EmailNotificationsState) {
         handleDispatchDeveloperTask,
         handleSaveRecipientsIntervals,
         trimmedEmail,
+        emailFormatStatus,
+        testResultStatus,
     };
 }

@@ -1,7 +1,10 @@
 import { SupabaseSyncApi } from './useSupabaseSync';
+import { Database } from 'lucide-react';
 
 export function GlobalSyncSection(props: SupabaseSyncApi) {
-    const { config, handleSaveConfig, text } = props;
+    const { config, handleSaveConfig } = props;
+
+    if (!config) return null;
 
     return (
             <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-4">

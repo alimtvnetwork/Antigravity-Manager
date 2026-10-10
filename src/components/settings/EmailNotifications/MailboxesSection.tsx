@@ -1,7 +1,8 @@
 import { EmailNotificationsApi } from './useEmailNotifications';
+import { ChevronDown, Database, FileCode, FileJson, FileSpreadsheet, FileText, Mail, Plus, RefreshCw, Server, SlidersHorizontal, Sparkles, Trash2, Upload } from 'lucide-react';
 
 export function MailboxesSection(props: EmailNotificationsApi) {
-    const { accounts, setIsImportModalOpen, testingAccountId, isActionsOpen, setIsActionsOpen, setIsSampleTemplatesOpen, actionsDropdownRef, handleOpenAddAccount, handleOpenEditAccount, handleDeleteAccount, handleSetDefault, handleTestSmtp, handleTestImap, handleExport, handleExportSingleAccount, text, handleLoadSampleMailboxes, handleBackupDb, handleRestoreDb } = props;
+    const { accounts, setIsImportModalOpen, testingAccountId, isActionsOpen, setIsActionsOpen, setIsSampleTemplatesOpen, actionsDropdownRef, handleOpenAddAccount, handleOpenEditAccount, handleDeleteAccount, handleSetDefault, handleTestSmtp, handleTestImap, handleExport, handleExportSingleAccount, handleLoadSampleMailboxes, handleBackupDb, handleRestoreDb } = props;
 
     return (
             <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100 dark:border-slate-800">

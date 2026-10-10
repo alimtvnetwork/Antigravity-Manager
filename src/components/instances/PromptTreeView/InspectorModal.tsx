@@ -1,11 +1,12 @@
-import { X, Copy, Check, Image as ImageIcon, FileText } from 'lucide-react';
-import { cn } from '../../../utils/cn';
+import { X, Copy, Check, Image as ImageIcon, FileText, Folder } from 'lucide-react';
 import { RichMarkdownRenderer } from './markdown';
+import { stripImagesFromPrompt } from './formatters';
 import type { InspectorPrompt } from './usePromptTreeState';
 
 export interface InspectorModalProps {
     inspectorPrompt: InspectorPrompt;
     showAllWords: boolean;
+    setShowAllWords: (v: boolean) => void;
     isCopied: boolean;
     setIsCopied: (v: boolean) => void;
     isCopiedRaw: boolean;
@@ -15,7 +16,7 @@ export interface InspectorModalProps {
 
 export function InspectorModal(props: InspectorModalProps) {
     const {
-        inspectorPrompt, showAllWords,
+        inspectorPrompt, showAllWords, setShowAllWords,
         isCopied, setIsCopied, isCopiedRaw,
         onClose, onCopyWithImages,
     } = props;

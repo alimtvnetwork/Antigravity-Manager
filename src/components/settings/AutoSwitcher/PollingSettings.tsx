@@ -1,5 +1,5 @@
 import { AutoSwitcherApi } from './useAutoSwitcher';
-import { cn } from '../../utils/cn';
+import { cn } from '../../../utils/cn';
 
 export function PollingSettings(props: AutoSwitcherApi) {
     const { t, currentConfig, daemonStatus, remainingSeconds, handleIntervalChange, handleThresholdChange, onChange } = props;

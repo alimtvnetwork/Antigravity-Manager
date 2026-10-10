@@ -1,22 +1,16 @@
 import * as instanceService from '../../services/instanceService';
-import * as accountService from '../../services/accountService';
 import { useErrorStore } from '../error-store';
-import { useConfigStore } from '../useConfigStore';
 import { showToast } from '../../components/common/ToastContainer';
-import type { Account } from '../../types/account';
-import type {
-    InstanceConfig,
-    InstanceStatus,
-    AutoProfileSwitcherConfig,
-    AutoSwitcherStatus,
-} from '../../services/instanceService';
 import type { InstanceState } from './types';
 import { instanceSelectionEpoch } from './shared';
 
 type SetState = (p: Partial<InstanceState> | ((s: InstanceState) => Partial<InstanceState>)) => void;
 type GetState = () => InstanceState;
 
-export function createLifecycleSlice(set: SetState, get: GetState): Partial<InstanceState> {
+export function createLifecycleSlice(set: SetState, get: GetState): Pick<InstanceState,
+    'launchInstance' | 'cloneInstanceExecutable' | 'setInstanceExecutable' | 'closeInstance' |
+    'stopInstance' | 'restartInstance' | 'fastForwardInstance' | 'setActiveInstance' |
+    'setDefaultInstance' | 'switchAccountToInstance' | 'syncInstance' | 'syncAllInstances'> {
     return {
     launchInstance: async (instanceId: string) => {
         set({ isLoading: true, error: null });
@@ -116,12 +110,12 @@ export function createLifecycleSlice(set: SetState, get: GetState): Partial<Inst
     },
 
     setActiveInstance: async (instanceId: string) => {
-        instanceSelectionEpoch += 1;
-        const epoch = instanceSelectionEpoch;
+        instanceSelectionEpoch.value += 1;
+        const epoch = instanceSelectionEpoch.value;
         set({ isLoading: true, error: null, activeInstanceId: instanceId });
         try {
             await instanceService.setActiveInstance(instanceId);
-            if (epoch === instanceSelectionEpoch) {
+            if (epoch === instanceSelectionEpoch.value) {
                 set({ activeInstanceId: instanceId, isLoading: false });
             }
         } catch (err: any) {
@@ -148,7 +142,7 @@ export function createLifecycleSlice(set: SetState, get: GetState): Partial<Inst
         set({ isLoading: true, error: null });
         try {
             await instanceService.switchAccountToInstance(accountId, instanceId);
-            const { useAccountStore } = await import('./useAccountStore');
+            const { useAccountStore } = await import('../useAccountStore');
             await Promise.all([
                 get().fetchInstances(true),
                 useAccountStore.getState().fetchAccounts(),
@@ -170,7 +164,7 @@ export function createLifecycleSlice(set: SetState, get: GetState): Partial<Inst
                     inst.config.id === instanceId ? updated : inst
                 ),
             }));
-            const { useAccountStore } = await import('./useAccountStore');
+            const { useAccountStore } = await import('../useAccountStore');
             await Promise.all([
                 get().fetchInstances(true),
                 useAccountStore.getState().fetchAccounts(),
@@ -190,7 +184,7 @@ export function createLifecycleSlice(set: SetState, get: GetState): Partial<Inst
             if (updatedList && updatedList.length > 0) {
                 set({ instances: updatedList });
             }
-            const { useAccountStore } = await import('./useAccountStore');
+            const { useAccountStore } = await import('../useAccountStore');
             await Promise.all([
                 get().fetchInstances(true),
                 useAccountStore.getState().fetchAccounts(),

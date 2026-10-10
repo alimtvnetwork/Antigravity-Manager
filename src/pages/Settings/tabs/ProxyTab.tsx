@@ -1,9 +1,9 @@
 import { SettingsPageApi } from '../useSettingsPage';
-import { Save, Network, Globe, Sliders } from 'lucide-react';
-import ProxyPoolSettings from '../components/settings/ProxyPoolSettings';
+import { Network, Globe, Sliders } from 'lucide-react';
+import ProxyPoolSettings from '../../../components/settings/ProxyPoolSettings';
 
 export function ProxyTab(props: SettingsPageApi) {
-    const { t, config, saveConfig, formData, setFormData, path } = props;
+    const { t, saveConfig, formData, setFormData } = props;
 
     return (
                         <div className="space-y-4 animate-in fade-in duration-300">

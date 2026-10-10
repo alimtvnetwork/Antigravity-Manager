@@ -1,4 +1,4 @@
-interface InstanceAuditTrailModalProps {
+export interface InstanceAuditTrailModalProps {
     instance: {
         id: string;
         name: string;

@@ -51,7 +51,7 @@ export interface AgmProjectTreeNode {
     repeat_badge?: string;
 }
 
-interface PromptTreeViewModalProps {
+export interface PromptTreeViewModalProps {
     isOpen: boolean;
     onClose: () => void;
     instanceId: string;
@@ -61,7 +61,7 @@ interface PromptTreeViewModalProps {
     initialSelectedProjectId?: string;
 }
 
-type ViewMode = 'preview' | 'raw' | 'edit';
+export type ViewMode = 'preview' | 'raw' | 'edit';
 
 export type PromptTier = 'USER_PROMPT' | 'SUBAGENT_INSTRUCTION' | 'SYSTEM_MESSAGE' | 'TOOL_OUTPUT';
 

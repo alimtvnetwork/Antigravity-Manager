@@ -1,13 +1,12 @@
 import { SettingsPageApi } from '../useSettingsPage';
-import { ShieldCheck, Bug, Terminal } from 'lucide-react';
-import { request as invoke } from '../utils/request';
-import { showToast } from '../components/common/ToastContainer';
-import { isTauri } from '../utils/env';
-import versionData from '../../version.json';
+import { ShieldCheck } from 'lucide-react';
+import { request as invoke } from '../../../utils/request';
+import { showToast } from '../../../components/common/ToastContainer';
+import { isTauri } from '../../../utils/env';
 
 import { AdvancedMaintenanceSection } from './AdvancedMaintenanceSection';
 export function AdvancedTab(props: SettingsPageApi) {
-    const { t, enable, disable, isEnabled, setIsBackupModalOpen, formData, setFormData, setIsClearLogsOpen, dataDirPath, isMigratingDataDir, handleOpenDataDir, handleSelectDataDir, handleSelectExportPath, handleSelectAntigravityPath, handleSelectAntigravityIdePath, handleSelectDebugLogDir, handleDetectAntigravityPath, command, path, handleSelectAntigravityCliPath, handleDetectAntigravityCliPath, handleOpenClearCacheDialog } = props;
+    const { t, setIsBackupModalOpen, formData, setFormData, dataDirPath, isMigratingDataDir, handleOpenDataDir, handleSelectDataDir, handleSelectExportPath, handleSelectAntigravityPath, handleSelectAntigravityIdePath, handleDetectAntigravityPath, handleSelectAntigravityCliPath, handleDetectAntigravityCliPath } = props;
 
     return (
                         <>

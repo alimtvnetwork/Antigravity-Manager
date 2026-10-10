@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useErrorStore } from '../../stores/error-store';
+import type { InstanceStatus } from './types';
 
 export interface AutoProfileSwitcherConfig {
     is_enabled: boolean;

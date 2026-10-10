@@ -1,22 +1,13 @@
 import * as instanceService from '../../services/instanceService';
-import * as accountService from '../../services/accountService';
 import { useErrorStore } from '../error-store';
-import { useConfigStore } from '../useConfigStore';
-import { showToast } from '../../components/common/ToastContainer';
-import type { Account } from '../../types/account';
-import type {
-    InstanceConfig,
-    InstanceStatus,
-    AutoProfileSwitcherConfig,
-    AutoSwitcherStatus,
-} from '../../services/instanceService';
+import type { AutoProfileSwitcherConfig } from '../../services/instanceService';
 import type { InstanceState } from './types';
-import { instanceSelectionEpoch } from './shared';
 
 type SetState = (p: Partial<InstanceState> | ((s: InstanceState) => Partial<InstanceState>)) => void;
 type GetState = () => InstanceState;
 
-export function createSwitcherSlice(set: SetState, get: GetState): Partial<InstanceState> {
+export function createSwitcherSlice(set: SetState, get: GetState): Pick<InstanceState,
+    'fetchSwitcherStatus' | 'updateSwitcherConfig' | 'triggerManualRotation' | 'toggleAutoSwitcher'> {
     return {
     fetchSwitcherStatus: async () => {
         try {

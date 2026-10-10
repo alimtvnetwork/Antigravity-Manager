@@ -1,4 +1,5 @@
 import { AutoSwitcherApi } from './useAutoSwitcher';
+import { Sparkles, Clock, Gauge, Award, History, ShieldCheck } from 'lucide-react';
 
 export function HowItWorksGuide(props: AutoSwitcherApi) {
     const { t } = props;

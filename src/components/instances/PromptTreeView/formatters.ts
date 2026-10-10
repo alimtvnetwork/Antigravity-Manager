@@ -9,7 +9,7 @@ export function formatDualBadge(agmCode: string | undefined, defaultAgm: string,
 
 // Helper to count words
 
-function countWords(str: string): number {
+export function countWords(str: string): number {
     const trimmed = str.trim();
     if (!trimmed) return 0;
     return trimmed.split(/\s+/).length;
@@ -17,7 +17,7 @@ function countWords(str: string): number {
 
 
 // Helper to truncate text at word limit while strictly preserving original line breaks and newlines
-function getTruncatedText(text: string, maxWords: number): { displayText: string; isTruncated: boolean; totalWords: number } {
+export function getTruncatedText(text: string, maxWords: number): { displayText: string; isTruncated: boolean; totalWords: number } {
     const trimmed = text.trim();
     if (!trimmed) return { displayText: '', isTruncated: false, totalWords: 0 };
     const allWords = trimmed.split(/\s+/).filter(Boolean);
@@ -62,7 +62,7 @@ function getTruncatedText(text: string, maxWords: number): { displayText: string
 
 // Pre-formatter to ensure inline markdown headings and paragraph line gaps have explicit spacing
 
-function formatPromptForMarkdown(text: string): string {
+export function formatPromptForMarkdown(text: string): string {
     if (!text) return '';
     let formatted = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
@@ -114,7 +114,7 @@ export function formatSeqBadge(raw: string | undefined | null, fallback: string)
 
 // Helper to check if a conversation has zero prompt content and untitled title (true ghost node)
 
-function stripImagesFromPrompt(text: string): string {
+export function stripImagesFromPrompt(text: string): string {
     return text
         .replace(/!\[.*?\]\((?:https?:\/\/.*?|data:image\/.*?;base64,.*?|[^\s)]+)\)/g, '')
         .trim();

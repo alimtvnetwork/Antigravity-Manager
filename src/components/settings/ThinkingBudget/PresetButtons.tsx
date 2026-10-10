@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import type { ThinkingBudgetConfig } from "../../types/config";
+import type { ThinkingBudgetConfig } from "../../../types/config";
 import type { BudgetFieldKey } from "./budgetTypes";
 
 interface PresetButtonsProps {

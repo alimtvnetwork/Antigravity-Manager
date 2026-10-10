@@ -1,4 +1,5 @@
 import { AutoSwitcherApi } from './useAutoSwitcher';
+import { ArrowRightLeft, Play, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export function ManualRotation(props: AutoSwitcherApi) {
     const { rotationFeedback, isRotating, handleManualRotate } = props;

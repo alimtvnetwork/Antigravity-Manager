@@ -8,13 +8,13 @@ import { DebugTab } from './Settings/tabs/DebugTab';
 import { ProxyTab } from './Settings/tabs/ProxyTab';
 import { AboutTab } from './Settings/tabs/AboutTab';
 import { SettingsModals } from './Settings/SettingsModals';
-import EmailNotificationSettings from './components/settings/EmailNotificationSettings';
-import ThemePicker from './components/settings/ThemePicker';
-import SupabaseSyncSettings from './components/settings/SupabaseSyncSettings';
+import EmailNotificationSettings from '../components/settings/EmailNotificationSettings';
+import ThemePicker from '../components/settings/ThemePicker';
+import SupabaseSyncSettings from '../components/settings/SupabaseSyncSettings';
 
 function Settings() {
     const page = useSettingsPage();
-    const { t, activeTab } = page;
+    const { t, activeTab, setActiveTab, isMoreDropdownOpen, setIsMoreDropdownOpen, openDebugModal, setIsBackupModalOpen, handleSave } = page;
 
     return (
             <div className="h-full w-full overflow-y-auto">

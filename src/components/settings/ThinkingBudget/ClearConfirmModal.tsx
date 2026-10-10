@@ -1,4 +1,4 @@
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Trash2 } from "lucide-react";
 import { BudgetSectionProps } from "./BudgetSectionProps";
 
 export function ClearConfirmModal(props: BudgetSectionProps) {

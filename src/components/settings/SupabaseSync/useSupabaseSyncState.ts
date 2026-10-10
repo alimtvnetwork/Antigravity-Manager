@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import type { SupabaseConfig, SupabaseEndpoint, LocalNodeInfo, TableVerificationResult, DataMigrationSummary, WorkspaceLease } from '../../services/supabaseService';
-import type { TelegramConfig, TelegramWatcherStatus } from '../../services/telegramService';
+import { useState } from 'react';
+import type { SupabaseConfig, SupabaseEndpoint, LocalNodeInfo, TableVerificationResult, DataMigrationSummary, WorkspaceLease } from '../../../services/supabaseService';
+import type { TelegramConfig, TelegramWatcherStatus } from '../../../services/telegramService';
 
 export function useSupabaseSyncState() {
     const [config, setConfig] = useState<SupabaseConfig | null>(null);
@@ -58,11 +58,6 @@ export function useSupabaseSyncState() {
         prune_threshold_mb: 200,
         priority: 1,
     });
-
-    useEffect(() => {
-        loadData();
-    }, []);
-
 
     return {
         config,

@@ -1,7 +1,10 @@
 import { SupabaseSyncApi } from './useSupabaseSync';
+import { Cpu, Loader2, Sparkles, ArrowRightLeft, ShieldCheck, Download, Upload } from 'lucide-react';
 
 export function HeaderSection(props: SupabaseSyncApi) {
-    const { config, nodeInfo, isSaving, isAutoDiscovering, setIsImportModalOpen, setIsAiPromptModalOpen, setIsBackupModalOpen, handleAutoDiscover, handleOpenMigrateModal, handleOpenExport, text } = props;
+    const { config, nodeInfo, isSaving, isAutoDiscovering, setIsImportModalOpen, setIsAiPromptModalOpen, setIsBackupModalOpen, handleAutoDiscover, handleOpenMigrateModal, handleOpenExport } = props;
+
+    if (!config) return null;
 
     return (
             <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">

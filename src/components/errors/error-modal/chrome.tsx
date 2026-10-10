@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import {
   AlertCircle,
+  AlertTriangle,
+  Info,
   Copy,
   Check,
   ChevronLeft,
@@ -8,12 +10,11 @@ import {
   X,
   Terminal,
   Layers,
-  Wrench,
   Bot,
   Trash2,
   ClipboardList,
 } from 'lucide-react';
-import { useErrorStore, type CapturedError, type ErrorModalTab } from '../../../stores/error-store';
+import { type CapturedError, type ErrorModalTab } from '../../../stores/error-store';
 import { showToast } from '../../common/ToastContainer';
 import { cn } from '../../../utils/cn';
 
@@ -23,7 +24,7 @@ interface ItemCopyButtonProps {
   successMessage?: string;
 }
 
-function ItemCopyButton({
+export function ItemCopyButton({
   text,
   label = 'Copy',
   successMessage,
@@ -58,7 +59,18 @@ function ItemCopyButton({
   );
 }
 
-function ModalHeader({
+interface ModalHeaderProps {
+  error: CapturedError;
+  queueLength: number;
+  queueIndex: number;
+  onNavigate: (direction: 'prev' | 'next') => void;
+  onClose: () => void;
+  onCopyAllData: () => void;
+  onRemove: () => void;
+  copiedAll: boolean;
+}
+
+export function ModalHeader({
   error,
   queueLength,
   queueIndex,
@@ -166,7 +178,7 @@ interface TabNavProps {
   onSelect: (tab: ErrorModalTab) => void;
 }
 
-function TabNav({ activeTab, onSelect }: TabNavProps): React.ReactNode {
+export function TabNav({ activeTab, onSelect }: TabNavProps): React.ReactNode {
   const tabs: Array<{ id: ErrorModalTab; label: string; icon: React.ReactNode }> = [
     { id: 'stack', label: 'Stack Trace', icon: <Layers className="w-3.5 h-3.5" /> },
     { id: 'overview', label: 'Overview', icon: <Info className="w-3.5 h-3.5" /> },
@@ -208,7 +220,7 @@ interface ModalFooterProps {
   onClose: () => void;
 }
 
-function ModalFooter({
+export function ModalFooter({
   copiedAi,
   copiedAll,
   onCopyAi,

@@ -1,7 +1,10 @@
 import { SupabaseSyncApi } from './useSupabaseSync';
+import { Server, Plus, Database, Loader2, Sparkles, CheckCircle2, AlertCircle, ShieldCheck, RefreshCw, Trash2 } from 'lucide-react';
 
 export function EndpointsSection(props: SupabaseSyncApi) {
-    const { config, testingEndpointId, testResults, verifyingEndpointId, tableVerification, isAutoDiscovering, setIsAddModalOpen, handleTestEndpoint, handleCheckTables, handleAutoDiscover, handleOpenSchemaModal, text, handleDeleteEndpoint } = props;
+    const { config, testingEndpointId, testResults, verifyingEndpointId, tableVerification, isAutoDiscovering, setIsAddModalOpen, handleTestEndpoint, handleCheckTables, handleAutoDiscover, handleOpenSchemaModal, handleDeleteEndpoint } = props;
+
+    if (!config) return null;
 
     return (
             <div className="space-y-3">

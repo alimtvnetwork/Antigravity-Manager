@@ -1,4 +1,4 @@
-function formatAuditTime(ts?: number | null): string {
+export function formatAuditTime(ts?: number | null): string {
     if (!ts || ts <= 0) return '—';
     const ms = ts < 1e11 ? ts * 1000 : ts;
     const d = new Date(ms);

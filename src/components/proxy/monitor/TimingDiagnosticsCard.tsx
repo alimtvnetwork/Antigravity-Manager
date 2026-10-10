@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Clock, CheckCircle, Copy } from 'lucide-react';
+import { Clock, CheckCircle, Copy, ChevronDown } from 'lucide-react';
 import { formatSeconds } from './timingUtils';
 import type { StageTimingInfo } from './timingUtils';
 

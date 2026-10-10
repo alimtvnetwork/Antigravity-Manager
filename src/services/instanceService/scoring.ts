@@ -1,4 +1,5 @@
 import type { Account } from '../../types/account';
+import type { InstanceStatus } from './types';
 import { parseFlexibleDate } from '../../utils/format';
 
 export function findBestSmartPlayAccount(

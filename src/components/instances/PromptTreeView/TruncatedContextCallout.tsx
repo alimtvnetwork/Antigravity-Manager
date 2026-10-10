@@ -1,3 +1,5 @@
+import { ChevronDown } from 'lucide-react';
+
 export interface TruncatedContextCalloutProps {
     omittedBytes?: number;
     omittedLines?: number;
