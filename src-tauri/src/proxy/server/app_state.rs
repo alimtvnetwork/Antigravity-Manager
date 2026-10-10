@@ -3,6 +3,7 @@ use crate::proxy::TokenManager;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use crate::proxy::server::image_scheduler::ImageScheduler;
 
 /// Axum application state
 #[derive(Clone)]

@@ -9,6 +9,9 @@ use axum::{
 use tower_http::cors::{Any, CorsLayer};
 
 use super::*;
+use crate::modules::account::crud::list_accounts;
+use crate::modules::account::current::get_current_account;
+use crate::modules::proxy_db::logs::get_logs;
 
 // ============================================================================
 // Server

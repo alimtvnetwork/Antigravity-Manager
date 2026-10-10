@@ -27,6 +27,10 @@ use chrono::Utc;
 use rusqlite::Connection;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use crate::modules::repo_db::project_queries::normalize_path_for_compare;
+use crate::modules::repo_db::sequences::extract_prompt_words_preview;
+use crate::modules::repo_db::dispatch::parse_flexible_timestamp;
+use crate::modules::repo_db::failed_commands::decode_uri_to_path;
 
 pub(crate) fn collect_tree_conversation_items(
     target: Option<&str>,

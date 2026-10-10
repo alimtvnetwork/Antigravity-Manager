@@ -17,11 +17,11 @@ const LAYER_3_TTL: Duration = Duration::from_secs(3600);
 #[derive(Debug, Clone)]
 struct SiCacheEntry {
     /// 清洗后的 system instruction 文本
-    sanitized_text: String,
+    pub(crate) sanitized_text: String,
     /// 创建/更新时间
-    timestamp: Instant,
+    pub(crate) timestamp: Instant,
     /// 命中次数
-    hit_count: u64,
+    pub(crate) hit_count: u64,
 }
 
 // ===== Layer 2: Tools Cache =====
@@ -30,11 +30,11 @@ struct SiCacheEntry {
 #[derive(Debug, Clone)]
 struct ToolsCacheEntry {
     /// 处理后的 tools JSON (序列化为字符串，使用时反序列化)
-    tools_json: String,
+    pub(crate) tools_json: String,
     /// 创建/更新时间
-    timestamp: Instant,
+    pub(crate) timestamp: Instant,
     /// 命中次数
-    hit_count: u64,
+    pub(crate) hit_count: u64,
 }
 
 // ===== Layer 3: Prefix Tracker =====
@@ -47,15 +47,15 @@ struct PrefixTrackingEntry {
     /// Layer 2 的 hash (用于关联)
     tools_hash: String,
     /// Gemini 缓存的资源名 (cachedContents/xxx)
-    cache_name: String,
+    pub(crate) cache_name: String,
     /// 创建时间
     created_at: Instant,
     /// 过期时间
-    expires_at: Instant,
+    pub(crate) expires_at: Instant,
     /// 隐式缓存命中次数 (cachedContentTokenCount > 0)
-    implicit_hit_count: u64,
+    pub(crate) implicit_hit_count: u64,
     /// 显式缓存命中次数 (成功注入 cachedContent)
-    explicit_hit_count: u64,
+    pub(crate) explicit_hit_count: u64,
     /// 模型名
     model: String,
 }

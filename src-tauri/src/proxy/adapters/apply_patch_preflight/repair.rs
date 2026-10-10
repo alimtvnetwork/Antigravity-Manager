@@ -22,6 +22,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
 use serde_json::Value;
+use crate::proxy::adapters::apply_patch_preflight::Repair;
 
 /// 一条 pre-flight 处理记录(给诊断页 / 日志)。
 
