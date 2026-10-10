@@ -53,7 +53,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { InstanceSettingsModal } from '../components/instances/InstanceSettingsModal';
 import InstanceTable, { type InstanceActionType } from '../components/instances/InstanceTable';
 import { FleetMachinesTable } from '../components/instances/FleetMachinesTable';
-import PromptTreeViewModal, { type AgmProjectTreeNode } from '../components/instances/PromptTreeViewModal';
+import PromptTreeViewModal, { type AgmProjectTreeNode, isGhostConversation } from '../components/instances/PromptTreeViewModal';
 import InstanceAuditTrailModal from '../components/instances/InstanceAuditTrailModal';
 import ModalDialog from '../components/common/ModalDialog';
 import { findQuotaModel } from '../config/modelConfig';
@@ -1110,8 +1110,12 @@ export default function Instances() {
 
                         const hasActiveTask = Boolean(inst.is_running) && runningTreeNodes.some((node) => {
                             const isInstanceMatch = isNodeOwnedByInstance(node, inst.config);
-                            const isNodeRunning = Boolean(node.is_running);
-                            return isInstanceMatch && isNodeRunning;
+                            const hasGenuineRunningConv = (node.conversations || []).some((c) =>
+                                Boolean(c.is_running) &&
+                                !isGhostConversation(c) &&
+                                !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+                            );
+                            return isInstanceMatch && Boolean(node.is_running) && hasGenuineRunningConv;
                         });
 
                         // Resolve effective executable path for display

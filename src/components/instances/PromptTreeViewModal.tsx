@@ -245,6 +245,34 @@ export function TruncatedContextCallout({
     );
 }
 
+// Helper to standardize and format clean sequence codes (#P001, C001)
+export function formatCleanSeqCode(code: string | undefined | null, prefix: 'P' | 'C' = 'C'): string {
+    if (!code) return prefix === 'P' ? '#P001' : 'C001';
+    const stripped = code.replace(/^(AGM:|GM:)/i, '').replace(/[\[\]]/g, '').trim();
+    if (!stripped) return prefix === 'P' ? '#P001' : 'C001';
+    if (prefix === 'P') {
+        const withP = stripped.startsWith('P') || stripped.startsWith('#P') ? stripped : `P${stripped}`;
+        return withP.startsWith('#') ? withP : `#${withP}`;
+    }
+    const withoutHash = stripped.replace(/^#/, '');
+    return withoutHash.startsWith('C') ? withoutHash : `C${withoutHash}`;
+}
+
+export function formatSeqBadge(raw: string | undefined | null, fallback: string): string {
+    if (!raw) return fallback;
+    const clean = raw.replace(/^(AGM:|GM:)/i, '').replace(/[\[\]]/g, '').trim();
+    if (!clean) return fallback;
+    if (fallback.startsWith('#P') || fallback === '#P001') {
+        const withP = clean.startsWith('P') || clean.startsWith('#P') ? clean : `P${clean}`;
+        return withP.startsWith('#') ? withP : `#${withP}`;
+    }
+    if (fallback.startsWith('C') || fallback === 'C001') {
+        const withoutHash = clean.replace(/^#/, '');
+        return withoutHash.startsWith('C') ? withoutHash : `C${withoutHash}`;
+    }
+    return clean.startsWith('#') || clean.startsWith('P') || clean.startsWith('C') ? clean : `#${clean}`;
+}
+
 // Helper to check if a conversation has zero prompt content and untitled title (true ghost node)
 export function isGhostConversation(conv: AgmConversationNode): boolean {
     const title = (conv.title || '').trim().toLowerCase();
@@ -1713,18 +1741,8 @@ export default function PromptTreeViewModal({
                 await navigator.clipboard.writeText(promptContent);
             } catch {}
 
-            // 4. Focus IDE instance window if workspace is known (avoids secondary launch hazard)
-            try {
-                if (repoPath) {
-                    const repoName = repoPath.split(/[/\\]/).filter(Boolean).pop() || repoPath;
-                    await focusInstanceWorkspace(targetInstId, repoPath, repoName);
-                }
-            } catch (focusErr) {
-                console.warn('focusInstanceWorkspace error', focusErr);
-            }
-
-            setActionMsg("Prompt Dispatched & Focused IDE (via Hotkey 'N' / Send Now)!");
-            setTimeout(() => setActionMsg(null), 3500);
+            setActionMsg("Prompt dispatched to IDE & copied to clipboard!");
+            setTimeout(() => setActionMsg(null), 3000);
         } catch (err: any) {
             setError(err?.toString() || 'Failed to dispatch prompt');
         } finally {
@@ -2123,7 +2141,7 @@ ${activePromptText}
                         ? 'bg-blue-600 text-white font-medium shadow-2xs'
                         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#0c2438]'
                 )}
-                title="Click to view prompt; double-click for Full inspector"
+                title={`${conv.title || 'Conversation'} · ${conv.step_count || 1} steps · Click to view`}
             >
                 <div className="flex items-center gap-1.5 min-w-0">
                     <span title={promptCategory.roleBadge || promptCategory.tier} className="shrink-0 flex items-center">
@@ -2140,7 +2158,7 @@ ${activePromptText}
                         )}
                         title={conv.short_id ? `GitMap SHA: ${conv.short_id}` : (conv.gitmap_seq_code ? `GitMap: ${conv.gitmap_seq_code}` : undefined)}
                     >
-                        {conv.seq_code || 'C001'}
+                        {formatSeqBadge(conv.seq_code, 'C001')}
                     </span>
                     {(conv.repeat_badge || (conv.repeat_count && conv.repeat_count > 1)) && (
                         <span
@@ -2160,16 +2178,6 @@ ${activePromptText}
                     </span>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                    <span
-                        className={cn(
-                            'text-[9px] font-mono px-1 rounded-[3px]',
-                            isConvSelected
-                                ? 'bg-blue-700/80 text-white'
-                                : 'bg-slate-200 dark:bg-[#15334d] text-slate-500 dark:text-slate-400'
-                        )}
-                    >
-                        {conv.step_count || 1} stp
-                    </span>
                     {isRunning && (
                         <span className={cn(
                             "flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[8.5px] font-bold font-mono border animate-pulse",
@@ -2214,7 +2222,9 @@ ${activePromptText}
                         <div className="pl-5 space-y-0.5 border-l-2 border-purple-300/40 dark:border-purple-800/40 ml-3.5 my-0.5">
                             {root.subagents.map((subNode, subIdx) => {
                                 const isSubSelected = selectedConversation?.conversation_id === subNode.primaryNode.conversation_id;
-                                const isSubRunning = Boolean(subNode.primaryNode.is_running);
+                                const isSubRunning = Boolean(subNode.primaryNode.is_running) &&
+                                    !isGhostConversation(subNode.primaryNode) &&
+                                    !(subNode.primaryNode.prompt_word_count === 0 && (!subNode.primaryNode.prompt_preview_200w || !subNode.primaryNode.prompt_preview_200w.trim()));
                                 const isLast = subIdx === root.subagents.length - 1;
                                 return (
                                     <div
@@ -2227,7 +2237,7 @@ ${activePromptText}
                                                 ? "bg-purple-600 text-white font-medium shadow-2xs"
                                                 : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#0c2438]"
                                         )}
-                                        title="AI Subagent Task Instruction - Click to view"
+                                        title={`AI Subagent Task · ${subNode.primaryNode.title || 'Subagent'} · ${subNode.primaryNode.step_count || 1} steps · Click to view`}
                                     >
                                         <div className="flex items-center gap-1.5 min-w-0">
                                             {/* Tree Branch Connector Glyph: ↳ or └── */}
@@ -2248,23 +2258,13 @@ ${activePromptText}
                                                 )}
                                                 title={subNode.primaryNode.short_id ? `GitMap SHA: ${subNode.primaryNode.short_id}` : (subNode.primaryNode.gitmap_seq_code ? `GitMap: ${subNode.primaryNode.gitmap_seq_code}` : undefined)}
                                             >
-                                                {subNode.primaryNode.seq_code || 'C001'}
+                                                {formatSeqBadge(subNode.primaryNode.seq_code, 'C001')}
                                             </span>
                                             <span className="truncate text-[11px]">
                                                 {subNode.primaryNode.title || 'Subagent Task'}
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-1.5 shrink-0">
-                                            <span
-                                                className={cn(
-                                                    'text-[9px] font-mono px-1 rounded-[3px]',
-                                                    isSubSelected
-                                                        ? 'bg-purple-700 text-white'
-                                                        : 'bg-slate-200 dark:bg-[#15334d] text-slate-500 dark:text-slate-400'
-                                                )}
-                                            >
-                                                {subNode.primaryNode.step_count || 1} stp
-                                            </span>
                                             {isSubRunning && (
                                                 <span className={cn(
                                                     "flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[8.5px] font-bold font-mono border animate-pulse",
@@ -2335,7 +2335,11 @@ ${activePromptText}
         });
 
         const isStaleGroupExpanded = Boolean(expandedStaleGroups[project.project_id]);
-        const runningConversations = project.conversations.filter((c) => Boolean(c.is_running));
+        const runningConversations = project.conversations.filter(
+            (c) => Boolean(c.is_running) &&
+                   !isGhostConversation(c) &&
+                   !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+        );
         const runningCount = runningConversations.length;
         const queuedConversations = project.conversations.filter((c) => (Boolean(c.is_queued) || c.status.toLowerCase().includes('queue')) && !c.is_running);
         const queuedCount = queuedConversations.length;
@@ -2358,7 +2362,7 @@ ${activePromptText}
                             ? 'bg-blue-100/70 text-blue-900 dark:bg-blue-950/60 dark:text-cyan-300'
                             : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#0c2438]'
                     )}
-                    title={`Project: ${project.repo_name} (${totalProjectPrompts} prompts total)`}
+                    title={`Project: ${project.repo_name} · ${totalProjectPrompts} prompts total`}
                 >
                     <div className="flex items-center gap-1.5 min-w-0">
                         {isProjectExpanded ? (
@@ -2376,7 +2380,7 @@ ${activePromptText}
                             )}
                             title={project.gitmap_seq_code || (project.seq_id ? `Project #${project.seq_id}` : undefined)}
                         >
-                            {project.seq_code || 'P001'}
+                            {formatSeqBadge(project.seq_code, '#P001')}
                         </span>
                         <span className="truncate">{project.repo_name}</span>
                     </div>
@@ -2400,51 +2404,53 @@ ${activePromptText}
                                 </span>
                             </div>
                         )}
-                        <button
-                            type="button"
-                            onClick={(e) => handleRefreshSingleProject(project.project_id, e)}
-                            disabled={refreshingProjectId === project.project_id}
-                            className="p-1 rounded-[5px] text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
-                            title="Refresh this project"
-                        >
-                            <RotateCw className={cn("w-3 h-3", refreshingProjectId === project.project_id && "animate-spin text-blue-500")} />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={(e) => togglePinProject(project.project_id, e)}
-                            className={cn(
-                                "p-1 rounded-[5px] transition-colors cursor-pointer",
-                                isPinned
-                                    ? "text-amber-500 bg-amber-50 dark:bg-amber-950/40"
-                                    : "text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#15334d]"
-                            )}
-                            title={isPinned ? "Unpin project" : "Pin project to top"}
-                        >
-                            <Pin className={cn("w-3 h-3", isPinned && "fill-current")} />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={(e) => toggleArchiveProject(project.project_id, e)}
-                            className={cn(
-                                "p-1 rounded-[5px] transition-colors cursor-pointer",
-                                isArchived
-                                    ? "text-rose-500 bg-rose-50 dark:bg-rose-950/40"
-                                    : "text-slate-400 hover:text-rose-500 hover:bg-slate-200 dark:hover:bg-[#15334d]"
-                            )}
-                            title={isArchived ? "Unarchive project" : "Archive / Less Favorite (Thumbs Down)"}
-                        >
-                            {isArchived ? (
-                                <ArchiveRestore className="w-3 h-3 text-rose-500" />
-                            ) : (
-                                <Archive className="w-3 h-3" />
-                            )}
-                        </button>
-                        <span
-                            className="rounded-[5px] bg-slate-200 dark:bg-[#15334d] px-2 py-0.5 text-[10px] font-mono text-slate-600 dark:text-slate-300"
-                            title={`${totalProjectPrompts} total prompt(s)`}
-                        >
-                            {totalProjectPrompts} prompts
-                        </span>
+                        {/* Project Action Button Cluster - Hover Only */}
+                        <div className={cn(
+                            "flex items-center gap-0.5 transition-opacity duration-150 shrink-0",
+                            isPinned || isArchived || refreshingProjectId === project.project_id
+                                ? "opacity-100"
+                                : "opacity-0 group-hover:opacity-100"
+                        )}>
+                            <button
+                                type="button"
+                                onClick={(e) => handleRefreshSingleProject(project.project_id, e)}
+                                disabled={refreshingProjectId === project.project_id}
+                                className="p-1 rounded-[5px] text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                                title="Refresh this project"
+                            >
+                                <RotateCw className={cn("w-3 h-3", refreshingProjectId === project.project_id && "animate-spin text-blue-500")} />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={(e) => togglePinProject(project.project_id, e)}
+                                className={cn(
+                                    "p-1 rounded-[5px] transition-colors cursor-pointer",
+                                    isPinned
+                                        ? "text-amber-500 bg-amber-50 dark:bg-amber-950/40"
+                                        : "text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#15334d]"
+                                )}
+                                title={isPinned ? "Unpin project" : "Pin project to top"}
+                            >
+                                <Pin className={cn("w-3 h-3", isPinned && "fill-current")} />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={(e) => toggleArchiveProject(project.project_id, e)}
+                                className={cn(
+                                    "p-1 rounded-[5px] transition-colors cursor-pointer",
+                                    isArchived
+                                        ? "text-rose-500 bg-rose-50 dark:bg-rose-950/40"
+                                        : "text-slate-400 hover:text-rose-500 hover:bg-slate-200 dark:hover:bg-[#15334d]"
+                                )}
+                                title={isArchived ? "Unarchive project" : "Archive / Less Favorite (Thumbs Down)"}
+                            >
+                                {isArchived ? (
+                                    <ArchiveRestore className="w-3 h-3 text-rose-500" />
+                                ) : (
+                                    <Archive className="w-3 h-3" />
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -2916,9 +2922,8 @@ ${activePromptText}
                                         <div className="flex items-center gap-2 flex-wrap min-w-0">
                                             {/* Indicator 1: Clean Sequence Code with compact Origin Tier Icon */}
                                             {(() => {
-                                                const rawSeq = selectedConversation.seq_code || 'P001';
-                                                const cleanSeq = rawSeq.replace(/^(AGM:|GM:)/i, '').replace(/[\[\]]/g, '').trim();
-                                                const seqDisplay = cleanSeq.startsWith('#') || cleanSeq.startsWith('P') || cleanSeq.startsWith('C') ? cleanSeq : `#${cleanSeq}`;
+                                                const rawSeq = selectedConversation.seq_code || 'C001';
+                                                const seqDisplay = formatSeqBadge(rawSeq, 'C001');
                                                 const tierInfo = classifyPromptTier(activePromptText, selectedConversation.title);
                                                 return (
                                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20" title={`${tierInfo.tier}`}>
@@ -2957,7 +2962,7 @@ ${activePromptText}
 
                                             {/* Subtle Instance Context (Breadcrumb style) */}
                                             <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate" title={`Instance #${instanceSeqNum} · ${instanceExeName} (${instanceNameDisplay})`}>
-                                                #{selectedConversation.seq_code ? selectedConversation.seq_code.replace(/^#/, '') : `C${String(instanceSeqNum).padStart(3, '0')}`} · {instanceNameDisplay}
+                                                #{formatSeqBadge(selectedConversation.seq_code, `C${String(instanceSeqNum).padStart(3, '0')}`).replace(/^#/, '')} · {instanceNameDisplay}
                                             </span>
                                         </div>
 

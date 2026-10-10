@@ -560,6 +560,10 @@ pub fn run() {
 
                     info!("Headless proxy service is running.");
 
+                    // Warm up in-memory smart process cache and cross-check running Antigravity IDE instances
+                    modules::instance::warm_up_smart_process_cache();
+                    info!("Startup smart process cache warmed up in headless mode.");
+
                     // Start smart scheduler for 7-day weekly reset warmup
                     modules::scheduler::start_scheduler(None, proxy_state.clone());
                     info!("Smart scheduler (7-Day Weekly Reset Warmup) started in headless mode.");
@@ -737,6 +741,11 @@ pub fn run() {
             // Discover and persist initial IDE information on first run in background
             std::thread::spawn(|| {
                 crate::modules::process::discover_and_persist_initial_ide_info();
+            });
+
+            // Warm up in-memory smart process cache and cross-check running Antigravity IDE instances
+            std::thread::spawn(|| {
+                crate::modules::instance::warm_up_smart_process_cache();
             });
 
             // Immediately start management server (8045) for Web access

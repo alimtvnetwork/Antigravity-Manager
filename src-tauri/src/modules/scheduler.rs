@@ -400,52 +400,55 @@ pub async fn trigger_warmup_for_account(account: &Account) {
     }
 }
 
-/// Start prompt queue scheduler that runs every 10 minutes (600s).
-/// Bookkeeps enqueued prompts, checks whether projects are idle,
-/// and automatically pushes the first enqueued prompt (FIFO) if idle.
+/// Start prompt queue scheduler that runs on an adaptive FIFO background ticker.
+/// When pending prompts are queued, ticks every 5 seconds to immediately dispatch
+/// as soon as projects become idle. When queue is empty, backs off to 30 seconds.
 pub fn start_prompt_queue_scheduler() {
     tauri::async_runtime::spawn(async move {
         logger::log_info(
-            "[PromptQueueScheduler] Background 10-minute prompt queue scheduler initialized.",
+            "[PromptQueueScheduler] Background adaptive FIFO prompt queue ticker initialized.",
         );
-        // Quiet delay after startup
-        tokio::time::sleep(Duration::from_secs(30)).await;
-
-        let mut interval = time::interval(Duration::from_secs(600));
-        interval.tick().await; // consume initial tick
+        tokio::time::sleep(Duration::from_secs(5)).await;
 
         loop {
-            interval.tick().await;
-            logger::log_info(
-                "[PromptQueueScheduler] Running 10-minute enqueued prompt bookkeeping cycle...",
-            );
-            match tauri::async_runtime::spawn_blocking(|| {
-                crate::modules::repo_db::check_and_dispatch_enqueued_prompts(None)
+            let pending_count = tauri::async_runtime::spawn_blocking(|| {
+                crate::modules::repo_db::count_enqueued_prompts(None)
             })
             .await
-            {
-                Ok(Ok(count)) => {
-                    if count > 0 {
-                        logger::log_info(&format!(
-                            "[PromptQueueScheduler] Bookkeeping cycle dispatched {} enqueued prompt(s)",
-                            count
+            .unwrap_or(0);
+
+            if pending_count > 0 {
+                // Fast ticker interval when prompts are queued waiting for project to become idle
+                match tauri::async_runtime::spawn_blocking(|| {
+                    crate::modules::repo_db::check_and_dispatch_enqueued_prompts(None)
+                })
+                .await
+                {
+                    Ok(Ok(count)) => {
+                        if count > 0 {
+                            logger::log_info(&format!(
+                                "[PromptQueueScheduler] Ticker dispatched {} enqueued prompt(s)",
+                                count
+                            ));
+                        }
+                    }
+                    Ok(Err(err)) => {
+                        logger::log_warn(&format!(
+                            "[PromptQueueScheduler] Ticker dispatch returned error: {}",
+                            err
                         ));
-                    } else {
-                        logger::log_info("[PromptQueueScheduler] Bookkeeping cycle finished: no idle projects with enqueued prompts");
+                    }
+                    Err(err) => {
+                        logger::log_warn(&format!(
+                            "[PromptQueueScheduler] Ticker task panicked: {}",
+                            err
+                        ));
                     }
                 }
-                Ok(Err(err)) => {
-                    logger::log_warn(&format!(
-                        "[PromptQueueScheduler] Bookkeeping cycle returned error: {}",
-                        err
-                    ));
-                }
-                Err(err) => {
-                    logger::log_warn(&format!(
-                        "[PromptQueueScheduler] Bookkeeping task panicked: {}",
-                        err
-                    ));
-                }
+                tokio::time::sleep(Duration::from_secs(5)).await;
+            } else {
+                // Idle backoff interval when queue is empty
+                tokio::time::sleep(Duration::from_secs(30)).await;
             }
         }
     });

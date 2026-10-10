@@ -102,6 +102,10 @@ pub static INSTANCE_PROCESS_CACHE: Lazy<Arc<RwLock<HashMap<String, InstanceProce
 pub static SMART_PROCESS_CACHE: Lazy<Arc<RwLock<HashMap<String, InstanceProcessRecord>>>> =
     Lazy::new(|| INSTANCE_PROCESS_CACHE.clone());
 
+#[cfg(test)]
+pub static MOCK_PID_ALIVE: Lazy<std::sync::RwLock<Option<std::collections::HashSet<u32>>>> =
+    Lazy::new(|| std::sync::RwLock::new(None));
+
 /// Check if a PID is alive in the OS process table
 pub fn is_pid_alive_os(pid: u32) -> bool {
     if pid == 0 {
@@ -130,6 +134,12 @@ pub fn is_pid_alive_os(pid: u32) -> bool {
 
 /// Check if a specific PID is alive in the operating system in sub-millisecond time.
 pub fn is_pid_alive_targeted(pid: u32) -> bool {
+    #[cfg(test)]
+    if let Ok(guard) = MOCK_PID_ALIVE.read() {
+        if let Some(set) = guard.as_ref() {
+            return set.contains(&pid);
+        }
+    }
     is_pid_alive_os(pid)
 }
 
@@ -2720,6 +2730,12 @@ pub fn saved_pid_matches(pid: u32) -> bool {
     if pid == 0 {
         return false;
     }
+    #[cfg(test)]
+    if let Ok(guard) = MOCK_PID_ALIVE.read() {
+        if let Some(set) = guard.as_ref() {
+            return set.contains(&pid);
+        }
+    }
     let mut sys = System::new();
     let target_pid = sysinfo::Pid::from_u32(pid);
     sys.refresh_processes_specifics(
@@ -3316,6 +3332,21 @@ pub fn get_instance_running_process_count() -> usize {
     scan_and_cache_all_running_instances()
 }
 
+/// Initialize and warm up the in-memory smart process cache on application startup.
+/// Refreshes the OS process table, cross-checks registered instances against SQLite
+/// `instance_processes` and live OS PIDs, and caches all active instances.
+pub fn warm_up_smart_process_cache() -> usize {
+    crate::modules::logger::log_info(
+        "[SmartProcessCache] Starting startup cache warm-up and cross-checking...",
+    );
+    let running_count = scan_and_cache_all_running_instances();
+    crate::modules::logger::log_info(&format!(
+        "[SmartProcessCache] Startup warm-up complete. Discovered and cached {} running Antigravity IDE instances.",
+        running_count
+    ));
+    running_count
+}
+
 fn check_cached_pid_alive(
     instance_id: &str,
     canonical_id: &str,
@@ -3439,15 +3470,23 @@ pub fn is_instance_process_running_smart(instance_id: &str) -> (bool, Option<u32
             || i.name == instance_id
             || (canonical_id == "default" && i.is_default)
     });
-    let Some(inst) = inst else {
+    let (inst_name, inst_data_dir, pids) = if let Some(inst) = inst {
+        let pids = scan_instance_os_pids(inst, &canonical_id);
+        (inst.name.clone(), inst.data_dir.clone(), pids)
+    } else if canonical_id == "default" || instance_id == "default" {
+        let default_dir = get_default_antigravity_data_dir()
+            .to_string_lossy()
+            .to_string();
+        let pids = crate::modules::process::get_antigravity_pids(None);
+        ("default".to_string(), default_dir, pids)
+    } else {
         return (false, None, Vec::new());
     };
-    let pids = scan_instance_os_pids(inst, &canonical_id);
     if pids.is_empty() {
         return (false, None, Vec::new());
     }
     let (primary_pid, pids) =
-        cache_live_instance_process(&canonical_id, instance_id, &inst.name, &inst.data_dir, pids);
+        cache_live_instance_process(&canonical_id, instance_id, &inst_name, &inst_data_dir, pids);
     (true, primary_pid, pids)
 }
 
@@ -3640,9 +3679,19 @@ fn launch_instance_inner_with_extra_workspaces(
     // If the instance process is verified to be alive and running, NEVER kill it with close_instance!
     let (is_already_running, _, _) = is_instance_process_running_smart(instance_id);
     if !is_already_running {
-        // Close only the existing process for THIS target instance if running, allowing OS to unmap locks
-        let _ = close_instance(instance_id);
-        std::thread::sleep(std::time::Duration::from_millis(300));
+        // Guard: do not kill running processes when !is_already_running if another instance is alive
+        let (other_pids, _) = other_instance_protection(instance_id);
+        let has_other_alive = other_pids.iter().any(|&p| is_pid_alive_targeted(p));
+        if !has_other_alive {
+            // Close only the existing process for THIS target instance if running, allowing OS to unmap locks
+            let _ = close_instance(instance_id);
+            std::thread::sleep(std::time::Duration::from_millis(300));
+        } else {
+            crate::modules::logger::log_info(&format!(
+                "[Instance] Another instance is currently alive; bypassing close_instance for '{}' to protect active processes.",
+                instance_id
+            ));
+        }
 
         // Clean any orphaned lock files in the target instance data directory
         let has_target_dir = target_data_path.exists();
@@ -4376,6 +4425,23 @@ pub fn other_instance_protection(except_id: &str) -> (Vec<u32>, Vec<String>) {
                 .to_lowercase();
             if !dir.is_empty() {
                 markers.push(dir);
+            }
+        }
+    }
+    if let Ok(cache) = INSTANCE_PROCESS_CACHE.read() {
+        for (id, record) in cache.iter() {
+            let same = id == except_id || (except_id == "default" && id == "default");
+            if !same && record.is_alive {
+                for &pid in &record.pids {
+                    if pid > 0 && !pids.contains(&pid) {
+                        pids.push(pid);
+                    }
+                }
+                if let Some(primary) = record.primary_pid {
+                    if primary > 0 && !pids.contains(&primary) {
+                        pids.push(primary);
+                    }
+                }
             }
         }
     }
@@ -8102,5 +8168,85 @@ mod clone_tree_tests {
         assert_eq!(fallback_exe, "Antigravity-inst-2.exe");
         #[cfg(not(target_os = "windows"))]
         assert_eq!(fallback_exe, "Antigravity-inst-2");
+    }
+
+    #[test]
+    fn test_child_pid_promotion_in_smart_cache() {
+        let test_inst = "test-child-promo-inst";
+        let dead_primary = 99991u32;
+        let live_child = 99992u32;
+
+        if let Ok(mut guard) = MOCK_PID_ALIVE.write() {
+            let mut set = std::collections::HashSet::new();
+            set.insert(live_child);
+            *guard = Some(set);
+        }
+
+        let now = chrono::Utc::now().timestamp();
+        let record = InstanceProcessRecord {
+            instance_id: test_inst.to_string(),
+            pid: dead_primary,
+            pids: vec![dead_primary, live_child],
+            primary_pid: Some(dead_primary),
+            data_dir: "/mock/test_data_dir".to_string(),
+            launched_at: now,
+            last_verified_at: now,
+            is_alive: true,
+            command_line: None,
+        };
+        update_cached_instance_process(record);
+
+        let result = check_cached_pid_alive(test_inst, test_inst);
+        assert!(result.is_some());
+        let (is_alive, primary_pid, pids) = result.unwrap();
+        assert!(is_alive);
+        assert_eq!(primary_pid, Some(live_child));
+        assert_eq!(pids, vec![live_child]);
+
+        let cached = get_cached_instance_process(test_inst).unwrap();
+        assert_eq!(cached.primary_pid, Some(live_child));
+        assert_eq!(cached.pid, live_child);
+
+        if let Ok(mut guard) = MOCK_PID_ALIVE.write() {
+            *guard = None;
+        }
+        invalidate_instance_process_cache(test_inst);
+    }
+
+    #[test]
+    fn test_ensure_instance_running_smart_reopen_guard() {
+        let test_inst = "test-reopen-guard-inst";
+        let live_pid = 99993u32;
+
+        if let Ok(mut guard) = MOCK_PID_ALIVE.write() {
+            let mut set = std::collections::HashSet::new();
+            set.insert(live_pid);
+            *guard = Some(set);
+        }
+
+        let now = chrono::Utc::now().timestamp();
+        let record = InstanceProcessRecord {
+            instance_id: test_inst.to_string(),
+            pid: live_pid,
+            pids: vec![live_pid],
+            primary_pid: Some(live_pid),
+            data_dir: "/mock/reopen_guard_dir".to_string(),
+            launched_at: now,
+            last_verified_at: now,
+            is_alive: true,
+            command_line: None,
+        };
+        update_cached_instance_process(record);
+
+        let res = ensure_instance_running_smart(test_inst, None);
+        assert!(res.is_ok());
+        let (is_running, primary_pid) = res.unwrap();
+        assert!(is_running);
+        assert_eq!(primary_pid, Some(live_pid));
+
+        if let Ok(mut guard) = MOCK_PID_ALIVE.write() {
+            *guard = None;
+        }
+        invalidate_instance_process_cache(test_inst);
     }
 }

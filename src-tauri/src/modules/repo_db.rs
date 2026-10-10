@@ -1399,29 +1399,6 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                 backed_up_count += 1;
                 let (extracted_img, img_paths) = extract_image_payload_or_path(&prompt_text);
                 let final_img = image_payload.clone().or(extracted_img);
-                let has_image = final_img.is_some() || !img_paths.is_empty();
-
-                // Write disk resume snapshot file inside project repo directory
-                let task_file =
-                    PathBuf::from(&project.repo_path).join(".antigravity_resume_task.json");
-                let payload = serde_json::json!({
-                    "prompt_id": prompt_id,
-                    "project_id": project.id,
-                    "instance_id": instance_id,
-                    "repo_path": project.repo_path,
-                    "prompt_content": prompt_text,
-                    "model": prompt_model,
-                    "session_id": project.id,
-                    "image_payload": final_img,
-                    "image_paths": img_paths,
-                    "has_image": has_image,
-                    "auto_boot": true,
-                    "status": "backed_up",
-                    "backed_up_at": now,
-                });
-                if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
-                    let _ = fs::write(&task_file, json_str);
-                }
 
                 let active_prompt = ActivePrompt {
                     id: prompt_id.clone(),
@@ -1434,8 +1411,21 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                     status: "backed_up".to_string(),
                     created_at: now,
                     updated_at: now,
-                    image_payload: final_img,
+                    image_payload: final_img.clone(),
                 };
+
+                // Write disk resume snapshot file inside project repo directory using canonical resume_task_document
+                let task_file =
+                    PathBuf::from(&project.repo_path).join(".antigravity_resume_task.json");
+                let mut payload =
+                    resume_task_document(&active_prompt, "backed_up", now, &img_paths);
+                if final_img.is_some() {
+                    payload["image_payload"] = serde_json::json!(final_img);
+                }
+                if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
+                    let _ = fs::write(&task_file, json_str);
+                }
+
                 if let Ok(mut map) = get_memory_prompts_map().lock() {
                     map.insert(prompt_id, active_prompt);
                 }
@@ -1811,7 +1801,13 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
     // 1. Check in-memory active prompts map
     let is_terminal_override = has_terminal_transition;
     if !is_terminal_override {
-        if let Ok(map) = get_memory_prompts_map().lock() {
+        if let Ok(mut map) = get_memory_prompts_map().lock() {
+            // Prune expired or terminal prompts from memory map (45s TTL)
+            map.retain(|_, p| {
+                let is_active_status = p.status == "running" || p.status == "dispatched";
+                let is_within_ttl = (now - p.updated_at) <= 45;
+                is_active_status && is_within_ttl
+            });
             for p in map.values() {
                 let matches_inst = if norm_inst == "default" {
                     p.instance_id == "default" || p.instance_id == "__default__"
@@ -1821,7 +1817,7 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                 let matches_proj = p.project_id == project_id || p.repo_path == project_id;
                 if matches_inst && matches_proj {
                     let has_running_status = p.status == "running";
-                    let is_fresh = (now - p.updated_at) <= 600;
+                    let is_fresh = (now - p.updated_at) <= 45;
                     if has_running_status && is_fresh {
                         crate::modules::logger::log_instance_prompt_audit(
                             norm_inst,
@@ -2030,10 +2026,7 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                                         .to_lowercase();
                                     let has_target = !clean_target.is_empty();
                                     let is_target_matched = has_target
-                                        && (clean_p == clean_target
-                                            || folder_name == clean_target
-                                            || clean_target
-                                                .starts_with(&format!("{}-", folder_name)));
+                                        && (clean_p == clean_target || folder_name == clean_target);
                                     if is_target_matched {
                                         crate::modules::logger::log_instance_prompt_audit(
                                             norm_inst,
@@ -2070,6 +2063,36 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
     );
 
     false
+}
+
+/// Count total enqueued/backed_up/pending prompts, optionally filtered by target_instance.
+pub fn count_enqueued_prompts(target_instance: Option<&str>) -> usize {
+    let Ok(conn) = connect_db() else {
+        return 0;
+    };
+    if let Some(target) = target_instance {
+        let norm_target = crate::modules::instance::resolve_instance_id(target)
+            .unwrap_or_else(|_| target.to_string());
+        let count: usize = conn
+            .query_row(
+                "SELECT COUNT(*) FROM active_prompts 
+                 WHERE status IN ('backed_up', 'queued', 'pending')
+                   AND (?1 = 'all' OR instance_id = ?1 OR (?1 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))",
+                rusqlite::params![norm_target],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        count
+    } else {
+        let count: usize = conn
+            .query_row(
+                "SELECT COUNT(*) FROM active_prompts WHERE status IN ('backed_up', 'queued', 'pending')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        count
+    }
 }
 
 /// Bookkeep and check enqueued/backed_up prompts across projects.
@@ -2164,7 +2187,7 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
                  WHERE (project_id = ?1 OR repo_path = ?2)
                    AND (instance_id = ?3 OR (?3 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))
                    AND status IN ('backed_up', 'queued', 'pending')
-                 ORDER BY created_at ASC
+                 ORDER BY created_at ASC, id ASC
                  LIMIT 1",
                 params![&project_id, &repo_path, &inst_id],
                 |row| {
@@ -3551,17 +3574,12 @@ pub fn send_prompt_now_for_instance(
     if !repo_path.trim().is_empty() {
         let ws_dir = PathBuf::from(repo_path);
         if ws_dir.exists() {
-            let payload = serde_json::json!({
-                "prompt_id": active_prompt.id,
-                "project_id": active_prompt.project_id,
-                "instance_id": canonical_inst,
-                "repo_path": repo_path,
-                "prompt_content": prompt_content,
-                "model": "gemini-2.5-pro",
-                "auto_boot": true,
-                "status": "dispatched",
-                "resumed_at": now,
-            });
+            let (extracted_img, img_paths) = extract_image_payload_or_path(prompt_content);
+            let final_img = active_prompt.image_payload.clone().or(extracted_img);
+            let mut payload = resume_task_document(&active_prompt, "dispatched", now, &img_paths);
+            if final_img.is_some() {
+                payload["image_payload"] = serde_json::json!(final_img);
+            }
             let serialized = serde_json::to_string_pretty(&payload).unwrap_or_default();
             let _ = fs::write(ws_dir.join(".antigravity_resume_task.json"), &serialized);
             let _ = fs::write(
@@ -3627,17 +3645,13 @@ pub fn enqueue_prompt_for_instance(
     if !repo_path.trim().is_empty() {
         let ws_dir = PathBuf::from(repo_path);
         if ws_dir.exists() {
-            let payload = serde_json::json!({
-                "prompt_id": active_prompt.id,
-                "project_id": active_prompt.project_id,
-                "instance_id": canonical_inst,
-                "repo_path": repo_path,
-                "prompt_content": prompt_content,
-                "model": "gemini-2.5-pro",
-                "auto_boot": false,
-                "status": "queued",
-                "queued_at": now,
-            });
+            let (extracted_img, img_paths) = extract_image_payload_or_path(prompt_content);
+            let final_img = active_prompt.image_payload.clone().or(extracted_img);
+            let mut payload = resume_task_document(&active_prompt, "queued", now, &img_paths);
+            if final_img.is_some() {
+                payload["image_payload"] = serde_json::json!(final_img);
+            }
+            payload["auto_boot"] = serde_json::json!(false);
             let serialized = serde_json::to_string_pretty(&payload).unwrap_or_default();
             let _ = fs::write(ws_dir.join(".antigravity_resume_task.json"), &serialized);
             let _ = fs::write(
@@ -4026,19 +4040,20 @@ pub fn auto_resume_recent_prompts(
 
         // Dispatch directly to project folder via .antigravity_resume_task.json to spin up boot process immediately
         let task_file = PathBuf::from(&project.repo_path).join(".antigravity_resume_task.json");
-        let payload = serde_json::json!({
-            "prompt_id": prompt_id,
-            "project_id": project.id,
-            "instance_id": instance_id,
-            "repo_path": project.repo_path,
-            "prompt_content": prompt_text,
-            "model": prompt_model,
-            "image_payload": image_payload,
-            "has_image": has_image,
-            "auto_boot": true,
-            "resumed_at": now,
-        });
-
+        let prompt_obj = ActivePrompt {
+            id: prompt_id.clone(),
+            project_id: project.id.clone(),
+            instance_id: instance_id.to_string(),
+            repo_path: project.repo_path.clone(),
+            prompt_content: prompt_text.clone(),
+            model: prompt_model.clone(),
+            session_id: Some(project.id.clone()),
+            status: "dispatched".to_string(),
+            created_at: now,
+            updated_at: now,
+            image_payload: image_payload.clone(),
+        };
+        let payload = resume_task_document(&prompt_obj, "dispatched", now, &[]);
         if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
             let _ = fs::write(&task_file, json_str);
         }
@@ -5795,7 +5810,7 @@ fn compute_project_conversation_tree(
                 return false;
             }
             let conv_ts = parse_flexible_timestamp(&c.last_modified);
-            conv_ts > 0 && (now - conv_ts <= 600)
+            conv_ts > 0 && (now - conv_ts <= 45)
         });
         let has_conv_nodes = !conv_nodes.is_empty();
 
@@ -5881,7 +5896,7 @@ fn compute_project_conversation_tree(
                             matches_inst
                                 && matches_proj
                                 && p.status == "running"
-                                && (now - p.updated_at <= 600)
+                                && (now - p.updated_at <= 45)
                         })
                     } else {
                         false
@@ -7689,5 +7704,63 @@ mod tests {
 
         let empty_snippet = extract_prompt_tail_snippet("   ", 12);
         assert_eq!(empty_snippet, "");
+    }
+
+    #[test]
+    fn test_resume_task_document_canonical_keys() {
+        let prompt = ActivePrompt {
+            id: "prompt-123".to_string(),
+            project_id: "test-proj".to_string(),
+            instance_id: "default".to_string(),
+            repo_path: "/test/repo".to_string(),
+            prompt_content: "test prompt content".to_string(),
+            model: Some("gemini-2.5-pro".to_string()),
+            session_id: Some("conv-abc-456".to_string()),
+            status: "dispatched".to_string(),
+            created_at: 1000,
+            updated_at: 1000,
+            image_payload: None,
+        };
+        let doc = resume_task_document(&prompt, "dispatched", 1000, &[]);
+        assert_eq!(doc["prompt_id"], "prompt-123");
+        assert_eq!(doc["project_id"], "test-proj");
+        assert_eq!(doc["instance_id"], "default");
+        assert_eq!(doc["repo_path"], "/test/repo");
+        assert_eq!(doc["prompt_content"], "test prompt content");
+        assert_eq!(doc["model"], "gemini-2.5-pro");
+        assert_eq!(doc["session_id"], "conv-abc-456");
+        assert_eq!(doc["conversation_id"], "conv-abc-456");
+        assert_eq!(doc["auto_boot"], true);
+        assert_eq!(doc["status"], "dispatched");
+        assert_eq!(doc["backed_up_at"], 1000);
+    }
+
+    #[test]
+    fn test_enqueued_prompts_fifo_dispatch_order() {
+        let conn = Connection::open_in_memory().unwrap();
+        assert!(init_tables(&conn).is_ok());
+
+        conn.execute(
+            "INSERT INTO active_prompts (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
+             VALUES ('p-t1', 'test-proj', 'default', '/test/repo', 'First prompt', 'gemini-2.5-pro', NULL, 'queued', 100, 100, NULL),
+                    ('p-t2', 'test-proj', 'default', '/test/repo', 'Second prompt', 'gemini-2.5-pro', NULL, 'queued', 200, 200, NULL),
+                    ('p-t3', 'test-proj', 'default', '/test/repo', 'Third prompt', 'gemini-2.5-pro', NULL, 'queued', 300, 300, NULL)",
+            [],
+        ).unwrap();
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT id FROM active_prompts 
+                 WHERE status IN ('backed_up', 'queued', 'pending')
+                 ORDER BY created_at ASC, id ASC",
+            )
+            .unwrap();
+        let prompt_ids: Vec<String> = stmt
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .flatten()
+            .collect();
+
+        assert_eq!(prompt_ids, vec!["p-t1", "p-t2", "p-t3"]);
     }
 }
