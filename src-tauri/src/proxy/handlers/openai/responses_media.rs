@@ -322,8 +322,6 @@ mod tests {
     };
     use super::*;
     use crate::proxy::handlers::openai::image_input::parse_image_data_url_parts;
-    use crate::proxy::handlers::openai::image_input::validate_input_image_limits;
-    use crate::proxy::handlers::openai::image_input::MAX_INPUT_IMAGE_BYTES;
     use crate::proxy::mappers::openai::{transform_openai_request, OpenAIRequest};
     use serde_json::{json, Value};
 

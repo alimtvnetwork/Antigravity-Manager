@@ -33,7 +33,6 @@ mod router_proxy;
 mod start;
 
 pub use crate::proxy::upstream::client::UpstreamClient;
-pub use crate::proxy::upstream::client::UpstreamClient;
 pub use app_state::AppState;
 pub use axum_server::AxumServer;
 pub use image_scheduler::{ImagePermit, ImageScheduler};
