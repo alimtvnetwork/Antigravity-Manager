@@ -2,6 +2,7 @@ use crate::models::QuotaData;
 use serde_json::json;
 
 use super::*;
+use crate::utils::http::create_standard_client;
 
 /// Fetch project ID and subscription tier
 async fn fetch_project_id(

@@ -74,7 +74,7 @@ const V1_INTERNAL_BASE_URL_DAILY: &str = "https://daily-cloudcode-pa.googleapis.
 const V1_INTERNAL_BASE_URL_SANDBOX: &str =
     "https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal";
 
-const V1_INTERNAL_BASE_URL_FALLBACKS: [&str; 3] = [
+pub(crate) const V1_INTERNAL_BASE_URL_FALLBACKS: [&str; 3] = [
     V1_INTERNAL_BASE_URL_DAILY, // 优先级 1: Daily (官方 IDE 原生唯一主力端点，稳定支持思维链与工具调用)
     V1_INTERNAL_BASE_URL_SANDBOX, // 优先级 2: Sandbox (沙箱备用；部分地区对合规账号返回终止性 400)
     V1_INTERNAL_BASE_URL_PROD,  // 优先级 3: Prod (生产兜底，易触发 429)

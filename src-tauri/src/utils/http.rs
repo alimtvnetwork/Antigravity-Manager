@@ -139,7 +139,7 @@ fn create_base_client(timeout_secs: u64) -> Client {
 }
 
 /// Base client creation logic strictly WITHOUT JA3 Emulation (Pure Native)
-fn create_standard_client(timeout_secs: u64) -> Client {
+pub(crate) fn create_standard_client(timeout_secs: u64) -> Client {
     // No .emulation(Emulation::Chrome123) here!
     let builder = Client::builder().timeout(std::time::Duration::from_secs(timeout_secs));
     let builder = apply_upstream_proxy(builder, "HTTP standard client");

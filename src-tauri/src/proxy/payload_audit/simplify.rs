@@ -81,7 +81,7 @@ fn simplify_part(part: &Value) -> Value {
     Value::Object(obj)
 }
 
-fn simplify_message(msg: &Value) -> Value {
+pub fn simplify_message(msg: &Value) -> Value {
     let mut out = Map::new();
     if let Some(role) = msg.get("role") {
         out.insert("role".into(), role.clone());
