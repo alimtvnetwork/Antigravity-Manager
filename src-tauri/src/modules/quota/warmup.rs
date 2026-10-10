@@ -2,6 +2,7 @@ use crate::modules::config;
 use serde_json::json;
 
 use super::*;
+use crate::proxy::project_resolver::fetch_project_id;
 
 /// Get valid token (auto-refresh if expired)
 pub async fn get_valid_token_for_warmup(
