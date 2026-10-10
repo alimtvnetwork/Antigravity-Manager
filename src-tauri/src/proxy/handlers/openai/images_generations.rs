@@ -25,6 +25,7 @@ use crate::proxy::handlers::openai::image_input::parse_generation_input_images;
 use crate::proxy::handlers::openai::image_input::generation_image_size_param;
 use crate::proxy::handlers::openai::responses_media::response_has_inline_image_data;
 use crate::proxy::handlers::common::apply_retry_strategy;
+use std::time::Duration;
 
 pub async fn handle_images_generations(
     State(state): State<AppState>,

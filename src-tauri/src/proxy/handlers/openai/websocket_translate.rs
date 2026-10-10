@@ -6,6 +6,7 @@ use tracing::error;
 
 use super::websocket_finalize::{finalize_ws_events, split_namespace_tool_name};
 use crate::proxy::handlers::openai::tool_cache::insert_cached_tool_call;
+use uuid::Uuid;
 
 pub(crate) struct TranslationState {
     pub(crate) response_id: String,

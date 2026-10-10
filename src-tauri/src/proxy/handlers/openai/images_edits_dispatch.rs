@@ -14,6 +14,7 @@ use crate::proxy::handlers::openai::image_input::image_account_selection_target;
 use crate::proxy::handlers::openai::responses_media::response_has_inline_image_data;
 use crate::proxy::handlers::common::retrystrategy::next_rotation_attempt;
 use crate::proxy::handlers::common::apply_retry_strategy;
+use std::time::Duration;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn spawn_image_edit_tasks(

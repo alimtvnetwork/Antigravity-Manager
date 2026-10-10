@@ -26,6 +26,7 @@ use crate::proxy::handlers::openai::responses_history::into_history_without_inli
 use crate::proxy::handlers::openai::websocket_normalize::should_handle_prewarm_locally;
 use crate::proxy::handlers::openai::websocket_normalize::handle_prewarm_locally;
 use axum::http::HeaderMap;
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub(crate) struct WebsocketSessionState {
