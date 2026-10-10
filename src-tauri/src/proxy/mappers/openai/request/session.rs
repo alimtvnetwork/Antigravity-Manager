@@ -8,6 +8,8 @@ use super::session_setup::{phase_setup, SetupState};
 use super::session_system::{phase_system, SystemState};
 use super::session_tools::phase_tools;
 use serde_json::Value;
+use super::super::models::OpenAIRequest;
+use crate::proxy::token_manager::ProxyToken;
 
 pub fn transform_openai_request_with_session(
     request: &OpenAIRequest,
