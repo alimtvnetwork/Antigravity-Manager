@@ -6,7 +6,7 @@ use super::*;
 ///
 /// 只有当最后一条消息为用户角色且内容严格全等于 "Warmup" 单词本身，且不包含任何工具调用或多余内容时，
 /// 才认定为客户端心跳。绝不使用 starts_with 匹配，绝不拦截 ToolResult。
-fn is_warmup_request(request: &ClaudeRequest) -> bool {
+pub(crate) fn is_warmup_request(request: &ClaudeRequest) -> bool {
     if let Some(msg) = request.messages.last() {
         if msg.role != "user" {
             return false;
@@ -37,7 +37,7 @@ fn is_warmup_request(request: &ClaudeRequest) -> bool {
 /// 创建 Warmup 请求的模拟响应
 ///
 /// 返回一个简单的响应，不消耗上游配额
-fn create_warmup_response(request: &ClaudeRequest, is_stream: bool) -> Response {
+pub(crate) fn create_warmup_response(request: &ClaudeRequest, is_stream: bool) -> Response {
     let model = &request.model;
     let message_id = format!("msg_warmup_{}", chrono::Utc::now().timestamp_millis());
 

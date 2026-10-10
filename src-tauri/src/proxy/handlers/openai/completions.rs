@@ -72,6 +72,7 @@ pub async fn handle_completions(
         &debug_cfg,
         clean_start,
         &original_body,
+        &uri,
     )
     .await
     {
@@ -139,6 +140,7 @@ pub async fn handle_completions(
                 &mut setup.failure_statuses,
                 &mut setup.last_error,
                 attempt,
+                setup.token_manager.clone(),
             )
             .await
             {

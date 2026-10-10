@@ -8,6 +8,9 @@ use tokio::task::JoinSet;
 use crate::proxy::server::UpstreamClient;
 use crate::proxy::TokenManager;
 use crate::proxy::handlers::common::retrystrategy::should_rotate_account;
+use crate::proxy::handlers::common::retrystrategy::RequestRetryState;
+use crate::proxy::handlers::common::FailureStatusTracker;
+use crate::proxy::handlers::common::retrystrategy::RetryStrategy;
 use crate::proxy::handlers::openai::image_input::build_image_edit_body;
 use crate::proxy::handlers::openai::image_input::NormalizedInputImage;
 use crate::proxy::handlers::openai::image_input::image_account_selection_target;
@@ -29,7 +32,7 @@ pub(crate) fn spawn_image_edit_tasks(
     debug_cfg: &crate::proxy::config::DebugLoggingConfig,
     trace_id: &str,
     attempt_no: usize,
-    state: &crate::proxy::AppState,
+    state: &crate::proxy::server::AppState,
     n: usize,
     contents_parts: Vec<Value>,
     image_config: Value,

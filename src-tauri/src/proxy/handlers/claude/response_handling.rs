@@ -58,8 +58,7 @@ pub(crate) async fn handle_nonstream_success(st: &mut AttemptState, call: Attemp
     );
 
     // 转换
-    // [FIX #765] Pass session_id and model_name for signature caching
-    let s_id_owned = session_id.map(|s| s.to_string());
+    // [FIX #765] Pass session_id and model_name for signature caching (s_id_owned from line 16)
     // [FIX #3379] Extract registered tool names for non-streaming leakage recovery
     let ns_registered_tool_names: Vec<String> = request_with_mapped
         .tools

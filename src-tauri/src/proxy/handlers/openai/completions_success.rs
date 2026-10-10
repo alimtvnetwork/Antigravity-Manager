@@ -2,6 +2,8 @@
 // non-streaming arm. The streaming arm always diverges, so the trailing
 // non-streaming arm is only reached when `list_response` is false.
 use std::collections::HashSet;
+use std::sync::Arc;
+use crate::proxy::TokenManager;
 
 use axum::extract::OriginalUri;
 use serde_json::Value;
@@ -44,6 +46,7 @@ pub(crate) async fn completions_handle_success(
     failure_statuses: &mut FailureStatusTracker,
     last_error: &mut String,
     attempt: usize,
+    token_manager: Arc<TokenManager>,
 ) -> CompletionsOutcome {
     let CompletionsSendOutput {
         response,

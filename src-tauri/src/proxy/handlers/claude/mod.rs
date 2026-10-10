@@ -63,3 +63,7 @@ pub(crate) use attempt_setup::prepare_attempt;
 pub(crate) use apply_compression::apply_compression;
 pub(crate) use compression::try_compress_with_summary;
 pub(crate) use setup_phase::preprocess_request;
+pub(crate) use thinking::{apply_thinking_hints, extract_thinking_hint};
+pub(crate) use variant::apply_variant;
+pub(crate) use warmup::{create_warmup_response, is_warmup_request};
+pub(crate) use helpers::inject_cache_control_to_forked_summary;

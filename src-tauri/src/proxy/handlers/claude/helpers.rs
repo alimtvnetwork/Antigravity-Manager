@@ -1,7 +1,7 @@
 use super::*;
 
 /// Injects cache_control ephemeral trigger to first message's content block if it's the XML summary
-fn inject_cache_control_to_forked_summary(body: &mut serde_json::Value) {
+pub(crate) fn inject_cache_control_to_forked_summary(body: &mut serde_json::Value) {
     if let Some(messages) = body.get_mut("messages").and_then(|m| m.as_array_mut()) {
         if !messages.is_empty() {
             let first_msg = &mut messages[0];
