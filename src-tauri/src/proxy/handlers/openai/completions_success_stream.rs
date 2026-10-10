@@ -335,6 +335,7 @@ pub(crate) async fn completions_success_stream(
 
         // Collect
         use crate::proxy::mappers::openai::collector::collect_stream_to_json;
+use bytes::Bytes;
         match collect_stream_to_json(combined_stream).await {
             Ok(chat_resp) => {
                 let is_responses_api = uri.path() == "/v1/responses";

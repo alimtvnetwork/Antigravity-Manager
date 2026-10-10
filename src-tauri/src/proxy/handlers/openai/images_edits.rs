@@ -319,4 +319,4 @@ use crate::proxy::handlers::openai::image_input::edit_size_input;
 use crate::proxy::handlers::openai::image_input::normalized_image_from_bytes;
 use crate::proxy::handlers::openai::image_input::NormalizedInputImage;
 
-static WEBSOCKET_TOOL_CALL_CACHE: OnceLock<TokioRwLock<HashMap<String, Value>>> = OnceLock::new();
+pub(crate) static WEBSOCKET_TOOL_CALL_CACHE: OnceLock<TokioRwLock<HashMap<String, Value>>> = OnceLock::new();

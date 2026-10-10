@@ -5,6 +5,8 @@ use std::time::{Duration, Instant};
 
 use serde_json::Value;
 
+use super::images_edits::WEBSOCKET_TOOL_CALL_CACHE;
+
 pub fn get_cached_tool_call(call_id: &str) -> Option<Value> {
     if let Some(cache) = WEBSOCKET_TOOL_CALL_CACHE.get() {
         if let Ok(guard) = cache.try_read() {
