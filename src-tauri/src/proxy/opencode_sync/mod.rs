@@ -9,7 +9,7 @@ mod catalog;
 mod commands;
 mod config_paths;
 mod dtos;
-mod lock;
+pub(crate) mod lock;
 mod models;
 mod sync;
 mod sync_apply;
