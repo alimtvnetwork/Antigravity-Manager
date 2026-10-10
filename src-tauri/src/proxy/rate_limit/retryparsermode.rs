@@ -111,7 +111,7 @@ impl RateLimitTracker {
     /// 生成限流 Key
     /// - 账号级: "account_id"
     /// - 模型级: "account_id:model_id"
-    fn get_limit_key(&self, account_id: &str, model: Option<&str>) -> String {
+    pub(crate) fn get_limit_key(&self, account_id: &str, model: Option<&str>) -> String {
         match model {
             Some(m) if !m.is_empty() => format!("{}:{}", account_id, m),
             _ => account_id.to_string(),
