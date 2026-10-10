@@ -9,10 +9,10 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 
 use super::build_parts::{
-use crate::modules::proxy_db::signatures::SENTINEL_SIGNATURE;
-use crate::proxy::mappers::claude::thinking_utils::MIN_SIGNATURE_LENGTH;
     build_google_content, empty_tool_result_fallback, inject_missing_tool_results,
 };
+use crate::modules::proxy_db::signatures::SENTINEL_SIGNATURE;
+use crate::proxy::mappers::claude::thinking_utils::MIN_SIGNATURE_LENGTH;
 
 /// 构建 Contents (Messages)
 pub(crate) fn build_contents(
