@@ -3,10 +3,10 @@
 
 use super::router_proxy::health_check_handler;
 use axum::{
-use super::{admin_accounts, admin_config, admin_devices, admin_import, admin_instances, admin_oauth, admin_prompts, admin_proxy, admin_stats, admin_sync_external, admin_sync_opencode};
     routing::{delete, get, post},
     Router,
 };
+use super::{admin_accounts, admin_config, admin_devices, admin_import, admin_instances, admin_oauth, admin_prompts, admin_proxy, admin_stats, admin_sync_external, admin_sync_opencode};
 
 pub(crate) fn admin_route_table_a() -> Router {
     let admin_routes = Router::new()
