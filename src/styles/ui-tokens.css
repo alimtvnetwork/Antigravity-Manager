@@ -1,0 +1,92 @@
+/* ==========================================================================
+   Antigravity Tools — Semantic UI Tokens
+   --------------------------------------------------------------------------
+   Centralized color system for the refined dark product UI.
+   Source of truth: "Antigravity Tools UI Refinement Instructions"
+   (semantic color system section). Values below are authoritative; do NOT
+   duplicate them inside individual components — consume via var(--ui-*).
+
+   Scope note: these tokens are calibrated for the dark navy theme (the
+   theme in the reference screenshots). Components apply them through
+   Tailwind `dark:` variants; light-theme styling is intentionally left on
+   the existing Tailwind gray scale so light-mode behavior is unchanged.
+   ========================================================================== */
+
+:root {
+  /* ---- Core surfaces and text ---- */
+  --ui-canvas: #071a26;            /* App background */
+  --ui-surface-1: #0b2232;         /* Main panel / card */
+  --ui-surface-2: #102b3d;         /* Nested groups and rows */
+  --ui-surface-hover: #14364a;     /* Hovered interactive row */
+  --ui-surface-pressed: #173e54;   /* Pressed / selected row */
+  --ui-border-subtle: #1e455c;     /* Default separators and borders */
+  --ui-border-emphasis: #2b617d;   /* Selected and emphasized border */
+  --ui-text-primary: #e8f1f6;      /* Primary labels */
+  --ui-text-secondary: #a9bdca;    /* Supporting text */
+  --ui-text-muted: #718b9b;        /* Metadata and disabled labels */
+
+  /* ---- Interaction and status colors ---- */
+  --ui-interactive: #4a8dff;       /* Links, clickable icons, standard selection */
+  --ui-focus-ring: #79aeff;        /* Keyboard focus ring */
+  --ui-success: #20d99a;           /* Running, healthy, complete */
+  --ui-warning: #f4b63e;           /* Active attention and warning */
+  --ui-danger: #f2556d;            /* Destructive, error, depleted */
+  --ui-info-cyan: #39b9d6;         /* Secondary informational state only */
+
+  /* ---- Interactive alpha variants (do not hand-roll opacities) ---- */
+  --ui-interactive-soft: rgb(74 141 255 / 0.1);    /* Email chip background */
+  --ui-interactive-border: rgb(74 141 255 / 0.28); /* Email chip border */
+  --ui-interactive-40: rgb(74 141 255 / 0.4);      /* Hover border tint */
+  --ui-amber-35: rgb(244 182 62 / 0.35);           /* Active-card edge tint */
+  --ui-success-glow: rgb(32 217 154 / 0.35);       /* Restrained endpoint glow */
+
+  /* ---- Quota / progress scale ---- */
+  --ui-quota-track: #0a1d29;         /* Bar track background */
+  --ui-quota-track-border: #1c4054;  /* Bar track border */
+  /* Continuous 8-stop spatial scale. Rendered full-width on the track and
+     revealed by the current percentage — NEVER stretched into a partial fill. */
+  --ui-quota-gradient: linear-gradient(
+    90deg,
+    #f2556d 0%,
+    #f46f5e 14%,
+    #f49a45 28%,
+    #f4b63e 40%,
+    #e7d36a 52%,
+    #a7de9b 64%,
+    #70ddb0 78%,
+    #20d99a 100%
+  );
+}
+
+/* --------------------------------------------------------------------------
+   Shared interaction timing for rows (per refinement spec).
+   -------------------------------------------------------------------------- */
+.ui-interactive-row {
+  transition:
+    background-color 140ms ease-out,
+    border-color 140ms ease-out,
+    color 140ms ease-out,
+    box-shadow 180ms ease-out;
+}
+
+/* --------------------------------------------------------------------------
+   Keyboard focus: visible 2px ring, :focus-visible only (never on mouse click).
+   3:1+ contrast of #79aeff against the navy surfaces.
+   -------------------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--ui-focus-ring);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   Reduced motion: state changes stay visible, animation is removed.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
