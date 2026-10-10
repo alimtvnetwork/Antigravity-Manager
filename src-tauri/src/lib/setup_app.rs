@@ -493,5 +493,4 @@ pub(crate) fn init_databases() {
     if let Err(e) = modules::user_token_db::init_db() {
         error!("Failed to initialize user token database: {}", e);
     }
-
 }
