@@ -6,6 +6,7 @@ use crate::proxy::mappers::claude::models::*;
 use bytes::Bytes;
 use serde_json::{json, Value};
 use super::PartProcessor;
+use crate::proxy::signature_cache::cacheentry::SignatureCache;
 
 impl<'a> PartProcessor<'a> {
     // -------------------------------------------------------------------------

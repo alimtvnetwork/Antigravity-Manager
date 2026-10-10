@@ -1,4 +1,5 @@
 use super::streaming::StreamingState;
+use super::streaming::PartProcessor;
 use crate::proxy::common::client_adapter::ClientAdapter;
 use bytes::Bytes;
 use futures::Stream;
