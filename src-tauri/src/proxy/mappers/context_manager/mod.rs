@@ -161,6 +161,12 @@ pub enum PurificationStrategy {
 /// Context Manager implementation
 pub struct ContextManager;
 
+pub(crate) struct OpenAIToolRound {
+    pub(crate) _assistant_index: usize,
+    pub(crate) _tool_indices: Vec<usize>,
+    pub(crate) indices: Vec<usize>,
+}
+
 pub mod claude;
 pub mod gemini;
 pub mod openai;

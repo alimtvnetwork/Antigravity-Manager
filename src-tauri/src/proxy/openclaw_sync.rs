@@ -26,6 +26,7 @@ pub(crate) use acquire_openclaw_config_lock::resolve_openclaw_path;
 pub(crate) use acquire_openclaw_config_lock::run_openclaw_version;
 pub(crate) use acquire_openclaw_config_lock::run_version_command;
 pub use acquire_openclaw_config_lock::OpenClawStatus;
+pub(crate) use acquire_openclaw_config_lock::PROVIDER_ID;
 pub use sync_openclaw_provider::clear_openclaw_config;
 pub use sync_openclaw_provider::execute_openclaw_clear;
 pub use sync_openclaw_provider::execute_openclaw_restore;
@@ -35,4 +36,5 @@ pub use sync_openclaw_provider::get_openclaw_sync_status;
 pub use sync_openclaw_provider::read_openclaw_config_content;
 pub use sync_openclaw_provider::restore_openclaw_config;
 pub use sync_openclaw_provider::sync_openclaw_provider;
+#[cfg(test)]
 pub(crate) use sync_openclaw_provider::tests;

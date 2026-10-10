@@ -5,7 +5,6 @@
 use serde_json::{json, Value};
 
 /// Request configuration after grounding resolution
-#[derive(Debug, Clone)]
 
 /// Check if two model strings are compatible (same family)
 pub fn is_model_compatible(cached: &str, target: &str) -> bool {

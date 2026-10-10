@@ -1,10 +1,13 @@
-use super::*;
-use crate::proxy::mappers::caveman_cleaner::CavemanCleaner;
-use crate::proxy::mappers::claude::models::{ClaudeRequest, ContentBlock, Message, MessageContent, SystemPrompt};
-use crate::proxy::mappers::openai::models::{OpenAIMessage, OpenAIRequest};
-use crate::proxy::mappers::rtk_cleaner::RtkCleaner;
+use super::super::caveman_cleaner::CavemanCleaner;
+use super::super::claude::models::{ClaudeRequest, ContentBlock, Message, MessageContent, SystemPrompt};
+use super::super::openai::models::{OpenAIMessage, OpenAIRequest};
+use super::super::rtk_cleaner::RtkCleaner;
 use serde_json::{json, Value};
 use tracing::{debug, info};
+use super::ContextManager;
+use super::estimate_tokens_from_str;
+use super::estimate_media_tokens_from_url;
+use super::estimate_inline_data_tokens;
 
 // Gemini-side context management (split from context_manager.rs).
 impl ContextManager {
@@ -283,6 +286,7 @@ impl ContextManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+use crate::proxy::mappers::context_manager::OpenAIToolRound;
 
     // Helper to create a request since Default is not implemented
 }

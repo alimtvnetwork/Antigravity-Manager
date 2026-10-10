@@ -1,5 +1,6 @@
 // Streaming shared types (split from streaming.rs)
 use crate::proxy::mappers::claude::models::*;
+use serde_json::Value;
 
 pub fn remap_function_call_args(name: &str, args: &mut Value) {
     // 纯透传协议工具参数，不进行任何字段重命名与拦截改写

@@ -29,9 +29,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
 use serde_json::Value;
+use crate::proxy::adapters::apply_patch_preflight::Repair;
 
 /// 一条 pre-flight 处理记录(给诊断页 / 日志)。
-#[derive(Debug, Clone, PartialEq)]
 
 /// apply_patch **中间层总入口**:按白名单规则**逐条恢复已知格式错误**,使模型不遵循 prompt 时
 /// 产出的畸形 patch 仍能被 Codex 正确 apply。**只动确定的已知坑;未知一律原样放行(不猜不丢)。**

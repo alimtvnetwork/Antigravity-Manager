@@ -10,7 +10,7 @@ use std::sync::OnceLock;
 static MEMORY_ACTIVE_PROMPTS: OnceLock<Mutex<HashMap<String, ActivePrompt>>> = OnceLock::new();
 static DISPATCHED_PROMPTS_CACHE: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 static ACTIVE_AGY_WORKERS: OnceLock<Mutex<HashMap<String, u32>>> = OnceLock::new();
-static STARTUP_PURGE_ONCE: Once = Once::new();
+pub(crate) static STARTUP_PURGE_ONCE: Once = Once::new();
 
 pub(crate) fn get_memory_prompts_map() -> &'static Mutex<HashMap<String, ActivePrompt>> {
     MEMORY_ACTIVE_PROMPTS.get_or_init(|| Mutex::new(HashMap::new()))

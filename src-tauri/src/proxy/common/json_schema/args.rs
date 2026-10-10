@@ -24,7 +24,7 @@ pub fn fix_tool_call_args(args: &mut Value, schema: &Value) {
 }
 
 /// 递归修正单个参数的类型
-fn fix_single_arg_recursive(value: &mut Value, schema: &Value) {
+pub fn fix_single_arg_recursive(value: &mut Value, schema: &Value) {
     // 1. 处理嵌套对象 (properties)
     if let Some(nested_props) = schema.get("properties").and_then(|p| p.as_object()) {
         if let Some(value_obj) = value.as_object_mut() {

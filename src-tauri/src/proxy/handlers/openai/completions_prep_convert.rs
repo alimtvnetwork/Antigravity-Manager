@@ -9,9 +9,9 @@ use super::responses_history::{
     drop_leading_orphan_tool_history, into_history_without_inline_media,
     rewrite_terminal_assistant_prefill,
 };
+use super::responses_history::build_responses_tool_output_content;
 use super::responses_media::{
-    build_responses_tool_output_content, responses_input_item_type, responses_message_parts,
-    responses_tool_output_parts,
+    responses_input_item_type, responses_message_parts, responses_tool_output_parts,
 };
 
 pub(crate) fn completions_convert_payload(

@@ -1,4 +1,8 @@
 use super::*;
+use crate::proxy::handlers::claude::error_handling::{build_exhaustion_error, handle_upstream_error};
+use crate::proxy::handlers::claude::request_log::log_request_summary;
+use crate::proxy::handlers::claude::response_handling::handle_nonstream_success;
+use crate::proxy::handlers::claude::stream_handling::handle_stream_success;
 
 pub async fn handle_messages(
     State(state): State<AppState>,
@@ -32,7 +36,7 @@ pub async fn handle_messages(
                     // [智能限流] 请求成功，重置该账号的连续失败计数
                     st.token_manager.mark_account_success(&call.email);
                     if call.actual_stream {
-                        match handle_stream_success(&mut st, call).await {
+                        match handle_stream_success(&mut st, call, attempt).await {
                             StreamOutcome::Respond(resp) => return resp,
                             StreamOutcome::Retry => continue,
                         }

@@ -1,4 +1,6 @@
 use super::*;
+use crate::proxy::mappers::gemini::wrapper::CONTEXT_SUMMARY_PROMPT;
+use crate::proxy::handlers::claude::consts::INTERNAL_BACKGROUND_TASK;
 
 // ===== [Helper] Synchronous Upstream Call =====
 // Reusable function for making non-streaming calls to Gemini API
@@ -92,7 +94,7 @@ async fn call_gemini_sync(
 /// 5. Returns the forked request
 ///
 /// Returns Ok(forked_request) on success, Err(error_message) on failure
-async fn try_compress_with_summary(
+pub(crate) async fn try_compress_with_summary(
     original_request: &ClaudeRequest,
     trace_id: &str,
     token_manager: &Arc<crate::proxy::TokenManager>,

@@ -2,15 +2,18 @@
 // Claude 请求转换 (Claude → Gemini v1internal)
 // 对应 transformClaudeRequestIn
 
-use super::models::*;
+use super::super::models::*;
 use crate::proxy::mappers::signature_store::get_thought_signature; // Deprecated, kept for fallback
 use crate::proxy::session_manager::SessionManager;
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use crate::proxy::mappers::common_utils::request::is_model_compatible;
 
 use super::build_parts::{
     build_google_content, empty_tool_result_fallback, inject_missing_tool_results,
 };
+use crate::modules::proxy_db::signatures::SENTINEL_SIGNATURE;
+use crate::proxy::mappers::claude::thinking_utils::MIN_SIGNATURE_LENGTH;
 
 /// 构建 Contents (Messages)
 pub(crate) fn build_contents(

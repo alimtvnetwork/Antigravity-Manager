@@ -1,6 +1,6 @@
 // Session setup phase (split from request.rs).
 // OpenAI → Gemini 请求转换
-use super::models::*;
+use super::super::models::*;
 use crate::proxy::model_specs;
 use crate::proxy::token_manager::ProxyToken;
 

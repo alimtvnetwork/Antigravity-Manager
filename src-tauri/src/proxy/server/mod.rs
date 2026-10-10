@@ -24,7 +24,7 @@ mod audit;
 mod axum_server;
 mod bind;
 mod dto;
-mod image_scheduler;
+pub(crate) mod image_scheduler;
 mod pending;
 mod router_admin;
 mod router_admin_a;
@@ -34,6 +34,7 @@ mod start;
 
 pub use app_state::AppState;
 pub use axum_server::AxumServer;
+pub use crate::proxy::upstream::client::UpstreamClient;
 pub use image_scheduler::{ImagePermit, ImageScheduler};
 pub use pending::{
     take_pending_delete_accounts, take_pending_reload_accounts, trigger_account_delete,

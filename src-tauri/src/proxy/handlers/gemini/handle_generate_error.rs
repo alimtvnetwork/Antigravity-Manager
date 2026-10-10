@@ -5,7 +5,7 @@ use super::*;
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn handle_generate_error(
     status: StatusCode,
-    response: reqwest::Response,
+    response: rquest::Response,
     debug_cfg: &crate::proxy::config::DebugLoggingConfig,
     trace_id: &str,
     model_name: &str,
@@ -19,8 +19,8 @@ pub(crate) async fn handle_generate_error(
     max_attempts: usize,
     pool_size: usize,
     token_manager: &std::sync::Arc<crate::proxy::TokenManager>,
-    headers: &axum::http::HeaderMap,
-    client_adapter: &Option<crate::proxy::common::client_adapter::ClientAdapter>,
+    _headers: &axum::http::HeaderMap,
+    client_adapter: &Option<std::sync::Arc<dyn crate::proxy::common::client_adapter::ClientAdapter>>,
     failure_statuses: &mut crate::proxy::handlers::common::FailureStatusTracker,
     last_error: &mut String,
     force_rotate: &mut bool,
@@ -28,6 +28,10 @@ pub(crate) async fn handle_generate_error(
     retry_credentials: &mut Option<(String, String, String, String, u64)>,
     retry_state: &mut crate::proxy::handlers::common::RequestRetryState,
     image_permit: &mut Option<crate::proxy::server::image_scheduler::ImagePermit>,
+    config: &crate::proxy::mappers::common_utils::RequestConfig,
+    body: &mut serde_json::Value,
+    access_token: &str,
+    project_id: &str,
 ) -> Result<ErrorOutcome, (StatusCode, String)> {
     failure_statuses.record(status);
     let status_code = status.as_u16();
@@ -40,7 +44,7 @@ pub(crate) async fn handle_generate_error(
         .text()
         .await
         .unwrap_or_else(|_| format!("HTTP {}", status_code));
-    last_error = format!("HTTP {}: {}", status_code, error_text);
+    *last_error = format!("HTTP {}: {}", status_code, error_text);
     if debug_logger::is_enabled(&debug_cfg) {
         let payload = json!({
             "kind": "upstream_response_error",
@@ -118,7 +122,7 @@ pub(crate) async fn handle_generate_error(
         status_code,
         &error_text,
         retry_after.as_deref(),
-        retried_without_thinking,
+        *retried_without_thinking,
         attempt,
         pool_size,
     );
@@ -144,8 +148,8 @@ pub(crate) async fn handle_generate_error(
             (
                 StatusCode::from_u16(status_code).unwrap_or(StatusCode::NOT_FOUND),
                 [
-                    ("X-Account-Email", email.as_str()),
-                    ("X-Mapped-Model", mapped_model.as_str()),
+                    ("X-Account-Email", email),
+                    ("X-Mapped-Model", mapped_model),
                 ],
                 Json(dual_err),
             )
@@ -154,8 +158,8 @@ pub(crate) async fn handle_generate_error(
     }
 
     if classification.is_thought_signature_error() {
-        if !retried_without_thinking {
-            retried_without_thinking = true;
+        if !*retried_without_thinking {
+            *retried_without_thinking = true;
             tracing::warn!(
                 "[Gemini] Pipeline: Thinking signature error detected on upstream (HTTP {}). Surgically purging corrupted signatures and retrying on same account.",
                 status_code
@@ -179,7 +183,7 @@ pub(crate) async fn handle_generate_error(
                 }
             }
             // 4. Retry on same account
-            force_rotate = false;
+            *force_rotate = false;
             return Ok(ErrorOutcome::Continue);
         } else {
             tracing::warn!(
@@ -218,16 +222,16 @@ pub(crate) async fn handle_generate_error(
         attempt,
         max_attempts,
         status_code,
-        trace_id,
+        &trace_id,
     )
     .await
     {
         if matches!(strategy, RetryStrategy::GraceRetry(_)) {
-            retry_credentials = Some((
-                access_token.clone(),
-                project_id.clone(),
-                email.clone(),
-                account_id.clone(),
+            *retry_credentials = Some((
+                access_token.to_string(),
+                project_id.to_string(),
+                email.to_string(),
+                account_id.to_string(),
                 0,
             ));
         }
@@ -248,9 +252,9 @@ pub(crate) async fn handle_generate_error(
                 "[{}] Keeping same account for status {} (Gemini server-side issue or Grace Retry)",
                 trace_id, status_code
             );
-            force_rotate = false;
+            *force_rotate = false;
         } else {
-            force_rotate = true;
+            *force_rotate = true;
         }
 
         return Ok(ErrorOutcome::Continue);
@@ -271,8 +275,8 @@ pub(crate) async fn handle_generate_error(
         (
             status,
             [
-                ("X-Account-Email", email.as_str()),
-                ("X-Mapped-Model", mapped_model.as_str()),
+                ("X-Account-Email", email),
+                ("X-Mapped-Model", mapped_model),
             ],
             Json(dual_err),
         )

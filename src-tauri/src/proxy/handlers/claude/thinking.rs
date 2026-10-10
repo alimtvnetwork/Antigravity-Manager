@@ -1,13 +1,13 @@
 use super::*;
 
-struct ThinkingHint {
-    budget_tokens: Option<u32>,
-    level: Option<String>,
+pub(crate) struct ThinkingHint {
+    pub(crate) budget_tokens: Option<u32>,
+    pub(crate) level: Option<String>,
 }
 
 /// Extract thinking hints from raw request JSON (OpenCode variants compatibility)
 /// Checks multiple possible paths for budget and level configuration
-fn extract_thinking_hint(body: &Value) -> ThinkingHint {
+pub(crate) fn extract_thinking_hint(body: &Value) -> ThinkingHint {
     let mut hint = ThinkingHint {
         budget_tokens: None,
         level: None,
@@ -89,7 +89,7 @@ fn level_to_effort(level: &str) -> String {
 }
 
 /// Apply thinking hints to ClaudeRequest
-fn apply_thinking_hints(
+pub(crate) fn apply_thinking_hints(
     request: &mut crate::proxy::mappers::claude::models::ClaudeRequest,
     hint: &ThinkingHint,
     trace_id: &str,

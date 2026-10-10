@@ -79,6 +79,7 @@ pub(crate) use proxyconfig::default_zai_base_url;
 pub(crate) use proxyconfig::default_zai_haiku_model;
 pub(crate) use proxyconfig::default_zai_opus_model;
 pub(crate) use proxyconfig::default_zai_sonnet_model;
+#[cfg(test)]
 pub(crate) use proxyconfig::tests;
 pub use proxyconfig::LogRetentionConfig;
 pub use proxyconfig::ProxyAuth;

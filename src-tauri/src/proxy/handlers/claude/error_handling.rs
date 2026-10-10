@@ -1,4 +1,10 @@
 use super::*;
+use crate::proxy::handlers::claude::attempt::AttemptCall;
+use crate::proxy::handlers::common::should_rotate_account;
+use crate::proxy::handlers::claude::attempt::AttemptState;
+use crate::proxy::handlers::claude::attempt::ErrorOutcome;
+use crate::proxy::handlers::common::apply_retry_strategy;
+use crate::proxy::handlers::common::RetryStrategy;
 
 /// Handle a non-success upstream response: status extraction, pipeline
 /// classification, account lockout, thinking-signature retry, 403 handling,
@@ -31,7 +37,6 @@ pub(crate) async fn handle_upstream_error(
     let status_code = status.as_u16();
     st.last_status = status;
     let retry_after = response
-        .st
         .headers()
         .get("Retry-After")
         .and_then(|h| h.to_str().ok())
@@ -294,7 +299,7 @@ pub(crate) async fn handle_upstream_error(
     };
 
     // 确定重试策略：传入当前 attempt 与 st.pool_size，执行智能自适应裁决
-    let retry_strategy = super::common::determine_retry_strategy_adaptive(
+    let retry_strategy = crate::proxy::handlers::common::determine_retry_strategy_adaptive(
         status_code,
         &error_text,
         retry_after.as_deref(),

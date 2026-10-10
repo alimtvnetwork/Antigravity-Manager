@@ -2,6 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use super::*;
+use crate::modules::email_vault_db;
 
 /// Backup email_vault.db and split email_passwords.db to target path
 pub fn backup_vault_db(target_path: &Path) -> Result<(), String> {

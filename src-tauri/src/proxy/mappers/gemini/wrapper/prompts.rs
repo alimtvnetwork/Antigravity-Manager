@@ -1,15 +1,17 @@
 // Prompt constants (split from wrapper.rs).
 use bytes::Bytes;
 use serde_json::{json, Value};
+use crate::proxy::mappers::gemini::wrapper::response::unwrap_response;
+use crate::proxy::mappers::gemini::wrapper::request::wrap_request;
 
-const INTERNAL_BACKGROUND_TASK: &str = "gemini-2.5-flash-lite";
+pub const INTERNAL_BACKGROUND_TASK: &str = "gemini-2.5-flash-lite";
 
 /// Layer-3 后台摘要请求的超时（秒）。
 ///
 /// 上游客户端的默认超时是 600s，对"摘要整段对话"这种辅助任务过长 ——
 /// 一旦上游卡住，会长时间占住一个后台任务与连接。这里显式收紧到有界值。
 pub const SUMMARY_REQUEST_TIMEOUT_SECS: u64 = 180;
-const CONTEXT_SUMMARY_PROMPT: &str = r#"You are a context compression specialist. Your task is to create a structured XML snapshot of the conversation history.
+pub const CONTEXT_SUMMARY_PROMPT: &str = r#"You are a context compression specialist. Your task is to create a structured XML snapshot of the conversation history.
 
 This snapshot will become the Agent's ONLY memory of the past. All key details, plans, errors, and user instructions MUST be preserved.
 

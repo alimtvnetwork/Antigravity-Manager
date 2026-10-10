@@ -11,15 +11,21 @@ use tracing::{debug, error, info, warn};
 
 use crate::proxy::config::DebugLoggingConfig;
 use crate::proxy::debug_logger;
-use crate::proxy::handlers::common::{next_rotation_attempt, FailureStatusTracker};
-use crate::proxy::mappers::image::ImageGenerationRequest;
+use crate::proxy::handlers::common::{FailureStatusTracker, RequestRetryState, RetryStrategy, next_rotation_attempt};
 use crate::proxy::monitor::UpstreamRequestBodyHolder;
 use crate::proxy::server::{AppState, UpstreamClient};
 use crate::proxy::session_manager::SessionManager;
 use crate::proxy::TokenManager;
 
+use super::image_input::{build_image_edit_body, NormalizedInputImage};
 use super::images_intercept::intercept_chat_to_image;
-use super::responses_media::{build_image_edit_body, NormalizedInputImage};
+use crate::proxy::handlers::common::retrystrategy::should_rotate_account;
+use crate::proxy::handlers::openai::image_input::build_image_contents;
+use crate::proxy::handlers::openai::image_input::parse_generation_input_images;
+use crate::proxy::handlers::openai::image_input::generation_image_size_param;
+use crate::proxy::handlers::openai::responses_media::response_has_inline_image_data;
+use crate::proxy::handlers::common::apply_retry_strategy;
+use std::time::Duration;
 
 pub async fn handle_images_generations(
     State(state): State<AppState>,
@@ -483,7 +489,7 @@ pub async fn handle_images_generations_internal(
     tokio::spawn(async move {
         // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
         crate::error::record_ignored(
-            account::refresh_all_quotas_logic().await,
+            crate::modules::account::refresh::refresh_all_quotas_logic().await,
             "refresh_all_quotas_logic",
         );
     });

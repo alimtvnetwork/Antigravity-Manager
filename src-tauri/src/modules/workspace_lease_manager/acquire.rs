@@ -3,6 +3,7 @@ use chrono::Utc;
 use serde_json::json;
 
 use super::*;
+use crate::modules::supabase_sync;
 
 /// Attempt to acquire an exclusive lease for an account
 pub async fn acquire_lease(

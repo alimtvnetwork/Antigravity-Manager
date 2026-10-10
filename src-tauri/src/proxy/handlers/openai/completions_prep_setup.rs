@@ -22,6 +22,7 @@ use crate::proxy::TokenManager;
 
 use super::completions_prep_codex::CompletionsCodexPrep;
 use super::websocket_compress::try_compress_openai_with_summary;
+use crate::proxy::session_manager::SessionManager;
 
 /// Everything the retry loop needs, prepared before the first attempt.
 pub(crate) struct CompletionsSetup {
@@ -67,6 +68,7 @@ pub(crate) async fn completions_prep_setup(
     debug_cfg: &DebugLoggingConfig,
     clean_start: Instant,
     original_body: &Option<Value>,
+    uri: &http::Uri,
 ) -> Result<CompletionsSetup, Response> {
     let CompletionsCodexPrep {
         previous_response_id,

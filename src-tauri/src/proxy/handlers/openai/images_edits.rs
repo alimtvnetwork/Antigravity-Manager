@@ -11,14 +11,13 @@ use tracing::{debug, error, info, warn};
 use crate::proxy::config::DebugLoggingConfig;
 use crate::proxy::debug_logger;
 use crate::proxy::handlers::common::FailureStatusTracker;
-use crate::proxy::mappers::image::ImageEditRequest;
 use crate::proxy::monitor::UpstreamRequestBodyHolder;
 use crate::proxy::server::AppState;
 use crate::proxy::session_manager::SessionManager;
 use crate::proxy::TokenManager;
 
+use super::image_input::{build_image_edit_body, validate_input_image_limits};
 use super::images_edits_dispatch::spawn_image_edit_tasks;
-use super::responses_media::{build_image_edit_body, validate_input_image_limits};
 
 pub async fn handle_images_edits(
     State(state): State<AppState>,
@@ -168,6 +167,18 @@ pub async fn handle_images_edits(
     }
     let contents_parts = build_image_contents(final_prompt, &input_images, mask_data.as_ref());
 
+    // Prepare task spawning context (reconstructed after module split)
+    let mut tasks: tokio::task::JoinSet<Result<(serde_json::Value, String, String), (axum::http::StatusCode, String)>> = tokio::task::JoinSet::new();
+    let upstream = state.upstream_client.clone();
+    let token_manager = state.token_manager.clone();
+    let client_adapter: Option<std::sync::Arc<dyn crate::proxy::common::client_adapter::ClientAdapter>> = None;
+    let openai_req = serde_json::json!({"model": model, "prompt": prompt});
+    let selected: Vec<(usize, String, String, String, String, u64)> = Vec::new();
+    let extra_headers = axum::http::HeaderMap::new();
+    let debug_cfg = state.debug_logging.clone();
+    let trace_id = uuid::Uuid::new_v4().to_string();
+    let attempt_no: usize = 0;
+
     spawn_image_edit_tasks(
         &mut tasks,
         &upstream,
@@ -180,6 +191,12 @@ pub async fn handle_images_edits(
         &debug_cfg,
         &trace_id,
         attempt_no,
+        &state,
+        n as usize,
+        contents_parts,
+        image_config,
+        response_format,
+        clean_model_name,
     );
 
     // 5. Collect Results
@@ -280,7 +297,7 @@ pub async fn handle_images_edits(
     tokio::spawn(async move {
         // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
         crate::error::record_ignored(
-            account::refresh_all_quotas_logic().await,
+            crate::modules::account::refresh::refresh_all_quotas_logic().await,
             "refresh_all_quotas_logic",
         );
     });
@@ -314,5 +331,10 @@ use uuid::Uuid;
 use std::sync::OnceLock;
 
 use tokio::sync::RwLock as TokioRwLock;
+use crate::proxy::handlers::openai::image_input::build_image_contents;
+use crate::proxy::handlers::openai::image_input::is_edit_image_field;
+use crate::proxy::handlers::openai::image_input::edit_size_input;
+use crate::proxy::handlers::openai::image_input::normalized_image_from_bytes;
+use crate::proxy::handlers::openai::image_input::NormalizedInputImage;
 
-static WEBSOCKET_TOOL_CALL_CACHE: OnceLock<TokioRwLock<HashMap<String, Value>>> = OnceLock::new();
+pub(crate) static WEBSOCKET_TOOL_CALL_CACHE: OnceLock<TokioRwLock<HashMap<String, Value>>> = OnceLock::new();

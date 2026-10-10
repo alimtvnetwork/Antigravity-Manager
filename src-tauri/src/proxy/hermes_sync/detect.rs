@@ -1,17 +1,18 @@
 use super::*;
+use crate::proxy::opencode_sync::lock::BACKUP_SUFFIX;
 
-fn get_hermes_dir() -> Option<PathBuf> {
+pub fn get_hermes_dir() -> Option<PathBuf> {
     env::var_os("HERMES_HOME")
         .filter(|path| !path.is_empty())
         .map(PathBuf::from)
         .or_else(|| dirs::home_dir().map(|home| home.join(HERMES_DIR)))
 }
 
-fn get_config_path() -> Option<PathBuf> {
+pub fn get_config_path() -> Option<PathBuf> {
     get_hermes_dir().map(|dir| dir.join(HERMES_CONFIG_FILE))
 }
 
-fn get_backup_path() -> Option<PathBuf> {
+pub fn get_backup_path() -> Option<PathBuf> {
     get_config_path().map(|path| {
         path.with_file_name(format!(
             "{}{}",
@@ -21,7 +22,7 @@ fn get_backup_path() -> Option<PathBuf> {
     })
 }
 
-fn normalize_base_url(input: &str) -> String {
+pub fn normalize_base_url(input: &str) -> String {
     let trimmed = input.trim().trim_end_matches('/');
     if trimmed.ends_with("/v1") {
         trimmed.to_string()
@@ -30,7 +31,7 @@ fn normalize_base_url(input: &str) -> String {
     }
 }
 
-fn find_in_path(executable: &str) -> Option<PathBuf> {
+pub fn find_in_path(executable: &str) -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
         for dir in env::var("PATH").ok()?.split(';') {
@@ -54,7 +55,7 @@ fn find_in_path(executable: &str) -> Option<PathBuf> {
     None
 }
 
-fn resolve_hermes_path() -> Option<PathBuf> {
+pub fn resolve_hermes_path() -> Option<PathBuf> {
     if let Some(path) = find_in_path("hermes") {
         return Some(path);
     }
@@ -76,7 +77,7 @@ fn resolve_hermes_path() -> Option<PathBuf> {
     None
 }
 
-fn extract_version(raw: &str) -> String {
+pub fn extract_version(raw: &str) -> String {
     let trimmed = raw.trim();
     for part in trimmed.split_whitespace() {
         let candidate = part.rsplit('/').next().unwrap_or(part);
@@ -100,7 +101,7 @@ fn extract_version(raw: &str) -> String {
     }
 }
 
-fn is_valid_version(value: &str) -> bool {
+pub fn is_valid_version(value: &str) -> bool {
     value
         .chars()
         .next()
@@ -111,7 +112,7 @@ fn is_valid_version(value: &str) -> bool {
             .all(|character| character.is_ascii_digit() || character == '.')
 }
 
-async fn run_version_command(mut command: Command, timeout: Duration) -> Option<String> {
+pub async fn run_version_command(mut command: Command, timeout: Duration) -> Option<String> {
     command.kill_on_drop(true);
     #[cfg(target_os = "windows")]
     command.creation_flags(CREATE_NO_WINDOW);
@@ -131,7 +132,7 @@ async fn run_version_command(mut command: Command, timeout: Duration) -> Option<
     }
 }
 
-async fn run_hermes_version(path: &PathBuf) -> Option<String> {
+pub async fn run_hermes_version(path: &PathBuf) -> Option<String> {
     let mut command = Command::new(path);
     command.arg("--version");
     run_version_command(command, VERSION_PROBE_TIMEOUT).await

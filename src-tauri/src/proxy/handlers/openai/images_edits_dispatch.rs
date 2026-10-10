@@ -7,6 +7,17 @@ use tokio::task::JoinSet;
 
 use crate::proxy::server::UpstreamClient;
 use crate::proxy::TokenManager;
+use crate::proxy::handlers::common::retrystrategy::should_rotate_account;
+use crate::proxy::handlers::common::retrystrategy::RequestRetryState;
+use crate::proxy::handlers::common::FailureStatusTracker;
+use crate::proxy::handlers::common::retrystrategy::RetryStrategy;
+use crate::proxy::handlers::openai::image_input::build_image_edit_body;
+use crate::proxy::handlers::openai::image_input::NormalizedInputImage;
+use crate::proxy::handlers::openai::image_input::image_account_selection_target;
+use crate::proxy::handlers::openai::responses_media::response_has_inline_image_data;
+use crate::proxy::handlers::common::retrystrategy::next_rotation_attempt;
+use crate::proxy::handlers::common::apply_retry_strategy;
+use std::time::Duration;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn spawn_image_edit_tasks(
@@ -14,18 +25,24 @@ pub(crate) fn spawn_image_edit_tasks(
     upstream: &Arc<UpstreamClient>,
     token_manager: &Arc<TokenManager>,
     client_adapter: &Option<Arc<dyn crate::proxy::common::client_adapter::ClientAdapter>>,
-    openai_req: &crate::proxy::mappers::image::ImageEditRequest,
-    input_images: &[super::responses_media::NormalizedInputImage],
+    openai_req: &serde_json::Value,
+    input_images: &[super::image_input::NormalizedInputImage],
     selected: &[(usize, String, String, String, String, u64)],
     extra_headers: &axum::http::HeaderMap,
     debug_cfg: &crate::proxy::config::DebugLoggingConfig,
     trace_id: &str,
     attempt_no: usize,
+    state: &crate::proxy::server::AppState,
+    n: usize,
+    contents_parts: Vec<Value>,
+    image_config: Value,
+    response_format: String,
+    clean_model_name: String,
 ) {
     // 4. 并发发送请求
     // 注意：不再在外部获取 Token，而是移入 Task 内部
-    let upstream = state.upstream.clone();
-    let token_manager = state.token_manager.clone();
+    let upstream = upstream.clone();
+    let token_manager = token_manager.clone();
     let image_scheduler = state.image_scheduler.clone();
     let request_timeout = state.request_timeout;
     let max_pool_size = token_manager.len();

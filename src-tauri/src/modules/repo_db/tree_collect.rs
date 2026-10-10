@@ -2,20 +2,20 @@
 
 #[derive(Debug, Clone)]
 pub(crate) struct RawConvItem {
-    cid: String,
-    title: String,
-    prompt: String,
-    status: String,
-    is_running: bool,
-    steps: usize,
-    last_mod: String,
-    conv_inst_id: String,
-    prompt_category: String,
-    is_queued: bool,
-    latest_step_summary: Option<String>,
-    latest_response: Option<String>,
-    execution_results: Option<String>,
-    tool_calls_summary: Option<String>,
+    pub(crate) cid: String,
+    pub(crate) title: String,
+    pub(crate) prompt: String,
+    pub(crate) status: String,
+    pub(crate) is_running: bool,
+    pub(crate) steps: usize,
+    pub(crate) last_mod: String,
+    pub(crate) conv_inst_id: String,
+    pub(crate) prompt_category: String,
+    pub(crate) is_queued: bool,
+    pub(crate) latest_step_summary: Option<String>,
+    pub(crate) latest_response: Option<String>,
+    pub(crate) execution_results: Option<String>,
+    pub(crate) tool_calls_summary: Option<String>,
 }
 
 use super::gemini_dirs::gemini_dirs_tagged;
@@ -27,6 +27,10 @@ use chrono::Utc;
 use rusqlite::Connection;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use crate::modules::repo_db::project_queries::normalize_path_for_compare;
+use crate::modules::repo_db::sequences::extract_prompt_words_preview;
+use crate::modules::repo_db::dispatch::parse_flexible_timestamp;
+use crate::modules::repo_db::failed_commands::decode_uri_to_path;
 
 pub(crate) fn collect_tree_conversation_items(
     target: Option<&str>,
@@ -88,6 +92,8 @@ pub(crate) fn collect_tree_conversation_items(
                 )
             });
 
+            let registry = crate::modules::instance::registry::load_registry()
+                .unwrap_or_default();
             if let Ok(s_conn) = s_conn {
                 let is_owning_inst_alive = if owning_inst_id == "default"
                     || owning_inst_id == "__default__"

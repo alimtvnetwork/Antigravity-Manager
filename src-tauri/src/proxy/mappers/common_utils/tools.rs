@@ -5,7 +5,6 @@
 use serde_json::{json, Value};
 
 /// Request configuration after grounding resolution
-#[derive(Debug, Clone)]
 
 /// Inject current googleSearch tool and ensure no duplicate legacy search tools.
 /// When client-defined function tools are present, skips googleSearch to avoid client-side empty/unknown tool dispatch errors.

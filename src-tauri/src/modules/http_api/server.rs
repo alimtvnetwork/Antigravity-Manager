@@ -9,6 +9,9 @@ use axum::{
 use tower_http::cors::{Any, CorsLayer};
 
 use super::*;
+use super::handlers::list_accounts;
+use super::handlers::get_current_account;
+use super::handlers::get_logs;
 
 // ============================================================================
 // Server

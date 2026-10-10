@@ -1,6 +1,6 @@
 // StreamingState (split from streaming.rs)
 use super::types::{BlockType, SignatureManager};
-use super::utils::to_claude_usage;
+use super::super::utils::to_claude_usage;
 use crate::proxy::common::client_adapter::{ClientAdapter, SignatureBufferStrategy};
 use crate::proxy::mappers::claude::models::*;
 use crate::proxy::mappers::estimation_calibrator::get_calibrator;
@@ -11,20 +11,20 @@ use serde_json::{json, Value};
 /// 流式状态机
 
 pub struct StreamingState {
-    pub(crate) block_type: BlockType,
+    block_type: BlockType,
     pub block_index: usize,
     pub message_start_sent: bool,
     pub message_stop_sent: bool,
-    pub(crate) used_tool: bool,
-    pub(crate) signatures: SignatureManager,
+    used_tool: bool,
+    signatures: SignatureManager,
     pub(crate) trailing_signature: Option<String>,
     pub web_search_query: Option<String>,
     pub grounding_chunks: Option<Vec<serde_json::Value>>,
     // [IMPROVED] Error recovery 状态追踪 (prepared for future use)
     #[allow(dead_code)]
-    pub(crate) parse_error_count: usize,
+    parse_error_count: usize,
     #[allow(dead_code)]
-    pub(crate) last_valid_state: Option<BlockType>,
+    last_valid_state: Option<BlockType>,
     // [NEW] Model tracking for signature cache
     pub model_name: Option<String>,
     // [NEW v3.3.17] Session ID for session-based signature caching

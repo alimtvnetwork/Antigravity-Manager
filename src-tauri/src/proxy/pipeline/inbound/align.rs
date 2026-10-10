@@ -163,7 +163,7 @@ impl InboundThinkingPipeline {
     }
 
     /// 剥离遗留思考块的前缀标记 (**Thinking**)
-    fn strip_thinking_prefix(text: &str) -> String {
+    pub(crate) fn strip_thinking_prefix(text: &str) -> String {
         let trimmed = text.trim_start();
         if let Some(rest) = trimmed.strip_prefix("**Thinking**") {
             let rest = rest.trim_start_matches(':');

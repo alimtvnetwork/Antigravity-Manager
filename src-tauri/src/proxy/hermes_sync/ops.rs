@@ -1,4 +1,12 @@
 use super::*;
+use crate::proxy::hermes_sync::sync_logic::read_config_state;
+use crate::proxy::hermes_sync::sync_logic::redact_sensitive_source;
+use crate::proxy::hermes_sync::detect::get_backup_path;
+use crate::modules::supabase_sync::config_a::get_config_path;
+use crate::proxy::hermes_sync::sync_logic::apply_sync_losslessly;
+use crate::proxy::hermes_sync::sync_logic::apply_clear_losslessly;
+use crate::proxy::hermes_sync::sync_logic::apply_restore_losslessly;
+use crate::proxy::hermes_sync::detect::normalize_base_url;
 
 pub fn sync_hermes_provider(
     proxy_url: String,

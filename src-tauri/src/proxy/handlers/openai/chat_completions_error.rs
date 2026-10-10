@@ -3,12 +3,15 @@
 use std::sync::Arc;
 
 use axum::http::StatusCode;
+use axum::Json;
+use axum::response::IntoResponse;
 use serde_json::{json, Value};
 use tracing::{debug, error};
 
 use crate::proxy::common::client_adapter::{ClientAdapter, CLIENT_ADAPTERS};
 use crate::proxy::config::DebugLoggingConfig;
 use crate::proxy::debug_logger;
+use crate::proxy::upstream::client::types::mask_email;
 use crate::proxy::handlers::common::{
     apply_retry_strategy, should_rotate_account, FailureStatusTracker, RequestRetryState,
     RetryStrategy,
@@ -34,6 +37,7 @@ pub(crate) async fn chat_completions_error(
     retry_state: &mut RequestRetryState,
     retried_without_thinking: &mut bool,
     max_attempts: usize,
+    attempt: usize,
     token_manager: Arc<TokenManager>,
     client_adapter: Option<Arc<dyn ClientAdapter>>,
     pool_size: usize,
@@ -108,7 +112,7 @@ pub(crate) async fn chat_completions_error(
         status_code,
         &error_text,
         retry_after.as_deref(),
-        retried_without_thinking,
+        *retried_without_thinking,
         attempt,
         pool_size,
     );
@@ -144,7 +148,7 @@ pub(crate) async fn chat_completions_error(
     }
 
     if classification.is_thought_signature_error() {
-        if !retried_without_thinking {
+        if !*retried_without_thinking {
             *retried_without_thinking = true;
             tracing::warn!(
                     "[{}] Pipeline: Thinking signature error detected on upstream (HTTP {}). Surgically purging corrupted signatures and retrying on same account.",

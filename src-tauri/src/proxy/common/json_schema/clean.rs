@@ -2,6 +2,7 @@
 use super::refs::{extract_best_schema_from_union, merge_all_of};
 use super::{MAX_DESCRIPTION_LENGTH, MAX_RECURSION_DEPTH};
 use serde_json::{json, Value};
+use crate::proxy::common::json_schema::recursive::clean_json_schema_recursive;
 
 pub fn sanitize_description(s: &str) -> String {
     if s.chars().count() <= MAX_DESCRIPTION_LENGTH {

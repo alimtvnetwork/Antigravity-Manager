@@ -1,4 +1,5 @@
 use super::*;
+use crate::proxy::monitor::proxyrequestlog::CURRENT_UPSTREAM_CAPTURE;
 
 impl UpstreamClient {
     /// Build v1internal URL

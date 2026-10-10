@@ -1,5 +1,6 @@
 use super::*;
 use crate::proxy::mappers::claude::models::ClaudeRequest;
+use crate::proxy::handlers::claude::attempt::AttemptState;
 
 /// Apply the 3-layer progressive compression to the request when the
 /// compression level is "high" (and thinking was not stripped for retry).
@@ -96,7 +97,7 @@ pub(crate) async fn apply_compression(
                 &request_with_mapped,
                 &st.trace_id,
                 &token_manager_clone,
-                &state.st.upstream,
+                &st.upstream,
             )
             .await
             {

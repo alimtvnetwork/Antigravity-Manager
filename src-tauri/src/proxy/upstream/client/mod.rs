@@ -12,7 +12,7 @@ mod client_calls;
 mod client_core;
 #[cfg(test)]
 mod tests;
-mod types;
+pub(crate) mod types;
 mod utils;
 
 pub use client_calls::*;

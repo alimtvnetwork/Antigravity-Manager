@@ -1,5 +1,7 @@
 // Normalize Codex-style websocket payloads to OpenAI requests.
 use serde_json::{json, Value};
+use super::responses_history::history_without_inline_media;
+use super::responses_media::{responses_input_item_type, validate_responses_input_image_limits};
 
 use super::websocket::WebsocketSessionState;
 
@@ -87,7 +89,7 @@ pub(crate) fn handle_prewarm_locally(
     (created_ev, completed_ev)
 }
 
-fn normalize_responses_websocket_request(
+pub(crate) fn normalize_responses_websocket_request(
     mut payload: Value,
     state: &mut WebsocketSessionState,
 ) -> Result<Value, String> {
@@ -298,6 +300,7 @@ fn dedupe_input_items_by_id(items: Vec<Value>) -> Vec<Value> {
 
 fn dedupe_function_calls_by_call_id(items: Vec<Value>) -> Vec<Value> {
     use std::collections::HashSet;
+use uuid::Uuid;
     let mut seen_call_ids = HashSet::new();
     let mut filtered = Vec::new();
     for item in items {

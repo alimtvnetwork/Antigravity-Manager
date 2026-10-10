@@ -24,7 +24,7 @@ impl std::ops::DerefMut for ThinkingDbGuard {
 /// Process-lifetime connection to thinking_store.db.
 /// Fill/hydrate must not open proxy_logs.db (it can be multi-GB on HDD).
 /// Automatically tracks data directory changes and reuses connection with fast pragmas.
-fn thinking_db() -> Result<ThinkingDbGuard, String> {
+pub fn thinking_db() -> Result<ThinkingDbGuard, String> {
     let db_path = get_thinking_db_path()?;
     let slot = THINKING_DB.get_or_init(|| Mutex::new(None));
     let mut guard = slot.lock().map_err(|e| format!("thinking db lock: {e}"))?;

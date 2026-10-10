@@ -6,6 +6,11 @@ use super::schema::connect_db;
 use chrono::Utc;
 use rusqlite::params;
 use std::path::Path;
+use crate::modules::repo_db::project_queries::normalize_path_for_compare;
+use crate::commands::instance::list_running_projects;
+use crate::modules::repo_db::gemini_dirs::gemini_dirs_tagged;
+use crate::modules::repo_db::dispatch::parse_flexible_timestamp;
+use crate::modules::repo_db::failed_commands::decode_uri_to_path;
 
 pub(crate) fn transition_stale_inflight_prompts(now: i64) {
     if let Ok(conn) = connect_db() {
@@ -77,6 +82,7 @@ pub(crate) fn discover_fallback_projects(
 
     for (owning_inst_id, base) in &candidate_dirs_fb {
         // Verify if the owning instance process is actually alive on the OS
+        let registry = crate::modules::instance::registry::load_registry().unwrap_or_default();
         let is_owning_inst_alive = if owning_inst_id == "default" || owning_inst_id == "__default__"
         {
             crate::modules::process::is_antigravity_running(None) || {

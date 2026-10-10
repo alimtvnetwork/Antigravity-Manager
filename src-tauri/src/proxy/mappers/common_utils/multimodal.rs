@@ -5,7 +5,6 @@
 use serde_json::{json, Value};
 
 /// Request configuration after grounding resolution
-#[derive(Debug, Clone)]
 
 /// [FIX] Parse markdown base64 images from text and split into Gemini parts
 pub fn parse_markdown_images_to_parts(text: &str) -> Vec<Value> {

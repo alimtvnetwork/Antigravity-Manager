@@ -2,7 +2,7 @@
 // Claude 请求转换 (Claude → Gemini v1internal)
 // 对应 transformClaudeRequestIn
 
-use super::models::*;
+use super::super::models::*;
 use crate::proxy::mappers::signature_store::get_thought_signature; // Deprecated, kept for fallback
 use crate::proxy::session_manager::SessionManager;
 use serde_json::{json, Value};
@@ -11,6 +11,8 @@ use std::collections::HashMap;
 use super::build_contents::build_contents;
 use super::messages::reorder_gemini_parts;
 use super::thinking::{clean_system_prompt_text, is_gemini_client_billing_metadata};
+use super::messages::normalize_claude_client_identity;
+use super::transform::TransformTiming;
 
 /// 构建 System Instruction (支持动态身份映射与 Prompt 隔离)
 pub(crate) fn build_system_instruction(

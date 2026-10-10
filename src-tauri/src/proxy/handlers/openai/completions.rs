@@ -72,6 +72,7 @@ pub async fn handle_completions(
         &debug_cfg,
         clean_start,
         &original_body,
+        &uri,
     )
     .await
     {
@@ -105,6 +106,7 @@ pub async fn handle_completions(
             &mut setup.failure_statuses,
             &mut setup.norm_ms,
             &mut setup.think_fill_ms,
+            &uri,
         )
         .await
         {
@@ -139,6 +141,7 @@ pub async fn handle_completions(
                 &mut setup.failure_statuses,
                 &mut setup.last_error,
                 attempt,
+                setup.token_manager.clone(),
             )
             .await
             {
@@ -169,11 +172,11 @@ pub async fn handle_completions(
             }
         }
     }
-    let final_status = failure_statuses.final_status();
+    let final_status = setup.failure_statuses.final_status();
     let headers = crate::proxy::handlers::common::build_token_error_headers(
-        Some(mapped_model.as_str()),
-        last_email.as_deref(),
-        &last_error,
+        Some(setup.mapped_model.as_str()),
+        setup.last_email.as_deref(),
+        &setup.last_error,
     );
     let protocol = if is_responses_api {
         "responses"
@@ -183,8 +186,8 @@ pub async fn handle_completions(
     let dual_err = crate::proxy::handlers::common::build_dual_track_error(
         protocol,
         final_status.as_u16(),
-        &mapped_model,
-        &last_error,
+        &setup.mapped_model,
+        &setup.last_error,
     );
     (final_status, headers, axum::Json(dual_err)).into_response()
 }

@@ -16,14 +16,14 @@ impl CacheManager {
     // ===== Shared Utilities =====
 
     /// SHA256 快速哈希
-    fn sha256_hex(data: &[u8]) -> String {
+    pub(crate) fn sha256_hex(data: &[u8]) -> String {
         let mut hasher = Sha256::new();
         hasher.update(data);
         format!("{:x}", hasher.finalize())
     }
 
     /// 检查 Instant 是否已过期
-    fn is_expired(timestamp: Instant, ttl: Duration) -> bool {
+    pub(crate) fn is_expired(timestamp: Instant, ttl: Duration) -> bool {
         timestamp.elapsed() > ttl
     }
 

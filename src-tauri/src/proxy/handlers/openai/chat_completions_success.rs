@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use axum::http::StatusCode;
+use bytes::Bytes;
 use serde_json::{json, Value};
 use tracing::{debug, error, info};
 
@@ -34,6 +35,7 @@ pub(crate) async fn chat_completions_success(
     failure_statuses: &mut FailureStatusTracker,
     last_error: &mut String,
     image_permit: &mut Option<crate::proxy::server::ImagePermit>,
+    attempt: usize,
 ) -> Result<ChatAttemptOutcome, (StatusCode, String)> {
     let ChatSendOutput {
         response,
@@ -279,6 +281,8 @@ pub(crate) async fn chat_completions_success(
             // 客户端请求非流式，但内部强制转为流式
             // 收集流数据并聚合为 JSON
             use crate::proxy::mappers::openai::collector::collect_stream_to_json;
+use bytes::Bytes;
+use axum::response::{IntoResponse, Response};
 
             match collect_stream_to_json(combined_stream).await {
                 Ok(full_response) => {

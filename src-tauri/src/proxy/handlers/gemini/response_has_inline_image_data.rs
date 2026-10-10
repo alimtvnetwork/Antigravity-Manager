@@ -56,22 +56,22 @@ pub(crate) enum HandleSuccessOutcome {
 /// Extracted from `handle_generate` to keep file sizes manageable.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn handle_generate_success(
-    response: reqwest::Response,
+    response: rquest::Response,
     is_stream: bool,
     debug_cfg: &crate::proxy::config::DebugLoggingConfig,
     trace_id: &str,
     model_name: &str,
-    mapped_model: &str,
+    mapped_model: String,
     request_type: &str,
     attempt: usize,
     status: StatusCode,
     upstream_url: &str,
-    session_id: &str,
+    session_id: String,
     client_session_id: &str,
     cloud_code_trace_id: Option<String>,
     upstream_req_start: std::time::Instant,
     token_manager: &std::sync::Arc<crate::proxy::TokenManager>,
-    account_id: &str,
+    account_id: String,
     email: &str,
     clean_ms: f64,
     norm_ms: f64,
@@ -121,23 +121,23 @@ pub(crate) async fn handle_generate_success(
                     tracing::warn!("[Gemini] Empty first chunk received, retrying...");
                     retry_gemini = true;
                 } else {
-                    ttft_ms = upstream_req_start.elapsed().as_micros() as f64 / 1000.0;
+                    *ttft_ms = upstream_req_start.elapsed().as_micros() as f64 / 1000.0;
                     first_chunk = Some(bytes);
                 }
             }
             Ok(Some(Err(e))) => {
                 tracing::warn!("[Gemini] Stream error during peek: {}, retrying...", e);
-                last_error = format!("Stream error: {}", e);
+                *last_error = format!("Stream error: {}", e);
                 retry_gemini = true;
             }
             Ok(None) => {
                 tracing::warn!("[Gemini] Stream ended immediately, retrying...");
-                last_error = "Empty response".to_string();
+                *last_error = "Empty response".to_string();
                 retry_gemini = true;
             }
             Err(_) => {
                 tracing::warn!("[Gemini] First chunk timeout after 300s, retrying...");
-                last_error = "First chunk timeout".to_string();
+                *last_error = "First chunk timeout".to_string();
                 retry_gemini = true;
             }
         }
@@ -305,7 +305,7 @@ pub(crate) async fn handle_generate_success(
             }
         };
 
-        if client_wants_stream {
+        if is_stream {
             let body = Body::from_stream(stream);
             return Ok(HandleSuccessOutcome::Respond(
                 Response::builder()
@@ -366,14 +366,14 @@ pub(crate) async fn handle_generate_success(
         }
     }
 
-    ttft_ms = upstream_req_start.elapsed().as_micros() as f64 / 1000.0;
+    *ttft_ms = upstream_req_start.elapsed().as_micros() as f64 / 1000.0;
     let mut gemini_resp: Value = response
         .json()
         .await
         .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Parse error: {}", e)))?;
 
     // [FIX #1522] Inject Tool ID into Non-streaming Response
-    crate::proxy::mappers::gemini::wrapper::inject_ids_to_response(&mut gemini_resp, mapped_model);
+    crate::proxy::mappers::gemini::wrapper::inject_ids_to_response(&mut gemini_resp, &mapped_model);
 
     // [FIX #765] Extract thoughtSignature from non-streaming response
     let inner_val = if gemini_resp.get("response").is_some() {
@@ -393,7 +393,7 @@ pub(crate) async fn handle_generate_success(
                     for part in parts {
                         if let Some(sig) = part.get("thoughtSignature").and_then(|s| s.as_str()) {
                             crate::proxy::SignatureCache::global().cache_session_signature(
-                                session_id,
+                                &session_id,
                                 sig.to_string(),
                                 1,
                             );
@@ -405,7 +405,7 @@ pub(crate) async fn handle_generate_success(
         }
     }
 
-    crate::proxy::thinking_store::capture_gemini_response(session_id, &gemini_resp);
+    crate::proxy::thinking_store::capture_gemini_response(&session_id, &gemini_resp);
     let unwrapped = unwrap_response(&gemini_resp);
     return Ok(HandleSuccessOutcome::Respond(
         Response::builder()

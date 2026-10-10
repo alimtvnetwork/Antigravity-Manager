@@ -20,6 +20,8 @@ use crate::proxy::upstream::client::mask_email;
 use crate::proxy::TokenManager;
 
 use super::responses_history::{debug_value_without_inline_data, serialized_json_len};
+use axum::Json;
+use axum::response::IntoResponse;
 
 /// Values produced by the send phase for the success/error phases.
 pub(crate) struct ChatSendOutput {
@@ -101,7 +103,7 @@ pub(crate) async fn chat_completions_send(
             drop(image_permit.take());
             match token_manager
                 .get_image_token(
-                    force_rotate,
+                    *force_rotate,
                     Some(&session_id),
                     &mapped_model,
                     &image_scheduler,
@@ -123,7 +125,7 @@ pub(crate) async fn chat_completions_send(
             match token_manager
                 .get_token(
                     &config.request_type,
-                    force_rotate,
+                    *force_rotate,
                     Some(&session_id),
                     &mapped_model,
                 )

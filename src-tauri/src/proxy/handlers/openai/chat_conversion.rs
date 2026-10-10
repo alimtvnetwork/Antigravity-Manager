@@ -1,7 +1,11 @@
 // Chat <-> Responses conversion helpers and Codex ledger helpers.
+use std::collections::VecDeque;
+
 use serde_json::{json, Value};
 
-use crate::proxy::mappers::openai::{OpenAIContent, OpenAIResponse};
+use crate::proxy::mappers::openai::{OpenAIContent, OpenAIContentBlock, OpenAIResponse};
+use super::responses_media::responses_input_item_type;
+use super::image_input::CODEX_VISIBLE_THOUGHT_MESSAGE_PREFIX;
 
 fn openai_content_text(content: &OpenAIContent) -> String {
     match content {
@@ -209,6 +213,7 @@ pub(crate) fn prefix_with_step_marker(_marker: Option<String>, content: String) 
 mod tests {
     use super::*;
     use serde_json::{json, Value};
+use crate::proxy::handlers::openai::responses_media::responses_input_item_type;
 
     fn responses_routing_identity_follows_the_response_chain() {
         let first = responses_routing_session_id(None, None, None, "resp-root-a");

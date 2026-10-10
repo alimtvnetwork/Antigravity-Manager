@@ -7,6 +7,8 @@ use std::sync::Arc;
 
 use axum::extract::OriginalUri;
 use axum::http::StatusCode;
+use bytes::Bytes;
+use super::responses_history::save_session_unless_response_cancelled;
 use axum::response::Response;
 use serde_json::{json, Value};
 use tracing::{debug, error, info};
@@ -66,6 +68,7 @@ pub(crate) async fn completions_success_stream(
     gemini_body_for_debug: &Option<Value>,
     attempt: usize,
 ) -> CompletionsStreamOutcome {
+    let is_responses_api = uri.path() == "/v1/responses";
     use axum::body::Body;
     use axum::response::Response;
     use futures::StreamExt;
@@ -337,8 +340,6 @@ pub(crate) async fn completions_success_stream(
         use crate::proxy::mappers::openai::collector::collect_stream_to_json;
         match collect_stream_to_json(combined_stream).await {
             Ok(chat_resp) => {
-                let is_responses_api = uri.path() == "/v1/responses";
-
                 if is_responses_api {
                     let mut resp = convert_chat_response_to_responses(&chat_resp);
                     resp["id"] = json!(response_id_for_save.clone());

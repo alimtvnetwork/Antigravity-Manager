@@ -24,9 +24,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
 use serde_json::Value;
+use crate::proxy::adapters::apply_patch_preflight::Repair;
 
 /// 一条 pre-flight 处理记录(给诊断页 / 日志)。
-#[derive(Debug, Clone, PartialEq)]
 
 /// **缺信封自动补全**:模型常只写 `*** Add/Update File:` + 内容,漏掉 `*** Begin Patch` /
 /// `*** End Patch` 头尾 → Codex(及本 adapter 的 V4A 校验)判 incomplete → 模型被迫重试。

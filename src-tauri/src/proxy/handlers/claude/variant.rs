@@ -1,6 +1,6 @@
 use super::*;
 
-fn apply_variant(
+pub(crate) fn apply_variant(
     request: &mut ClaudeRequest,
     effort_tier: Option<crate::proxy::common::variant_mapping::VariantTier>,
     client_budget: Option<u32>,

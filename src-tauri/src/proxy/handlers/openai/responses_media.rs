@@ -1,5 +1,6 @@
 // Responses-media helpers: stream-chunk inspection and content-part parsing.
 use serde_json::{json, Value};
+use super::image_input::{parse_image_data_url_parts, validate_input_image_limits, MAX_INPUT_IMAGE_BYTES};
 
 use crate::proxy::mappers::openai::{OpenAIContent, OpenAIContentBlock};
 
@@ -233,9 +234,9 @@ fn decoded_base64_len(encoded: &str) -> Result<usize, String> {
         encoded.as_bytes(),
         &base64::engine::general_purpose::STANDARD,
     );
-    let mut sink = io::sink();
+    let mut sink = std::io::sink();
     usize::try_from(
-        io::copy(&mut decoder, &mut sink)
+        std::io::copy(&mut decoder, &mut sink)
             .map_err(|_| "Input image contains invalid base64 data".to_string())?,
     )
     .map_err(|_| "Input image is too large".to_string())
@@ -320,6 +321,9 @@ mod tests {
     use super::*;
     use crate::proxy::mappers::openai::{transform_openai_request, OpenAIRequest};
     use serde_json::{json, Value};
+use crate::proxy::handlers::openai::image_input::MAX_INPUT_IMAGE_BYTES;
+use crate::proxy::handlers::openai::image_input::validate_input_image_limits;
+use crate::proxy::handlers::openai::image_input::parse_image_data_url_parts;
 
     fn responses_created_with_null_error_is_not_an_error_event() {
         let chunk = br#"event: response.created

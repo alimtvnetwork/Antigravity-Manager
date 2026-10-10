@@ -2,6 +2,7 @@ use crate::modules::config;
 use serde_json::json;
 
 use super::*;
+use crate::proxy::project_resolver::fetch_project_id;
 
 /// Get valid token (auto-refresh if expired)
 pub async fn get_valid_token_for_warmup(
@@ -30,12 +31,9 @@ pub async fn get_valid_token_for_warmup(
     }
 
     // Fetch project_id
-    let (project_id, _) = fetch_project_id(
-        &account.token.access_token,
-        &account.email,
-        Some(&account.id),
-    )
-    .await;
+    let project_id = fetch_project_id(&account.token.access_token)
+        .await
+        .ok();
     let final_pid = project_id.unwrap_or_else(|| "bamboo-precept-lgxtn".to_string());
 
     Ok((account.token.access_token, final_pid))

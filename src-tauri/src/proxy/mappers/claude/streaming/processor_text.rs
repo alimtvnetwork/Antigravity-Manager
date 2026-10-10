@@ -3,10 +3,11 @@ use super::state::StreamingState;
 use super::types::BlockType;
 use crate::proxy::mappers::claude::models::*;
 use bytes::Bytes;
-use serde_json::Value;
+use serde_json::{json, Value};
+use super::PartProcessor;
 
 impl<'a> PartProcessor<'a> {
-    fn process_text(&mut self, text: &str, signature: Option<String>) -> Vec<Bytes> {
+    pub(crate) fn process_text(&mut self, text: &str, signature: Option<String>) -> Vec<Bytes> {
         let mut chunks = Vec::new();
 
         // 空 text 带签名 - 暂存

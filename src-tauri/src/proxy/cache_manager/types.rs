@@ -1,15 +1,15 @@
 use super::*;
 
 // ===== Layer Limits (following SignatureCache pattern) =====
-const SI_CACHE_LIMIT: usize = 200;
-const TOOLS_CACHE_LIMIT: usize = 100;
-const PREFIX_TRACKER_LIMIT: usize = 500;
+pub const SI_CACHE_LIMIT: usize = 200;
+pub const TOOLS_CACHE_LIMIT: usize = 100;
+pub const PREFIX_TRACKER_LIMIT: usize = 500;
 
 // ===== TTL Constants =====
 /// Layer 1 & 2 TTL: 30 min — 比最终内容缓存更长，因为不随 session 变化
-const LAYER_12_TTL: Duration = Duration::from_secs(30 * 60);
+pub const LAYER_12_TTL: Duration = Duration::from_secs(30 * 60);
 /// Layer 3 TTL: 1 hour — 对齐 Gemini 显式缓存默认 TTL
-const LAYER_3_TTL: Duration = Duration::from_secs(3600);
+pub const LAYER_3_TTL: Duration = Duration::from_secs(3600);
 
 // ===== Layer 1: System Instruction Cache =====
 

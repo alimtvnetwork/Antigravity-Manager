@@ -25,6 +25,6 @@ mod tests_d;
 #[cfg(test)]
 mod tests_e;
 
-pub use helpers::{extract_client_tool_names, is_tiered_flash_model};
+pub(crate) use helpers::{extract_client_tool_names, is_tiered_flash_model};
 pub use session::transform_openai_request_with_session;
 pub use transform::{enforce_uppercase_types, transform_openai_request};

@@ -1,6 +1,6 @@
 use super::*;
 
-const MAX_LOCKOUT_SECONDS: u64 = 300;
+pub(crate) const MAX_LOCKOUT_SECONDS: u64 = 300;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RetryParserMode {

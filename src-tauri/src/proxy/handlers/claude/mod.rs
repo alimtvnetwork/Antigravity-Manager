@@ -31,7 +31,6 @@ use std::sync::{atomic::Ordering, Arc}; // [NEW]
 
 // ===== Task #6: OpenCode variants thinking config mapping =====
 // Helper structs for parsing thinking hints from raw JSON
-#[derive(Debug, Clone)]
 // Claude protocol handler — facade module.
 // The implementation is split into focused submodules; public paths are
 // preserved via re-exports below.
@@ -59,3 +58,12 @@ mod warmup;
 mod warmup_tests;
 
 pub use handler::{handle_count_tokens, handle_list_models, handle_messages};
+pub(crate) use attempt::{AttemptCall, AttemptState, ErrorOutcome, PrepOutcome, StreamOutcome};
+pub(crate) use attempt_setup::prepare_attempt;
+pub(crate) use apply_compression::apply_compression;
+pub(crate) use compression::try_compress_with_summary;
+pub(crate) use setup_phase::preprocess_request;
+pub(crate) use thinking::{apply_thinking_hints, extract_thinking_hint};
+pub(crate) use variant::apply_variant;
+pub(crate) use warmup::{create_warmup_response, is_warmup_request};
+pub(crate) use helpers::inject_cache_control_to_forked_summary;

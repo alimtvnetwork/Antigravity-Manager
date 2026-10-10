@@ -2,6 +2,7 @@ use crate::models::QuotaData;
 use serde_json::json;
 
 use super::*;
+use crate::proxy::project_resolver::fetch_project_id;
 
 /// Fetch quota with cache support
 pub async fn fetch_quota_with_cache(
@@ -22,7 +23,10 @@ pub async fn fetch_quota_with_cache(
     let load_assist_needed = needs_tier_fetch || needs_project_fetch;
 
     let fetched = if load_assist_needed {
-        fetch_project_id(access_token, email, account_id).await
+        match fetch_project_id(access_token).await {
+            Ok(pid) => (Some(pid), None),
+            Err(_) => (None, None),
+        }
     } else {
         (None, None)
     };

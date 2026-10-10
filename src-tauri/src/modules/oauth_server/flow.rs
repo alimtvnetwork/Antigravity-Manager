@@ -7,7 +7,7 @@ use tokio::sync::watch;
 
 use super::*;
 
-async fn ensure_oauth_flow_prepared(
+pub(crate) async fn ensure_oauth_flow_prepared(
     app_handle: Option<tauri::AppHandle>,
     requested_client_key: Option<String>,
 ) -> Result<String, String> {

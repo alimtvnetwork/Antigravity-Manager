@@ -21,6 +21,14 @@ use super::responses_history::serialized_json_len;
 use super::websocket_codex::convert_codex_to_openai_request;
 use super::websocket_finalize::finalize_ws_events;
 use super::websocket_translate::{send_ws_event, translate_openai_chunk_to_ws, TranslationState};
+use crate::proxy::handlers::openai::responses_history::debug_value_without_inline_data;
+use crate::proxy::handlers::openai::responses_history::into_history_without_inline_media;
+use crate::proxy::handlers::openai::websocket_normalize::should_handle_prewarm_locally;
+use crate::proxy::handlers::openai::websocket_normalize::handle_prewarm_locally;
+use axum::http::HeaderMap;
+use uuid::Uuid;
+use super::websocket_normalize::normalize_responses_websocket_request;
+use super::chat_completions::handle_chat_completions;
 
 #[derive(Debug, Clone)]
 pub(crate) struct WebsocketSessionState {

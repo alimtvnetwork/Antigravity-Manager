@@ -21,9 +21,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
 use serde_json::Value;
+use crate::proxy::adapters::apply_patch_preflight::Repair;
 
 /// 一条 pre-flight 处理记录(给诊断页 / 日志)。
-#[derive(Debug, Clone, PartialEq)]
 
 /// **规则:`Update File` 目标是空文件 → `Delete File + Add File`**(prompt gotcha #3,无损)。
 /// `*** Update File:` 无法作用于空文件(Codex 报 `cannot operate on a completely empty file`)。

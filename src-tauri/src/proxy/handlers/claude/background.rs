@@ -1,4 +1,5 @@
 use super::*;
+use crate::proxy::handlers::claude::consts::INTERNAL_BACKGROUND_TASK;
 
 // ===== 后台任务检测辅助函数 =====
 

@@ -4,7 +4,7 @@ const MAX_RETRY_ATTEMPTS: usize = 3;
 
 // ===== Model Constants for Background Tasks =====
 // These can be adjusted for performance/cost optimization or overridden by custom_mapping
-const INTERNAL_BACKGROUND_TASK: &str = "internal-background-task"; // Unified virtual ID for all background tasks
+pub(crate) const INTERNAL_BACKGROUND_TASK: &str = "internal-background-task"; // Unified virtual ID for all background tasks
 
 // ===== Layer 3: XML Summary Prompt Template =====
 // Borrowed from Practical-Guide-to-Context-Engineering + Claude Code official practice
@@ -77,6 +77,6 @@ The structure MUST be as follows:
 
 // ===== 统一退避策略模块 =====
 // 移除本地重复定义，使用 common 中的统一实现
-use super::common::{apply_retry_strategy, should_rotate_account, RetryStrategy};
+use crate::proxy::handlers::common::{apply_retry_strategy, should_rotate_account, RetryStrategy};
 
 // ===== 退避策略模块结束 =====

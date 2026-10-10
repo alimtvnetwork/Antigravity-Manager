@@ -372,6 +372,7 @@ pub async fn get_openclaw_config_content() -> Result<String, String> {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+use crate::proxy::openclaw_sync::acquire_openclaw_config_lock::PROVIDER_ID;
 
     #[test]
     fn test_classify_openclaw_version() {

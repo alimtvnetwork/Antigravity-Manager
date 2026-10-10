@@ -1,9 +1,11 @@
 use super::streaming::StreamingState;
+use super::streaming::PartProcessor;
 use crate::proxy::common::client_adapter::ClientAdapter;
 use bytes::Bytes;
 use futures::Stream;
 use serde_json::Value;
 use std::pin::Pin;
+use super::models::{GeminiPart, UsageMetadata};
 pub fn create_claude_sse_stream<S, E>(
     mut gemini_stream: Pin<Box<S>>,
     trace_id: String,

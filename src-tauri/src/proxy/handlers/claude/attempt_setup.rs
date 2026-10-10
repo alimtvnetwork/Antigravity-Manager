@@ -1,4 +1,6 @@
 use super::*;
+use crate::proxy::handlers::claude::attempt::AttemptState;
+use crate::proxy::handlers::claude::attempt::PrepOutcome;
 
 /// Run one retry-loop attempt up to the upstream call: model routing, token
 /// acquisition, request transform, upstream invocation and fallback logging.
@@ -100,7 +102,7 @@ pub(crate) async fn prepare_attempt(st: &mut AttemptState, attempt: usize) -> Pr
     info!("✓ Using account: {} (type: {})", email, config.request_type);
 
     let mut request_with_mapped =
-        match apply_compression(&st.st.request_for_body, &mapped_model, st).await {
+        match apply_compression(&st.request_for_body, &mapped_model, st).await {
             Ok(r) => r,
             Err(resp) => return PrepOutcome::Respond(resp),
         };
@@ -139,7 +141,7 @@ pub(crate) async fn prepare_attempt(st: &mut AttemptState, attempt: usize) -> Pr
                 return PrepOutcome::Respond(
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
-                        st.headers,
+                        st.headers.clone(),
                         Json(json!({
                             "type": "error",
                             "error": {

@@ -1,5 +1,5 @@
 // Verified real model specs (split from variant_mapping.rs)
-use super::types::RealModelSpec;
+use super::types::{AliasPolicy, CanonicalFamily, RealModelSpec, VariantTier};
 
 // ── verified real model specs (from upstream spec) ──
 // gemini-3.7-flash family (maxOutputTokens = 65536)

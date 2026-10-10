@@ -6,7 +6,7 @@ use axum::extract::Extension;
 use axum::http::StatusCode;
 use axum::response::Response;
 use serde_json::{json, Value};
-use tracing::debug;
+use tracing::{debug, info};
 
 use crate::proxy::config::DebugLoggingConfig;
 use crate::proxy::debug_logger;
@@ -69,6 +69,7 @@ pub(crate) async fn completions_send(
     failure_statuses: &mut FailureStatusTracker,
     norm_ms: &mut f64,
     think_fill_ms: &mut f64,
+    uri: &http::Uri,
 ) -> CompletionsSendOutcome {
     let norm_start = std::time::Instant::now();
     // 3. 模型配置解析

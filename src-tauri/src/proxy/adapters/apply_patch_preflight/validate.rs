@@ -23,9 +23,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
 use serde_json::Value;
+use crate::proxy::adapters::apply_patch_preflight::Repair;
 
 /// 一条 pre-flight 处理记录(给诊断页 / 日志)。
-#[derive(Debug, Clone, PartialEq)]
 
 /// 发送给 Codex 自定义 apply_patch 前的后验校验。发现明确非法的 V4A 时,调用方应把该工具项
 /// 标成 incomplete,避免 Codex 执行后再把失败历史喂回模型形成循环。

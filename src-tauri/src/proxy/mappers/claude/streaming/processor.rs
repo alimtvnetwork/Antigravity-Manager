@@ -3,11 +3,13 @@ use super::state::StreamingState;
 use super::types::BlockType;
 use crate::proxy::mappers::claude::models::*;
 use bytes::Bytes;
-use serde_json::Value;
+use serde_json::{json, Value};
+use crate::proxy::common::client_adapter::SignatureBufferStrategy;
+use crate::proxy::signature_cache::cacheentry::SignatureCache;
 
 /// Part 处理器
 pub struct PartProcessor<'a> {
-    state: &'a mut StreamingState,
+    pub(crate) state: &'a mut StreamingState,
 }
 
 impl<'a> PartProcessor<'a> {

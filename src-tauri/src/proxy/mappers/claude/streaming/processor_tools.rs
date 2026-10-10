@@ -5,7 +5,9 @@ use super::types::remap_function_call_args;
 use super::types::BlockType;
 use crate::proxy::mappers::claude::models::*;
 use bytes::Bytes;
-use serde_json::Value;
+use serde_json::{json, Value};
+use super::PartProcessor;
+use crate::proxy::signature_cache::cacheentry::SignatureCache;
 
 impl<'a> PartProcessor<'a> {
     // -------------------------------------------------------------------------
@@ -131,7 +133,7 @@ impl<'a> PartProcessor<'a> {
     ///
     /// Returns `Some(chunks)` when recovery succeeds, or `None` to let the caller
     /// fall through to the normal `text_delta` path.
-    fn try_recover_call_default_api_text(&mut self, text: &str) -> Option<Vec<bytes::Bytes>> {
+    pub(crate) fn try_recover_call_default_api_text(&mut self, text: &str) -> Option<Vec<bytes::Bytes>> {
         // G1: Tools must have been registered for this request
         if self.state.registered_tool_names.is_empty() {
             return None;
@@ -220,7 +222,7 @@ impl<'a> PartProcessor<'a> {
     }
 
     /// Process FunctionCall and capture signature for global storage
-    fn process_function_call(
+    pub(crate) fn process_function_call(
         &mut self,
         fc: &FunctionCall,
         signature: Option<String>,

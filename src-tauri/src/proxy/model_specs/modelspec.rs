@@ -14,7 +14,7 @@ pub(crate) struct SpecsConfig {
 }
 
 static SPECS: Lazy<SpecsConfig> = Lazy::new(|| {
-    let json_str = include_str!("../../resources/model_specs.json");
+    let json_str = include_str!("../../../resources/model_specs.json");
     serde_json::from_str(json_str).expect("Failed to parse model_specs.json")
 });
 

@@ -1,6 +1,7 @@
 // V2 compression phase (split from wrapper.rs).
 // NOTE: wrap_request_v2 underwent behavior-preserving phase extraction
 // to bring files under 500 lines.
+use serde_json::json;
 
 pub(crate) fn phase_compression(
     inner_request: &mut serde_json::Value,
@@ -43,7 +44,7 @@ pub(crate) fn phase_compression(
         );
 
         // ===== Layer 1: Tool Message Trimming =====
-        if usage_ratio > threshold_l1 && !compression_applied {
+        if usage_ratio > threshold_l1 && !*compression_applied {
             if crate::proxy::mappers::context_manager::ContextManager::trim_gemini_tool_messages(
                 &mut inner_request,
                 5,
@@ -52,7 +53,7 @@ pub(crate) fn phase_compression(
                     "[{}] [Layer-1] [Gemini] Tool trimming triggered (usage: {:.1}%, threshold: {:.1}%)",
                     trace_id, usage_ratio * 100.0, threshold_l1 * 100.0
                 );
-                compression_applied = true;
+                *compression_applied = true;
 
                 let new_raw = crate::proxy::mappers::context_manager::ContextManager::estimate_gemini_token_usage(&inner_request);
                 let new_usage = calibrator.calibrate(new_raw);
@@ -71,13 +72,13 @@ pub(crate) fn phase_compression(
                     usage_ratio = new_ratio;
                 } else {
                     usage_ratio = new_ratio;
-                    compression_applied = false;
+                    *compression_applied = false;
                 }
             }
         }
 
         // ===== Layer 2: Thinking Content Compression =====
-        if usage_ratio > threshold_l2 && !compression_applied {
+        if usage_ratio > threshold_l2 && !*compression_applied {
             tracing::info!(
                 "[{}] [Layer-2] [Gemini] Thinking compression triggered (usage: {:.1}%, threshold: {:.1}%)",
                 trace_id, usage_ratio * 100.0, threshold_l2 * 100.0
@@ -87,7 +88,7 @@ pub(crate) fn phase_compression(
                 &mut inner_request,
                 4,
             ) {
-                compression_applied = true;
+                *compression_applied = true;
 
                 let new_raw = crate::proxy::mappers::context_manager::ContextManager::estimate_gemini_token_usage(&inner_request);
                 let new_usage = calibrator.calibrate(new_raw);
@@ -103,7 +104,7 @@ pub(crate) fn phase_compression(
         }
 
         // ===== Layer 3: Fork Conversation + XML Summary =====
-        if usage_ratio > threshold_l3 && !compression_applied {
+        if usage_ratio > threshold_l3 && !*compression_applied {
             tracing::info!(
                 "[{}] [Layer-3] [Gemini] Context pressure ({:.1}%) exceeded threshold ({:.1}%), spawning Fork+Summary in background",
                 trace_id, usage_ratio * 100.0, threshold_l3 * 100.0

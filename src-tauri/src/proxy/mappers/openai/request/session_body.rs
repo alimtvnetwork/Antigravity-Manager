@@ -1,12 +1,13 @@
 // Request body phase (split from request.rs).
 // OpenAI → Gemini 请求转换
-use super::models::*;
+use super::super::models::*;
 use crate::proxy::model_specs;
 use crate::proxy::token_manager::ProxyToken;
 
 use serde_json::{json, Value};
 
 use super::session_setup::SetupState;
+use crate::proxy::mappers::openai::request::helpers::is_tiered_flash_model;
 
 pub(crate) fn phase_body(
     request: &super::models::OpenAIRequest,
