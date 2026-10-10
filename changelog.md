@@ -103,6 +103,19 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+*   **v4.182.0 (2026-10-10)**:
+        -   **Restart & Fast-Forward Reliability Fix**:
+            -   **Description**: Rewrote `restart_instance` as a hardened Kill → Verify-Dead → Refresh → Start pipeline: the bound/selected account's token is refreshed up front (in the async command wrapper), the IDE process tree is force-closed and its death verified (a close failure is now a hard error instead of being swallowed), the stale smart-PID cache entry is dropped so launch cannot spawn a duplicate process on the same data dir, credentials are re-injected by the launch pipeline, and the new process is verified alive before returning. Also hardened `switch_account_to_instance` (the fast-forward path): the close is verified dead before any credential injection, fixing the bug where the dying IDE overwrote the newly injected `state.vscdb` credentials. (Thanks to @aukgit)
+        -   **Configurable Best-Account Tier Multipliers**:
+            -   **Description**: The best-account scoring algorithm no longer hardcodes tier weights: new `AutoProfileSwitcherConfig` fields `ultra_tier_multiplier` (default 4.0), `pro_tier_multiplier` (default 2.0), `free_tier_multiplier` (default 1.0) feed `calculate_weekly_base_score` (replacing the old hardcoded 5.0/3.0/1.0), and the frontend mirror in `instanceService.ts` (`getSubscriptionTierMultiplier` / `calculateMultiplicativeScore` / `rankSmartCandidates`) accepts the same configurable weights with identical defaults; all UI call sites resolve them from Settings. (Thanks to @aukgit)
+        -   **Settings Algorithm Section**:
+            -   **Description**: New Best-Account Scoring Algorithm card in Settings → Auto Profile Switcher showing the live formula `score = (M_tier × weekly_quota × hours_elapsed) / 100` with editable Ultra/Pro/Free multiplier inputs (clamped 0.1–10), a reset-to-defaults button, and hot-save — changes apply to the next evaluation immediately. (Thanks to @aukgit)
+        -   **Scoring Spec Update**:
+            -   **Description**: Updated `02-spec/20-instance-management/03-multiplicative-candidate-scoring-spec.md` for configurable multipliers (defaults, settings source, recalculated examples, v4.182.0 changelog note). (Thanks to @aukgit)
+        -   **Remote Fleet Section Tests**:
+            -   **Description**: Verified the Remote Fleet Machines data path (Supabase `nodes` + `instance_profiles` query, local-node filtering, 15s polling, manual refresh, empty/disabled/loading states) and added `src/components/instances/__tests__/fleetMachinesTable.test.ts` covering email masking, relative heartbeat formatting (sec/ms inputs), and local-node exclusion — full suite 5/5 green. (Thanks to @aukgit)
+
+
     *   **v4.181.0 (2026-10-10)**:
         -   **Quota UI Compaction & Stronger Progress Bars**:
             -   **Description**: Compacted the Accounts table quota columns (tighter cell padding, narrower info column) and strengthened `QuotaProgressBar` (compact bar `h-2` → `h-3`, standard bar `h-3` → `h-3.5`, larger checkpoint nodes, tighter gaps); instance cards on the Instances page got the same whitespace tightening. (Thanks to @aukgit)
