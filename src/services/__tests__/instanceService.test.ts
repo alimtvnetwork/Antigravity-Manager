@@ -9,6 +9,7 @@ import {
     calculateMultiplicativeScore,
     rankSmartCandidates,
     getSubscriptionTierMultiplier,
+    tierMultipliersFromSettings,
 } from '../instanceService';
 import type { Account, QuotaData } from '../../types/account';
 
@@ -90,11 +91,29 @@ function makeSyntheticAccount(
 }
 
 // ── Test 1: Subscription Tier Multipliers ────────────────────────────────────
-test('getSubscriptionTierMultiplier maps Ultra=5, Pro=3, Free/other=1', () => {
-    assertEqual(getSubscriptionTierMultiplier('ULTRA'), 5);
-    assertEqual(getSubscriptionTierMultiplier('pro'), 3);
+test('getSubscriptionTierMultiplier maps Ultra=4, Pro=2, Free/other=1 by default', () => {
+    assertEqual(getSubscriptionTierMultiplier('ULTRA'), 4);
+    assertEqual(getSubscriptionTierMultiplier('pro'), 2);
     assertEqual(getSubscriptionTierMultiplier('FREE'), 1);
     assertEqual(getSubscriptionTierMultiplier(undefined), 1);
+});
+
+test('getSubscriptionTierMultiplier honors custom settings multipliers', () => {
+    const custom = { ultra: 7, pro: 3, free: 1 };
+    assertEqual(getSubscriptionTierMultiplier('ultra', custom), 7);
+    assertEqual(getSubscriptionTierMultiplier('pro', custom), 3);
+    assertEqual(getSubscriptionTierMultiplier('free', custom), 1);
+});
+
+test('tierMultipliersFromSettings falls back to defaults per-tier', () => {
+    const partial = tierMultipliersFromSettings({ pro_tier_multiplier: 3 });
+    assertEqual(partial.ultra, 4);
+    assertEqual(partial.pro, 3);
+    assertEqual(partial.free, 1);
+    const empty = tierMultipliersFromSettings(null);
+    assertEqual(empty.ultra, 4);
+    assertEqual(empty.pro, 2);
+    assertEqual(empty.free, 1);
 });
 
 // ── Test 2: Weekly Quota Group Extraction & Bottleneck ───────────────────────
@@ -112,13 +131,13 @@ test('extractWeeklyQuotaPercent extracts bottleneck from quota_groups', () => {
 test('calculateMultiplicativeScore computes active * tier * weeklyQuota', () => {
     const accA = makeSyntheticAccount('synth_user_a', 'synth_a@test.local', 'pro', 100, 100);
     const scoreA = calculateMultiplicativeScore(accA, []);
-    // S_active=1, M_tier=3, Q_weekly=100 -> 300 / 1000 (normalized) = 0.3
-    assertEqual(scoreA.score, 0.3);
+    // S_active=1, M_tier=2 (Pro default), Q_weekly=100 -> 200 / 1000 (normalized) = 0.2
+    assertEqual(scoreA.score, 0.2);
 
     const accB = makeSyntheticAccount('synth_user_b', 'synth_b@test.local', 'pro', 21, 100);
     const scoreB = calculateMultiplicativeScore(accB, []);
-    // S_active=1, M_tier=3, Q_weekly=21 -> 63 / 1000 (normalized) = 0.063
-    assertEqual(scoreB.score, 0.063);
+    // S_active=1, M_tier=2, Q_weekly=21 -> 42 / 1000 (normalized) = 0.042
+    assertEqual(scoreB.score, 0.042);
 
     // In-use account: S_active=0 -> score 0
     const inUseScore = calculateMultiplicativeScore(accA, ['synth_user_a']);
@@ -138,9 +157,18 @@ test('rankSmartCandidates ranks 100% weekly quota over 21% weekly quota', () => 
     const ranked = rankSmartCandidates([accB, accA], []);
     assertEqual(ranked.length, 2);
     assertEqual(ranked[0].account.id, 'synth_user_a');
-    assertEqual(ranked[0].score, 0.3);
+    assertEqual(ranked[0].score, 0.2);
     assertEqual(ranked[1].account.id, 'synth_user_b');
-    assertEqual(ranked[1].score, 0.063);
+    assertEqual(ranked[1].score, 0.042);
+});
+
+test('calculateMultiplicativeScore honors custom multipliers end-to-end', () => {
+    const accA = makeSyntheticAccount('synth_user_a', 'synth_a@test.local', 'pro', 100, 100);
+    const custom = { ultra: 7, pro: 3, free: 1 };
+    // S_active=1, M_tier=3 (Pro custom), Q_weekly=100 -> 300 / 1000 = 0.3
+    const scoreA = calculateMultiplicativeScore(accA, [], undefined, undefined, custom);
+    assertEqual(scoreA.score, 0.3);
+    assertEqual(scoreA.tierMultiplier, 3);
 });
 
 if (failed > 0) {

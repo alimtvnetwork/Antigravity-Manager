@@ -48,6 +48,7 @@ import {
     getAutoSwitcherDaemonStatus,
     type AutoSwitcherDaemonStatus,
     rankSmartCandidates,
+    tierMultipliersFromSettings,
 } from '../services/instanceService';
 import { invoke } from '@tauri-apps/api/core';
 import { InstanceSettingsModal } from '../components/instances/InstanceSettingsModal';
@@ -902,7 +903,7 @@ export default function Instances() {
                     {(() => {
                         const activeInstance = instances.find(i => i.config.id === (activeInstanceId || 'default')) || instances.find(i => i.config.is_default) || instances[0];
                         const inUseAccountIds = instances.map(i => i.config.bound_account_id).filter(Boolean) as string[];
-                        const rankedCandidates = rankSmartCandidates(accounts, inUseAccountIds, activeInstance?.config.bound_account_id);
+                        const rankedCandidates = rankSmartCandidates(accounts, inUseAccountIds, activeInstance?.config.bound_account_id, tierMultipliersFromSettings(config?.auto_profile_switcher));
                         const nextBestCandidate = rankedCandidates[0]?.account || null;
                         const rotateTooltip = `Target: ${activeInstance?.config.name || 'Current'} → Next Best: ${nextBestCandidate ? `${nextBestCandidate.email} (${nextBestCandidate.quota?.subscription_tier || 'PRO'} · 4H: ${nextBestCandidate.quota?.models?.[0]?.percentage ?? 100}%)` : 'No idle candidate available'}`;
                         return (

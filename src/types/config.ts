@@ -236,6 +236,9 @@ export interface AutoProfileSwitcherConfig {
     fast_forward_shortcut?: string;
     account_cooldown_minutes?: number;
     account_lockout_window_minutes?: number;
+    ultra_tier_multiplier?: number; // Best-account scoring: Ultra tier weight (default 4.0)
+    pro_tier_multiplier?: number; // Best-account scoring: Pro tier weight (default 2.0)
+    free_tier_multiplier?: number; // Best-account scoring: Free tier weight (default 1.0)
 }
 
 // ============================================================================

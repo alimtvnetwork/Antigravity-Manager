@@ -610,13 +610,39 @@ export interface MultiplicativeCandidateResult {
 
 export type SmartCandidateResult = MultiplicativeCandidateResult;
 
-export function getSubscriptionTierMultiplier(tierName?: string): number {
+/**
+ * Subscription-tier score weights for the best-account selection algorithm.
+ * User-configurable via Settings → Auto Profile Switcher → Best-Account Scoring
+ * Algorithm; these are the defaults applied when no settings are loaded.
+ */
+export interface TierMultipliers {
+    ultra: number;
+    pro: number;
+    free: number;
+}
+
+export const DEFAULT_TIER_MULTIPLIERS: TierMultipliers = { ultra: 4, pro: 2, free: 1 };
+
+/** Build effective multipliers from the settings object, falling back to defaults per-tier. */
+export function tierMultipliersFromSettings(settings?: {
+    ultra_tier_multiplier?: number;
+    pro_tier_multiplier?: number;
+    free_tier_multiplier?: number;
+} | null): TierMultipliers {
+    return {
+        ultra: settings?.ultra_tier_multiplier ?? DEFAULT_TIER_MULTIPLIERS.ultra,
+        pro: settings?.pro_tier_multiplier ?? DEFAULT_TIER_MULTIPLIERS.pro,
+        free: settings?.free_tier_multiplier ?? DEFAULT_TIER_MULTIPLIERS.free,
+    };
+}
+
+export function getSubscriptionTierMultiplier(tierName?: string, multipliers: TierMultipliers = DEFAULT_TIER_MULTIPLIERS): number {
     const lower = (tierName || '').toLowerCase();
     const isUltra = lower.includes('ultra');
-    if (isUltra) return 5;
+    if (isUltra) return multipliers.ultra;
     const isPro = lower.includes('pro');
-    if (isPro) return 3;
-    return 1;
+    if (isPro) return multipliers.pro;
+    return multipliers.free;
 }
 
 export function extractWeeklyQuotaPercent(acc: Account): number {
@@ -731,20 +757,22 @@ function calculateAccountRefillDays(acc: Account, nowMs: number): number {
  * Normalized Multiplicative Candidate Scoring Algorithm (divided by 1000 for minimal compact numbers):
  * - Anyone with < 100% 4h quota gets a score of `0`.
  * - Otherwise: Score = (S_active * M_tier * Q_weekly) / 1000
- *   where S_active = 1 if unused (0 if in use), M_tier = {Ultra: 5, Pro: 3, Free: 1}, Q_weekly = 0..100.
- *   Example scores: Ultra 100% = 0.5, Pro 100% = 0.3, Free 100% = 0.1, < 100% 4h quota = 0.
+ *   where S_active = 1 if unused (0 if in use), M_tier comes from Settings → Algorithm
+ *   (defaults: Ultra 4, Pro 2, Free 1), Q_weekly = 0..100.
+ *   Example scores (defaults): Ultra 100% = 0.4, Pro 100% = 0.2, Free 100% = 0.1, < 100% 4h quota = 0.
  */
 export function calculateMultiplicativeScore(
     acc: Account,
     activeInUseAccountIds: string[] = [],
     currentAccountId?: string,
-    targetModel?: string
+    targetModel?: string,
+    tierMultipliers: TierMultipliers = DEFAULT_TIER_MULTIPLIERS
 ): MultiplicativeCandidateResult {
     const isInUse = activeInUseAccountIds.includes(acc.id);
     const isCurrent = Boolean(currentAccountId && acc.id === currentAccountId);
     const activeFactor = isInUse || isCurrent ? 0 : 1;
 
-    const tierMultiplier = getSubscriptionTierMultiplier(acc.quota?.subscription_tier);
+    const tierMultiplier = getSubscriptionTierMultiplier(acc.quota?.subscription_tier, tierMultipliers);
     const weeklyQuotaPercent = extractWeeklyQuotaPercent(acc);
     const fourHourQuotaPercent = extract4hWindowQuotaPercent(acc, targetModel);
 
@@ -794,7 +822,8 @@ export function calculateMultiplicativeScore(
 export function rankSmartCandidates(
     accounts: Account[],
     activeInUseAccountIds: string[] = [],
-    currentAccountId?: string
+    currentAccountId?: string,
+    tierMultipliers: TierMultipliers = DEFAULT_TIER_MULTIPLIERS
 ): MultiplicativeCandidateResult[] {
     const eligible = accounts.filter(acc => {
         // Never allow the current account or active in-use accounts to be considered as candidates to rotate into
@@ -827,7 +856,9 @@ export function rankSmartCandidates(
             return calculateMultiplicativeScore(
                 acc,
                 activeInUseAccountIds,
-                currentAccountId
+                currentAccountId,
+                undefined,
+                tierMultipliers
             );
         })
         .filter(item => item.score > 0 && item.activeFactor > 0);
@@ -860,12 +891,14 @@ export function rankSmartCandidates(
 export function findSmartRotationAccount(
     accounts: Account[],
     currentAccountId?: string,
-    activeInUseAccountIds: string[] = []
+    activeInUseAccountIds: string[] = [],
+    tierMultipliers: TierMultipliers = DEFAULT_TIER_MULTIPLIERS
 ): MultiplicativeCandidateResult | null {
     const ranked = rankSmartCandidates(
         accounts,
         activeInUseAccountIds,
-        currentAccountId
+        currentAccountId,
+        tierMultipliers
     );
     const hasRanked = ranked.length > 0;
     if (!hasRanked) return null;
@@ -875,9 +908,10 @@ export function findSmartRotationAccount(
 export function pickBestCandidateAccount(
     accounts: Account[],
     activeInUseAccountIds: string[] = [],
-    currentAccountId?: string
+    currentAccountId?: string,
+    tierMultipliers: TierMultipliers = DEFAULT_TIER_MULTIPLIERS
 ): Account | null {
-    const smart = findSmartRotationAccount(accounts, currentAccountId, activeInUseAccountIds);
+    const smart = findSmartRotationAccount(accounts, currentAccountId, activeInUseAccountIds, tierMultipliers);
     if (smart?.account && (smart.fourHourQuotaPercent ?? 0) >= 100) {
         return smart.account;
     }

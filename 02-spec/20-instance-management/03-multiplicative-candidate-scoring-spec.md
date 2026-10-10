@@ -1,7 +1,9 @@
 # Spec: Multiplicative Profile Candidate Scoring & Pre-Activation Verification
 
 ## Status: Approved
-## Scope: Frontend (`src/services/instanceService.ts`, `src/stores/useInstanceStore.ts`) & Backend (`src-tauri/src/modules/auto_switcher.rs`)
+## Scope: Frontend (`src/services/instanceService.ts`, `src/stores/useInstanceStore.ts`, `src/components/settings/AutoSwitcherSettings.tsx`) & Backend (`src-tauri/src/modules/auto_switcher.rs`, `src-tauri/src/models/config.rs`)
+## Changelog
+- **v4.182.0**: Tier multipliers are now user-configurable via Settings → Auto Profile Switcher → Best-Account Scoring Algorithm (defaults: Ultra 4.0, Pro 2.0, Free 1.0). Previously hardcoded as Ultra 5.0 / Pro 3.0 / Free 1.0 in `calculate_weekly_base_score`.
 
 ---
 
@@ -18,7 +20,7 @@ $$\text{FinalScore} = S_{\text{active}} \times M_{\text{tier}} \times Q_{\text{w
 ```mermaid
 flowchart TD
     A[Eligible Accounts Pool] --> B[Calculate S_active: Unused=1, InUse=0]
-    B --> C[Determine Tier Multiplier M_tier: Ultra=5, Pro=3, Free=1]
+    B --> C[Determine Tier Multiplier M_tier from settings: Ultra=4.0, Pro=2.0, Free=1.0 (defaults)]
     C --> D[Determine Weekly Available Quota Q_weekly: 0 to 100]
     D --> E["Score = S_active * M_tier * Q_weekly"]
     E --> F{Score > 0?}
@@ -57,10 +59,17 @@ flowchart TD
 ### 3.2 Tier Multiplier ($M_{\text{tier}}$)
 
 - **Definition**: Reflects the token limit capacity and service level of the Google Workspace / Gemini subscription tier.
-- **Values**:
-  - Ultra subscription: $M_{\text{tier}} = 5$
-  - Pro subscription: $M_{\text{tier}} = 3$
-  - Standard / Free tier: $M_{\text{tier}} = 1$
+- **Source of truth**: User-configurable via **Settings → Auto Profile Switcher → Best-Account Scoring Algorithm**. Stored in `AutoProfileSwitcherConfig`:
+  - `ultra_tier_multiplier` (default `4.0`)
+  - `pro_tier_multiplier` (default `2.0`)
+  - `free_tier_multiplier` (default `1.0`)
+- **Backend**: `calculate_weekly_base_score` (`src-tauri/src/modules/auto_switcher.rs`) reads these values from the loaded app config at evaluation time; nothing is hardcoded. Serde defaults guarantee the documented defaults for configs written before v4.182.0.
+- **Frontend**: `AutoSwitcherSettings.tsx` renders the Algorithm card with numeric inputs (clamped to `0.1`–`10`) plus a reset-to-defaults button; changes hot-save and apply to the next best-profile evaluation immediately.
+- **Defaults**:
+  - Ultra subscription: $M_{\text{tier}} = 4.0$
+  - Pro subscription: $M_{\text{tier}} = 2.0$
+  - Standard / Free tier: $M_{\text{tier}} = 1.0$
+- **History**: Prior to v4.182.0 the multipliers were hardcoded as Ultra 5.0 / Pro 3.0 / Free 1.0.
 
 ### 3.3 Weekly Available Quota Credits ($Q_{\text{weekly}}$)
 
@@ -76,11 +85,13 @@ flowchart TD
 
 | Account Email | Active Status | Tier | Weekly Quota % | Calculation | Final Score | Rank |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| `alice@corp.com` | Unused ($1$) | Ultra ($5$) | $90\%$ ($90$) | $1 \times 5 \times 90$ | **450** | **#1 (Winner)** |
-| `bob@corp.com` | Unused ($1$) | Pro ($3$) | $80\%$ ($80$) | $1 \times 3 \times 80$ | **240** | **#2** |
+| `alice@corp.com` | Unused ($1$) | Ultra ($4$) | $90\%$ ($90$) | $1 \times 4 \times 90$ | **360** | **#1 (Winner)** |
+| `bob@corp.com` | Unused ($1$) | Pro ($2$) | $80\%$ ($80$) | $1 \times 2 \times 80$ | **160** | **#2** |
 | `charlie@corp.com`| Unused ($1$) | Free ($1$) | $95\%$ ($95$) | $1 \times 1 \times 95$ | **95** | **#3** |
-| `dave@corp.com` | Unused ($1$) | Pro ($3$) | $10\%$ ($10$) | $1 \times 3 \times 10$ | **30** | **#4** |
-| `eve@corp.com` | In Use ($0$) | Ultra ($5$) | $100\%$ ($100$) | $0 \times 5 \times 100$ | **0** | **Disqualified** |
+| `dave@corp.com` | Unused ($1$) | Pro ($2$) | $10\%$ ($10$) | $1 \times 2 \times 10$ | **20** | **#4** |
+| `eve@corp.com` | In Use ($0$) | Ultra ($4$) | $100\%$ ($100$) | $0 \times 4 \times 100$ | **0** | **Disqualified** |
+
+> Examples use the default multipliers (Ultra 4.0, Pro 2.0, Free 1.0). With custom settings (e.g. Pro ×3, Ultra ×7) the same formula applies with the configured values.
 
 ---
 
@@ -127,7 +138,7 @@ interface MultiplicativeCandidateResult {
     account: Account;
     score: number;
     activeFactor: number; // 0 or 1
-    tierMultiplier: number; // 1, 3, or 5
+    tierMultiplier: number; // user-configurable; defaults 4.0 (Ultra) / 2.0 (Pro) / 1.0 (Free)
     weeklyQuotaPercent: number; // 0 - 100
     isVerified: boolean;
 }

@@ -679,7 +679,8 @@ fn compute_weekly_hours_elapsed(bucket: &crate::models::quota::QuotaBucket, now_
 /// Hours-elapsed-weighted weekly quota scoring algorithm:
 /// - Any candidate with < 100% 4-hour quota (and period not finished) evaluates to `0.0`.
 /// - Otherwise: `Score = (S_active * M_tier * (weekly_quota_pct × hours_elapsed)) / 16800.0`
-///   where S_active = 1.0, M_tier = {Ultra: 5.0, Pro: 3.0, Free: 1.0}.
+///   where S_active = 1.0, M_tier is user-configurable via Settings → Algorithm
+///   (defaults: Ultra 4.0, Pro 2.0, Free 1.0).
 /// - Sorting direction: ASCENDING (lowest score = account just reset = selected first).
 /// - Weekly quota < 8% treated as 0 (below viable threshold for Gemini).
 /// - Claude/3p buckets are excluded (TODO: define Claude weekly scoring algorithm).
@@ -696,7 +697,8 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
         .map(|s| s.is_period_finished)
         .unwrap_or(false);
 
-    // 1. Subscription tier multiplier
+    // 1. Subscription tier multiplier (user-configurable via Settings → Algorithm;
+    //    defaults: Ultra 4.0, Pro 2.0, Free 1.0)
     let tier = acc
         .quota
         .as_ref()
@@ -704,12 +706,15 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
         .map(|s| s.to_lowercase())
         .unwrap_or_default();
 
+    let switcher_cfg = config::load_app_config()
+        .map(|c| c.auto_profile_switcher)
+        .unwrap_or_default();
     let tier_multiplier = if tier.contains("ultra") {
-        5.0
+        switcher_cfg.ultra_tier_multiplier
     } else if tier.contains("pro") {
-        3.0
+        switcher_cfg.pro_tier_multiplier
     } else {
-        1.0
+        switcher_cfg.free_tier_multiplier
     };
 
     const TOTAL_WEEK_HOURS: f64 = 168.0;

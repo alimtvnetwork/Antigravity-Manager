@@ -1414,7 +1414,20 @@ pub fn stop_instance(instance_id: &str) -> Result<(), String> {
     close_instance(instance_id)
 }
 
-/// Restart an instance on its current profile and bound account
+/// Restart an instance on its current profile and bound account.
+///
+/// Hardened flow ("Kill First → Verify Dead → Refresh → Start"):
+/// 1. The bound/selected account's token is refreshed BEFORE closing, so the
+///    reopened IDE comes up with the same account on fresh credentials.
+/// 2. The old IDE process tree is force-closed (graceful → SIGKILL/taskkill
+///    escalation inside `close_instance`) and its death is VERIFIED — a close
+///    failure is a hard error, never swallowed.
+/// 3. The stale smart-PID cache entry is dropped so the launch below cannot
+///    mistake the dead process for a live one, skip its own close, and spawn
+///    a duplicate process on the same data dir (which corrupts the credential
+///    injection — the exiting process overwrites state.vscdb).
+/// 4. `launch_instance` re-injects the bound account's credentials and spawns
+///    the same IDE fresh; the new process is verified alive before returning.
 pub fn restart_instance(instance_id: &str) -> AppResult<InstanceStatus> {
     let resolved_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
     crate::modules::logger::log_info(&format!(
@@ -1422,32 +1435,74 @@ pub fn restart_instance(instance_id: &str) -> AppResult<InstanceStatus> {
         instance_id, resolved_id
     ));
 
-    // 1. Terminate current running process(es)
-    // Justification: best-effort shutdown; the stop path is idempotent and re-attempted on the next action
-    crate::error::record_ignored(stop_instance(&resolved_id), "stop instance");
+    let registry = load_registry().map_err(AppError::Config)?;
+    let config = registry
+        .instances
+        .iter()
+        .find(|i| i.id == resolved_id)
+        .cloned()
+        .ok_or_else(|| AppError::Config(format!("Instance '{}' not found", resolved_id)))?;
+    let is_default = config.is_default || resolved_id == "default";
 
-    // 2. Poll up to 1500ms for process cleanup and lockfile release
+    // 0. The bound/selected account's token is refreshed by the async command
+    //    wrapper BEFORE this runs (see commands::instance::restart_instance),
+    //    so the reopened IDE comes up with the same account on fresh credentials.
+    //    (A sync fn must not block_on inside the Tokio runtime.)
+
+    // 1. Force-close the IDE. A close failure is a hard error now — the old
+    //    code swallowed it via record_ignored and relaunched into a broken state.
+    stop_instance(&resolved_id).map_err(AppError::Unknown)?;
+
+    // 2. Drop the stale smart-PID cache entry so launch cannot mistake the
+    //    dead process for a live one.
+    invalidate_instance_process_cache(&resolved_id);
+
+    // 3. VERIFY the process tree is actually gone before touching credentials.
     let start_wait = std::time::Instant::now();
-    if let Ok(registry) = load_registry() {
-        if let Some(config) = registry.instances.iter().find(|i| i.id == resolved_id) {
-            let is_default = config.is_default || resolved_id == "default";
-            while start_wait.elapsed() < std::time::Duration::from_millis(1500) {
-                let pids = find_pids_for_data_dir(&config.data_dir, is_default);
-                if pids.is_empty() {
-                    break;
-                }
-                std::thread::sleep(std::time::Duration::from_millis(80));
-            }
+    let max_wait = std::time::Duration::from_millis(5000);
+    loop {
+        let pids = find_pids_for_data_dir(&config.data_dir, is_default);
+        if pids.is_empty() {
+            break;
         }
+        if start_wait.elapsed() >= max_wait {
+            return Err(AppError::Process(format!(
+                "Instance '{}' did not terminate (PIDs {:?} still alive); refusing to relaunch into a broken state",
+                resolved_id, pids
+            )));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
     }
 
-    // 3. Invalidate prompt tree cache so running status reflects fresh state
+    // 4. Invalidate prompt tree cache so running status reflects fresh state
     crate::modules::repo_db::invalidate_prompt_tree_cache(Some(&resolved_id));
 
-    // 4. Launch instance with its existing bound account and workspaces
+    // 5. Launch the same IDE fresh; the launch pipeline re-injects the bound
+    //    account's credentials (token, device profile, keyring) before spawn.
     launch_instance(&resolved_id)?;
 
-    // 5. Return updated InstanceStatus
+    // 6. Verify the new process actually came up.
+    let launched = {
+        let start = std::time::Instant::now();
+        let mut ok = false;
+        while start.elapsed() < std::time::Duration::from_millis(8000) {
+            let (running, _, _) = is_instance_process_running_smart(&resolved_id);
+            if running {
+                ok = true;
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(250));
+        }
+        ok
+    };
+    if !launched {
+        return Err(AppError::Process(format!(
+            "Instance '{}' relaunch did not produce a live process",
+            resolved_id
+        )));
+    }
+
+    // 7. Return updated InstanceStatus
     let statuses = list_instances().map_err(AppError::Unknown)?;
     let updated = statuses
         .into_iter()
@@ -1459,6 +1514,10 @@ pub fn restart_instance(instance_id: &str) -> AppResult<InstanceStatus> {
             ))
         })?;
 
+    crate::modules::logger::log_info(&format!(
+        "[Instance] Restarted instance '{}' on bound account {:?}",
+        resolved_id, config.bound_account_id
+    ));
     Ok(updated)
 }
 
@@ -6060,6 +6119,8 @@ pub async fn switch_account_to_instance(
     // 2. [Step 2/5] Close the running instance process FIRST ("Kill First -> Write Second -> Start Third")
     //    Running Antigravity flushes in-memory state to state.vscdb/keyring on exit; closing first
     //    prevents the exiting process from overwriting our newly injected credentials.
+    //    The close is VERIFIED here: injecting credentials while the old IDE is still alive is
+    //    the fast-forward/restart reliability bug (the exiting process overwrites state.vscdb).
     let pids_to_kill = find_pids_for_data_dir(&instance.data_dir, is_default_inst);
     crate::modules::logger::log_info(&format!(
         "[INSTANCE_SWITCH:STAGE_2_TERMINATE] Terminating {} PIDs for instance '{}': {:?}",
@@ -6067,9 +6128,30 @@ pub async fn switch_account_to_instance(
         instance.id,
         pids_to_kill
     ));
-    // Justification: best-effort close; close is idempotent and re-attempted on the next action
-    crate::error::record_ignored(close_instance(&instance.id), "close instance");
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    close_instance(&instance.id).map_err(|e| {
+        format!(
+            "Failed to close instance '{}' before account switch: {}",
+            instance.id, e
+        )
+    })?;
+    invalidate_instance_process_cache(&instance.id);
+    {
+        let start_wait = std::time::Instant::now();
+        let max_wait = std::time::Duration::from_millis(5000);
+        loop {
+            let remaining = find_pids_for_data_dir(&instance.data_dir, is_default_inst);
+            if remaining.is_empty() {
+                break;
+            }
+            if start_wait.elapsed() >= max_wait {
+                return Err(format!(
+                    "Instance '{}' did not terminate (PIDs {:?} still alive); refusing to inject credentials into a live process",
+                    instance.id, remaining
+                ));
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+    }
 
     // 3. [Step 3/5] Inject credentials into target instance's state.vscdb & storage.json (and OS keyring) AFTER process exit
     inject_all_credentials(&account)?;

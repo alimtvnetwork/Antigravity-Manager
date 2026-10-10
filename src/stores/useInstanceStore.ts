@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import * as instanceService from '../services/instanceService';
 import * as accountService from '../services/accountService';
 import { useErrorStore } from './error-store';
+import { useConfigStore } from './useConfigStore';
 import { showToast } from '../components/common/ToastContainer';
 import type { Account } from '../types/account';
 import type {
@@ -414,7 +415,8 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             let candidate = instanceService.pickBestCandidateAccount(
                 accounts,
                 activeInUseAccountIds,
-                cur?.config.bound_account_id
+                cur?.config.bound_account_id,
+                instanceService.tierMultipliersFromSettings(useConfigStore.getState().config?.auto_profile_switcher)
             );
 
             if (!candidate) {
@@ -529,7 +531,8 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
             let candidatePool = instanceService.rankSmartCandidates(
                 eligibleAccounts,
                 activeInUseAccountIds,
-                currentAccountId
+                currentAccountId,
+                instanceService.tierMultipliersFromSettings(useConfigStore.getState().config?.auto_profile_switcher)
             );
 
             const hasCandidates = candidatePool.length > 0;

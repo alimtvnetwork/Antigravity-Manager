@@ -47,6 +47,42 @@ pub fn stop_instance(instance_id: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn restart_instance(instance_id: String) -> Result<InstanceStatus, String> {
     let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
+
+    // Refresh the bound/selected account's token BEFORE the sync restart runs,
+    // so the reopened IDE comes up with the same account on fresh credentials.
+    // (The sync `instance::restart_instance` cannot block_on inside the runtime.)
+    if let Ok(registry) = instance::load_registry() {
+        if let Some(cfg) = registry.instances.iter().find(|i| i.id == resolved_id) {
+            if let Some(ref account_id) = cfg.bound_account_id {
+                if let Ok(mut account) = crate::modules::account::load_account(account_id) {
+                    match crate::modules::oauth::ensure_fresh_token(
+                        &account.token,
+                        Some(&account.id),
+                    )
+                    .await
+                    {
+                        Ok(tok) => {
+                            if tok.access_token != account.token.access_token {
+                                account.token = tok;
+                                // Justification: token persistence is write-through; re-persisted on the next account touch
+                                crate::error::record_ignored(
+                                    crate::modules::account::save_account(&account),
+                                    "save refreshed account token",
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            crate::modules::logger::log_warn(&format!(
+                                "[Instance] Token refresh failed for bound account '{}' during restart: {}. Proceeding with stored token.",
+                                account.email, e
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     instance::restart_instance(&resolved_id).map_err(|e| e.to_string())
 }
 

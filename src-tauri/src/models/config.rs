@@ -340,6 +340,15 @@ pub struct AutoProfileSwitcherConfig {
     pub account_lockout_window_minutes: u32,
     #[serde(default = "default_account_cooldown_minutes")]
     pub account_cooldown_minutes: u32,
+    /// Subscription-tier score multipliers for the best-account selection algorithm.
+    /// Applied in `calculate_weekly_base_score` as `M_tier`.
+    /// Defaults: Ultra 4.0, Pro 2.0, Free 1.0. User-customizable via Settings → Algorithm.
+    #[serde(default = "default_ultra_tier_multiplier")]
+    pub ultra_tier_multiplier: f64,
+    #[serde(default = "default_pro_tier_multiplier")]
+    pub pro_tier_multiplier: f64,
+    #[serde(default = "default_free_tier_multiplier")]
+    pub free_tier_multiplier: f64,
 }
 
 impl Default for AutoProfileSwitcherConfig {
@@ -365,8 +374,23 @@ impl Default for AutoProfileSwitcherConfig {
             pid_refresh_seconds: 600,
             account_lockout_window_minutes: 60,
             account_cooldown_minutes: 60,
+            ultra_tier_multiplier: 4.0,
+            pro_tier_multiplier: 2.0,
+            free_tier_multiplier: 1.0,
         }
     }
+}
+
+fn default_ultra_tier_multiplier() -> f64 {
+    4.0
+}
+
+fn default_pro_tier_multiplier() -> f64 {
+    2.0
+}
+
+fn default_free_tier_multiplier() -> f64 {
+    1.0
 }
 
 fn default_fast_forward_shortcut() -> String {
