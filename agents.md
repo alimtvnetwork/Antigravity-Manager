@@ -63,5 +63,14 @@
   - Keep an explicit fallback to the verified path whenever you replace it (e.g. "0 matches found → full restart"). A silent no-op is worse than the failure it was meant to fix.
   - Order side effects to fail before the point of no return: write credentials before killing a process, validate before deleting.
   - Detect broadly, act narrowly: a matcher may recognize a whole class of problems, while its effect stays inside the intended data — not across line breaks, tags, or other clauses. Bound every wait with a timeout.
+- **No Silent Errors** (house rule, 2026-10-10): every fallible operation must route its failure into the error module. Swallowing an error — discarding it where no one can ever see it — is forbidden.
+  - **Rust** (`src-tauri/src/`): errors flow into `AppError` (`src-tauri/src/error.rs`) and are logged via `tracing` (file + console + Tauri log bridge). Never leave a bare `let _ = <fallible>`, `.ok()`, or `.unwrap_or_default()` on a `Result` without routing the `Err`:
+    - FORBIDDEN: `let _ = std::fs::write(&path, data);`
+    - REQUIRED: propagate with context — `std::fs::write(&path, data).map_err(|e| AppError::Io(format!("write config {path:?}: {e}")))?;`
+    - For genuinely best-effort ops (cleanup, best-effort notifies): `crate::error::record_ignored(std::fs::remove_file(&tmp), "remove temp file")` **plus** a one-line `// Justification:` comment explaining why it is safe to continue. Both the tracking call and the comment are required — neither alone suffices.
+  - **TypeScript** (`src/`): failures go through the error store (`src/stores/error-store.ts`). Use `captureError`/`captureException` for user-facing failures (opens the error modal), `trackWarning` for benign/best-effort failures (records into error history without a modal — never a bare `catch {}`):
+    - FORBIDDEN: `await invoke('save_x').catch(() => {});` or `catch {}` / `catch (e) { console.warn(e); }`
+    - REQUIRED: `catch (e) { useErrorStore.getState().trackWarning(e, { source: 'MyComp.save', triggerAction: 'save_x' }); /* fallback */ }`
+  - Success paths must never change as part of error-visibility work: failures become visible, successes behave exactly as before. No fake success — a failed op must not report success to the user.
 
 Maintained by @aukgit
