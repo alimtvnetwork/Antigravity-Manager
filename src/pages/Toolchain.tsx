@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { useErrorStore } from '../stores/error-store';
 import {
     Wrench, Play, CheckCircle2, XCircle, Loader2, TerminalSquare,
     ChevronDown, Cpu, Globe, Zap, Package, MonitorDown, RefreshCw,
@@ -126,8 +127,12 @@ function Toolchain() {
         try {
             const list = await invoke<ToolchainItem[]>('toolchain_list_items');
             if (Array.isArray(list) && list.length > 0) setItems(list);
-        } catch {
+        } catch (e) {
             /* backend not wired yet — keep fallback catalog */
+            useErrorStore.getState().trackWarning(e, {
+                source: 'Toolchain.loadItems',
+                triggerAction: 'toolchain_list_items',
+            });
         } finally {
             setLoadingItems(false);
         }

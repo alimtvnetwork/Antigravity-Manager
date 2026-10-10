@@ -1,48 +1,17 @@
-import { useMemo, useState, useRef } from 'react';
-import { ArrowRightLeft, RefreshCw, Trash2, Download, Info, Lock, Ban, ToggleLeft, ToggleRight, Fingerprint, Sparkles, Tag, X, Check, Clock, Bot, Repeat2, Terminal } from 'lucide-react';
-import { Account, ModelQuota } from '../../types/account';
-import { cn } from '../../utils/cn';
+import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { cn } from '../../utils/cn';
 import { useConfigStore } from '../../stores/useConfigStore';
-import { QuotaItem } from './QuotaItem';
-import { MODEL_CONFIG, sortModels, getModelProtectionKey, resolveQuotaModels, ensurePinnedImageSelector } from '../../config/modelConfig';
-import { getValidationBlockedStatusLabel } from './accountValidationStatus';
-import { getLiveLimitForModel } from '../../utils/liveLimit';
 import { useInstanceStore } from '../../stores/useInstanceStore';
-import { formatDateTime } from '../../utils/date';
-import { getModelQuotaDisplay } from '../../utils/quotaDisplay';
-import { TierBadge } from '../common/TierBadge';
-import { PriorityBadge } from './PriorityBadge';
-import { SELECTED_CARD_CLASSES, ACTIVE_PILL_CLASSES } from '../common/selectedState';
+import { getValidationBlockedStatusLabel } from './accountValidationStatus';
+import { SELECTED_CARD_CLASSES } from '../common/selectedState';
+import type { AccountCardProps } from './AccountCard/types';
+import { useAccountCardModels } from './AccountCard/useAccountCardModels';
+import { AccountCardHeader } from './AccountCard/AccountCardHeader';
+import { AccountCardQuota } from './AccountCard/AccountCardQuota';
+import { AccountCardActions } from './AccountCard/AccountCardActions';
 
-interface AccountCardProps {
-    account: Account;
-    selected: boolean;
-    onSelect: () => void;
-    isCurrent: boolean;
-    isRefreshing: boolean;
-    isSwitching?: boolean;
-    isFocused?: boolean;
-    onSwitch: (targetIde?: string) => void;
-    onRefresh: () => void;
-    onViewDevice: () => void;
-    onViewDetails: () => void;
-    onExport: () => void;
-    onDelete: () => void;
-    onToggleProxy: () => void;
-    onWarmup?: () => void;
-    onUpdateLabel?: (label: string) => void;
-    onUpdatePriority?: (priority: number) => Promise<void> | void;
-    onViewError: () => void;
-}
-
-// Use unified model configuration
-const DEFAULT_MODELS = Object.entries(MODEL_CONFIG).map(([id, config]) => ({
-    id,
-    label: config.label,
-    protectedKey: config.protectedKey,
-    Icon: config.Icon
-}));
+export type { AccountCardProps } from './AccountCard/types';
 
 function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, isRefreshing, isSwitching = false, isFocused = false, onSwitch, onRefresh, onViewDetails, onExport, onDelete, onToggleProxy, onViewDevice, onWarmup, onUpdateLabel, onUpdatePriority, onViewError }: AccountCardProps) {
     const { t } = useTranslation();
@@ -83,93 +52,13 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
         }
     };
 
-    const displayModels = useMemo(() => {
-        // Build map of friendly labels and icons from DEFAULT_MODELS
-        const iconMap = new Map(DEFAULT_MODELS.map(m => [m.id, m.Icon]));
+    const { displayModels, weeklyItems, isModelProtected } = useAccountCardModels({
+        account,
+        showAllQuotas,
+        pinnedModels: config?.pinned_quota_models?.models,
+        quotaProtectionEnabled: Boolean(config?.quota_protection?.enabled),
+    });
 
-        // Get all models from account (source of truth)
-        const accountModels = account.quota?.models?.map(m => {
-            // Note: DEFAULT_MODELS contains shortLabel from MODEL_CONFIG
-            // Ensure shortLabel is present in mapped models
-            // Safely retrieve directly from MODEL_CONFIG
-            const fullConfig = MODEL_CONFIG[m.name.toLowerCase()];
-            return {
-                id: m.name,
-                label: m.display_name || fullConfig?.shortLabel || fullConfig?.label || m.name,
-                protectedKey: getModelProtectionKey(m.name) ?? fullConfig?.protectedKey ?? m.name,
-                Icon: iconMap.get(m.name) || Bot,
-                data: m
-            };
-        }) || [];
-
-        let models: typeof accountModels;
-
-        if (showAllQuotas) {
-            models = accountModels;
-        } else {
-            // Filter for pinned or defaults
-            const pinned = config?.pinned_quota_models?.models;
-            if (pinned && pinned.length > 0) {
-                const selections = resolveQuotaModels(
-                    accountModels.map(m => m.data),
-                    ensurePinnedImageSelector(pinned),
-                );
-                models = selections
-                    .map(sel => sel.model ? accountModels.find(am => am.data === sel.model) : undefined)
-                    .filter((m): m is typeof accountModels[number] => m !== undefined);
-                // Preserve pinned models without quota data (display 0%)
-                for (const sel of selections) {
-                    if (!sel.model) {
-                        const selectorConfig = MODEL_CONFIG[sel.selectorId.toLowerCase()];
-                        if (selectorConfig) {
-                            models = [...models, {
-                                id: sel.selectorId,
-                                label: selectorConfig.shortLabel || selectorConfig.label,
-                                protectedKey: selectorConfig.protectedKey,
-                                Icon: selectorConfig.Icon,
-                                data: { name: sel.selectorId, percentage: 0 } as ModelQuota,
-                            }];
-                        }
-                    }
-                }
-            } else {
-                // Default fallback: show known default models, plus we show all dynamic pinned models
-                // Fallback: if pinned is not configured, show built-in models and models with a display_name.
-                models = accountModels.filter(m => DEFAULT_MODELS.some(d => d.id === m.id) || m.data.display_name);
-            }
-        }
-
-        // Apply sorting and filter expired models
-        return sortModels(models).filter(m => m.id !== 'claude-sonnet-4-6-thinking' && m.id !== 'claude-sonnet-4-5-thinking' && m.id !== 'claude-opus-4-5-thinking');
-    }, [config, account, showAllQuotas]);
-
-    // Parse weekly quota entries when in weekly view
-    const weeklyItems = useMemo(() => {
-        return (account.quota?.quota_groups || []).flatMap(group => {
-            return (group.buckets || [])
-                .filter(b => b.window.toLowerCase().includes('week') || b.bucket_id.toLowerCase().includes('week'))
-                .map(b => {
-                    const shortGroupName = (group.display_name || '')
-                        .replace(/ models?$/i, '')
-                        .replace(/Claude and GPT/i, 'Claude/GPT');
-                    const weeklySuffix = t('accounts.quota_window_weekly_short', 'Semanal');
-                    return {
-                        id: `${group.display_name}-${b.bucket_id}`,
-                        label: b.display_name ? `${shortGroupName} (${b.display_name})` : `${shortGroupName} (${weeklySuffix})`,
-                        percentage: Math.round((b.remaining_fraction || 0) * 100),
-                        resetTime: b.reset_time,
-                        cycleTokens: b.cycle_tokens,
-                        Icon: shortGroupName.toLowerCase().includes('claude') ? Sparkles : Bot,
-                    };
-                });
-        });
-    }, [account.quota?.quota_groups]);
-
-    const isModelProtected = (key?: string) => {
-        if (!config?.quota_protection?.enabled) return false;
-        if (!key) return false;
-        return account.protected_models?.includes(key);
-    };
     const cardRef = useRef<HTMLDivElement>(null);
 
     return (
@@ -188,326 +77,50 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
             (isRefreshing || isDisabled) && "opacity-70"
         )}>
 
-            {/* Header: Checkbox + Email + Badges */}
-            <div className="flex-none flex items-start gap-3 mb-1.5">
-                <input
-                    type="checkbox"
-                    className="mt-1 checkbox checkbox-xs rounded border-2 border-gray-400 dark:border-gray-500 checked:border-blue-600 checked:bg-blue-600 [--chkbg:theme(colors.blue.600)] [--chkfg:white]"
-                    checked={selected}
-                    onChange={() => onSelect()}
-                    onClick={(e) => e.stopPropagation()}
-                />
-                <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-                    <h3 className={cn(
-                        "font-semibold text-sm truncate w-full",
-                        isFocused || selected
-                            ? "text-blue-950 dark:text-blue-200 font-bold"
-                            : isCurrent
-                            ? "text-blue-900 dark:text-amber-300 font-bold"
-                            : "text-gray-900 dark:text-gray-100"
-                    )} title={account.email}>
-                        {account.email}
-                    </h3>
-                    <div className="flex items-center justify-between w-full gap-2">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                            {isCurrent && (
-                                <span className={cn(ACTIVE_PILL_CLASSES, "text-[9px] px-1.5 py-0.2")}>
-                                    {t('accounts.current').toUpperCase()}
-                                </span>
-                            )}
-                            {isDisabled && (
-                                <span
-                                    className="px-1.5 py-0.5 rounded-md bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 text-[9px] font-bold flex items-center gap-1 shadow-sm border border-rose-200/50"
-                                >
-                                    <Ban className="w-2.5 h-2.5" />
-                                    {t('accounts.disabled').toUpperCase()}
-                                </span>
-                            )}
-                            {account.proxy_disabled && (
-                                <span
-                                    className="px-1.5 py-0.5 rounded-md bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 text-[9px] font-bold flex items-center gap-1 shadow-sm border border-orange-200/50"
-                                >
-                                    <Ban className="w-2.5 h-2.5" />
-                                    {t('accounts.proxy_disabled').toUpperCase()}
-                                </span>
-                            )}
-                            {account.quota?.is_forbidden && (
-                                <span className="px-1.5 py-0.5 rounded-md bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 text-[9px] font-bold flex items-center gap-1 shadow-sm border border-red-200/50">
-                                    <Lock className="w-2.5 h-2.5" />
-                                    {t('accounts.forbidden').toUpperCase()}
-                                </span>
-                            )}
-                            {account.validation_blocked && (
-                                <span className="px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 text-[9px] font-bold flex items-center gap-1 shadow-sm border border-amber-200/50">
-                                    <Clock className="w-2.5 h-2.5" />
-                                    {validationBlockedLabel.toUpperCase()}
-                                </span>
-                            )}
-                            {/* Subscription tier badge */}
-                            <TierBadge tier={account.quota?.subscription_tier} size="sm" />
-                            {/* Priority */}
-                            <PriorityBadge
-                                priority={account.priority}
-                                accountId={account.id}
-                                onUpdatePriority={onUpdatePriority}
-                                size="sm"
-                            />
-                            {/* Custom label */}
-                            {account.custom_label && (
-                                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 text-[9px] font-bold shadow-sm border border-orange-200/50 dark:border-orange-800/50">
-                                    <Tag className="w-2.5 h-2.5" />
-                                    {account.custom_label}
-                                </span>
-                            )}
-                            {/* Bound instance badge */}
-                            {boundInstance && (
-                                <span
-                                    className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-[9px] font-bold shadow-xs border border-indigo-200/50 dark:border-indigo-800/50 cursor-default"
-                                    title={`Bound to profile: ${boundInstance.config.name}`}
-                                >
-                                    <span className={cn(
-                                        "w-1.5 h-1.5 rounded-full shrink-0",
-                                        boundInstance.is_running ? "bg-teal-500 animate-pulse" : "bg-indigo-400"
-                                    )} />
-                                    <span>{boundInstance.config.name}</span>
-                                </span>
-                            )}
-                        </div>
-                        <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono shrink-0 whitespace-nowrap">
-                            {formatDateTime(account.last_used)}
-                        </span>
-                    </div>
-                </div>
-            </div>
+            <AccountCardHeader
+                account={account}
+                selected={selected}
+                isCurrent={isCurrent}
+                isFocused={isFocused}
+                isDisabled={isDisabled}
+                validationBlockedLabel={validationBlockedLabel}
+                boundInstance={boundInstance}
+                onSelect={onSelect}
+                onUpdatePriority={onUpdatePriority}
+            />
 
+            <AccountCardQuota
+                account={account}
+                isDisabled={isDisabled}
+                validationBlockedLabel={validationBlockedLabel}
+                displayModels={displayModels}
+                weeklyItems={weeklyItems}
+                isModelProtected={isModelProtected}
+                onViewError={onViewError}
+            />
 
-            {/* Quota display */}
-            <div className="flex-1 px-1.5 mb-1.5 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-[#15334d]/60 scrollbar-track-transparent">
-                {isDisabled || account.quota?.is_forbidden || account.proxy_disabled || account.validation_blocked ? (
-                    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 h-full py-4 text-center">
-                        <div className={cn(
-                            "flex items-center gap-1.5",
-                            account.validation_blocked ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"
-                        )}>
-                            {account.validation_blocked ? <Clock className="w-4 h-4" /> : (isDisabled || account.proxy_disabled ? <Ban className="w-4 h-4" /> : <Lock className="w-4 h-4" />)}
-                            <span className="text-[11px] font-bold">
-                                {account.validation_blocked ? validationBlockedLabel : (isDisabled ? t('accounts.status.disabled') : account.proxy_disabled ? t('accounts.status.proxy_disabled') : t('accounts.forbidden_msg'))}
-                            </span>
-                        </div>
-                        <div className={cn(
-                            "w-px h-3 hidden sm:block",
-                            account.validation_blocked ? "bg-amber-200 dark:bg-amber-800/50" : "bg-red-200 dark:bg-red-800/50"
-                        )} />
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onViewError(); }}
-                            className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-medium"
-                        >
-                            {t('accounts.view_error')}
-                        </button>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 gap-2 content-start">
-                        {displayModels[0] ? (
-                            <QuotaItem
-                                key={displayModels[0].id}
-                                label="4h"
-                                percentage={displayModels[0].data.percentage}
-                                resetTime={displayModels[0].data.reset_time}
-                                Icon={displayModels[0].Icon}
-                            />
-                        ) : null}
-                        {weeklyItems[0] ? (
-                            <QuotaItem
-                                key={weeklyItems[0].id}
-                                label="Weekly"
-                                percentage={weeklyItems[0].percentage}
-                                resetTime={weeklyItems[0].resetTime}
-                                Icon={weeklyItems[0].Icon}
-                            />
-                        ) : (
-                            displayModels.slice(1).map((model) => (
-                                <QuotaItem
-                                    key={model.id}
-                                    label={model.label}
-                                    {...getModelQuotaDisplay(model.id, model.data, account.quota?.quota_groups)}
-                                    isProtected={isModelProtected(model.protectedKey)}
-                                    liveLimit={getLiveLimitForModel(account, model.id, model.protectedKey)}
-                                    Icon={model.Icon}
-                                />
-                            ))
-                        )}
-                    </div>
-                )}
-            </div>
-
-            {/* Footer: Actions Only */}
-            <div className="flex-none flex items-center justify-center pt-2 pb-1 border-t border-slate-200/80 dark:border-slate-800/80">
-                {/* Label edit popup */}
-                {isEditingLabel && (
-                    <div className="absolute inset-0 bg-white/95 dark:bg-base-100/95 rounded-xl z-10 flex items-center justify-center p-4">
-                        <div className="flex items-center gap-2 w-full max-w-xs">
-                            <input
-                                type="text"
-                                className="flex-1 px-2 py-1 text-sm border border-orange-300 dark:border-orange-700 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white dark:bg-base-200"
-                                placeholder={t('accounts.custom_label_placeholder', 'Enter custom label')}
-                                value={labelInput}
-                                onChange={(e) => setLabelInput(e.target.value)}
-                                onKeyDown={handleKeyDown}
-                                autoFocus
-                                maxLength={15}
-                            />
-                            <button
-                                className="p-1.5 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-[5px] transition-all"
-                                onClick={handleSaveLabel}
-                                title={t('common.save', 'Save')}
-                            >
-                                <Check className="w-4 h-4" />
-                            </button>
-                            <button
-                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-[5px] transition-all"
-                                onClick={handleCancelLabel}
-                                title={t('common.cancel', 'Cancel')}
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
-                )}
-                <div className="flex flex-wrap items-center justify-center gap-1 w-full">
-                    {/* 1. Refresh button (top priority) */}
-                    <button
-                        className={`p-1.5 rounded-[5px] transition-all ${isRefreshing
-                            ? 'text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20'
-                            : 'text-gray-400 hover:text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/20'}`}
-                        onClick={(e) => { e.stopPropagation(); onRefresh(); }}
-                        disabled={isRefreshing || isDisabled}
-                        title={isDisabled ? t('accounts.disabled_tooltip') : t('common.refresh')}
-                    >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    </button>
-
-                    {/* 2. Switch operations group */}
-                    <button
-                        className={`p-1.5 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
-                        onClick={(e) => { e.stopPropagation(); onSwitch(); }}
-                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_classic', 'Switch to Antigravity (Classic)'))}
-                        disabled={isSwitching || isDisabled}
-                    >
-                        <ArrowRightLeft className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
-                    </button>
-                    <button
-                        className={`p-1.5 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30'}`}
-                        onClick={(e) => { e.stopPropagation(); onSwitch('ide'); }}
-                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_ide', 'Switch to Antigravity IDE'))}
-                        disabled={isSwitching || isDisabled}
-                    >
-                        <Repeat2 className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
-                    </button>
-                    <button
-                        className={`p-1.5 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30'}`}
-                        onClick={(e) => { e.stopPropagation(); onSwitch('agy'); }}
-                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_agy', 'Switch to Antigravity CLI (agy)'))}
-                        disabled={isSwitching || isDisabled}
-                    >
-                        <Terminal className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
-                    </button>
-
-                    {/* 3. Details and auxiliary operations */}
-                    <button
-                        className="p-1.5 text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-[5px] transition-all"
-                        onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
-                        title={t('common.details')}
-                    >
-                        <Info className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                        className="p-1.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-[5px] transition-all"
-                        onClick={(e) => { e.stopPropagation(); onViewDevice(); }}
-                        title={t('accounts.device_fingerprint')}
-                    >
-                        <Fingerprint className="w-3.5 h-3.5" />
-                    </button>
-                    {/* Custom label button */}
-                    {onUpdateLabel && (
-                        <button
-                            className={cn(
-                                "p-1.5 rounded-[5px] transition-all",
-                                account.custom_label
-                                    ? "text-orange-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30"
-                                    : "text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/30"
-                            )}
-                            onClick={(e) => { e.stopPropagation(); setIsEditingLabel(true); }}
-                            title={t('accounts.edit_label', 'Edit Label')}
-                        >
-                            <Tag className="w-3.5 h-3.5" />
-                        </button>
-                    )}
-                    <button
-                        className={`p-1.5 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
-                        onClick={(e) => { e.stopPropagation(); onSwitch('classic'); }}
-                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_classic', 'Switch to Antigravity (Classic)'))}
-                        disabled={isSwitching || isDisabled}
-                    >
-                        <ArrowRightLeft className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
-                    </button>
-                    <button
-                        className={`p-1.5 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30'}`}
-                        onClick={(e) => { e.stopPropagation(); onSwitch('ide'); }}
-                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_ide', 'Switch to Antigravity IDE'))}
-                        disabled={isSwitching || isDisabled}
-                    >
-                        <Repeat2 className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
-                    </button>
-                    <button
-                        className={`p-1.5 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30'}`}
-                        onClick={(e) => { e.stopPropagation(); onSwitch('agy'); }}
-                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_agy', 'Switch to Antigravity CLI (agy)'))}
-                        disabled={isSwitching || isDisabled}
-                    >
-                        <Terminal className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
-                    </button>
-                    {onWarmup && (
-                        <button
-                            className={`p-1.5 rounded-[5px] transition-all ${(isRefreshing || isDisabled) ? 'text-orange-600 bg-orange-50 dark:bg-orange-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/30'}`}
-                            onClick={(e) => { e.stopPropagation(); onWarmup(); }}
-                            title={isDisabled ? t('accounts.disabled_tooltip') : (isRefreshing ? t('common.loading') : t('accounts.warmup_this', 'Warm up this account'))}
-                            disabled={isRefreshing || isDisabled}
-                        >
-                            <Sparkles className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-pulse' : ''}`} />
-                        </button>
-                    )}
-                    <button
-                        className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-[5px] transition-all"
-                        onClick={(e) => { e.stopPropagation(); onExport(); }}
-                        title={t('common.export')}
-                    >
-                        <Download className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                        className={cn(
-                            "p-1.5 rounded-[5px] transition-all",
-                            account.proxy_disabled
-                                ? "text-gray-400 hover:text-cyan-600 hover:bg-cyan-50"
-                                : "text-gray-400 hover:text-orange-600 hover:bg-orange-50"
-                        )}
-                        onClick={(e) => { e.stopPropagation(); onToggleProxy(); }}
-                        title={account.proxy_disabled ? t('accounts.enable_proxy') : t('accounts.disable_proxy')}
-                    >
-                        {account.proxy_disabled ? (
-                            <ToggleRight className="w-3.5 h-3.5" />
-                        ) : (
-                            <ToggleLeft className="w-3.5 h-3.5" />
-                        )}
-                    </button>
-                    <button
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-[5px] transition-all"
-                        onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                        title={t('common.delete')}
-                    >
-                        <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                </div>
-            </div>
+            <AccountCardActions
+                account={account}
+                isRefreshing={isRefreshing}
+                isSwitching={isSwitching}
+                isDisabled={isDisabled}
+                isEditingLabel={isEditingLabel}
+                labelInput={labelInput}
+                onSwitch={onSwitch}
+                onRefresh={onRefresh}
+                onViewDetails={onViewDetails}
+                onViewDevice={onViewDevice}
+                onExport={onExport}
+                onDelete={onDelete}
+                onToggleProxy={onToggleProxy}
+                onWarmup={onWarmup}
+                onUpdateLabel={onUpdateLabel}
+                setIsEditingLabel={setIsEditingLabel}
+                setLabelInput={setLabelInput}
+                handleSaveLabel={handleSaveLabel}
+                handleCancelLabel={handleCancelLabel}
+                handleKeyDown={handleKeyDown}
+            />
         </div >
     );
 }

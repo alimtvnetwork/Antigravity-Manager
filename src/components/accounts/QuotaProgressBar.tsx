@@ -42,7 +42,7 @@ export function QuotaProgressBar({
     isWeeklyConstrained = false,
     className,
     compact = false,
-    heightClassName = compact ? "h-3" : "h-3.5",
+    heightClassName = compact ? "h-4" : "h-[18px]",
     checkpoints = [100, 75, 50, 25, 0],
     showCheckpoints = true,
     Icon,

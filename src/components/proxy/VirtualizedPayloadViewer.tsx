@@ -1,324 +1,18 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import {
-    Search,
-    ChevronUp,
-    ChevronDown,
-    Copy,
-    CheckCircle,
-    X,
-    WrapText,
-    CaseSensitive,
-} from 'lucide-react';
-
-export interface VirtualizedPayloadViewerProps {
-    cardId: string;
-    title: string;
-    badge: string;
-    badgeStyle: string;
-    rawPayload?: string;
-    concisePayload?: string;
-    headersJson?: string;
-    viewMode: 'concise' | 'full';
-    emptyPlaceholder: string;
-    onCopy: (content: string) => Promise<void>;
-    isCopied: boolean;
-    duration?: number;
-    timingNode?: React.ReactNode;
-}
-
-interface SearchMatch {
-    lineIndex: number;
-    colStart: number;
-    length: number;
-    globalIndex: number;
-}
-
-interface LineToken {
-    text: string;
-    type: 'key' | 'string' | 'number' | 'boolean' | 'null' | 'punct' | 'plain';
-    start: number;
-    end: number;
-}
-
-const getTokenClass = (type: string) => {
-    switch (type) {
-        case 'key':
-            return 'text-sky-600 dark:text-sky-400 font-medium';
-        case 'string':
-            return 'text-emerald-700 dark:text-emerald-300';
-        case 'boolean':
-            return 'text-purple-600 dark:text-purple-400 font-semibold';
-        case 'null':
-            return 'text-rose-500 dark:text-rose-400 font-semibold italic';
-        case 'number':
-            return 'text-amber-600 dark:text-amber-300 font-semibold';
-        case 'punct':
-            return 'text-gray-400 dark:text-gray-500';
-        default:
-            return 'text-gray-700 dark:text-gray-300';
-    }
-};
-
-// Global token cache pool: avoids re-tokenizing rendered lines during scrolling, reducing CPU usage
-const tokenCache = new Map<string, LineToken[]>();
-
-// Lossless single-line JSON tokenizer with O(1) character dispatch
-const tokenizeJsonLine = (line: string): LineToken[] => {
-    if (!line) return [];
-
-    const cached = tokenCache.get(line);
-    if (cached) return cached;
-
-    const tokenRegex = /("(?:\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|[{}[\],:]|\s+|[^"{}[\],:\s]+|[\s\S])/g;
-
-    const tokens: LineToken[] = [];
-    let match: RegExpExecArray | null;
-
-    while ((match = tokenRegex.exec(line)) !== null) {
-        const text = match[0];
-        const start = match.index;
-        const end = start + text.length;
-        let type: LineToken['type'] = 'plain';
-
-        const firstChar = text.charCodeAt(0);
-        if (firstChar === 34) {
-            // String literals: "..." or "..." :
-            type = match[2] ? 'key' : 'string';
-        } else if (text === 'true' || text === 'false') {
-            type = 'boolean';
-        } else if (text === 'null') {
-            type = 'null';
-        } else if ((firstChar >= 48 && firstChar <= 57) || firstChar === 45) {
-            // Numeric values: begins with 0-9 or -
-            type = 'number';
-        } else if (text.length === 1 && (firstChar === 123 || firstChar === 125 || firstChar === 91 || firstChar === 93 || firstChar === 44 || firstChar === 58)) {
-            // Punctuation: { } [ ] , :
-            type = 'punct';
-        }
-
-        tokens.push({ text, type, start, end });
-    }
-
-    if (tokenCache.size > 10000) {
-        tokenCache.clear();
-    }
-    tokenCache.set(line, tokens);
-
-    return tokens;
-};
-
-// Calculate visual character width in monospace font (ASCII = 1, CJK/full-width = 2)
-const getVisualCharCount = (str: string): number => {
-    let count = 0;
-    const len = str.length;
-    for (let i = 0; i < len; i++) {
-        const code = str.charCodeAt(i);
-        if (code > 255) {
-            count += 2;
-        } else if (code === 9) {
-            count += 2;
-        } else {
-            count += 1;
-        }
-    }
-    return count;
-};
-
-// Gutter slot 44px + text left padding 10px, used for horizontal positioning when nowrap
-const LINE_GUTTER_PX = 54;
-
-// Cancel TanStack scrollToIndex internal retry alignment, avoiding pulling back already aligned mark to row center
-const cancelVirtualizerScrollToIndex = (virtualizer: unknown) => {
-    (virtualizer as { currentScrollToIndex: number | null }).currentScrollToIndex = null;
-};
-
-// Render single-line text: sliced based on lossless tokens and search highlight intervals
-const renderLineContent = (
-    line: string,
-    lineIndex: number,
-    lineMatches: SearchMatch[] | undefined,
-    currentMatchIndex: number,
-    cardId: string
-) => {
-    if (!line) return <span>&nbsp;</span>;
-
-    const tokens = tokenizeJsonLine(line);
-
-    if (!lineMatches || lineMatches.length === 0) {
-        return tokens.map((t, idx) => (
-            <span key={`l-${lineIndex}-t-${idx}`} className={getTokenClass(t.type)}>
-                {t.text}
-            </span>
-        ));
-    }
-
-    // When search matches exist on line: slice tokens into highlight segments preserving quotes
-    const elements: React.ReactNode[] = [];
-
-    for (let tIdx = 0; tIdx < tokens.length; tIdx++) {
-        const token = tokens[tIdx];
-        const tokenKey = `l-${lineIndex}-tok-${tIdx}`;
-        const tokenClass = getTokenClass(token.type);
-
-        // Find search matches overlapping with current token
-        const overlapping = lineMatches.filter(
-            (m) => m.colStart < token.end && m.colStart + m.length > token.start
-        );
-
-        if (overlapping.length === 0) {
-            elements.push(
-                <span key={tokenKey} className={tokenClass}>
-                    {token.text}
-                </span>
-            );
-            continue;
-        }
-
-        // Slice token interior according to matches
-        let currentPos = token.start;
-        for (let i = 0; i < overlapping.length; i++) {
-            const m = overlapping[i];
-            const matchStart = Math.max(token.start, m.colStart);
-            const matchEnd = Math.min(token.end, m.colStart + m.length);
-
-            if (matchStart > currentPos) {
-                const nonMatchSlice = token.text.slice(
-                    currentPos - token.start,
-                    matchStart - token.start
-                );
-                elements.push(
-                    <span key={`${tokenKey}-p-${i}`} className={tokenClass}>
-                        {nonMatchSlice}
-                    </span>
-                );
-            }
-
-            const matchSlice = token.text.slice(
-                matchStart - token.start,
-                matchEnd - token.start
-            );
-            const isActive = m.globalIndex === currentMatchIndex;
-
-            elements.push(
-                <mark
-                    key={`${tokenKey}-m-${i}`}
-                    id={isActive ? `active-match-${cardId}` : undefined}
-                    data-card-id={cardId}
-                    data-match-index={m.globalIndex}
-                    data-active-match={isActive ? 'true' : undefined}
-                    className={`rounded-sm px-0.5 font-bold transition-all duration-150 select-text ${
-                        isActive
-                            ? 'bg-amber-400 text-gray-950 ring-2 ring-amber-500 shadow-sm z-10'
-                            : 'bg-amber-400/40 text-amber-950 dark:text-amber-100'
-                    }`}
-                >
-                    {matchSlice}
-                </mark>
-            );
-
-            currentPos = matchEnd;
-        }
-
-        if (currentPos < token.end) {
-            const tailSlice = token.text.slice(currentPos - token.start);
-            elements.push(
-                <span key={`${tokenKey}-tail`} className={tokenClass}>
-                    {tailSlice}
-                </span>
-            );
-        }
-    }
-
-    return elements;
-};
-
-interface VirtualLineProps {
-    lineIndex: number;
-    line: string;
-    start: number;
-    isWrap: boolean;
-    cardId: string;
-    lineMatches?: SearchMatch[];
-    currentMatchIndex: number;
-    measureElement: (node: HTMLDivElement | null) => void;
-}
-
-// React.memo isolates viewport row rendering for smooth 60fps scrolling
-const VirtualLine = React.memo<VirtualLineProps>(({
-    lineIndex,
-    line,
-    start,
-    isWrap,
-    cardId,
-    lineMatches,
-    currentMatchIndex,
-    measureElement,
-}) => {
-    return (
-        <div
-            ref={measureElement}
-            data-index={lineIndex}
-            style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                transform: `translateY(${start}px)`,
-            }}
-            className="flex items-start hover:bg-gray-200/40 dark:hover:bg-base-300/40 transition-colors"
-        >
-            {/* Line Number Gutter */}
-            <div className="w-11 shrink-0 text-right pr-2 select-none text-[10px] font-mono text-gray-400 dark:text-gray-500 border-r border-gray-200/70 dark:border-base-300 bg-gray-100/40 dark:bg-base-300/20 leading-5">
-                {lineIndex + 1}
-            </div>
-
-            {/* Line Content */}
-            <div
-                className={`flex-1 pl-2.5 pr-4 font-mono text-[11px] leading-5 ${
-                    isWrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'
-                }`}
-            >
-                {renderLineContent(line, lineIndex, lineMatches, currentMatchIndex, cardId)}
-            </div>
-        </div>
-    );
-});
-
-VirtualLine.displayName = 'VirtualLine';
-
-
-/**
- * 递归深度反转义并反序列化嵌套在 JSON 字符串属性中的 JSON 内容
- * 例如将 "response": "{\"error\":{\"code\":400...}}" 自动展开为真实的嵌套对象
- * 彻底消除转义反斜杠 \"，并在 JSON.stringify 时自动美化换行和缩进
- */
-function deepUnescapeJsonValue(val: any): any {
-    if (typeof val === 'string') {
-        const trimmed = val.trim();
-        if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
-            try {
-                const parsed = JSON.parse(trimmed);
-                return deepUnescapeJsonValue(parsed);
-            } catch {
-                return val;
-            }
-        }
-        return val;
-    }
-    if (Array.isArray(val)) {
-        return val.map(deepUnescapeJsonValue);
-    }
-    if (val && typeof val === 'object') {
-        const res: Record<string, any> = {};
-        for (const [k, v] of Object.entries(val)) {
-            res[k] = deepUnescapeJsonValue(v);
-        }
-        return res;
-    }
-    return val;
-}
+import { Copy, CheckCircle, ChevronDown } from 'lucide-react';
+import type {
+    FontMetrics,
+    VirtualizedPayloadViewerProps,
+} from './payload-viewer/types';
+import { DEFAULT_FONT_METRICS, MINIMAP_MAX_TICKS } from './payload-viewer/types';
+import { getVisualCharCount } from './payload-viewer/tokenizer';
+import { VirtualLine } from './payload-viewer/VirtualLine';
+import { usePayloadContent } from './payload-viewer/usePayloadContent';
+import { usePayloadSearch } from './payload-viewer/usePayloadSearch';
+import { useMatchNavigation } from './payload-viewer/useMatchNavigation';
+import { ViewerToolbar } from './payload-viewer/ViewerToolbar';
 
 export const VirtualizedPayloadViewer: React.FC<VirtualizedPayloadViewerProps> = ({
     cardId,
@@ -335,23 +29,35 @@ export const VirtualizedPayloadViewer: React.FC<VirtualizedPayloadViewerProps> =
     timingNode,
 }) => {
     const { t } = useTranslation();
-    const [searchTerm, setSearchTerm] = useState('');
-    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-    const [caseSensitive, setCaseSensitive] = useState(false);
     const [isWrap, setIsWrap] = useState(true);
     const [isHeadersExpanded, setIsHeadersExpanded] = useState(false);
-    const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
-
+    const [isHeadersCopied, setIsHeadersCopied] = useState(false);
     const [containerWidth, setContainerWidth] = useState<number>(0);
-    const [fontMetrics, setFontMetrics] = useState<{ charWidth: number; lineHeight: number }>({
-        charWidth: 6.62,
-        lineHeight: 20,
+    const [fontMetrics, setFontMetrics] = useState<FontMetrics>(DEFAULT_FONT_METRICS);
+
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const fontMeasureRef = useRef<HTMLSpanElement | null>(null);
+
+    const { formattedContent, lines, prettyHeaders, copyPayload } = usePayloadContent({
+        viewMode,
+        concisePayload,
+        rawPayload,
+        headersJson,
     });
 
-    const containerRef = useRef<HTMLDivElement>(null);
-    const searchInputRef = useRef<HTMLInputElement>(null);
-    const fontMeasureRef = useRef<HTMLSpanElement>(null);
-    const scrollGenRef = useRef(0);
+    const {
+        searchTerm,
+        setSearchTerm,
+        debouncedSearchTerm,
+        caseSensitive,
+        setCaseSensitive,
+        matches,
+        matchesByLine,
+        matchesCount,
+        currentMatchIndex,
+        setCurrentMatchIndex,
+        searchInputRef,
+    } = usePayloadSearch(lines);
 
     // Measure precise monospace character width and line height
     useEffect(() => {
@@ -385,118 +91,6 @@ export const VirtualizedPayloadViewer: React.FC<VirtualizedPayloadViewerProps> =
         ro.observe(el);
         return () => ro.disconnect();
     }, []);
-
-    // Debounced search input (120ms): ensures responsive typing and fast indexing
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedSearchTerm(searchTerm);
-        }, 120);
-        return () => clearTimeout(timer);
-    }, [searchTerm]);
-
-    // Active display content
-    const activeContent = useMemo(() => {
-        if (viewMode === 'concise') {
-            const trimmed = concisePayload ? concisePayload.trim() : '';
-            if (trimmed && trimmed !== '{}') {
-                return concisePayload;
-            }
-            return rawPayload || '';
-        }
-        return rawPayload || '';
-    }, [viewMode, concisePayload, rawPayload]);
-
-    // Formatted JSON string (deep unescape and format)
-    const formattedContent = useMemo(() => {
-        if (!activeContent) return '';
-        try {
-            let obj = JSON.parse(activeContent);
-            // 处理顶层被二次转义为字符串的情况
-            if (typeof obj === 'string') {
-                try {
-                    obj = JSON.parse(obj);
-                } catch {
-                    // Justification: format probe — a non-JSON string here is the expected common case
-                    // (plain-text payloads), not an error; the original string is formatted as-is below.
-                }
-            }
-            const unescaped = deepUnescapeJsonValue(obj);
-            return JSON.stringify(unescaped, null, 2);
-        } catch {
-            return activeContent;
-        }
-    }, [activeContent]);
-
-    // Split into lines for virtualization (< 2ms for 20,000 lines)
-    const lines = useMemo(() => {
-        if (!formattedContent) return [];
-        return formattedContent.split('\n');
-    }, [formattedContent]);
-
-    // Formatted Headers
-    const prettyHeaders = useMemo(() => {
-        if (!headersJson) return '';
-        try {
-            return JSON.stringify(JSON.parse(headersJson), null, 2);
-        } catch {
-            return headersJson;
-        }
-    }, [headersJson]);
-
-    // Independent Headers Copy
-    const [isHeadersCopied, setIsHeadersCopied] = useState(false);
-    const handleCopyHeaders = useCallback(async (e?: React.MouseEvent) => {
-        if (e) e.stopPropagation();
-        if (!prettyHeaders) return;
-        try {
-            await navigator.clipboard.writeText(prettyHeaders);
-            setIsHeadersCopied(true);
-            setTimeout(() => setIsHeadersCopied(false), 2000);
-        } catch {
-            if (onCopy) {
-                await onCopy(prettyHeaders);
-                setIsHeadersCopied(true);
-                setTimeout(() => setIsHeadersCopied(false), 2000);
-            }
-        }
-    }, [prettyHeaders, onCopy]);
-
-    // Fast line-level search index (< 1.5ms for 20,000 lines)
-    const { matches, matchesByLine } = useMemo(() => {
-        const trimmed = debouncedSearchTerm.trim();
-        if (!trimmed || lines.length === 0) {
-            return { matches: [] as SearchMatch[], matchesByLine: new Map<number, SearchMatch[]>() };
-        }
-
-        const matchesList: SearchMatch[] = [];
-        const map = new Map<number, SearchMatch[]>();
-        const query = caseSensitive ? trimmed : trimmed.toLowerCase();
-
-        for (let i = 0; i < lines.length; i++) {
-            const line = caseSensitive ? lines[i] : lines[i].toLowerCase();
-            let pos = 0;
-            while ((pos = line.indexOf(query, pos)) !== -1) {
-                const item: SearchMatch = {
-                    lineIndex: i,
-                    colStart: pos,
-                    length: query.length,
-                    globalIndex: matchesList.length,
-                };
-                matchesList.push(item);
-                let lineArr = map.get(i);
-                if (!lineArr) {
-                    lineArr = [];
-                    map.set(i, lineArr);
-                }
-                lineArr.push(item);
-                pos += query.length;
-            }
-        }
-
-        return { matches: matchesList, matchesByLine: map };
-    }, [lines, debouncedSearchTerm, caseSensitive]);
-
-    const matchesCount = matches.length;
 
     // Estimated line height table (O(1) lookup to stabilize scroll bar)
     const lineHeights = useMemo(() => {
@@ -549,150 +143,48 @@ export const VirtualizedPayloadViewer: React.FC<VirtualizedPayloadViewerProps> =
     // Reset measurement cache when content, wrapping, or container width changes
     useEffect(() => {
         rowVirtualizer.measure();
-    }, [formattedContent, isWrap, containerWidth]);
+    }, [formattedContent, isWrap, containerWidth, rowVirtualizer]);
 
-    // Pixel offset of match point in virtual row: convert wrapRow by visual column width to avoid scrollToIndex only centering whole line
-    const getMatchContentOffset = useCallback((match: SearchMatch) => {
-        const cw = fontMetrics.charWidth || 6.62;
-        const lh = fontMetrics.lineHeight || 20;
-        const line = lines[match.lineIndex] || '';
-        const visualBefore = getVisualCharCount(line.slice(0, match.colStart));
-
-        const measured = rowVirtualizer.measurementsCache[match.lineIndex];
-        let lineStart = 0;
-        if (measured && Number.isFinite(measured.start)) {
-            lineStart = measured.start;
-        } else if (lineHeights) {
-            for (let i = 0; i < match.lineIndex && i < lineHeights.length; i++) {
-                lineStart += lineHeights[i];
-            }
-        } else {
-            lineStart = match.lineIndex * lh;
-        }
-
-        if (!isWrap) {
-            return {
-                top: lineStart,
-                left: LINE_GUTTER_PX + visualBefore * cw,
-            };
-        }
-
-        const usableWidth = Math.max(100, (containerRef.current?.clientWidth || containerWidth || 600) - 70);
-        const charsPerLine = Math.max(10, Math.floor(usableWidth / cw));
-        const wrapRow = Math.floor(visualBefore / charsPerLine);
-        return {
-            top: lineStart + wrapRow * lh,
-            left: 0,
-        };
-    }, [fontMetrics, lines, rowVirtualizer, lineHeights, isWrap, containerWidth]);
-
-    // Small viewport + long wrapped lines: jump to match point then fine tune geometrically once mark enters DOM
-    const ensureActiveMatchInView = useCallback((targetIndex: number) => {
-        const match = matches[targetIndex];
-        if (!match) return;
-
-        const gen = ++scrollGenRef.current;
-        const lh = fontMetrics.lineHeight || 20;
-
-        const jumpByMath = () => {
-            const el = containerRef.current;
-            if (!el) return;
-            const { top, left } = getMatchContentOffset(match);
-            el.scrollTop = Math.max(0, Math.round(top - el.clientHeight / 2 + lh / 2));
-            el.scrollLeft = isWrap ? 0 : Math.max(0, Math.round(left - el.clientWidth / 2));
-        };
-
-        cancelVirtualizerScrollToIndex(rowVirtualizer);
-        jumpByMath();
-
-        const MAX_FRAMES = 30;
-        const step = (frame: number) => {
-            if (scrollGenRef.current !== gen) return;
-
-            const el = containerRef.current;
-            if (!el) return;
-
-            const activeMark = el.querySelector(
-                `mark[data-card-id="${cardId}"][data-match-index="${targetIndex}"]`
-            ) as HTMLElement | null;
-
-            if (activeMark) {
-                // mark in DOM: stop scrollToIndex retries and roll match point to center
-                cancelVirtualizerScrollToIndex(rowVirtualizer);
-                const containerRect = el.getBoundingClientRect();
-                const markRect = activeMark.getBoundingClientRect();
-                const pad = 8;
-                const visible =
-                    markRect.bottom > containerRect.top + pad &&
-                    markRect.top < containerRect.bottom - pad &&
-                    markRect.right > containerRect.left + pad &&
-                    markRect.left < containerRect.right - pad;
-
-                const dy = markRect.top + markRect.height / 2 - (containerRect.top + containerRect.height / 2);
-                const dx = isWrap
-                    ? 0
-                    : markRect.left + markRect.width / 2 - (containerRect.left + containerRect.width / 2);
-                const ySlop = Math.max(16, containerRect.height * 0.18);
-                const xSlop = Math.max(24, containerRect.width * 0.22);
-
-                if (visible && Math.abs(dy) <= ySlop && Math.abs(dx) <= xSlop) {
-                    return;
-                }
-
-                el.scrollTop = Math.max(0, el.scrollTop + dy);
-                if (!isWrap) {
-                    el.scrollLeft = Math.max(0, el.scrollLeft + dx);
-                }
-            } else if (frame === 8 || frame === 18) {
-                // Estimation offset: pull row into DOM
-                rowVirtualizer.scrollToIndex(match.lineIndex, { align: 'start', behavior: 'auto' });
-            } else if (frame < 8 || frame > 20) {
-                jumpByMath();
-            }
-
-            if (frame < MAX_FRAMES) {
-                requestAnimationFrame(() => step(frame + 1));
-            }
-        };
-
-        requestAnimationFrame(() => step(0));
-    }, [matches, cardId, rowVirtualizer, fontMetrics.lineHeight, isWrap, getMatchContentOffset]);
-
-    const ensureActiveMatchInViewRef = useRef(ensureActiveMatchInView);
-    ensureActiveMatchInViewRef.current = ensureActiveMatchInView;
+    const { handleNext, handlePrev, scrollToMatch } = useMatchNavigation({
+        matches,
+        cardId,
+        isWrap,
+        fontMetrics,
+        lines,
+        lineHeights,
+        containerWidth,
+        containerRef,
+        rowVirtualizer,
+        currentMatchIndex,
+        setCurrentMatchIndex,
+    });
 
     // Reset highlight to first match on search query update
+    const scrollToMatchRef = useRef(scrollToMatch);
+    scrollToMatchRef.current = scrollToMatch;
     useEffect(() => {
         setCurrentMatchIndex(0);
         if (matches.length > 0) {
-            ensureActiveMatchInViewRef.current(0);
+            scrollToMatchRef.current(0);
         }
-    }, [debouncedSearchTerm, caseSensitive, matches.length, formattedContent]);
+    }, [debouncedSearchTerm, caseSensitive, matches.length, formattedContent, setCurrentMatchIndex]);
 
-    // Smoothly scroll active match into view
-    const scrollToMatch = useCallback((targetIndex: number) => {
-        ensureActiveMatchInView(targetIndex);
-    }, [ensureActiveMatchInView]);
-
-    const handleNext = useCallback(() => {
-        if (matchesCount > 0) {
-            const nextIdx = (currentMatchIndex + 1) % matchesCount;
-            setCurrentMatchIndex(nextIdx);
-            scrollToMatch(nextIdx);
+    // Independent Headers Copy
+    const handleCopyHeaders = useCallback(async (e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        if (!prettyHeaders) return;
+        try {
+            await navigator.clipboard.writeText(prettyHeaders);
+            setIsHeadersCopied(true);
+            setTimeout(() => setIsHeadersCopied(false), 2000);
+        } catch {
+            if (onCopy) {
+                await onCopy(prettyHeaders);
+                setIsHeadersCopied(true);
+                setTimeout(() => setIsHeadersCopied(false), 2000);
+            }
         }
-    }, [matchesCount, currentMatchIndex, scrollToMatch]);
-
-    const handlePrev = useCallback(() => {
-        if (matchesCount > 0) {
-            const prevIdx = (currentMatchIndex - 1 + matchesCount) % matchesCount;
-            setCurrentMatchIndex(prevIdx);
-            scrollToMatch(prevIdx);
-        }
-    }, [matchesCount, currentMatchIndex, scrollToMatch]);
-
-    const copyPayload = prettyHeaders
-        ? `/* headers */\n${prettyHeaders}\n\n/* body */\n${formattedContent}`
-        : formattedContent;
+    }, [prettyHeaders, onCopy]);
 
     return (
         <div
@@ -735,108 +227,20 @@ export const VirtualizedPayloadViewer: React.FC<VirtualizedPayloadViewerProps> =
             </div>
 
             {/* Browser-Grade Search & Control Toolbar */}
-            <div className="px-2.5 py-1.5 bg-gray-100/70 dark:bg-base-300/40 border-b border-gray-200 dark:border-base-300 flex items-center gap-1.5 shrink-0">
-                <div className="relative flex-1 min-w-0 flex items-center">
-                    <Search size={12} className="absolute left-2 text-gray-400 pointer-events-none" />
-                    <input
-                        ref={searchInputRef}
-                        type="text"
-                        placeholder={t('monitor.details.search_placeholder', 'Search payload... (Enter: next, Shift+Enter: previous)')}
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                e.preventDefault();
-                                if (e.shiftKey) {
-                                    handlePrev();
-                                } else {
-                                    handleNext();
-                                }
-                            } else if (e.key === 'Escape') {
-                                setSearchTerm('');
-                                searchInputRef.current?.blur();
-                            } else if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                searchInputRef.current?.select();
-                            }
-                        }}
-                        className="input input-xs input-bordered w-full pl-6 pr-6 text-[11px] h-7 bg-white dark:bg-base-100 border-gray-200 dark:border-base-300 text-gray-800 dark:text-gray-200 rounded-md focus:border-blue-500 font-mono"
-                    />
-                    {searchTerm && (
-                        <button
-                            type="button"
-                            onClick={() => setSearchTerm('')}
-                            className="absolute right-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5"
-                            title="Clear search"
-                        >
-                            <X size={12} />
-                        </button>
-                    )}
-                </div>
-
-                {/* Case-Sensitive Toggle */}
-                <button
-                    type="button"
-                    onClick={() => setCaseSensitive((prev) => !prev)}
-                    className={`h-7 px-1.5 rounded-md border text-[10px] font-bold flex items-center gap-0.5 transition-colors cursor-pointer select-none ${
-                        caseSensitive
-                            ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800'
-                            : 'bg-white dark:bg-base-100 text-gray-400 border-gray-200 dark:border-base-300 hover:text-gray-600 dark:hover:text-gray-300'
-                    }`}
-                    title={caseSensitive ? 'Case sensitive enabled' : 'Toggle case sensitive'}
-                >
-                    <CaseSensitive size={13} />
-                </button>
-
-                {/* Wrap / No-Wrap Toggle */}
-                <button
-                    type="button"
-                    onClick={() => setIsWrap((prev) => !prev)}
-                    className={`h-7 px-1.5 rounded-md border text-[10px] font-medium flex items-center gap-1 transition-colors cursor-pointer select-none ${
-                        isWrap
-                            ? 'bg-gray-200/80 text-gray-800 border-gray-300 dark:bg-base-200 dark:text-gray-200 dark:border-base-300'
-                            : 'bg-white dark:bg-base-100 text-gray-400 border-gray-200 dark:border-base-300 hover:text-gray-600 dark:hover:text-gray-300'
-                    }`}
-                    title={isWrap ? 'Word wrap enabled (click to toggle)' : 'Single line horizontal scroll (click to toggle wrap)'}
-                >
-                    <WrapText size={12} />
-                    <span className="hidden sm:inline text-[9px]">{isWrap ? 'Wrap' : 'No Wrap'}</span>
-                </button>
-
-                {/* Match Counter & Prev/Next Controls */}
-                {searchTerm.trim() && (
-                    <div className="flex items-center gap-1 shrink-0 bg-white dark:bg-base-100 border border-gray-200 dark:border-base-300 rounded-md px-1.5 py-0.5 h-7">
-                        <span className={`text-[10px] font-mono font-bold ${
-                            matchesCount > 0
-                                ? 'text-amber-600 dark:text-amber-400'
-                                : 'text-gray-400'
-                        }`}>
-                            {matchesCount > 0 ? `${currentMatchIndex + 1}/${matchesCount}` : 'No matches'}
-                        </span>
-                        <div className="flex items-center">
-                            <button
-                                type="button"
-                                onClick={handlePrev}
-                                disabled={matchesCount <= 1}
-                                className="btn btn-ghost btn-xs p-0.5 h-5 min-h-0 text-gray-500 dark:text-gray-400 disabled:opacity-30"
-                                title="Previous match (Shift+Enter)"
-                            >
-                                <ChevronUp size={12} />
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleNext}
-                                disabled={matchesCount <= 1}
-                                className="btn btn-ghost btn-xs p-0.5 h-5 min-h-0 text-gray-500 dark:text-gray-400 disabled:opacity-30"
-                                title="Next match (Enter)"
-                            >
-                                <ChevronDown size={12} />
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </div>
+            <ViewerToolbar
+                t={t}
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                caseSensitive={caseSensitive}
+                setCaseSensitive={setCaseSensitive}
+                isWrap={isWrap}
+                setIsWrap={setIsWrap}
+                matchesCount={matchesCount}
+                currentMatchIndex={currentMatchIndex}
+                onNext={handleNext}
+                onPrev={handlePrev}
+                searchInputRef={searchInputRef}
+            />
 
             {/* Optional Header Section (Timing or Headers) */}
             <div className="shrink-0 bg-gray-50 dark:bg-base-200 border-b border-gray-200 dark:border-base-300">
@@ -902,7 +306,7 @@ export const VirtualizedPayloadViewer: React.FC<VirtualizedPayloadViewerProps> =
                         className="absolute right-0 top-0 bottom-0 w-2.5 pointer-events-none z-20 overflow-hidden"
                         aria-hidden="true"
                     >
-                        {matches.slice(0, 300).map((m) => {
+                        {matches.slice(0, MINIMAP_MAX_TICKS).map((m) => {
                             const totalSize = rowVirtualizer.getTotalSize();
                             let topPct = (m.lineIndex / Math.max(1, lines.length)) * 100;
                             if (totalSize > 0) {

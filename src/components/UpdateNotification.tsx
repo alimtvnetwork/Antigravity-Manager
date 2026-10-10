@@ -164,7 +164,13 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                 <h3 className="font-semibold text-xs text-gray-800 dark:text-white leading-tight">
                   {updateState === 'ready'
                     ? t('update_notification.ready')
-                    : t('update_notification.title')}
+                    : updateState === 'manual'
+                      ? t('update_notification.available_title', 'Update Available')
+                      : updateState === 'error'
+                        ? t('update_notification.toast.failed')
+                        : updateState === 'downloading'
+                          ? t('update_notification.title')
+                          : t('update_notification.checking_title', 'Checking for updates...')}
                 </h3>
                 {updateInfo && (
                   <div className="flex items-center gap-1.5 mt-0.5">

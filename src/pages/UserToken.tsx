@@ -1,229 +1,38 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, RefreshCw, Copy, Activity, User, Settings, Shield, Clock, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { request as invoke } from '../utils/request';
-import { showToast } from '../components/common/ToastContainer';
-import { copyToClipboard } from '../utils/clipboard';
-import { formatDateTime } from '../utils/date';
-
-interface UserToken {
-    id: string;
-    token: string;
-    username: string;
-    description?: string;
-    enabled: boolean;
-    expires_type: string;
-    expires_at?: number;
-    max_ips: number;
-    curfew_start?: string;
-    curfew_end?: string;
-    created_at: number;
-    updated_at: number;
-    last_used_at?: number;
-    total_requests: number;
-    total_tokens_used: number;
-}
-
-interface UserTokenStats {
-    total_tokens: number;
-    active_tokens: number;
-    total_users: number;
-    today_requests: number;
-}
-
-// interface CreateTokenRequest omitted as it's not explicitly used for typing variables
+import { useUserTokens } from './user-token/useUserTokens';
+import { TokenDialogs } from './user-token/TokenDialogs';
+import {
+    TOKEN_PREVIEW_LENGTH,
+    TOKEN_PREVIEW_MASK,
+    USERNAME_AVATAR_LENGTH,
+    TOKENS_PER_THOUSAND,
+    TOKEN_KILO_DECIMALS,
+    MS_PER_SECOND,
+    EXPIRES_TYPE_DAY,
+    EXPIRES_TYPE_WEEK,
+    EXPIRES_TYPE_MONTH,
+} from './user-token/types';
 
 const UserToken: React.FC = () => {
     const { t } = useTranslation();
-    const [tokens, setTokens] = useState<UserToken[]>([]);
-    const [stats, setStats] = useState<UserTokenStats | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [creating, setCreating] = useState(false);
-
-    // Edit State
-    const [showEditModal, setShowEditModal] = useState(false);
-    const [editingToken, setEditingToken] = useState<UserToken | null>(null);
-    const [editUsername, setEditUsername] = useState('');
-    const [editDesc, setEditDesc] = useState('');
-    const [editMaxIps, setEditMaxIps] = useState(0);
-    const [editCurfewStart, setEditCurfewStart] = useState('');
-    const [editCurfewEnd, setEditCurfewEnd] = useState('');
-    const [updating, setUpdating] = useState(false);
-
-    // Create Form State
-    const [newUsername, setNewUsername] = useState('');
-    const [newDesc, setNewDesc] = useState('');
-    const [newExpiresType, setNewExpiresType] = useState('month'); // day, week, month, never, custom
-    const [newMaxIps, setNewMaxIps] = useState(0);
-    const [newCurfewStart, setNewCurfewStart] = useState('');
-    const [newCurfewEnd, setNewCurfewEnd] = useState('');
-    const [newCustomExpires, setNewCustomExpires] = useState(''); // datetime-local value
-
-    const loadData = async () => {
-        setLoading(true);
-        try {
-            const [tokensData, statsData] = await Promise.all([
-                invoke<UserToken[]>('list_user_tokens'),
-                invoke<UserTokenStats>('get_user_token_summary')
-            ]);
-            setTokens(tokensData);
-            setStats(statsData);
-        } catch (e) {
-            console.error('Failed to load user tokens', e);
-            showToast(t('common.load_failed') || 'Failed to load data', 'error');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    const handleCreate = async () => {
-        if (!newUsername) {
-            showToast(t('user_token.username_required') || 'Username is required', 'error');
-            return;
-        }
-
-        // 验证自定义时间
-        if (newExpiresType === 'custom' && !newCustomExpires) {
-            showToast(t('user_token.custom_expires_required') || 'Please select a custom expiration time', 'error');
-            return;
-        }
-
-        setCreating(true);
-        try {
-            // 计算自定义过期时间戳
-            const customExpiresAt = newExpiresType === 'custom' && newCustomExpires
-                ? Math.floor(new Date(newCustomExpires).getTime() / 1000)
-                : undefined;
-
-            await invoke('create_user_token', {
-                request: {
-                    username: newUsername,
-                    expires_type: newExpiresType,
-                    description: newDesc || null,
-                    max_ips: newMaxIps,
-                    curfew_start: newCurfewStart || null,
-                    curfew_end: newCurfewEnd || null,
-                    custom_expires_at: customExpiresAt || null
-                }
-            });
-            showToast(t('common.create_success') || 'Created successfully', 'success');
-            setShowCreateModal(false);
-            setNewUsername('');
-            setNewDesc('');
-            setNewExpiresType('month');
-            setNewMaxIps(0);
-            setNewCurfewStart('');
-            setNewCurfewEnd('');
-            setNewCustomExpires('');
-            loadData();
-        } catch (e) {
-            console.error('Failed to create token', e);
-            showToast(String(e), 'error');
-        } finally {
-            setCreating(false);
-        }
-    };
-
-    const handleDelete = async (id: string) => {
-        try {
-            await invoke('delete_user_token', { id });
-            showToast(t('common.delete_success') || 'Deleted successfully', 'success');
-            loadData();
-        } catch (e) {
-            showToast(String(e), 'error');
-        }
-    };
-
-    const handleEdit = (token: UserToken) => {
-        setEditingToken(token);
-        setEditUsername(token.username);
-        setEditDesc(token.description || '');
-        setEditMaxIps(token.max_ips ?? 0);  // 使用 ?? 确保 null/undefined 变为 0
-        setEditCurfewStart(token.curfew_start ?? '');
-        setEditCurfewEnd(token.curfew_end ?? '');
-        setShowEditModal(true);
-    };
-
-    const handleUpdate = async () => {
-        if (!editingToken) return;
-        if (!editUsername) {
-            showToast(t('user_token.username_required') || 'Username is required', 'error');
-            return;
-        }
-
-        setUpdating(true);
-        try {
-            await invoke('update_user_token', {
-                id: editingToken.id,
-                request: {
-                    username: editUsername,
-                    description: editDesc || undefined,
-                    max_ips: editMaxIps,
-                    // 使用双层包装: undefined = 不更新, null = 清空, string = 设置值
-                    curfew_start: editCurfewStart === '' ? null : editCurfewStart,
-                    curfew_end: editCurfewEnd === '' ? null : editCurfewEnd
-                }
-            });
-            showToast(t('common.update_success') || 'Updated successfully', 'success');
-            setShowEditModal(false);
-            setEditingToken(null);
-            loadData();
-        } catch (e) {
-            console.error('Failed to update token', e);
-            showToast(String(e), 'error');
-        } finally {
-            setUpdating(false);
-        }
-    };
-
-    const handleRenew = async (id: string, type: string) => {
-        try {
-            await invoke('renew_user_token', { id, expiresType: type });
-            showToast(t('user_token.renew_success') || 'Renewed successfully', 'success');
-            loadData();
-        } catch (e) {
-            showToast(String(e), 'error');
-        }
-    };
-
-    const handleCopyToken = async (text: string) => {
-        const success = await copyToClipboard(text);
-        if (success) {
-            showToast(t('common.copied') || 'Copied to clipboard', 'success');
-        } else {
-            showToast(t('common.copy_failed') || 'Failed to copy to clipboard', 'error');
-        }
-    };
-
-    const formatTime = (ts?: number) => {
-        return formatDateTime(ts);
-    };
-
-    const getExpiresLabel = (type: string) => {
-        switch (type) {
-            case 'day': return t('user_token.expires_day', { defaultValue: '1 Day' });
-            case 'week': return t('user_token.expires_week', { defaultValue: '1 Week' });
-            case 'month': return t('user_token.expires_month', { defaultValue: '1 Month' });
-            case 'never': return t('user_token.expires_never', { defaultValue: 'Never' });
-            case 'custom': return t('user_token.expires_custom', { defaultValue: 'Custom' });
-            default: return type;
-        }
-    };
-
-    // Calculate expiration status style
-    const getExpiresStatus = (expiresAt?: number) => {
-        if (!expiresAt) return 'text-green-500';
-        const now = Date.now() / 1000;
-        if (expiresAt < now) return 'text-red-500 font-bold';
-        if (expiresAt - now < 86400 * 3) return 'text-orange-500'; // Less than 3 days
-        return 'text-green-500';
-    };
+    const state = useUserTokens();
+    const {
+        tokens,
+        stats,
+        loading,
+        setShowCreateModal,
+        loadData,
+        handleDelete,
+        handleEdit,
+        handleRenew,
+        handleCopyToken,
+        formatTime,
+        getExpiresLabel,
+        getExpiresStatus,
+    } = state;
 
     return (
         <motion.div
@@ -341,7 +150,7 @@ const UserToken: React.FC = () => {
                                     <td className="py-4">
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center text-purple-600 font-bold text-xs">
-                                                {token.username.substring(0, 2).toUpperCase()}
+                                                {token.username.substring(0, USERNAME_AVATAR_LENGTH).toUpperCase()}
                                             </div>
                                             <div>
                                                 <div className="font-semibold text-gray-900 dark:text-white uppercase tracking-wider text-xs">{token.username}</div>
@@ -352,7 +161,7 @@ const UserToken: React.FC = () => {
                                     <td>
                                         <div className="flex items-center gap-2 group/token">
                                             <code className="bg-gray-50 dark:bg-base-200 px-2 py-1 rounded border border-gray-100 dark:border-base-300 text-[11px] font-mono text-gray-600 dark:text-gray-400">
-                                                {token.token.substring(0, 8)}••••••••
+                                                {token.token.substring(0, TOKEN_PREVIEW_LENGTH)}{TOKEN_PREVIEW_MASK}
                                             </code>
                                             <button
                                                 onClick={() => handleCopyToken(token.token)}
@@ -370,7 +179,7 @@ const UserToken: React.FC = () => {
                                             <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-base-200 text-gray-500 rounded lowercase">
                                                 {getExpiresLabel(token.expires_type)}
                                             </span>
-                                            {token.expires_at && token.expires_at < Date.now() / 1000 && (
+                                            {token.expires_at && token.expires_at < Date.now() / MS_PER_SECOND && (
                                                 <button
                                                     onClick={() => handleRenew(token.id, token.expires_type)}
                                                     className="text-[10px] text-blue-500 hover:underline font-medium"
@@ -383,7 +192,7 @@ const UserToken: React.FC = () => {
                                     <td>
                                         <div className="text-xs font-semibold text-gray-700 dark:text-gray-300">{token.total_requests} <span className="text-[10px] font-normal text-gray-400">reqs</span></div>
                                         <div className="text-[10px] text-gray-400 mt-0.5">
-                                            {(token.total_tokens_used / 1000).toFixed(1)}k tokens
+                                            {(token.total_tokens_used / TOKENS_PER_THOUSAND).toFixed(TOKEN_KILO_DECIMALS)}k tokens
                                         </div>
                                     </td>
                                     <td>
@@ -416,9 +225,9 @@ const UserToken: React.FC = () => {
                                                 </label>
                                                 <ul tabIndex={0} className="dropdown-content z-[10] menu p-2 shadow-xl bg-white dark:bg-base-100 rounded-xl w-32 border border-gray-100 dark:border-base-200 mt-1">
                                                     <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('user_token.renew')}</div>
-                                                    <li><a className="text-xs py-2" onClick={() => handleRenew(token.id, 'day')}>{t('user_token.expires_day', { defaultValue: '1 Day' })}</a></li>
-                                                    <li><a className="text-xs py-2" onClick={() => handleRenew(token.id, 'week')}>{t('user_token.expires_week', { defaultValue: '1 Week' })}</a></li>
-                                                    <li><a className="text-xs py-2" onClick={() => handleRenew(token.id, 'month')}>{t('user_token.expires_month', { defaultValue: '1 Month' })}</a></li>
+                                                    <li><a className="text-xs py-2" onClick={() => handleRenew(token.id, EXPIRES_TYPE_DAY)}>{t('user_token.expires_day', { defaultValue: '1 Day' })}</a></li>
+                                                    <li><a className="text-xs py-2" onClick={() => handleRenew(token.id, EXPIRES_TYPE_WEEK)}>{t('user_token.expires_week', { defaultValue: '1 Week' })}</a></li>
+                                                    <li><a className="text-xs py-2" onClick={() => handleRenew(token.id, EXPIRES_TYPE_MONTH)}>{t('user_token.expires_month', { defaultValue: '1 Month' })}</a></li>
                                                 </ul>
                                             </div>
                                             <button
@@ -454,223 +263,41 @@ const UserToken: React.FC = () => {
                 </table>
             </div>
 
-            {/* Create Modal */}
-            {showCreateModal && (
-                <div className="modal modal-open">
-                    <div className="modal-box">
-                        <h3 className="font-bold text-lg mb-4">{t('user_token.create_title', { defaultValue: 'Create New Token' })}</h3>
-
-                        <div className="form-control w-full mb-3">
-                            <label className="label">
-                                <span className="label-text">{t('user_token.username', { defaultValue: 'Username' })} *</span>
-                            </label>
-                            <input
-                                type="text"
-                                className="input input-bordered w-full"
-                                value={newUsername}
-                                onChange={e => setNewUsername(e.target.value)}
-                                placeholder={t('user_token.placeholder_username', { defaultValue: 'e.g. user1' })}
-                            />
-                        </div>
-
-                        <div className="form-control w-full mb-3">
-                            <label className="label">
-                                <span className="label-text">{t('user_token.description', { defaultValue: 'Description' })}</span>
-                            </label>
-                            <input
-                                type="text"
-                                className="input input-bordered w-full"
-                                value={newDesc}
-                                onChange={e => setNewDesc(e.target.value)}
-                                placeholder={t('user_token.placeholder_desc', { defaultValue: 'Optional notes' })}
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 mb-3">
-                            <div className="form-control w-full">
-                                <label className="label">
-                                    <span className="label-text">{t('user_token.expires', { defaultValue: 'Expires In' })}</span>
-                                </label>
-                                <select
-                                    className="select select-bordered w-full"
-                                    value={newExpiresType}
-                                    onChange={e => setNewExpiresType(e.target.value)}
-                                >
-                                    <option value="day">{t('user_token.expires_day', { defaultValue: '1 Day' })}</option>
-                                    <option value="week">{t('user_token.expires_week', { defaultValue: '1 Week' })}</option>
-                                    <option value="month">{t('user_token.expires_month', { defaultValue: '1 Month' })}</option>
-                                    <option value="custom">{t('user_token.expires_custom', { defaultValue: 'Custom' })}</option>
-                                    <option value="never">{t('user_token.expires_never', { defaultValue: 'Never' })}</option>
-                                </select>
-                            </div>
-
-                            <div className="form-control w-full">
-                                <label className="label">
-                                    <span className="label-text">{t('user_token.ip_limit', { defaultValue: 'Max IPs' })}</span>
-                                </label>
-                                <input
-                                    type="number"
-                                    className="input input-bordered w-full"
-                                    value={newMaxIps}
-                                    onChange={e => setNewMaxIps(parseInt(e.target.value) || 0)}
-                                    min="0"
-                                    placeholder={t('user_token.placeholder_max_ips', { defaultValue: '0 = Unlimited' })}
-                                />
-                                <label className="label">
-                                    <span className="label-text-alt text-gray-500">{t('user_token.hint_max_ips', { defaultValue: '0 = Unlimited' })}</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        {/* Custom Expiration Time Picker */}
-                        {newExpiresType === 'custom' && (
-                            <div className="form-control w-full mb-3">
-                                <label className="label">
-                                    <span className="label-text">{t('user_token.custom_expires_at', { defaultValue: 'Expiration Date & Time' })} *</span>
-                                </label>
-                                <input
-                                    type="datetime-local"
-                                    className="input input-bordered w-full"
-                                    value={newCustomExpires}
-                                    onChange={e => setNewCustomExpires(e.target.value)}
-                                    min={new Date().toISOString().slice(0, 16)}
-                                />
-                                <label className="label">
-                                    <span className="label-text-alt text-gray-500">{t('user_token.hint_custom_expires', { defaultValue: 'Select the exact date and hour when this token expires' })}</span>
-                                </label>
-                            </div>
-                        )}
-
-                        <div className="form-control w-full mb-3">
-                            <label className="label">
-                                <span className="label-text">{t('user_token.curfew', { defaultValue: 'Curfew (Service Unavailable Time)' })}</span>
-                            </label>
-                            <div className="flex gap-2 items-center">
-                                <input
-                                    type="time"
-                                    className="input input-bordered w-full"
-                                    value={newCurfewStart}
-                                    onChange={e => setNewCurfewStart(e.target.value)}
-                                />
-                                <span className="text-gray-400">to</span>
-                                <input
-                                    type="time"
-                                    className="input input-bordered w-full"
-                                    value={newCurfewEnd}
-                                    onChange={e => setNewCurfewEnd(e.target.value)}
-                                />
-                            </div>
-                            <label className="label">
-                                <span className="label-text-alt text-gray-500">{t('user_token.hint_curfew', { defaultValue: 'Leave empty to disable. Based on Beijing time (UTC+8).' })}</span>
-                            </label>
-                        </div>
-
-                        <div className="modal-action">
-                            <button className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-base-200 rounded-lg text-sm transition-colors" onClick={() => setShowCreateModal(false)}>
-                                {t('common.cancel', { defaultValue: 'Cancel' })}
-                            </button>
-                            <button
-                                className={`px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-all shadow-sm shadow-blue-500/20 flex items-center gap-2 ${creating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                onClick={handleCreate}
-                                disabled={creating}
-                            >
-                                {creating && <RefreshCw size={14} className="animate-spin" />}
-                                {t('common.create', { defaultValue: 'Create' })}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Edit Modal */}
-            {showEditModal && editingToken && (
-                <div className="modal modal-open">
-                    <div className="modal-box">
-                        <h3 className="font-bold text-lg mb-4">{t('user_token.edit_title', { defaultValue: 'Edit Token' })}</h3>
-
-                        <div className="form-control w-full mb-3">
-                            <label className="label">
-                                <span className="label-text">{t('user_token.username', { defaultValue: 'Username' })} *</span>
-                            </label>
-                            <input
-                                type="text"
-                                className="input input-bordered w-full"
-                                value={editUsername}
-                                onChange={e => setEditUsername(e.target.value)}
-                                placeholder={t('user_token.placeholder_username', { defaultValue: 'e.g. user1' })}
-                            />
-                        </div>
-
-                        <div className="form-control w-full mb-3">
-                            <label className="label">
-                                <span className="label-text">{t('user_token.description', { defaultValue: 'Description' })}</span>
-                            </label>
-                            <input
-                                type="text"
-                                className="input input-bordered w-full"
-                                value={editDesc}
-                                onChange={e => setEditDesc(e.target.value)}
-                                placeholder={t('user_token.placeholder_desc', { defaultValue: 'Optional notes' })}
-                            />
-                        </div>
-
-                        <div className="form-control w-full mb-3">
-                            <label className="label">
-                                <span className="label-text">{t('user_token.ip_limit', { defaultValue: 'Max IPs' })}</span>
-                            </label>
-                            <input
-                                type="number"
-                                className="input input-bordered w-full"
-                                value={editMaxIps}
-                                onChange={e => setEditMaxIps(parseInt(e.target.value) || 0)}
-                                min="0"
-                                placeholder={t('user_token.placeholder_max_ips', { defaultValue: '0 = Unlimited' })}
-                            />
-                            <label className="label">
-                                <span className="label-text-alt text-gray-500">{t('user_token.hint_max_ips', { defaultValue: '0 = Unlimited' })}</span>
-                            </label>
-                        </div>
-
-                        <div className="form-control w-full mb-3">
-                            <label className="label">
-                                <span className="label-text">{t('user_token.curfew', { defaultValue: 'Curfew (Service Unavailable Time)' })}</span>
-                            </label>
-                            <div className="flex gap-2 items-center">
-                                <input
-                                    type="time"
-                                    className="input input-bordered w-full"
-                                    value={editCurfewStart}
-                                    onChange={e => setEditCurfewStart(e.target.value)}
-                                />
-                                <span className="text-gray-400">to</span>
-                                <input
-                                    type="time"
-                                    className="input input-bordered w-full"
-                                    value={editCurfewEnd}
-                                    onChange={e => setEditCurfewEnd(e.target.value)}
-                                />
-                            </div>
-                            <label className="label">
-                                <span className="label-text-alt text-gray-500">{t('user_token.hint_curfew', { defaultValue: 'Leave empty to disable. Based on Beijing time (UTC+8).' })}</span>
-                            </label>
-                        </div>
-
-                        <div className="modal-action">
-                            <button className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-base-200 rounded-lg text-sm transition-colors" onClick={() => setShowEditModal(false)}>
-                                {t('common.cancel', { defaultValue: 'Cancel' })}
-                            </button>
-                            <button
-                                className={`px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-all shadow-sm shadow-blue-500/20 flex items-center gap-2 ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                onClick={handleUpdate}
-                                disabled={updating}
-                            >
-                                {updating && <RefreshCw size={14} className="animate-spin" />}
-                                {t('common.update', { defaultValue: 'Update' })}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <TokenDialogs
+                showCreateModal={state.showCreateModal}
+                setShowCreateModal={state.setShowCreateModal}
+                newUsername={state.newUsername}
+                setNewUsername={state.setNewUsername}
+                newDesc={state.newDesc}
+                setNewDesc={state.setNewDesc}
+                newExpiresType={state.newExpiresType}
+                setNewExpiresType={state.setNewExpiresType}
+                newMaxIps={state.newMaxIps}
+                setNewMaxIps={state.setNewMaxIps}
+                newCurfewStart={state.newCurfewStart}
+                setNewCurfewStart={state.setNewCurfewStart}
+                newCurfewEnd={state.newCurfewEnd}
+                setNewCurfewEnd={state.setNewCurfewEnd}
+                newCustomExpires={state.newCustomExpires}
+                setNewCustomExpires={state.setNewCustomExpires}
+                creating={state.creating}
+                handleCreate={state.handleCreate}
+                showEditModal={state.showEditModal}
+                setShowEditModal={state.setShowEditModal}
+                editingToken={state.editingToken}
+                editUsername={state.editUsername}
+                setEditUsername={state.setEditUsername}
+                editDesc={state.editDesc}
+                setEditDesc={state.setEditDesc}
+                editMaxIps={state.editMaxIps}
+                setEditMaxIps={state.setEditMaxIps}
+                editCurfewStart={state.editCurfewStart}
+                setEditCurfewStart={state.setEditCurfewStart}
+                editCurfewEnd={state.editCurfewEnd}
+                setEditCurfewEnd={state.setEditCurfewEnd}
+                updating={state.updating}
+                handleUpdate={state.handleUpdate}
+            />
         </motion.div>
     );
 };

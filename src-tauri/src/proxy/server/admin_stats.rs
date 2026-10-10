@@ -1,0 +1,255 @@
+//! Token-usage statistics admin handlers.
+use super::dto::ErrorResponse;
+use crate::modules::{logger, token_stats};
+use axum::{
+    extract::Query,
+    http::StatusCode,
+    response::{IntoResponse, Json, Response},
+};
+use serde::Deserialize;
+
+#[derive(Deserialize, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+struct StatsPeriodQuery {
+    hours: Option<i64>,
+    days: Option<i64>,
+    weeks: Option<i64>,
+}
+
+pub(crate) async fn admin_get_token_stats_hourly(
+    Query(p): Query<StatsPeriodQuery>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    let hours = p.hours.unwrap_or(24);
+    let res = tokio::task::spawn_blocking(move || token_stats::get_hourly_stats(hours)).await;
+
+    match res {
+        Ok(Ok(stats)) => Ok(Json(stats)),
+        Ok(Err(e)) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )),
+    }
+}
+
+pub(crate) async fn admin_get_token_stats_daily(
+    Query(p): Query<StatsPeriodQuery>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    let days = p.days.unwrap_or(7);
+    let res = tokio::task::spawn_blocking(move || token_stats::get_daily_stats(days)).await;
+
+    match res {
+        Ok(Ok(stats)) => Ok(Json(stats)),
+        Ok(Err(e)) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )),
+    }
+}
+
+pub(crate) async fn admin_get_token_stats_weekly(
+    Query(p): Query<StatsPeriodQuery>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    let weeks = p.weeks.unwrap_or(4);
+    let res = tokio::task::spawn_blocking(move || token_stats::get_weekly_stats(weeks)).await;
+
+    match res {
+        Ok(Ok(stats)) => Ok(Json(stats)),
+        Ok(Err(e)) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )),
+    }
+}
+
+pub(crate) async fn admin_get_token_stats_by_account(
+    Query(p): Query<StatsPeriodQuery>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    let hours = p.hours.unwrap_or(168);
+    let res = tokio::task::spawn_blocking(move || token_stats::get_account_stats(hours)).await;
+
+    match res {
+        Ok(Ok(stats)) => Ok(Json(stats)),
+        Ok(Err(e)) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )),
+    }
+}
+
+pub(crate) async fn admin_get_token_stats_summary(
+    Query(p): Query<StatsPeriodQuery>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    let hours = p.hours.unwrap_or(168);
+    let res = tokio::task::spawn_blocking(move || token_stats::get_summary_stats(hours)).await;
+
+    match res {
+        Ok(Ok(stats)) => Ok(Json(stats)),
+        Ok(Err(e)) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )),
+    }
+}
+
+pub(crate) async fn admin_get_token_stats_by_model(
+    Query(p): Query<StatsPeriodQuery>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    let hours = p.hours.unwrap_or(168);
+    let res = tokio::task::spawn_blocking(move || token_stats::get_model_stats(hours)).await;
+
+    match res {
+        Ok(Ok(stats)) => Ok(Json(stats)),
+        Ok(Err(e)) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )),
+    }
+}
+
+pub(crate) async fn admin_get_token_stats_model_trend_hourly(
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    let res = tokio::task::spawn_blocking(|| {
+        token_stats::get_model_trend_hourly(24) // Default 24 hours
+    })
+    .await;
+
+    match res {
+        Ok(Ok(stats)) => Ok(Json(stats)),
+        Ok(Err(e)) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )),
+    }
+}
+
+pub(crate) async fn admin_get_token_stats_model_trend_daily(
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    let res = tokio::task::spawn_blocking(|| {
+        token_stats::get_model_trend_daily(7) // Default 7 days
+    })
+    .await;
+
+    match res {
+        Ok(Ok(stats)) => Ok(Json(stats)),
+        Ok(Err(e)) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )),
+    }
+}
+
+pub(crate) async fn admin_get_token_stats_account_trend_hourly(
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    let res = tokio::task::spawn_blocking(|| {
+        token_stats::get_account_trend_hourly(24) // Default 24 hours
+    })
+    .await;
+
+    match res {
+        Ok(Ok(stats)) => Ok(Json(stats)),
+        Ok(Err(e)) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )),
+    }
+}
+
+pub(crate) async fn admin_get_token_stats_account_trend_daily(
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    let res = tokio::task::spawn_blocking(|| {
+        token_stats::get_account_trend_daily(7) // Default 7 days
+    })
+    .await;
+
+    match res {
+        Ok(Ok(stats)) => Ok(Json(stats)),
+        Ok(Err(e)) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: e }),
+        )),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )),
+    }
+}
+
+pub(crate) async fn admin_clear_token_stats() -> impl IntoResponse {
+    let res = tokio::task::spawn_blocking(|| {
+        // Clear databases (brute force)
+        if let Ok(path) = token_stats::get_db_path() {
+            // Justification: best-effort cleanup; a leftover file is harmless
+            crate::error::record_ignored(std::fs::remove_file(path), "remove_file");
+        }
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(token_stats::init_db(), "init_db");
+    })
+    .await;
+
+    match res {
+        Ok(_) => {
+            logger::log_info("[API] Cleared all token statistics");
+            StatusCode::OK
+        }
+        Err(e) => {
+            logger::log_error(&format!("[API] Failed to clear token statistics: {}", e));
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    }
+}

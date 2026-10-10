@@ -1650,7 +1650,9 @@
       "failed": "Auto-update failed"
     },
     "custom_build_warning": "A new official version is available. Since you are running a custom enhanced build, automatic silent updates are disabled to prevent overwriting your customizations. You can view the release on GitHub or download manually.",
-    "btn_view_github": "View on GitHub"
+    "btn_view_github": "View on GitHub",
+    "available_title": "Update Available",
+    "checking_title": "Checking for updates..."
   },
   "login": {
     "title": "Secure Access Control",
