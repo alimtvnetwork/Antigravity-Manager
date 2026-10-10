@@ -103,6 +103,13 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.175.0 (2026-10-10)**:
+        -   **UI Refinement: Semantic Tokens, Continuous Quota Scale & Calmer Interactions**:
+            -   **Description**: Centralized semantic UI tokens in `src/styles/ui-tokens.css` (surfaces, borders, text, interactive/success/warning/danger/info-cyan) consumed via `var(--ui-*)`; rebuilt the quota progress bar on a continuous 8-stop red→green scale with the gradient fixed to the full track width and revealed by percentage; fixed the account/email row hover (surface lift + restrained blue-tinted border instead of near-black + amber outline); calmed the active instance card to one amber rail + 35% edge tint; fixed update-dialog surface and secondary-action contrast. (Thanks to @aukgit)
+        -   **Prompt Tree Send/Queue False-Success Fix**:
+            -   **Description**: Root-caused dead Send/Queue buttons in the Prompt Tree View: `send_prompt_now_for_instance` discarded the agy spawn result and returned `Ok` on failure while the modal showed success messages regardless. Backend now returns descriptive errors on spawn failure; the modal shows the real error (with clipboard fallback) instead of false success, and the legacy double-invoke + silent file fallback in the queue path was removed. (Thanks to @aukgit)
+
+
     *   **v4.174.0 (2026-10-10)**:
         -   **CI Green: Stale CliContext Field Fix & Fork Actions Re-enable**:
             -   **Description**: Fixed `error[E0609]: no field 'instance' on type 'CliContext'` at two call sites in `src-tauri/src/bin/agm.rs` (`cmd_prompts_send`, `cmd_prompts_queue`) — the instance-process-cache refactor had renamed the field to `instance_id` but missed these sites; corrected to `ctx.instance_id.is_none()`, restoring compilation. Re-enabled GitHub Actions on the fork (GitHub had auto-disabled workflows because it is a fork) via the Actions-page attestation; CI now green across all 7 jobs (Check Rust Code and Build Tauri App on ubuntu/macos/windows, plus Build Frontend). (Thanks to @aukgit)

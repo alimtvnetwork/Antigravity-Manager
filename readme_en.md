@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.174.0)
+> Professional AI Account Management & Protocol Proxy System (v4.175.0)
 > Professional AI Account Management & Protocol Proxy System (v4.166.0)
 
 <div align="center">
@@ -11,7 +11,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.174.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.175.0-blue?style=flat-square" alt="Version">
       <img src="https://img.shields.io/badge/Version-4.166.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
@@ -508,6 +508,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
+> Latest version **v4.175.0**: UI refinement — centralized semantic color tokens, quota bars rebuilt as one continuous red→green scale, account/email hover fixed, calmer active-instance treatment; plus Prompt Tree Send/Queue fix — the buttons reported false success while the IDE dispatch silently failed, now surfacing real errors. (Thanks to @aukgit)
 > Latest version **v4.174.0**: CI green — fixed `error[E0609]: no field 'instance' on type 'CliContext'` at two call sites in `src-tauri/src/bin/agm.rs` (stale field name left by the instance-process-cache refactor; corrected to `instance_id`), and re-enabled GitHub Actions on the fork (GitHub had auto-disabled workflows because it is a fork) — CI now passes all 7 jobs. (Thanks to @aukgit)
 > Latest version **v4.173.0**: Updater honesty fixes — corrected the in-app update checker's download link (it pointed at the upstream `lbjlaq` repo instead of this fork) and removed phantom binary-asset URLs from `releases-manifest.json` for the notes-only releases v4.168.0–v4.172.0 so the installer no longer chases dead download links. (Thanks to @aukgit)
 > Latest version **v4.172.0**: Smart Multi-Instance Process Cache Multi-PID Survival & Deep Transcript Scan — enhanced `check_cached_pid_alive` with surviving child PID promotion, Windows 8.3 short-path expansion (`GetShortPathNameW`), path normalization, and zero-relaunch guarantee; guarded against killing running IDE sessions in `launch_instance_inner_with_extra_workspaces`; deepened reverse transcript scan to 25 lines with telemetry noise immunity and 45s prompt TTLs to eradicate ghost running items; stripped literal bracket tokens (`[Collapse Full Text]`, `[Expand Full Text]`) and word count clutter across Prompt Tree View. (Thanks to @aukgit)
