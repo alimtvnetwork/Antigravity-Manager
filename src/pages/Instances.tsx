@@ -1133,7 +1133,7 @@ export default function Instances() {
                                 className={cn(
                                     "group relative rounded-[5px] border transition-all duration-200 flex flex-col justify-between overflow-hidden backdrop-blur-xs",
                                     isActive
-                                        ? cn(SELECTED_CARD_CLASSES, "border-amber-400/50 shadow-md")
+                                        ? SELECTED_CARD_CLASSES
                                         : "bg-white dark:bg-[var(--ui-surface-1)] border-gray-200/50 dark:border-[var(--ui-border-subtle)] hover:border-gray-300/80 dark:hover:border-[var(--ui-interactive-40)] hover:bg-slate-50/90 dark:hover:bg-[var(--ui-surface-hover)] shadow-xs"
                                 )}
                             >
