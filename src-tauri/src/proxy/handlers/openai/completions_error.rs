@@ -18,6 +18,7 @@ use crate::proxy::TokenManager;
 
 use super::completions::CompletionsOutcome;
 use super::completions_send::CompletionsSendOutput;
+use axum::response::IntoResponse;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn completions_handle_error(

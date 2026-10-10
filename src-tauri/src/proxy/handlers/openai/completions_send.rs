@@ -69,7 +69,7 @@ pub(crate) async fn completions_send(
     failure_statuses: &mut FailureStatusTracker,
     norm_ms: &mut f64,
     think_fill_ms: &mut f64,
-    uri: &axum::extract::OriginalUri,
+    uri: &http::Uri,
 ) -> CompletionsSendOutcome {
     let norm_start = std::time::Instant::now();
     // 3. 模型配置解析

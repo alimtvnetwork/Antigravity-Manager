@@ -68,7 +68,7 @@ pub(crate) async fn completions_prep_setup(
     debug_cfg: &DebugLoggingConfig,
     clean_start: Instant,
     original_body: &Option<Value>,
-    uri: &axum::extract::OriginalUri,
+    uri: &http::Uri,
 ) -> Result<CompletionsSetup, Response> {
     let CompletionsCodexPrep {
         previous_response_id,
