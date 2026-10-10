@@ -440,6 +440,10 @@ pub async fn handle_generate(
             &mut retry_credentials,
             &mut retry_state,
             &mut image_permit,
+            &config,
+            &mut body,
+            &access_token,
+            &project_id,
         )
         .await
         {

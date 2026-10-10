@@ -5,7 +5,7 @@ use super::*;
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn handle_generate_error(
     status: StatusCode,
-    response: reqwest::Response,
+    response: rquest::Response,
     debug_cfg: &crate::proxy::config::DebugLoggingConfig,
     trace_id: &str,
     model_name: &str,
@@ -28,6 +28,10 @@ pub(crate) async fn handle_generate_error(
     retry_credentials: &mut Option<(String, String, String, String, u64)>,
     retry_state: &mut crate::proxy::handlers::common::RequestRetryState,
     image_permit: &mut Option<crate::proxy::server::image_scheduler::ImagePermit>,
+    config: &crate::proxy::mappers::common_utils::RequestConfig,
+    body: &mut serde_json::Value,
+    access_token: &str,
+    project_id: &str,
 ) -> Result<ErrorOutcome, (StatusCode, String)> {
     failure_statuses.record(status);
     let status_code = status.as_u16();

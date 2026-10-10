@@ -56,7 +56,7 @@ pub(crate) enum HandleSuccessOutcome {
 /// Extracted from `handle_generate` to keep file sizes manageable.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn handle_generate_success(
-    response: reqwest::Response,
+    response: rquest::Response,
     is_stream: bool,
     debug_cfg: &crate::proxy::config::DebugLoggingConfig,
     trace_id: &str,
@@ -305,7 +305,7 @@ pub(crate) async fn handle_generate_success(
             }
         };
 
-        if client_wants_stream {
+        if is_stream {
             let body = Body::from_stream(stream);
             return Ok(HandleSuccessOutcome::Respond(
                 Response::builder()
