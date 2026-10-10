@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.184.0] - 2026-10-10
+
+### Added
+- Routine release v4.184.0
+
+---
+
 ## [v4.167.0] - 2026-10-09
 
 ### Added
@@ -109,7 +116,6 @@
         -   **Clipboard Copy Fallback Fix**:
             -   **Description**: Fixed the `E9001 Failed to execute 'writeText' on 'Clipboard': Document is not focused` warnings in Prompt Tree View send flow. Root cause: `sendPromptNow` focuses the IDE window, stealing document focus, so the subsequent `navigator.clipboard.writeText` throws `NotAllowedError`. The send flow now uses the shared `copyToClipboard` helper, which falls back to the hidden-textarea + `execCommand('copy')` path when the async Clipboard API is unavailable — a warning is only tracked if both paths fail. (Thanks to @aukgit)
 
-
 *   **v4.182.0 (2026-10-10)**:
         -   **Restart & Fast-Forward Reliability Fix**:
             -   **Description**: Rewrote `restart_instance` as a hardened Kill → Verify-Dead → Refresh → Start pipeline: the bound/selected account's token is refreshed up front (in the async command wrapper), the IDE process tree is force-closed and its death verified (a close failure is now a hard error instead of being swallowed), the stale smart-PID cache entry is dropped so launch cannot spawn a duplicate process on the same data dir, credentials are re-injected by the launch pipeline, and the new process is verified alive before returning. Also hardened `switch_account_to_instance` (the fast-forward path): the close is verified dead before any credential injection, fixing the bug where the dying IDE overwrote the newly injected `state.vscdb` credentials. (Thanks to @aukgit)
@@ -121,7 +127,6 @@
             -   **Description**: Updated `02-spec/20-instance-management/03-multiplicative-candidate-scoring-spec.md` for configurable multipliers (defaults, settings source, recalculated examples, v4.182.0 changelog note). (Thanks to @aukgit)
         -   **Remote Fleet Section Tests**:
             -   **Description**: Verified the Remote Fleet Machines data path (Supabase `nodes` + `instance_profiles` query, local-node filtering, 15s polling, manual refresh, empty/disabled/loading states) and added `src/components/instances/__tests__/fleetMachinesTable.test.ts` covering email masking, relative heartbeat formatting (sec/ms inputs), and local-node exclusion — full suite 5/5 green. (Thanks to @aukgit)
-
 
     *   **v4.181.0 (2026-10-10)**:
         -   **Quota UI Compaction & Stronger Progress Bars**:
@@ -139,21 +144,17 @@
         -   **Navbar Segmented Capsule & Update Shortcut**:
             -   **Description**: The Accounts/Instances/Settings nav buttons now form one contiguous segmented capsule (circular outer edges, rectangular middles, subtle dividers); the hamburger dropdown gained a pinned `Check for Updates` section that runs the update check and surfaces the update card or a toast. (Thanks to @aukgit)
 
-
     *   **v4.180.0 (2026-10-10)**:
         -   **Release Pipeline Completion & CI Green Confirmation**:
             -   **Description**: No code changes since v4.179.0. Re-ran the v4.179.0 macOS universal artifact upload after a transient GitHub artifact-service timeout (`CreateArtifact` request timeout ×5) so the release carries the complete asset set; CI is green across all platforms on the record_ignored type-error fixes. (Thanks to @aukgit)
-
 
     *   **v4.179.0 (2026-10-10)**:
         -   **Accounts Table Compact Density Pass**:
             -   **Description**: Tightened the Accounts table density — row cell padding reduced (`py-1` → `py-0.5` on quota cells and header), `QuotaProgressBar` gained a `compact` mode (bar `h-3` → `h-2`, checkpoint markers `w-3.5` → `w-2.5` with proportionally smaller check glyphs, tighter gaps, smaller time/percentage labels) applied to the accounts table only; other views using the bar are untouched. Gradient, checkpoint positions, and behavior unchanged. (Thanks to @aukgit)
 
-
     *   **v4.178.0 (2026-10-10)**:
         -   **CI Fix: Duplicate Cargo.lock Version Entry Removed & Bump Script Hardened**:
             -   **Description**: Fixed `src-tauri/Cargo.lock` TOML parse failure — the `agm-alim` package entry carried two `version` lines (`4.177.0` + stale `4.175.0`), which broke cargo metadata parsing and failed all Rust CI/Release jobs. Removed the stale line and hardened `scripts/bump-version.mjs` so its Cargo.lock replacement collapses any run of duplicate version lines into exactly one instead of preserving them. (Thanks to @aukgit)
-
 
     *   **v4.177.0 (2026-10-10)**:
         -   **Smart Instance Process Cache Warm-Up, Closed-PID Recovery & Reopen Elimination**:
@@ -165,11 +166,9 @@
         -   **Prompt Tree View UI Compaction & Race Condition Fix**:
             -   **Description**: Compacted sidebar project rows in `src/components/instances/PromptTreeViewModal.tsx` by removing `{totalProjectPrompts} prompts` tags (reclaiming horizontal space), making project action buttons hover-only, removing `{conv.step_count} stp` pills from conversation rows, and stripping target bracket tokens (`#P001`, `C001`). Eliminated redundant client-side `focusInstanceWorkspace()` call after `sendPromptNow()` to resolve IPC window focus race hazards. (Thanks to @aukgit)
 
-
     *   **v4.176.0 (2026-10-10)**:
         -   **Smart Instance Process Cache Warm-Up, Closed-PID Recovery, Adaptive Queue Ticker & UI Compaction**:
             -   **Description**: Initialized `warm_up_smart_process_cache` on startup in both headless and GUI modes (`src-tauri/src/modules/instance.rs`, `src-tauri/src/lib.rs`) to pre-populate `INSTANCE_PROCESS_CACHE` with active OS processes across instances; implemented closed-PID vitality promotion and fresh OS re-scans before declaring instances offline, enforcing a strict zero-relaunch guarantee in `ensure_instance_running_smart` and protecting active IDE processes in `launch_instance_inner_with_extra_workspaces`. Upgraded `start_prompt_queue_scheduler` (`src-tauri/src/modules/scheduler.rs`) to an adaptive FIFO background ticker (5s active interval when prompts are queued, backing off to 30s when empty) and standardized `.antigravity_resume_task.json` persistence via `resume_task_document(...)` (`src-tauri/src/modules/repo_db.rs`) to preserve session and conversation context. Compacted sidebar project rows in `src/components/instances/PromptTreeViewModal.tsx` by removing `{totalProjectPrompts} prompts` tags (reclaiming horizontal space), making project action buttons hover-only, removing `{conv.step_count} stp` pills from conversation rows, and stripping target bracket tokens (`#P001`, `C001`). Eradicated ghost running indicators by synchronizing project `runningCount` to filter out ghost and empty 0-word placeholder records, tightening memory prompt TTLs to 45s, eliminating loose hyphen prefix matching in `is_prompt_running_for_project`, and hardening instance card `hasActiveTask` in `src/pages/Instances.tsx`. (Thanks to @aukgit)
-
 
 *   **v4.175.0 (2026-10-10)**:
         -   **UI Refinement: Semantic Tokens, Continuous Quota Scale & Calmer Interactions**:
@@ -177,11 +176,9 @@
         -   **Prompt Tree Send/Queue False-Success Fix**:
             -   **Description**: Root-caused dead Send/Queue buttons in the Prompt Tree View: `send_prompt_now_for_instance` discarded the agy spawn result and returned `Ok` on failure while the modal showed success messages regardless. Backend now returns descriptive errors on spawn failure; the modal shows the real error (with clipboard fallback) instead of false success, and the legacy double-invoke + silent file fallback in the queue path was removed. (Thanks to @aukgit)
 
-
     *   **v4.174.0 (2026-10-10)**:
         -   **CI Green: Stale CliContext Field Fix & Fork Actions Re-enable**:
             -   **Description**: Fixed `error[E0609]: no field 'instance' on type 'CliContext'` at two call sites in `src-tauri/src/bin/agm.rs` (`cmd_prompts_send`, `cmd_prompts_queue`) — the instance-process-cache refactor had renamed the field to `instance_id` but missed these sites; corrected to `ctx.instance_id.is_none()`, restoring compilation. Re-enabled GitHub Actions on the fork (GitHub had auto-disabled workflows because it is a fork) via the Actions-page attestation; CI now green across all 7 jobs (Check Rust Code and Build Tauri App on ubuntu/macos/windows, plus Build Frontend). (Thanks to @aukgit)
-
 
     *   **v4.173.0 (2026-10-10)**:
         -   **Updater Download Link & Release Manifest Honesty Fix**:
@@ -195,31 +192,25 @@
         -   **Smart Instance Process Cache Multi-PID Survival, Relaunch Elimination & Deep Transcript Scan**:
             -   **Description**: Enhanced `check_cached_pid_alive` with multi-PID vitality scanning—when Electron launcher bootstrap PIDs exit, surviving child processes in `entry.pids` are automatically promoted to `primary_pid`, preserving cache validity and eliminating premature invalidation; added Windows 8.3 short-path expansion (`GetShortPathNameW`) and path normalization in `find_pids_for_data_dir` to ensure robust process detection across case and path formatting variants. Enforced zero-relaunch guarantee in `ensure_instance_running_smart` and added a running guard in `launch_instance_inner_with_extra_workspaces` to prevent `close_instance` from terminating active IDE windows. Deepened reverse transcript inspection to 25 lines in `inspect_conversation_transcript` while immunizing against telemetry bursts (`TOKEN_USAGE`, `HEARTBEAT`, `TELEMETRY`), broadened terminal completion detection, guarded fallback projects with `is_owning_inst_alive`, and tightened active prompt TTLs to 45s to completely eradicate phantom running indicators. Eliminated literal bracket tokens (`[Collapse Full Text]`, `[Expand Full Text]`) and word count clutter across the Prompt Tree View, compacted sequence badges to clean `C001` / `P001` with GitMap SHA tooltips, streamlined Instance Table status cells to `Running · {pid}`, and verified 100% pass rate in safe host-shielded E2E test suite `03-ai-scripts/45-prompt-dispatch-process-cache-e2e.py`. (Thanks to @aukgit)
 
-
     *   **v4.171.0 (2026-10-10)**:
         -   **Smart Instance Process Cache, Relaunch Prevention & Ghost Running Fix**:
             -   **Description**: Resolved root-cause IDE instance relaunch bug by integrating canonical instance ID resolution into `is_instance_process_running_smart` to resolve sequence numbers (`1`), aliases (`default`), and case variants before checking the process cache; implemented two-tier closed-PID double-check and OS re-scan before declaring instances offline; decoupled window focus failures from process liveness to guarantee zero unwanted restarts when the IDE is already running. Unified `enqueue_prompt` IPC handler and CLI command (`agm prompt queue`) with strict FIFO queueing (`ORDER BY created_at ASC, id ASC`) and `.antigravity_resume_task.json` persistence. Eradicated false-positive running prompt indicators by filtering `auto_resume_recent_prompts` strictly to `WHERE status IN ('queued', 'pending')`, eliminating idle conversation bypasses, and enforcing terminal planner state detection (`is_terminal_done`). Compacted Prompt Tree View UI badges (`P001 · #1`, `C001 · <cid>`), stripped outer bracket tokens and redundant role labels, and verified 100% pass rate across all 5 test cases in safe host-shielded E2E test harness `03-ai-scripts/45-prompt-dispatch-process-cache-e2e.py`. (Thanks to @aukgit)
-
 
     *   **v4.170.0 (2026-10-10)**:
         -   **Toolchain Installer UI + Profiles + SSH**:
             -   **Description**: New Toolchain settings page: install dev tools from the UI via backend endpoints with live progress. Installer script v3 adds stackable profiles (`minimal`/`rust-dev`/`frontend`/`full`), `--dry-run` preview, `--list-items`, `--troubleshoot`, `--ssh` remote install, and new items (Node.js, pnpm, sccache, cargo-watch, Tauri CLI, gh) — for both shell and PowerShell. (Thanks to @aukgit)
 
-
     *   **v4.169.0 (2026-10-10)**:
         -   **CI Build Fix — Duplicate enqueue_prompt Definitions**:
             -   **Description**: Fixed CI build failure (`E0428`) caused by duplicate `enqueue_prompt` / `enqueue_prompt_for_instance` definitions left behind by parallel feature streams: removed the stale 4-arg `enqueue_prompt` Tauri command (`src-tauri/src/commands/instance.rs`) and the stale `enqueue_prompt_for_instance` implementation (`src-tauri/src/modules/repo_db.rs`); the superset `enqueue_prompt` command (optional fields, `AppResult<serde_json::Value>`) remains and is backward-compatible with existing frontend invoke args. Migrated the `agm prompts enqueue` CLI verb (`src-tauri/src/modules/cli.rs`) to the canonical `enqueue_prompt_for_instance_full` route for GUI/CLI parity, and removed the duplicate `commands::enqueue_prompt` registration in `src-tauri/src/lib.rs`. (Thanks to @aukgit)
-
 
     *   **v4.168.0 (2026-10-10)**:
         -   **Model Inventory Curation**:
             -   **Description**: Curated the model inventory (`src/config/modelConfig.ts`): removed the outdated Gemini 2.5 series (flash, flash-lite, flash-thinking, pro); kept the nano tier (gemini-3.1-flash-lite); added 5 newer open-source models in a new 'Open Source' group (gpt-oss-20b, deepseek-v4, qwen3-max, qwen3-8b, llama-4-maverick); every model now carries priority, capabilities, and speed annotations (`nano`/`fast`/`balanced`/`powerful`). (Thanks to @aukgit)
 
-
     *   **v4.167.0 (2026-10-09)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
 *   **v4.166.0 (2026-10-09)**:
         -   **[Smart Process Caching & Prompt Dispatch Architecture]**:
@@ -233,7 +224,6 @@
         -   **[CLI Parity for Prompts Management & System Health]**:
             -   **AGM Prompts Subcommands**: Added CLI routing and handlers for `agm prompts ls`, `tree`, `send`, `enqueue`, `backup`, and `restore` with complete `--json` and human-readable terminal table output. (Thanks to @aukgit)
             -   **AGM Doctor Diagnostic Engine**: Added `agm doctor` system health checker evaluating nodes, proxy gateways, database connectivity, and running Antigravity processes. (Thanks to @aukgit)
-
 
     *   **v4.165.0 (2026-10-09)**:
         -   **[Smart Instance Process Cache & Anti-Restart Reliability]**:
@@ -252,7 +242,6 @@
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
 
-
     *   **v4.164.0 (2026-10-08)**:
         -   **[Prompt Tree In-Flight Execution Banner & Window Focus]**:
             -   **Active Execution Banner**: Added dedicated in-flight execution banner inside `PromptTreeViewModal` displaying animated pulse, live agent step summary, elapsed runtime, and step counter. (Thanks to @aukgit)
@@ -263,7 +252,6 @@
         -   **[Fleet Synchronization Refinement & Deduplication]**:
             -   **Unified Schema & Types**: Unified `FleetMachineInfo` data structures and deduplicated imports across Supabase sync modules and Tauri IPC handlers. (Thanks to @aukgit)
             -   **UI Streamlining**: Deduplicated `<FleetMachinesTable />` elements, refining privacy email masking and 15-second auto-polling countdown pills. (Thanks to @aukgit)
-
 
     *   **v4.163.0 (2026-10-08)**:
 -   **[Supabase Multi-Machine Fleet Synchronization & Observability]**:
@@ -287,7 +275,6 @@
             -   **Resilient Fallback & PostgREST Compatibility**: Implemented automatic fallback to local machine metrics when Supabase is disabled or unreachable, plus graceful column-missing tolerance during schema migrations. (Thanks to @aukgit)
             -   **Auto-Polling & Countdown Capsule**: Integrated 15-second background auto-refresh with a sleek segmented pill countdown and manual refresh trigger. (Thanks to @aukgit)
 
-
     *   **v4.162.5 (2026-10-08)**:
         -   **[Prompt Tree Modernization & Pill Capsule Header]**:
             -   **Segmented Pill Capsule Toolbar**: Redesigned header actions into contiguous segmented dark-glass pill capsules (`rounded-full`, shared border, subtle dividers) with compact typography and icons. (Thanks to @aukgit)
@@ -303,7 +290,6 @@
             -   **Thin Scrollbars**: Added dedicated `.custom-thin-scrollbar` (4px width) for sleek, accessible scroll areas. (Thanks to @aukgit)
         -   **[AGM CLI Commands & Diagnostics]**:
             -   **CLI Verbs & Telemetry**: Added `agm prompts ls|tree|backup|restore` and `agm doctor` commands with `--json` parity and help documentation. (Thanks to @aukgit)
-
 
     *   **v4.162.0 (2026-10-07)**:
         -   **[CI Runner Inventory Robustness & Sequence Linter Integrity]**:
