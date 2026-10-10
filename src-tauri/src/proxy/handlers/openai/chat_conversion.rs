@@ -209,6 +209,7 @@ pub(crate) fn prefix_with_step_marker(_marker: Option<String>, content: String) 
 mod tests {
     use super::*;
     use serde_json::{json, Value};
+use crate::proxy::handlers::openai::responses_media::responses_input_item_type;
 
     fn responses_routing_identity_follows_the_response_chain() {
         let first = responses_routing_session_id(None, None, None, "resp-root-a");

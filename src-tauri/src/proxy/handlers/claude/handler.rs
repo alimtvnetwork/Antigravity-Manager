@@ -59,6 +59,8 @@ pub async fn handle_messages(
 
 pub async fn handle_list_models(State(state): State<AppState>) -> impl IntoResponse {
     use crate::proxy::common::model_mapping::get_all_dynamic_models;
+use crate::proxy::handlers::claude::request_log::log_request_summary;
+use crate::proxy::handlers::claude::error_handling::build_exhaustion_error;
 
     let only_raw = *state.only_raw_quota_models.read().await;
     let model_ids =

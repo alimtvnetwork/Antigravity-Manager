@@ -7,6 +7,12 @@ use tokio::task::JoinSet;
 
 use crate::proxy::server::UpstreamClient;
 use crate::proxy::TokenManager;
+use crate::proxy::handlers::common::retrystrategy::should_rotate_account;
+use crate::proxy::handlers::openai::image_input::build_image_edit_body;
+use crate::proxy::handlers::openai::image_input::NormalizedInputImage;
+use crate::proxy::handlers::openai::image_input::image_account_selection_target;
+use crate::proxy::handlers::openai::responses_media::response_has_inline_image_data;
+use crate::proxy::handlers::common::retrystrategy::next_rotation_attempt;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn spawn_image_edit_tasks(

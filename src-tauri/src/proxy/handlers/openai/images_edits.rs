@@ -11,14 +11,13 @@ use tracing::{debug, error, info, warn};
 use crate::proxy::config::DebugLoggingConfig;
 use crate::proxy::debug_logger;
 use crate::proxy::handlers::common::FailureStatusTracker;
-use crate::proxy::mappers::image::ImageEditRequest;
 use crate::proxy::monitor::UpstreamRequestBodyHolder;
 use crate::proxy::server::AppState;
 use crate::proxy::session_manager::SessionManager;
 use crate::proxy::TokenManager;
 
+use super::image_input::{build_image_edit_body, validate_input_image_limits};
 use super::images_edits_dispatch::spawn_image_edit_tasks;
-use super::responses_media::{build_image_edit_body, validate_input_image_limits};
 
 pub async fn handle_images_edits(
     State(state): State<AppState>,
@@ -314,5 +313,10 @@ use uuid::Uuid;
 use std::sync::OnceLock;
 
 use tokio::sync::RwLock as TokioRwLock;
+use crate::proxy::handlers::openai::image_input::build_image_contents;
+use crate::proxy::handlers::openai::image_input::is_edit_image_field;
+use crate::proxy::handlers::openai::image_input::edit_size_input;
+use crate::proxy::handlers::openai::image_input::normalized_image_from_bytes;
+use crate::proxy::handlers::openai::image_input::NormalizedInputImage;
 
 static WEBSOCKET_TOOL_CALL_CACHE: OnceLock<TokioRwLock<HashMap<String, Value>>> = OnceLock::new();

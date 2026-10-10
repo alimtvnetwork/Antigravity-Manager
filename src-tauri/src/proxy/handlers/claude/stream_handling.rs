@@ -184,6 +184,9 @@ pub(crate) async fn handle_stream_success(
             } else {
                 // 客户端要非 Stream，需要收集完整响应并转换为 JSON
                 use crate::proxy::mappers::claude::collect_stream_to_json;
+use crate::proxy::handlers::claude::attempt::AttemptCall;
+use crate::proxy::handlers::claude::attempt::StreamOutcome;
+use crate::proxy::handlers::claude::attempt::AttemptState;
 
                 match collect_stream_to_json(Box::pin(combined_stream)).await {
                     Ok(full_response) => {

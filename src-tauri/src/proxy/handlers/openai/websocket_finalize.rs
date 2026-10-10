@@ -4,6 +4,8 @@ use futures::SinkExt;
 use serde_json::{json, Value};
 
 use super::websocket_translate::{send_ws_event, TranslationState};
+use crate::proxy::handlers::openai::websocket::WebsocketSessionState;
+use crate::proxy::handlers::openai::tool_cache::insert_cached_tool_call;
 
 pub(crate) async fn finalize_ws_events(
     state: &mut TranslationState,

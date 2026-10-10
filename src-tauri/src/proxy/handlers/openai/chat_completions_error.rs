@@ -9,6 +9,7 @@ use tracing::{debug, error};
 use crate::proxy::common::client_adapter::{ClientAdapter, CLIENT_ADAPTERS};
 use crate::proxy::config::DebugLoggingConfig;
 use crate::proxy::debug_logger;
+use crate::proxy::upstream::client::types::mask_email;
 use crate::proxy::handlers::common::{
     apply_retry_strategy, should_rotate_account, FailureStatusTracker, RequestRetryState,
     RetryStrategy,

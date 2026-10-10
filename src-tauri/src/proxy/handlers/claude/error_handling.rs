@@ -1,4 +1,8 @@
 use super::*;
+use crate::proxy::handlers::claude::attempt::AttemptCall;
+use crate::proxy::handlers::common::retrystrategy::should_rotate_account;
+use crate::proxy::handlers::claude::attempt::AttemptState;
+use crate::proxy::handlers::claude::attempt::ErrorOutcome;
 
 /// Handle a non-success upstream response: status extraction, pipeline
 /// classification, account lockout, thinking-signature retry, 403 handling,

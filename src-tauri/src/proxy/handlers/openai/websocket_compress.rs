@@ -8,6 +8,8 @@ use crate::proxy::config::DebugLoggingConfig;
 use crate::proxy::mappers::openai::OpenAIRequest;
 use crate::proxy::server::UpstreamClient;
 use crate::proxy::TokenManager;
+use crate::proxy::mappers::openai::request::transform::transform_openai_request;
+use crate::proxy::mappers::gemini::wrapper::prompts::SUMMARY_REQUEST_TIMEOUT_SECS;
 
 const INTERNAL_BACKGROUND_TASK: &str = "gemini-2.5-flash-lite";
 const CONTEXT_SUMMARY_PROMPT: &str = r#"You are a context compression specialist. Your task is to create a structured XML snapshot of the conversation history.

@@ -13,6 +13,7 @@ use crate::proxy::mappers::openai::{transform_openai_response, OpenAIRequest};
 use crate::proxy::thinking_store::SessionScope;
 
 use super::completions::CompletionsOutcome;
+use crate::proxy::handlers::openai::chat_conversion::convert_chat_response_to_responses;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn completions_success_nonstream(

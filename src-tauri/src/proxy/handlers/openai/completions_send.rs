@@ -6,7 +6,7 @@ use axum::extract::Extension;
 use axum::http::StatusCode;
 use axum::response::Response;
 use serde_json::{json, Value};
-use tracing::debug;
+use tracing::{debug, info};
 
 use crate::proxy::config::DebugLoggingConfig;
 use crate::proxy::debug_logger;

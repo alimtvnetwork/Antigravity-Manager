@@ -1,4 +1,6 @@
 use super::*;
+use crate::proxy::handlers::claude::attempt::AttemptState;
+use crate::proxy::handlers::claude::attempt::PrepOutcome;
 
 /// Run one retry-loop attempt up to the upstream call: model routing, token
 /// acquisition, request transform, upstream invocation and fallback logging.
