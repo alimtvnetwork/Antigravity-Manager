@@ -113,7 +113,7 @@ pub struct SwitchPromptSnap {
 }
 
 impl SwitchPromptSnap {
-    fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Self {
             prompt_id: String::new(),
             prompt_text: String::new(),
