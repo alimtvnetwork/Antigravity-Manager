@@ -1746,24 +1746,12 @@ export default function PromptTreeViewModal({
                 await navigator.clipboard.writeText(promptContent);
             } catch {}
 
-            setActionMsg("Prompt dispatched to IDE & copied to clipboard!");
-            setTimeout(() => setActionMsg(null), 3000);
-            // 4. Focus IDE instance window if workspace is known (avoids secondary launch hazard)
-            try {
-                if (repoPath) {
-                    const repoName = repoPath.split(/[/\\]/).filter(Boolean).pop() || repoPath;
-                    await focusInstanceWorkspace(targetInstId, repoPath, repoName);
-                }
-            } catch (focusErr) {
-                console.warn('focusInstanceWorkspace error', focusErr);
-            }
-
             if (dispatchOk) {
-                setActionMsg("Prompt Dispatched & Focused IDE (via Hotkey 'N' / Send Now)!");
+                setActionMsg("Prompt dispatched to IDE & copied to clipboard!");
+                setTimeout(() => setActionMsg(null), 3000);
             } else {
                 setError(`Send failed: ${dispatchErr?.toString() || 'dispatch rejected'} — prompt copied to clipboard; paste it into the IDE manually.`);
             }
-            setTimeout(() => setActionMsg(null), 3500);
         } catch (err: any) {
             setError(err?.toString() || 'Failed to dispatch prompt');
         } finally {
