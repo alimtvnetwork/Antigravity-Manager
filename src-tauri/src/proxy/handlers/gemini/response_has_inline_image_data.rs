@@ -121,23 +121,23 @@ pub(crate) async fn handle_generate_success(
                     tracing::warn!("[Gemini] Empty first chunk received, retrying...");
                     retry_gemini = true;
                 } else {
-                    ttft_ms = upstream_req_start.elapsed().as_micros() as f64 / 1000.0;
+                    *ttft_ms = upstream_req_start.elapsed().as_micros() as f64 / 1000.0;
                     first_chunk = Some(bytes);
                 }
             }
             Ok(Some(Err(e))) => {
                 tracing::warn!("[Gemini] Stream error during peek: {}, retrying...", e);
-                last_error = format!("Stream error: {}", e);
+                *last_error = format!("Stream error: {}", e);
                 retry_gemini = true;
             }
             Ok(None) => {
                 tracing::warn!("[Gemini] Stream ended immediately, retrying...");
-                last_error = "Empty response".to_string();
+                *last_error = "Empty response".to_string();
                 retry_gemini = true;
             }
             Err(_) => {
                 tracing::warn!("[Gemini] First chunk timeout after 300s, retrying...");
-                last_error = "First chunk timeout".to_string();
+                *last_error = "First chunk timeout".to_string();
                 retry_gemini = true;
             }
         }
@@ -366,7 +366,7 @@ pub(crate) async fn handle_generate_success(
         }
     }
 
-    ttft_ms = upstream_req_start.elapsed().as_micros() as f64 / 1000.0;
+    *ttft_ms = upstream_req_start.elapsed().as_micros() as f64 / 1000.0;
     let mut gemini_resp: Value = response
         .json()
         .await

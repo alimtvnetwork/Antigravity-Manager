@@ -1,8 +1,8 @@
 use super::*;
 
-struct ThinkingHint {
-    budget_tokens: Option<u32>,
-    level: Option<String>,
+pub(crate) struct ThinkingHint {
+    pub(crate) budget_tokens: Option<u32>,
+    pub(crate) level: Option<String>,
 }
 
 /// Extract thinking hints from raw request JSON (OpenCode variants compatibility)
@@ -101,7 +101,7 @@ pub(crate) fn apply_thinking_hints(
     if let Some(budget) = hint.budget_tokens {
         request.thinking = Some(crate::proxy::mappers::claude::models::ThinkingConfig {
             type_: "enabled".to_string(),
-            budget_tokens: Some(budget),
+            pub(crate) budget_tokens: Some(budget),
             effort: None,
         });
         tracing::debug!(
@@ -128,7 +128,7 @@ pub(crate) fn apply_thinking_hints(
             let budget = level_to_budget(level, budget_cap);
             request.thinking = Some(crate::proxy::mappers::claude::models::ThinkingConfig {
                 type_: "enabled".to_string(),
-                budget_tokens: Some(budget),
+                pub(crate) budget_tokens: Some(budget),
                 effort: None,
             });
             tracing::debug!(

@@ -11,7 +11,7 @@ use tokio::time::{sleep, Duration};
 use tracing::{debug, info};
 
 mod handle_detect_model;
-mod retrystrategy;
+pub(crate) mod retrystrategy;
 
 pub use handle_detect_model::build_dual_track_error;
 pub use handle_detect_model::build_token_error_headers;

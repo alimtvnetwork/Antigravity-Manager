@@ -141,7 +141,7 @@ pub(crate) async fn prepare_attempt(st: &mut AttemptState, attempt: usize) -> Pr
                 return PrepOutcome::Respond(
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
-                        st.headers,
+                        st.headers.clone(),
                         Json(json!({
                             "type": "error",
                             "error": {

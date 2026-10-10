@@ -122,7 +122,7 @@ pub(crate) async fn handle_generate_error(
         status_code,
         &error_text,
         retry_after.as_deref(),
-        retried_without_thinking,
+        *retried_without_thinking,
         attempt,
         pool_size,
     );
@@ -148,8 +148,8 @@ pub(crate) async fn handle_generate_error(
             (
                 StatusCode::from_u16(status_code).unwrap_or(StatusCode::NOT_FOUND),
                 [
-                    ("X-Account-Email", email.as_str()),
-                    ("X-Mapped-Model", mapped_model.as_str()),
+                    ("X-Account-Email", email),
+                    ("X-Mapped-Model", mapped_model),
                 ],
                 Json(dual_err),
             )
@@ -158,8 +158,8 @@ pub(crate) async fn handle_generate_error(
     }
 
     if classification.is_thought_signature_error() {
-        if !retried_without_thinking {
-            retried_without_thinking = true;
+        if !*retried_without_thinking {
+            *retried_without_thinking = true;
             tracing::warn!(
                 "[Gemini] Pipeline: Thinking signature error detected on upstream (HTTP {}). Surgically purging corrupted signatures and retrying on same account.",
                 status_code
@@ -183,7 +183,7 @@ pub(crate) async fn handle_generate_error(
                 }
             }
             // 4. Retry on same account
-            force_rotate = false;
+            *force_rotate = false;
             return Ok(ErrorOutcome::Continue);
         } else {
             tracing::warn!(
@@ -222,12 +222,12 @@ pub(crate) async fn handle_generate_error(
         attempt,
         max_attempts,
         status_code,
-        trace_id,
+        &trace_id,
     )
     .await
     {
         if matches!(strategy, RetryStrategy::GraceRetry(_)) {
-            retry_credentials = Some((
+            *retry_credentials = Some((
                 access_token.clone(),
                 project_id.clone(),
                 email.clone(),
@@ -252,9 +252,9 @@ pub(crate) async fn handle_generate_error(
                 "[{}] Keeping same account for status {} (Gemini server-side issue or Grace Retry)",
                 trace_id, status_code
             );
-            force_rotate = false;
+            *force_rotate = false;
         } else {
-            force_rotate = true;
+            *force_rotate = true;
         }
 
         return Ok(ErrorOutcome::Continue);
@@ -275,8 +275,8 @@ pub(crate) async fn handle_generate_error(
         (
             status,
             [
-                ("X-Account-Email", email.as_str()),
-                ("X-Mapped-Model", mapped_model.as_str()),
+                ("X-Account-Email", email),
+                ("X-Mapped-Model", mapped_model),
             ],
             Json(dual_err),
         )
