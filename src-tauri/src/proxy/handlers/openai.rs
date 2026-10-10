@@ -2252,14 +2252,12 @@ pub async fn handle_chat_completions(
         let norm_total_micros = norm_start.elapsed().as_micros() as u64;
         norm_ms = norm_total_micros.saturating_sub(tf_micros) as f64 / 1000.0;
         think_fill_ms = tf_micros as f64 / 1000.0;
-        // Justification: best-effort call; failure logged without changing control flow
-        crate::error::record_ignored(
+        // Justification: non-Result return value intentionally discarded — no error channel to track
+        let _ =
             crate::proxy::mappers::context_manager::ContextManager::apply_post_transit_context_mgmt(
                 &mut gemini_body,
                 &mapped_model,
-            ),
-            "apply_post_transit_context_mgmt",
-        );
+            );
         crate::proxy::mappers::prompt_sanitizer::PromptSanitizer::sanitize_gemini_payload(
             &mut gemini_body,
         );
@@ -4115,14 +4113,12 @@ pub async fn handle_completions(
         let norm_total_micros = norm_start.elapsed().as_micros() as u64;
         norm_ms = norm_total_micros.saturating_sub(tf_micros) as f64 / 1000.0;
         think_fill_ms = tf_micros as f64 / 1000.0;
-        // Justification: best-effort call; failure logged without changing control flow
-        crate::error::record_ignored(
+        // Justification: non-Result return value intentionally discarded — no error channel to track
+        let _ =
             crate::proxy::mappers::context_manager::ContextManager::apply_post_transit_context_mgmt(
                 &mut gemini_body,
                 &mapped_model,
-            ),
-            "apply_post_transit_context_mgmt",
-        );
+            );
         crate::proxy::mappers::prompt_sanitizer::PromptSanitizer::sanitize_gemini_payload(
             &mut gemini_body,
         );

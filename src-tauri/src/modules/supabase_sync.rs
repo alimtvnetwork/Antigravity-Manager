@@ -603,11 +603,8 @@ pub fn load_config() -> Result<SupabaseConfig, AppError> {
 /// Auto-discover Supabase credentials from repo-secrets, normalize URLs (stripping /rest/v1), enable sync, save, and return updated config.
 pub fn auto_discover_supabase_credentials() -> crate::error::AppResult<SupabaseConfig> {
     let mut config = load_config().unwrap_or_default();
-    // Justification: best-effort call; failure logged without changing control flow
-    crate::error::record_ignored(
-        auto_seed_from_repo_secrets(&mut config),
-        "auto_seed_from_repo_secrets",
-    );
+    // Justification: non-Result return value intentionally discarded — no error channel to track
+    let _ = auto_seed_from_repo_secrets(&mut config);
 
     for seed_path in candidate_seed_config_paths() {
         if seed_path.exists() {

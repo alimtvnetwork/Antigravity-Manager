@@ -1942,14 +1942,11 @@ pub async fn check_and_rotate_with_options(
             || quota_percent <= effective_low_threshold
             || quota_percent <= switcher_cfg.critical_threshold_percent;
         if below_threshold || force {
-            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-            crate::error::record_ignored(
-                instance::resolve_instance_pid_for_switch(
-                    &inst.id,
-                    &inst.data_dir,
-                    inst.is_default || inst.id == "default",
-                ),
-                "resolve_instance_pid_for_switch",
+            // Justification: non-Result return value intentionally discarded — no error channel to track
+            let _ = instance::resolve_instance_pid_for_switch(
+                &inst.id,
+                &inst.data_dir,
+                inst.is_default || inst.id == "default",
             );
         }
 
@@ -2653,11 +2650,8 @@ pub fn start_auto_switcher() {
                 }
             }
 
-            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-            crate::error::record_ignored(
-                instance::refresh_pid_cache_if_due(switcher_cfg.pid_refresh_seconds),
-                "refresh_pid_cache_if_due",
-            );
+            // Justification: non-Result return value intentionally discarded — no error channel to track
+            let _ = instance::refresh_pid_cache_if_due(switcher_cfg.pid_refresh_seconds);
 
             if let Err(e) = check_and_rotate_if_needed().await {
                 logger::log_warn(&format!("[AutoSwitcher] Error during check cycle: {}", e));

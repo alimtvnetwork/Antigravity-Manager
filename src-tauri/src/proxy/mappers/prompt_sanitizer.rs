@@ -771,11 +771,8 @@ mod tests {
             }
         });
 
-        // Justification: best-effort call; failure logged without changing control flow
-        crate::error::record_ignored(
-            PromptSanitizer::sanitize_gemini_payload(&mut payload),
-            "sanitize_gemini_payload",
-        );
+        // Justification: non-Result return value intentionally discarded — no error channel to track
+        let _ = PromptSanitizer::sanitize_gemini_payload(&mut payload);
 
         let parts = payload["request"]["contents"][0]["parts"]
             .as_array()

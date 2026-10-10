@@ -651,11 +651,8 @@ pub fn restore_running_prompts_for_instance(
         repo_db::resend_running_commands_for_instance(Some(target_inst), 20),
         "resend_running_commands_for_instance",
     );
-    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-    crate::error::record_ignored(
-        repo_db::ensure_prompt_goals_running_for_instance(target_inst),
-        "ensure_prompt_goals_running_for_instance",
-    );
+    // Justification: non-Result return value intentionally discarded — no error channel to track
+    let _ = repo_db::ensure_prompt_goals_running_for_instance(target_inst);
 
     Ok(records)
 }

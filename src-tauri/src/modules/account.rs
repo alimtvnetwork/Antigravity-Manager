@@ -1771,32 +1771,29 @@ pub async fn switch_account(
                     .unwrap_or(true)
         })
         .map(|c| c.email);
-        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-        crate::error::record_ignored(
-            crate::modules::notification_hub::notify_account_switched_details(
-                crate::modules::notification_hub::SwitchNotificationDetails {
-                    previous_email: followup_prev,
-                    previous_quota_4h: prev_4h,
-                    previous_quota_weekly: prev_weekly,
-                    predicted_next_email,
-                    selected_email: followup_email,
-                    target_quota_4h: target_4h,
-                    target_quota_weekly: target_weekly,
-                    credit_before_switch: prev_4h,
-                    threshold_activated: None,
-                    instance_id: followup_target.clone(),
-                    instance_name: followup_target,
-                    instance_mode: String::new(),
-                    reason: "Manual account switch".to_string(),
-                    is_auto: false,
-                    backed_up_projects: Vec::new(),
-                    backed_up_prompts_count: None,
-                    restored_prompts_count: None,
-                },
-            )
-            .await,
-            "notify_account_switched_details",
-        );
+        // Justification: non-Result return value intentionally discarded — no error channel to track
+        let _ = crate::modules::notification_hub::notify_account_switched_details(
+            crate::modules::notification_hub::SwitchNotificationDetails {
+                previous_email: followup_prev,
+                previous_quota_4h: prev_4h,
+                previous_quota_weekly: prev_weekly,
+                predicted_next_email,
+                selected_email: followup_email,
+                target_quota_4h: target_4h,
+                target_quota_weekly: target_weekly,
+                credit_before_switch: prev_4h,
+                threshold_activated: None,
+                instance_id: followup_target.clone(),
+                instance_name: followup_target,
+                instance_mode: String::new(),
+                reason: "Manual account switch".to_string(),
+                is_auto: false,
+                backed_up_projects: Vec::new(),
+                backed_up_prompts_count: None,
+                restored_prompts_count: None,
+            },
+        )
+        .await;
         if let Ok(mut refreshed) = load_account(&followup_id) {
             if let Ok(fresh_quota) = fetch_quota_with_retry(&mut refreshed).await {
                 refreshed.quota = Some(fresh_quota);

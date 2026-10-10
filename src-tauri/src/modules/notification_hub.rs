@@ -384,11 +384,8 @@ pub fn notify_account_switched(
     match tokio::runtime::Handle::try_current() {
         Ok(handle) => {
             handle.spawn(async move {
-                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-                crate::error::record_ignored(
-                    notify_account_switched_details(details).await,
-                    "notify_account_switched_details",
-                );
+                // Justification: non-Result return value intentionally discarded — no error channel to track
+                let _ = notify_account_switched_details(details).await;
             });
         }
         Err(_) => {

@@ -313,14 +313,12 @@ pub async fn handle_generate(
         norm_ms = norm_total_micros.saturating_sub(tf_micros) as f64 / 1000.0;
         think_fill_ms = tf_micros as f64 / 1000.0;
 
-        // Justification: best-effort call; failure logged without changing control flow
-        crate::error::record_ignored(
+        // Justification: non-Result return value intentionally discarded — no error channel to track
+        let _ =
             crate::proxy::mappers::context_manager::ContextManager::apply_post_transit_context_mgmt(
                 &mut wrapped_body,
                 &mapped_model,
-            ),
-            "apply_post_transit_context_mgmt",
-        );
+            );
 
         if let Some(ref recorder) = upstream_recorder {
             recorder.set_value(&wrapped_body);

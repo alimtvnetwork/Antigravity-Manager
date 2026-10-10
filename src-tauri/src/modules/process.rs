@@ -3201,11 +3201,8 @@ mod tests {
 
     #[test]
     fn test_discover_and_persist_initial_ide_info_runs_without_panic() {
-        // Justification: best-effort call; failure logged without changing control flow
-        crate::error::record_ignored(
-            discover_and_persist_initial_ide_info(),
-            "discover_and_persist_initial_ide_info",
-        );
+        // Justification: non-Result return value intentionally discarded — no error channel to track
+        let _ = discover_and_persist_initial_ide_info();
     }
 
     #[test]

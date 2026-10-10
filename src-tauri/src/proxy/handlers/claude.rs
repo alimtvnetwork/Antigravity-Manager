@@ -1194,14 +1194,12 @@ pub async fn handle_messages(
                 }
             };
 
-        // Justification: best-effort call; failure logged without changing control flow
-        crate::error::record_ignored(
+        // Justification: non-Result return value intentionally discarded — no error channel to track
+        let _ =
             crate::proxy::mappers::context_manager::ContextManager::apply_post_transit_context_mgmt(
                 &mut gemini_body,
                 &mapped_model,
-            ),
-            "apply_post_transit_context_mgmt",
-        );
+            );
         crate::proxy::mappers::prompt_sanitizer::PromptSanitizer::sanitize_gemini_payload(
             &mut gemini_body,
         );

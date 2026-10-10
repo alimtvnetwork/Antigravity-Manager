@@ -70,11 +70,8 @@ pub fn load_app_config() -> Result<AppConfig, String> {
                 if !bak_trimmed.is_empty() {
                     if let Ok(mut bak_val) = serde_json::from_str::<serde_json::Value>(&bak_content)
                     {
-                        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-                        crate::error::record_ignored(
-                            migrate_config_value(&mut bak_val),
-                            "migrate_config_value",
-                        );
+                        // Justification: non-Result return value intentionally discarded — no error channel to track
+                        let _ = migrate_config_value(&mut bak_val);
                         if let Ok(cfg) = serde_json::from_value::<AppConfig>(bak_val) {
                             info!(
                                 "Successfully restored empty config from backup: {:?}",
@@ -113,11 +110,8 @@ pub fn load_app_config() -> Result<AppConfig, String> {
                         if let Ok(mut bak_val) =
                             serde_json::from_str::<serde_json::Value>(&bak_content)
                         {
-                            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-                            crate::error::record_ignored(
-                                migrate_config_value(&mut bak_val),
-                                "migrate_config_value",
-                            );
+                            // Justification: non-Result return value intentionally discarded — no error channel to track
+                            let _ = migrate_config_value(&mut bak_val);
                             if let Ok(cfg) = serde_json::from_value::<AppConfig>(bak_val) {
                                 info!(
                                     "Successfully recovered corrupted config from backup: {:?}",
