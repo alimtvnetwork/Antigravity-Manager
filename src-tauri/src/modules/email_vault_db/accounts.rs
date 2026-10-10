@@ -3,6 +3,8 @@ use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension};
 use uuid::Uuid;
 
+use rand::RngCore;
+
 use super::*;
 
 // ---------------------------------------------------------------------------

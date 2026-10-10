@@ -26,7 +26,7 @@ pub enum UpdateChannel {
 }
 
 impl Default for UpdateChannel {
-    pub(crate) fn default() -> Self {
+    fn default() -> Self {
         if CURRENT_VERSION.contains('-') {
             UpdateChannel::Beta
         } else {
@@ -55,7 +55,7 @@ pub struct UpdateInfo {
     pub updater_json_url: Option<String>,
 }
 
-pub(crate) fn default_true() -> bool {
+fn default_true() -> bool {
     true
 }
 
@@ -79,12 +79,12 @@ pub struct UpdateSettings {
     pub update_channel: UpdateChannel,
 }
 
-pub(crate) fn default_check_interval() -> u64 {
+fn default_check_interval() -> u64 {
     DEFAULT_CHECK_INTERVAL_HOURS
 }
 
 impl Default for UpdateSettings {
-    pub(crate) fn default() -> Self {
+    fn default() -> Self {
         Self {
             auto_check: true,
             last_check_time: 0,
@@ -103,7 +103,7 @@ pub(crate) struct GitHubRelease {
     pub(crate) tag_name: String,
     pub(crate) html_url: String,
     pub(crate) body: Option<String>,
-    published_at: Option<String>,
+    pub(crate) published_at: Option<String>,
     #[serde(default)]
     pub(crate) prerelease: bool,
     #[serde(default)]

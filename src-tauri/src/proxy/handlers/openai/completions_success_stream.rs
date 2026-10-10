@@ -142,26 +142,26 @@ pub(crate) async fn completions_success_stream(
                         continue;
                     }
                     if stream_chunk_has_error_event(&bytes) {
-                        last_error = "Error event during peek".to_string();
+                        *last_error = "Error event during peek".to_string();
                         retry_this_account = true;
                         break;
                     }
-                    ttft_ms = upstream_req_start.elapsed().as_micros() as f64 / 1000.0;
+                    *ttft_ms = upstream_req_start.elapsed().as_micros() as f64 / 1000.0;
                     first_data_chunk = Some(bytes);
                     break;
                 }
                 Ok(Some(Err(e))) => {
-                    last_error = format!("Stream error during peek: {}", e);
+                    *last_error = format!("Stream error during peek: {}", e);
                     retry_this_account = true;
                     break;
                 }
                 Ok(None) => {
-                    last_error = "Empty response stream".to_string();
+                    *last_error = "Empty response stream".to_string();
                     retry_this_account = true;
                     break;
                 }
                 Err(_) => {
-                    last_error = "Timeout waiting for first data".to_string();
+                    *last_error = "Timeout waiting for first data".to_string();
                     retry_this_account = true;
                     break;
                 }
@@ -279,26 +279,26 @@ pub(crate) async fn completions_success_stream(
                         continue;
                     }
                     if stream_chunk_has_error_event(&bytes) {
-                        last_error = "Error event in internal stream".to_string();
+                        *last_error = "Error event in internal stream".to_string();
                         retry_this_account = true;
                         break;
                     }
-                    ttft_ms = upstream_req_start.elapsed().as_micros() as f64 / 1000.0;
+                    *ttft_ms = upstream_req_start.elapsed().as_micros() as f64 / 1000.0;
                     first_data_chunk = Some(bytes);
                     break;
                 }
                 Ok(Some(Err(e))) => {
-                    last_error = format!("Internal stream error: {}", e);
+                    *last_error = format!("Internal stream error: {}", e);
                     retry_this_account = true;
                     break;
                 }
                 Ok(None) => {
-                    last_error = "Empty internal stream".to_string();
+                    *last_error = "Empty internal stream".to_string();
                     retry_this_account = true;
                     break;
                 }
                 Err(_) => {
-                    last_error = "Timeout peek internal".to_string();
+                    *last_error = "Timeout peek internal".to_string();
                     retry_this_account = true;
                     break;
                 }

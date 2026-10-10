@@ -104,7 +104,7 @@ pub struct EmailNotificationSettings {
 }
 
 impl Default for EmailNotificationSettings {
-    pub(crate) fn default() -> Self {
+    fn default() -> Self {
         Self {
             id: "global".to_string(),
             is_enabled: false,

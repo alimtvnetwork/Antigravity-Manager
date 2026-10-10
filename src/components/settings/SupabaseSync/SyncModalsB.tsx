@@ -1,5 +1,5 @@
 import { SupabaseSyncApi } from './useSupabaseSync';
-import { UnifiedBackupModal } from '../modals/UnifiedBackupModal';
+import { UnifiedBackupModal } from '../../modals/UnifiedBackupModal';
 import ModalDialog from '../common/ModalDialog';
 import { showToast } from '../common/ToastContainer';
 

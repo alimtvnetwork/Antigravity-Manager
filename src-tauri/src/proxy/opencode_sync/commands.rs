@@ -14,7 +14,7 @@ use super::sync_helpers::{create_backup, get_sync_status, restore_backup_to_targ
 use crate::proxy::common::variant_mapping::GEMINI_FAMILIES;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs;
 
 pub fn read_opencode_config_content(file_name: Option<String>) -> Result<String, String> {

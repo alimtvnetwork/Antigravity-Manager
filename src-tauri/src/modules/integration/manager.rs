@@ -74,11 +74,11 @@ impl SystemIntegration for SystemManager {
         }
     }
 
-    pub(crate) fn update_tray(&self) {
+    fn update_tray(&self) {
         self.update_tray();
     }
 
-    pub(crate) fn show_notification(&self, title: &str, body: &str) {
+    fn show_notification(&self, title: &str, body: &str) {
         self.show_notification(title, body);
     }
 }

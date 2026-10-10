@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useAccountStore } from "../../stores/useAccountStore";
 import { useConfigStore } from "../../stores/useConfigStore";
 import { useInstanceStore } from "../../stores/useInstanceStore";
+import type { InstanceStatus } from "../../services/instanceService";
 import { useUpdateStore } from "../../stores/use-update-store";
 import { resolveFocusTarget } from "../../lib/resolve-focus-target";
 import { Account } from "../../types/account";
@@ -37,7 +38,7 @@ export function useAccountsState() {
   const { instances, activeInstanceId } = useInstanceStore();
 
   const boundInstanceAccountId = useMemo(() => {
-    const selectedInstance = instances.find((inst) => inst.config.id === activeInstanceId);
+    const selectedInstance = instances.find((inst: InstanceStatus) => inst.config.id === activeInstanceId);
     if (!selectedInstance) return null;
     return (
       selectedInstance.config.bound_account_id ||
@@ -381,6 +382,16 @@ export function useAccountsState() {
     reorderAccounts,
     updateAccountPriority,
     fetchAccounts,
-    loading
+    loading,
+    warmUpAccount,
+    warmUpAccounts,
+    updateAccountLabel,
+    addAccount,
+    switchAccount,
+    deleteAccount,
+    deleteAccounts,
+    refreshQuota,
+    toggleProxyStatus,
+    fetchCurrentAccount
   };
 }

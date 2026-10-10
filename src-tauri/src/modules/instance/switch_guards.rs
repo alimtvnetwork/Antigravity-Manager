@@ -1,5 +1,4 @@
 //! Switch preconditions: guards evaluated before an account switch proceeds.
-use super::*;
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;

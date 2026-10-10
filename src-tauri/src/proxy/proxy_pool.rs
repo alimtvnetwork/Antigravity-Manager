@@ -2,12 +2,12 @@ use crate::proxy::config::{ProxyEntry, ProxyPoolConfig, ProxySelectionStrategy};
 use dashmap::DashMap;
 use futures::{stream, StreamExt};
 use rquest::Client;
+use rquest_util::Emulation;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::OnceLock;
 use std::time::Duration;
 use tokio::sync::RwLock;
-use rquest_util::Emulation;
-use std::sync::OnceLock;
 
 mod get_global_proxy_pool;
 mod proxypoolmanager_impl;

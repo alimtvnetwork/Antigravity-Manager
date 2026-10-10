@@ -64,7 +64,7 @@ pub(crate) async fn chat_completions_error(
         .text()
         .await
         .unwrap_or_else(|_| format!("HTTP {}", status_code));
-    last_error = format!("HTTP {}: {}", status_code, error_text);
+    *last_error = format!("HTTP {}: {}", status_code, error_text);
 
     // [New] 打印错误报文日志
     tracing::error!(
@@ -145,7 +145,7 @@ pub(crate) async fn chat_completions_error(
 
     if classification.is_thought_signature_error() {
         if !retried_without_thinking {
-            retried_without_thinking = true;
+            *retried_without_thinking = true;
             tracing::warn!(
                     "[{}] Pipeline: Thinking signature error detected on upstream (HTTP {}). Surgically purging corrupted signatures and retrying on same account.",
                     trace_id, status_code
@@ -156,7 +156,7 @@ pub(crate) async fn chat_completions_error(
             // 2. 清理当前 session 的 SignatureCache
             crate::proxy::SignatureCache::global().delete_session_signature(&client_session_id);
             // 3. 保持同一账号原地重试
-            force_rotate = false;
+            *force_rotate = false;
             return Ok(ChatAttemptOutcome::Continue);
         } else {
             tracing::warn!(
@@ -250,7 +250,7 @@ pub(crate) async fn chat_completions_error(
     .await
     {
         if matches!(strategy, RetryStrategy::GraceRetry(_)) {
-            retry_credentials = Some((
+            *retry_credentials = Some((
                 access_token.clone(),
                 project_id.clone(),
                 email.clone(),
@@ -275,9 +275,9 @@ pub(crate) async fn chat_completions_error(
                 "[{}] Keeping same account for status {} (Grace Retry or Server Issue)",
                 trace_id, status_code
             );
-            force_rotate = false;
+            *force_rotate = false;
         } else {
-            force_rotate = true;
+            *force_rotate = true;
         }
 
         tracing::warn!(

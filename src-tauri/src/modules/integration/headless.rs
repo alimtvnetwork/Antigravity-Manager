@@ -26,11 +26,11 @@ impl SystemIntegration for HeadlessIntegration {
         desktop.on_account_switch(account, target_ide).await
     }
 
-    pub(crate) fn update_tray(&self) {
+    fn update_tray(&self) {
         // No-op
     }
 
-    pub(crate) fn show_notification(&self, title: &str, body: &str) {
+    fn show_notification(&self, title: &str, body: &str) {
         crate::modules::logger::log_info(&format!("[Log Notification] {}: {}", title, body));
     }
 }

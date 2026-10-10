@@ -1,7 +1,6 @@
 use super::*;
 
 impl RateLimitTracker {
-
     pub fn clear_model(&self, account_id: &str, model: &str) -> bool {
         let normalized = crate::proxy::common::model_mapping::normalize_to_standard_id(model)
             .unwrap_or_else(|| model.to_string());
@@ -123,7 +122,6 @@ impl RateLimitTracker {
             count
         );
     }
-
 }
 
 impl Default for RateLimitTracker {

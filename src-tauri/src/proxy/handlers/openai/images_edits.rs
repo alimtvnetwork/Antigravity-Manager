@@ -315,6 +315,4 @@ use std::sync::OnceLock;
 
 use tokio::sync::RwLock as TokioRwLock;
 
-use std::collections::HashMap;
-
 static WEBSOCKET_TOOL_CALL_CACHE: OnceLock<TokioRwLock<HashMap<String, Value>>> = OnceLock::new();

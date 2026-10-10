@@ -1,7 +1,6 @@
 use super::*;
 
 impl ProxyPoolManager {
-
     /// Build rquest::Proxy configuration
     fn build_proxy_config(&self, entry: &ProxyEntry) -> Result<PoolProxyConfig, String> {
         let raw_url = crate::proxy::config::normalize_proxy_url(&entry.url);
@@ -312,7 +311,6 @@ impl ProxyPoolManager {
             }
         });
     }
-
 }
 
 #[cfg(test)]

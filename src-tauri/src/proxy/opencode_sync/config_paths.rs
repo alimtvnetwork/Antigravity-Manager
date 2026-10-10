@@ -3,6 +3,7 @@ use super::lock::{
     OPENCODE_CONFIG_FILE_JSONC, OPENCODE_DIR,
 };
 use serde_json::Value;
+#[cfg(test)]
 use std::fs;
 use std::path::PathBuf;
 

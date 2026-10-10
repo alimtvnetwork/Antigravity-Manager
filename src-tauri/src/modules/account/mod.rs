@@ -9,8 +9,11 @@ pub mod quota_fetch;
 pub mod quota_ops;
 pub mod refresh;
 pub mod switch;
+#[cfg(test)]
 mod test_index_a;
+#[cfg(test)]
 mod test_index_b;
+#[cfg(test)]
 mod test_quota;
 
 pub use crud::*;

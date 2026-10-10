@@ -8,7 +8,7 @@ use super::models::ModelInput;
 use super::sync_apply::{apply_openai_compatible_provider_sync, apply_sync_to_config};
 use super::sync_helpers::create_backup;
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 

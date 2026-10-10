@@ -1,5 +1,4 @@
 //! OS process-table scanning for instance PIDs.
-use super::*;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::fs;

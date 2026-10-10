@@ -1,8 +1,7 @@
 import type { useAccountsState } from "./useAccountsState";
 import type { useAccountsHandlers } from "./useAccountsHandlers";
+import type { Account } from "../../types/account";
 import AccountDetailsDialog from "../../components/accounts/AccountDetailsDialog";
-import DeviceFingerprintDialog from "../../components/accounts/DeviceFingerprintDialog";
-import ModalDialog from "../../components/common/ModalDialog";
 import AccountErrorDialog from "../../components/accounts/AccountErrorDialog";
 import { UnifiedBackupModal } from "../../components/modals/UnifiedBackupModal";
 
@@ -14,17 +13,11 @@ interface AccountsDialogsProps {
   handlers: AccountsHandlers;
 }
 
-export function AccountsDialogs({ state, handlers }: AccountsDialogsProps) {
+export function AccountsDialogs({ state }: AccountsDialogsProps) {
   const {
     detailsAccount, setDetailsAccount, errorAccountId, setErrorAccountId, isBackupModalOpen, setIsBackupModalOpen,
-    backupModalTab
+    backupModalTab, accounts, updateAccountPriority
   } = state;
-  const {
-    handleWarmup, handleUpdateLabel, handleWarmupAll, handlePageChange, handleToggleSelect, handleToggleAll,
-    handleAddAccount, handleSwitch, handleRefresh, handleBatchDelete, executeBatchDelete, handleDelete,
-    executeDelete, handleToggleProxy, executeToggleProxy, handleBatchToggleProxy, handleRefreshClick, executeRefresh,
-    handleFocusActiveAccount, exportAccountsToJson, handleExportOne, handleViewDetails, handleViewDevice
-  } = handlers;
   return (
     <>
     <AccountDetailsDialog
@@ -35,7 +28,7 @@ export function AccountsDialogs({ state, handlers }: AccountsDialogsProps) {
 
     {/* Account error dialog */}
     <AccountErrorDialog
-      account={accounts.find(a => a.id === errorAccountId) || null}
+      account={accounts.find((a: Account) => a.id === errorAccountId) || null}
       onClose={() => setErrorAccountId(null)}
     />
 

@@ -236,14 +236,14 @@ impl SystemIntegration for DesktopIntegration {
         Ok(())
     }
 
-    pub(crate) fn update_tray(&self) {
+    fn update_tray(&self) {
         if let Some(ref h) = self.app_handle {
             // Justification: update_tray_menus returns (); there is no error to surface
             let _ = crate::modules::tray::update_tray_menus(h);
         }
     }
 
-    pub(crate) fn show_notification(&self, title: &str, body: &str) {
+    fn show_notification(&self, title: &str, body: &str) {
         // 使用 tauri-plugin-dialog 或原生通知（此处简化）
         crate::modules::logger::log_info(&format!("[Notification] {}: {}", title, body));
     }

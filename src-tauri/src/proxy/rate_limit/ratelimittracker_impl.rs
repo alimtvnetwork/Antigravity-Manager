@@ -1,7 +1,6 @@
 use super::*;
 
 impl RateLimitTracker {
-
     pub fn set_lockout_until_iso_with_cap(
         &self,
         account_id: &str,
@@ -452,5 +451,4 @@ impl RateLimitTracker {
     pub fn get(&self, account_id: &str) -> Option<RateLimitInfo> {
         self.limits.get(account_id).map(|r| r.clone())
     }
-
 }

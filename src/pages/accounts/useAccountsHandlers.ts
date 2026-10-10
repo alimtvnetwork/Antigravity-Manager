@@ -3,23 +3,23 @@ import { exportAccounts } from "../../services/accountService";
 import { isTauri } from "../../utils/env";
 import { request as invoke } from "../../utils/request";
 import type { Account } from "../../types/account";
+import { useAccountStore } from "../../stores/useAccountStore";
 import type { useAccountsState } from "./useAccountsState";
 
 type AccountsState = ReturnType<typeof useAccountsState>;
 
 export function useAccountsHandlers(state: AccountsState) {
   const {
-    t, config, showAllQuotas, toggleShowAllQuotas, updateInfo, installUpdate,
-    isInstalling, searchQuery, setSearchQuery, filter, setFilter, currentPage,
-    setCurrentPage, instances, activeInstanceId, boundInstanceAccountId, activeFocusTargetId, activeFocusTargetAccount,
-    isSearchExpanded, setIsSearchExpanded, viewMode, setViewMode, selectedIds, setSelectedIds,
-    deviceAccount, setDeviceAccount, detailsAccount, setDetailsAccount, deleteConfirmId, setDeleteConfirmId,
-    isBatchDelete, setIsBatchDelete, isDeleting, setIsDeleting, toggleProxyConfirm, setToggleProxyConfirm,
-    isWarmupConfirmOpen, setIsWarmupConfirmOpen, isWarmuping, setIsWarmuping, refreshingIds, setRefreshingIds,
-    errorAccountId, setErrorAccountId, focusedAccountId, setFocusedAccountId, isBackupModalOpen, setIsBackupModalOpen,
-    backupModalTab, setBackupModalTab, containerSize, setContainerSize, localPageSize, setLocalPageSize,
-    ITEMS_PER_PAGE, searchedAccounts, filterCounts, filteredAccounts, paginatedAccounts, switchingAccountId,
-    setSwitchingAccountId, isRefreshing, setIsRefreshing, isRefreshConfirmOpen, setIsRefreshConfirmOpen
+    t, config, searchQuery, setSearchQuery, filter, setFilter,
+    currentPage, setCurrentPage, activeFocusTargetId, selectedIds, setSelectedIds, setDeviceAccount,
+    setDetailsAccount, deleteConfirmId, setDeleteConfirmId, setIsBatchDelete, isDeleting, setIsDeleting,
+    toggleProxyConfirm, setToggleProxyConfirm, setIsWarmupConfirmOpen, setIsWarmuping, refreshingIds, setRefreshingIds,
+    setFocusedAccountId, ITEMS_PER_PAGE, paginatedAccounts, switchingAccountId, setSwitchingAccountId, setIsRefreshing,
+    setIsRefreshConfirmOpen,
+    accounts,
+    warmUpAccount, warmUpAccounts, updateAccountLabel, addAccount, switchAccount,
+    deleteAccount, deleteAccounts, refreshQuota, toggleProxyStatus,
+    loading
   } = state;
   const handleWarmup = async (accountId: string) => {
     setRefreshingIds((prev) => {
@@ -104,7 +104,7 @@ export function useAccountsHandlers(state: AccountsState) {
 
   const handleToggleAll = () => {
     // Select all items on current page
-    const currentIds = paginatedAccounts.map((a) => a.id);
+    const currentIds = paginatedAccounts.map((a: Account) => a.id);
     const allSelected = currentIds.every((id) => selectedIds.has(id));
 
     const newSet = new Set(selectedIds);
@@ -283,7 +283,7 @@ export function useAccountsHandlers(state: AccountsState) {
 
         results.forEach((result, index) => {
           const id = ids[index];
-          const email = accounts.find((a) => a.id === id)?.email || id;
+          const email = accounts.find((a: Account) => a.id === id)?.email || id;
           if (result.status === "fulfilled") {
             successCount++;
           } else {
@@ -293,7 +293,7 @@ export function useAccountsHandlers(state: AccountsState) {
         });
       } else {
         // Refresh all accounts
-        setRefreshingIds(new Set(accounts.map((a) => a.id)));
+        setRefreshingIds(new Set(accounts.map((a: Account) => a.id)));
         const stats = await useAccountStore.getState().refreshAllQuotas();
         if (stats) {
           successCount = stats.success;
@@ -337,7 +337,7 @@ export function useAccountsHandlers(state: AccountsState) {
       return;
     }
 
-    const targetAccount = accounts.find((a) => a.id === targetAccountId);
+    const targetAccount = accounts.find((a: Account) => a.id === targetAccountId);
     if (!targetAccount) {
       showToast(
         t("accounts.no_active_to_focus", "No active account found to focus"),
@@ -353,7 +353,7 @@ export function useAccountsHandlers(state: AccountsState) {
     }
 
     // 3. Calculate target page number and navigate if necessary
-    const targetIndex = accounts.findIndex((a) => a.id === targetAccountId);
+    const targetIndex = accounts.findIndex((a: Account) => a.id === targetAccountId);
     if (targetIndex >= 0) {
       const targetPage = Math.floor(targetIndex / ITEMS_PER_PAGE) + 1;
       if (targetPage !== currentPage) {
@@ -435,21 +435,21 @@ export function useAccountsHandlers(state: AccountsState) {
   };
 
   const handleExportOne = (accountId: string) => {
-    const account = accounts.find((a) => a.id === accountId);
+    const account = accounts.find((a: Account) => a.id === accountId);
     if (account) {
       exportAccountsToJson([account]);
     }
   };
 
   const handleViewDetails = (accountId: string) => {
-    const account = accounts.find((a) => a.id === accountId);
+    const account = accounts.find((a: Account) => a.id === accountId);
     if (account) {
       setDetailsAccount(account);
     }
   };
 
   const handleViewDevice = (accountId: string) => {
-    const account = accounts.find((a) => a.id === accountId);
+    const account = accounts.find((a: Account) => a.id === accountId);
     if (account) {
       setDeviceAccount(account);
     }

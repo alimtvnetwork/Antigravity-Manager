@@ -10,13 +10,13 @@ pub struct ThinkingDbGuard(pub(crate) MutexGuard<'static, Option<(PathBuf, Conne
 
 impl std::ops::Deref for ThinkingDbGuard {
     type Target = Connection;
-    pub(crate) fn deref(&self) -> &Self::Target {
+    fn deref(&self) -> &Self::Target {
         &self.0.as_ref().expect("thinking db connection").1
     }
 }
 
 impl std::ops::DerefMut for ThinkingDbGuard {
-    pub(crate) fn deref_mut(&mut self) -> &mut Self::Target {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0.as_mut().expect("thinking db connection").1
     }
 }
@@ -24,7 +24,7 @@ impl std::ops::DerefMut for ThinkingDbGuard {
 /// Process-lifetime connection to thinking_store.db.
 /// Fill/hydrate must not open proxy_logs.db (it can be multi-GB on HDD).
 /// Automatically tracks data directory changes and reuses connection with fast pragmas.
-pub(crate) fn thinking_db() -> Result<ThinkingDbGuard, String> {
+fn thinking_db() -> Result<ThinkingDbGuard, String> {
     let db_path = get_thinking_db_path()?;
     let slot = THINKING_DB.get_or_init(|| Mutex::new(None));
     let mut guard = slot.lock().map_err(|e| format!("thinking db lock: {e}"))?;
@@ -35,7 +35,7 @@ pub(crate) fn thinking_db() -> Result<ThinkingDbGuard, String> {
     Ok(ThinkingDbGuard(guard))
 }
 
-pub(crate) fn mark_thinking_imported(conn: &Connection) {
+fn mark_thinking_imported(conn: &Connection) {
     // Justification: session-row backfill after log import; best-effort
     crate::error::record_ignored(
         conn.execute(
@@ -48,7 +48,7 @@ pub(crate) fn mark_thinking_imported(conn: &Connection) {
 
 /// Copy old thinking rows out of proxy_logs.db into thinking_store.db.
 /// Never deletes the log DB. Old uncompressed rows stay readable via unpack_thought.
-pub(crate) fn migrate_thinking_from_logs() -> Result<(), String> {
+fn migrate_thinking_from_logs() -> Result<(), String> {
     let conn = thinking_db()?;
     let imported: Option<String> = conn
         .query_row(

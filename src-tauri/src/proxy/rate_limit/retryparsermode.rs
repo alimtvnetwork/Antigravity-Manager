@@ -100,7 +100,6 @@ pub struct RateLimitTracker {
 }
 
 impl RateLimitTracker {
-
     pub fn new() -> Self {
         Self {
             limits: DashMap::new(),
@@ -349,5 +348,4 @@ impl RateLimitTracker {
         }
         self.restore_persisted_long_limit(account_id, reset_time, detected_at, model)
     }
-
 }

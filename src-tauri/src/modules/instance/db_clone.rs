@@ -1,5 +1,4 @@
 //! Safe SQLite cloning and recursive directory copy.
-use super::*;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;

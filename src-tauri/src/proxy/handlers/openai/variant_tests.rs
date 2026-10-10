@@ -2,9 +2,6 @@
 use crate::proxy::common::variant_mapping;
 use crate::proxy::mappers::openai::models::ThinkingConfig;
 
-use crate::proxy::common::variant_mapping;
-use crate::proxy::mappers::openai::models::ThinkingConfig;
-
 #[test]
 fn openai_opus_preserves_client_budget_when_present() {
     let client_budget = Some(32_768);

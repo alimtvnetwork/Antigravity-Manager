@@ -14,7 +14,7 @@ pub(crate) struct ActionOutcome {
 }
 
 impl Default for ActionOutcome {
-    pub(crate) fn default() -> Self {
+    fn default() -> Self {
         Self {
             action_str: "unknown".to_string(),
             status: "success".to_string(),

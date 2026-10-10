@@ -25,7 +25,7 @@ pub struct SupabaseConfig {
 }
 
 impl Default for SupabaseConfig {
-    pub(crate) fn default() -> Self {
+    fn default() -> Self {
         let node_id = get_local_node_id();
         let short_id = if node_id.len() > 6 {
             &node_id[..6]

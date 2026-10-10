@@ -35,7 +35,7 @@ impl TokenManager {
             let latest_token_opt = self.tokens.get(&token.account_id).map(|r| r.clone());
             if let Some(latest) = latest_token_opt {
                 if now < latest.timestamp - TOKEN_REFRESH_BUFFER_SECS {
-                    token = latest.clone();
+                    *token = latest.clone();
                     tracing::debug!("账号 {} 已由并发线程在循环中刷新，跳过", token.email);
                 } else {
                     tracing::debug!(

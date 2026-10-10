@@ -1,5 +1,7 @@
 use base64::engine::general_purpose::STANDARD;
 
+use base64::Engine;
+
 use super::*;
 
 pub fn base64_encode_multi(data: &str, passes: usize) -> String {

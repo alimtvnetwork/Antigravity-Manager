@@ -110,12 +110,12 @@ pub(crate) async fn chat_completions_send(
                 .await
             {
                 Ok((access_token, project_id, email, account_id, wait_ms, permit)) => {
-                    image_permit = Some(permit);
+                    *image_permit = Some(permit);
                     (access_token, project_id, email, account_id, wait_ms)
                 }
                 Err((status, message)) => {
                     failure_statuses.record(status);
-                    last_error = message;
+                    *last_error = message;
                     return Ok(ChatSendOutcome::BreakLoop);
                 }
             }
@@ -156,7 +156,7 @@ pub(crate) async fn chat_completions_send(
         .resolve_dynamic_model_for_account(&account_id, &mapped_model)
         .await;
 
-    last_email = Some(email.clone());
+    *last_email = Some(email.clone());
     info!("✓ Using account: {} (type: {})", email, config.request_type);
 
     // 4. 转换请求 (返回内容包含 session_id, message_count, prefix_hash)
@@ -165,8 +165,8 @@ pub(crate) async fn chat_completions_send(
         transform_openai_request(openai_req, &project_id, &mapped_model, proxy_token.as_ref());
     let tf_micros = tf_start.elapsed().as_micros() as u64;
     let norm_total_micros = norm_start.elapsed().as_micros() as u64;
-    norm_ms = norm_total_micros.saturating_sub(tf_micros) as f64 / 1000.0;
-    think_fill_ms = tf_micros as f64 / 1000.0;
+    *norm_ms = norm_total_micros.saturating_sub(tf_micros) as f64 / 1000.0;
+    *think_fill_ms = tf_micros as f64 / 1000.0;
     // Justification: non-Result return value intentionally discarded — no error channel to track
     let _ = crate::proxy::mappers::context_manager::ContextManager::apply_post_transit_context_mgmt(
         &mut gemini_body,
@@ -272,7 +272,7 @@ pub(crate) async fn chat_completions_send(
     {
         Ok(r) => r,
         Err(e) => {
-            last_error = e.clone();
+            *last_error = e.clone();
             failure_statuses.record(StatusCode::BAD_GATEWAY);
             drop(image_permit.take());
             debug!(

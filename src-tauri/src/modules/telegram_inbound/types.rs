@@ -22,7 +22,7 @@ pub struct TelegramConfig {
 }
 
 impl Default for TelegramConfig {
-    pub(crate) fn default() -> Self {
+    fn default() -> Self {
         Self {
             bot_token: String::new(),
             allowed_chat_id: None,

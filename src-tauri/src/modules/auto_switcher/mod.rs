@@ -8,8 +8,10 @@ pub mod scheduling;
 pub mod scoring;
 pub mod selection;
 pub mod status;
-pub mod tests_a;
-pub mod tests_b;
+#[cfg(test)]
+mod tests_a;
+#[cfg(test)]
+mod tests_b;
 pub mod types;
 
 pub use daemon::*;
@@ -22,6 +24,4 @@ pub use scheduling::*;
 pub use scoring::*;
 pub use selection::*;
 pub use status::*;
-pub use tests_a::*;
-pub use tests_b::*;
 pub use types::*;

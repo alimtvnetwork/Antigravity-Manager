@@ -6,6 +6,8 @@ use std::net::{TcpStream, ToSocketAddrs};
 use std::time::Duration;
 use uuid::Uuid;
 
+use std::io::{Read, Write};
+
 use super::*;
 
 pub fn is_implicit_tls_imap(port: u16, encryption_type: &str) -> bool {

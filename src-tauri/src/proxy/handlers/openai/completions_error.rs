@@ -61,7 +61,7 @@ pub(crate) async fn completions_handle_error(
         .text()
         .await
         .unwrap_or_else(|_| format!("HTTP {}", status_code));
-    last_error = format!("HTTP {}: {}", status_code, error_text);
+    *last_error = format!("HTTP {}: {}", status_code, error_text);
 
     tracing::error!(
         "[Codex-Upstream] Error Response {}: {}",
@@ -151,7 +151,7 @@ pub(crate) async fn completions_handle_error(
     .await
     {
         if matches!(strategy, RetryStrategy::GraceRetry(_)) {
-            retry_credentials = Some((
+            *retry_credentials = Some((
                 access_token.clone(),
                 project_id.clone(),
                 email.clone(),
@@ -159,7 +159,7 @@ pub(crate) async fn completions_handle_error(
                 0,
             ));
         }
-        force_rotate = should_rotate_account(status_code, Some(&strategy));
+        *force_rotate = should_rotate_account(status_code, Some(&strategy));
         return CompletionsOutcome::ContinueLoop;
     } else {
         // 不可重试

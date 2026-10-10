@@ -100,7 +100,7 @@ impl AuditTask {
 }
 
 impl Drop for AuditTask {
-    pub(crate) fn drop(&mut self) {
+    fn drop(&mut self) {
         if self.open {
             // Justification: best-effort call; failure logged without changing control flow
             crate::error::record_ignored(

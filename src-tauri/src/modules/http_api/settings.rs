@@ -36,7 +36,7 @@ pub(crate) fn default_port() -> u16 {
 }
 
 impl Default for HttpApiSettings {
-    pub(crate) fn default() -> Self {
+    fn default() -> Self {
         Self {
             enabled: true,
             port: DEFAULT_PORT,

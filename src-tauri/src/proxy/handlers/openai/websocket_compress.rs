@@ -129,7 +129,7 @@ async fn call_openai_gemini_sync(
         .ok_or_else(|| "Failed to extract text from response".to_string())
 }
 
-async fn try_compress_openai_with_summary(
+pub(crate) async fn try_compress_openai_with_summary(
     original_request: &OpenAIRequest,
     trace_id: &str,
     token_manager: &std::sync::Arc<crate::proxy::TokenManager>,

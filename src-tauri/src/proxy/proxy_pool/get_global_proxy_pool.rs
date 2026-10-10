@@ -39,7 +39,6 @@ pub struct ProxyPoolManager {
 }
 
 impl ProxyPoolManager {
-
     pub fn new(config: Arc<RwLock<ProxyPoolConfig>>) -> Self {
         // Load saved bindings from configuration
         let account_bindings = Arc::new(DashMap::new());
@@ -335,5 +334,4 @@ impl ProxyPoolManager {
         // Simple weighted implementation: using Priority as surrogate
         self.select_by_priority(proxies)
     }
-
 }

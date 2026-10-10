@@ -13,8 +13,10 @@ pub mod parse_pipe;
 pub mod parsing_utils;
 pub mod receipts;
 pub mod security;
-pub mod tests_a;
-pub mod tests_b;
+#[cfg(test)]
+mod tests_a;
+#[cfg(test)]
+mod tests_b;
 pub mod types;
 
 pub use cli::*;
@@ -32,6 +34,4 @@ pub use parse_pipe::*;
 pub use parsing_utils::*;
 pub use receipts::*;
 pub use security::*;
-pub use tests_a::*;
-pub use tests_b::*;
 pub use types::*;

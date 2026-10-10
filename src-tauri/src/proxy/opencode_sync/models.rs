@@ -1,7 +1,7 @@
 use super::catalog::{build_model_catalog, ModelDef};
 use super::sync_helpers::build_model_json;
 use crate::proxy::common::variant_mapping::GEMINI_FAMILIES;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 

@@ -118,19 +118,19 @@ pub(crate) async fn chat_completions_success(
                     // Check for error events
                     if stream_chunk_has_error_event(&bytes) {
                         tracing::warn!("[OpenAI] Error detected during peek, retrying...");
-                        last_error = "Error event during peek".to_string();
+                        *last_error = "Error event during peek".to_string();
                         retry_this_account = true;
                         break;
                     }
 
                     // We found real data!
-                    ttft_ms = upstream_req_start.elapsed().as_micros() as f64 / 1000.0;
+                    *ttft_ms = upstream_req_start.elapsed().as_micros() as f64 / 1000.0;
                     first_data_chunk = Some(bytes);
                     break;
                 }
                 Ok(Some(Err(e))) => {
                     tracing::warn!("[OpenAI] Stream error during peek: {}, retrying...", e);
-                    last_error = format!("Stream error during peek: {}", e);
+                    *last_error = format!("Stream error during peek: {}", e);
                     retry_this_account = true;
                     break;
                 }
@@ -138,13 +138,13 @@ pub(crate) async fn chat_completions_success(
                     tracing::warn!(
                         "[OpenAI] Stream ended during peek (Empty Response), retrying..."
                     );
-                    last_error = "Empty response stream during peek".to_string();
+                    *last_error = "Empty response stream during peek".to_string();
                     retry_this_account = true;
                     break;
                 }
                 Err(_) => {
                     tracing::warn!("[OpenAI] First chunk timeout after 300s, retrying...");
-                    last_error = "First chunk timeout".to_string();
+                    *last_error = "First chunk timeout".to_string();
                     retry_this_account = true;
                     break;
                 }
@@ -336,7 +336,7 @@ pub(crate) async fn chat_completions_success(
         }
     }
 
-    ttft_ms = upstream_req_start.elapsed().as_micros() as f64 / 1000.0;
+    *ttft_ms = upstream_req_start.elapsed().as_micros() as f64 / 1000.0;
     let gemini_resp: Value = response
         .json()
         .await

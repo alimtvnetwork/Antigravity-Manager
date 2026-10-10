@@ -14,7 +14,7 @@ use super::sync_helpers::{
     merge_provider_options, restore_backup_to_target,
 };
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 pub fn restore_opencode_config() -> Result<(), String> {
     let _lock = acquire_opencode_config_lock();

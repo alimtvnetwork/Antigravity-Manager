@@ -2,7 +2,7 @@
 use axum::{
     body::Body, extract::State, http::StatusCode, response::IntoResponse, response::Response,
 };
-use serde_json::Value;
+use serde_json::{json, Value};
 use tracing::{debug, error};
 
 use crate::proxy::server::AppState;
@@ -18,7 +18,7 @@ pub async fn handle_chat_redirection(
     handle_chat_completions(State(state), headers, upstream_recorder, Json(body)).await
 }
 
-async fn intercept_chat_to_image(
+pub(crate) async fn intercept_chat_to_image(
     state: AppState,
     body: Value,
     model_name: &str,

@@ -1,5 +1,7 @@
-use aes_gcm::{Aes256Gcm, Nonce};
+use aes_gcm::aead::Aead;
+use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
 use base64::prelude::*;
+use rand::RngCore;
 use sha2::{Digest, Sha256};
 
 use super::*;

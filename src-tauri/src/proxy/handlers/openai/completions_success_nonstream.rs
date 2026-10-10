@@ -35,7 +35,7 @@ pub(crate) async fn completions_success_nonstream(
     ttft_ms: &mut f64,
     gemini_body_for_debug: &Option<Value>,
 ) -> CompletionsOutcome {
-    ttft_ms = upstream_req_start.elapsed().as_micros() as f64 / 1000.0;
+    *ttft_ms = upstream_req_start.elapsed().as_micros() as f64 / 1000.0;
     let gemini_resp: Value = match response.json().await {
         Ok(json) => json,
         Err(e) => {

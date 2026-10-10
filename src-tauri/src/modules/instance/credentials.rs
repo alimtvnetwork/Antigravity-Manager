@@ -243,6 +243,7 @@ fn inject_token_once(
         account.token.oauth_client_key.as_deref(),
         target_hint,
     )
+    .map(|_| ())
 }
 
 /// Windows-only: mirror the token + device profile into the per-instance

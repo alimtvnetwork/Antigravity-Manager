@@ -5,6 +5,8 @@ use rusqlite::{params, Connection, OpenFlags};
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
+use std::io::{Read, Write};
+
 use super::*;
 
 pub(crate) static LOG_WRITE_LOCK: Mutex<()> = Mutex::new(());

@@ -13,7 +13,7 @@ pub enum EmailStream {
 }
 
 impl Read for EmailStream {
-    pub(crate) fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         match self {
             EmailStream::Plain(s) => s.read(buf),
             EmailStream::Tls(s) => s.read(buf),
@@ -22,14 +22,14 @@ impl Read for EmailStream {
 }
 
 impl Write for EmailStream {
-    pub(crate) fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         match self {
             EmailStream::Plain(s) => s.write(buf),
             EmailStream::Tls(s) => s.write(buf),
         }
     }
 
-    pub(crate) fn flush(&mut self) -> std::io::Result<()> {
+    fn flush(&mut self) -> std::io::Result<()> {
         match self {
             EmailStream::Plain(s) => s.flush(),
             EmailStream::Tls(s) => s.flush(),

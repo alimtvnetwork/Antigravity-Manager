@@ -2,7 +2,7 @@ import { SettingsPageApi } from './useSettingsPage';
 import { Coffee } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-dialog';
 import ModalDialog from '../components/common/ModalDialog';
-import { UnifiedBackupModal } from '../components/modals/UnifiedBackupModal';
+import { UnifiedBackupModal } from '../../components/modals/UnifiedBackupModal';
 import { showToast } from '../components/common/ToastContainer';
 import { relaunch } from '@tauri-apps/plugin-process';
 
