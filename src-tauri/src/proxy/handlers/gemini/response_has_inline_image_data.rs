@@ -373,7 +373,7 @@ pub(crate) async fn handle_generate_success(
         .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Parse error: {}", e)))?;
 
     // [FIX #1522] Inject Tool ID into Non-streaming Response
-    crate::proxy::mappers::gemini::wrapper::inject_ids_to_response(&mut gemini_resp, mapped_model);
+    crate::proxy::mappers::gemini::wrapper::inject_ids_to_response(&mut gemini_resp, &mapped_model);
 
     // [FIX #765] Extract thoughtSignature from non-streaming response
     let inner_val = if gemini_resp.get("response").is_some() {
@@ -393,7 +393,7 @@ pub(crate) async fn handle_generate_success(
                     for part in parts {
                         if let Some(sig) = part.get("thoughtSignature").and_then(|s| s.as_str()) {
                             crate::proxy::SignatureCache::global().cache_session_signature(
-                                session_id,
+                                &session_id,
                                 sig.to_string(),
                                 1,
                             );
@@ -405,7 +405,7 @@ pub(crate) async fn handle_generate_success(
         }
     }
 
-    crate::proxy::thinking_store::capture_gemini_response(session_id, &gemini_resp);
+    crate::proxy::thinking_store::capture_gemini_response(&session_id, &gemini_resp);
     let unwrapped = unwrap_response(&gemini_resp);
     return Ok(HandleSuccessOutcome::Respond(
         Response::builder()
