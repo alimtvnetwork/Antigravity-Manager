@@ -103,6 +103,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.180.0 (2026-10-10)**:
+        -   **Release Pipeline Completion & CI Green Confirmation**:
+            -   **Description**: No code changes since v4.179.0. Re-ran the v4.179.0 macOS universal artifact upload after a transient GitHub artifact-service timeout (`CreateArtifact` request timeout ×5) so the release carries the complete asset set; CI is green across all platforms on the record_ignored type-error fixes. (Thanks to @aukgit)
+
+
     *   **v4.179.0 (2026-10-10)**:
         -   **Accounts Table Compact Density Pass**:
             -   **Description**: Tightened the Accounts table density — row cell padding reduced (`py-1` → `py-0.5` on quota cells and header), `QuotaProgressBar` gained a `compact` mode (bar `h-3` → `h-2`, checkpoint markers `w-3.5` → `w-2.5` with proportionally smaller check glyphs, tighter gaps, smaller time/percentage labels) applied to the accounts table only; other views using the bar are untouched. Gradient, checkpoint positions, and behavior unchanged. (Thanks to @aukgit)
