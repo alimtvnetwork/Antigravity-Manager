@@ -11,7 +11,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::proxy::config::DebugLoggingConfig;
 use crate::proxy::debug_logger;
-use crate::proxy::handlers::common::{next_rotation_attempt, FailureStatusTracker};
+use crate::proxy::handlers::common::{FailureStatusTracker, RequestRetryState, RetryStrategy, next_rotation_attempt};
 use crate::proxy::monitor::UpstreamRequestBodyHolder;
 use crate::proxy::server::{AppState, UpstreamClient};
 use crate::proxy::session_manager::SessionManager;
@@ -489,7 +489,7 @@ pub async fn handle_images_generations_internal(
     tokio::spawn(async move {
         // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
         crate::error::record_ignored(
-            account::refresh_all_quotas_logic().await,
+            crate::modules::account::refresh::refresh_all_quotas_logic().await,
             "refresh_all_quotas_logic",
         );
     });

@@ -279,7 +279,7 @@ pub async fn handle_images_edits(
     tokio::spawn(async move {
         // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
         crate::error::record_ignored(
-            account::refresh_all_quotas_logic().await,
+            crate::modules::account::refresh::refresh_all_quotas_logic().await,
             "refresh_all_quotas_logic",
         );
     });
