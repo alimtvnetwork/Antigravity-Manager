@@ -19,7 +19,7 @@ use tracing::{debug, info};
 /// - ASCII/English: ~4 characters per token
 /// - Unicode/CJK: ~1.5 characters per token (Chinese, Japanese, Korean are tokenized differently)
 /// - Adds 15% safety margin to prevent underestimation
-fn estimate_tokens_from_str(s: &str) -> u32 {
+pub(crate) fn estimate_tokens_from_str(s: &str) -> u32 {
     if s.is_empty() {
         return 0;
     }
@@ -82,7 +82,7 @@ fn estimate_image_tokens_from_url(url: &str) -> u32 {
 /// Estimate token cost for audio from a URL.
 /// Audio is tokenized at roughly 32 tokens per second.
 /// From base64, we estimate duration from payload size.
-fn estimate_media_tokens_from_url(url: &str) -> u32 {
+pub(crate) fn estimate_media_tokens_from_url(url: &str) -> u32 {
     const BASE_AUDIO_TOKENS: u32 = 500; // ~15 seconds default
 
     if url.starts_with("data:") {
@@ -104,7 +104,7 @@ fn estimate_media_tokens_from_url(url: &str) -> u32 {
 
 /// Estimate token cost for Gemini inlineData (base64 images/audio in Gemini format).
 /// mime_type determines the estimation strategy. data_len is the length of the base64 string.
-fn estimate_inline_data_tokens(mime_type: &str, data_len: usize) -> u32 {
+pub(crate) fn estimate_inline_data_tokens(mime_type: &str, data_len: usize) -> u32 {
     if mime_type.starts_with("image/") {
         // Same logic as estimate_image_tokens_from_url for base64
         let raw_bytes = (data_len * 3) / 4;

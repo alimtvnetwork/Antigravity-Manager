@@ -7,6 +7,7 @@ use crate::proxy::token_manager::ProxyToken;
 use serde_json::{json, Value};
 
 use super::session_setup::SetupState;
+use super::helpers::flatten_tools;
 
 pub(crate) fn phase_tools(
     request: &super::models::OpenAIRequest,

@@ -5,6 +5,10 @@ use super::super::rtk_cleaner::RtkCleaner;
 use serde_json::{json, Value};
 use tracing::{debug, info};
 use super::ContextManager;
+use super::PurificationStrategy;
+use super::estimate_tokens_from_str;
+use super::estimate_media_tokens_from_url;
+use super::estimate_inline_data_tokens;
 
 // OpenAI-side context management (split from context_manager.rs).
 impl ContextManager {

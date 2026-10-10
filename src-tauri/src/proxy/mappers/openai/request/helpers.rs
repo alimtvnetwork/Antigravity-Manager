@@ -88,7 +88,7 @@ fn qualify_namespace_tool_name(namespace_name: &str, child_name: &str) -> String
     format!("{}__{}", ns, child)
 }
 
-fn flatten_tools(tools: &[Value]) -> Vec<Value> {
+pub(crate) fn flatten_tools(tools: &[Value]) -> Vec<Value> {
     let mut flat = Vec::new();
     for tool in tools {
         let t = tool.get("type").and_then(|v| v.as_str()).unwrap_or("");

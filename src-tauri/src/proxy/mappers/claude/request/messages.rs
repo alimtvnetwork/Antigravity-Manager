@@ -14,7 +14,7 @@ use std::collections::HashMap;
 /// Claude Code's CLI identity and can reject an otherwise identical request with
 /// RESOURCE_EXHAUSTED. Keep the match exact so user-authored text that merely
 /// mentions the SDK identity is not rewritten.
-fn normalize_claude_client_identity(text: &str) -> &str {
+pub(crate) fn normalize_claude_client_identity(text: &str) -> &str {
     crate::proxy::mappers::prompt_sanitizer::PromptSanitizer::normalize_client_identity(text)
 }
 

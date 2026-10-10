@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use super::build_contents::build_contents;
 use super::messages::reorder_gemini_parts;
 use super::thinking::{clean_system_prompt_text, is_gemini_client_billing_metadata};
+use super::messages::normalize_claude_client_identity;
 
 /// 构建 System Instruction (支持动态身份映射与 Prompt 隔离)
 pub(crate) fn build_system_instruction(

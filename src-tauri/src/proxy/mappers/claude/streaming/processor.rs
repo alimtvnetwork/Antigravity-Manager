@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 
 /// Part 处理器
 pub struct PartProcessor<'a> {
-    state: &'a mut StreamingState,
+    pub(crate) state: &'a mut StreamingState,
 }
 
 impl<'a> PartProcessor<'a> {
