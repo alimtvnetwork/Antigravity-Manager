@@ -1134,7 +1134,7 @@ export default function Instances() {
                                     "group relative rounded-[5px] border transition-all duration-200 flex flex-col justify-between overflow-hidden backdrop-blur-xs",
                                     isActive
                                         ? cn(SELECTED_CARD_CLASSES, "border-amber-400/50 shadow-md")
-                                        : "bg-white dark:bg-[#0a1e30] border-gray-200/50 dark:border-[#15334d]/60 hover:border-gray-300/80 dark:hover:border-blue-500/40 hover:bg-slate-50/90 dark:hover:bg-[#061421] shadow-xs"
+                                        : "bg-white dark:bg-[var(--ui-surface-1)] border-gray-200/50 dark:border-[var(--ui-border-subtle)] hover:border-gray-300/80 dark:hover:border-[var(--ui-interactive-40)] hover:bg-slate-50/90 dark:hover:bg-[var(--ui-surface-hover)] shadow-xs"
                                 )}
                             >
                                 {/* Card Mutex Overlay when action is executing */}
@@ -1222,7 +1222,7 @@ export default function Instances() {
                                                         setEditTargetId(inst.config.id);
                                                         setEditInstanceName(inst.config.name);
                                                     }}
-                                                    className="p-1 rounded-[5px] text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="p-1 rounded-[5px] text-gray-500 dark:text-[var(--ui-text-secondary)] hover:text-blue-600 dark:hover:text-[var(--ui-interactive)] hover:bg-blue-50 dark:hover:bg-[var(--ui-surface-hover)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                     title={t('instances.edit_title', 'Rename profile')}
                                                 >
                                                     <Pencil className="w-3 h-3" />
@@ -1234,7 +1234,7 @@ export default function Instances() {
                                                         setCopyInstanceName(`${inst.config.name} Copy`);
                                                         setCopyProjects(true);
                                                     }}
-                                                    className="p-1 rounded-[5px] text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="p-1 rounded-[5px] text-gray-500 dark:text-[var(--ui-text-secondary)] hover:text-blue-600 dark:hover:text-[var(--ui-interactive)] hover:bg-blue-50 dark:hover:bg-[var(--ui-surface-hover)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                     title="Clone / Duplicate profile settings and extensions"
                                                 >
                                                     <Copy className="w-3 h-3" />
@@ -1243,7 +1243,7 @@ export default function Instances() {
                                                     <button
                                                         onClick={() => handleDelete(inst.config.id)}
                                                         disabled={inst.is_running || isBusy || deletingId === inst.config.id}
-                                                        className="p-1 rounded-[5px] text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                                                        className="p-1 rounded-[5px] text-gray-500 dark:text-[var(--ui-text-secondary)] hover:text-red-600 dark:hover:text-[var(--ui-danger)] hover:bg-red-50 dark:hover:bg-[var(--ui-surface-hover)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                                                         title="Delete profile"
                                                     >
                                                         {currentAction === 'delete' ? (
@@ -1258,11 +1258,11 @@ export default function Instances() {
 
                                         {/* Bound Account / Email Section: Compact py-1 px-2.5 rounded-md */}
                                         <div className={cn(
-                                            "py-1 px-2.5 rounded-md bg-gray-50/80 dark:bg-[#0c2438]/90 border border-gray-100 dark:border-[#15334d] mb-2.5 flex items-center justify-between gap-1.5 transition-all duration-200",
-                                            "group-hover:border-amber-400/40 dark:group-hover:border-amber-400/50 dark:group-hover:bg-[#050f18]"
+                                            "ui-interactive-row py-1 px-2.5 rounded-md bg-gray-50/80 dark:bg-[var(--ui-surface-2)] border border-gray-100 dark:border-[var(--ui-border-subtle)] mb-2.5 flex items-center justify-between gap-1.5",
+                                            "group-hover:border-gray-300 dark:group-hover:bg-[var(--ui-surface-hover)] dark:group-hover:border-[var(--ui-interactive-40)]"
                                         )}>
                                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                                <Mail className="w-3 h-3 text-gray-400 group-hover:text-amber-400 transition-colors shrink-0" />
+                                                <Mail className="w-3 h-3 text-gray-400 dark:text-[var(--ui-text-secondary)] group-hover:text-blue-500 dark:group-hover:text-[var(--ui-interactive)] transition-colors shrink-0" />
                                                 <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium shrink-0">
                                                     Account:
                                                 </span>
@@ -1270,12 +1270,11 @@ export default function Instances() {
                                                     <span
                                                         className={cn(
                                                             "px-1.5 py-0.5 rounded-md text-[11px] font-semibold font-mono border flex items-center gap-1 min-w-0 shadow-2xs transition-colors",
-                                                            theme.emailPill,
-                                                            "group-hover:text-amber-600 dark:group-hover:text-amber-300"
+                                                            "bg-blue-500/10 text-blue-700 border-blue-500/30 dark:bg-[var(--ui-interactive-soft)] dark:text-[var(--ui-interactive)] dark:border-[var(--ui-interactive-border)]"
                                                         )}
                                                         title={displayEmail}
                                                     >
-                                                        <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", theme.dot)} />
+                                                        <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-500 dark:bg-[var(--ui-interactive)]" />
                                                         <span className="truncate">{displayEmail}</span>
                                                     </span>
                                                 ) : (
@@ -1296,7 +1295,7 @@ export default function Instances() {
                                         {/* Colorful Gemini Quota & Weekly Progress Bar */}
                                         <div className="mb-2.5">
                                             {(geminiModel || weeklyQuota) ? (
-                                                <div className="p-2.5 rounded-md bg-gray-50/90 dark:bg-[#0c2438]/90 border border-gray-200/70 dark:border-[#15334d] space-y-2">
+                                                <div className="p-2.5 rounded-md bg-gray-50/90 dark:bg-[var(--ui-surface-2)] border border-gray-200/70 dark:border-[var(--ui-border-subtle)] space-y-2">
                                                     {geminiModel && (
                                                         <div className="space-y-1">
                                                             <div className="flex items-center justify-between text-xs">
@@ -1745,8 +1744,8 @@ export default function Instances() {
                                             "absolute inset-0 bg-gradient-to-r transition-all duration-300 ease-out transform",
                                             theme.accentBar,
                                             isActive
-                                                ? "opacity-60 scale-x-100 group-hover:opacity-100 group-hover:shadow-[0_0_8px_rgba(59,130,246,0.5)]"
-                                                : "opacity-0 scale-x-95 group-hover:opacity-100 group-hover:scale-x-100 group-hover:shadow-[0_0_8px_rgba(59,130,246,0.3)]"
+                                                ? "opacity-60 scale-x-100 group-hover:opacity-100"
+                                                : "opacity-0 scale-x-95 group-hover:opacity-100 group-hover:scale-x-100"
                                         )}
                                     />
                                 </div>
