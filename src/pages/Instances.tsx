@@ -1297,11 +1297,11 @@ export default function Instances() {
                                         </div>
 
                                         {/* Colorful Gemini Quota & Weekly Progress Bar */}
-                                        <div className="mb-2.5">
+                                        <div className="mb-2">
                                             {(geminiModel || weeklyQuota) ? (
-                                                <div className="p-2.5 rounded-md bg-gray-50/90 dark:bg-[var(--ui-surface-2)] border border-gray-200/70 dark:border-[var(--ui-border-subtle)] space-y-2">
+                                                <div className="p-2 rounded-md bg-gray-50/90 dark:bg-[var(--ui-surface-2)] border border-gray-200/70 dark:border-[var(--ui-border-subtle)] space-y-1.5">
                                                     {geminiModel && (
-                                                        <div className="space-y-1">
+                                                        <div className="space-y-0.5">
                                                             <div className="flex items-center justify-between text-xs">
                                                                 <div className="flex items-center gap-1.5 min-w-0">
                                                                     <Gemini.Color className="w-3.5 h-3.5 shrink-0" />
@@ -1317,7 +1317,7 @@ export default function Instances() {
                                                         </div>
                                                     )}
                                                     {weeklyQuota && (
-                                                        <div className={cn("space-y-1", geminiModel && "pt-1.5 border-t border-gray-200/60 dark:border-[#15334d]/60")}>
+                                                        <div className={cn("space-y-0.5", geminiModel && "pt-1 border-t border-gray-200/60 dark:border-[#15334d]/60")}>
                                                             <div className="flex items-center justify-between text-xs">
                                                                 <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">
                                                                     Weekly Quota

@@ -151,6 +151,27 @@ impl SupabaseClient {
         format!("{}/rest/v1/rpc/{}", self.base_url, function_name)
     }
 
+    /// Classify a reqwest transport error into an actionable user-facing message
+    /// so users see likely causes and next steps instead of a raw error string.
+    fn classify_transport_error(&self, e: &reqwest::Error) -> String {
+        if e.is_timeout() {
+            format!(
+                "Connection timed out reaching {}. The Supabase project may be paused (free-tier projects pause after inactivity) or the network may be blocking it. Verify the project is active in the Supabase dashboard, then press Test again.",
+                self.base_url
+            )
+        } else if e.is_connect() {
+            format!(
+                "Cannot connect to {} (DNS/connection refused). The project URL may be wrong or the project deleted/paused. Verify the project URL in the Supabase dashboard.",
+                self.base_url
+            )
+        } else {
+            format!(
+                "Network request to {} failed: {}. Check the URL, API key, and that no firewall/proxy blocks the connection.",
+                self.base_url, e
+            )
+        }
+    }
+
     /// Test the connection to the Supabase endpoint using a resilient multi-stage probe ladder:
     /// 1. Query root `/rest/v1/` with API key & Bearer token.
     /// 2. If 404 (due to Supabase blocking OpenAPI spec for anon keys or disabled OpenAPI),
@@ -191,7 +212,7 @@ impl SupabaseClient {
             Err(e) => {
                 return Ok(EndpointTestResult {
                     is_success: false,
-                    message: format!("Network connection failed: {}", e),
+                    message: self.classify_transport_error(&e),
                     status_code: None,
                 });
             }

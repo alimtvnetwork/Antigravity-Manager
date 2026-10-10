@@ -758,9 +758,15 @@ Here are my Supabase details:
                                                 {ep.role} DB
                                             </span>
                                             {ep.is_enabled ? (
-                                                <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                                                    Active
-                                                </span>
+                                                result && !result.isSuccess ? (
+                                                    <span className="text-[10px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">
+                                                        Unreachable
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                                        Active
+                                                    </span>
+                                                )
                                             ) : (
                                                 <span className="text-[10px] text-gray-500 bg-gray-500/10 px-1.5 py-0.5 rounded">
                                                     Disabled

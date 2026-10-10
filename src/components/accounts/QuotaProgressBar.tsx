@@ -42,7 +42,7 @@ export function QuotaProgressBar({
     isWeeklyConstrained = false,
     className,
     compact = false,
-    heightClassName = compact ? "h-2" : "h-3",
+    heightClassName = compact ? "h-3" : "h-3.5",
     checkpoints = [100, 75, 50, 25, 0],
     showCheckpoints = true,
     Icon,
@@ -69,7 +69,7 @@ export function QuotaProgressBar({
     const sortedCheckpoints = [...activeCheckpoints].sort((a, b) => b - a);
 
     return (
-        <div className={cn("w-[82%] max-w-[82%] flex items-center", compact ? "gap-1.5" : "gap-2", className)}>
+        <div className={cn("w-[84%] max-w-[84%] flex items-center", compact ? "gap-1" : "gap-2", className)}>
             {/* Optional Icon / Label on Left */}
             {(Icon || label) && (
                 <div className="flex items-center gap-1 shrink-0 max-w-[18%] min-w-0 text-slate-700 dark:text-slate-300">
@@ -124,7 +124,7 @@ export function QuotaProgressBar({
                             key={cp}
                             className={cn(
                                 "absolute top-1/2 rounded-full flex items-center justify-center transition-all duration-300 z-10 pointer-events-none border-[1.5px]",
-                                compact ? "w-2.5 h-2.5" : "w-3.5 h-3.5",
+                                compact ? "w-3 h-3" : "w-3.5 h-3.5",
                                 isFilled
                                     ? (cp >= 50
                                         // Restrained glow only at the current endpoint in the healthy range
@@ -163,7 +163,7 @@ export function QuotaProgressBar({
             </div>
 
             {/* Single Column for Remaining Time and Percentage */}
-            <div className={cn("flex flex-col items-end shrink-0 w-[18%] max-w-[18%]", compact ? "leading-none" : "leading-tight")}>
+            <div className={cn("flex flex-col items-end shrink-0 w-[16%] max-w-[16%]", compact ? "leading-none" : "leading-tight")}>
                 {resetTime ? (
                     <span
                         className={cn(

@@ -652,7 +652,7 @@ function AccountRowContent({
             </td>
 
             {/* 4H 模型配额列 */}
-            <td className="px-2.5 py-0.5 align-middle min-w-[210px] bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#15334d] border-b border-slate-200/90 dark:border-slate-800/90">
+            <td className="px-2 py-px align-middle min-w-[210px] bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#15334d] border-b border-slate-200/90 dark:border-slate-800/90">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <div className={cn(
                         "flex items-center justify-center gap-1.5 py-0.5 px-2 rounded-md border group/error",
@@ -693,7 +693,7 @@ function AccountRowContent({
             </td>
 
             {/* Weekly 配额列 */}
-            <td className="px-2.5 py-0.5 align-middle min-w-[210px] bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#15334d] border-b border-slate-200/90 dark:border-slate-800/90">
+            <td className="px-2 py-px align-middle min-w-[210px] bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#15334d] border-b border-slate-200/90 dark:border-slate-800/90">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <span className="text-[10px] text-gray-400 italic">--</span>
                 ) : (

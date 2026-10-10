@@ -42,6 +42,11 @@ export const enterMiniMode = async (contentHeight: number, shouldCenter: boolean
         }
     } catch (error) {
         console.error('Failed to enter mini mode:', error);
+        // Tracked in the error module; window keeps current state, user can toggle manually.
+        useErrorStore.getState().trackWarning(error, {
+          source: 'windowManager.enterMiniMode',
+          triggerAction: 'enter_mini_mode',
+        });
     }
 };
 

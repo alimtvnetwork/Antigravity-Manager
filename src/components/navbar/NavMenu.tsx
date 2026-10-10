@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Users, Laptop, Settings, Menu, Check } from 'lucide-react';
+import { Users, Laptop, Settings, Menu, Check, Download } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useClickOutside } from './NavDropdowns';
 import { isActive, type NavItem } from './constants';
 import { useConfigStore } from '../../stores/useConfigStore';
+import { useUpdateStore } from '../../stores/use-update-store';
+import { showToast } from '../common/ToastContainer';
 import { cn } from '../../utils/cn';
 
 interface NavMenuProps {
@@ -57,15 +59,45 @@ export function NavMenu({ navItems }: NavMenuProps) {
     const activeDropdownItem = dropdownNavItems.find(item => isActive(location.pathname, item.path));
     const isDropdownRouteActive = Boolean(activeDropdownItem);
 
+    // Segmented capsule rounding: first visible button gets the circular left
+    // edge, the last gets the circular right edge, middle buttons stay
+    // rectangular so the three join into one continuous pill.
+    const visibleDirect = [accountsItem, instancesItem, settingsItem].filter(
+        (x): x is NavItem => Boolean(x)
+    );
+    const segRounding = (item: NavItem) => {
+        const i = visibleDirect.indexOf(item);
+        if (visibleDirect.length <= 1) return 'rounded-full';
+        if (i === 0) return 'rounded-l-full rounded-r-none';
+        if (i === visibleDirect.length - 1) return 'rounded-l-none rounded-r-full';
+        return 'rounded-none';
+    };
+
+    const checkForUpdates = useUpdateStore((s) => s.checkForUpdates);
+    const handleCheckUpdates = async () => {
+        setIsMenuOpen(false);
+        const info = await checkForUpdates(true);
+        if (info?.has_update) {
+            // The UpdateNotification card appears automatically via the store.
+            return;
+        }
+        if (info) {
+            showToast(t('nav.update_up_to_date', 'You are on the latest version'), 'success');
+        } else {
+            showToast(t('nav.update_check_failed', 'Could not check for updates'), 'error');
+        }
+    };
+
     return (
-        <div className="flex items-center rounded-full bg-gray-100 dark:bg-[#0c2438] border border-gray-200/60 dark:border-[#15334d] p-0.5 shadow-xs">
+        <div className="flex items-center rounded-full bg-gray-100 dark:bg-[#0c2438] border border-gray-200/60 dark:border-[#15334d] p-0.5 shadow-xs divide-x divide-gray-200/70 dark:divide-[#15334d]/70">
             {/* 1. Accounts direct button */}
             {accountsItem && (
                 <Link
                     to="/accounts"
                     draggable="false"
                     className={cn(
-                        "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all duration-150 cursor-pointer select-none",
+                        "flex items-center gap-1.5 px-3 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none",
+                        segRounding(accountsItem),
                         isAccountsActive
                             ? "bg-blue-600 text-white shadow-xs"
                             : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#15334d]"
@@ -83,7 +115,8 @@ export function NavMenu({ navItems }: NavMenuProps) {
                     to="/instances"
                     draggable="false"
                     className={cn(
-                        "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all duration-150 cursor-pointer select-none",
+                        "flex items-center gap-1.5 px-3 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none",
+                        segRounding(instancesItem),
                         isInstancesActive
                             ? "bg-blue-600 text-white shadow-xs"
                             : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#15334d]"
@@ -101,7 +134,8 @@ export function NavMenu({ navItems }: NavMenuProps) {
                     to="/settings"
                     draggable="false"
                     className={cn(
-                        "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all duration-150 cursor-pointer select-none",
+                        "flex items-center gap-1.5 px-3 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none",
+                        segRounding(settingsItem),
                         isSettingsActive
                             ? "bg-blue-600 text-white shadow-xs"
                             : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#15334d]"
@@ -140,6 +174,18 @@ export function NavMenu({ navItems }: NavMenuProps) {
                 {/* Dropdown Menu */}
                 {isMenuOpen && (
                     <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-60 max-w-[calc(100vw-32px)] bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-200 dark:border-slate-800 py-1.5 z-[9999] animate-in fade-in zoom-in-95 duration-150 origin-top">
+                        {/* Update section */}
+                        <div className="px-1.5 pb-1.5 mb-1 border-b border-gray-100 dark:border-slate-800">
+                            <button
+                                type="button"
+                                onClick={handleCheckUpdates}
+                                className="w-full px-3 py-2 text-left text-xs flex items-center gap-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors cursor-pointer text-gray-700 dark:text-gray-300"
+                                title={t('nav.check_for_updates_title', 'Check for a new version now')}
+                            >
+                                <Download className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                                <span className="font-medium">{t('nav.check_for_updates', 'Check for Updates')}</span>
+                            </button>
+                        </div>
                         <div className="flex items-center justify-between px-3 py-1 border-b border-gray-100 dark:border-slate-800 text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
                             <span>{t('common.more_views', 'More Views')}</span>
                             {activeDropdownItem && (

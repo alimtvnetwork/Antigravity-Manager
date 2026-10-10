@@ -4765,6 +4765,29 @@ pub fn import_instances_json(json_str: &str) -> Result<Vec<InstanceConfig>, Stri
 }
 
 /// Clone or create an isolated executable for an instance regardless of OS
+/// True when an existing Windows executable clone still matches the current base
+/// executable (same size and not older). Instance executables on Windows are
+/// hard links/copies that go stale when the Antigravity updater replaces the
+/// base binary, so a stale clone must be dropped and re-linked.
+#[cfg(target_os = "windows")]
+fn exe_clone_is_fresh(base_exe: &Path, clone_path: &Path) -> bool {
+    let base_meta = match std::fs::metadata(base_exe) {
+        Ok(m) => m,
+        Err(_) => return false,
+    };
+    let clone_meta = match std::fs::metadata(clone_path) {
+        Ok(m) => m,
+        Err(_) => return false,
+    };
+    if base_meta.len() != clone_meta.len() {
+        return false;
+    }
+    match (base_meta.modified(), clone_meta.modified()) {
+        (Ok(base_mtime), Ok(clone_mtime)) => clone_mtime >= base_mtime,
+        _ => false,
+    }
+}
+
 pub fn clone_instance_executable(instance_id: &str) -> Result<String, crate::error::AppError> {
     let mut registry = load_registry().map_err(crate::error::AppError::Config)?;
     let pos = registry
@@ -4790,6 +4813,21 @@ pub fn clone_instance_executable(instance_id: &str) -> Result<String, crate::err
     let cloned_path = {
         let parent_dir = base_exe.parent().unwrap_or(&instance_bin_dir);
         let target_in_parent = parent_dir.join(format!("Antigravity-{}.exe", instance_id));
+        // Refresh stale clones: if the base executable was updated (size/mtime
+        // changed because the updater replaced the file), the existing hard
+        // link/copy still points at the old binary — drop it so a fresh
+        // link/copy is created below instead of silently reusing the stale one.
+        if target_in_parent.exists() && !exe_clone_is_fresh(&base_exe, &target_in_parent) {
+            crate::modules::logger::log_info(&format!(
+                "[Instance] Refreshing stale executable clone for instance '{}'",
+                instance_id
+            ));
+            // Justification: the stale clone is immediately replaced by a fresh link/copy below
+            crate::error::record_ignored(
+                std::fs::remove_file(&target_in_parent),
+                "remove stale executable clone",
+            );
+        }
         let has_target = target_in_parent.exists();
         if has_target {
             target_in_parent

@@ -1727,7 +1727,16 @@ export default function PromptTreeViewModal({
             }
         }
 
-        if (!conv && !proj) return;
+        if (!conv && !proj) {
+            // Visible no-op guard: previously a silent return that made the
+            // Send button appear dead with no feedback.
+            useErrorStore.getState().trackWarning('Send: no conversation or project resolved', {
+                source: 'PromptTreeViewModal.handleResendPrompt',
+                triggerAction: 'resolve_send_target',
+            });
+            setError('Send failed: no conversation or project could be resolved — select a prompt first.');
+            return;
+        }
 
         try {
             setIsResending(true);
@@ -1869,7 +1878,16 @@ ${activePromptText}
 
     // Handle Enqueue Prompt Action (Calls FIFO scheduler queue / writes queue task)
     const handleEnqueuePrompt = async () => {
-        if (!selectedConversation) return;
+        if (!selectedConversation) {
+            // Visible no-op guard: previously a silent return that made the
+            // Queue button appear dead with no feedback.
+            useErrorStore.getState().trackWarning('Queue: no conversation selected', {
+                source: 'PromptTreeViewModal.handleEnqueuePrompt',
+                triggerAction: 'resolve_queue_target',
+            });
+            setError('Queue failed: no conversation selected — select a prompt first.');
+            return;
+        }
         try {
             setIsEnqueueing(true);
             setActionMsg('Enqueueing prompt into FIFO scheduler queue...');
