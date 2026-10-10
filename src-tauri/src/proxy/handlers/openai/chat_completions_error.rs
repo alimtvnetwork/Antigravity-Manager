@@ -35,6 +35,7 @@ pub(crate) async fn chat_completions_error(
     retry_state: &mut RequestRetryState,
     retried_without_thinking: &mut bool,
     max_attempts: usize,
+    attempt: usize,
     token_manager: Arc<TokenManager>,
     client_adapter: Option<Arc<dyn ClientAdapter>>,
     pool_size: usize,

@@ -401,6 +401,7 @@ pub async fn handle_chat_completions(
                 &mut failure_statuses,
                 &mut last_error,
                 &mut image_permit,
+                0,
             )
             .await?
             {
@@ -422,6 +423,7 @@ pub async fn handle_chat_completions(
                 &mut retry_state,
                 &mut retried_without_thinking,
                 max_attempts,
+                0,
                 token_manager.clone(),
                 client_adapter.clone(),
                 pool_size,

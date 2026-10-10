@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use axum::http::StatusCode;
+use bytes::Bytes;
 use serde_json::{json, Value};
 use tracing::{debug, error, info};
 
@@ -34,6 +35,7 @@ pub(crate) async fn chat_completions_success(
     failure_statuses: &mut FailureStatusTracker,
     last_error: &mut String,
     image_permit: &mut Option<crate::proxy::server::ImagePermit>,
+    attempt: usize,
 ) -> Result<ChatAttemptOutcome, (StatusCode, String)> {
     let ChatSendOutput {
         response,
