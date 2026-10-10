@@ -3571,11 +3571,20 @@ pub fn send_prompt_now_for_instance(
         }
     }
 
-    // 4. Dispatch via agy CLI execution
+    // 4. Dispatch via agy CLI execution. A failed spawn must surface as an
+    // error: returning Ok here previously made the UI report "Dispatched!"
+    // while nothing reached the IDE (agy binary missing, workspace dir
+    // missing, or another worker active all return false from the spawner).
     let spawned = spawn_prompt_via_agy(&active_prompt);
+    if !spawned {
+        return Err(format!(
+            "prompt '{}' recorded but agy CLI dispatch failed for instance '{}' (agy executable not found, workspace directory missing, or another dispatch already active for this workspace — see logs)",
+            active_prompt.id, canonical_inst
+        ));
+    }
     crate::modules::logger::log_info(&format!(
-        "[RepoDB] send_prompt_now_for_instance dispatched prompt '{}' (spawned: {}) for instance '{}' in '{}'",
-        active_prompt.id, spawned, canonical_inst, repo_path
+        "[RepoDB] send_prompt_now_for_instance dispatched prompt '{}' for instance '{}' in '{}'",
+        active_prompt.id, canonical_inst, repo_path
     ));
 
     Ok(active_prompt)
