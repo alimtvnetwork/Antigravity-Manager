@@ -1,7 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.173.0)
-> Professional AI Account Management & Protocol Proxy System (v4.175.0)
-> Professional AI Account Management & Protocol Proxy System (v4.166.0)
+> Professional AI Account Management & Protocol Proxy System (v4.176.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -12,9 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.173.0-blue?style=flat-square" alt="Version">
-      <img src="https://img.shields.io/badge/Version-4.175.0-blue?style=flat-square" alt="Version">
-      <img src="https://img.shields.io/badge/Version-4.166.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.176.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -510,7 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
-> Latest version **v4.173.0**: Smart Process Cache Warm-Up, Closed-PID Recovery & Adaptive Queue Ticker — initialized `warm_up_smart_process_cache` on startup to pre-warm cached PIDs across instances; added closed-PID recovery and zero-relaunch guarantee in `ensure_instance_running_smart` to eliminate repeated IDE launches; added adaptive FIFO background prompt queue scheduler (5s active / 30s idle) with canonical `resume_task_document(...)` serialization; compacted Prompt Tree View sidebar tags (removing `{totalProjectPrompts} prompts` and `{conv.step_count} stp`, setting project actions to hover-only), stripped bracket noise (`#P001`, `C001`), and eradicated ghost running indicators on idle projects and instance cards. (Thanks to @aukgit)
+> Latest version **v4.176.0**: Smart Process Cache Warm-Up, Closed-PID Recovery & Adaptive Queue Ticker — initialized `warm_up_smart_process_cache` on startup to pre-warm cached PIDs across instances; added closed-PID recovery and zero-relaunch guarantee in `ensure_instance_running_smart` to eliminate repeated IDE launches; added adaptive FIFO background prompt queue scheduler (5s active / 30s idle) with canonical `resume_task_document(...)` serialization; compacted Prompt Tree View sidebar tags (removing `{totalProjectPrompts} prompts` and `{conv.step_count} stp`, setting project actions to hover-only), stripped bracket noise (`#P001`, `C001`), and eradicated ghost running indicators on idle projects and instance cards. (Thanks to @aukgit)
 > Latest version **v4.175.0**: UI refinement — centralized semantic color tokens, quota bars rebuilt as one continuous red→green scale, account/email hover fixed, calmer active-instance treatment; plus Prompt Tree Send/Queue fix — the buttons reported false success while the IDE dispatch silently failed, now surfacing real errors. (Thanks to @aukgit)
 > Latest version **v4.174.0**: CI green — fixed `error[E0609]: no field 'instance' on type 'CliContext'` at two call sites in `src-tauri/src/bin/agm.rs` (stale field name left by the instance-process-cache refactor; corrected to `instance_id`), and re-enabled GitHub Actions on the fork (GitHub had auto-disabled workflows because it is a fork) — CI now passes all 7 jobs. (Thanks to @aukgit)
 > Latest version **v4.173.0**: Updater honesty fixes — corrected the in-app update checker's download link (it pointed at the upstream `lbjlaq` repo instead of this fork) and removed phantom binary-asset URLs from `releases-manifest.json` for the notes-only releases v4.168.0–v4.172.0 so the installer no longer chases dead download links. (Thanks to @aukgit)

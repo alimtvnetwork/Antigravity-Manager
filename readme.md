@@ -22,10 +22,9 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.173.0-3B82F6?style=flat-square" alt="Version v4.173.0">
-    <img src="https://img.shields.io/badge/Version-v4.175.0-3B82F6?style=flat-square" alt="Version v4.175.0">
-    <img src="https://img.shields.io/badge/Version-v4.166.0-3B82F6?style=flat-square" alt="Version v4.166.0">
+    <img src="https://img.shields.io/badge/Version-v4.176.0-3B82F6?style=flat-square" alt="Version v4.176.0">
   </a>
+
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust Backend">
   <img src="https://img.shields.io/badge/Frontend-React%2019-61DAFB?style=flat-square" alt="React 19">
@@ -116,9 +115,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.173.0)**
-**Bar 2: Version-Based Installation (v4.175.0)**
-**Bar 2: Version-Based Installation (v4.166.0)**
+**Bar 2: Version-Based Installation (v4.176.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -469,7 +466,7 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
 
 ## 🔄 What's New
 
-- **v4.173.0** (2026-10-10):
+- **v4.176.0** (2026-10-10):
   - **Smart Instance Process Cache Warm-Up & Closed-PID Recovery**: Initialized `warm_up_smart_process_cache` on startup to pre-warm the process cache across instances; implemented closed-PID vitality promotion and fresh OS re-scans before declaring instances offline, enforcing a strict zero-relaunch guarantee and eliminating repeated IDE reopening. (Thanks to @aukgit)
   - **Adaptive FIFO Prompt Queue Background Ticker**: Enhanced `start_prompt_queue_scheduler` to dynamically tick every 5s when queued prompts exist and back off to 30s when empty, enforcing strict First-In-First-Out ordering (`ORDER BY created_at ASC, id ASC`) and standardizing `.antigravity_resume_task.json` through `resume_task_document(...)`. (Thanks to @aukgit)
   - **Prompt Tree View UI Tag Compaction & Bracket Stripping**: Removed redundant `{totalProjectPrompts} prompts` tags and `{conv.step_count} stp` pills from default view, converted project action buttons to hover-only, and stripped outer bracket clutter (`#P001`, `C001`). (Thanks to @aukgit)

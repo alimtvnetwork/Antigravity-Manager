@@ -77,9 +77,7 @@ export default function MiniView() {
                     console.error('Failed to get app version:', error);
                 }
             } else {
-                setAppVersion(versionData.version || versionData.Version || '4.173.0');
-                setAppVersion(versionData.version || versionData.Version || '4.175.0');
-                setAppVersion(versionData.version || versionData.Version || '4.166.0');
+                setAppVersion(versionData.version || versionData.Version || '4.176.0');
             }
         };
         fetchVersion();

@@ -310,6 +310,19 @@ fn init_tables(conn: &Connection) -> Result<(), String> {
 
 /// Purge corrupted and un-namespaced running_projects rows and clear stale prompt tree cache
 pub fn purge_corrupted_running_projects(conn: &Connection) -> Result<(usize, usize), String> {
+    // 1. Delete any active_prompts referencing corrupted/un-namespaced running_projects to prevent FK constraint failures
+    let _ = conn.execute(
+        "DELETE FROM active_prompts 
+         WHERE project_id IN (
+             SELECT id FROM running_projects 
+             WHERE workspace_storage_path IS NULL 
+                OR trim(workspace_storage_path) = '' 
+                OR instr(id, '__') = 0 
+                OR trim(instance_id) = ''
+         )",
+        [],
+    );
+
     let deleted_projects = conn
         .execute(
             "DELETE FROM running_projects 
@@ -1727,28 +1740,9 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
     let norm_inst = resolved_inst.as_str();
 
     // 0. Dynamic process activity check: If no Antigravity process is actively running for this instance, prompt cannot be executing
-    let (has_active_process, resolved_name, host_pid) = if norm_inst == "default" {
-        let default_dir = crate::modules::instance::get_default_antigravity_data_dir();
-        let pids =
-            crate::modules::instance::find_pids_for_data_dir(&default_dir.to_string_lossy(), true);
-        let is_running = !pids.is_empty();
-        let pid = pids.first().copied();
-        (is_running, "default".to_string(), pid)
-    } else if let Ok(registry) = crate::modules::instance::load_registry() {
-        if let Some(inst) = registry
-            .instances
-            .iter()
-            .find(|i| i.id == norm_inst || i.name == norm_inst)
-        {
-            let is_running =
-                crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
-            (is_running, inst.name.clone(), inst.pid)
-        } else {
-            (false, norm_inst.to_string(), None)
-        }
-    } else {
-        (false, norm_inst.to_string(), None)
-    };
+    let (has_active_process, host_pid, _) =
+        crate::modules::instance::is_instance_process_running_smart(norm_inst);
+    let resolved_name = norm_inst.to_string();
 
     if !has_active_process {
         crate::modules::logger::log_instance_prompt_audit(
@@ -2842,6 +2836,7 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
 
     // 3. Merge with discovered projects from running_projects
     let projects = list_running_projects().unwrap_or_default();
+    let mut seen_keys = std::collections::HashSet::new();
     for p in projects {
         let clean_path = normalize_path_for_compare(&p.repo_path);
         let norm_proj_inst = if p.instance_id == "default" || p.instance_id == "__default__" {
@@ -2853,18 +2848,29 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
                 .unwrap_or_else(|_| p.instance_id.clone())
         };
         let norm_inst = norm_proj_inst.to_lowercase();
+        let dedupe_key = (norm_inst.clone(), clean_path.clone());
+        if !seen_keys.insert(dedupe_key) {
+            continue; // Deduplicate duplicate workspace rows
+        }
 
         let mut is_running = false;
         let mut prompt_snippet = None;
         let mut last_time = p.last_detected_at;
 
-        // Check path match in live_map
-        if let Some((run, snippet, l_time)) = live_map.get(&(norm_inst.clone(), clean_path.clone()))
-        {
-            if *run {
-                is_running = true;
-                prompt_snippet = snippet.clone();
-                last_time = *l_time;
+        // Gate 0: Host process must be running on OS for any project to be actively running
+        let (is_inst_alive, _, _) =
+            crate::modules::instance::is_instance_process_running_smart(&norm_inst);
+
+        // Check path match in live_map only when host instance is actively running
+        if is_inst_alive {
+            if let Some((run, snippet, l_time)) =
+                live_map.get(&(norm_inst.clone(), clean_path.clone()))
+            {
+                if *run {
+                    is_running = true;
+                    prompt_snippet = snippet.clone();
+                    last_time = *l_time;
+                }
             }
         }
 
