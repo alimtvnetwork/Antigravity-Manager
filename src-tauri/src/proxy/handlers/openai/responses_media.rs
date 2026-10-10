@@ -1,5 +1,6 @@
 // Responses-media helpers: stream-chunk inspection and content-part parsing.
 use serde_json::{json, Value};
+use super::image_input::{parse_image_data_url_parts, validate_input_image_limits, MAX_INPUT_IMAGE_BYTES};
 
 use crate::proxy::mappers::openai::{OpenAIContent, OpenAIContentBlock};
 
@@ -323,7 +324,6 @@ mod tests {
 use crate::proxy::handlers::openai::image_input::MAX_INPUT_IMAGE_BYTES;
 use crate::proxy::handlers::openai::image_input::validate_input_image_limits;
 use crate::proxy::handlers::openai::image_input::parse_image_data_url_parts;
-use super::image_input::{parse_image_data_url_parts, validate_input_image_limits, MAX_INPUT_IMAGE_BYTES};
 
     fn responses_created_with_null_error_is_not_an_error_event() {
         let chunk = br#"event: response.created

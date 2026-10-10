@@ -302,6 +302,8 @@ use crate::proxy::handlers::openai::responses_history::history_without_inline_me
 use crate::proxy::handlers::openai::responses_media::responses_input_item_type;
 use crate::proxy::handlers::openai::responses_media::validate_responses_input_image_limits;
 use uuid::Uuid;
+use super::responses_history::history_without_inline_media;
+use super::responses_media::{responses_input_item_type, validate_responses_input_image_limits};
     let mut seen_call_ids = HashSet::new();
     let mut filtered = Vec::new();
     for item in items {
