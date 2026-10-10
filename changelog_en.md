@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.178.0 (2026-10-10)**:
+        -   **CI Fix: Duplicate Cargo.lock Version Entry Removed & Bump Script Hardened**:
+            -   **Description**: Fixed `src-tauri/Cargo.lock` TOML parse failure — the `agm-alim` package entry carried two `version` lines (`4.177.0` + stale `4.175.0`), which broke cargo metadata parsing and failed all Rust CI/Release jobs. Removed the stale line and hardened `scripts/bump-version.mjs` so its Cargo.lock replacement collapses any run of duplicate version lines into exactly one instead of preserving them. (Thanks to @aukgit)
+
     *   **v4.177.0 (2026-10-10)**:
         -   **Smart Instance Process Cache Warm-Up, Closed-PID Recovery & Reopen Elimination**:
             -   **Description**: Initialized `warm_up_smart_process_cache` on startup in both desktop and headless modes (`src-tauri/src/modules/instance.rs`, `src-tauri/src/lib.rs`) to pre-warm cached PIDs across instances; implemented closed-PID vitality promotion and fresh OS re-scans before declaring instances offline, enforcing a strict zero-relaunch guarantee in `ensure_instance_running_smart` and protecting active IDE processes in `launch_instance_inner_with_extra_workspaces`. (Thanks to @aukgit)
