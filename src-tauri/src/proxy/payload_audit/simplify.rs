@@ -1,6 +1,6 @@
 use super::*;
 
-fn truncate_chars(s: &str, max: usize) -> String {
+pub(crate) fn truncate_chars(s: &str, max: usize) -> String {
     let mut out = String::new();
     for (i, ch) in s.chars().enumerate() {
         if i >= max {
@@ -143,7 +143,7 @@ pub fn simplify_message(msg: &Value) -> Value {
 
 /// OpenAI Responses 的 `input` 项结构与 chat message 不同（`type` / `call_id` / `arguments` /
 /// `output` 等），单独裁剪：沿用 `simplify_message` 的体积控制，再补回调试必需的字段。
-fn simplify_responses_input_item(item: &Value) -> Value {
+pub(crate) fn simplify_responses_input_item(item: &Value) -> Value {
     let mut out = simplify_message(item);
     if let Some(obj) = out.as_object_mut() {
         for key in ["type", "role", "call_id", "arguments", "output"] {
@@ -155,7 +155,7 @@ fn simplify_responses_input_item(item: &Value) -> Value {
     out
 }
 
-fn simplify_content(content: &Value) -> Value {
+pub(crate) fn simplify_content(content: &Value) -> Value {
     match content {
         Value::String(s) => Value::String(s.clone()),
         Value::Array(arr) => Value::Array(
@@ -252,6 +252,6 @@ fn simplify_content(content: &Value) -> Value {
 }
 
 /// Fully preserves tools Schema (functionDeclarations, parameters, googleSearch, etc.) for debugging
-fn simplify_tools(tools: &Value) -> Value {
+pub(crate) fn simplify_tools(tools: &Value) -> Value {
     tools.clone()
 }

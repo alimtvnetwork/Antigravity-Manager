@@ -2,6 +2,7 @@
 use super::responses_history::history_without_inline_media;
 use super::responses_media::{responses_input_item_type, validate_responses_input_image_limits};
 use serde_json::{json, Value};
+use uuid::Uuid;
 
 use super::websocket::WebsocketSessionState;
 

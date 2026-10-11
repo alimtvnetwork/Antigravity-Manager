@@ -4,6 +4,9 @@ use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::time::Duration;
 
 use super::*;
+use super::sensors::check_quota_drop_sensor;
+use super::sensors::check_idle_projects_sensor;
+use super::sensors::poll_inbox_cycle;
 
 pub(crate) fn determine_inbox_interval(
     settings: &email_vault_db::EmailNotificationSettings,
@@ -78,7 +81,7 @@ async fn execute_heartbeat_tick(
     }
 }
 
-async fn run_watcher_heartbeat_loop() {
+pub(crate) async fn run_watcher_heartbeat_loop() {
     // Enforce 60-second startup quiet period: nothing runs until 1 minute after launch
     tokio::time::sleep(Duration::from_secs(60)).await;
 

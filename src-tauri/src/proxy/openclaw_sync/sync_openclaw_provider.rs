@@ -1,4 +1,5 @@
 use super::*;
+use super::acquire_openclaw_config_lock::OPENCLAW_CONFIG_FILE;
 
 pub fn sync_openclaw_provider(
     proxy_url: String,

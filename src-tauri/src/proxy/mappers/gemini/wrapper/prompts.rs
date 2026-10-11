@@ -68,7 +68,7 @@ The structure MUST be as follows:
 4. The thinking signature must be copied exactly, no modifications
 "#;
 
-async fn try_compress_gemini_with_summary(
+pub(crate) async fn try_compress_gemini_with_summary(
     original_request: &Value,
     trace_id: &str,
     token_manager: &std::sync::Arc<crate::proxy::TokenManager>,

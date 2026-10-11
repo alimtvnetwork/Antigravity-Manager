@@ -48,7 +48,7 @@ fn mark_thinking_imported(conn: &Connection) {
 
 /// Copy old thinking rows out of proxy_logs.db into thinking_store.db.
 /// Never deletes the log DB. Old uncompressed rows stay readable via unpack_thought.
-fn migrate_thinking_from_logs() -> Result<(), String> {
+pub(crate) fn migrate_thinking_from_logs() -> Result<(), String> {
     let conn = thinking_db()?;
     let imported: Option<String> = conn
         .query_row(

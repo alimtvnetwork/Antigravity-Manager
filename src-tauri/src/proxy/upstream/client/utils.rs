@@ -1,7 +1,7 @@
 use super::*;
 
 /// 派生确定性 UUID 格式的客户端窗口 Session ID (RFC 4122 v4 格式)
-fn derive_session_uuid(seed: &str) -> String {
+pub(crate) fn derive_session_uuid(seed: &str) -> String {
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
     hasher.update(b"antigravity-session-v1:");

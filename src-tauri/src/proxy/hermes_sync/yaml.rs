@@ -1,4 +1,5 @@
 use super::*;
+use super::types::BACKUP_SUFFIX;
 
 pub fn parse_pointer(path: &str) -> Result<JsonPointer, String> {
     JsonPointer::parse(path).map_err(|error| format!("Invalid YAML path {path:?}: {error}"))

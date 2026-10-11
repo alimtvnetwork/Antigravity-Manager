@@ -20,7 +20,7 @@ pub(crate) fn is_tiered_flash_model(model: &str) -> bool {
 
 /// Collect system/developer text without joining. A string content is one block;
 /// a content array contributes one block per text part.
-fn collect_system_instruction_blocks(request: &OpenAIRequest) -> Vec<String> {
+pub(crate) fn collect_system_instruction_blocks(request: &OpenAIRequest) -> Vec<String> {
     let mut blocks = Vec::new();
 
     if let Some(inst) = &request.instructions {

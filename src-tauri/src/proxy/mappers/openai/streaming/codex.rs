@@ -111,7 +111,7 @@ where
             let mut next_output_index: u32 = 0;
             let mut message_output_index: u32 = 0;
             let mut reasoning_output_index: u32 = 0;
-            let mut final_usage: Option<super::models::OpenAIUsage> = None;
+            let mut final_usage: Option<super::super::models::OpenAIUsage> = None;
             let mut heartbeat_interval = tokio::time::interval(std::time::Duration::from_secs(15));
             heartbeat_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
@@ -282,7 +282,7 @@ where
                                                                     let mut args = func_call.get("args").unwrap_or(&json!({})).clone();
 
                                                                     // [FIX #1575 & #3430] 标准化并清洗 shell / PowerShell 等工具参数名称与必填字段
-                                                                    super::response::normalize_and_sanitize_tool_args(name, &mut args);
+                                                                    super::super::response::normalize_and_sanitize_tool_args(name, &mut args);
 
                                                                     let args_str = serde_json::to_string(&args).unwrap_or_default();
 
@@ -294,6 +294,8 @@ where
                                                                             let mut hasher = std::collections::hash_map::DefaultHasher::new();
                                                                             use std::hash::{Hash, Hasher};
     use crate::proxy::mappers::openai::streaming::openai::store_thought_signature;
+use super::openai::extract_usage_metadata;
+use super::openai::store_thought_signature;
                                                                             call_key.hash(&mut hasher);
                                                                             sequence_number.hash(&mut hasher);
                                                                             std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos().hash(&mut hasher);

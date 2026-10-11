@@ -6,6 +6,7 @@ use crate::proxy::token_manager::ProxyToken;
 
 use super::helpers::flatten_tools;
 use serde_json::{json, Value};
+use super::helpers::collect_system_instruction_blocks;
 
 pub(crate) struct SystemState {
     pub system_instructions: Vec<String>,

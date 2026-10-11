@@ -7,7 +7,7 @@ use super::*;
 ///
 /// Best-effort: returns `None` on any failure so that the primary 5h quota fetch
 /// (fetchAvailableModels) is never blocked by this auxiliary endpoint.
-async fn fetch_quota_summary(
+pub(crate) async fn fetch_quota_summary(
     access_token: &str,
     email: &str,
     project_id: Option<&str>,

@@ -12,6 +12,7 @@ use super::handlers::get_current_account;
 use super::handlers::get_logs;
 use super::handlers::list_accounts;
 use super::*;
+use super::handlers::{health, switch_account, refresh_all_quotas, bind_device};
 
 // ============================================================================
 // Server

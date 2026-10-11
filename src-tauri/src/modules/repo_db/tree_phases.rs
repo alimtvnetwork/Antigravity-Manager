@@ -9,7 +9,7 @@ use crate::modules::repo_db::failed_commands::decode_uri_to_path;
 use crate::modules::repo_db::gemini_dirs::gemini_dirs_tagged;
 use crate::modules::repo_db::project_queries::normalize_path_for_compare;
 use chrono::Utc;
-use rusqlite::params;
+use rusqlite::{params, Connection};
 use std::path::Path;
 
 pub(crate) fn transition_stale_inflight_prompts(now: i64) {

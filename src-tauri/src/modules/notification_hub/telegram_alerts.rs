@@ -4,7 +4,7 @@ use crate::modules::telegram_inbound;
 use super::*;
 
 /// Helper to render and dispatch Telegram switch notification
-async fn dispatch_telegram_switch_alert(
+pub(crate) async fn dispatch_telegram_switch_alert(
     details: &SwitchNotificationDetails,
 ) -> Result<String, String> {
     let config = match telegram_inbound::load_config() {

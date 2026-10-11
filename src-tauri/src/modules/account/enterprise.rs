@@ -21,7 +21,7 @@ pub(crate) fn normalize_project_id(project_id: Option<&str>) -> Option<String> {
         .map(ToOwned::to_owned)
 }
 
-async fn ensure_enterprise_project_ready(account: &mut Account) -> Result<(), String> {
+pub(crate) async fn ensure_enterprise_project_ready(account: &mut Account) -> Result<(), String> {
     if !is_enterprise_client(account.token.oauth_client_key.as_deref()) {
         return Ok(());
     }

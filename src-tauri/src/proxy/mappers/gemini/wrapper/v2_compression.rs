@@ -2,6 +2,7 @@
 // NOTE: wrap_request_v2 underwent behavior-preserving phase extraction
 // to bring files under 500 lines.
 use serde_json::json;
+use super::prompts::try_compress_gemini_with_summary;
 
 pub(crate) fn phase_compression(
     inner_request: &mut serde_json::Value,

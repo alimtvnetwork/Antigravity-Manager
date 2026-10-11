@@ -9,6 +9,7 @@ use super::ContextManager;
 use super::PurificationStrategy;
 use serde_json::{json, Value};
 use tracing::{debug, info};
+use super::openai::identify_tool_rounds;
 
 // Claude-side context management (split from context_manager.rs).
 impl ContextManager {

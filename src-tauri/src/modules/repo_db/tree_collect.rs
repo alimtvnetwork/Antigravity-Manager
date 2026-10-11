@@ -153,6 +153,7 @@ pub(crate) fn collect_tree_conversation_items(
                                 continue;
                             }
 
+                            let now = chrono::Utc::now().timestamp();
                             let conv_ts = parse_flexible_timestamp(&last_time_str);
                             let is_recent = conv_ts > 0 && (now - conv_ts <= 60);
 

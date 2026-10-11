@@ -38,7 +38,7 @@ pub fn transform_openai_response(
                         .and_then(|s| s.as_str())
                     {
                         if let Some(sid) = session_id {
-                            super::streaming::store_thought_signature(sig, sid, message_count);
+                            super::super::streaming::store_thought_signature(sig, sid, message_count);
                         }
                     }
 
@@ -292,7 +292,7 @@ pub fn transform_openai_response(
     // and new Interactions API format (total_input_tokens/total_output_tokens/total_thought_tokens/total_cached_tokens)
     let usage = raw.get("usageMetadata").map(|u| {
         let canonical = crate::proxy::pipeline::CanonicalUsage::from_gemini(u);
-        let mut usage = super::models::OpenAIUsage::from(&canonical);
+        let mut usage = super::super::models::OpenAIUsage::from(&canonical);
         usage.input_tokens_by_modality = u.get("input_tokens_by_modality").cloned();
         usage.total_tool_use_tokens = u
             .get("total_tool_use_tokens")

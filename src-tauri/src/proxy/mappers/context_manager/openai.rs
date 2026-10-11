@@ -11,6 +11,7 @@ use super::ContextManager;
 use super::PurificationStrategy;
 use serde_json::{json, Value};
 use tracing::{debug, info};
+use super::estimate_image_tokens_from_url;
 
 // OpenAI-side context management (split from context_manager.rs).
 impl ContextManager {
@@ -213,7 +214,7 @@ struct ToolRound {
 }
 
 /// Identify tool call rounds in the message history
-fn identify_tool_rounds(messages: &[Message]) -> Vec<ToolRound> {
+pub(crate) fn identify_tool_rounds(messages: &[Message]) -> Vec<ToolRound> {
     let mut rounds = Vec::new();
     let mut current_round: Option<ToolRound> = None;
 
@@ -260,12 +261,6 @@ fn identify_tool_rounds(messages: &[Message]) -> Vec<ToolRound> {
     );
 
     rounds
-}
-
-struct OpenAIToolRound {
-    _assistant_index: usize,
-    _tool_indices: Vec<usize>,
-    indices: Vec<usize>,
 }
 
 fn identify_openai_tool_rounds(messages: &[OpenAIMessage]) -> Vec<OpenAIToolRound> {

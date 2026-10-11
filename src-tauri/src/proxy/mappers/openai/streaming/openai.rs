@@ -37,9 +37,9 @@ pub fn store_thought_signature(sig: &str, session_id: &str, message_count: usize
 /// - Old format: candidatesTokenCount = all output tokens (text + thinking + tool)
 /// - New format: total_output_tokens = text + tool output only; thought tokens are separate (total_thought_tokens)
 /// For Codex, we must sum them back together as `completion_tokens`.
-fn extract_usage_metadata(u: &Value) -> Option<super::models::OpenAIUsage> {
+pub(crate) fn extract_usage_metadata(u: &Value) -> Option<super::super::models::OpenAIUsage> {
     let canonical = crate::proxy::pipeline::CanonicalUsage::from_gemini(u);
-    let mut usage = super::models::OpenAIUsage::from(&canonical);
+    let mut usage = super::super::models::OpenAIUsage::from(&canonical);
     usage.input_tokens_by_modality = u.get("input_tokens_by_modality").cloned();
     usage.total_tool_use_tokens = u
         .get("total_tool_use_tokens")
@@ -93,7 +93,7 @@ where
 
     let stream = async_stream::stream! {
         let mut emitted_tool_calls = std::collections::HashSet::new();
-        let mut final_usage: Option<super::models::OpenAIUsage> = None;
+        let mut final_usage: Option<super::super::models::OpenAIUsage> = None;
         let mut error_occurred = false;
         let mut tool_call_index = 0;
         let mut thinking_acc = if let Some(ref a) = causal_anchor {
@@ -167,9 +167,9 @@ where
                                                                     let mut args = func_call.get("args").unwrap_or(&json!({})).clone();
 
                                                                     // [FIX #1575 & #3430] 标准化并清洗 shell / PowerShell 等工具参数名称与必填字段
-                                                                    super::response::normalize_and_sanitize_tool_args(name, &mut args);
+                                                                    super::super::response::normalize_and_sanitize_tool_args(name, &mut args);
 
-                                                                    let final_name = super::response::resolve_shell_tool_name(name, &client_tool_names);
+                                                                    let final_name = super::super::response::resolve_shell_tool_name(name, &client_tool_names);
 
                                                                     let call_id = func_call
                                                                         .get("id")
@@ -399,7 +399,7 @@ where
     let created_ts = Utc::now().timestamp();
 
     let stream = async_stream::stream! {
-        let mut final_usage: Option<super::models::OpenAIUsage> = None;
+        let mut final_usage: Option<super::super::models::OpenAIUsage> = None;
         let mut error_occurred = false;
         let mut thinking_acc = crate::proxy::thinking_store::TurnAccumulator::new();
         let mut heartbeat_interval = tokio::time::interval(std::time::Duration::from_secs(15));

@@ -1,6 +1,7 @@
 // `POST /v1/images/generations`.
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::task::JoinSet;
 
 use axum::{
     body::Body, extract::Json, extract::State, http::StatusCode, response::IntoResponse,

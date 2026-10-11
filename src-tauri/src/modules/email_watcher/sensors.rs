@@ -6,7 +6,7 @@ use chrono::Utc;
 use super::*;
 
 /// Run a single cycle of inbox checking
-async fn poll_inbox_cycle(m_name: &str, m_ip: &str) {
+pub(crate) async fn poll_inbox_cycle(m_name: &str, m_ip: &str) {
     let accounts = match email_vault_db::list_email_accounts() {
         Ok(a) => a,
         Err(_) => return,
@@ -44,7 +44,7 @@ async fn poll_inbox_cycle(m_name: &str, m_ip: &str) {
 }
 
 /// Check quota drop sensor
-async fn check_quota_drop_sensor(
+pub(crate) async fn check_quota_drop_sensor(
     settings: &email_vault_db::EmailNotificationSettings,
     m_name: &str,
     m_ip: &str,
@@ -171,7 +171,7 @@ async fn check_quota_drop_sensor(
 }
 
 /// Check idle running projects sensor
-async fn check_idle_projects_sensor(m_name: &str, m_ip: &str, last_alert: &mut i64) {
+pub(crate) async fn check_idle_projects_sensor(m_name: &str, m_ip: &str, last_alert: &mut i64) {
     // 1. If ANY prompt or conversation is actively running in Antigravity or repo_db, we are NOT idle!
     if crate::modules::repo_db::is_any_prompt_actively_running() {
         return;

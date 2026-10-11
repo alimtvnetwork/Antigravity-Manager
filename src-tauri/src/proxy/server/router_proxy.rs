@@ -1,6 +1,7 @@
 //! Public AI-protocol route table and final app assembly.
 use super::app_state::AppState;
 use crate::proxy::handlers;
+use super::admin_oauth::handle_oauth_callback;
 use crate::proxy::middleware::{
     auth_middleware, cors_layer, ip_filter_middleware, monitor_middleware,
     service_status_middleware,
@@ -8,6 +9,7 @@ use crate::proxy::middleware::{
 use axum::{
     Json,
     extract::DefaultBodyLimit,
+    http::StatusCode,
     response::Response,
     routing::{any, get, post},
     Router,

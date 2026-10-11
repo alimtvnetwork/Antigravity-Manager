@@ -14,7 +14,7 @@ use super::*;
 // ============================================================================
 
 /// GET /health - Health check
-async fn health() -> impl IntoResponse {
+pub(crate) async fn health() -> impl IntoResponse {
     Json(HealthResponse {
         status: "ok".to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
@@ -113,7 +113,7 @@ pub(crate) async fn get_current_account(
 }
 
 /// POST /accounts/switch - Switch account
-async fn switch_account(
+pub(crate) async fn switch_account(
     State(state): State<ApiState>,
     Json(payload): Json<SwitchRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
@@ -174,7 +174,7 @@ async fn switch_account(
 }
 
 /// POST /accounts/refresh - Refresh all quotas
-async fn refresh_all_quotas() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+pub(crate) async fn refresh_all_quotas() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
     logger::log_info("[HTTP API] Starting refresh of all account quotas");
 
     // Execute refresh asynchronously
@@ -203,7 +203,7 @@ async fn refresh_all_quotas() -> Result<impl IntoResponse, (StatusCode, Json<Err
 }
 
 /// POST /accounts/:id/bind-device - Bind device fingerprint
-async fn bind_device(
+pub(crate) async fn bind_device(
     Path(account_id): Path<String>,
     Json(payload): Json<BindDeviceRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
