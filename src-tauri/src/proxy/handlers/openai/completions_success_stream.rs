@@ -350,7 +350,7 @@ pub(crate) async fn completions_success_stream(
                         .cloned()
                         .unwrap_or_default()
                         .into_iter()
-                        .filter_map(into_history_without_inline_media)
+                        .filter_map(|v| into_history_without_inline_media(v))
                         .collect();
                     if store_response {
                         crate::proxy::http_session_store::save_session_delta(
