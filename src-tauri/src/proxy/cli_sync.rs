@@ -27,6 +27,7 @@ pub(crate) use scan_windows_cli_paths::is_safe_path;
 pub(crate) use scan_windows_cli_paths::parse_where_output;
 #[cfg(target_os = "windows")]
 pub(crate) use scan_windows_cli_paths::run_version_command;
+#[cfg(target_os = "windows")]
 pub(crate) use scan_windows_cli_paths::scan_windows_cli_paths;
 pub use scan_windows_cli_paths::CliApp;
 pub use scan_windows_cli_paths::CliConfigFile;

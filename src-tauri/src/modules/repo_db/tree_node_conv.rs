@@ -24,6 +24,11 @@ pub(crate) fn build_transcript_conv_nodes(
     let only_running = ctx.only_running;
     let conn_opt = ctx.conn_opt;
     let registry = ctx.registry;
+    // Instance identity for the current project (used when conv_inst_id matches proj.instance_id)
+    let instance_seq_num: Option<i64> = None;
+    let instance_name: String = proj.instance_id.clone();
+    let instance_exe_name: String =
+        crate::modules::instance::resolve_instance_exe_name(&proj.instance_id, None);
     if let Some(raw_convs) =
         convs_by_inst_and_path.get(&(norm_proj_inst.clone(), norm_path.clone()))
     {
