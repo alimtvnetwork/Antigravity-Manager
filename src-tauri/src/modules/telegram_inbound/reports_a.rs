@@ -377,7 +377,8 @@ pub fn format_fleet_identity_report() -> String {
             accounts.iter().find(|a| Some(&a.id) == curr_id.as_ref())
         });
 
-    let (tier_str, quota_str) = if let Some(acc) = bound_acc {
+    let full_acc = bound_acc.and_then(|a| account::load_account(&a.id).ok());
+    let (tier_str, quota_str) = if let Some(acc) = full_acc.as_ref() {
         let t = acc
             .quota
             .as_ref()

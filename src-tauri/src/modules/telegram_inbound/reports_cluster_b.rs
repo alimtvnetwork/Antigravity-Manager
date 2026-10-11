@@ -1,4 +1,3 @@
-use crate::error::AppError;
 use crate::modules::repo_db;
 use crate::modules::*;
 use serde_json::{json, Value};

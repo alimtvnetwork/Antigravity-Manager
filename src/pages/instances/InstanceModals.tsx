@@ -143,14 +143,14 @@ export function InstanceAttachedModals({ api }: { api: InstancePageApi }) {
         return () => window.removeEventListener('agm:open-instance-backup', handleOpenBackup);
     }, []);
 
-    const isBackupOpen = (api as Record<string, unknown>).isBackupModalOpen !== undefined
-        ? Boolean((api as Record<string, unknown>).isBackupModalOpen)
+    const apiObj = api as unknown as Record<string, unknown>;
+    const isBackupOpen = apiObj.isBackupModalOpen !== undefined
+        ? Boolean(apiObj.isBackupModalOpen)
         : localBackupOpen;
 
-    const backupTab = ((api as Record<string, unknown>).backupInitialTab as 'export' | 'import') || localBackupTab;
+    const backupTab = (apiObj.backupInitialTab as 'export' | 'import') || localBackupTab;
 
     const handleCloseBackup = () => {
-        const apiObj = api as Record<string, unknown>;
         if (typeof apiObj.setIsBackupModalOpen === 'function') {
             (apiObj.setIsBackupModalOpen as (v: boolean) => void)(false);
         }

@@ -440,6 +440,24 @@ pub(crate) fn describe_format(
                 total,
             )
         }
+        KnownDataType::SshNodes => {
+            let count = if let Some(arr) = data.get("nodes").and_then(|e| e.as_array()) {
+                arr.len()
+            } else if let Some(arr) = data.as_array() {
+                arr.len()
+            } else {
+                1
+            };
+            (
+                "SSH Cluster Fleet Nodes".to_string(),
+                format!(
+                    "Registers/updates {} SSH node(s) for multi-node cluster delegation",
+                    count
+                ),
+                format!("agm ssh load-json \"{}\" -y", clean_path),
+                count,
+            )
+        }
         KnownDataType::Unrecognized(other) => (
             format!("{} (Custom)", other),
             format!("Unrecognized AGM schema type '{}'", other),

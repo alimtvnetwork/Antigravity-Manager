@@ -62,20 +62,14 @@ impl WorkDirResolver {
 
             // Query work_directories table: preference for is_default = 1, then lowest id
             let query = "SELECT absolute_path FROM work_directories ORDER BY is_default DESC, id ASC LIMIT 1";
-            if let Ok(mut stmt) = conn.prepare(query) {
-                if let Ok(mut rows) = stmt.query([]) {
-                    if let Ok(Some(row)) = rows.next() {
-                        if let Ok(val) = row.get::<_, String>(0) {
-                            let trimmed = val.trim();
-                            if !trimmed.is_empty() {
-                                let path = PathBuf::from(trimmed);
-                                if path.exists() {
-                                    return Some(normalize_canonical_path(&path));
-                                }
-                                return Some(path);
-                            }
-                        }
+            if let Ok(val) = conn.query_row(query, [], |row| row.get::<_, String>(0)) {
+                let trimmed = val.trim();
+                if !trimmed.is_empty() {
+                    let path = PathBuf::from(trimmed);
+                    if path.exists() {
+                        return Some(normalize_canonical_path(&path));
                     }
+                    return Some(path);
                 }
             }
         }

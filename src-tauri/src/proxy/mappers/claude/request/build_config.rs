@@ -297,9 +297,6 @@ pub(crate) fn build_generation_config(
 
 /// Recursively remove 'thought' and 'thoughtSignature' fields
 /// Used when downgrading thinking (e.g. during 400 retry)
-
-/// Recursively remove 'thought' and 'thoughtSignature' fields
-/// Used when downgrading thinking (e.g. during 400 retry)
 pub fn clean_thinking_fields_recursive(val: &mut Value) {
     match val {
         Value::Object(map) => {

@@ -254,7 +254,7 @@ pub fn start_telegram_daemon() {
             {
                 let mut st = LAST_TELEGRAM_STATUS.write().await;
                 st.is_running = true;
-                st.last_poll_at = Some(Utc::now().to_rfc3339());
+                st.last_poll_at = Utc::now().timestamp();
                 st.error_message = None;
             }
 

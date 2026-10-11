@@ -92,7 +92,10 @@ export function TreePanel(props: TreePanelProps) {
 
     const [subLoading, setSubLoading] = useState(promptTreeLoadingEmitter.isLoading);
     useEffect(() => {
-        return promptTreeLoadingEmitter.subscribe((v) => setSubLoading(v));
+        const unsubscribe = promptTreeLoadingEmitter.subscribe((v) => setSubLoading(v));
+        return () => {
+            unsubscribe();
+        };
     }, []);
 
     const isEffectiveLoading = isLoading ?? subLoading;
