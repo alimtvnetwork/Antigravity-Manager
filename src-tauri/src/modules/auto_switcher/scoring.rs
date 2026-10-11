@@ -483,4 +483,59 @@ mod tests {
             "Target gemini-2.5-pro must be isolated from exhausted gemini-1.5-flash"
         );
     }
+
+    #[test]
+    fn test_score_candidate_account_fallback_sub_100() {
+        let now_sec = 1790090000;
+        let future_time = "2026-09-30T14:30:00Z";
+        let mut acc = make_test_account(
+            "acc-sub100",
+            "sub100@test.local",
+            "gemini-pro",
+            95,
+            future_time,
+        );
+        if let Some(ref mut q) = acc.quota {
+            q.quota_groups = Some(vec![crate::models::quota::QuotaGroup {
+                display_name: "Gemini Models".to_string(),
+                description: None,
+                buckets: vec![crate::models::quota::QuotaBucket {
+                    bucket_id: "gemini-weekly".to_string(),
+                    window: "weekly".to_string(),
+                    remaining_fraction: 0.95,
+                    reset_time: future_time.to_string(),
+                    observed_at: None,
+                    cycle_tokens: None,
+                    display_name: None,
+                    description: None,
+                }],
+            }]);
+            q.models = vec![crate::models::quota::ModelQuota {
+                name: "gemini-pro".to_string(),
+                percentage: 95,
+                reset_time: future_time.to_string(),
+                display_name: None,
+                supports_images: None,
+                supports_thinking: None,
+                thinking_budget: None,
+                recommended: None,
+                max_tokens: None,
+                max_output_tokens: None,
+                supported_mime_types: None,
+            }];
+        }
+
+        let primary_score = score_candidate_account(&acc, "gemini-pro", now_sec);
+        assert_eq!(
+            primary_score, 0.0,
+            "Primary score for <100% quota account must be 0.0"
+        );
+
+        let fallback_score = score_candidate_account_fallback(&acc, "gemini-pro", now_sec);
+        assert!(
+            fallback_score > 0.0,
+            "Fallback score for 95% quota account must be > 0.0, got {}",
+            fallback_score
+        );
+    }
 }

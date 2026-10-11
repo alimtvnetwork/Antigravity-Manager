@@ -289,8 +289,9 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
             }
         }
     } else {
-        // For instances, also include any child processes that descend from matched root PIDs
-        let matched_set: std::collections::HashSet<u32> = matched_pids.iter().cloned().collect();
+        // For instances, strictly include child processes that descend from matched root PIDs
+        let mut matched_set: std::collections::HashSet<u32> =
+            matched_pids.iter().cloned().collect();
         for proc_info in &processes {
             let pid_u32 = proc_info.pid;
             if matched_set.contains(&pid_u32) {
@@ -299,8 +300,10 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
             let mut curr = pid_u32;
             for _ in 0..10 {
                 if let Some(&p) = parent_map.get(&curr) {
-                    if matched_set.contains(&p) || instance_root_pids.contains(&p) {
+                    // Strictly match ancestors belonging to this specific instance
+                    if matched_set.contains(&p) {
                         matched_pids.push(pid_u32);
+                        matched_set.insert(pid_u32);
                         break;
                     }
                     curr = p;

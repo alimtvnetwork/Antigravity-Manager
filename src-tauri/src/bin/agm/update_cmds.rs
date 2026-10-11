@@ -12,6 +12,82 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
+/// Normalize version string: e.g., "4.162" or "v4.162" -> "4.162.0".
+pub(crate) fn normalize_version_string(raw: &str) -> String {
+    let clean = raw.trim().trim_start_matches(['v', 'V']).trim();
+    let parts: Vec<&str> = clean.split('.').collect();
+    if parts.len() == 2 && parts.iter().all(|p| p.chars().all(|c| c.is_ascii_digit())) {
+        format!("{}.0", clean)
+    } else {
+        clean.to_string()
+    }
+}
+
+/// Extract target version string from command-line arguments.
+/// Supports: 'to v4.162', 'to 4.162', 'revert v4.162', 'downgrade 4.162', '4.162', 'v4.162', '--version 4.162', '-v 4.162'.
+pub(crate) fn extract_target_version(args: &[String]) -> Option<String> {
+    let mut iter = args.iter().peekable();
+    while let Some(arg) = iter.next() {
+        let clean = arg.trim();
+        if clean.eq_ignore_ascii_case("to")
+            || clean.eq_ignore_ascii_case("revert")
+            || clean.eq_ignore_ascii_case("downgrade")
+        {
+            if let Some(next_arg) = iter.next() {
+                let v = next_arg.trim().trim_start_matches(['v', 'V']);
+                if !v.is_empty()
+                    && v.chars()
+                        .next()
+                        .map(|c| c.is_ascii_digit())
+                        .unwrap_or(false)
+                {
+                    return Some(normalize_version_string(v));
+                }
+            }
+        } else if clean == "--version" || clean == "-v" {
+            if let Some(next_arg) = iter.next() {
+                let v = next_arg.trim().trim_start_matches(['v', 'V']);
+                if !v.is_empty()
+                    && v.chars()
+                        .next()
+                        .map(|c| c.is_ascii_digit())
+                        .unwrap_or(false)
+                {
+                    return Some(normalize_version_string(v));
+                }
+            }
+        } else if let Some(stripped) = clean.strip_prefix("--version=") {
+            let v = stripped.trim().trim_start_matches(['v', 'V']);
+            if !v.is_empty()
+                && v.chars()
+                    .next()
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false)
+            {
+                return Some(normalize_version_string(v));
+            }
+        } else if !clean.starts_with('-')
+            && !clean.eq_ignore_ascii_case("all")
+            && !clean.eq_ignore_ascii_case("gitmap")
+            && !clean.eq_ignore_ascii_case("gm")
+            && !clean.eq_ignore_ascii_case("ssh")
+            && !clean.eq_ignore_ascii_case("export-zip")
+            && !clean.eq_ignore_ascii_case("help")
+        {
+            let v = clean.trim_start_matches(['v', 'V']);
+            if v.contains('.')
+                && v.chars()
+                    .next()
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false)
+            {
+                return Some(normalize_version_string(v));
+            }
+        }
+    }
+    None
+}
+
 pub(crate) fn cmd_update(args: &[String]) {
     let is_json = args.iter().any(|a| a == "--json" || a == "-j");
     let is_help = args
@@ -28,6 +104,8 @@ pub(crate) fn cmd_update(args: &[String]) {
     let is_export_zip = args
         .iter()
         .any(|a| a == "export-zip" || a == "--export-zip");
+    let requested_version = extract_target_version(args);
+    let has_explicit_target = requested_version.is_some();
 
     if is_export_zip {
         crate::update_helpers::cmd_update_export_zip(args);
@@ -148,16 +226,32 @@ pub(crate) fn cmd_update(args: &[String]) {
         std::process::exit(if ok { 0 } else { 1 });
     }
 
-    let api_url = "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases/latest";
-    let updater_cdn_url =
-        "https://github.com/alimtvnetwork/Antigravity-Manager/releases/latest/download/updater.json";
+    let (api_url, updater_cdn_url) = if let Some(ref target) = requested_version {
+        (
+            format!(
+                "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases/tags/v{}",
+                target
+            ),
+            format!(
+                "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v{}/updater.json",
+                target
+            ),
+        )
+    } else {
+        (
+            "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases/latest"
+                .to_string(),
+            "https://github.com/alimtvnetwork/Antigravity-Manager/releases/latest/download/updater.json"
+                .to_string(),
+        )
+    };
 
     let mut tag_name = String::new();
     let mut release_html_url =
         "https://github.com/alimtvnetwork/Antigravity-Manager/releases".to_string();
     let mut release_name = String::new();
 
-    if let Ok(resp) = client.get(api_url).send() {
+    if let Ok(resp) = client.get(&api_url).send() {
         if resp.status().is_success() {
             if let Ok(json) = resp.json::<serde_json::Value>() {
                 tag_name = json["tag_name"]
@@ -176,7 +270,7 @@ pub(crate) fn cmd_update(args: &[String]) {
     }
 
     if tag_name.is_empty() {
-        if let Ok(resp) = client.get(updater_cdn_url).send() {
+        if let Ok(resp) = client.get(&updater_cdn_url).send() {
             if resp.status().is_success() {
                 if let Ok(json) = resp.json::<serde_json::Value>() {
                     tag_name = json["version"]
@@ -197,24 +291,34 @@ pub(crate) fn cmd_update(args: &[String]) {
     }
 
     if tag_name.is_empty() {
-        if is_json {
-            let err_obj = serde_json::json!({
-                "success": false,
-                "error": "Failed to fetch latest release metadata from GitHub API and CDN updater.json",
-                "current_version": crate::common::VERSION,
-                "timestamp": chrono::Utc::now().timestamp(),
-            });
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&err_obj).unwrap_or_default()
+        if let Some(ref target) = requested_version {
+            tag_name = target.clone();
+            release_html_url = format!(
+                "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v{}",
+                target
             );
+            release_name = format!("v{}", target);
         } else {
-            eprintln!("Failed to fetch latest release metadata from GitHub API and CDN.");
+            if is_json {
+                let err_obj = serde_json::json!({
+                    "success": false,
+                    "error": "Failed to fetch latest release metadata from GitHub API and CDN updater.json",
+                    "current_version": crate::common::VERSION,
+                    "timestamp": chrono::Utc::now().timestamp(),
+                });
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&err_obj).unwrap_or_default()
+                );
+            } else {
+                eprintln!("Failed to fetch latest release metadata from GitHub API and CDN.");
+            }
+            return;
         }
-        return;
     }
 
     let is_up_to_date = tag_name == crate::common::VERSION;
+    let is_downgrade = has_explicit_target && !is_up_to_date;
     let mut updated = false;
 
     // Repo check if in workspace
@@ -247,18 +351,29 @@ pub(crate) fn cmd_update(args: &[String]) {
     }
 
     // Binary update if needed
-    if (!is_up_to_date || is_force) && !is_check {
+    let should_proceed_update = (!is_up_to_date || is_force || has_explicit_target) && !is_check;
+    if should_proceed_update {
         let export_path = crate::update_helpers::default_update_export_path();
         match crate::update_helpers::download_release_zip(&export_path) {
             Ok(()) => println!("EXPORT_ZIP={}", export_path.display()),
             Err(err) => eprintln!("[WARN] update zip was not saved: {}", err),
         }
         if !is_json {
-            println!(
-                "[*] A new version is available: v{} -> v{}",
-                crate::common::VERSION,
-                tag_name
-            );
+            if is_downgrade {
+                println!(
+                    "[*] Target release requested: v{} -> v{} (revert/downgrade)",
+                    crate::common::VERSION,
+                    tag_name
+                );
+            } else if is_up_to_date {
+                println!("[*] Reinstalling requested release: v{}", tag_name);
+            } else {
+                println!(
+                    "[*] A new version is available: v{} -> v{}",
+                    crate::common::VERSION,
+                    tag_name
+                );
+            }
             println!("[*] Triggering automatic update installation...");
         }
 
@@ -271,11 +386,14 @@ pub(crate) fn cmd_update(args: &[String]) {
             println!(
                 "[*] Antigravity Manager UI is currently running. Delegating to 3-stage Update CLI (agm-update-cli -> agm update -> agm open-ui)..."
             );
-            let delegate_args = vec![
+            let mut delegate_args = vec![
                 "--relaunch".to_string(),
                 "--version".to_string(),
                 tag_name.clone(),
             ];
+            if is_force || has_explicit_target {
+                delegate_args.push("--force".to_string());
+            }
             antigravity_tools_lib::modules::delegate_updater::run(&delegate_args);
             return;
         }
@@ -309,6 +427,8 @@ pub(crate) fn cmd_update(args: &[String]) {
             "command": if is_all { "update-all" } else { "update" },
             "current_version": format!("v{}", crate::common::VERSION),
             "latest_release": format!("v{}", tag_name),
+            "target_version": format!("v{}", tag_name),
+            "is_downgrade": is_downgrade,
             "release_name": release_name,
             "release_url": release_html_url,
             "is_up_to_date": is_up_to_date,
@@ -345,7 +465,12 @@ pub(crate) fn cmd_update(args: &[String]) {
         println!("    ● Latest Release:    v{}", tag_name);
         println!(
             "    ● Update Status:     {}",
-            if is_up_to_date {
+            if is_downgrade && updated {
+                format!(
+                    "[REVERTED/DOWNGRADED] (Successfully downgraded to v{})",
+                    tag_name
+                )
+            } else if is_up_to_date && !has_explicit_target {
                 "[UP TO DATE] (System is currently running the latest release)".to_string()
             } else if updated {
                 format!("[UPDATED] (Successfully updated to v{})", tag_name)
@@ -392,4 +517,62 @@ pub(crate) fn cmd_update(args: &[String]) {
 
 pub(crate) fn cmd_delegate_update(args: &[String]) {
     antigravity_tools_lib::modules::delegate_updater::run(args);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_target_version() {
+        assert_eq!(
+            extract_target_version(&["to".to_string(), "v4.162".to_string()]),
+            Some("4.162.0".to_string())
+        );
+        assert_eq!(
+            extract_target_version(&["to".to_string(), "4.162".to_string()]),
+            Some("4.162.0".to_string())
+        );
+        assert_eq!(
+            extract_target_version(&["revert".to_string(), "v4.162".to_string()]),
+            Some("4.162.0".to_string())
+        );
+        assert_eq!(
+            extract_target_version(&["downgrade".to_string(), "4.162".to_string()]),
+            Some("4.162.0".to_string())
+        );
+        assert_eq!(
+            extract_target_version(&["4.162".to_string()]),
+            Some("4.162.0".to_string())
+        );
+        assert_eq!(
+            extract_target_version(&["v4.162.0".to_string()]),
+            Some("4.162.0".to_string())
+        );
+        assert_eq!(
+            extract_target_version(&["--version".to_string(), "4.162".to_string()]),
+            Some("4.162.0".to_string())
+        );
+        assert_eq!(
+            extract_target_version(&["-v".to_string(), "v4.162".to_string()]),
+            Some("4.162.0".to_string())
+        );
+        assert_eq!(
+            extract_target_version(&["--version=4.162".to_string()]),
+            Some("4.162.0".to_string())
+        );
+        assert_eq!(
+            extract_target_version(&["all".to_string(), "--force".to_string()]),
+            None
+        );
+    }
+
+    #[test]
+    fn test_normalize_version_string() {
+        assert_eq!(normalize_version_string("4.162"), "4.162.0");
+        assert_eq!(normalize_version_string("v4.162"), "4.162.0");
+        assert_eq!(normalize_version_string("4.162.0"), "4.162.0");
+        assert_eq!(normalize_version_string("v4.185.0"), "4.185.0");
+        assert_eq!(normalize_version_string("4.162.0-beta.1"), "4.162.0-beta.1");
+    }
 }

@@ -251,7 +251,7 @@ pub fn select_candidate_profiles(
     }
 
     // 3. Fallback: If no candidate met the 100% or period-finished criteria, fall back to best available accounts above threshold
-    if available_pool.is_empty() && cooldown_pool.is_empty() {
+    if available_pool.is_empty() {
         for acc in &all_accounts {
             if seen_account_ids.contains(&acc.id) {
                 continue;
@@ -389,7 +389,7 @@ pub async fn select_and_verify_next_best_profile(
 
     if candidates.is_empty() {
         logger::log_info(
-            "[AutoSwitcher] No initial candidate profiles found meeting 100% quota requirement.",
+            "[AutoSwitcher] No eligible candidate profiles found meeting quota threshold requirement.",
         );
         return Ok(None);
     }
@@ -531,6 +531,7 @@ pub async fn select_and_verify_next_best_profile(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::TokenData;
 
     #[test]
     fn test_is_account_rate_limited_detection() {

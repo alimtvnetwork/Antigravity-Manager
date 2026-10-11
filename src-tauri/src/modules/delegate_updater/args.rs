@@ -40,16 +40,54 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
                     i += 1;
                 }
             }
-            "--version" => {
+            "--version" | "-v" => {
                 if i + 1 < args.len() {
-                    opts.target_version = Some(args[i + 1].clone());
+                    let v = args[i + 1].trim().trim_start_matches(['v', 'V']);
+                    opts.target_version = Some(v.to_string());
                     i += 1;
                 }
             }
             "--delegated-worker" => {
                 opts.is_delegated_worker = true;
             }
-            _ => {}
+            arg if arg.starts_with("--version=") => {
+                let v = arg
+                    .trim_start_matches("--version=")
+                    .trim()
+                    .trim_start_matches(['v', 'V']);
+                opts.target_version = Some(v.to_string());
+            }
+            arg if arg.eq_ignore_ascii_case("to")
+                || arg.eq_ignore_ascii_case("revert")
+                || arg.eq_ignore_ascii_case("downgrade") =>
+            {
+                if i + 1 < args.len() {
+                    let v = args[i + 1].trim().trim_start_matches(['v', 'V']);
+                    if !v.is_empty()
+                        && v.chars()
+                            .next()
+                            .map(|c| c.is_ascii_digit())
+                            .unwrap_or(false)
+                    {
+                        opts.target_version = Some(v.to_string());
+                        i += 1;
+                    }
+                }
+            }
+            _ => {
+                if opts.target_version.is_none() && !args[i].starts_with('-') {
+                    let clean = args[i].trim();
+                    let v = clean.trim_start_matches(['v', 'V']);
+                    if v.contains('.')
+                        && v.chars()
+                            .next()
+                            .map(|c| c.is_ascii_digit())
+                            .unwrap_or(false)
+                    {
+                        opts.target_version = Some(v.to_string());
+                    }
+                }
+            }
         }
         i += 1;
     }

@@ -277,12 +277,20 @@ pub fn run_cli_update(args: &[String]) -> bool {
             "--install-dir \"{}\"",
             resolved_install_dir.to_string_lossy()
         );
+        let ver_arg = opts
+            .target_version
+            .as_ref()
+            .map(|v| format!("--version \"{}\"", v))
+            .unwrap_or_default();
         let sh_script = if Path::new("install.sh").exists() {
-            format!("bash ./install.sh --update --no-launch {}", dir_arg)
+            format!(
+                "bash ./install.sh --update --no-launch {} {}",
+                dir_arg, ver_arg
+            )
         } else {
             format!(
-                "curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash -s -- --update --no-launch {}",
-                dir_arg
+                "curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash -s -- --update --no-launch {} {}",
+                dir_arg, ver_arg
             )
         };
 

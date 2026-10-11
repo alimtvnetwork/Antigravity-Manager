@@ -1452,7 +1452,7 @@ if ($isPinned -and $cleanPinned) {
 
 $TargetVersion = $versionQueue[0]
 
-if ($Update -and -not $Force) {
+if ($Update -and -not $Force -and -not $isPinned) {
     $curr = Get-InstalledVersion
     if ($curr) {
         try {
