@@ -149,7 +149,7 @@ impl TokenManager {
 
                     {
                         let mut preferred = self.preferred_account_id.write().await;
-                        if preferred.as_deref() == Some(pref_id.as_str()) {
+                        if preferred.as_deref() == Some(pref_id) {
                             *preferred = None;
                         }
                     }

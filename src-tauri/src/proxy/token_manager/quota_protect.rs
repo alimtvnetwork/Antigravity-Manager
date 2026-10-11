@@ -188,5 +188,5 @@ impl TokenManager {
     }
 
     /// P2C 算法的候选池大小 - 从前 N 个最优候选中随机选择
-    const P2C_POOL_SIZE: usize = 5;
+    pub(crate) const P2C_POOL_SIZE: usize = 5;
 }

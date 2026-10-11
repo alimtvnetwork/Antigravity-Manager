@@ -295,7 +295,6 @@ where
                                                                             use std::hash::{Hash, Hasher};
     use crate::proxy::mappers::openai::streaming::openai::store_thought_signature;
 use super::openai::extract_usage_metadata;
-use super::openai::store_thought_signature;
                                                                             call_key.hash(&mut hasher);
                                                                             sequence_number.hash(&mut hasher);
                                                                             std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos().hash(&mut hasher);

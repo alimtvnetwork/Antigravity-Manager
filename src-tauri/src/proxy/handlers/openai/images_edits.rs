@@ -171,7 +171,7 @@ pub async fn handle_images_edits(
     let mut tasks: tokio::task::JoinSet<
         Result<(serde_json::Value, String, String), (axum::http::StatusCode, String)>,
     > = tokio::task::JoinSet::new();
-    let upstream = state.upstream_client.clone();
+    let upstream = state.upstream.clone();
     let token_manager = state.token_manager.clone();
     let client_adapter: Option<
         std::sync::Arc<dyn crate::proxy::common::client_adapter::ClientAdapter>,
@@ -180,7 +180,7 @@ pub async fn handle_images_edits(
     let selected: Vec<(usize, String, String, String, String, u64)> = Vec::new();
     let extra_headers = axum::http::HeaderMap::new();
     let debug_cfg = state.debug_logging.clone();
-    let debug_cfg_read = debug_cfg.read().unwrap();
+    let debug_cfg_read = debug_cfg.read().await;
     let trace_id = uuid::Uuid::new_v4().to_string();
     let attempt_no: usize = 0;
 

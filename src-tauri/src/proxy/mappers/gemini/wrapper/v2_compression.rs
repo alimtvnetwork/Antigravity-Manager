@@ -47,7 +47,7 @@ pub(crate) fn phase_compression(
         // ===== Layer 1: Tool Message Trimming =====
         if usage_ratio > threshold_l1 && !*compression_applied {
             if crate::proxy::mappers::context_manager::ContextManager::trim_gemini_tool_messages(
-                &mut inner_request,
+                &mut *inner_request,
                 5,
             ) {
                 tracing::info!(
@@ -86,7 +86,7 @@ pub(crate) fn phase_compression(
             );
 
             if crate::proxy::mappers::context_manager::ContextManager::compress_gemini_thinking_preserve_signature(
-                &mut inner_request,
+                &mut *inner_request,
                 4,
             ) {
                 *compression_applied = true;

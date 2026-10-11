@@ -116,14 +116,14 @@ pub async fn monitor_middleware(
     let upstream_holder = UpstreamRequestBodyHolder::new();
     let mut request = request;
     request.extensions_mut().insert(upstream_holder.clone());
+    let request_headers_json =
+        crate::proxy::payload_audit::headers_to_redacted_json(request.headers());
 
     let response = crate::proxy::monitor::CURRENT_UPSTREAM_CAPTURE
         .scope(upstream_holder.clone(), next.run(request))
         .await;
     let upstream_request_body = upstream_holder.take();
     let upstream_request_headers = upstream_holder.take_headers();
-    let request_headers_json =
-        crate::proxy::payload_audit::headers_to_redacted_json(request.headers());
     let response_headers_json =
         crate::proxy::payload_audit::headers_to_redacted_json(response.headers());
 
