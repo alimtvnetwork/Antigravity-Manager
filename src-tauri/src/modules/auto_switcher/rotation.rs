@@ -222,6 +222,25 @@ pub async fn execute_profile_rotation_with_context(
             ),
             "copy_instance_projects",
         );
+        // Re-attribute backed-up prompts from depleted instance to target instance so post-switch restore finds them
+        if let Ok(conn) = crate::modules::repo_db::connect_db() {
+            let reattributed = conn
+                .execute(
+                    "UPDATE active_prompts SET instance_id = ?1 WHERE instance_id = ?2 AND status = 'backed_up'",
+                    rusqlite::params![&target.instance_id, &current_instance_id],
+                )
+                .unwrap_or(0);
+            logger::log_info(&format!(
+                "[AutoSwitcher] Re-attributed {} backed-up prompts from '{}' to target '{}'",
+                reattributed, current_instance_id, target.instance_id
+            ));
+        }
+        if let Ok(conn) = crate::modules::backup_prompts_db::connect_db() {
+            let _ = conn.execute(
+                "UPDATE prompt_backups SET instance_id = ?1 WHERE instance_id = ?2 AND is_restored = 0",
+                rusqlite::params![&target.instance_id, &current_instance_id],
+            );
+        }
         for ws in &active_workspaces {
             // Justification: best-effort call; failure logged without changing control flow
             crate::error::record_ignored(

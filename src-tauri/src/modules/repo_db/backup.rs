@@ -61,22 +61,22 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
     let is_all_or_default =
         instance_id == "all" || instance_id == "__default__" || instance_id == "default";
 
-    // Transition in-flight 'running' prompts in active_prompts to 'backed_up' before switch (scoped to target instance)
+    // Transition in-flight and active prompts in active_prompts to 'backed_up' before switch (scoped to target instance)
     let transitioned = if instance_id == "all" {
         conn.execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status = 'running'",
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched')",
             params![now],
         )
         .unwrap_or(0)
     } else if is_all_or_default {
         conn.execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status = 'running' AND instance_id IN ('default', '__default__')",
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched') AND instance_id IN ('default', '__default__')",
             params![now],
         )
         .unwrap_or(0)
     } else {
         conn.execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status = 'running' AND instance_id = ?2",
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched') AND instance_id = ?2",
             params![now, instance_id],
         )
         .unwrap_or(0)
@@ -89,7 +89,9 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                     || (is_all_or_default
                         && (p.instance_id == "default" || p.instance_id == "__default__"))
                     || p.instance_id == instance_id;
-                if p.status == "running" && matches_inst {
+                if (p.status == "running" || p.status == "in_flight" || p.status == "dispatched")
+                    && matches_inst
+                {
                     p.status = "backed_up".to_string();
                     p.updated_at = now;
                 }
