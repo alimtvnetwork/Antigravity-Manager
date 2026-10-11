@@ -264,7 +264,7 @@ pub(crate) async fn completions_success_stream(
             message_count,
             Some(client_tool_names.clone()),
             true,
-            Some(causal_anchor),
+            causal_anchor,
         );
 
         // Peek Logic (Repeated for safety/correctness on this stream type)
