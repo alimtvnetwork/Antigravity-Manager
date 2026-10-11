@@ -6,7 +6,7 @@ use super::router_admin_b::admin_route_table_b;
 use crate::proxy::middleware::admin_auth_middleware;
 use axum::Router;
 
-pub(crate) fn build_admin_routes(state: &AppState) -> Router {
+pub(crate) fn build_admin_routes(state: &AppState) -> Router<AppState> {
     Router::new()
         .merge(admin_route_table_a())
         .merge(admin_route_table_b())

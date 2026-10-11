@@ -30,7 +30,7 @@ pub(crate) async fn silent_ok_handler() -> Response {
     StatusCode::OK.into_response()
 }
 
-pub(crate) fn build_proxy_routes(state: &AppState) -> Router {
+pub(crate) fn build_proxy_routes(state: &AppState) -> Router<AppState> {
     // 1. Build primary AI proxy routes (honoring auth_mode configuration)
     let proxy_routes = Router::new()
         .route("/health", get(health_check_handler))
@@ -134,7 +134,7 @@ pub(crate) fn build_proxy_routes(state: &AppState) -> Router {
     proxy_routes
 }
 
-pub(crate) fn assemble_app(state: &AppState, proxy_routes: Router, admin_routes: Router) -> Router {
+pub(crate) fn assemble_app(state: &AppState, proxy_routes: Router<AppState>, admin_routes: Router<AppState>) -> Router<AppState> {
     // 3. Integrate and apply global middleware layers
     // Read body size limit from environment variable (default 50MB)
     let max_body_size: usize = std::env::var("ABV_MAX_BODY_SIZE")

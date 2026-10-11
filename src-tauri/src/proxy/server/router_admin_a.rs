@@ -6,12 +6,13 @@ use super::{
     admin_accounts, admin_config, admin_devices, admin_import, admin_instances, admin_oauth,
     admin_prompts, admin_proxy, admin_stats, admin_sync_external, admin_sync_opencode,
 };
+use super::app_state::AppState;
 use axum::{
     routing::{delete, get, post},
     Router,
 };
 
-pub(crate) fn admin_route_table_a() -> Router {
+pub(crate) fn admin_route_table_a() -> Router<AppState> {
     let admin_routes = Router::new()
         .route("/health", get(health_check_handler))
         // ── Instance Management REST Routes ──

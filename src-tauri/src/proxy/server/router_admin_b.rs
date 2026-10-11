@@ -5,12 +5,13 @@ use super::{
     admin_accounts, admin_accounts_ops, admin_cloudflared, admin_import, admin_logs, admin_oauth,
     admin_proxy, admin_security, admin_stats, admin_system, admin_tokens,
 };
+use super::app_state::AppState;
 use axum::{
     routing::{delete, get, post},
     Router,
 };
 
-pub(crate) fn admin_route_table_b() -> Router {
+pub(crate) fn admin_route_table_b() -> Router<AppState> {
     let admin_routes = Router::new()
         .route(
             "/accounts/oauth/prepare",
