@@ -1,5 +1,5 @@
-use super::*;
 use super::retryparsermode::FAILURE_COUNT_EXPIRY_SECONDS;
+use super::*;
 
 impl RateLimitTracker {
     pub fn set_lockout_until_iso_with_cap(

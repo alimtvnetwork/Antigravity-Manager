@@ -1,7 +1,7 @@
 use rusqlite::{params, Connection, OpenFlags};
 
-use super::*;
 use super::thinking_db::migrate_thinking_from_logs;
+use super::*;
 
 pub fn init_db() -> Result<(), String> {
     let conn = Connection::open(get_proxy_db_path()?).map_err(|e| e.to_string())?;

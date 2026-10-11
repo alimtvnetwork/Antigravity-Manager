@@ -1,6 +1,6 @@
+use super::utils::derive_session_uuid;
 use super::*;
 use crate::proxy::monitor::proxyrequestlog::CURRENT_UPSTREAM_CAPTURE;
-use super::utils::derive_session_uuid;
 
 impl UpstreamClient {
     /// Build v1internal URL

@@ -287,9 +287,9 @@ impl ContextManager {
 }
 #[cfg(test)]
 mod tests {
+    use super::OpenAIToolRound;
     use super::*;
     use crate::proxy::mappers::context_manager::OpenAIToolRound;
-use super::OpenAIToolRound;
 
     // Helper to create a request since Default is not implemented
 }

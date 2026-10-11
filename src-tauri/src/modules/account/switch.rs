@@ -12,8 +12,8 @@ pub async fn switch_account(
     target_ide: Option<&str>,
     integration: &(impl modules::integration::SystemIntegration + ?Sized),
 ) -> Result<(), String> {
+    use super::enterprise::ensure_enterprise_project_ready;
     use crate::modules::oauth;
-use super::enterprise::ensure_enterprise_project_ready;
 
     let index = {
         let _lock = ACCOUNT_INDEX_LOCK

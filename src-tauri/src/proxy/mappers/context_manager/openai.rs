@@ -4,6 +4,7 @@ use super::super::claude::models::{
 };
 use super::super::openai::models::{OpenAIMessage, OpenAIRequest};
 use super::super::rtk_cleaner::RtkCleaner;
+use super::estimate_image_tokens_from_url;
 use super::estimate_inline_data_tokens;
 use super::estimate_media_tokens_from_url;
 use super::estimate_tokens_from_str;
@@ -11,7 +12,6 @@ use super::ContextManager;
 use super::PurificationStrategy;
 use serde_json::{json, Value};
 use tracing::{debug, info};
-use super::estimate_image_tokens_from_url;
 
 // OpenAI-side context management (split from context_manager.rs).
 impl ContextManager {

@@ -27,6 +27,7 @@ mod run;
 #[path = "lib/setup_app.rs"]
 mod setup_app;
 
+#[cfg(target_os = "linux")]
 pub(crate) use appruntimeflags::configure_linux_graphics;
 pub(crate) use appruntimeflags::credential_state;
 pub(crate) use appruntimeflags::env_flag_enabled;

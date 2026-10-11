@@ -5,11 +5,11 @@ use super::super::claude::models::{
 use super::super::openai::models::{OpenAIMessage, OpenAIRequest};
 use super::super::rtk_cleaner::RtkCleaner;
 use super::estimate_tokens_from_str;
+use super::openai::identify_tool_rounds;
 use super::ContextManager;
 use super::PurificationStrategy;
 use serde_json::{json, Value};
 use tracing::{debug, info};
-use super::openai::identify_tool_rounds;
 
 // Claude-side context management (split from context_manager.rs).
 impl ContextManager {

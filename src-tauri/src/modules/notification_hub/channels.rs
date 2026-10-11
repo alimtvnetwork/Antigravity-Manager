@@ -1,7 +1,7 @@
 use crate::modules::logger;
 
-use super::*;
 use super::telegram_alerts::dispatch_telegram_switch_alert;
+use super::*;
 
 /// Dispatch rich notifications across Email and Telegram upon account/instance switch
 pub async fn notify_account_switched_details(mut details: SwitchNotificationDetails) -> String {

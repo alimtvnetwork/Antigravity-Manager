@@ -226,8 +226,8 @@ pub fn normalize_to_standard_id(model_name: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::super::map_claude_model_to_gemini;
+    use super::claude_gemini::map_claude_model_to_gemini;
     use super::*;
-use super::claude_gemini::map_claude_model_to_gemini;
 
     #[test]
     fn test_model_mapping() {

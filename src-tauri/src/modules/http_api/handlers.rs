@@ -174,7 +174,8 @@ pub(crate) async fn switch_account(
 }
 
 /// POST /accounts/refresh - Refresh all quotas
-pub(crate) async fn refresh_all_quotas() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+pub(crate) async fn refresh_all_quotas(
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
     logger::log_info("[HTTP API] Starting refresh of all account quotas");
 
     // Execute refresh asynchronously

@@ -12,8 +12,8 @@ pub async fn fetch_quota_with_cache(
     account_id: Option<&str>,
     existing_quota: Option<&QuotaData>,
 ) -> crate::error::AppResult<(QuotaData, Option<String>)> {
+    use super::fetch_more::fetch_quota_summary;
     use crate::error::AppError;
-use super::fetch_more::fetch_quota_summary;
     use crate::models::quota::{
         is_subscription_tier_fetch_needed, resolve_fetched_subscription_tier,
     };

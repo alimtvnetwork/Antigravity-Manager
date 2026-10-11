@@ -1,5 +1,5 @@
-use super::*;
 use super::proxyrequestlog::LOG_WRITERS;
+use super::*;
 
 impl ProxyMonitor {
     pub fn new(max_logs: usize, app_handle: Option<tauri::AppHandle>) -> Self {

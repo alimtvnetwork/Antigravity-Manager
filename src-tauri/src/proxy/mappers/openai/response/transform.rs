@@ -38,7 +38,11 @@ pub fn transform_openai_response(
                         .and_then(|s| s.as_str())
                     {
                         if let Some(sid) = session_id {
-                            super::super::streaming::store_thought_signature(sig, sid, message_count);
+                            super::super::streaming::store_thought_signature(
+                                sig,
+                                sid,
+                                message_count,
+                            );
                         }
                     }
 

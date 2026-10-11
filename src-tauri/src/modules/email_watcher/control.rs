@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 
-use super::*;
 use super::heartbeat::run_watcher_heartbeat_loop;
+use super::*;
 
 /// Start the background watcher loop
 pub fn start_email_watcher() {

@@ -184,8 +184,10 @@ pub(crate) fn phase_tools(
         } else {
             None
         };
-    let system_parts =
-        super::super::context_blocks::build_system_instruction_parts(&system_instructions, global_prompt);
+    let system_parts = super::super::context_blocks::build_system_instruction_parts(
+        &system_instructions,
+        global_prompt,
+    );
     if !system_parts.is_empty() {
         inner_request["systemInstruction"] = json!({
             "role": "user",

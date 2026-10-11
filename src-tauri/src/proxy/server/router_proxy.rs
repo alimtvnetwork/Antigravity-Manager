@@ -1,20 +1,19 @@
 //! Public AI-protocol route table and final app assembly.
+use super::admin_oauth::handle_oauth_callback;
 use super::app_state::AppState;
 use crate::proxy::handlers;
-use super::admin_oauth::handle_oauth_callback;
 use crate::proxy::middleware::{
     auth_middleware, cors_layer, ip_filter_middleware, monitor_middleware,
     service_status_middleware,
 };
+use axum::response::IntoResponse;
 use axum::{
-    Json,
     extract::DefaultBodyLimit,
     http::StatusCode,
     response::Response,
     routing::{any, get, post},
-    Router,
+    Json, Router,
 };
-use axum::response::IntoResponse;
 
 /// Health check handler
 pub(crate) async fn health_check_handler() -> Response {
@@ -134,7 +133,11 @@ pub(crate) fn build_proxy_routes(state: &AppState) -> Router<AppState> {
     proxy_routes
 }
 
-pub(crate) fn assemble_app(state: &AppState, proxy_routes: Router<AppState>, admin_routes: Router<AppState>) -> Router<AppState> {
+pub(crate) fn assemble_app(
+    state: &AppState,
+    proxy_routes: Router<AppState>,
+    admin_routes: Router<AppState>,
+) -> Router<AppState> {
     // 3. Integrate and apply global middleware layers
     // Read body size limit from environment variable (default 50MB)
     let max_body_size: usize = std::env::var("ABV_MAX_BODY_SIZE")

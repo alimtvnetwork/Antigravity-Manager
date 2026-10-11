@@ -1,12 +1,12 @@
 //! Admin route table, first half: health, instances, prompts, accounts, proxy service.
 //! (Split from the single admin route table to respect the 500-line file limit.)
 
+use super::app_state::AppState;
 use super::router_proxy::health_check_handler;
 use super::{
     admin_accounts, admin_config, admin_devices, admin_import, admin_instances, admin_oauth,
     admin_prompts, admin_proxy, admin_stats, admin_sync_external, admin_sync_opencode,
 };
-use super::app_state::AppState;
 use axum::{
     routing::{delete, get, post},
     Router,
