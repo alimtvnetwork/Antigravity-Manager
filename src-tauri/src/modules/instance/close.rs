@@ -99,7 +99,8 @@ pub fn close_instance_verified(
         // validated above); the kill itself is best-effort per pass and the
         // verification poll below is what decides success.
         close_instance(instance_id)?;
-        let deadline = std::time::Instant::now() + timeout;
+        let effective_timeout = timeout.min(std::time::Duration::from_millis(2500));
+        let deadline = std::time::Instant::now() + effective_timeout;
         let mut last_poll_log = std::time::Instant::now();
         let mut first_poll = true;
         loop {
@@ -131,7 +132,7 @@ pub fn close_instance_verified(
                 }
                 break;
             }
-            std::thread::sleep(std::time::Duration::from_millis(200));
+            std::thread::sleep(std::time::Duration::from_millis(50));
         }
     }
 

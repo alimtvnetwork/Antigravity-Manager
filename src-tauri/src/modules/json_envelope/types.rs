@@ -218,6 +218,13 @@ pub fn default_commands_for_type(
             Some("agm which-format gitmap-ssh-nodes.json".to_string()),
             Some("SSH cluster fleet nodes configuration. Cross-platform compatible across Windows, Linux, Ubuntu, and macOS.".to_string()),
         )
+    } else if lower.contains("compact-export") || lower.contains("compact_export") || lower.contains("compact") {
+        (
+            Some("agm import-compact agm-workspace-compact.json -y".to_string()),
+            Some("agm export-compact --file agm-workspace-compact.json".to_string()),
+            Some("agm which-format agm-workspace-compact.json".to_string()),
+            Some("Portable workspace compaction snapshot including pinned projects, conversations, running prompts, and execution history.".to_string()),
+        )
     } else {
         (None, None, Some("agm which-format".to_string()), None)
     }

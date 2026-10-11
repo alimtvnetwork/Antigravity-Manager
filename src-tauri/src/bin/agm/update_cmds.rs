@@ -354,7 +354,7 @@ pub(crate) fn cmd_update(args: &[String]) {
     let should_proceed_update = (!is_up_to_date || is_force || has_explicit_target) && !is_check;
     if should_proceed_update {
         let export_path = crate::update_helpers::default_update_export_path();
-        match crate::update_helpers::download_release_zip(&export_path) {
+        match crate::update_helpers::download_release_zip(&export_path, Some(&tag_name)) {
             Ok(()) => println!("EXPORT_ZIP={}", export_path.display()),
             Err(err) => eprintln!("[WARN] update zip was not saved: {}", err),
         }

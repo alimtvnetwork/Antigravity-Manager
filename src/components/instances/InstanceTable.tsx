@@ -3,7 +3,7 @@ import { cn } from '../../utils/cn';
 import { useAccountStore } from '../../stores/useAccountStore';
 import { useErrorStore } from '../../stores/error-store';
 import type { InstanceTableProps } from './table/instanceTableTypes';
-import { buildRowCellData, ProfileCell, QuotaCell, StatusCell, PathCell } from './table/InstanceRowCells';
+import { buildRowCellData, ProfileCell, QuotaCell, StatusCell, PathCell, ExePathCell } from './table/InstanceRowCells';
 import { ActionsCell, MoreMenuPortal } from './table/InstanceRowActions';
 import { resolveDataDir } from './table/instanceTableUtils';
 
@@ -92,6 +92,7 @@ export default function InstanceTable({
                             <th className="px-2 py-1.5 min-w-[160px] max-w-[200px]">Model & Weekly Quota</th>
                             <th className="px-2 py-1.5 min-w-[90px] max-w-[110px]">Status & PID</th>
                             <th className="px-2 py-1.5 min-w-[110px] max-w-[130px]">File / Data Path</th>
+                            <th className="px-2 py-1.5 min-w-[120px] max-w-[150px]">Executable Path</th>
                             <th className="px-2 py-1.5 text-right w-[130px]">Actions</th>
                         </tr>
                     </thead>
@@ -131,6 +132,7 @@ export default function InstanceTable({
                                         isCopied={copiedPathId === inst.config.id}
                                         onCopy={() => handleCopyPath(inst.config.id, resolveDataDir(inst))}
                                     />
+                                    <ExePathCell inst={inst} />
                                     <ActionsCell
                                         inst={inst}
                                         currentAction={data.currentAction}

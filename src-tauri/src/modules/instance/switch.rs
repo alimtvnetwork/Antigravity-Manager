@@ -151,8 +151,16 @@ pub async fn switch_account_to_instance(
     };
 
     // 1.5. [Step 1/5] Snapshot and re-enqueue running prompts scoped to THIS target instance BEFORE closing IDE
-    let backed_up_count =
-        crate::modules::repo_db::backup_running_prompts(&instance.id).unwrap_or(0);
+    let backed_up_count = match crate::modules::repo_db::backup_running_prompts(&instance.id) {
+        Ok(count) => count,
+        Err(e) => {
+            crate::modules::logger::log_warn(&format!(
+                "[INSTANCE_SWITCH] Failed to backup running prompts for '{}': {}",
+                instance.id, e
+            ));
+            0
+        }
+    };
     // Justification: opportunistic prompt backup; re-attempted on the next switch
     crate::error::record_ignored(
         crate::modules::backup_prompts_db::backup_active_running_prompts(Some(&instance.id), None),
@@ -237,7 +245,16 @@ pub async fn switch_account_to_instance(
 
     // 4. Bind account in registry and set active account
     bind_account_to_instance(&instance.id, &account.id, &account.email)?;
-    let registry_after = load_registry().unwrap_or_default();
+    let registry_after = match load_registry() {
+        Ok(reg) => reg,
+        Err(e) => {
+            crate::modules::logger::log_warn(&format!(
+                "[INSTANCE_SWITCH] Failed to reload registry after binding account: {}",
+                e
+            ));
+            Default::default()
+        }
+    };
     if registry_after.active_instance_id.is_empty()
         || registry_after.active_instance_id == instance.id
     {
@@ -421,33 +438,46 @@ pub async fn switch_account_to_instance(
                     .unwrap_or(true)
         })
         .map(|c| c.email);
-        let running_projs = crate::modules::repo_db::list_running_projects().unwrap_or_default();
+        let running_projs = match crate::modules::repo_db::list_running_projects() {
+            Ok(projs) => projs,
+            Err(e) => {
+                crate::modules::logger::log_warn(&format!(
+                    "[INSTANCE_SWITCH] Failed to list running projects for notification: {}",
+                    e
+                ));
+                Vec::new()
+            }
+        };
         let unique_projs = crate::modules::notification_hub::deduplicate_names(
             running_projs.into_iter().map(|p| p.repo_name),
         );
-        // Justification: intentionally discards the notification id String; the function is infallible and a missed toast does not affect state
-        let _ = crate::modules::notification_hub::notify_account_switched_details(
-            crate::modules::notification_hub::SwitchNotificationDetails {
-                previous_email: followup_prev,
-                previous_quota_4h: prev_4h,
-                previous_quota_weekly: prev_weekly,
-                predicted_next_email,
-                selected_email: followup_email,
-                target_quota_4h: target_4h,
-                target_quota_weekly: target_weekly,
-                credit_before_switch: prev_4h,
-                threshold_activated: None,
-                instance_id: followup_instance_id.clone(),
-                instance_name: followup_instance_name,
-                instance_mode: String::new(),
-                reason: "Smart Rotator / Instance Account Switch".to_string(),
-                is_auto: false,
-                backed_up_projects: unique_projs,
-                backed_up_prompts_count: Some(backed_up_count),
-                restored_prompts_count: Some(backed_up_count),
-            },
-        )
-        .await;
+        crate::error::record_ignored(
+            Ok::<String, String>(
+                crate::modules::notification_hub::notify_account_switched_details(
+                    crate::modules::notification_hub::SwitchNotificationDetails {
+                        previous_email: followup_prev,
+                        previous_quota_4h: prev_4h,
+                        previous_quota_weekly: prev_weekly,
+                        predicted_next_email,
+                        selected_email: followup_email,
+                        target_quota_4h: target_4h,
+                        target_quota_weekly: target_weekly,
+                        credit_before_switch: prev_4h,
+                        threshold_activated: None,
+                        instance_id: followup_instance_id.clone(),
+                        instance_name: followup_instance_name,
+                        instance_mode: String::new(),
+                        reason: "Smart Rotator / Instance Account Switch".to_string(),
+                        is_auto: false,
+                        backed_up_projects: unique_projs,
+                        backed_up_prompts_count: Some(backed_up_count),
+                        restored_prompts_count: Some(backed_up_count),
+                    },
+                )
+                .await,
+            ),
+            "notify_account_switched",
+        ); // Justification: notification failure should not abort account switch
     });
 
     let snap = crate::modules::repo_db::switch_prompt_snapshot(&instance.id);

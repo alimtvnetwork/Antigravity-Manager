@@ -41,6 +41,8 @@ pub(crate) fn dispatch_prompt_domain(subcommand: &str, args: &[String]) {
         "queue" | "qe" => cmd_prompts_queue(args),
         "history" => cmd_prompts_history(args),
         "export" => crate::prompt_import_export::cmd_prompts_export(args),
+        "export-compact" | "compact-export" => crate::compact_cmds::cmd_export_compact(args),
+        "import-compact" | "compact-import" => crate::compact_cmds::cmd_import_compact(args),
         "backup" | "brp" => cmd_prompts_backup(args),
         "restore" | "rrp" => cmd_prompts_restore(args),
         "purge" | "clean" => cmd_prompts_purge(args),

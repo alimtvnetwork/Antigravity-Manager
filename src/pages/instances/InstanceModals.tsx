@@ -1,7 +1,10 @@
+import { useState, useEffect } from 'react';
 import ModalDialog from '../../components/common/ModalDialog';
 import { InstanceSettingsModal } from '../../components/instances/InstanceSettingsModal';
 import PromptTreeViewModal from '../../components/instances/PromptTreeViewModal';
 import InstanceAuditTrailModal from '../../components/instances/InstanceAuditTrailModal';
+import { UnifiedBackupModal } from '../../components/modals/UnifiedBackupModal';
+import { InstancesCliHelpCard } from './InstancesStates';
 import type { InstancePageApi } from './instancePageTypes';
 
 export function InstanceConfirmDialogs({ api }: { api: InstancePageApi }) {
@@ -127,6 +130,33 @@ export function InstanceAttachedModals({ api }: { api: InstancePageApi }) {
         fetchRunningTasks,
     } = api;
 
+    const [localBackupOpen, setLocalBackupOpen] = useState(false);
+    const [localBackupTab, setLocalBackupTab] = useState<'export' | 'import'>('export');
+
+    useEffect(() => {
+        const handleOpenBackup = (e: Event) => {
+            const customEvent = e as CustomEvent<{ tab?: 'export' | 'import' }>;
+            setLocalBackupTab(customEvent.detail?.tab || 'export');
+            setLocalBackupOpen(true);
+        };
+        window.addEventListener('agm:open-instance-backup', handleOpenBackup);
+        return () => window.removeEventListener('agm:open-instance-backup', handleOpenBackup);
+    }, []);
+
+    const isBackupOpen = (api as Record<string, unknown>).isBackupModalOpen !== undefined
+        ? Boolean((api as Record<string, unknown>).isBackupModalOpen)
+        : localBackupOpen;
+
+    const backupTab = ((api as Record<string, unknown>).backupInitialTab as 'export' | 'import') || localBackupTab;
+
+    const handleCloseBackup = () => {
+        const apiObj = api as Record<string, unknown>;
+        if (typeof apiObj.setIsBackupModalOpen === 'function') {
+            (apiObj.setIsBackupModalOpen as (v: boolean) => void)(false);
+        }
+        setLocalBackupOpen(false);
+    };
+
     return (
         <>
             <InstanceSettingsModal
@@ -158,6 +188,16 @@ export function InstanceAttachedModals({ api }: { api: InstancePageApi }) {
                 onClose={() => setAuditModalInstance(null)}
                 instance={auditModalInstance}
             />
+
+            <UnifiedBackupModal
+                isOpen={isBackupOpen}
+                onClose={handleCloseBackup}
+                initialTab={backupTab}
+            />
+
+            <div className="pt-2">
+                <InstancesCliHelpCard />
+            </div>
         </>
     );
 }

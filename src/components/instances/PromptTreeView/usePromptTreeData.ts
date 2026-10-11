@@ -4,6 +4,7 @@ import { getArchivedProjectsForInstance } from '../../../services/instanceServic
 import type { AgmConversationNode, AgmProjectTreeNode } from './types';
 import { isGhostConversation, isStaleOrEmptyConversation } from './conversationGuards';
 import type { PromptTreeState } from './usePromptTreeState';
+import { useErrorStore } from '../../../stores/error-store';
 
 export interface PromptTreeData {
     selectConversation: (conv: AgmConversationNode, project: AgmProjectTreeNode) => void;
@@ -27,6 +28,28 @@ interface RunningCand {
     proj: AgmProjectTreeNode;
     timestamp: number;
 }
+
+interface PromptTreeSwrEntry {
+    data: AgmProjectTreeNode[];
+    timestamp: number;
+}
+
+// Module-level in-memory SWR cache across modal mount/unmount lifecycles
+const promptTreeSwrCache = new Map<string, PromptTreeSwrEntry>();
+
+// Shared loading state emitter so TreePanel can observe initial load and render skeletons
+export const promptTreeLoadingEmitter = {
+    isLoading: false,
+    listeners: new Set<(loading: boolean) => void>(),
+    set(loading: boolean) {
+        this.isLoading = loading;
+        this.listeners.forEach((fn) => fn(loading));
+    },
+    subscribe(fn: (loading: boolean) => void) {
+        this.listeners.add(fn);
+        return () => this.listeners.delete(fn);
+    },
+};
 
 function isValidConversation(c: AgmConversationNode): boolean {
     return (
@@ -211,12 +234,13 @@ export function usePromptTreeData({
     const loadTree = useCallback(
         async (
             isInitialLoad: boolean = true,
-            isForce: boolean = true,
+            isForce: boolean = false,
             overrideArchivedIds?: string[],
             overridePinnedIds?: string[]
         ) => {
             if (isInitialLoad) {
                 setIsLoading(true);
+                promptTreeLoadingEmitter.set(true);
             } else {
                 setIsAutoSyncing(true);
             }
@@ -250,6 +274,11 @@ export function usePromptTreeData({
                           }))
                     : data;
                 const finalData = relevant;
+
+                // Cache in memory for immediate SWR retrieval on subsequent opens
+                const cacheKey = instanceId || 'default';
+                promptTreeSwrCache.set(cacheKey, { data: finalData, timestamp: Date.now() });
+
                 setTreeData(finalData);
 
                 if (isInitialLoad) {
@@ -282,12 +311,14 @@ export function usePromptTreeData({
             } catch (err: unknown) {
                 if (isInitialLoad) {
                     setError(err instanceof Error ? err.message : String(err) || 'Failed to load project and conversation tree');
+                    useErrorStore.getState().trackWarning(err, { source: 'usePromptTreeData.loadTree', triggerAction: 'initial_load' });
                 } else {
-                    console.warn('Background auto-sync failed:', err);
+                    useErrorStore.getState().trackWarning(err, { source: 'usePromptTreeData.loadTree', triggerAction: 'auto_sync' });
                 }
             } finally {
                 if (isInitialLoad) {
                     setIsLoading(false);
+                    promptTreeLoadingEmitter.set(false);
                 } else {
                     setIsAutoSyncing(false);
                 }
@@ -312,9 +343,11 @@ export function usePromptTreeData({
         ]
     );
 
-    // Modal open effect
+    // Modal open effect: Check SWR in-memory cache first for instant 0ms perceived render
     useEffect(() => {
         if (isOpen) {
+            const cacheKey = instanceId || 'default';
+            const cached = promptTreeSwrCache.get(cacheKey);
             const latestArchived = getArchivedProjectsForInstance(instanceId);
             const latestPinned = (() => {
                 try {
@@ -326,9 +359,19 @@ export function usePromptTreeData({
             })();
             setArchivedProjectIds(latestArchived);
             setPinnedProjectIds(latestPinned);
-            loadTree(true, true, latestArchived, latestPinned);
+
+            if (cached && cached.data.length > 0) {
+                // Immediate SWR render
+                setTreeData(cached.data);
+                performAutoSelection(cached.data, latestArchived, latestPinned);
+                // Revalidate in background using force: false to leverage backend SQLite cache
+                loadTree(false, false, latestArchived, latestPinned);
+            } else {
+                // Initial load using force: false to leverage backend SQLite cache
+                loadTree(true, false, latestArchived, latestPinned);
+            }
         }
-    }, [isOpen, instanceId, initialSelectedProjectId, loadTree, setArchivedProjectIds, setPinnedProjectIds]);
+    }, [isOpen, instanceId, initialSelectedProjectId, loadTree, performAutoSelection, setArchivedProjectIds, setPinnedProjectIds, setTreeData]);
 
     // Configurable auto-sync interval timer (minimum 15s floor)
     useEffect(() => {
@@ -343,7 +386,7 @@ export function usePromptTreeData({
         const safeIntervalMs = Math.max(intervalMs, 15000);
 
         const timer = setInterval(() => {
-            loadTree(false, true);
+            loadTree(false, false);
         }, safeIntervalMs);
 
         return () => clearInterval(timer);

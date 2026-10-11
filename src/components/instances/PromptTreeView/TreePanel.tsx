@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import {
     Folder,
     Search,
@@ -12,11 +13,13 @@ import {
 import { cn } from '../../../utils/cn';
 import type { AgmConversationNode, AgmProjectTreeNode } from './types';
 import { ProjectNode } from './ProjectNode';
+import { promptTreeLoadingEmitter } from './usePromptTreeData';
 
 export type ActiveFilter = 'all' | 'running' | 'queued' | 'latest_conv' | 'latest_prompt' | 'pinned' | 'archived';
 export type CategoryFilter = 'all' | 'user' | 'subagent' | 'system';
 
 export interface TreePanelProps {
+    isLoading?: boolean;
     treeData: AgmProjectTreeNode[];
     activeProjects: AgmProjectTreeNode[];
     archivedProjects: AgmProjectTreeNode[];
@@ -53,6 +56,7 @@ export interface TreePanelProps {
 
 export function TreePanel(props: TreePanelProps) {
     const {
+        isLoading,
         treeData,
         activeProjects,
         archivedProjects,
@@ -86,8 +90,16 @@ export function TreePanel(props: TreePanelProps) {
         onToggleArchive,
     } = props;
 
+    const [subLoading, setSubLoading] = useState(promptTreeLoadingEmitter.isLoading);
+    useEffect(() => {
+        return promptTreeLoadingEmitter.subscribe((v) => setSubLoading(v));
+    }, []);
+
+    const isEffectiveLoading = isLoading ?? subLoading;
+
     const renderProject = (project: AgmProjectTreeNode) => (
         <ProjectNode
+            key={project.project_id}
             project={project}
             isExpanded={Boolean(expandedProjects[project.project_id])}
             isSelected={selectedProjectId === project.project_id}
@@ -120,7 +132,7 @@ export function TreePanel(props: TreePanelProps) {
                     <select
                         value={selectedProjectScope}
                         onChange={(e) => setSelectedProjectScope(e.target.value)}
-                        className="w-full text-xs font-medium bg-transparent text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
+                        className="w-full text-xs font-medium bg-transparent border-0 focus:ring-0 focus:outline-none text-slate-800 dark:text-slate-200 cursor-pointer"
                         title="Filter tree by project scope"
                     >
                         <option value="all" className="dark:bg-[#0c2438]">All Projects ({treeData.length})</option>
@@ -259,7 +271,7 @@ export function TreePanel(props: TreePanelProps) {
                             if (val === 'archived') setActiveFilter('archived');
                             else setActiveFilter('all');
                         }}
-                        className="text-[10px] font-medium bg-white dark:bg-[#0c2438] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#15334d] rounded-full px-2 py-0.5 focus:outline-none cursor-pointer"
+                        className="text-[10px] font-medium bg-transparent border-0 focus:ring-0 focus:outline-none text-slate-700 dark:text-slate-300 rounded-full px-2 py-0.5 cursor-pointer"
                     >
                         <option value="all" className="dark:bg-[#0c2438]">All ({treeData.length})</option>
                         <option value="archived" className="dark:bg-[#0c2438]">Archived ({archivedCount})</option>
@@ -277,6 +289,23 @@ export function TreePanel(props: TreePanelProps) {
                     ) : (
                         archivedProjects.map((project) => renderProject(project))
                     )
+                ) : isEffectiveLoading && treeData.length === 0 ? (
+                    /* Animated Skeleton Shimmer replacing jarring false-empty flash */
+                    <div className="space-y-2 p-1 animate-pulse">
+                        {[1, 2, 3].map((n) => (
+                            <div key={n} className="rounded-lg border border-slate-200/60 dark:border-[#15334d]/60 p-2.5 space-y-2 bg-slate-50/50 dark:bg-[#0c2438]/40">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-800" />
+                                    <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-slate-800" />
+                                    <div className="ml-auto h-3 w-10 rounded bg-slate-200 dark:bg-slate-800" />
+                                </div>
+                                <div className="pl-6 space-y-1.5">
+                                    <div className="h-3 w-48 rounded bg-slate-200/70 dark:bg-slate-800/70" />
+                                    <div className="h-3 w-36 rounded bg-slate-200/70 dark:bg-slate-800/70" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 ) : (
                     <>
                         {activeProjects.length === 0 && archivedProjects.length === 0 ? (

@@ -1,4 +1,6 @@
-import { Mail, Folder, Copy, Check, RotateCw } from 'lucide-react';
+import { useState } from 'react';
+import { Mail, Folder, Copy, Check, RotateCw, Terminal } from 'lucide-react';
+import { useErrorStore } from '../../../stores/error-store';
 import { cn } from '../../../utils/cn';
 import { maskEmail } from '../../../utils/maskEmail';
 import type { Account } from '../../../types/account';
@@ -290,6 +292,52 @@ export function PathCell({ inst, isCopied, onCopy }: PathCellProps) {
                     onClick={onCopy}
                     className="p-1 rounded-[5px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer shrink-0"
                     title={isCopied ? 'Copied!' : 'Copy full path'}
+                >
+                    {isCopied ? <Check className="w-3 h-3 text-teal-500" /> : <Copy className="w-3 h-3" />}
+                </button>
+            </div>
+        </td>
+    );
+}
+
+export type InstanceInfo = InstanceStatus;
+
+export function ExePathCell({ inst }: { inst: InstanceInfo }) {
+    const [isCopied, setIsCopied] = useState(false);
+    const effectivePath =
+        inst.config.executable_path ||
+        (inst.config.is_default || inst.config.id === 'default'
+            ? 'Antigravity.exe (Default)'
+            : 'Default IDE');
+    const shortPath = inst.config.executable_path
+        ? formatShortPath(inst.config.executable_path)
+        : effectivePath;
+
+    const handleCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(effectivePath);
+            setIsCopied(true);
+            setTimeout(() => setIsCopied(false), 1500);
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'InstanceRowCells.ExePathCell',
+                triggerAction: 'copy_exe_path',
+            });
+        }
+    };
+
+    return (
+        <td className="px-2 py-1 whitespace-nowrap min-w-[120px] max-w-[150px]" title={effectivePath}>
+            <div className="flex items-center justify-between gap-1 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                <div className="flex items-center gap-1 min-w-0 truncate" title={effectivePath}>
+                    <Terminal className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="truncate">{shortPath}</span>
+                </div>
+                <button
+                    type="button"
+                    onClick={handleCopy}
+                    className="p-1 rounded-[5px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer shrink-0"
+                    title={isCopied ? 'Copied!' : 'Copy executable path'}
                 >
                     {isCopied ? <Check className="w-3 h-3 text-teal-500" /> : <Copy className="w-3 h-3" />}
                 </button>

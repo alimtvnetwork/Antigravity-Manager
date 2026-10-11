@@ -60,7 +60,8 @@ export function useInstanceSettings(
         try {
             const raw = localStorage.getItem('agm_instance_clipboard_buffer');
             return raw ? (JSON.parse(raw) as InstanceClipboardBuffer) : null;
-        } catch {
+        } catch (e) {
+            useErrorStore.getState().trackWarning(e, { source: 'useInstanceSettings' });
             return null;
         }
     });
@@ -109,7 +110,8 @@ export function useInstanceSettings(
                 if (typeof parsed['antigravity.planReviewAlwaysProceed'] === 'boolean') {
                     setIsAlwaysProceed(parsed['antigravity.planReviewAlwaysProceed']);
                 }
-            } catch {
+            } catch (e) {
+                useErrorStore.getState().trackWarning(e, { source: 'useInstanceSettings' });
                 // Keep raw string if parse fails
             }
             setJsonContent(formatted);

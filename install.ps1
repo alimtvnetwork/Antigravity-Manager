@@ -1262,7 +1262,11 @@ if (-not $Version) {
 $isPinned = $false
 $cleanPinned = $null
 if ($Version) {
-    $cleanPinned = $Version -replace "^v", ""
+    $cleanPinned = ($Version -replace "^v", "").Trim()
+    $parts = $cleanPinned.Split("-")[0].Split(".")
+    if ($parts.Length -eq 2) {
+        $cleanPinned = "$cleanPinned.0"
+    }
     $candidateVersions.Add($cleanPinned)
     $isPinned = $true
     Write-Step "Respecting pinned release version: v$cleanPinned"
@@ -1420,10 +1424,18 @@ if (-not $isPinned -and (-not $manifestLoaded -or $candidateVersions.Count -lt 5
 # If pinned, ensure deterministic direct asset fallback without drifting to unrequested versions
 if ($isPinned) {
     if (-not $manifestAssetUrlMap.ContainsKey($cleanPinned) -and -not $releaseMetadataMap.ContainsKey($cleanPinned)) {
-        $directSetupUrl = "https://github.com/$Repo/releases/download/v$cleanPinned/agm-alim_${cleanPinned}_x64-setup.exe"
-        if (Test-UrlReachable -Url $directSetupUrl -TimeoutSec 4) {
-            $manifestAssetUrlMap[$cleanPinned] = $directSetupUrl
-            Write-Step "Configured deterministic direct asset target for pinned release: v$cleanPinned"
+        $candidateAssetFiles = @(
+            "agm-alim-setup.exe",
+            "agm-alim_${cleanPinned}_x64-setup.exe",
+            "agm-alim_${cleanPinned}_windows_x64.zip"
+        )
+        foreach ($cFile in $candidateAssetFiles) {
+            $directSetupUrl = "https://github.com/$Repo/releases/download/v$cleanPinned/$cFile"
+            if (Test-UrlReachable -Url $directSetupUrl -TimeoutSec 4) {
+                $manifestAssetUrlMap[$cleanPinned] = $directSetupUrl
+                Write-Step "Configured deterministic direct asset target for pinned release: v$cleanPinned ($cFile)"
+                break
+            }
         }
     }
 }

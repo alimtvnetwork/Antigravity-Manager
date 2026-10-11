@@ -75,7 +75,10 @@ pub(crate) fn cmd_fast_forward(args: &[String]) {
     };
 
     // Snapshot & backup running prompts before rotation
-    let _ = repo_db::backup_running_prompts(&target_instance);
+    antigravity_tools_lib::error::record_ignored(
+        repo_db::backup_running_prompts(&target_instance),
+        "backup_running_prompts before fastforward",
+    ); // Justification: best-effort prompt snapshotting before rotation (crate::error::record_ignored)
 
     if !is_json {
         println!(
@@ -89,8 +92,14 @@ pub(crate) fn cmd_fast_forward(args: &[String]) {
 
     if result.is_ok() {
         // Immediately restore and dispatch running prompts for target instance
-        let _ = repo_db::resend_running_commands_for_instance(Some(&target_instance), 20);
-        let _ = repo_db::dispatch_running_prompts(&target_instance);
+        antigravity_tools_lib::error::record_ignored(
+            repo_db::resend_running_commands_for_instance(Some(&target_instance), 20),
+            "resend_running_commands_for_instance",
+        ); // Justification: best-effort prompt re-injection (crate::error::record_ignored)
+        antigravity_tools_lib::error::record_ignored(
+            repo_db::dispatch_running_prompts(&target_instance),
+            "dispatch_running_prompts",
+        ); // Justification: best-effort prompt re-injection (crate::error::record_ignored)
     }
 
     let status_after = auto_switcher::get_status();

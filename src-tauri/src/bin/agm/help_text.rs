@@ -80,6 +80,8 @@ pub(crate) fn print_help_json() {
                 "items": [
                     { "name": "backup", "aliases": ["backpack", "brp", "backup-running-prompts"], "flags": ["ls", "clean", "-f <file>", "--json"], "description": "Parallel snapshot of active prompts across all workspaces to split SQLite DB" },
                     { "name": "restore", "aliases": ["rrp", "restore-running-prompts", "resend-running"], "flags": ["--keep", "--json", "-f <file>"], "description": "Restore and re-enqueue in-flight prompts into active workspaces" },
+                    { "name": "export-compact", "aliases": ["compact-export", "ec"], "flags": ["-f <file>", "-w <work-dir>", "--no-pinned", "--absolute"], "description": "Export portable workspace compaction snapshot to JSON envelope v2.0 or SQLite DB" },
+                    { "name": "import-compact", "aliases": ["compact-import", "ic"], "flags": ["<file>", "-w <work-dir>", "-y"], "description": "Import portable workspace compaction snapshot into local SQLite databases" },
                     { "name": "which-prompts-running", "aliases": ["wpr"], "flags": ["--json"], "description": "List running projects, conv IDs, and prompt queues" },
                     { "name": "prompts ls", "aliases": ["running-prompts ls"], "flags": ["[N]", "--json", "--words <W>"], "description": "Show N running prompts in ASC stack order (with friendly project names)" },
                     { "name": "prompt", "aliases": [], "flags": ["\"<text>\"", "--prefix <cat>", "--suffix <cat>"], "description": "Dispatch prompt with git pull & 01-prompts templates" },
@@ -207,6 +209,10 @@ pub(crate) fn print_help() {
     );
     println!("    restore, restore-running-prompts [--keep] [--json] [-f file]");
     println!("        Restore and re-enqueue in-flight prompts into active workspaces");
+    println!("    export-compact, compact-export, ec [-f file] [-w dir] [--no-pinned] [--absolute]");
+    println!("        Export portable workspace compaction snapshot to JSON envelope v2.0 or SQLite DB");
+    println!("    import-compact, compact-import, ic <file> [-w dir] [-y]");
+    println!("        Import portable workspace compaction snapshot into local SQLite databases");
     println!("    queue-scheduler, scheduler, qs [--once] [instance]");
     println!("        10-minute automated queue bookkeeping: auto-push FIFO prompts when project is idle");
     println!("    tree [all] [--words <W>] [--json]");

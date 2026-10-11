@@ -10,6 +10,7 @@ import {
     List,
     ToggleLeft,
     ToggleRight,
+    FolderArchive,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import type { InstancePageApi } from './instancePageTypes';
@@ -41,6 +42,14 @@ export function InstancesHeader({ api }: { api: InstancePageApi }) {
     } = api;
 
     const switcher = switcherStatus as { is_running?: boolean } | null;
+
+    const handleOpenBackup = () => {
+        if ('setIsBackupModalOpen' in api && typeof (api as any).setIsBackupModalOpen === 'function') {
+            (api as any).setBackupInitialTab?.('export');
+            (api as any).setIsBackupModalOpen(true);
+        }
+        window.dispatchEvent(new CustomEvent('agm:open-instance-backup', { detail: { tab: 'export' } }));
+    };
 
     return (
         <div className="space-y-3">
@@ -89,6 +98,15 @@ export function InstancesHeader({ api }: { api: InstancePageApi }) {
                     >
                         <FolderSync className={cn('w-3.5 h-3.5 text-cyan-500', isSyncingAll && 'animate-spin')} />
                         <span>Sync All</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleOpenBackup}
+                        className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-100/50 dark:hover:bg-purple-950/40 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                        title="Unified Backup: Export accounts, configurations, or restore encrypted archives"
+                    >
+                        <FolderArchive className="w-3.5 h-3.5 text-purple-500" />
+                        <span>Import / Export</span>
                     </button>
                     <button
                         type="button"

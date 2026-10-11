@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { showToast } from '../../common/ToastContainer';
 import { useInstanceStore } from '../../../stores/useInstanceStore';
+import { useErrorStore } from '../../../stores/error-store';
 import { getAutoSwitcherDaemonStatus, type AutoSwitcherDaemonStatus } from '../../../services/instanceService';
 import { DEFAULT_CONFIG } from './switcherTypes';
 import type { AutoProfileSwitcherConfig } from '../../../types/config';
@@ -31,7 +32,9 @@ export function useAutoSwitcher(config?: AutoProfileSwitcherConfig, onChange: (c
                         setRemainingSeconds(Math.max(0, status.next_check_in_seconds));
                     }
                 })
-                .catch(() => {});
+                .catch((e) => {
+                    useErrorStore.getState().trackWarning(e, { source: 'useAutoSwitcher' });
+                });
         };
 
         fetchStatus();
@@ -52,7 +55,9 @@ export function useAutoSwitcher(config?: AutoProfileSwitcherConfig, onChange: (c
                 } else {
                     unsub();
                 }
-            }).catch(() => {});
+            }).catch((e) => {
+                useErrorStore.getState().trackWarning(e, { source: 'useAutoSwitcher' });
+            });
         });
 
         const pollTimer = setInterval(fetchStatus, 3000);

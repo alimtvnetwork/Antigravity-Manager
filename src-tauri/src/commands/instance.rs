@@ -21,14 +21,22 @@ pub fn create_instance(
 
     if let Some(ref acc_id) = bound_account_id {
         if from_instance_id.is_some() {
-            // Justification: best-effort blocking wait on an async op; failure logged
-            crate::error::record_ignored(
-                tauri::async_runtime::block_on(instance::switch_account_to_instance(
+            let switch_res = tauri::async_runtime::block_on(instance::switch_account_to_instance(
+                acc_id,
+                Some(&cfg.id),
+            ));
+            if let Err(ref e) = switch_res {
+                tracing::warn!(
+                    "[Instance] Failed to switch account '{}' to new instance '{}': {}",
                     acc_id,
-                    Some(&cfg.id),
-                )),
-                "block_on",
-            );
+                    cfg.id,
+                    e
+                );
+            }
+            crate::error::record_ignored(
+                switch_res,
+                "create_instance: switch_account_to_instance",
+            ); // Justification: best-effort account binding after cloning; instance was created successfully
             if let Ok(acc) = crate::modules::account::load_account(acc_id) {
                 cfg.bound_account_id = Some(acc.id);
                 cfg.bound_email = Some(acc.email);

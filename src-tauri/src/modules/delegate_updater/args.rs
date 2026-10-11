@@ -3,6 +3,22 @@ use std::path::{Path, PathBuf};
 
 use super::*;
 
+/// Normalize version string: e.g., "4.162" or "v4.162" -> "4.162.0".
+pub fn normalize_version_string(raw: &str) -> String {
+    let clean = raw.trim().trim_start_matches(['v', 'V']).trim();
+    let base = clean.split('-').next().unwrap_or(clean);
+    let parts: Vec<&str> = base.split('.').collect();
+    if parts.len() == 2 && parts.iter().all(|p| p.chars().all(|c| c.is_ascii_digit())) {
+        if let Some(suffix_idx) = clean.find('-') {
+            format!("{}.0{}", &clean[..suffix_idx], &clean[suffix_idx..])
+        } else {
+            format!("{}.0", clean)
+        }
+    } else {
+        clean.to_string()
+    }
+}
+
 pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
     let mut opts = DelegateUpdateOptions {
         wait_pid: None,
@@ -43,7 +59,7 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
             "--version" | "-v" => {
                 if i + 1 < args.len() {
                     let v = args[i + 1].trim().trim_start_matches(['v', 'V']);
-                    opts.target_version = Some(v.to_string());
+                    opts.target_version = Some(normalize_version_string(v));
                     i += 1;
                 }
             }
@@ -55,7 +71,7 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
                     .trim_start_matches("--version=")
                     .trim()
                     .trim_start_matches(['v', 'V']);
-                opts.target_version = Some(v.to_string());
+                opts.target_version = Some(normalize_version_string(v));
             }
             arg if arg.eq_ignore_ascii_case("to")
                 || arg.eq_ignore_ascii_case("revert")
@@ -69,7 +85,7 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
                             .map(|c| c.is_ascii_digit())
                             .unwrap_or(false)
                     {
-                        opts.target_version = Some(v.to_string());
+                        opts.target_version = Some(normalize_version_string(v));
                         i += 1;
                     }
                 }
@@ -84,7 +100,7 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
                             .map(|c| c.is_ascii_digit())
                             .unwrap_or(false)
                     {
-                        opts.target_version = Some(v.to_string());
+                        opts.target_version = Some(normalize_version_string(v));
                     }
                 }
             }

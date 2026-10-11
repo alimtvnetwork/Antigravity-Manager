@@ -147,13 +147,29 @@ pub fn wait_for_instance_prompt_channel(instance_id: &str) {
         let running = !pids.is_empty()
             || (inst.is_default && crate::modules::process::is_antigravity_running(None));
         if running {
+            let data_path = PathBuf::from(&inst.data_dir);
+            let has_channel_socket_or_heartbeat = || -> bool {
+                data_path.join("DevToolsActivePort").exists()
+                    || data_path.join("command_socket").exists()
+                    || data_path.join(".antigravity_goal_prompt.log").exists()
+            };
+
+            let stabilize_start = std::time::Instant::now();
+            let max_stabilize_duration = std::time::Duration::from_millis(1200);
+            while stabilize_start.elapsed() < max_stabilize_duration {
+                if has_channel_socket_or_heartbeat() {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+
             crate::modules::logger::log_info(&format!(
-                "[Instance] Prompt channel ready for '{}' ({} pids after {:?}); allowing 6s stabilization window before inject",
+                "[Instance] Prompt channel ready for '{}' ({} pids after {:?}); stabilization window completed in {:?}",
                 instance_id,
                 pids.len(),
-                start_time.elapsed()
+                start_time.elapsed(),
+                stabilize_start.elapsed()
             ));
-            std::thread::sleep(std::time::Duration::from_millis(6000));
             return;
         }
         if start_time.elapsed() >= max_wait_duration {

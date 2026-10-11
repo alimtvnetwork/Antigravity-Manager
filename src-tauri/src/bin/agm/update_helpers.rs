@@ -77,13 +77,25 @@ pub(crate) fn default_update_export_path() -> std::path::PathBuf {
         .join("agm-update.zip")
 }
 
-pub(crate) fn download_release_zip(dest: &std::path::Path) -> Result<(), String> {
+pub(crate) fn download_release_zip(
+    dest: &std::path::Path,
+    target_version: Option<&str>,
+) -> Result<(), String> {
     let client = reqwest::blocking::Client::builder()
         .user_agent("antigravity-manager")
         .build()
         .map_err(|err| err.to_string())?;
+    let release_url = if let Some(ver) = target_version {
+        let tag = ver.trim().trim_start_matches(['v', 'V']);
+        format!(
+            "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases/tags/v{}",
+            tag
+        )
+    } else {
+        "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases/latest".to_string()
+    };
     let release: serde_json::Value = client
-        .get("https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases/latest")
+        .get(&release_url)
         .header("Accept", "application/vnd.github+json")
         .send()
         .map_err(|err| err.to_string())?
@@ -94,7 +106,7 @@ pub(crate) fn download_release_zip(dest: &std::path::Path) -> Result<(), String>
     let assets = release
         .get("assets")
         .and_then(|item| item.as_array())
-        .ok_or_else(|| "latest release has no assets".to_string())?;
+        .ok_or_else(|| "release has no assets".to_string())?;
     let asset = assets
         .iter()
         .filter(|item| {
@@ -183,7 +195,8 @@ pub(crate) fn cmd_update_export_zip(args: &[String]) {
         index += 1;
     }
     let dest = output.unwrap_or_else(default_update_export_path);
-    match download_release_zip(&dest) {
+    let target_version = crate::update_cmds::extract_target_version(args);
+    match download_release_zip(&dest, target_version.as_deref()) {
         Ok(()) => {
             println!("EXPORT_ZIP={}", dest.display());
             println!(

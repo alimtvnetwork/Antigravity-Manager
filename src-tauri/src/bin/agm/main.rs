@@ -12,6 +12,7 @@ mod account_cmds;
 mod account_mgmt;
 mod cache_cmds;
 mod common;
+mod compact_cmds;
 mod doctor_cmds;
 mod email_arms_a;
 mod email_arms_b;
@@ -205,6 +206,29 @@ fn main() {
         }
         "restore-running-prompts" | "rrp" | "restore-prompts" | "restore" => {
             crate::prompt_cmds::dispatch_prompt_domain("restore", &cmd_args);
+        }
+        "export-compact" | "compact-export" | "ec" => {
+            crate::compact_cmds::cmd_export_compact(&cmd_args);
+        }
+        "import-compact" | "compact-import" | "ic" => {
+            crate::compact_cmds::cmd_import_compact(&cmd_args);
+        }
+        "compact" => {
+            if cmd_args
+                .first()
+                .map(|s| s == "export" || s == "exp" || s == "e")
+                .unwrap_or(false)
+            {
+                crate::compact_cmds::cmd_export_compact(&cmd_args[1..]);
+            } else if cmd_args
+                .first()
+                .map(|s| s == "import" || s == "imp" || s == "i")
+                .unwrap_or(false)
+            {
+                crate::compact_cmds::cmd_import_compact(&cmd_args[1..]);
+            } else {
+                crate::compact_cmds::cmd_export_compact(&cmd_args);
+            }
         }
         "running-prompts" => {
             crate::prompt_cmds::dispatch_prompt_domain("running", &cmd_args);

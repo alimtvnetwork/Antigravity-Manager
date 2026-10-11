@@ -93,3 +93,26 @@ pub async fn deploy_accounts_to_fleet(
         raw_output,
     })
 }
+
+// =========================================================================
+// Headless Fleet Synchronization Commands
+// =========================================================================
+
+#[tauri::command]
+pub fn get_fleet_sync_machines() -> Result<Vec<crate::modules::fleet_sync::FleetNodeInfo>, String> {
+    crate::modules::fleet_sync::get_fleet_summary_machines().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn generate_fleet_sync_json() -> Result<String, String> {
+    let payload = crate::modules::fleet_sync::generate_local_fleet_sync_payload()
+        .map_err(|e| e.to_string())?;
+    serde_json::to_string_pretty(&payload)
+        .map_err(|e| format!("Failed to serialize fleet sync payload: {e}"))
+}
+
+#[tauri::command]
+pub fn ingest_fleet_sync_json(payload: String, transport: String) -> Result<(), String> {
+    crate::modules::fleet_sync::ingest_fleet_sync_payload(&payload, &transport)
+        .map_err(|e| e.to_string())
+}

@@ -240,6 +240,23 @@ pub(crate) fn detect_legacy_signature(root: &Value) -> Option<(KnownDataType, Va
         if map.get("connections").is_some() || map.get("nodes").is_some() {
             return Some((KnownDataType::SshNodes, root.clone(), 1));
         }
+
+        // Compact Export: contains "pinnedProjects" or "pinned_projects" or ("conversations" and "runningPrompts")
+        if map.get("pinnedProjects").is_some()
+            || map.get("pinned_projects").is_some()
+            || (map.get("conversations").is_some() && map.get("runningPrompts").is_some())
+            || (map.get("conversations").is_some() && map.get("running_prompts").is_some())
+        {
+            let p_count = map.get("pinnedProjects").or_else(|| map.get("pinned_projects"))
+                .and_then(|p| p.as_array()).map(|a| a.len()).unwrap_or(0);
+            let c_count = map.get("conversations")
+                .and_then(|c| c.as_array()).map(|a| a.len()).unwrap_or(0);
+            let r_count = map.get("runningPrompts").or_else(|| map.get("running_prompts"))
+                .and_then(|r| r.as_array()).map(|a| a.len()).unwrap_or(0);
+            let h_count = map.get("promptHistory").or_else(|| map.get("prompt_history"))
+                .and_then(|h| h.as_array()).map(|a| a.len()).unwrap_or(0);
+            return Some((KnownDataType::CompactExport, root.clone(), p_count + c_count + r_count + h_count));
+        }
     } else if let Value::Array(arr) = root {
         if arr
             .iter()
@@ -369,12 +386,41 @@ pub(crate) fn describe_format(
             format!("agm telegram config import \"{}\" -y", clean_path),
             1,
         ),
-        KnownDataType::SshNodes => (
-            "SSH Cluster Fleet Nodes".to_string(),
-            "Imports and synchronizes remote SSH machine nodes and key paths into local vault".to_string(),
-            format!("agm ssh nodes import-json \"{}\" -y", clean_path),
-            1,
-        ),
+        KnownDataType::CompactExport => {
+            let p_count = data
+                .get("pinnedProjects")
+                .or_else(|| data.get("pinned_projects"))
+                .and_then(|p| p.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0);
+            let c_count = data
+                .get("conversations")
+                .and_then(|c| c.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0);
+            let r_count = data
+                .get("runningPrompts")
+                .or_else(|| data.get("running_prompts"))
+                .and_then(|r| r.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0);
+            let h_count = data
+                .get("promptHistory")
+                .or_else(|| data.get("prompt_history"))
+                .and_then(|h| h.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0);
+            let total = p_count + c_count + r_count + h_count;
+            (
+                "Workspace Compaction Archive".to_string(),
+                format!(
+                    "Imports {} pinned project(s), {} conversation(s), {} running prompt(s), {} history record(s) into local SQLite repository database",
+                    p_count, c_count, r_count, h_count
+                ),
+                format!("agm import-compact \"{}\" -y", clean_path),
+                total,
+            )
+        }
         KnownDataType::Unrecognized(other) => (
             format!("{} (Custom)", other),
             format!("Unrecognized AGM schema type '{}'", other),

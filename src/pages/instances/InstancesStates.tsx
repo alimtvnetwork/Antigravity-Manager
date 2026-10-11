@@ -1,4 +1,5 @@
-import { Search, Plus, Play, RotateCw, Laptop, AlertCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Search, Plus, Play, RotateCw, Laptop, AlertCircle, Terminal, ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
 import type { InstancePageApi } from './instancePageTypes';
 
 export function InstancesFilterBar({ api }: { api: InstancePageApi }) {
@@ -128,6 +129,145 @@ export function InstancesNoResultsState({ api }: { api: InstancePageApi }) {
             <p className="text-xs text-gray-400 mt-1">
                 {t('instances.no_search_results_desc', 'Try searching with a different name, profile ID, or email')}
             </p>
+        </div>
+    );
+}
+
+export function InstancesCliHelpCard() {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
+
+    const commands = [
+        {
+            category: 'Lifecycle',
+            cmd: 'agm list',
+            desc: 'View active instances, PIDs, and running tasks',
+            notes: 'Real-time status',
+        },
+        {
+            category: 'Sync',
+            cmd: 'agm sync',
+            desc: 'Synchronize process PIDs and account quotas',
+            notes: 'Automated multi-process audit',
+        },
+        {
+            category: 'Switch',
+            cmd: 'agm switch <id>',
+            desc: 'Rotate profile, transfer credentials, and resume tasks',
+            notes: 'Atomic handoff',
+        },
+        {
+            category: 'Vault',
+            cmd: 'agm backup',
+            desc: 'Export encrypted profile backup archive',
+            notes: 'AES-256-GCM',
+        },
+        {
+            category: 'Vault',
+            cmd: 'agm restore <file>',
+            desc: 'Restore accounts and configurations from archive',
+            notes: 'Safe merge',
+        },
+        {
+            category: 'Hygiene',
+            cmd: 'agm clean-restart',
+            desc: 'Terminate orphaned processes and clean lockfiles',
+            notes: 'Resolves port & lock conflicts',
+        },
+        {
+            category: 'Prompt',
+            cmd: 'agm prompts list',
+            desc: 'Inspect historical and active prompts across profiles',
+            notes: 'FIFO ordered',
+        },
+    ];
+
+    const copyCommand = (cmd: string) => {
+        navigator.clipboard.writeText(cmd);
+        setCopiedCmd(cmd);
+        setTimeout(() => setCopiedCmd(null), 2000);
+    };
+
+    return (
+        <div className="rounded-xl border border-gray-200/80 dark:border-[#15334d] bg-white/60 dark:bg-[#0c2438]/60 backdrop-blur-md shadow-xs overflow-hidden transition-all duration-200">
+            <button
+                type="button"
+                onClick={() => setIsExpanded((prev) => !prev)}
+                className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50/50 dark:hover:bg-[#15334d]/30 transition-colors cursor-pointer"
+            >
+                <div className="flex items-center gap-2.5">
+                    <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-cyan-400">
+                        <Terminal className="w-4 h-4" />
+                    </div>
+                    <div>
+                        <span className="text-xs font-bold text-gray-900 dark:text-white">
+                            agm CLI Reference & Operator Shortcuts
+                        </span>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                            Command-line interface commands for headless environments, scripts, and quick automation
+                        </p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-cyan-400 font-semibold">
+                        7 Commands
+                    </span>
+                    {isExpanded ? (
+                        <ChevronDown className="w-4 h-4 text-gray-400" />
+                    ) : (
+                        <ChevronRight className="w-4 h-4 text-gray-400" />
+                    )}
+                </div>
+            </button>
+
+            {isExpanded && (
+                <div className="px-4 pb-4 pt-1 border-t border-gray-100 dark:border-[#15334d]/60 space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                        {commands.map((c) => (
+                            <div
+                                key={c.cmd}
+                                className="flex items-start justify-between gap-2 p-2.5 rounded-lg bg-gray-50 dark:bg-[#071a27] border border-gray-200/70 dark:border-[#15334d]/70 group hover:border-blue-400/50 transition-colors"
+                            >
+                                <div className="space-y-1 min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                            {c.category}
+                                        </span>
+                                        <code className="font-mono text-[11px] font-semibold text-blue-600 dark:text-cyan-400">
+                                            {c.cmd}
+                                        </code>
+                                    </div>
+                                    <p className="text-[11px] text-gray-600 dark:text-gray-300 line-clamp-1">
+                                        {c.desc}
+                                    </p>
+                                    <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                                        {c.notes}
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => copyCommand(c.cmd)}
+                                    className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
+                                    title="Copy command to clipboard"
+                                >
+                                    {copiedCmd === c.cmd ? (
+                                        <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                    ) : (
+                                        <Copy className="w-3.5 h-3.5" />
+                                    )}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="p-2.5 rounded-lg bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/40 text-[11px] text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                        <span className="font-semibold">💡 Tip:</span>
+                        <span>
+                            All instances run in conscious process sandboxes with isolated Electron storage. Use <code className="font-mono bg-blue-100 dark:bg-blue-900/40 px-1 py-0.5 rounded">agm switch &lt;id&gt;</code> to seamlessly rotate between profiles without losing active task contexts.
+                        </span>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

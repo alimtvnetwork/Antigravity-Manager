@@ -76,6 +76,7 @@ pub enum KnownDataType {
     EmailCredentials,
     TelegramConfig,
     SshNodes,
+    CompactExport,
     Unrecognized(String),
 }
 
@@ -92,6 +93,7 @@ impl KnownDataType {
             Self::EmailCredentials => "agm/email-credentials",
             Self::TelegramConfig => "agm/telegram-config",
             Self::SshNodes => "agm/ssh-nodes",
+            Self::CompactExport => "agm/compact-export",
             Self::Unrecognized(s) => s.as_str(),
         }
     }
@@ -114,6 +116,9 @@ impl KnownDataType {
             "agm/email-credentials" | "email-credentials" | "email" => Self::EmailCredentials,
             "agm/telegram-config" | "telegram-config" | "telegram" => Self::TelegramConfig,
             "agm/ssh-nodes" | "ssh-nodes" | "ssh_nodes" | "nodes" => Self::SshNodes,
+            "agm/compact-export" | "compact-export" | "compact_export" | "compact" => {
+                Self::CompactExport
+            }
             other => Self::Unrecognized(other.to_string()),
         }
     }
