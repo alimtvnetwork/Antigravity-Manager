@@ -41,6 +41,7 @@ pub(crate) fn dispatch_instance_domain(subcommand: &str, args: &[String]) {
         "copy" | "clone" | "duplicate" => cmd_instances_copy(args),
         "delete" | "rm" => cmd_instances_delete(args),
         "logs" | "log" => cmd_instances_logs(args),
+        "prompt" => crate::prompt_dispatch::cmd_prompt_dispatch(args),
         _ => crate::common::handle_unknown_domain_command("instances", subcommand, args),
     }
 }

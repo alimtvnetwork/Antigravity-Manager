@@ -249,7 +249,7 @@ fn main() {
                 crate::misc_cmds::cmd_agy(&cmd_args);
             }
         }
-        "queues" | "queue" => {
+        "queues" | "queue" | "qe" => {
             crate::prompt_cmds::dispatch_prompt_domain("queue", &cmd_args);
         }
         "agy" => {

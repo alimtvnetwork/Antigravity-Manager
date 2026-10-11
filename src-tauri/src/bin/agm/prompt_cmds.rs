@@ -38,7 +38,7 @@ pub(crate) fn dispatch_prompt_domain(subcommand: &str, args: &[String]) {
         "inspect" | "observe" => cmd_prompts_inspect(args),
         "send" | "dispatch" => cmd_prompts_send(args),
         "running" | "wpr" => cmd_prompts_running(args),
-        "queue" => cmd_prompts_queue(args),
+        "queue" | "qe" => cmd_prompts_queue(args),
         "history" => cmd_prompts_history(args),
         "export" => crate::prompt_import_export::cmd_prompts_export(args),
         "backup" | "brp" => cmd_prompts_backup(args),

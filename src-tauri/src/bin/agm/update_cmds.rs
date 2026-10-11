@@ -377,6 +377,35 @@ pub(crate) fn cmd_update(args: &[String]) {
             println!("[*] Triggering automatic update installation...");
         }
 
+        #[cfg(target_os = "windows")]
+        {
+            let current_exe = std::env::current_exe().unwrap_or_default();
+            let exe_str = current_exe.to_string_lossy().to_lowercase();
+            let is_isolated_temp = exe_str.contains("agm-updater");
+            if !is_isolated_temp && !is_json {
+                println!(
+                    "[*] Windows executable lock guard: Self-delegating to isolated updater in %TEMP%..."
+                );
+                let mut delegate_args = vec![
+                    "--relaunch".to_string(),
+                    "--version".to_string(),
+                    tag_name.clone(),
+                ];
+                if is_force || has_explicit_target {
+                    delegate_args.push("--force".to_string());
+                }
+                for i in 0..args.len() {
+                    if args[i] == "--install-dir" && i + 1 < args.len() {
+                        delegate_args.push("--install-dir".to_string());
+                        delegate_args.push(args[i + 1].clone());
+                        break;
+                    }
+                }
+                antigravity_tools_lib::modules::delegate_updater::run(&delegate_args);
+                std::process::exit(0);
+            }
+        }
+
         let ui_running =
             antigravity_tools_lib::modules::delegate_updater::is_ui_process_running_excluding(
                 std::process::id(),

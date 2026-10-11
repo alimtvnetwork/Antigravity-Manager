@@ -277,7 +277,9 @@ function Close-ToolProcesses {
         "antigravity-tools",
         "Anti-Gravity Tools",
         "Anti-Gravity Tools by Alim",
-        "AGM by Alim"
+        "AGM by Alim",
+        "antigravity-manager",
+        "agm"
     )
 
     # 1. Gracefully terminate other running tool instances (protecting invoking parent process during in-app update)
@@ -1579,7 +1581,11 @@ foreach ($candVersion in $versionQueue) {
                 (Join-Path $InstallDir "agm-alim.exe"),
                 (Join-Path $InstallDir "AGM by Alim.exe"),
                 (Join-Path $InstallDir "Anti-Gravity Tools by Alim.exe"),
-                (Join-Path $InstallDir "antigravity-tools.exe")
+                (Join-Path $InstallDir "antigravity-tools.exe"),
+                (Join-Path $InstallDir "antigravity-manager.exe"),
+                (Join-Path $InstallDir "agm.exe"),
+                (Join-Path $cliDir "agm.exe"),
+                (Join-Path $cliDir "agm-update-cli.exe")
             )
             foreach ($lc in $lockCandidates) {
                 if (Test-Path $lc) {

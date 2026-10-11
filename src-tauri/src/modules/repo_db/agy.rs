@@ -62,6 +62,13 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
         cmd.current_dir(&ws_dir);
         cmd.arg("--dangerously-skip-permissions");
 
+        if let Some(ref sess) = prompt.session_id {
+            let s = sess.trim();
+            if !s.is_empty() && !s.starts_with("conv-") {
+                cmd.arg("--resume").arg(s);
+            }
+        }
+
         if clean_prompt.len() <= 24000 {
             cmd.arg("-p").arg(&clean_prompt);
         } else {

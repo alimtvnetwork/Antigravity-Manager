@@ -54,7 +54,12 @@ pub fn is_ui_process_running() -> bool {
 pub fn is_ui_process_running_excluding(exclude_pid: u32) -> bool {
     #[cfg(target_os = "windows")]
     {
-        let process_names = ["agm-alim.exe", "antigravity-tools.exe"];
+        let process_names = [
+            "agm-alim.exe",
+            "antigravity-tools.exe",
+            "antigravity-manager.exe",
+            "agm.exe",
+        ];
         for proc_name in process_names {
             let output = Command::new("tasklist.exe")
                 .args(["/FI", &format!("IMAGENAME eq {}", proc_name), "/NH"])
@@ -105,20 +110,20 @@ pub fn kill_other_ui_processes(exclude_pid: u32) {
         } else {
             "PID gt 0".to_string()
         };
-        // Justification: best-effort process spawn; failure logged
-        crate::error::record_ignored(
-            Command::new("taskkill.exe")
-                .args(["/F", "/IM", "agm-alim.exe", "/FI", &filter])
-                .output(),
-            "spawn taskkill.exe",
-        );
-        // Justification: best-effort process spawn; failure logged
-        crate::error::record_ignored(
-            Command::new("taskkill.exe")
-                .args(["/F", "/IM", "antigravity-tools.exe", "/FI", &filter])
-                .output(),
-            "spawn taskkill.exe",
-        );
+        let procs = [
+            "agm-alim.exe",
+            "antigravity-tools.exe",
+            "antigravity-manager.exe",
+        ];
+        for p in procs {
+            // Justification: best-effort process spawn; failure logged
+            crate::error::record_ignored(
+                Command::new("taskkill.exe")
+                    .args(["/F", "/IM", p, "/FI", &filter])
+                    .output(),
+                "spawn taskkill.exe",
+            );
+        }
     }
     #[cfg(not(target_os = "windows"))]
     {
