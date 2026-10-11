@@ -442,14 +442,6 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null());
 
-        #[cfg(target_os = "windows")]
-        {
-            // 0x00000200: CREATE_NEW_PROCESS_GROUP
-            // 0x01000000: CREATE_BREAKAWAY_FROM_JOB
-            // Note: NEVER add 0x08000000 (CREATE_NO_WINDOW) to a GUI application!
-            cmd.creation_flags(0x00000200 | 0x01000000);
-        }
-
         #[cfg(target_os = "linux")]
         {
             crate::modules::process::clean_appimage_env(&mut cmd);
@@ -474,9 +466,147 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
             "inject instance settings",
         );
 
-        let child = cmd.spawn().map_err(|e| {
-            crate::error::AppError::Process(format!("Failed to spawn instance process: {}", e))
-        })?;
+        let child_res = crate::modules::process::spawn_with_job_breakaway_fallback(&mut cmd);
+        let child = match child_res {
+            Ok(c) => c,
+            Err(initial_err) => {
+                let mut fallback_child = None;
+                // If spawning the custom or cloned executable failed, fall back to the base detected executable
+                if let Ok(base_exe) =
+                    crate::modules::process::detect_antigravity_with_diagnostics(None)
+                {
+                    let base_str = base_exe.to_string_lossy().to_string();
+                    if base_str != exe_str && base_exe.exists() {
+                        crate::modules::logger::log_warn(&format!(
+                            "[Instance] Spawning '{}' failed ({}). Attempting fallback to detected base executable '{}'...",
+                            exe_str, initial_err, base_str
+                        ));
+                        let mut fallback_cmd = Command::new(&base_str);
+                        fallback_cmd.env("RUST_BACKTRACE", "1");
+                        if has_custom_data {
+                            fallback_cmd.arg(format!("--user-data-dir={}", data_dir));
+                            fallback_cmd.arg("--password-store=basic");
+                            fallback_cmd.arg("--remote-debugging-port=0");
+                            if let Some(ref inst_home) = inst_home_opt {
+                                #[cfg(target_os = "windows")]
+                                {
+                                    fallback_cmd.env("USERPROFILE", inst_home);
+                                    fallback_cmd
+                                        .env("APPDATA", inst_home.join("AppData").join("Roaming"));
+                                    fallback_cmd.env(
+                                        "LOCALAPPDATA",
+                                        inst_home.join("AppData").join("Local"),
+                                    );
+                                }
+                                #[cfg(not(target_os = "windows"))]
+                                {
+                                    fallback_cmd.env("HOME", inst_home);
+                                }
+                            }
+                            if let Some(ref acc) = resolved_account {
+                                fallback_cmd.env("JETSKI_OAUTH_TOKEN", &acc.token.access_token);
+                                fallback_cmd.env("GEMINI_CLI_OAUTH_TOKEN", &acc.token.access_token);
+                            }
+                        }
+                        if let Some(ref ext_dir) = extensions_dir {
+                            fallback_cmd.arg(format!("--extensions-dir={}", ext_dir));
+                        }
+                        if !workspace_folders.is_empty() {
+                            for folder in &workspace_folders {
+                                fallback_cmd.arg(folder);
+                            }
+                        } else {
+                            fallback_cmd.arg("--new-window");
+                        }
+                        fallback_cmd
+                            .stdin(std::process::Stdio::null())
+                            .stdout(std::process::Stdio::null())
+                            .stderr(std::process::Stdio::null());
+
+                        #[cfg(target_os = "linux")]
+                        crate::modules::process::clean_appimage_env(&mut fallback_cmd);
+
+                        if let Ok(c) = crate::modules::process::spawn_with_job_breakaway_fallback(
+                            &mut fallback_cmd,
+                        ) {
+                            crate::modules::logger::log_info(&format!(
+                                "[Instance] Successfully launched instance '{}' using fallback base executable '{}'",
+                                instance_id, base_str
+                            ));
+                            fallback_child = Some(c);
+                        }
+                    }
+                }
+
+                if let Some(c) = fallback_child {
+                    c
+                } else {
+                    #[cfg(target_os = "windows")]
+                    {
+                        if initial_err.raw_os_error() == Some(5)
+                            || initial_err.kind() == std::io::ErrorKind::PermissionDenied
+                        {
+                            crate::modules::logger::log_warn(
+                                "[Instance] Direct process spawn returned Access Denied (os error 5). Attempting Windows Shell dispatch (cmd.exe /c start)..."
+                            );
+                            let target_bin = if Path::new(&exe_str).exists() {
+                                exe_str.clone()
+                            } else if let Ok(base_exe) =
+                                crate::modules::process::detect_antigravity_with_diagnostics(None)
+                            {
+                                base_exe.to_string_lossy().to_string()
+                            } else {
+                                exe_str.clone()
+                            };
+
+                            let mut shell_cmd = Command::new("cmd.exe");
+                            shell_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW for transient cmd
+                            shell_cmd.arg("/c").arg("start").arg("").arg(&target_bin);
+                            if has_custom_data {
+                                shell_cmd.arg(format!("--user-data-dir={}", data_dir));
+                                shell_cmd.arg("--password-store=basic");
+                                shell_cmd.arg("--remote-debugging-port=0");
+                            }
+                            if let Some(ref ext_dir) = extensions_dir {
+                                shell_cmd.arg(format!("--extensions-dir={}", ext_dir));
+                            }
+                            if !workspace_folders.is_empty() {
+                                for folder in &workspace_folders {
+                                    shell_cmd.arg(folder);
+                                }
+                            } else {
+                                shell_cmd.arg("--new-window");
+                            }
+                            shell_cmd
+                                .stdin(std::process::Stdio::null())
+                                .stdout(std::process::Stdio::null())
+                                .stderr(std::process::Stdio::null());
+
+                            if let Ok(status) = shell_cmd.status() {
+                                if status.success() {
+                                    std::thread::sleep(std::time::Duration::from_millis(600));
+                                    let pids = find_pids_for_data_dir(&data_dir, is_default);
+                                    let detected_pid = pids.first().copied().unwrap_or(0);
+                                    record_spawned_instance_process(
+                                        instance_id,
+                                        &data_dir,
+                                        reinject_prompts,
+                                        detected_pid,
+                                    )?;
+                                    return Ok(());
+                                }
+                            }
+                        }
+                    }
+
+                    return Err(crate::error::AppError::Process(format!(
+                        "Failed to spawn instance process: {}",
+                        initial_err
+                    )));
+                }
+            }
+        };
+
         // Justification: PID cache bookkeeping; staleness is tolerated via the OS-level re-detect fallback
         record_spawned_instance_process(instance_id, &data_dir, reinject_prompts, child.id())?;
         Ok(())

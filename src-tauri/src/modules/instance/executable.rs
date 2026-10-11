@@ -85,7 +85,11 @@ pub(crate) fn resolve_launch_executable(
         if let Some(p) = custom_exe {
             let pb = PathBuf::from(p);
             let p_lower = p.to_lowercase();
-            if pb.exists() && !p_lower.contains(".trash") {
+            if pb.exists()
+                && !p_lower.contains(".trash")
+                && !p_lower.ends_with(".cmd")
+                && !p_lower.ends_with(".bat")
+            {
                 Ok(pb)
             } else if let Ok(cloned) = clone_instance_executable(instance_id) {
                 Ok(PathBuf::from(cloned))
@@ -150,14 +154,17 @@ pub fn clone_instance_executable(instance_id: &str) -> Result<String, crate::err
         } else if std::fs::copy(&base_exe, &target_in_parent).is_ok() {
             target_in_parent
         } else {
-            // If hardlink and copy fail (e.g. read-only Program Files), create a launcher cmd script in instance bin
-            let launcher_cmd = instance_bin_dir.join(format!("launch-{}.cmd", instance_id));
-            let script_content = format!(
-                "@echo off\r\nstart \"\" \"{}\" %*\r\n",
-                base_exe.to_string_lossy()
-            );
-            fs::write(&launcher_cmd, script_content).map_err(|e| crate::error::AppError::Io(e))?;
-            launcher_cmd
+            // If hardlink and copy fail in parent (e.g. read-only directory),
+            // copy to the instance's own bin directory which is always user-writable:
+            let instance_exe = instance_bin_dir.join(format!("Antigravity-{}.exe", instance_id));
+            if std::fs::hard_link(&base_exe, &instance_exe).is_ok()
+                || std::fs::copy(&base_exe, &instance_exe).is_ok()
+            {
+                instance_exe
+            } else {
+                // Infallible fallback: use base executable directly
+                base_exe
+            }
         }
     };
 

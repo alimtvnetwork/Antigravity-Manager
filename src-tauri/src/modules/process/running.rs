@@ -11,15 +11,22 @@ pub fn is_antigravity_running(target_ide: Option<&str>) -> bool {
 
     if target_ide.is_none() {
         let default_dir = crate::modules::instance::get_default_antigravity_data_dir();
-        return !crate::modules::instance::find_pids_for_data_dir(&default_dir.to_string_lossy(), true).is_empty();
+        return !crate::modules::instance::find_pids_for_data_dir(
+            &default_dir.to_string_lossy(),
+            true,
+        )
+        .is_empty();
     }
 
     if let Some(target) = target_ide {
         if let Some(inst_id) = target.strip_prefix("instance:") {
             if inst_id == "default" {
                 let default_dir = crate::modules::instance::get_default_antigravity_data_dir();
-                return !crate::modules::instance::find_pids_for_data_dir(&default_dir.to_string_lossy(), true)
-                    .is_empty();
+                return !crate::modules::instance::find_pids_for_data_dir(
+                    &default_dir.to_string_lossy(),
+                    true,
+                )
+                .is_empty();
             } else if let Ok(reg) = crate::modules::instance::load_registry() {
                 if let Some(cfg) = reg.instances.into_iter().find(|i| i.id == inst_id) {
                     return !crate::modules::instance::find_pids_for_data_dir(&cfg.data_dir, false)

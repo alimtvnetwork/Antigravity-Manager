@@ -35,6 +35,52 @@ pub fn clean_appimage_env(cmd: &mut Command) {
     }
 }
 
+/// Resiliently spawn an external process on Windows handling Job Object restrictions.
+///
+/// On Windows, if the caller process is inside a Job Object without `JOB_OBJECT_LIMIT_BREAKAWAY_OK`,
+/// passing `CREATE_BREAKAWAY_FROM_JOB` (0x01000000) results in `ERROR_ACCESS_DENIED` (os error 5).
+/// This helper first tries with `CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB`, and if
+/// Access Denied occurs, automatically retries with `CREATE_NEW_PROCESS_GROUP` only, and then default flags.
+pub fn spawn_with_job_breakaway_fallback(
+    cmd: &mut Command,
+) -> std::io::Result<std::process::Child> {
+    #[cfg(target_os = "windows")]
+    {
+        cmd.creation_flags(0x00000200 | 0x01000000);
+        match cmd.spawn() {
+            Ok(c) => Ok(c),
+            Err(e)
+                if e.raw_os_error() == Some(5)
+                    || e.kind() == std::io::ErrorKind::PermissionDenied =>
+            {
+                crate::modules::logger::log_warn(&format!(
+                    "[Process] Spawn with CREATE_BREAKAWAY_FROM_JOB returned Access Denied (os error 5). Retrying with CREATE_NEW_PROCESS_GROUP only..."
+                ));
+                cmd.creation_flags(0x00000200);
+                match cmd.spawn() {
+                    Ok(c) => Ok(c),
+                    Err(e2)
+                        if e2.raw_os_error() == Some(5)
+                            || e2.kind() == std::io::ErrorKind::PermissionDenied =>
+                    {
+                        crate::modules::logger::log_warn(&format!(
+                            "[Process] Spawn with CREATE_NEW_PROCESS_GROUP returned Access Denied (os error 5). Retrying with standard creation flags..."
+                        ));
+                        cmd.creation_flags(0);
+                        cmd.spawn()
+                    }
+                    Err(e2) => Err(e2),
+                }
+            }
+            Err(e) => Err(e),
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        cmd.spawn()
+    }
+}
+
 /// Helper to construct argument list for macOS `open` command.
 ///
 /// Ensures `-n` and `-a` are passed, and that `--args` is added BEFORE any application flags
@@ -184,15 +230,11 @@ pub fn start_antigravity_with_fallback_path(
                     }
                 }
 
-                #[cfg(target_os = "windows")]
-                {
-                    cmd.creation_flags(0x00000200 | 0x01000000); // CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB
-                }
-
                 #[cfg(target_os = "linux")]
                 clean_appimage_env(&mut cmd);
 
-                cmd.spawn().map_err(|e| format!("Startup failed: {}", e))?;
+                spawn_with_job_breakaway_fallback(&mut cmd)
+                    .map_err(|e| format!("Startup failed: {}", e))?;
             }
 
             crate::modules::logger::log_info(&format!(
@@ -266,15 +308,10 @@ pub fn start_antigravity_with_fallback_path(
                     }
                 }
 
-                #[cfg(target_os = "windows")]
-                {
-                    cmd.creation_flags(0x00000200 | 0x01000000); // CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB
-                }
-
                 #[cfg(target_os = "linux")]
                 clean_appimage_env(&mut cmd);
 
-                cmd.spawn().map_err(|e| {
+                spawn_with_job_breakaway_fallback(&mut cmd).map_err(|e| {
                     format!(
                         "Startup failed (preferred snapshot path {:?}): {}",
                         pref_path, e
@@ -340,15 +377,10 @@ pub fn start_antigravity_with_fallback_path(
                     }
                 }
 
-                #[cfg(target_os = "windows")]
-                {
-                    cmd.creation_flags(0x00000200 | 0x01000000); // CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB
-                }
-
                 #[cfg(target_os = "linux")]
                 clean_appimage_env(&mut cmd);
 
-                cmd.spawn().map_err(|e| {
+                spawn_with_job_breakaway_fallback(&mut cmd).map_err(|e| {
                     format!("Startup failed (detected path {:?}): {}", detected_path, e)
                 })?;
 
