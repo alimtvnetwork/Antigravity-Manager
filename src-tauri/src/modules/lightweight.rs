@@ -2,11 +2,18 @@ use tauri::{AppHandle, Manager, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_window_state::{AppHandleExt, StateFlags, WindowExt};
 
 /// Attempt to acquire or rebuild the main window.
-/// If the main window has been destroyed in lightweight mode, dynamically rebuild it from tauri.conf.json configuration,
-/// restoring window position, dimensions, and icons.
+/// If the main window has been destroyed in lightweight mode or its webview has crashed (0x8007139F),
+/// dynamically rebuild it from tauri.conf.json configuration, restoring window position, dimensions, and icons.
 pub fn ensure_main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
     if let Some(window) = app.get_webview_window("main") {
-        return Ok(window);
+        if is_main_window_alive(&window) {
+            return Ok(window);
+        }
+        tracing::warn!(
+            "[Recovery] WebviewWindow('main') exists but webview is unresponsive or crashed (0x8007139F); destroying and recreating..."
+        );
+        // Justification: best-effort destruction of corrupted window; recreating follows immediately
+        crate::error::record_ignored(window.destroy(), "destroy unresponsive main window");
     }
 
     tracing::info!("[Lightweight] Main window is currently inactive, rebuilding WebviewWindow('main') from config...");
@@ -66,12 +73,30 @@ pub fn ensure_main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
     // 5. Restore window state (remembered positions and dimensions)
     // Justification: best-effort call; failure logged without changing control flow
     crate::error::record_ignored(
-        window.restore_state(StateFlags::all().difference(StateFlags::VISIBLE)),
+        window.restore_state(
+            StateFlags::all().difference(StateFlags::VISIBLE | StateFlags::MINIMIZED),
+        ),
         "restore_state",
     );
 
     tracing::info!("[Lightweight] Main window rebuilt successfully");
     Ok(window)
+}
+
+/// Check if the main window's webview is responsive and healthy.
+/// Returns false if the WebView2/WebKit process has crashed (e.g. HRESULT 0x8007139F on Windows).
+pub fn is_main_window_alive(window: &WebviewWindow) -> bool {
+    window.eval("true").is_ok()
+}
+
+/// Dynamically destroy a dead or unresponsive main window and rebuild it cleanly from config.
+pub fn rebuild_main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
+    tracing::warn!("[Recovery] Rebuilding WebviewWindow('main') after webview invalidation or crash...");
+    if let Some(window) = app.get_webview_window("main") {
+        // Justification: best-effort destruction of corrupted window; rebuilding follows immediately
+        crate::error::record_ignored(window.destroy(), "destroy dead main window");
+    }
+    ensure_main_window(app)
 }
 
 /// Exit lightweight mode: ensure main window exists, then show, unminimize, and focus it.
@@ -97,7 +122,9 @@ pub fn enter_lightweight_mode(app: &AppHandle) -> Result<(), String> {
         // 1. Save window state
         // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
         crate::error::record_ignored(
-            app.save_window_state(StateFlags::all().difference(StateFlags::VISIBLE)),
+            app.save_window_state(
+                StateFlags::all().difference(StateFlags::VISIBLE | StateFlags::MINIMIZED),
+            ),
             "save_window_state",
         );
 

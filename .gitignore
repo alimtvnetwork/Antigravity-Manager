@@ -77,6 +77,7 @@ tmp/
 .gitmap/
 .ai-memory/cicd/
 .ai-memory/temp-agents/
+.ai-memory/pipeline-ai/
 
 .gitmap/release-assets
 release-assets

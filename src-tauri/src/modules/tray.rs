@@ -48,6 +48,7 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
 
     // System functions
     let show_i = MenuItem::with_id(app, "show", &texts.show_window, true, None::<&str>)?;
+    let reload_ui_i = MenuItem::with_id(app, "reload_ui", "Reload UI", true, None::<&str>)?;
     let lightweight_i = CheckMenuItem::with_id(
         app,
         "toggle_lightweight",
@@ -73,6 +74,7 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
             &refresh_curr,
             &sep2,
             &show_i,
+            &reload_ui_i,
             &lightweight_i,
             &sep3,
             &quit_i,
@@ -98,6 +100,16 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
                     if let Some(window) = app.get_webview_window("main") {
                         crate::restore_and_focus_window(&window);
                     }
+                }
+                "reload_ui" => {
+                    tracing::info!("[Tray] Reload UI requested by user.");
+                    // Justification: best-effort recovery call; failure logged
+                    crate::error::record_ignored(
+                        modules::lightweight::rebuild_main_window(&app_handle).map(|w| {
+                            crate::restore_and_focus_window(&w);
+                        }),
+                        "rebuild_main_window",
+                    );
                 }
                 "toggle_lightweight" => {
                     tauri::async_runtime::spawn(async move {
@@ -332,6 +344,7 @@ pub fn update_tray_menus(app: &tauri::AppHandle) {
         );
 
         let show_i = MenuItem::with_id(&app_clone, "show", &texts.show_window, true, None::<&str>);
+        let reload_ui_i = MenuItem::with_id(&app_clone, "reload_ui", "Reload UI", true, None::<&str>);
         let lightweight_i = CheckMenuItem::with_id(
             &app_clone,
             "toggle_lightweight",
@@ -342,11 +355,12 @@ pub fn update_tray_menus(app: &tauri::AppHandle) {
         );
         let quit_i = MenuItem::with_id(&app_clone, "quit", &texts.quit, true, None::<&str>);
 
-        if let (Ok(i_u), Ok(s_n), Ok(r_c), Ok(s), Ok(l), Ok(q)) = (
+        if let (Ok(i_u), Ok(s_n), Ok(r_c), Ok(s), Ok(r_ui), Ok(l), Ok(q)) = (
             info_user,
             switch_next,
             refresh_curr,
             show_i,
+            reload_ui_i,
             lightweight_i,
             quit_i,
         ) {
@@ -369,6 +383,7 @@ pub fn update_tray_menus(app: &tauri::AppHandle) {
                 items.push(s);
             }
             items.push(&s);
+            items.push(&r_ui);
             items.push(&l);
             if let Some(ref s) = sep3 {
                 items.push(s);

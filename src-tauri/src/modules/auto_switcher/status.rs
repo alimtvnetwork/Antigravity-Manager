@@ -106,6 +106,14 @@ pub fn get_daemon_status() -> AutoSwitcherDaemonStatus {
 /// Emit daemon status tick event to frontend
 pub fn emit_daemon_status() {
     if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
+        use tauri::Manager;
+        // If main window exists but webview is dead (crashed 0x8007139F), avoid emitting to suppress log storm
+        if let Some(window) = handle.get_webview_window("main") {
+            if !crate::modules::lightweight::is_main_window_alive(&window) {
+                return;
+            }
+        }
+
         use tauri::Emitter;
         let daemon_status = get_daemon_status();
         // Justification: best-effort frontend event; a dropped event only skips a UI refresh

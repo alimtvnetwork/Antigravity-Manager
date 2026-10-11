@@ -10,10 +10,17 @@ pub fn run() {
     #[cfg(target_os = "windows")]
     {
         windows_api::disable_efficiency_mode();
-        std::env::set_var(
-            "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+        let is_virtual_env = windows_api::detect_virtual_or_software_graphics();
+        let mut browser_args = String::from(
             "--disable-features=CalculateNativeWinOcclusion,CalculateNativeWindowOcclusion --disable-backgrounding-occluded-windows --disable-renderer-backgrounding --disable-background-timer-throttling",
         );
+        if is_virtual_env {
+            tracing::info!(
+                "[Graphics] Virtualized or software graphics environment detected (VMware/VirtualBox/Hyper-V). Appending --disable-gpu-compositing to prevent WebView2 D3D11 crash."
+            );
+            browser_args.push_str(" --disable-gpu-compositing");
+        }
+        std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", browser_args);
     }
 
     // Check for headless mode
@@ -51,8 +58,10 @@ pub fn run() {
         .plugin(
             tauri_plugin_window_state::Builder::default()
                 .with_state_flags(
-                    tauri_plugin_window_state::StateFlags::all()
-                        .difference(tauri_plugin_window_state::StateFlags::VISIBLE),
+                    tauri_plugin_window_state::StateFlags::all().difference(
+                        tauri_plugin_window_state::StateFlags::VISIBLE
+                            | tauri_plugin_window_state::StateFlags::MINIMIZED,
+                    ),
                 )
                 .build(),
         )

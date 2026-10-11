@@ -166,6 +166,18 @@ pub fn force_restore_and_focus_win32(window: &tauri::WebviewWindow) {
 }
 
 pub fn restore_and_focus_window(window: &tauri::WebviewWindow) {
+    if !crate::modules::lightweight::is_main_window_alive(window) {
+        tracing::warn!(
+            "[Recovery] Detected dead/invalid WebView2 in main window (0x8007139F). Rebuilding window..."
+        );
+        if let Ok(new_window) =
+            crate::modules::lightweight::rebuild_main_window(window.app_handle())
+        {
+            restore_and_focus_window(&new_window);
+            return;
+        }
+    }
+
     // Justification: best-effort window operation; the UI continues without it
     crate::error::record_ignored(window.show(), "window.show");
     // Justification: best-effort window operation; the UI continues without it
@@ -362,6 +374,142 @@ pub(crate) mod windows_api {
                 );
             }
         }
+    }
+
+    #[link(name = "Advapi32")]
+    extern "system" {
+        fn RegOpenKeyExW(
+            h_key: Handle,
+            lp_sub_key: *const u16,
+            ul_options: u32,
+            sam_desired: u32,
+            phk_result: *mut Handle,
+        ) -> i32;
+        fn RegQueryValueExW(
+            h_key: Handle,
+            lp_value_name: *const u16,
+            lp_reserved: *mut u32,
+            lp_type: *mut u32,
+            lp_data: *mut u8,
+            lpcb_data: *mut u32,
+        ) -> i32;
+        fn RegCloseKey(h_key: Handle) -> i32;
+    }
+
+    fn read_reg_string(sub_key: &str, value_name: &str) -> Option<String> {
+        use std::ffi::OsStr;
+        use std::os::windows::ffi::OsStrExt;
+
+        let sub_key_wide: Vec<u16> = OsStr::new(sub_key)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        let val_name_wide: Vec<u16> = OsStr::new(value_name)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+
+        const HKEY_LOCAL_MACHINE: Handle = 0x8000_0002usize as Handle;
+        const KEY_READ: u32 = 0x20019;
+
+        unsafe {
+            let mut h_key: Handle = std::ptr::null_mut();
+            if RegOpenKeyExW(
+                HKEY_LOCAL_MACHINE,
+                sub_key_wide.as_ptr(),
+                0,
+                KEY_READ,
+                &mut h_key,
+            ) != 0
+            {
+                return None;
+            }
+
+            let mut data_len: u32 = 512;
+            let mut val_type: u32 = 0;
+            let mut buffer = vec![0u8; data_len as usize];
+
+            let query_res = RegQueryValueExW(
+                h_key,
+                val_name_wide.as_ptr(),
+                std::ptr::null_mut(),
+                &mut val_type,
+                buffer.as_mut_ptr(),
+                &mut data_len,
+            );
+
+            RegCloseKey(h_key);
+
+            if query_res != 0 {
+                return None;
+            }
+
+            // REG_SZ is 1, REG_EXPAND_SZ is 2
+            if val_type == 1 || val_type == 2 {
+                let u16_slice = std::slice::from_raw_parts(
+                    buffer.as_ptr() as *const u16,
+                    (data_len as usize) / 2,
+                );
+                let len = u16_slice
+                    .iter()
+                    .position(|&c| c == 0)
+                    .unwrap_or(u16_slice.len());
+                return Some(String::from_utf16_lossy(&u16_slice[..len]));
+            }
+
+            None
+        }
+    }
+
+    pub fn detect_virtual_or_software_graphics() -> bool {
+        if std::env::var("AGM_DISABLE_GPU").is_ok()
+            || std::env::var("ANTIGRAVITY_DISABLE_GPU").is_ok()
+        {
+            return true;
+        }
+
+        // Check BIOS Manufacturer / Product
+        let bios_key = r"HARDWARE\DESCRIPTION\System\BIOS";
+        if let Some(man) = read_reg_string(bios_key, "SystemManufacturer") {
+            let man_lower = man.to_lowercase();
+            if man_lower.contains("vmware")
+                || man_lower.contains("virtualbox")
+                || man_lower.contains("qemu")
+                || man_lower.contains("kvm")
+                || man_lower.contains("xen")
+                || man_lower.contains("bochs")
+            {
+                return true;
+            }
+        }
+
+        if let Some(prod) = read_reg_string(bios_key, "SystemProductName") {
+            let prod_lower = prod.to_lowercase();
+            if prod_lower.contains("vmware")
+                || prod_lower.contains("virtualbox")
+                || prod_lower.contains("virtual machine")
+                || prod_lower.contains("hyper-v")
+            {
+                return true;
+            }
+        }
+
+        // Check Primary Display Driver Description
+        let display_key =
+            r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0000";
+        if let Some(driver) = read_reg_string(display_key, "DriverDesc") {
+            let driver_lower = driver.to_lowercase();
+            if driver_lower.contains("vmware")
+                || driver_lower.contains("virtualbox")
+                || driver_lower.contains("basic display")
+                || driver_lower.contains("standard vga")
+                || driver_lower.contains("remote")
+            {
+                return true;
+            }
+        }
+
+        false
     }
 }
 
