@@ -164,6 +164,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.190.0 (2026-10-12)**:
+        -   **[Theme] Royal Violet UI**: Implemented the approved Royal Violet design system across the app — daisyUI dark theme tokens, semantic CSS variables, and legacy navy hex remap (canvas `#090611`, panel `#171025`, primary `#7C3AED`, aurora `#A855F7`, highlight `#E879F9`). (Thanks to @aukgit)
+        -   **[Fixed] Account Switch Relaunch Verification**: Added post-relaunch IDE verification to the account-switch flow (`switch_account_to_instance` and the 5-step desktop switch). A spawn that returns Ok no longer reports success when no IDE window materializes — the switch now surfaces a diagnosable error instead of a silent no-reopen. (Thanks to @aukgit)
+
+
     *   **v4.189.0 (2026-10-12)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

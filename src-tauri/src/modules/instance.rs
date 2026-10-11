@@ -125,6 +125,7 @@ pub use merge::{
     purge_recent_project_paths,
 };
 pub use misc::{count_instances, resolve_instance_exe_name};
+pub(crate) use observe::verify_instance_relaunched;
 pub use observe::{observe_instance, resolve_instance_id, ObservedInstanceState};
 pub use paths::{
     get_instance_db_path, get_instance_home_dir, get_instances_dir, get_registry_path,

@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.189.0)
+> Professional AI Account Management & Protocol Proxy System (v4.190.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.189.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.190.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,6 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
+> Latest version **v4.190.0**: Royal Violet UI & Account Switch Relaunch Verification — Implemented the approved Royal Violet design system (daisyUI dark theme, semantic CSS tokens, legacy navy remap); added post-relaunch IDE verification to the account-switch flow so a stillborn relaunch surfaces a diagnosable error instead of silent no-reopen. (Thanks to @aukgit)
 > Latest version **v4.189.0**: Auto-Switch & Fast-Forward Scoring Fallback, Conscious Process Isolation, CLI Revert Engine & Cross-Platform CI Green — Replaced strict 100% quota requirement in Step 3 fallback with proportional quota headroom scoring (`score_candidate_account_fallback`), eliminating rotation lockups when accounts have partial quota; enforced conscious instance root PID isolation in `pid_scan.rs` (`matched_set.contains(&p)`), preventing stopped sibling instances from falsely reporting as running or having their processes terminated; fully enabled CLI update rollbacks (`agm update <ver>` / `agm update to <ver>`) with automatic 2-part SemVer normalization, tag-specific endpoint resolution, and `-isPinned`/`-Force` pass-through in `install.ps1`; and resolved all 7 cross-platform compilation and Clippy errors with 100% green CI gate across Ubuntu, macOS, and Windows matrix runners. (Thanks to @aukgit)
 > Latest version **v4.188.0**: Auto-Switch & Fast-Forward PID Contamination Fix, CLI Version Downgrades, IDE Executable Path & Headless Fleet Sync — Eliminated cross-instance PID contamination in `pid_scan.rs` and unblocked candidate evaluation for sub-100% quota accounts; enabled CLI version downgrades and rollbacks (`agm update <ver>`) with automatic 2-part SemVer normalization; optimized launch latency by eliminating synchronous 6s blocking sleeps in `wait_for_instance_prompt_channel`; added dedicated IDE Executable path column in instance list view; introduced decentralized headless fleet synchronization over Email and Telegram without Supabase; and audited/eliminated silent error discards across instance lifecycle and frontend settings. (Thanks to @aukgit)
 > Latest version **v4.187.0**: Full Task Manager Termination & Profile Switch Spawn Fallback — Enforced full application and background thread process termination in Windows Task Manager on window close and tray quit by routing all teardowns through `exit_app_fully(&AppHandle)` and cleanly halting Cloudflared tunnels, Admin Server listeners, and Proxy instances before invoking `std::process::exit(0)`; resolved profile and account switch crashes (`Access is denied (os error 5)`) in restricted Windows Job Objects with a 4-stage launch fallback ladder (direct breakaway fallback -> detected base executable -> `cmd.exe /s /c start` -> PowerShell `Start-Process` with `ShellExecuteEx`); upgraded Telegram notifications with structured HTML cards, `<pre><code>` prompt blocks, native inline copy buttons, free image hosting, and standalone Fleet Identity discovery (`/fleet`, `/whoami`, `/instances`, `/accounts`). (Thanks to @aukgit)

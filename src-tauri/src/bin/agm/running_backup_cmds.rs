@@ -202,7 +202,7 @@ pub(crate) fn cmd_restore_running_prompts(args: &[String]) {
     if let Some(first) = args.first() {
         if first.eq_ignore_ascii_case("help") || first == "--help" || first == "-h" {
             println!("AGM Restore Running Prompts (Split SQLite):");
-            println!("  agm restore [--keep/-k] [--json] [-file/-f <path>]");
+            println!("  agm restore [--keep/-k] [--json] [-file/-f <path>] [-i/--instance <id>]");
             println!("  Restores unrestored prompts into active execution queue and re-injects to workspaces.");
             println!(
                 "\nAliases: agm restore, agm restore-running-prompts, agm rrp, agm resend-running"
@@ -211,12 +211,15 @@ pub(crate) fn cmd_restore_running_prompts(args: &[String]) {
             println!("    --keep, -k      Preserve backup records as unrestored without starting 1-day retention timer");
             println!("    --json          Output pure JSON restored records payload");
             println!("    -f, --file      Target custom SQLite database file");
+            println!("    -i, --instance  Restore only backups recorded for this instance id");
+            println!("                    (default: restore all unrestored backups across every instance)");
             println!("\nExamples:");
             println!(
                 "  agm restore                      # Restore & re-inject all backed-up prompts"
             );
             println!("  agm restore --keep               # Restore prompts without clearing backup state");
             println!("  agm restore --json               # Restore and print JSON payload");
+            println!("  agm restore -i inst-1            # Restore only instance 'inst-1' backups");
             return;
         }
     }
@@ -224,8 +227,10 @@ pub(crate) fn cmd_restore_running_prompts(args: &[String]) {
     let is_json = args.iter().any(|a| a == "--json");
     let keep_backup = args.iter().any(|a| a == "--keep" || a == "-k");
     let mut custom_file: Option<&str> = None;
-    let mut target_instance =
-        instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string());
+    // Explicit -i/--instance only. Without it, restore covers every instance:
+    // backups are recorded under the instance active at backup time, which is
+    // usually NOT the instance active at restore time (post-switch).
+    let mut explicit_instance: Option<String> = None;
     let mut i = 0;
     while i < args.len() {
         if (args[i] == "-f" || args[i] == "--file" || args[i] == "-file") && i + 1 < args.len() {
@@ -236,30 +241,30 @@ pub(crate) fn cmd_restore_running_prompts(args: &[String]) {
             && i + 1 < args.len()
         {
             let spec = &args[i + 1];
-            target_instance = instance::resolve_instance_id(spec).unwrap_or_else(|_| spec.clone());
+            explicit_instance =
+                Some(instance::resolve_instance_id(spec).unwrap_or_else(|_| spec.clone()));
             i += 2;
             continue;
         } else if args[i].starts_with("--instance=") || args[i].starts_with("-i=") {
             if let Some(spec) = args[i].split('=').nth(1) {
-                target_instance =
-                    instance::resolve_instance_id(spec).unwrap_or_else(|_| spec.to_string());
+                explicit_instance =
+                    Some(instance::resolve_instance_id(spec).unwrap_or_else(|_| spec.to_string()));
             }
         }
         i += 1;
     }
 
-    let _ = repo_db::resend_running_commands_for_instance(Some(&target_instance), 20);
-    let _ = repo_db::dispatch_running_prompts(&target_instance);
-    match backup_prompts_db::restore_running_prompts(
-        Some(&target_instance),
-        keep_backup,
-        custom_file,
-    ) {
+    // Restore first so freshly re-injected prompts are dispatched in this same run.
+    // restore_running_prompts fans out the resend itself (scoped when -i was given,
+    // across all instances otherwise).
+    let restore_scope = explicit_instance.as_deref();
+    match backup_prompts_db::restore_running_prompts(restore_scope, keep_backup, custom_file) {
         Ok(records) => {
             if is_json {
                 let payload = serde_json::json!({
                     "restored_count": records.len(),
                     "keep_backup": keep_backup,
+                    "instance_scope": restore_scope,
                     "records": records,
                 });
                 println!(
