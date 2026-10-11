@@ -4,6 +4,7 @@ use antigravity_tools_lib::modules::{account, db, instance, integration, repo_db
 use chrono::Utc;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Duration;
 
 use super::test_flow::TestFlowState;
 
@@ -12,26 +13,28 @@ impl TestFlowState {
         // Step 3: Bind Project (Gitmap) and Seed Running and Queued Prompts
         println!("[STEP 3/7] Binding project 'Gitmap' and seeding active and queued prompts...");
         self.gitmap_dir = if Path::new("d:\\work\\gitmap").exists() {
-            "d:\\work\\gitmap"
+            "d:\\work\\gitmap".to_string()
         } else {
-            "d:\\work\\Antigravity-Manager"
+            "d:\\work\\Antigravity-Manager".to_string()
         };
         match instance::assign_project_to_instance(
             &self.new_inst.as_ref().expect("new_inst set").id,
-            self.gitmap_dir,
+            &self.gitmap_dir,
         ) {
             Ok(msg) => println!("  [✓] Project Bound: {}", msg),
             Err(e) => println!("  [WARN] Project bind: {}", e),
         }
 
-        let heartbeat_log = Path::new(self.gitmap_dir).join(".antigravity_goal_prompt.log");
+        let heartbeat_log = Path::new(&self.gitmap_dir).join(".antigravity_goal_prompt.log");
         self.heartbeat_log_str = heartbeat_log.to_string_lossy().to_string();
         if heartbeat_log.exists() {
             let _ = std::fs::remove_file(&heartbeat_log);
         }
-        self.py_heartbeat_runner = "scripts/prompt_heartbeat_runner.py";
+        self.py_heartbeat_runner = "scripts/prompt_heartbeat_runner.py".to_string();
 
         let now_ts = Utc::now().timestamp();
+        let new_inst = self.new_inst.as_ref().expect("new_inst set");
+        let gitmap_dir = &self.gitmap_dir;
         self.running_prompt = Some(ActivePrompt {
             id: format!("prompt-{}-running-1", new_inst.id),
             project_id: "gitmap-test".to_string(),
@@ -111,7 +114,7 @@ impl TestFlowState {
         println!("  [*] Launching Real-Time 5s Prompt Heartbeat Runner...");
         let start_res = Command::new("python")
             .args([
-                self.py_heartbeat_runner,
+                &self.py_heartbeat_runner,
                 "start",
                 &self.running_prompt.as_ref().expect("running_prompt set").id,
                 &self.new_inst.as_ref().expect("new_inst set").id,
@@ -127,7 +130,7 @@ impl TestFlowState {
         std::thread::sleep(Duration::from_secs(6));
 
         let check_res = Command::new("python")
-            .args([self.py_heartbeat_runner, "check", &self.heartbeat_log_str])
+            .args([&self.py_heartbeat_runner, "check", &self.heartbeat_log_str])
             .output();
         self.initial_heartbeat_status = "RUNNING (Iteration 1-2, Active)".to_string();
         if let Ok(out) = check_res {
@@ -167,7 +170,9 @@ impl TestFlowState {
         self.spawned_pid = instance_pids
             .first()
             .copied()
-            .or_else(|| instance::get_instance_saved_pid(&new_inst.id))
+            .or_else(|| {
+                instance::get_instance_saved_pid(&self.new_inst.as_ref().expect("new_inst set").id)
+            })
             .unwrap_or(0);
         self.assert_not_protected(self.spawned_pid, "instance launch verification");
 
@@ -189,11 +194,13 @@ impl TestFlowState {
         } else {
             std::path::PathBuf::from(".")
         };
-        self.py_script = root_dir
+        self.py_script = self
+            .root_dir
             .join("assets")
             .join("screenshots")
             .join("generate_instance_screenshot.py");
-        self.shot1_path = root_dir
+        self.shot1_path = self
+            .root_dir
             .join("assets")
             .join("screenshots")
             .join("instance_step1_initial.png");

@@ -1,8 +1,11 @@
 use super::common::VERSION;
-use antigravity_tools_lib::modules::{account, db, instance, integration, repo_db};
+use antigravity_tools_lib::modules::{
+    account, backup_prompts_db, db, instance, integration, repo_db,
+};
 use chrono::Utc;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Duration;
 
 use super::test_flow::TestFlowState;
 
@@ -91,10 +94,10 @@ impl TestFlowState {
 
         println!("  [*] Step 5b-2: Stopping prompt heartbeat runner during instance transition...");
         let _ = Command::new("python")
-            .args([self.py_heartbeat_runner, "stop", &self.heartbeat_log_str])
+            .args([&self.py_heartbeat_runner, "stop", &self.heartbeat_log_str])
             .output();
         let stop_chk = Command::new("python")
-            .args([self.py_heartbeat_runner, "check", &self.heartbeat_log_str])
+            .args([&self.py_heartbeat_runner, "check", &self.heartbeat_log_str])
             .output();
         if let Ok(out) = stop_chk {
             println!(
@@ -146,7 +149,9 @@ impl TestFlowState {
         self.post_switch_pid = post_switch_pids
             .first()
             .copied()
-            .or_else(|| instance::get_instance_saved_pid(&new_inst.id))
+            .or_else(|| {
+                instance::get_instance_saved_pid(&self.new_inst.as_ref().expect("new_inst set").id)
+            })
             .unwrap_or(0);
         self.assert_not_protected(self.post_switch_pid, "post-switch verification");
         println!(
@@ -181,7 +186,7 @@ impl TestFlowState {
             resent_count.len(),
             dispatched_count
         );
-        let resume_task_json = Path::new(self.gitmap_dir).join(".antigravity_resume_task.json");
+        let resume_task_json = Path::new(&self.gitmap_dir).join(".antigravity_resume_task.json");
         if resume_task_json.exists() {
             println!("      ● Verified .antigravity_resume_task.json written to Gitmap workspace.");
         }
@@ -189,7 +194,7 @@ impl TestFlowState {
         println!("  [*] Step 5f-2: Re-invoking running prompt with active 5s heartbeat runner...");
         let _ = Command::new("python")
             .args([
-                self.py_heartbeat_runner,
+                &self.py_heartbeat_runner,
                 "start",
                 &self.running_prompt.as_ref().expect("running_prompt set").id,
                 &self.new_inst.as_ref().expect("new_inst set").id,
@@ -200,7 +205,7 @@ impl TestFlowState {
         println!("  [*] Waiting 6s for resumed prompt heartbeat to append new iterations...");
         std::thread::sleep(Duration::from_secs(6));
         let resume_chk = Command::new("python")
-            .args([self.py_heartbeat_runner, "check", &self.heartbeat_log_str])
+            .args([&self.py_heartbeat_runner, "check", &self.heartbeat_log_str])
             .output();
         let mut resumed_heartbeat_status = "RESUMED & RUNNING (Iteration 3, Active)".to_string();
         if let Ok(out) = resume_chk {
@@ -237,7 +242,8 @@ impl TestFlowState {
         ));
 
         let now_ts_2 = Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
-        self.shot2_path = root_dir
+        self.shot2_path = self
+            .root_dir
             .join("assets")
             .join("screenshots")
             .join("instance_step2_switched.png");
@@ -332,7 +338,7 @@ impl TestFlowState {
             }
         }
         let _ = Command::new("python")
-            .args([self.py_heartbeat_runner, "stop", &self.heartbeat_log_str])
+            .args([&self.py_heartbeat_runner, "stop", &self.heartbeat_log_str])
             .output();
 
         println!(
@@ -366,7 +372,9 @@ impl TestFlowState {
         self.final_pid = final_pids
             .first()
             .copied()
-            .or_else(|| instance::get_instance_saved_pid(&new_inst.id))
+            .or_else(|| {
+                instance::get_instance_saved_pid(&self.new_inst.as_ref().expect("new_inst set").id)
+            })
             .unwrap_or(0);
         self.assert_not_protected(self.final_pid, "final verification");
         println!("      ● Re-opened Instance Process PID: {}", self.final_pid);
@@ -392,7 +400,7 @@ impl TestFlowState {
             resent_count_2.len(),
             dispatched_count_2
         );
-        let resume_task_json_2 = Path::new(self.gitmap_dir).join(".antigravity_resume_task.json");
+        let resume_task_json_2 = Path::new(&self.gitmap_dir).join(".antigravity_resume_task.json");
         if resume_task_json_2.exists() {
             println!("      ● Verified .antigravity_resume_task.json written to Gitmap workspace.");
         }
@@ -400,7 +408,7 @@ impl TestFlowState {
         println!("  [*] Step 6e-2: Re-invoking running prompt with active 5s heartbeat runner...");
         let _ = Command::new("python")
             .args([
-                self.py_heartbeat_runner,
+                &self.py_heartbeat_runner,
                 "start",
                 &self.running_prompt.as_ref().expect("running_prompt set").id,
                 &self.new_inst.as_ref().expect("new_inst set").id,
@@ -411,7 +419,7 @@ impl TestFlowState {
         println!("  [*] Waiting 6s for re-invoked prompt heartbeat to append new iterations...");
         std::thread::sleep(Duration::from_secs(6));
         let reinvoke_chk = Command::new("python")
-            .args([self.py_heartbeat_runner, "check", &self.heartbeat_log_str])
+            .args([&self.py_heartbeat_runner, "check", &self.heartbeat_log_str])
             .output();
         let mut reinvoked_heartbeat_status =
             "RE-INVOKED & RUNNING (Iteration 5, Active)".to_string();
@@ -432,7 +440,8 @@ impl TestFlowState {
         ));
 
         let now_ts_3 = Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
-        self.shot3_path = root_dir
+        self.shot3_path = self
+            .root_dir
             .join("assets")
             .join("screenshots")
             .join("instance_step3_switched_back.png");

@@ -27,6 +27,7 @@ mod models;
 mod responses_history;
 mod responses_media;
 mod tool_cache;
+#[cfg(test)]
 mod variant_tests;
 mod websocket;
 mod websocket_codex;

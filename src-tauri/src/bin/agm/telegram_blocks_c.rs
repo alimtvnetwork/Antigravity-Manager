@@ -1,5 +1,7 @@
 //! telegram_blocks_c — Telegram subcommand handlers, split from agm.rs.
 
+use antigravity_tools_lib::modules::telegram_inbound;
+
 pub(crate) fn telegram_route_nodes(
     args: &[String],
     first_lower: &str,

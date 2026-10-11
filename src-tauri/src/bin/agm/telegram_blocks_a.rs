@@ -129,7 +129,7 @@ pub(crate) fn telegram_route_import(
 pub(crate) fn telegram_route_set(
     args: &[String],
     first_lower: &str,
-    t_cfg: &telegram_inbound::TelegramConfig,
+    t_cfg: &mut telegram_inbound::TelegramConfig,
     rt: &tokio::runtime::Runtime,
 ) -> bool {
     if first_lower == "set"
@@ -257,7 +257,7 @@ pub(crate) fn telegram_route_set(
 pub(crate) fn telegram_route_detect_chat_id(
     args: &[String],
     first_lower: &str,
-    t_cfg: &telegram_inbound::TelegramConfig,
+    t_cfg: &mut telegram_inbound::TelegramConfig,
     rt: &tokio::runtime::Runtime,
 ) -> bool {
     if first_lower == "detect-chat-id" || first_lower == "chat-id" {

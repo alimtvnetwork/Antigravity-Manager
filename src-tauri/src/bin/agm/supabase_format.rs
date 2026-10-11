@@ -1,5 +1,9 @@
 //! supabase_format — config format helpers, split from agm.rs.
 
+use antigravity_tools_lib::modules::json_envelope::{
+    build_bulk_import_command, inspect_json_file, resolve_json_targets,
+};
+
 pub(crate) fn cmd_which_format(args: &[String]) {
     use std::path::PathBuf;
 

@@ -228,7 +228,7 @@ fn main() {
             crate::supabase_cmds::cmd_supabase(&cmd_args);
         }
         "which-format" | "which_format" | "format" | "inspect-format" | "scan-format" => {
-            crate::supabase_config_cmds::cmd_which_format(&cmd_args);
+            crate::supabase_format::cmd_which_format(&cmd_args);
         }
         "nodes" => {
             crate::fleet_cmds::dispatch_fleet_domain("nodes", &cmd_args);

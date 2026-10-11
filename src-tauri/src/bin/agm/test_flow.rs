@@ -1,6 +1,6 @@
 use super::common::VERSION;
 use antigravity_tools_lib::modules::repo_db::ActivePrompt;
-use antigravity_tools_lib::modules::{account, db, instance, integration, repo_db};
+use antigravity_tools_lib::modules::{account, db, instance, integration, oauth, repo_db};
 use std::path::{Path, PathBuf};
 
 /// Mutable state threaded through the sequential test-flow steps.
@@ -61,7 +61,7 @@ impl TestFlowState {
     }
 }
 impl TestFlowState {
-    fn assert_not_protected(&self, pid: u32, context: &str) {
+    pub(crate) fn assert_not_protected(&self, pid: u32, context: &str) {
         if pid > 0 && self.protected_pids.contains(&pid) {
             eprintln!(
                 "[FATAL ERROR] Refusing to touch PID {} during {}: Belongs to protected main IDE!",
@@ -74,7 +74,7 @@ impl TestFlowState {
         // 0. Safety Invariant Check: Identify the Running Main Antigravity IDE (PID & Data Dir)
         let default_data_dir = instance::get_default_antigravity_data_dir();
         self.default_data_dir_str = default_data_dir.to_string_lossy().to_string();
-        self.protected_pids = instance::find_pids_for_data_dir(&default_data_dir_str, true)
+        self.protected_pids = instance::find_pids_for_data_dir(&self.default_data_dir_str, true)
             .into_iter()
             .collect();
 
@@ -174,10 +174,10 @@ impl TestFlowState {
                 .clone(),
         );
 
-        self.new_inst = Some(match &clone_source {
+        self.new_inst = Some(match &self.clone_source {
             Some(source) => {
                 let resolved =
-                    instance::resolve_instance_id(source).unwrap_or_else(|_| source.clone());
+                    instance::resolve_instance_id(source).unwrap_or_else(|_| source.to_string());
                 match instance::copy_instance(&resolved, test_inst_name.clone(), Some("full")) {
                     Ok(cfg) => cfg,
                     Err(e) => {

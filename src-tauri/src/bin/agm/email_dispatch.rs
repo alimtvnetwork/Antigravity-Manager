@@ -14,7 +14,7 @@ pub(crate) fn cmd_email(args: &[String]) {
 
     match sub.as_str() {
         "help" | "-h" | "--help" => {
-            crate::email_arms_a::email_arm_help(args, is_json, sub);
+            crate::email_arms_a::email_arm_help(args, is_json, &sub);
         }
         "status" => {
             crate::email_arms_a::email_arm_status(args, is_json);

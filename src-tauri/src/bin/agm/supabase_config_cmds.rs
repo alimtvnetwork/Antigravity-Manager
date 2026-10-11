@@ -161,6 +161,7 @@ pub(crate) fn cmd_supabase_set_config(args: &[String]) {
 
 pub(crate) fn cmd_supabase_load_json(args: &[String]) {
     use base64::engine::general_purpose::STANDARD;
+    use base64::Engine;
 
     let paths: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
     if paths.is_empty() {

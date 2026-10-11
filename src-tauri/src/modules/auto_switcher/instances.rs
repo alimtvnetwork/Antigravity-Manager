@@ -14,9 +14,7 @@ pub fn list_running_or_active_instances() -> Result<Vec<crate::models::InstanceC
         let is_active = inst.id == active_id;
         let is_running = instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
 
-        if is_active {
-            result.push(inst);
-        } else if is_running {
+        if is_active || is_running {
             result.push(inst);
         }
     }

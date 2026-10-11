@@ -45,6 +45,7 @@ pub(crate) fn cmd_prompts_export(args: &[String]) {
     }
 
     use base64::engine::general_purpose::STANDARD;
+    use base64::Engine;
 
     let mut limit_n: usize = 50;
     let mut target_file: Option<String> = None;

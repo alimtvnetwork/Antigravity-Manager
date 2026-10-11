@@ -35,11 +35,15 @@ pub(crate) fn cmd_telegram(args: &[String]) {
         if crate::telegram_blocks_a::telegram_route_import(args, &first_lower, &t_cfg, &rt) {
             return;
         }
-        if crate::telegram_blocks_a::telegram_route_set(args, &first_lower, &t_cfg, &rt) {
+        if crate::telegram_blocks_a::telegram_route_set(args, &first_lower, &mut t_cfg, &rt) {
             return;
         }
-        if crate::telegram_blocks_a::telegram_route_detect_chat_id(args, &first_lower, &t_cfg, &rt)
-        {
+        if crate::telegram_blocks_a::telegram_route_detect_chat_id(
+            args,
+            &first_lower,
+            &mut t_cfg,
+            &rt,
+        ) {
             return;
         }
         if crate::telegram_blocks_a::telegram_route_ls(args, &first_lower, &t_cfg, &rt) {
