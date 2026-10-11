@@ -2,6 +2,7 @@
 
 use super::*;
 use std::collections::HashSet;
+use std::fs;
 use std::sync::Mutex as StdMutex;
 
 use super::*;

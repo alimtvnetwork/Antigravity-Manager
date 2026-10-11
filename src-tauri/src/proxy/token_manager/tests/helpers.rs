@@ -2,6 +2,8 @@
 
 use super::super::ProxyToken;
 use std::cmp::Ordering;
+pub(crate) use std::collections::{HashMap, HashSet};
+pub(crate) use std::path::PathBuf;
 
 pub(crate) fn weekly_quota_account(now: i64) -> serde_json::Value {
     let reset = |seconds| {
@@ -29,7 +31,7 @@ pub(crate) fn weekly_quota_account(now: i64) -> serde_json::Value {
 }
 
 /// 创建测试用的 ProxyToken
-fn create_test_token(
+pub(crate) fn create_test_token(
     email: &str,
     tier: Option<&str>,
     health_score: f32,
@@ -60,7 +62,7 @@ fn create_test_token(
 }
 
 /// 测试排序比较函数（与 get_token_internal 中的逻辑一致）
-fn compare_tokens(a: &ProxyToken, b: &ProxyToken) -> Ordering {
+pub(crate) fn compare_tokens(a: &ProxyToken, b: &ProxyToken) -> Ordering {
     const RESET_TIME_THRESHOLD_SECS: i64 = 600; // 10 分钟阈值
 
     // 统一走 models::quota::tier_priority（与生产排序逻辑共用同一实现）
@@ -101,7 +103,7 @@ fn compare_tokens(a: &ProxyToken, b: &ProxyToken) -> Ordering {
 }
 
 /// 创建带 protected_models 的测试 Token
-fn create_test_token_with_protected(
+pub(crate) fn create_test_token_with_protected(
     email: &str,
     remaining_quota: Option<i32>,
     protected_models: HashSet<String>,

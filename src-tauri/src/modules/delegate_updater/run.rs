@@ -6,6 +6,12 @@ use std::time::Duration;
 
 use super::*;
 
+#[cfg(target_os = "windows")]
+extern "system" {
+    fn AttachConsole(dw_process_id: u32) -> i32;
+    fn AllocConsole() -> i32;
+}
+
 pub fn run(args: &[String]) {
     #[cfg(target_os = "windows")]
     unsafe {

@@ -1,5 +1,15 @@
 # Changelog
 
+## [v4.185.0] - 2026-10-11
+
+### Fixed
+- **Comprehensive Compiler and Pipeline Error Resolution**: Resolved all compilation, visibility, and trait bound errors reported by CI across proxy rate limiting (`RateLimitTracker`), signature cache (`SignatureCache::new`), token manager helpers, HTTP session store (`SessionParent`), upstream client (`build_url`), and mappers. (Thanks to @aukgit)
+- **Axum 0.7 Router Trait Bound Compatibility**: Restored `assemble_app` return type to `axum::Router` and aligned `spawn_serve_loop` signature, resolving hyper/axum `ServiceExt::map_request` trait bound compilation errors. (Thanks to @aukgit)
+- **Platform-Specific Windows Flag Scoping**: Added `#[cfg(target_os = "windows")]` attributes for `CommandExt::creation_flags`, `CREATE_NO_WINDOW`, and Win32 console functions (`AllocConsole`, `AttachConsole`) across process, updater, and sync modules. (Thanks to @aukgit)
+- **Codebase Formatting and Test Visibility**: Automated full Rust code formatting pass via `cargo fmt` and restored crate-level visibility re-exports across OpenAI, Claude, and Gemini mappers and test suites. (Thanks to @aukgit)
+
+---
+
 ## [v4.184.0] - 2026-10-10
 
 ### Added
@@ -110,6 +120,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.185.0 (2026-10-11)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.183.0 (2026-10-10)**:
         -   **Switch / Fast-Forward Reliability Hardening**:
             -   **Description**: Root-caused the "switch and fast-forward not working at all" reports: the close step was best-effort and unverified, so orphaned IDE child processes could survive the kill and either hold the SQLite lock on `state.vscdb` (failing credential injection outright) or collide with the relaunch on the Chromium singleton lock (new IDE exits, old session stays). New `close_instance_verified` helper now kills, polls the OS process table, retries once for stragglers, and only then proceeds — surviving orphans log a warning instead of bricking the switch/restart (the v4.182.0 hard-error behavior could never fire on a lingering PID again). The primary token injection in `switch_account_to_instance` now retries 3x over the dying process's DB-lock release window instead of failing the whole switch on the first locked write. `fastForwardInstance` now captures errors into the Error Manager (with modal) like every other instance action, so future fast-forward failures are diagnosable from the in-app diagnostics report. (Thanks to @aukgit)

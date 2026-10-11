@@ -25,6 +25,13 @@ pub(crate) const CLAUDE_AGENT_SDK_IDENTITY: &str =
 pub(crate) const CLAUDE_CODE_CLI_IDENTITY: &str =
     "You are Claude Code, Anthropic's official CLI for Claude.";
 
+#[cfg(test)]
+pub(crate) use super::models::*;
+#[cfg(test)]
+pub(crate) use build_config::build_tools;
+#[cfg(test)]
+pub(crate) use thinking::{is_gemini_client_billing_metadata, model_supports_thinking};
+
 // NOTE: build_contents underwent minimal extract-method (empty_tool_result_fallback,
 // inject_missing_tool_results) to bring the file under 500 lines; behavior is unchanged.
 

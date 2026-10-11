@@ -1,7 +1,7 @@
 use super::*;
 
 #[cfg(target_os = "windows")]
-const CREATE_NO_WINDOW: u32 = 0x08000000;
+pub(crate) const CREATE_NO_WINDOW: u32 = 0x08000000;
 pub(crate) const VERSION_PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub(crate) const HERMES_DIR: &str = ".hermes";

@@ -216,7 +216,7 @@ pub(crate) fn phase_body(
     let mut inner_request = json!({});
     // 先放 contents（后续会被 reordered_request 覆盖到后面）
     inner_request["contents"] = json!(contents);
-    inner_request["generationConfig"] = gen_config;
+    inner_request["generationConfig"] = gen_config.clone();
     inner_request["safetySettings"] = json!([
         { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "OFF" },
         { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "OFF" },

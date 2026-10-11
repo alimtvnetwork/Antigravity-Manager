@@ -26,6 +26,11 @@ mod tests_c_providers;
 #[cfg(test)]
 mod tests_d_config;
 
+#[cfg(test)]
+pub(crate) use serde_json::Value;
+#[cfg(test)]
+pub(crate) use std::fs;
+
 pub use binary::check_opencode_installed;
 pub use commands::{
     apply_remove_provider, execute_opencode_clear, execute_opencode_openai_sync,

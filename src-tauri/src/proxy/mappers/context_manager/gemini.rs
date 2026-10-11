@@ -8,6 +8,7 @@ use super::estimate_inline_data_tokens;
 use super::estimate_media_tokens_from_url;
 use super::estimate_tokens_from_str;
 use super::ContextManager;
+use super::OpenAIToolRound;
 use serde_json::{json, Value};
 use tracing::{debug, info};
 
@@ -287,9 +288,7 @@ impl ContextManager {
 }
 #[cfg(test)]
 mod tests {
-    use super::OpenAIToolRound;
     use super::*;
-    use crate::proxy::mappers::context_manager::OpenAIToolRound;
 
     // Helper to create a request since Default is not implemented
 }

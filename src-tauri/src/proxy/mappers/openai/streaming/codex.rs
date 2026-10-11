@@ -2,6 +2,7 @@
 // NOTE: create_codex_sse_stream (627 lines) uses yield inside async_stream! macro;
 // it cannot be safely decomposed via pure code moves. Reported as exception.
 // OpenAI 流式转换
+use super::openai::{extract_usage_metadata, store_thought_signature};
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use futures::{Stream, StreamExt};

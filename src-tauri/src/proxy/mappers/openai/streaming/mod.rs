@@ -18,3 +18,10 @@ pub use openai::{
     create_legacy_sse_stream, create_openai_sse_stream, create_openai_sse_stream_with_anchor,
     store_thought_signature,
 };
+
+#[cfg(test)]
+pub(crate) use bytes::Bytes;
+#[cfg(test)]
+pub(crate) use futures::StreamExt;
+#[cfg(test)]
+pub(crate) use serde_json::Value;

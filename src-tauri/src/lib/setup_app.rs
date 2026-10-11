@@ -69,7 +69,7 @@ pub(crate) fn setup_app(
             }
         }
 
-        let icon_bytes: &[u8] = include_bytes!("../icons/icon.png");
+        let icon_bytes: &[u8] = include_bytes!("../../icons/icon.png");
         if let Ok(img) = image::load_from_memory(icon_bytes) {
             let rgba = img.to_rgba8();
             let (width, height) = rgba.dimensions();

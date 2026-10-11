@@ -1,4 +1,6 @@
 use crate::modules::logger;
+#[cfg(target_os = "windows")]
+use crate::utils::command::CommandExtWrapper;
 
 use super::*;
 

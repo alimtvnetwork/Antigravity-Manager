@@ -197,14 +197,14 @@ pub(crate) fn phase_tools(
 
     if setup.config.inject_google_search {
         crate::proxy::mappers::common_utils::inject_google_search_tool(
-            &mut inner_request,
+            inner_request,
             Some(mapped_model),
         );
         // [REMOVED v4.8.2] toolConfig / tool_config 注入已移除（官方不带该字段），
         // googleSearch 工具声明本身已由 inject_google_search_tool 写入 tools。
     }
 
-    if let Some(image_config) = setup.config.image_config {
+    if let Some(ref image_config) = setup.config.image_config {
         if let Some(obj) = inner_request.as_object_mut() {
             obj.remove("tools");
             obj.remove("systemInstruction");
@@ -214,7 +214,7 @@ pub(crate) fn phase_tools(
                 // gen_obj.remove("thinkingConfig");
                 gen_obj.remove("responseMimeType");
                 gen_obj.remove("responseModalities");
-                gen_obj.insert("imageConfig".to_string(), image_config);
+                gen_obj.insert("imageConfig".to_string(), image_config.clone());
             }
         }
     }
@@ -237,7 +237,6 @@ pub(crate) fn phase_tools(
     // [CACHE] 重建 inner_request 字段顺序——稳定前缀在前，动态内容在后
     // [CACHE] 统一委托进站流水线进行前缀拓扑规范化与对齐（Pipeline First 核心归一）
     crate::proxy::pipeline::InboundThinkingPipeline::align_google_request_prefix_topology(
-        &mut inner_request,
+        inner_request,
     );
-    let reordered_request = inner_request;
 }

@@ -62,3 +62,18 @@ pub use cwd::{extract_cwd, remember_cwd_from_request, remember_cwd_from_text};
 pub use envelope::{ensure_v4a_envelope, preflight_repair};
 pub use pipeline::optimize_patch;
 pub use validate::validate_v4a_for_codex;
+
+#[cfg(test)]
+pub(crate) use cwd::*;
+#[cfg(test)]
+pub(crate) use envelope::*;
+#[cfg(test)]
+pub(crate) use normalize::*;
+#[cfg(test)]
+pub(crate) use read::*;
+#[cfg(test)]
+pub(crate) use recover::*;
+#[cfg(test)]
+pub(crate) use repair::*;
+#[cfg(test)]
+pub(crate) use validate::*;

@@ -1,3 +1,5 @@
+#[cfg(target_os = "windows")]
+use super::types::CREATE_NO_WINDOW;
 use super::types::{HERMES_DIR, VERSION_PROBE_TIMEOUT};
 use super::*;
 use crate::proxy::opencode_sync::lock::BACKUP_SUFFIX;

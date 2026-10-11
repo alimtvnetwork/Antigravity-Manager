@@ -137,7 +137,7 @@ pub(crate) fn assemble_app(
     state: &AppState,
     proxy_routes: Router<AppState>,
     admin_routes: Router<AppState>,
-) -> Router<AppState> {
+) -> Router {
     // 3. Integrate and apply global middleware layers
     // Read body size limit from environment variable (default 50MB)
     let max_body_size: usize = std::env::var("ABV_MAX_BODY_SIZE")

@@ -1,4 +1,4 @@
-// Model route resolution + normalization (split from model_mapping.rs)
+use super::claude_gemini::map_claude_model_to_gemini;
 use super::forwarding::DYNAMIC_MODEL_FORWARDING_RULES;
 
 /// Wildcard matching - supports multiple wildcards
@@ -226,7 +226,6 @@ pub fn normalize_to_standard_id(model_name: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::super::map_claude_model_to_gemini;
-    use super::claude_gemini::map_claude_model_to_gemini;
     use super::*;
 
     #[test]

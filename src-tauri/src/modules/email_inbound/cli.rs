@@ -1,3 +1,4 @@
+use crate::utils::command::CommandExtWrapper;
 use base64::prelude::*;
 use std::process::Command;
 

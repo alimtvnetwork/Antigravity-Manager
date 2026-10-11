@@ -8,6 +8,8 @@ use serde_json::{json, Value};
 
 use super::session_setup::SetupState;
 
+use crate::proxy::mappers::common_utils;
+
 pub(crate) fn phase_finalize(
     request: &super::super::models::OpenAIRequest,
     project_id: &str,
@@ -18,14 +20,12 @@ pub(crate) fn phase_finalize(
 ) -> (serde_json::Value, String, usize, String) {
     // requestId：官方 5 段形态，三适配器共用（含 unixMs → 幂等隔离）。
     // 历史教训：复用 session / message-count 的 ID 会把后续请求 pin 到一次更早的 429 结果。
-    let request_id = super::super::common_utils::build_official_request_id(
-        &setup.session_id,
-        setup.message_count as u64,
-    );
+    let request_id =
+        common_utils::build_official_request_id(&setup.session_id, setup.message_count as u64);
 
     // 官方客户端指纹（企业 / GCP 账号为 jetski）—— 三适配器共用，避免指纹漂移
     let (official_user_agent, _official_ide_type) =
-        super::super::common_utils::resolve_official_fingerprint(token);
+        common_utils::resolve_official_fingerprint(token);
 
     // [NEW] 动态检测是否需要标记为 agent 请求
     // 只有在请求携带 tools，或上下文包含工具调用交互时才打上 agent 标签
@@ -36,7 +36,7 @@ pub(crate) fn phase_finalize(
         .unwrap_or(false);
     let has_tool_interactions = inner_request
         .get("contents")
-        .map(super::super::common_utils::contents_has_tool_interactions)
+        .map(common_utils::contents_has_tool_interactions)
         .unwrap_or(false);
     let is_agent_request =
         setup.config.request_type != "image_gen" && (has_tools || has_tool_interactions);

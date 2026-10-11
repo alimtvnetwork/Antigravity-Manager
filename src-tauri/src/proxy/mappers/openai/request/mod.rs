@@ -28,3 +28,8 @@ mod tests_e;
 pub(crate) use helpers::{extract_client_tool_names, is_tiered_flash_model};
 pub use session::transform_openai_request_with_session;
 pub use transform::{enforce_uppercase_types, transform_openai_request};
+
+#[cfg(test)]
+pub(crate) use super::models::*;
+#[cfg(test)]
+pub(crate) use serde_json::json;

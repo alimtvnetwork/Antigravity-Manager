@@ -1,4 +1,4 @@
-// V1 request wrapper (split from wrapper.rs).
+use super::request_v2::wrap_request_v2;
 use bytes::Bytes;
 use serde_json::{json, Value};
 
@@ -26,8 +26,7 @@ static TEST_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[cfg(test)]
 mod test_fixes {
-    use super::request_v2::wrap_request_v2;
-    use crate::proxy::mappers::gemini::wrapper::request_v2::wrap_request_v2;
+    use super::*;
     use serde_json::json;
 
     #[test]

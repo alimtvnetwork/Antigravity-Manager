@@ -147,7 +147,7 @@ fn bind_listener(host: &str, port: u16) -> Result<tokio::net::TcpListener, Strin
 }
 
 fn spawn_serve_loop(
-    app: axum::Router<crate::proxy::server::app_state::AppState>,
+    app: axum::Router,
     listener: tokio::net::TcpListener,
     server_cancel_token: tokio_util::sync::CancellationToken,
 ) -> tokio::task::JoinHandle<()> {

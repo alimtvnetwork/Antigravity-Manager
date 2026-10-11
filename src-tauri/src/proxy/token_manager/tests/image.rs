@@ -3,6 +3,7 @@
 use super::super::helpers::wait_for_image_account_change;
 use super::super::helpers::wait_for_image_token_selection;
 use super::super::TokenManager;
+use super::super::TrackerParserMode;
 use super::helpers::*;
 use std::time::Duration;
 

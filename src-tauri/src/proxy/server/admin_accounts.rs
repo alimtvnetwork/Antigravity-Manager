@@ -229,9 +229,9 @@ pub(crate) async fn admin_delete_account(
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SwitchRequest {
-    account_id: String,
+    pub(crate) account_id: String,
     #[serde(default)]
-    target_ide: Option<String>,
+    pub(crate) target_ide: Option<String>,
 }
 
 pub(crate) async fn admin_switch_account(

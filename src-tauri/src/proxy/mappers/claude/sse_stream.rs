@@ -222,7 +222,7 @@ where
 }
 
 /// 处理单行 SSE 数据
-fn process_sse_line(
+pub(crate) fn process_sse_line(
     line: &str,
     state: &mut StreamingState,
     trace_id: &str,

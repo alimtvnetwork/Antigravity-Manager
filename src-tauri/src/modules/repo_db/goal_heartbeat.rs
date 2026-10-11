@@ -6,6 +6,8 @@ use super::state::get_active_agy_workers;
 use chrono::Utc;
 use std::fs;
 use std::io::Write;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};

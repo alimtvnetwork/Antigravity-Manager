@@ -36,7 +36,9 @@ pub use appruntimeflags::force_restore_and_focus_win32;
 pub(crate) use appruntimeflags::greet;
 #[cfg(target_os = "macos")]
 pub(crate) use appruntimeflags::increase_nofile_limit;
+#[cfg(target_os = "linux")]
 pub(crate) use appruntimeflags::is_wayland_session;
+#[cfg(target_os = "linux")]
 pub(crate) use appruntimeflags::nvidia_proprietary_loaded;
 pub use appruntimeflags::restore_and_focus_window;
 pub(crate) use appruntimeflags::should_enable_tray;

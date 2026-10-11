@@ -37,7 +37,7 @@ impl TestDataDir {
 }
 
 impl Drop for TestDataDir {
-    pub(crate) fn drop(&mut self) {
+    fn drop(&mut self) {
         // Justification: best-effort cleanup; a leftover directory is harmless
         crate::error::record_ignored(fs::remove_dir_all(&self.path), "remove_dir_all");
     }

@@ -1,5 +1,5 @@
-// (split from variant_mapping.rs)
 use super::resolve::{infer_tier, resolve, resolve_with_tier, tier_from_effort};
+use super::specs::*;
 use super::test_helpers::check;
 use super::types::VariantTier;
 

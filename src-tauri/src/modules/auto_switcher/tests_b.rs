@@ -237,9 +237,8 @@ pub(crate) fn test_cooldown_partition_and_fallback_logic() {
     let mut acc_cd2 = acc_cd2;
     acc_cd2.last_used = now_sec - 2400;
 
-    let is_cooldown = |acc: &account::Account| -> bool {
-        acc.last_used > 0 && (now_sec - acc.last_used) < cooldown_secs
-    };
+    let is_cooldown =
+        |acc: &Account| -> bool { acc.last_used > 0 && (now_sec - acc.last_used) < cooldown_secs };
 
     assert!(!is_cooldown(&acc_avail));
     assert!(is_cooldown(&acc_cd1));

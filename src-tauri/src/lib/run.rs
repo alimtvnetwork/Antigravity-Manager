@@ -70,7 +70,7 @@ pub fn run() {
         .manage(commands::proxy::ProxyServiceState::new())
         .manage(commands::cloudflared::CloudflaredState::new())
         .manage(AppRuntimeFlags { tray_enabled })
-        .setup(|app| setup_app(app, tray_enabled))
+        .setup(move |app| setup_app(app, tray_enabled))
         .on_window_event(handle_window_event)
         .invoke_handler(tauri::generate_handler![
             greet,

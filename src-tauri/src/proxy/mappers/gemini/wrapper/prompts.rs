@@ -3,6 +3,7 @@ use crate::proxy::mappers::gemini::wrapper::request::wrap_request;
 use crate::proxy::mappers::gemini::wrapper::response::unwrap_response;
 use bytes::Bytes;
 use serde_json::{json, Value};
+use tracing::{debug, info};
 
 pub const INTERNAL_BACKGROUND_TASK: &str = "gemini-2.5-flash-lite";
 

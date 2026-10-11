@@ -12,6 +12,10 @@ pub mod status;
 mod tests_a;
 #[cfg(test)]
 mod tests_b;
+#[cfg(test)]
+pub(crate) use crate::models::account::Account;
+#[cfg(test)]
+pub(crate) use tests_a::make_test_account;
 pub mod types;
 
 pub use daemon::*;

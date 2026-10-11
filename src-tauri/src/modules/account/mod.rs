@@ -15,6 +15,8 @@ mod test_index_a;
 mod test_index_b;
 #[cfg(test)]
 mod test_quota;
+#[cfg(test)]
+pub(crate) use test_index_a::*;
 
 pub use crud::*;
 pub use current::*;

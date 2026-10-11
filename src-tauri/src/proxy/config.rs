@@ -68,6 +68,8 @@ pub use normalize_proxy_url::ZaiConfig;
 pub use normalize_proxy_url::ZaiDispatchMode;
 pub use normalize_proxy_url::ZaiMcpConfig;
 pub use normalize_proxy_url::ZaiModelDefaults;
+#[cfg(test)]
+pub use normalize_proxy_url::TEST_CONFIG_LOCK;
 pub use proxyconfig::default_custom_mapping;
 pub(crate) use proxyconfig::default_max_age_days;
 pub(crate) use proxyconfig::default_max_body_age_hours;
@@ -79,8 +81,6 @@ pub(crate) use proxyconfig::default_zai_base_url;
 pub(crate) use proxyconfig::default_zai_haiku_model;
 pub(crate) use proxyconfig::default_zai_opus_model;
 pub(crate) use proxyconfig::default_zai_sonnet_model;
-#[cfg(test)]
-pub(crate) use proxyconfig::tests;
 pub use proxyconfig::LogRetentionConfig;
 pub use proxyconfig::ProxyAuth;
 pub use proxyconfig::ProxyConfig;

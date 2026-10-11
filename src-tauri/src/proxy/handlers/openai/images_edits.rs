@@ -201,7 +201,7 @@ pub async fn handle_images_edits(
         contents_parts,
         image_config,
         response_format,
-        clean_model_name,
+        clean_model_name.clone(),
     );
 
     // 5. Collect Results
