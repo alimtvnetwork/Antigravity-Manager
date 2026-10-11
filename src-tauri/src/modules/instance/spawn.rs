@@ -1,9 +1,5 @@
 //! Post-spawn bookkeeping for instance launches.
 use super::*;
-use crate::error::AppError;
-
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
 
 /// Record a freshly spawned instance process and run the post-launch prompt
 /// restoration pipeline when requested.

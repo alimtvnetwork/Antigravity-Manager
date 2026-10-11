@@ -23,7 +23,7 @@ pub use current::*;
 pub use device::*;
 pub use enterprise::*;
 pub use index::*;
-pub use locks::*;
+pub(crate) use locks::*;
 pub use paths::*;
 pub use quota_fetch::*;
 pub use quota_ops::*;

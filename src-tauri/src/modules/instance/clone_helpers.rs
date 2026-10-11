@@ -4,9 +4,6 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
-
 /// Sanitize cloned conversation summaries in the target instance home and data directories.
 /// Resets in-flight session flags (not_fully_idle = 0, status = 'IDLE') so a newly cloned
 /// instance profile never inherits active running conversation states from the source.

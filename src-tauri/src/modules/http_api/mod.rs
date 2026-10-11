@@ -6,7 +6,7 @@ pub mod server;
 pub mod settings;
 pub mod types;
 
-pub use handlers::*;
+pub(crate) use handlers::*;
 pub use server::*;
 pub use settings::*;
 pub use types::*;

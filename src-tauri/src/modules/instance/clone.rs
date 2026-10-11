@@ -3,9 +3,6 @@ use super::*;
 use std::fs;
 use std::path::PathBuf;
 
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
-
 /// Copy/clone an existing profile with options (optionally copying open projects and recent paths)
 pub fn copy_instance_with_options(
     source_id: &str,

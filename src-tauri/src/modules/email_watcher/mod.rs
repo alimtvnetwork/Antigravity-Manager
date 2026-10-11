@@ -8,6 +8,7 @@ pub mod detection;
 pub mod heartbeat;
 pub mod sensors;
 pub mod state;
+#[cfg(test)]
 pub mod tests;
 
 pub use control::*;
@@ -15,4 +16,5 @@ pub use detection::*;
 pub use heartbeat::*;
 pub use sensors::*;
 pub use state::*;
-pub use tests::*;
+#[cfg(test)]
+pub(crate) use tests::*;

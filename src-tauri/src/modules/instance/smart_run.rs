@@ -1,10 +1,6 @@
 //! Ensure-running / focus-or-launch smart entry points.
 use super::*;
-use crate::error::AppError;
 use std::path::PathBuf;
-
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
 
 /// Smart ensure instance is running:
 /// Checks process cache and OS PID table. If already running, reuses without reopening.

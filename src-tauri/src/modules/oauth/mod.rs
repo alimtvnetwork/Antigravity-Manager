@@ -10,6 +10,6 @@ pub use clients::*;
 pub(crate) use constants::*;
 pub use exchange::*;
 pub use refresh::*;
-pub use registry::*;
+pub(crate) use registry::*;
 pub(crate) use tests::*;
 pub use types::*;

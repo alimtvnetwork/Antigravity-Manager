@@ -2,9 +2,6 @@
 use super::*;
 use std::fs;
 
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
-
 /// Create a new isolated profile with optional specific account binding
 pub fn create_instance_with_account(
     name: String,

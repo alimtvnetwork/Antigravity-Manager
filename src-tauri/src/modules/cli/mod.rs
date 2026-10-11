@@ -13,7 +13,7 @@ pub mod supabase;
 pub mod switch;
 pub mod types;
 
-pub use agy::*;
+pub(crate) use agy::*;
 pub use args::*;
 pub use auto_switch::*;
 pub use daemon::*;

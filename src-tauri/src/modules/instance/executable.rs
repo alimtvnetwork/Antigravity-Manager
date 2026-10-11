@@ -1,12 +1,8 @@
 //! Per-instance executable cloning and launch resolution.
 use super::*;
-use crate::error::AppError;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
-
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
 
 /// Export all instance configurations to a JSON string
 pub fn export_instances_json() -> Result<String, String> {

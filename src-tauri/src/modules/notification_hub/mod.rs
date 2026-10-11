@@ -19,6 +19,6 @@ pub use email_alerts::*;
 pub use state::*;
 pub use switch_context::*;
 pub use system::*;
-pub use telegram_alerts::*;
+pub(crate) use telegram_alerts::*;
 pub use telemetry::*;
 pub use tests::*;

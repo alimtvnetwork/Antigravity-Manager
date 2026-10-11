@@ -1,9 +1,6 @@
 //! Active/default instance selection and account binding.
 use super::*;
 
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
-
 /// Get currently active instance ID
 pub fn get_active_instance_id() -> Result<String, String> {
     let registry = load_registry()?;

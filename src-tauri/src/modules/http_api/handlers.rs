@@ -3,8 +3,7 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, post},
-    Json, Router,
+    Json,
 };
 
 use super::*;

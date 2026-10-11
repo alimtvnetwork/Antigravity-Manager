@@ -1,6 +1,6 @@
 ---
 name: agm-core-architecture
-description: Master architectural guide, subsystem index, and invariant directory for Antigravity-Manager. Use this skill as the primary gateway to navigate the 41 specialized AGM skills, core system invariants, directory-to-skill mappings, and end-to-end data flows.
+description: Master architectural guide, subsystem index, and invariant directory for Antigravity-Manager. Use this skill as the primary gateway to navigate the 45 specialized AGM skills, core system invariants, directory-to-skill mappings, and end-to-end data flows.
 ---
 
 # AGM Core Architecture & Subsystem Skill Directory
@@ -102,6 +102,10 @@ When modifying any component in the repository, refer to the corresponding skill
 | `src-tauri/src/modules/cloudflared.rs`, `commands/cloudflared.rs` | Cloudflared Zero Trust tunnels, Quick/Auth tunnel modes, automated binary acquisition, headless web access | [`agm-cloudflared-tunnel`](.agents/skills/agm-cloudflared-tunnel/skill.md) |
 | `src-tauri/src/modules/task_history_db.rs`, `audit_action.rs` | 500-row auto-rotation split DBs (`task_index.db`, `history-*.db`), `AuditAction` codes, audit UI/CLI views | [`agm-task-history-and-audit`](.agents/skills/agm-task-history-and-audit/skill.md) |
 | `src-tauri/src/modules/training_api.rs` | Machine training vault (`training_vault.db`), node telemetry endpoints, dynamic routing adjustments | [`agm-training-vault-and-learning`](.agents/skills/agm-training-vault-and-learning/skill.md) |
+| `src-tauri/src/modules/compact_engine/`, `src-tauri/src/bin/agm/compact_cmds.rs` | Workspace compaction, portable `.db` bundles, 5-stage workdir resolution ladder, path re-anchoring | [`agm-compact-engine`](.agents/skills/agm-compact-engine/skill.md) |
+| `src-tauri/src/modules/fleet_sync.rs`, `src-tauri/src/bin/agm/fleet_cmds.rs` | Headless decentralized fleet sync, multi-machine node discovery, telemetry broadcasts without Supabase | [`agm-fleet-sync`](.agents/skills/agm-fleet-sync/skill.md) |
+| `src/components/instances/PromptTreeView/` | 4-tier prompt origin classification, hierarchical tree rendering with branch glyphs, interactive omission banners | [`agm-prompt-tree-origin-hierarchy`](.agents/skills/agm-prompt-tree-origin-hierarchy/skill.md) |
+| Repository-wide | Code failure taxonomy, CI/logic failure patterns, syntax rules, local quality gates | [`agm-code-failure-decoding`](.agents/skills/agm-code-failure-decoding/skill.md) |
 
 
 

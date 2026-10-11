@@ -1,6 +1,5 @@
 //! IDE launch pipeline with extra workspaces.
 use super::*;
-use crate::error::AppError;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
