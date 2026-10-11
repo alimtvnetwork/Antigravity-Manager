@@ -324,7 +324,7 @@ impl TokenManager {
                                     .is_rate_limited(&token.account_id, Some(&normalized_target))
                                     .await
                                 || (quota_protection_enabled
-                                    && token.protected_models.contains(&normalized_target))
+                                    && token.protected_models.contains(normalized_target))
                             {
                                 continue;
                             }
