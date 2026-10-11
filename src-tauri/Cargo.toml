@@ -23,7 +23,7 @@ test = false
 
 [[bin]]
 name = "agm"
-path = "src/bin/agm.rs"
+path = "src/bin/agm/main.rs"
 test = false
 
 [build-dependencies]
