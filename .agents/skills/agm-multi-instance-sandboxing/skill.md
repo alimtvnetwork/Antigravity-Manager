@@ -117,7 +117,15 @@ When an instance is reset or prepared for account rotation (`cleanAndRestartWork
 ---
 
 ## 6. Local E2E Testing Invariants (Plan 83 / Spec 72)
-
+ 
 - The local E2E test suite in `instance.rs` is protected by dual skip-by-default isolation:
   1. `#[ignore = "local_only_e2e"]` prevents automated CI/CD runners from executing it.
   2. Runtime check requires `RUN_TEMP_E2E=1` environment variable.
+
+---
+
+## 7. Windows Process Spawn & Elevation Safety
+
+1. **Job Object Breakaway**: Always use `spawn_with_job_breakaway_fallback` for external process execution to safely degrade when running inside Windows Job Objects without breakaway permissions.
+2. **Binary Integrity**: Cloned executables must always reside in user-writable paths (`~/.antigravity_tools/instances/<id>/bin/Antigravity-<id>.exe`) as genuine PE binaries. Executable resolvers reject `.cmd` and `.bat` extensions.
+3. **Multi-Stage Launch Ladder**: If spawning a cloned executable fails, the launcher attempts the base detected executable (`detect_antigravity_with_diagnostics(None)`). If Windows Access Denied (`os error 5`) persists, it executes via Windows Shell dispatch (`cmd.exe /c start "" "<bin>"`) to break out of restrictive job environments before registering discovered PIDs.
