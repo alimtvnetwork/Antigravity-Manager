@@ -3,7 +3,7 @@
 **Task Slug**: `update-cli-command-and-pipeline-fixes`  
 **Target Release**: `v4.186.0` (Minor Bump)  
 **Maintainer Attribution**: Strictly `@aukgit` (`(Thanks to @aukgit)`)  
-**Status**: IN_PROGRESS
+**Status**: COMPLETED
 
 ---
 
@@ -39,11 +39,11 @@
 
 | Subtask ID | File | Description | Status |
 | :--- | :--- | :--- | :--- |
-| **01** | `.ai-memory/plans/subtasks/update-cli-command-and-pipeline-fixes/01-update-cli-self-delegation-fix.md` | Universal Windows self-delegation & process lock candidate expansion | PENDING |
-| **02** | `.ai-memory/plans/subtasks/update-cli-command-and-pipeline-fixes/02-prompt-pipeline-and-queue-fix.md` | Prompt pipeline dispatch, queue options, conversation targeting & fallback | PENDING |
-| **03** | `.ai-memory/plans/subtasks/update-cli-command-and-pipeline-fixes/03-prompt-backup-and-restore-switch-fix.md` | Pre-switch status backup expansion, cross-instance re-attribution & auto-resume | PENDING |
-| **04** | `.ai-memory/plans/subtasks/update-cli-command-and-pipeline-fixes/04-ui-conversation-choice-fix.md` | UI conversation target selector in PromptTreeView header for Send and Queue | PENDING |
-| **05** | `.ai-memory/plans/subtasks/update-cli-command-and-pipeline-fixes/05-preflight-release-ceremony.md` | Pre-flight validation, version bump `v4.186.0`, changelog attribution & release tag | PENDING |
+| **01** | `.ai-memory/plans/subtasks/update-cli-command-and-pipeline-fixes/01-update-cli-self-delegation-fix.md` | Universal Windows self-delegation & process lock candidate expansion | COMPLETED |
+| **02** | `.ai-memory/plans/subtasks/update-cli-command-and-pipeline-fixes/02-prompt-pipeline-and-queue-fix.md` | Prompt pipeline dispatch, queue options, conversation targeting & fallback | COMPLETED |
+| **03** | `.ai-memory/plans/subtasks/update-cli-command-and-pipeline-fixes/03-prompt-backup-and-restore-switch-fix.md` | Pre-switch status backup expansion, cross-instance re-attribution & auto-resume | COMPLETED |
+| **04** | `.ai-memory/plans/subtasks/update-cli-command-and-pipeline-fixes/04-ui-conversation-choice-fix.md` | UI conversation target selector in PromptTreeView header for Send and Queue | COMPLETED |
+| **05** | `.ai-memory/plans/subtasks/update-cli-command-and-pipeline-fixes/05-preflight-release-ceremony.md` | Pre-flight validation, version bump `v4.186.0`, changelog attribution & release tag | COMPLETED |
 
 ---
 
