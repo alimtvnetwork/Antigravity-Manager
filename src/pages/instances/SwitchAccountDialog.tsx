@@ -125,7 +125,7 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                                         ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300'
                                                         : tier.includes('PRO')
                                                           ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
-                                                          : 'bg-gray-100 text-gray-600 dark:bg-[#15334d] dark:text-slate-300'
+                                                          : 'bg-gray-100 text-gray-600 dark:bg-[#40285e] dark:text-slate-300'
                                                 )}
                                             >
                                                 {tier}

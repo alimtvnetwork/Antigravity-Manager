@@ -27,7 +27,7 @@ export function WaterDrainProgressBar({
     // Glow is strictly isolated to the top 2 bubbles. Secondary bubbles retain 1.5px border and shadow-none.
     const getNodeStyle = (idx: number, isFilled: boolean) => {
         if (!isFilled) {
-            return "bg-slate-200/50 dark:bg-[#0c2438] border border-slate-300 dark:border-[#15334d]/60 shadow-none";
+            return "bg-slate-200/50 dark:bg-[#171025] border border-slate-300 dark:border-[#40285e]/60 shadow-none";
         }
         switch (idx) {
             case 0: // 100% node — neon green glow
@@ -58,7 +58,7 @@ export function WaterDrainProgressBar({
 
             {/* Base Progress Track */}
             <div className={cn(
-                "relative w-full h-2 rounded-full overflow-hidden bg-slate-200 dark:bg-[#071a27] border border-slate-300 dark:border-[#15334d]",
+                "relative w-full h-2 rounded-full overflow-hidden bg-slate-200 dark:bg-[#090611] border border-slate-300 dark:border-[#40285e]",
                 clamped >= 50 ? 'shadow-[0_0_10px_rgba(26,241,141,0.75)]' : ''
             )}>
                 {/* Active Water Fill with Gradient & Subtle Shimmer */}

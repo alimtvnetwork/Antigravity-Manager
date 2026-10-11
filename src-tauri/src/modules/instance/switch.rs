@@ -343,6 +343,22 @@ pub async fn switch_account_to_instance(
             })?;
     }
 
+    // 4b. Verify the relaunched IDE actually materialized. A spawn() that
+    // returns Ok does not guarantee a running window; without this check a
+    // stillborn relaunch reports success while the user sees nothing reopen.
+    if !crate::modules::instance::verify_instance_relaunched(
+        &instance.id,
+        &instance.data_dir,
+        instance.pid,
+    ) {
+        let err_msg = format!(
+            "Account switched for '{}', but the relaunched IDE did not appear within 15s. Credentials were injected; launch the instance manually.",
+            instance.id
+        );
+        crate::modules::logger::log_error(&format!("[INSTANCE_SWITCH:ERROR] {}", err_msg));
+        return Err(err_msg);
+    }
+
     let target_inst_id = instance.id.clone();
     let target_inst_data_dir = instance.data_dir.clone();
     crate::modules::logger::log_info(&format!(

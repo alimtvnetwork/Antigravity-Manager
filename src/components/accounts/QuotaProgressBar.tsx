@@ -26,11 +26,11 @@ export interface QuotaProgressBarProps {
  * corresponds to its position on the scale.
  */
 const CHECKPOINT_SCALE_COLORS: Record<number, string> = {
-    100: '#20d99a',
+    100: '#31c9a4',
     75: '#70ddb0',
     50: '#e7d36a',
     25: '#f49a45',
-    0: '#f2556d',
+    0: '#ef6a8a',
 };
 
 export function QuotaProgressBar({
@@ -117,7 +117,7 @@ export function QuotaProgressBar({
                     const leftPos = cp >= 100 ? '100%' : cp <= 0 ? '0%' : `${cp}%`;
                     const transform = cp >= 100 ? 'translate(-100%, -50%)' : cp <= 0 ? 'translate(0, -50%)' : 'translate(-50%, -50%)';
                     const isCritical = clamped < 25;
-                    const scaleColor = CHECKPOINT_SCALE_COLORS[cp] ?? '#20d99a';
+                    const scaleColor = CHECKPOINT_SCALE_COLORS[cp] ?? '#31c9a4';
 
                     return (
                         <div

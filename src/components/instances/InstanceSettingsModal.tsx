@@ -40,11 +40,11 @@ export function InstanceSettingsModal({
             />
 
             <div
-                className="bg-white dark:bg-[#0c2438] rounded-2xl w-full max-w-2xl max-h-[90vh] shadow-2xl border border-gray-200 dark:border-[#15334d] flex flex-col overflow-hidden text-xs text-gray-900 dark:text-gray-100 animate-in fade-in zoom-in-95"
+                className="bg-white dark:bg-[#171025] rounded-2xl w-full max-w-2xl max-h-[90vh] shadow-2xl border border-gray-200 dark:border-[#40285e] flex flex-col overflow-hidden text-xs text-gray-900 dark:text-gray-100 animate-in fade-in zoom-in-95"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Modal Header */}
-                <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-[#15334d] bg-gray-50/70 dark:bg-[#091e30]">
+                <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-[#40285e] bg-gray-50/70 dark:bg-[#091e30]">
                     <div className="flex items-center gap-2.5">
                         <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-cyan-400">
                             <SlidersHorizontal className="w-5 h-5" />
@@ -65,7 +65,7 @@ export function InstanceSettingsModal({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
                         title={t('common.close', 'Close')}
                     >
                         <X className="w-4 h-4" />
@@ -73,13 +73,13 @@ export function InstanceSettingsModal({
                 </div>
 
                 {/* Target Instance Bar */}
-                <div className="px-5 py-2.5 bg-blue-50/40 dark:bg-[#081a28] border-b border-gray-100 dark:border-[#15334d] flex items-center justify-between gap-3 flex-wrap">
+                <div className="px-5 py-2.5 bg-blue-50/40 dark:bg-[#081a28] border-b border-gray-100 dark:border-[#40285e] flex items-center justify-between gap-3 flex-wrap">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                         <span className="font-semibold text-gray-700 dark:text-gray-300 shrink-0">Target Profile:</span>
                         <select
                             value={selectedTargetId}
                             onChange={(e) => handleTargetChange(e.target.value)}
-                            className="min-w-0 flex-1 truncate bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] rounded-lg px-2.5 py-1 text-xs font-bold text-blue-700 dark:text-cyan-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                            className="min-w-0 flex-1 truncate bg-white dark:bg-[#171025] border border-gray-200 dark:border-[#40285e] rounded-lg px-2.5 py-1 text-xs font-bold text-blue-700 dark:text-cyan-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                         >
                             {instances.map((inst, idx) => {
                                 const seq = inst.config.seq_num ?? idx + 1;
@@ -97,7 +97,7 @@ export function InstanceSettingsModal({
                     </div>
 
                     <div className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400 font-mono shrink-0">
-                        <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-[#15334d] border border-gray-200 dark:border-[#1e466b]">
+                        <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-[#40285e] border border-gray-200 dark:border-[#1e466b]">
                             ID: {selectedTargetId}
                         </span>
                         {currentInstanceObj?.is_running && (
@@ -116,7 +116,7 @@ export function InstanceSettingsModal({
                 </div>
 
                 {/* Modal Footer */}
-                <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 dark:border-[#15334d] bg-gray-50/70 dark:bg-[#091e30]">
+                <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 dark:border-[#40285e] bg-gray-50/70 dark:bg-[#091e30]">
                     <span className="text-[11px] text-gray-400">
                         Targeting:{' '}
                         <strong className="text-gray-700 dark:text-gray-200">
@@ -126,7 +126,7 @@ export function InstanceSettingsModal({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="px-4 py-1.5 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-[#15334d] hover:bg-gray-100 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                        className="px-4 py-1.5 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-[#40285e] hover:bg-gray-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
                     >
                         {t('common.done', 'Done')}
                     </button>

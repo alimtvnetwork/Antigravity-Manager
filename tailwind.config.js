@@ -18,15 +18,15 @@ export default {
             },
             colors: {
                 awan: {
-                    blue: '#2878f0',     // Lift Blue (Main Brand Anchor)
-                    green: '#16a97a',    // Vector Green (Automation Success)
-                    cyan: '#19b7c9',     // Zero-G Cyan (Bridge / Glow)
-                    mint: '#43d6a2',     // Plasma Mint (Luminosity Highlight)
-                    dark: '#071a27',     // Deep Orbit (Dark Background)
-                    card: '#0c2438',     // Deep Orbit Card Surface
-                    border: '#15334d',   // Deep Orbit Border
-                    slate: '#5d6b76',    // Slate Vector (Supporting Neutral)
-                    light: '#f5faf9',    // Cloud Field (Light Background)
+                    blue: '#7C3AED',     // Royal Violet (Primary Brand Anchor)
+                    green: '#31C9A4',    // Success
+                    cyan: '#A855F7',     // Aurora (Bridge / Glow)
+                    mint: '#E879F9',     // Highlight (Luminosity Highlight)
+                    dark: '#090611',     // Canvas (Dark Background)
+                    card: '#171025',     // Panel Surface
+                    border: '#40285E',   // Violet Border
+                    slate: '#B8ACCB',    // Muted (Supporting Neutral)
+                    light: '#F5F0FF',    // Text (Light)
                 },
             },
         },
@@ -51,17 +51,17 @@ export default {
             },
             {
                 dark: {
-                    "primary": "#2878f0",
-                    "secondary": "#19b7c9",
-                    "accent": "#16a97a",
-                    "neutral": "#071a27",
-                    "base-100": "#071a27", // Deep Orbit Dark
-                    "base-200": "#0c2438", // Deep Orbit Card
-                    "base-300": "#15334d", // Deep Orbit Border / Component
-                    "info": "#19b7c9",     // Zero-G Cyan
-                    "success": "#16a97a",  // Vector Green
-                    "warning": "#f59e0b",
-                    "error": "#ef4444",
+                    "primary": "#7C3AED",   // Royal Violet primary
+                    "secondary": "#A855F7", // Aurora
+                    "accent": "#E879F9",    // Highlight
+                    "neutral": "#10091D",   // Navigation
+                    "base-100": "#090611",  // Canvas
+                    "base-200": "#171025",  // Panel
+                    "base-300": "#211631",  // Surface 2
+                    "info": "#A855F7",      // Aurora
+                    "success": "#31C9A4",
+                    "warning": "#F5BF58",
+                    "error": "#EF6A8A",
                 },
             },
         ],

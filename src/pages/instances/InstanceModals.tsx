@@ -41,7 +41,7 @@ export function InstanceConfirmDialogs({ api }: { api: InstancePageApi }) {
                                 'Are you sure you want to delete this profile? This will permanently delete the isolated profile data directory and all settings.'
                             )}
                         </div>
-                        <div className="bg-gray-50 dark:bg-[#0c2438] rounded-xl p-3 border border-gray-200/70 dark:border-[#15334d] space-y-1.5 text-xs">
+                        <div className="bg-gray-50 dark:bg-[#171025] rounded-xl p-3 border border-gray-200/70 dark:border-[#40285e] space-y-1.5 text-xs">
                             <div className="flex items-center justify-between">
                                 <span className="text-gray-500 dark:text-slate-400 font-medium">
                                     {t('instances.name', 'Profile Name')}:
@@ -53,11 +53,11 @@ export function InstanceConfirmDialogs({ api }: { api: InstancePageApi }) {
                                     {deleteModalTarget.config.name}
                                 </span>
                             </div>
-                            <div className="flex flex-col gap-1 pt-1.5 border-t border-gray-200/50 dark:border-[#15334d]/60">
+                            <div className="flex flex-col gap-1 pt-1.5 border-t border-gray-200/50 dark:border-[#40285e]/60">
                                 <span className="text-gray-500 dark:text-slate-400 font-medium">
                                     {t('instances.data_dir', 'Data Directory')}:
                                 </span>
-                                <span className="font-mono text-[11px] text-gray-700 dark:text-slate-300 break-all bg-white dark:bg-[#071a27] p-1.5 rounded-lg border border-gray-200 dark:border-[#15334d]">
+                                <span className="font-mono text-[11px] text-gray-700 dark:text-slate-300 break-all bg-white dark:bg-[#090611] p-1.5 rounded-lg border border-gray-200 dark:border-[#40285e]">
                                     {deleteModalTarget.config.data_dir}
                                 </span>
                             </div>
@@ -85,7 +85,7 @@ export function InstanceConfirmDialogs({ api }: { api: InstancePageApi }) {
                                 'This will clear all saved account credentials and session tokens from this profile without deleting its workspace or configurations.'
                             )}
                         </div>
-                        <div className="bg-gray-50 dark:bg-[#0c2438] rounded-xl p-3 border border-gray-200/70 dark:border-[#15334d] space-y-1.5 text-xs">
+                        <div className="bg-gray-50 dark:bg-[#171025] rounded-xl p-3 border border-gray-200/70 dark:border-[#40285e] space-y-1.5 text-xs">
                             <div className="flex items-center justify-between">
                                 <span className="text-gray-500 dark:text-slate-400 font-medium">
                                     {t('instances.name', 'Profile Name')}:
@@ -98,7 +98,7 @@ export function InstanceConfirmDialogs({ api }: { api: InstancePageApi }) {
                                 </span>
                             </div>
                             {wipeModalTarget.config.bound_email && (
-                                <div className="flex items-center justify-between pt-1.5 border-t border-gray-200/50 dark:border-[#15334d]/60">
+                                <div className="flex items-center justify-between pt-1.5 border-t border-gray-200/50 dark:border-[#40285e]/60">
                                     <span className="text-gray-500 dark:text-slate-400 font-medium">
                                         {t('instances.bound_account', 'Bound Account')}:
                                     </span>

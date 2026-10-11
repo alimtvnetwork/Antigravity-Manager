@@ -186,6 +186,28 @@ impl SystemIntegration for DesktopIntegration {
             active_args.as_deref(),
         )?;
 
+        // STEP 4b: Verify the relaunched IDE actually materialized. A spawn()
+        // that returns Ok does not guarantee a running window; without this
+        // check a stillborn relaunch reports success while the user sees
+        // nothing reopen.
+        {
+            let default_data_dir = crate::modules::instance::get_default_antigravity_data_dir()
+                .to_string_lossy()
+                .to_string();
+            if !crate::modules::instance::verify_instance_relaunched(
+                "default",
+                &default_data_dir,
+                None,
+            ) {
+                let err_msg = format!(
+                    "Account '{}' switched, but the relaunched IDE did not appear within 15s. Credentials were injected; launch Antigravity manually.",
+                    account.email
+                );
+                crate::modules::logger::log_error(&format!("[Desktop][ERROR] {}", err_msg));
+                return Err(err_msg);
+            }
+        }
+
         // =========================================================================
         // STEP 5: Re-Inject the Backed-Up Running Prompts (Asynchronous 5-Second Post-Launch Restoration)
         // =========================================================================

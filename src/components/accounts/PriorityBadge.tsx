@@ -88,7 +88,7 @@ export function PriorityBadge({
             <span
                 className={cn(
                     'font-bold cursor-pointer select-none transition-colors',
-                    'bg-gray-100 dark:bg-[#15334d] text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#1a3d5c]',
+                    'bg-gray-100 dark:bg-[#40285e] text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#1a3d5c]',
                     sizeClasses,
                     className
                 )}

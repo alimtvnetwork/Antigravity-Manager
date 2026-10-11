@@ -22,9 +22,9 @@ export function InspectorModal(props: InspectorModalProps) {
     } = props;
     return (
     <div className="fixed inset-0 z-[320] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-        <div className="flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 dark:border-[#15334d] bg-white dark:bg-[#0c2438] shadow-2xl">
+        <div className="flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025] shadow-2xl">
             {/* Inspector Header */}
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#15334d] px-6 py-4 bg-slate-50 dark:bg-[#071a27] shrink-0">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#40285e] px-6 py-4 bg-slate-50 dark:bg-[#090611] shrink-0">
                 <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-[5px] bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
                         <FileText className="h-5 w-5" />
@@ -42,7 +42,7 @@ export function InspectorModal(props: InspectorModalProps) {
                 </div>
 
                 {/* Inspector Actions Capsule */}
-                <div className="flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs shrink-0">
+                <div className="flex items-center rounded-full bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200 dark:border-[#40285e] p-0.5 divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs shrink-0">
                     <button
                         type="button"
                         onClick={() => {
@@ -51,7 +51,7 @@ export function InspectorModal(props: InspectorModalProps) {
                             setIsCopied(true);
                             setTimeout(() => setIsCopied(false), 2000);
                         }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                         title="Copy clean prompt text"
                     >
                         {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />}
@@ -60,7 +60,7 @@ export function InspectorModal(props: InspectorModalProps) {
                     <button
                         type="button"
                         onClick={onCopyWithImages}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                         title="Copy rich text with images"
                     >
                         {isCopiedRaw ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-indigo-500" />}
@@ -90,7 +90,7 @@ export function InspectorModal(props: InspectorModalProps) {
                             {inspectorPrompt.images.map((img, i) => (
                                 <div
                                     key={i}
-                                    className="overflow-hidden rounded-[5px] border border-slate-200 dark:border-[#15334d] bg-slate-100 dark:bg-[#071a27] p-2"
+                                    className="overflow-hidden rounded-[5px] border border-slate-200 dark:border-[#40285e] bg-slate-100 dark:bg-[#090611] p-2"
                                 >
                                     <img
                                         src={img}
@@ -120,7 +120,7 @@ export function InspectorModal(props: InspectorModalProps) {
                             {inspectorPrompt.files.map((file, i) => (
                                 <span
                                     key={i}
-                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[5px] bg-slate-100 dark:bg-[#071a27] border border-slate-200 dark:border-[#15334d] text-xs font-mono text-slate-700 dark:text-slate-300"
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[5px] bg-slate-100 dark:bg-[#090611] border border-slate-200 dark:border-[#40285e] text-xs font-mono text-slate-700 dark:text-slate-300"
                                 >
                                     <FileText className="w-3 h-3 text-slate-400" />
                                     <span className="truncate max-w-xs">{file}</span>
@@ -135,7 +135,7 @@ export function InspectorModal(props: InspectorModalProps) {
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                         Full Prompt Instruction
                     </label>
-                    <div className="rounded-xl border border-slate-200 dark:border-[#15334d] bg-slate-50 dark:bg-[#071a27] p-5 text-xs text-slate-900 dark:text-slate-100 leading-relaxed max-h-[600px] overflow-y-auto select-text shadow-inner">
+                    <div className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#090611] p-5 text-xs text-slate-900 dark:text-slate-100 leading-relaxed max-h-[600px] overflow-y-auto select-text shadow-inner">
                         <RichMarkdownRenderer
                             content={inspectorPrompt.text}
                             showAllWords={showAllWords}
@@ -143,7 +143,7 @@ export function InspectorModal(props: InspectorModalProps) {
                             isTruncated={inspectorPrompt.text.trim().endsWith('...') || inspectorPrompt.text.trim().endsWith('…')}
                         />
                         {(inspectorPrompt.text.trim().endsWith('...') || inspectorPrompt.text.trim().endsWith('…') || showAllWords) && (
-                            <div className="mt-3 pt-2 border-t border-slate-200/50 dark:border-[#15334d]/50 flex items-center">
+                            <div className="mt-3 pt-2 border-t border-slate-200/50 dark:border-[#40285e]/50 flex items-center">
                                 <span
                                     onClick={(e) => {
                                         e.stopPropagation();

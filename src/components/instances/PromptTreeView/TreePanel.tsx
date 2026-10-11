@@ -126,11 +126,11 @@ export function TreePanel(props: TreePanelProps) {
     );
 
     return (
-        <div className="w-80 sm:w-96 flex flex-col border-r border-slate-200 dark:border-[#15334d] bg-slate-50/50 dark:bg-[#071a27]/60">
+        <div className="w-80 sm:w-96 flex flex-col border-r border-slate-200 dark:border-[#40285e] bg-slate-50/50 dark:bg-[#090611]/60">
             {/* Search Input & Filter Controls */}
-            <div className="p-3 border-b border-slate-200 dark:border-[#15334d] shrink-0 space-y-2">
+            <div className="p-3 border-b border-slate-200 dark:border-[#40285e] shrink-0 space-y-2">
                 {/* Project Scope Dropdown */}
-                <div className="flex items-center gap-1.5 bg-white dark:bg-[#0c2438] px-2 py-1 rounded-[5px] border border-slate-200 dark:border-[#15334d]">
+                <div className="flex items-center gap-1.5 bg-white dark:bg-[#171025] px-2 py-1 rounded-[5px] border border-slate-200 dark:border-[#40285e]">
                     <Folder className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                     <select
                         value={selectedProjectScope}
@@ -138,9 +138,9 @@ export function TreePanel(props: TreePanelProps) {
                         className="w-full text-xs font-medium bg-transparent border-0 focus:ring-0 focus:outline-none text-slate-800 dark:text-slate-200 cursor-pointer"
                         title="Filter tree by project scope"
                     >
-                        <option value="all" className="dark:bg-[#0c2438]">All Projects ({treeData.length})</option>
+                        <option value="all" className="dark:bg-[#171025]">All Projects ({treeData.length})</option>
                         {treeData.map((p) => (
-                            <option key={p.project_id} value={p.project_id} className="dark:bg-[#0c2438]">
+                            <option key={p.project_id} value={p.project_id} className="dark:bg-[#171025]">
                                 {p.repo_name} {p.is_running ? '●' : ''} ({p.conversations.length} convs)
                             </option>
                         ))}
@@ -155,13 +155,13 @@ export function TreePanel(props: TreePanelProps) {
                         placeholder="Search projects, convos, or prompts..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full rounded-[5px] bg-white dark:bg-[#0c2438] pl-9 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                        className="w-full rounded-[5px] bg-white dark:bg-[#171025] pl-9 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#40285e] focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                     />
                 </div>
 
                 {/* Row 1: 4-Tier Category Filter Segmented Capsule */}
                 <div className="flex items-center justify-between gap-1">
-                    <div className="w-full inline-flex items-center rounded-full border border-slate-200 dark:border-[#15334d] bg-white/80 dark:bg-[#0c2438]/80 backdrop-blur-xs p-0.5 shadow-2xs divide-x divide-slate-200 dark:divide-[#15334d]">
+                    <div className="w-full inline-flex items-center rounded-full border border-slate-200 dark:border-[#40285e] bg-white/80 dark:bg-[#171025]/80 backdrop-blur-xs p-0.5 shadow-2xs divide-x divide-slate-200 dark:divide-[#40285e]">
                         <button
                             type="button"
                             onClick={() => setCategoryFilter('all')}
@@ -222,7 +222,7 @@ export function TreePanel(props: TreePanelProps) {
 
                 {/* Row 2: Status Filter Segmented Capsule & Archive Scope */}
                 <div className="flex items-center justify-between gap-1 pt-0.5">
-                    <div className="inline-flex items-center rounded-full border border-slate-200 dark:border-[#15334d] bg-white/80 dark:bg-[#0c2438]/80 backdrop-blur-xs p-0.5 shadow-2xs">
+                    <div className="inline-flex items-center rounded-full border border-slate-200 dark:border-[#40285e] bg-white/80 dark:bg-[#171025]/80 backdrop-blur-xs p-0.5 shadow-2xs">
                         <button
                             type="button"
                             onClick={() => setActiveFilter(activeFilter === 'running' ? 'all' : 'running')}
@@ -276,8 +276,8 @@ export function TreePanel(props: TreePanelProps) {
                         }}
                         className="text-[10px] font-medium bg-transparent border-0 focus:ring-0 focus:outline-none text-slate-700 dark:text-slate-300 rounded-full px-2 py-0.5 cursor-pointer"
                     >
-                        <option value="all" className="dark:bg-[#0c2438]">All ({treeData.length})</option>
-                        <option value="archived" className="dark:bg-[#0c2438]">Archived ({archivedCount})</option>
+                        <option value="all" className="dark:bg-[#171025]">All ({treeData.length})</option>
+                        <option value="archived" className="dark:bg-[#171025]">Archived ({archivedCount})</option>
                     </select>
                 </div>
             </div>
@@ -296,7 +296,7 @@ export function TreePanel(props: TreePanelProps) {
                     /* Animated Skeleton Shimmer replacing jarring false-empty flash */
                     <div className="space-y-2 p-1 animate-pulse">
                         {[1, 2, 3].map((n) => (
-                            <div key={n} className="rounded-lg border border-slate-200/60 dark:border-[#15334d]/60 p-2.5 space-y-2 bg-slate-50/50 dark:bg-[#0c2438]/40">
+                            <div key={n} className="rounded-lg border border-slate-200/60 dark:border-[#40285e]/60 p-2.5 space-y-2 bg-slate-50/50 dark:bg-[#171025]/40">
                                 <div className="flex items-center gap-2">
                                     <div className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-800" />
                                     <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-slate-800" />
@@ -314,7 +314,7 @@ export function TreePanel(props: TreePanelProps) {
                         {activeProjects.length === 0 && archivedProjects.length === 0 ? (
                             treeData.length === 0 ? (
                                 <div className="py-16 text-center space-y-3 px-6">
-                                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-[#0c2438] flex items-center justify-center mx-auto text-slate-400">
+                                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-[#171025] flex items-center justify-center mx-auto text-slate-400">
                                         <Folder className="w-6 h-6 text-slate-400" />
                                     </div>
                                     <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">
@@ -345,10 +345,10 @@ export function TreePanel(props: TreePanelProps) {
 
                                 {/* Collapsed at bottom: Archived Projects */}
                                 {archivedProjects.length > 0 && (
-                                    <div className="space-y-0.5 mt-2 pt-2 border-t border-slate-200 dark:border-[#15334d]">
+                                    <div className="space-y-0.5 mt-2 pt-2 border-t border-slate-200 dark:border-[#40285e]">
                                         <div
                                             onClick={() => setIsArchivedProjectsExpanded(!isArchivedProjectsExpanded)}
-                                            className="group flex items-center justify-between rounded-[5px] px-2.5 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#0c2438] cursor-pointer transition-colors"
+                                            className="group flex items-center justify-between rounded-[5px] px-2.5 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#171025] cursor-pointer transition-colors"
                                             title="Toggle Archived Projects"
                                         >
                                             <div className="flex items-center gap-1.5 min-w-0">

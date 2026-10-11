@@ -174,7 +174,7 @@ export function AccountTab(props: SettingsPageApi) {
                                                         showToast(`${t('common.error')}: ${error}`, 'error');
                                                     }
                                                 }}
-                                                className="appearance-none px-3 py-1.5 pr-8 bg-slate-50 dark:bg-[#0c2438] border border-slate-200 dark:border-[#15334d] rounded-[5px] text-xs font-medium text-slate-800 dark:text-slate-200 shadow-2xs focus:outline-none focus:ring-1 focus:ring-blue-500/40 cursor-pointer"
+                                                className="appearance-none px-3 py-1.5 pr-8 bg-slate-50 dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] rounded-[5px] text-xs font-medium text-slate-800 dark:text-slate-200 shadow-2xs focus:outline-none focus:ring-1 focus:ring-blue-500/40 cursor-pointer"
                                             >
                                                 <option value={15}>{t('settings.auto_switcher.lockout_15m', '15 minutes')}</option>
                                                 <option value={30}>{t('settings.auto_switcher.lockout_30m', '30 minutes')}</option>

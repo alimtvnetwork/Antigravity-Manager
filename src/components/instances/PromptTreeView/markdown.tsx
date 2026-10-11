@@ -65,7 +65,7 @@ function parseInlineMarkdown(text: string, onToggleExpand?: () => void): React.R
                     key={`img-${match.index}`}
                     src={imgSrc}
                     alt={imgAlt || ''}
-                    className="inline-block max-h-48 max-w-full my-1 rounded-[5px] border border-slate-200 dark:border-[#15334d]"
+                    className="inline-block max-h-48 max-w-full my-1 rounded-[5px] border border-slate-200 dark:border-[#40285e]"
                     onError={(e) => {
                         (e.target as HTMLElement).style.display = 'none';
                     }}
@@ -87,7 +87,7 @@ function parseInlineMarkdown(text: string, onToggleExpand?: () => void): React.R
             rawNodes.push(
                 <code
                     key={`code-${match.index}`}
-                    className="px-1.5 py-0.5 rounded-[4px] bg-slate-100 dark:bg-[#071a27] text-cyan-700 dark:text-cyan-300 font-mono text-[11px] border border-slate-200 dark:border-cyan-900/40"
+                    className="px-1.5 py-0.5 rounded-[4px] bg-slate-100 dark:bg-[#090611] text-cyan-700 dark:text-cyan-300 font-mono text-[11px] border border-slate-200 dark:border-cyan-900/40"
                 >
                     {inlineCode}
                 </code>
@@ -241,7 +241,7 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
                 elements.push(
                     <div
                         key={`codeblock-${blockIdx}`}
-                        className="my-3 overflow-hidden rounded-[5px] border border-slate-200 dark:border-[#15334d] bg-slate-900 text-slate-100"
+                        className="my-3 overflow-hidden rounded-[5px] border border-slate-200 dark:border-[#40285e] bg-slate-900 text-slate-100"
                     >
                         <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950/70 px-3 py-1.5 text-[11px] font-mono text-slate-400">
                             <span>{lang || 'code'}</span>
@@ -347,14 +347,14 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
 
         // Horizontal rules
         if (/^(---|\*\*\*|___)$/.test(trimmed)) {
-            elements.push(<hr key={`hr-${i}`} className="my-3 border-slate-200 dark:border-[#15334d]" />);
+            elements.push(<hr key={`hr-${i}`} className="my-3 border-slate-200 dark:border-[#40285e]" />);
             continue;
         }
 
         // Headings
         if (trimmed.startsWith('# ')) {
             elements.push(
-                <h1 key={`h1-${i}`} className="text-base font-bold mt-3 mb-1.5 text-slate-900 dark:text-white pb-1 border-b border-slate-200 dark:border-[#15334d]">
+                <h1 key={`h1-${i}`} className="text-base font-bold mt-3 mb-1.5 text-slate-900 dark:text-white pb-1 border-b border-slate-200 dark:border-[#40285e]">
                     {parseInlineMarkdown(trimmed.slice(2), onToggleExpand)}
                 </h1>
             );
@@ -362,7 +362,7 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
         }
         if (trimmed.startsWith('## ')) {
             elements.push(
-                <h2 key={`h2-${i}`} className="text-sm font-bold mt-2.5 mb-1 text-slate-900 dark:text-white pb-0.5 border-b border-slate-200/60 dark:border-[#15334d]/60">
+                <h2 key={`h2-${i}`} className="text-sm font-bold mt-2.5 mb-1 text-slate-900 dark:text-white pb-0.5 border-b border-slate-200/60 dark:border-[#40285e]/60">
                     {parseInlineMarkdown(trimmed.slice(3), onToggleExpand)}
                 </h2>
             );
@@ -393,7 +393,7 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
                     <img
                         src={singleImgMatch[2]}
                         alt={singleImgMatch[1] || ''}
-                        className="max-h-60 max-w-full rounded-[5px] border border-slate-200 dark:border-[#15334d] object-contain bg-slate-100 dark:bg-[#071a27]"
+                        className="max-h-60 max-w-full rounded-[5px] border border-slate-200 dark:border-[#40285e] object-contain bg-slate-100 dark:bg-[#090611]"
                         onError={(e) => {
                             (e.target as HTMLElement).style.display = 'none';
                         }}

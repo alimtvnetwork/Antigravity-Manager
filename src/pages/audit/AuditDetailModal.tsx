@@ -30,12 +30,12 @@ export function AuditDetailModal({
             onClick={onClose}
         >
             <div
-                className="flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border border-slate-200 dark:border-[#15334d] bg-white dark:bg-[#0c2438] text-slate-950 dark:text-gray-100 shadow-xl"
+                className="flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025] text-slate-950 dark:text-gray-100 shadow-xl"
                 onClick={(event) => event.stopPropagation()}
                 role="dialog"
                 aria-label="Audit detail"
             >
-                <div className="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-[#15334d] px-4 py-3">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-[#40285e] px-4 py-3">
                     <div className="flex items-center gap-2">
                         <h2 className="font-semibold text-gray-900 dark:text-gray-100">Audit Detail</h2>
                         {detail && renderActionBadge(detail)}
@@ -43,7 +43,7 @@ export function AuditDetailModal({
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-300 dark:border-[#15334d] bg-white dark:bg-[#071a27] text-slate-800 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-[#15334d] px-3 py-1 text-xs disabled:opacity-40 cursor-pointer"
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-300 dark:border-[#40285e] bg-white dark:bg-[#090611] text-slate-800 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-[#40285e] px-3 py-1 text-xs disabled:opacity-40 cursor-pointer"
                             disabled={!detail}
                             onClick={() => {
                                 if (!detail) return;
@@ -62,7 +62,7 @@ export function AuditDetailModal({
                         </button>
                         <button
                             type="button"
-                            className="rounded-lg border border-slate-300 dark:border-[#15334d] bg-white dark:bg-[#071a27] text-slate-800 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-[#15334d] px-3 py-1 text-xs cursor-pointer"
+                            className="rounded-lg border border-slate-300 dark:border-[#40285e] bg-white dark:bg-[#090611] text-slate-800 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-[#40285e] px-3 py-1 text-xs cursor-pointer"
                             onClick={onClose}
                         >
                             Cancel
@@ -73,12 +73,12 @@ export function AuditDetailModal({
                     {detailError && <p className="text-rose-700 dark:text-rose-400">{detailError}</p>}
                     {!detail && !detailError && <p className="text-slate-500 dark:text-slate-400">Loading this row from its split file...</p>}
                     {detail && (
-                        <table className="w-full text-left text-xs border border-slate-200 dark:border-[#15334d] rounded-lg overflow-hidden">
+                        <table className="w-full text-left text-xs border border-slate-200 dark:border-[#40285e] rounded-lg overflow-hidden">
                             <tbody>
                                 {detailRows(detail, payload, detailRevealed).map((row) => (
-                                    <tr key={row.label} className="border-t border-slate-100 dark:border-[#15334d]/60 first:border-t-0">
-                                        <th className="w-44 px-3.5 py-2.5 font-semibold align-top bg-slate-50 dark:bg-[#071a27] text-slate-700 dark:text-gray-300">{row.label}</th>
-                                        <td className="px-3.5 py-2.5 whitespace-pre-wrap text-slate-900 dark:text-gray-100 bg-white dark:bg-[#0c2438]">{row.value}</td>
+                                    <tr key={row.label} className="border-t border-slate-100 dark:border-[#40285e]/60 first:border-t-0">
+                                        <th className="w-44 px-3.5 py-2.5 font-semibold align-top bg-slate-50 dark:bg-[#090611] text-slate-700 dark:text-gray-300">{row.label}</th>
+                                        <td className="px-3.5 py-2.5 whitespace-pre-wrap text-slate-900 dark:text-gray-100 bg-white dark:bg-[#171025]">{row.value}</td>
                                     </tr>
                                 ))}
                             </tbody>

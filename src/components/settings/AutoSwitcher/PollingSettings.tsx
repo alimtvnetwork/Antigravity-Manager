@@ -6,7 +6,7 @@ export function PollingSettings(props: AutoSwitcherApi) {
 
     return (
         <>
-                        <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-[5px] bg-slate-50 dark:bg-[#0c2438] border border-slate-200 dark:border-[#15334d] shadow-2xs">
+                        <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-[5px] bg-slate-50 dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-2xs">
                             <div className="flex items-center gap-2.5 min-w-0">
                                 <span className="relative flex h-2.5 w-2.5 shrink-0">
                                     <span className={cn(

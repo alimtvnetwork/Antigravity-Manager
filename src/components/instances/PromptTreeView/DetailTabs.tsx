@@ -25,9 +25,9 @@ export function DetailTabs(props: DetailTabsProps) {
         viewMode, setViewMode, setIsDetailsModalOpen,
     } = props;
     return (
-<div className="flex items-center justify-between gap-3 flex-wrap pb-1 border-b border-slate-200/60 dark:border-[#15334d]/60">
+<div className="flex items-center justify-between gap-3 flex-wrap pb-1 border-b border-slate-200/60 dark:border-[#40285e]/60">
     {/* Primary Tabs Capsule: Prompt Instruction vs AI Results */}
-    <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#15334d]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#15334d]/80 shadow-2xs">
+    <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#40285e]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#40285e]/80 shadow-2xs">
         <button
             type="button"
             onClick={() => setPreviewTab('instruction')}
@@ -98,7 +98,7 @@ export function DetailTabs(props: DetailTabsProps) {
                 )}
 
                 {/* View Mode Toggle Capsule */}
-                <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#15334d]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#15334d]/80 shadow-2xs">
+                <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#40285e]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#40285e]/80 shadow-2xs">
                     <button
                         type="button"
                         onClick={() => setViewMode('preview')}
@@ -106,7 +106,7 @@ export function DetailTabs(props: DetailTabsProps) {
                             'flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-l-full transition-colors cursor-pointer',
                             viewMode === 'preview'
                                 ? 'bg-blue-600 text-white font-semibold shadow-2xs'
-                                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#15334d]/60'
+                                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60'
                         )}
                         title="Rich Markdown Preview"
                     >
@@ -120,7 +120,7 @@ export function DetailTabs(props: DetailTabsProps) {
                             'flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-none transition-colors cursor-pointer',
                             viewMode === 'raw'
                                 ? 'bg-blue-600 text-white font-semibold shadow-2xs'
-                                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#15334d]/60'
+                                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60'
                         )}
                         title="Plain Monospace Raw View"
                     >
@@ -134,7 +134,7 @@ export function DetailTabs(props: DetailTabsProps) {
                             'flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-r-full transition-colors cursor-pointer',
                             viewMode === 'edit'
                                 ? 'bg-blue-600 text-white font-semibold shadow-2xs'
-                                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#15334d]/60'
+                                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60'
                         )}
                         title="Editable Textarea Mode"
                     >
@@ -148,7 +148,7 @@ export function DetailTabs(props: DetailTabsProps) {
         <button
             type="button"
             onClick={() => setIsDetailsModalOpen(true)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-[#071a27] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-[#090611] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-slate-200 dark:border-[#40285e] hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
             title="View full conversation & project details"
         >
             <FileText className="w-3 h-3 text-slate-400" />

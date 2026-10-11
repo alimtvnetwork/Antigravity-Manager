@@ -64,12 +64,12 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             className={cn(
             "group transition-all duration-200 border-b border-slate-200/90 dark:border-slate-800/90 border-l-2",
             isFocused
-                ? "bg-teal-50/90 dark:bg-[#0e2c44] text-slate-900 dark:text-cyan-300 font-bold border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/90 dark:border-slate-800/90 shadow-md ring-1 ring-cyan-500/30"
+                ? "bg-teal-50/90 dark:bg-[#171025] text-slate-900 dark:text-cyan-300 font-bold border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/90 dark:border-slate-800/90 shadow-md ring-1 ring-cyan-500/30"
                 : isCurrent
-                ? cn(SELECTED_ROW_CLASSES, "border-b border-slate-200/90 dark:border-slate-800/90 hover:bg-slate-200/60 dark:hover:bg-[#0c2438]")
+                ? cn(SELECTED_ROW_CLASSES, "border-b border-slate-200/90 dark:border-slate-800/90 hover:bg-slate-200/60 dark:hover:bg-[#171025]")
                 : selected
-                ? "bg-blue-50/90 dark:bg-[#0f273d] text-blue-950 dark:text-blue-100 border-l-blue-500 dark:border-l-blue-500 font-semibold shadow-xs ring-1 ring-blue-500/30"
-                : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50/80 dark:hover:bg-[#0f273d]/60 hover:text-slate-900 dark:hover:text-white hover:border-l-blue-500/70",
+                ? "bg-blue-50/90 dark:bg-[#171025] text-blue-950 dark:text-blue-100 border-l-blue-500 dark:border-l-blue-500 font-semibold shadow-xs ring-1 ring-blue-500/30"
+                : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50/80 dark:hover:bg-[#171025]/60 hover:text-slate-900 dark:hover:text-white hover:border-l-blue-500/70",
             (isRefreshing || isDisabled) && "opacity-70"
         )}>
             {/* 序号 */}
@@ -144,7 +144,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* 4H 模型配额 */}
-            <td className="px-2.5 py-0.5 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#15334d]">
+            <td className="px-2.5 py-0.5 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#40285e]">
                 {account.quota?.is_forbidden ? (
                     <div className="flex items-center gap-1.5 text-[10px] text-rose-600 dark:text-rose-400 bg-rose-500/10 p-1 rounded-[5px] border border-rose-400/20">
                         <Ban className="w-3 h-3 shrink-0" />
@@ -161,7 +161,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* Weekly 配额 */}
-            <td className="px-2.5 py-0.5 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#15334d]">
+            <td className="px-2.5 py-0.5 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#40285e]">
                 {account.quota?.is_forbidden ? (
                     <span className="text-[10px] text-gray-400 italic">--</span>
                 ) : (

@@ -25,8 +25,8 @@ function CloneScopeCard({
             className={cn(
                 'p-3.5 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3',
                 selected
-                    ? 'border-blue-500 dark:border-cyan-400 bg-blue-50/80 dark:bg-[#0c283f] ring-2 ring-blue-500/20 dark:ring-cyan-400/25 shadow-xs dark:shadow-[0_0_15px_rgba(6,182,212,0.12)]'
-                    : 'border-gray-200 dark:border-[#14344d] bg-gray-50/50 dark:bg-[#061724] hover:border-gray-300 dark:hover:border-[#1e4a6d] hover:bg-gray-100/60 dark:hover:bg-[#092033]'
+                    ? 'border-blue-500 dark:border-cyan-400 bg-blue-50/80 dark:bg-[#171025] ring-2 ring-blue-500/20 dark:ring-cyan-400/25 shadow-xs dark:shadow-[0_0_15px_rgba(6,182,212,0.12)]'
+                    : 'border-gray-200 dark:border-[#171025] bg-gray-50/50 dark:bg-[#090611] hover:border-gray-300 dark:hover:border-[#40285e] hover:bg-gray-100/60 dark:hover:bg-[#092033]'
             )}
         >
             <div className="mt-0.5 shrink-0">
@@ -38,7 +38,7 @@ function CloneScopeCard({
                             : 'border-gray-400 dark:border-slate-500 bg-transparent'
                     )}
                 >
-                    {selected && <div className="w-1.5 h-1.5 rounded-full bg-white dark:bg-[#081a29]" />}
+                    {selected && <div className="w-1.5 h-1.5 rounded-full bg-white dark:bg-[#090611]" />}
                 </div>
             </div>
             <div className="min-w-0 flex-1">
@@ -79,12 +79,12 @@ export function CopyInstanceModal({ api }: { api: InstanceSelectorApi }) {
             onClick={() => setIsCopyOpen(false)}
         >
             <div
-                className="bg-white dark:bg-[#081a29] rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-[#153a54] ring-1 ring-black/5 dark:ring-white/5 transition-all"
+                className="bg-white dark:bg-[#090611] rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-[#171025] ring-1 ring-black/5 dark:ring-white/5 transition-all"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="flex items-center justify-between pb-3.5 border-b border-gray-100 dark:border-[#153a54] mb-4">
+                <div className="flex items-center justify-between pb-3.5 border-b border-gray-100 dark:border-[#171025] mb-4">
                     <div className="flex items-center gap-2.5">
-                        <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-[#0c283f] text-blue-600 dark:text-cyan-400 border border-blue-200/60 dark:border-cyan-500/30 shadow-xs">
+                        <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-[#171025] text-blue-600 dark:text-cyan-400 border border-blue-200/60 dark:border-cyan-500/30 shadow-xs">
                             <Copy className="w-5 h-5" />
                         </div>
                         <div>
@@ -152,8 +152,8 @@ export function CopyInstanceModal({ api }: { api: InstanceSelectorApi }) {
                     className={cn(
                         'mb-5 p-3.5 rounded-xl border transition-all flex items-center justify-between gap-3 cursor-pointer',
                         copyProjects
-                            ? 'border-blue-500/70 dark:border-cyan-400/70 bg-blue-50/60 dark:bg-[#0c283f] ring-1 ring-blue-500/20 dark:ring-cyan-400/20 shadow-xs dark:shadow-[0_0_12px_rgba(6,182,212,0.1)]'
-                            : 'border-gray-200 dark:border-[#14344d] bg-gray-50/50 dark:bg-[#061724] hover:border-gray-300 dark:hover:border-[#1e4a6d]'
+                            ? 'border-blue-500/70 dark:border-cyan-400/70 bg-blue-50/60 dark:bg-[#171025] ring-1 ring-blue-500/20 dark:ring-cyan-400/20 shadow-xs dark:shadow-[0_0_12px_rgba(6,182,212,0.1)]'
+                            : 'border-gray-200 dark:border-[#171025] bg-gray-50/50 dark:bg-[#090611] hover:border-gray-300 dark:hover:border-[#40285e]'
                     )}
                 >
                     <div className="min-w-0 pr-2">
@@ -181,11 +181,11 @@ export function CopyInstanceModal({ api }: { api: InstanceSelectorApi }) {
                     </div>
                 </div>
 
-                <div className="flex justify-end items-center gap-2.5 pt-3 border-t border-gray-100 dark:border-[#153a54]">
+                <div className="flex justify-end items-center gap-2.5 pt-3 border-t border-gray-100 dark:border-[#171025]">
                     <button
                         type="button"
                         onClick={() => setIsCopyOpen(false)}
-                        className="px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-[#153a54] hover:bg-gray-100 dark:hover:bg-[#102a40] transition-all duration-200 active:scale-95 cursor-pointer"
+                        className="px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-[#171025] hover:bg-gray-100 dark:hover:bg-[#102a40] transition-all duration-200 active:scale-95 cursor-pointer"
                     >
                         {t('common.cancel', 'Cancel')}
                     </button>

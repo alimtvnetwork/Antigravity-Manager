@@ -45,7 +45,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
 
         <div
             onDoubleClick={() => openInspector(selectedConversation, selectedProject?.repo_path || '')}
-            className="rounded-xl border border-slate-200 dark:border-[#15334d] bg-slate-50 dark:bg-[#071a27] p-5 text-xs text-slate-800 dark:text-slate-200 leading-relaxed max-h-[460px] overflow-y-auto cursor-pointer hover:border-blue-400 dark:hover:border-blue-500/50 transition-colors shadow-inner"
+            className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#090611] p-5 text-xs text-slate-800 dark:text-slate-200 leading-relaxed max-h-[460px] overflow-y-auto cursor-pointer hover:border-blue-400 dark:hover:border-blue-500/50 transition-colors shadow-inner"
         >
             <RichMarkdownRenderer
                 content={displayedMarkdown}
@@ -54,7 +54,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                 isTruncated={isTruncated}
             />
             {(isTruncated || activePromptText.trim().endsWith('...') || activePromptText.trim().endsWith('…') || showAllWords) && (
-                <div className="mt-3 pt-2 border-t border-slate-200/50 dark:border-[#15334d]/50 flex items-center">
+                <div className="mt-3 pt-2 border-t border-slate-200/50 dark:border-[#40285e]/50 flex items-center">
                     <span
                         onClick={(e) => {
                             e.stopPropagation();
@@ -82,7 +82,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                     <button
                         type="button"
                         onClick={() => setShowAllWords(!showAllWords)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-xs font-semibold bg-blue-50 dark:bg-[#0c2438] text-blue-600 dark:text-cyan-300 border border-blue-200 dark:border-[#15334d] hover:bg-blue-100 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-xs font-semibold bg-blue-50 dark:bg-[#171025] text-blue-600 dark:text-cyan-300 border border-blue-200 dark:border-[#40285e] hover:bg-blue-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
                         title={showAllWords ? 'Collapse preview to 120 words' : 'Expand full prompt'}
                     >
                         {showAllWords ? (
@@ -106,7 +106,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                         setIsCopied(true);
                         setTimeout(() => setIsCopied(false), 2000);
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-xs font-semibold bg-slate-100 dark:bg-[#0c2438] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-xs font-semibold bg-slate-100 dark:bg-[#171025] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#40285e] hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
                     title="Copy full prompt text to clipboard"
                 >
                     {isCopied ? (
@@ -129,7 +129,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
 {/* Tab 2: Raw Mode (Monospace Clean Text with Explicit <br /> Line Gaps) */}
 {viewMode === 'raw' && (
     <div className="space-y-3">
-        <div className="rounded-xl border border-slate-200 dark:border-[#15334d] bg-slate-50 dark:bg-[#071a27] p-5 font-mono text-xs text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap break-words max-h-[460px] overflow-y-auto select-text shadow-inner">
+        <div className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#090611] p-5 font-mono text-xs text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap break-words max-h-[460px] overflow-y-auto select-text shadow-inner">
             {activePromptText ? (
                 formatPromptForMarkdown(activePromptText).split('\n').map((line, idx, arr) => (
                     <span key={`raw-line-${idx}`} className="block">
@@ -149,7 +149,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                     setIsCopied(true);
                     setTimeout(() => setIsCopied(false), 2000);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-xs font-semibold bg-slate-100 dark:bg-[#0c2438] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-xs font-semibold bg-slate-100 dark:bg-[#171025] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#40285e] hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
                 title="Copy raw text to clipboard"
             >
                 {isCopied ? (
@@ -180,14 +180,14 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         <textarea
             value={editedPromptText}
             onChange={(e) => setEditedPromptText(e.target.value)}
-            className="w-full h-80 rounded-xl border border-slate-200 dark:border-[#15334d] bg-slate-50 dark:bg-[#071a27] p-4 font-mono text-xs text-slate-900 dark:text-slate-100 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-y"
+            className="w-full h-80 rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#090611] p-4 font-mono text-xs text-slate-900 dark:text-slate-100 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-y"
             placeholder="Type or modify prompt instruction here..."
         />
         <div className="flex items-center justify-between pt-1">
             <button
                 type="button"
                 onClick={() => setEditedPromptText(activePromptText)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] bg-slate-100 dark:bg-[#0c2438] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d] text-xs font-semibold transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] bg-slate-100 dark:bg-[#171025] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#40285e] hover:bg-slate-200 dark:hover:bg-[#40285e] text-xs font-semibold transition-colors cursor-pointer"
                 title="Reset to original text"
             >
                 <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
@@ -200,7 +200,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                     setActionMsg('Prompt changes saved to current session!');
                     setTimeout(() => setActionMsg(null), 2500);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] bg-emerald-50 dark:bg-[#0c2438] text-emerald-700 dark:text-emerald-300 border border-emerald-300/60 dark:border-[#15334d] hover:bg-emerald-100 dark:hover:bg-[#15334d] text-xs font-semibold transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] bg-emerald-50 dark:bg-[#171025] text-emerald-700 dark:text-emerald-300 border border-emerald-300/60 dark:border-[#40285e] hover:bg-emerald-100 dark:hover:bg-[#40285e] text-xs font-semibold transition-colors cursor-pointer"
                 title="Save prompt changes"
             >
                 <Check className="w-3.5 h-3.5 text-emerald-500" />

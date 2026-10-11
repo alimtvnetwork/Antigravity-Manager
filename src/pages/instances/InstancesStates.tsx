@@ -189,11 +189,11 @@ export function InstancesCliHelpCard() {
     };
 
     return (
-        <div className="rounded-xl border border-gray-200/80 dark:border-[#15334d] bg-white/60 dark:bg-[#0c2438]/60 backdrop-blur-md shadow-xs overflow-hidden transition-all duration-200">
+        <div className="rounded-xl border border-gray-200/80 dark:border-[#40285e] bg-white/60 dark:bg-[#171025]/60 backdrop-blur-md shadow-xs overflow-hidden transition-all duration-200">
             <button
                 type="button"
                 onClick={() => setIsExpanded((prev) => !prev)}
-                className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50/50 dark:hover:bg-[#15334d]/30 transition-colors cursor-pointer"
+                className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50/50 dark:hover:bg-[#40285e]/30 transition-colors cursor-pointer"
             >
                 <div className="flex items-center gap-2.5">
                     <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-cyan-400">
@@ -221,12 +221,12 @@ export function InstancesCliHelpCard() {
             </button>
 
             {isExpanded && (
-                <div className="px-4 pb-4 pt-1 border-t border-gray-100 dark:border-[#15334d]/60 space-y-3">
+                <div className="px-4 pb-4 pt-1 border-t border-gray-100 dark:border-[#40285e]/60 space-y-3">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                         {commands.map((c) => (
                             <div
                                 key={c.cmd}
-                                className="flex items-start justify-between gap-2 p-2.5 rounded-lg bg-gray-50 dark:bg-[#071a27] border border-gray-200/70 dark:border-[#15334d]/70 group hover:border-blue-400/50 transition-colors"
+                                className="flex items-start justify-between gap-2 p-2.5 rounded-lg bg-gray-50 dark:bg-[#090611] border border-gray-200/70 dark:border-[#40285e]/70 group hover:border-blue-400/50 transition-colors"
                             >
                                 <div className="space-y-1 min-w-0">
                                     <div className="flex items-center gap-1.5">

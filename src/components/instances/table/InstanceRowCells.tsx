@@ -132,7 +132,7 @@ export function ProfileCell({ inst, data, onToggleEmail, onSetActive, onSetDefau
         <>
             <td className="px-2 py-1 min-w-[140px] max-w-[180px]">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold bg-slate-100 dark:bg-[#071a27] text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-[#15334d]">
+                    <span className="px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold bg-slate-100 dark:bg-[#090611] text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-[#40285e]">
                         #{data.seq}
                     </span>
                     <span className="font-bold text-slate-800 dark:text-slate-100 text-xs truncate max-w-[110px]" title={inst.config.name}>
@@ -263,7 +263,7 @@ export function StatusCell({ inst, data }: { inst: InstanceStatus; data: RowCell
                     Running{inst.pid ? ` · ${inst.pid}` : ''}
                 </span>
             ) : (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100/90 text-slate-600 dark:bg-[#071a27]/90 dark:text-slate-400 border border-slate-200 dark:border-[#15334d] backdrop-blur-xs">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100/90 text-slate-600 dark:bg-[#090611]/90 dark:text-slate-400 border border-slate-200 dark:border-[#40285e] backdrop-blur-xs">
                     Idle
                 </span>
             )}
@@ -290,7 +290,7 @@ export function PathCell({ inst, isCopied, onCopy }: PathCellProps) {
                 <button
                     type="button"
                     onClick={onCopy}
-                    className="p-1 rounded-[5px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer shrink-0"
+                    className="p-1 rounded-[5px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer shrink-0"
                     title={isCopied ? 'Copied!' : 'Copy full path'}
                 >
                     {isCopied ? <Check className="w-3 h-3 text-teal-500" /> : <Copy className="w-3 h-3" />}
@@ -336,7 +336,7 @@ export function ExePathCell({ inst }: { inst: InstanceInfo }) {
                 <button
                     type="button"
                     onClick={handleCopy}
-                    className="p-1 rounded-[5px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer shrink-0"
+                    className="p-1 rounded-[5px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer shrink-0"
                     title={isCopied ? 'Copied!' : 'Copy executable path'}
                 >
                     {isCopied ? <Check className="w-3 h-3 text-teal-500" /> : <Copy className="w-3 h-3" />}

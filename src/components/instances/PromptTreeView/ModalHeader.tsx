@@ -55,7 +55,7 @@ export function ModalHeader(props: ModalHeaderProps) {
     } = props;
 
     return (
-        <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-[#15334d] px-4 py-2.5 bg-slate-50/80 dark:bg-[#071a27] shrink-0">
+        <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-[#40285e] px-4 py-2.5 bg-slate-50/80 dark:bg-[#090611] shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
                 <div className="flex h-8 w-8 items-center justify-center rounded-[5px] bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20 shrink-0">
                     <Layers className="h-4 w-4" />
@@ -66,7 +66,7 @@ export function ModalHeader(props: ModalHeaderProps) {
                             Project & Prompt Tree View
                         </h2>
                         {sequenceNumber != null && sequenceNumber > 0 && (
-                            <span className="shrink-0 rounded-[5px] bg-slate-100 dark:bg-[#0c2438] px-1.5 py-0.5 text-[10px] font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#15334d]">
+                            <span className="shrink-0 rounded-[5px] bg-slate-100 dark:bg-[#171025] px-1.5 py-0.5 text-[10px] font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#40285e]">
                                 #{sequenceNumber}
                             </span>
                         )}
@@ -77,7 +77,7 @@ export function ModalHeader(props: ModalHeaderProps) {
                             const trailing = executablePath.replace(/^.*[\\/]/, '');
                             return (
                                 <span
-                                    className="hidden sm:inline-block shrink-0 rounded-[5px] bg-slate-100 dark:bg-[#0c2438] px-1.5 py-0.5 text-[10px] font-mono text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-[#15334d] max-w-[150px] truncate"
+                                    className="hidden sm:inline-block shrink-0 rounded-[5px] bg-slate-100 dark:bg-[#171025] px-1.5 py-0.5 text-[10px] font-mono text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-[#40285e] max-w-[150px] truncate"
                                     title={executablePath}
                                 >
                                     ...\{trailing}
@@ -91,12 +91,12 @@ export function ModalHeader(props: ModalHeaderProps) {
             {/* Top Right Header Controls: Two Independent Segmented Dark-Glass Capsules */}
             <div className="flex items-center gap-1.5 shrink-0">
                 {/* Capsule 1: Data Operations Capsule */}
-                <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#15334d]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#15334d]/80 shadow-2xs">
+                <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#40285e]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#40285e]/80 shadow-2xs">
                     {/* Backup Button */}
                     <button
                         type="button"
                         onClick={onBackup}
-                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d]/90 rounded-l-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 rounded-l-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                         title="Backup Prompts to JSON"
                     >
                         <Download className="w-3.5 h-3.5 text-indigo-500" />
@@ -107,7 +107,7 @@ export function ModalHeader(props: ModalHeaderProps) {
                     <button
                         type="button"
                         onClick={onRestore}
-                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d]/90 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                         title="Restore Prompts from JSON backup file"
                     >
                         <Upload className="w-3.5 h-3.5 text-emerald-500" />
@@ -119,7 +119,7 @@ export function ModalHeader(props: ModalHeaderProps) {
                         type="button"
                         onClick={onRefreshAll}
                         disabled={isLoading}
-                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d]/90 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
                         title="Refresh all projects"
                     >
                         <RefreshCw className={cn("w-3.5 h-3.5 text-blue-500", isLoading && "animate-spin")} />
@@ -156,12 +156,12 @@ export function ModalHeader(props: ModalHeaderProps) {
                 </div>
 
                 {/* Capsule 2: Window Controls Capsule */}
-                <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#15334d]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#15334d]/80 shadow-2xs">
+                <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#40285e]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#40285e]/80 shadow-2xs">
                     {/* Fullscreen Toggle */}
                     <button
                         type="button"
                         onClick={() => setIsFullscreen(!isFullscreen)}
-                        className="p-1.5 rounded-l-full text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d]/90 transition-colors cursor-pointer"
+                        className="p-1.5 rounded-l-full text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-colors cursor-pointer"
                         title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
                     >
                         {isFullscreen ? (

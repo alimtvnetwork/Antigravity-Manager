@@ -12,7 +12,7 @@ export function EditInstanceModal({ api }: { api: InstanceSelectorApi }) {
             onClick={() => setIsEditOpen(false)}
         >
             <div
-                className="bg-white dark:bg-[#0c2438] rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-[#15334d]"
+                className="bg-white dark:bg-[#171025] rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-[#40285e]"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between mb-3">
@@ -25,7 +25,7 @@ export function EditInstanceModal({ api }: { api: InstanceSelectorApi }) {
                     <button
                         type="button"
                         onClick={() => setIsEditOpen(false)}
-                        className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                        className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
                         title={t('common.close', 'Close')}
                     >
                         <X className="w-4 h-4" />
@@ -37,7 +37,7 @@ export function EditInstanceModal({ api }: { api: InstanceSelectorApi }) {
                     value={editInstanceName}
                     onChange={(e) => setEditInstanceName(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleEdit()}
-                    className="input input-sm w-full bg-gray-50 dark:bg-[#071a27] border border-gray-200 dark:border-[#15334d] text-gray-900 dark:text-slate-100 rounded-lg mb-4 text-xs"
+                    className="input input-sm w-full bg-gray-50 dark:bg-[#090611] border border-gray-200 dark:border-[#40285e] text-gray-900 dark:text-slate-100 rounded-lg mb-4 text-xs"
                     autoFocus
                 />
                 <div className="flex justify-end gap-2">
@@ -73,7 +73,7 @@ export function DeleteInstanceModal({ api }: { api: InstanceSelectorApi }) {
             onClick={closeDelete}
         >
             <div
-                className="bg-white dark:bg-[#0c2438] rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-[#15334d]"
+                className="bg-white dark:bg-[#171025] rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-[#40285e]"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between mb-3 text-red-600">
@@ -86,7 +86,7 @@ export function DeleteInstanceModal({ api }: { api: InstanceSelectorApi }) {
                     <button
                         type="button"
                         onClick={closeDelete}
-                        className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                        className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
                         title={t('common.close', 'Close')}
                     >
                         <X className="w-4 h-4" />

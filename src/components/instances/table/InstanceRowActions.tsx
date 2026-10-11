@@ -45,7 +45,7 @@ export function ActionsCell({
 }: ActionsCellProps) {
     return (
         <td className="px-2 py-1 text-right whitespace-nowrap w-[130px]">
-            <div className="inline-flex items-center rounded-[5px] overflow-hidden bg-slate-100 dark:bg-[#071a27] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+            <div className="inline-flex items-center rounded-[5px] overflow-hidden bg-slate-100 dark:bg-[#090611] border border-slate-200/80 dark:border-[#40285e] p-0.5 divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs">
                 {inst.is_running ? (
                     <div className="inline-flex items-center rounded-l-[5px] overflow-hidden">
                         <button
@@ -81,7 +81,7 @@ export function ActionsCell({
                         type="button"
                         disabled={isBusy}
                         onClick={onLaunch}
-                        className="px-2 py-1 text-teal-600 dark:text-teal-400 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-l-[5px] transition-colors cursor-pointer disabled:opacity-50"
+                        className="px-2 py-1 text-teal-600 dark:text-teal-400 hover:bg-slate-200 dark:hover:bg-[#40285e] rounded-l-[5px] transition-colors cursor-pointer disabled:opacity-50"
                         title="Launch Instance"
                     >
                         {currentAction === 'launch' ? (
@@ -96,7 +96,7 @@ export function ActionsCell({
                     type="button"
                     disabled={isBusy}
                     onClick={onSwitch}
-                    className="px-2 py-1 text-sky-600 dark:text-sky-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50"
+                    className="px-2 py-1 text-sky-600 dark:text-sky-400 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50"
                     title="Switch Account"
                 >
                     {currentAction === 'switch' ? (
@@ -110,7 +110,7 @@ export function ActionsCell({
                     type="button"
                     disabled={isBusy}
                     onClick={onFastForward}
-                    className="px-2 py-1 text-amber-600 dark:text-amber-400 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer disabled:opacity-50"
+                    className="px-2 py-1 text-amber-600 dark:text-amber-400 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50"
                     title="Fast Forward to Best Candidate"
                 >
                     {currentAction === 'fast-forward' ? (
@@ -128,8 +128,8 @@ export function ActionsCell({
                         onToggleMore(e.currentTarget);
                     }}
                     className={cn(
-                        'px-2 py-1 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-r-[5px] transition-colors cursor-pointer',
-                        isMoreOpen && 'bg-slate-200 dark:bg-[#15334d]'
+                        'px-2 py-1 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#40285e] rounded-r-[5px] transition-colors cursor-pointer',
+                        isMoreOpen && 'bg-slate-200 dark:bg-[#40285e]'
                     )}
                     title="More Actions (Prompts, Audit, Sync, Settings, Clone, Delete)"
                 >
@@ -169,12 +169,12 @@ export function MoreMenuPortal({
 }: MoreMenuPortalProps) {
     const isDefault = inst.config.is_default || inst.config.id === 'default';
     const itemClass =
-        'flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#15334d] cursor-pointer';
+        'flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#40285e] cursor-pointer';
 
     return createPortal(
         <div
             ref={menuRef}
-            className="fixed z-[10000] min-w-[180px] rounded-[5px] border border-slate-200 dark:border-[#15334d] bg-white dark:bg-[#0c2438] py-1 text-slate-800 dark:text-slate-200 shadow-xl text-xs"
+            className="fixed z-[10000] min-w-[180px] rounded-[5px] border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025] py-1 text-slate-800 dark:text-slate-200 shadow-xl text-xs"
             style={{ top: menuPos.top, left: menuPos.left, transform: 'translateX(-100%)' }}
             onClick={(e) => e.stopPropagation()}
         >

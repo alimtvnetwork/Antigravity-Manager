@@ -98,7 +98,7 @@ export function ResultsView(props: ResultsViewProps) {
                     <button
                         type="button"
                         onClick={handleCopyResults}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-[#0c2438] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#15334d] hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-[#171025] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#40285e] hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
                         title="Copy AI execution results to clipboard"
                     >
                         {isCopiedResults ? (
@@ -117,8 +117,8 @@ export function ResultsView(props: ResultsViewProps) {
 
                 {/* 1. Assistant Text Response */}
                 {selectedConversation.latest_response && (
-                    <div className="rounded-xl border border-slate-200 dark:border-[#15334d] bg-slate-50 dark:bg-[#071a27] p-5 text-xs text-slate-800 dark:text-slate-200 leading-relaxed max-h-[460px] overflow-y-auto shadow-inner">
-                        <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-slate-200/60 dark:border-[#15334d]/60 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
+                    <div className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#090611] p-5 text-xs text-slate-800 dark:text-slate-200 leading-relaxed max-h-[460px] overflow-y-auto shadow-inner">
+                        <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-slate-200/60 dark:border-[#40285e]/60 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
                             <Sparkles className="w-3.5 h-3.5" />
                             <span>AI Assistant Response</span>
                         </div>
@@ -133,7 +133,7 @@ export function ResultsView(props: ResultsViewProps) {
 
                 {/* 2. Tool & Terminal Execution Details */}
                 {selectedConversation.execution_results && (
-                    <div className="rounded-xl border border-slate-200 dark:border-[#15334d] bg-slate-900 text-slate-100 p-4 font-mono text-[11px] leading-relaxed max-h-[300px] overflow-y-auto select-text shadow-inner">
+                    <div className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-900 text-slate-100 p-4 font-mono text-[11px] leading-relaxed max-h-[300px] overflow-y-auto select-text shadow-inner">
                         <div className="flex items-center gap-1.5 mb-2 pb-1 border-b border-slate-800 text-cyan-400 font-semibold text-[10px]">
                             <Terminal className="w-3 h-3" />
                             <span>Execution & Tool Details</span>
@@ -175,7 +175,7 @@ export function ResultsView(props: ResultsViewProps) {
                 </button>
             </div>
         ) : (
-            <div className="rounded-xl border border-dashed border-slate-200 dark:border-[#15334d] p-8 flex flex-col items-center justify-center text-center space-y-2 text-slate-400">
+            <div className="rounded-xl border border-dashed border-slate-200 dark:border-[#40285e] p-8 flex flex-col items-center justify-center text-center space-y-2 text-slate-400">
                 <Terminal className="w-8 h-8 text-slate-400/80 mb-1" />
                 <span className="font-semibold text-slate-600 dark:text-slate-300 text-xs">
                     No execution results recorded yet

@@ -42,7 +42,7 @@ export default function Audit() {
     } = useAuditData();
 
     return (
-        <div className="h-full overflow-auto bg-white dark:bg-[#0c2438] px-4 sm:px-6 pt-3 pb-6 max-w-[1400px] mx-auto w-full text-slate-950 dark:text-base-content">
+        <div className="h-full overflow-auto bg-white dark:bg-[#171025] px-4 sm:px-6 pt-3 pb-6 max-w-[1400px] mx-auto w-full text-slate-950 dark:text-base-content">
             <div className="mb-3">
                 <h1 className="text-lg font-semibold text-gray-900 dark:text-base-content">Audit Log & History</h1>
                 <p className="text-xs text-slate-600 dark:text-slate-400">
@@ -58,13 +58,13 @@ export default function Audit() {
 
         {/* Filter Tabs / Chips */}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="inline-flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-[#071a27] border border-slate-200 dark:border-[#15334d]">
+            <div className="inline-flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-[#090611] border border-slate-200 dark:border-[#40285e]">
                 <button
                     type="button"
                     onClick={() => setFilter('all')}
                     className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                         filter === 'all'
-                            ? 'bg-white dark:bg-[#15334d] text-slate-900 dark:text-white shadow-sm border border-slate-200/80 dark:border-cyan-500/40'
+                            ? 'bg-white dark:bg-[#40285e] text-slate-900 dark:text-white shadow-sm border border-slate-200/80 dark:border-cyan-500/40'
                             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                     }`}
                 >
@@ -73,7 +73,7 @@ export default function Audit() {
                         <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-semibold ${
                             filter === 'all'
                                 ? 'bg-slate-100 text-slate-700 dark:bg-cyan-950/80 dark:text-cyan-300'
-                                : 'bg-slate-200/80 text-slate-600 dark:bg-[#0c2438] dark:text-slate-400'
+                                : 'bg-slate-200/80 text-slate-600 dark:bg-[#171025] dark:text-slate-400'
                         }`}>
                             {filterCounts.all}
                         </span>
@@ -85,7 +85,7 @@ export default function Audit() {
                     onClick={() => setFilter('switch')}
                     className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                         filter === 'switch'
-                            ? 'bg-white dark:bg-[#15334d] text-slate-900 dark:text-white shadow-sm border border-slate-200/80 dark:border-amber-500/40'
+                            ? 'bg-white dark:bg-[#40285e] text-slate-900 dark:text-white shadow-sm border border-slate-200/80 dark:border-amber-500/40'
                             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                     }`}
                 >
@@ -94,7 +94,7 @@ export default function Audit() {
                         <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-semibold ${
                             filter === 'switch'
                                 ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300'
-                                : 'bg-slate-200/80 text-slate-600 dark:bg-[#0c2438] dark:text-slate-400'
+                                : 'bg-slate-200/80 text-slate-600 dark:bg-[#171025] dark:text-slate-400'
                         }`}>
                             {filterCounts.switch}
                         </span>
@@ -106,7 +106,7 @@ export default function Audit() {
                     onClick={() => setFilter('scheduler')}
                     className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                         filter === 'scheduler'
-                            ? 'bg-white dark:bg-[#15334d] text-slate-900 dark:text-white shadow-sm border border-slate-200/80 dark:border-purple-500/40'
+                            ? 'bg-white dark:bg-[#40285e] text-slate-900 dark:text-white shadow-sm border border-slate-200/80 dark:border-purple-500/40'
                             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                     }`}
                 >
@@ -115,7 +115,7 @@ export default function Audit() {
                         <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-semibold ${
                             filter === 'scheduler'
                                 ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/80 dark:text-purple-300'
-                                : 'bg-slate-200/80 text-slate-600 dark:bg-[#0c2438] dark:text-slate-400'
+                                : 'bg-slate-200/80 text-slate-600 dark:bg-[#171025] dark:text-slate-400'
                         }`}>
                             {filterCounts.scheduler}
                         </span>
@@ -163,7 +163,7 @@ export default function Audit() {
                     <select
                         value={pageSize}
                         onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                        className="h-7 px-2 py-0.5 rounded-lg border border-slate-300 dark:border-[#15334d] bg-white dark:bg-[#0c2438] text-slate-900 dark:text-gray-100 font-medium cursor-pointer"
+                        className="h-7 px-2 py-0.5 rounded-lg border border-slate-300 dark:border-[#40285e] bg-white dark:bg-[#171025] text-slate-900 dark:text-gray-100 font-medium cursor-pointer"
                     >
                         <option value={100}>100</option>
                         <option value={200}>200</option>
@@ -173,7 +173,7 @@ export default function Audit() {
             <div className="flex gap-2">
                 <button
                     type="button"
-                    className="rounded-lg border border-slate-300 dark:border-[#15334d] bg-white dark:bg-[#0c2438] px-3 py-1 text-slate-950 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-[#15334d] disabled:opacity-40 cursor-pointer"
+                    className="rounded-lg border border-slate-300 dark:border-[#40285e] bg-white dark:bg-[#171025] px-3 py-1 text-slate-950 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-[#40285e] disabled:opacity-40 cursor-pointer"
                     disabled={page <= 0}
                     onClick={() => setPage((current) => Math.max(0, current - 1))}
                 >
@@ -181,7 +181,7 @@ export default function Audit() {
                 </button>
                 <button
                     type="button"
-                    className="rounded-lg border border-slate-300 dark:border-[#15334d] bg-white dark:bg-[#0c2438] px-3 py-1 text-slate-950 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-[#15334d] disabled:opacity-40 cursor-pointer"
+                    className="rounded-lg border border-slate-300 dark:border-[#40285e] bg-white dark:bg-[#171025] px-3 py-1 text-slate-950 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-[#40285e] disabled:opacity-40 cursor-pointer"
                     disabled={page + 1 >= pageCount}
                     onClick={() => setPage((current) => current + 1)}
                 >

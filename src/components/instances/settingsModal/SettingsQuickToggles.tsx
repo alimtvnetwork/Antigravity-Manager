@@ -15,7 +15,7 @@ export function SettingsQuickToggles({ api }: { api: InstanceSettingsApi }) {
             </span>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Turbo Mode Card */}
-                <div className="p-3.5 rounded-xl border border-gray-200 dark:border-[#15334d] bg-gray-50/60 dark:bg-[#071a27]/60 flex flex-col justify-between space-y-2.5">
+                <div className="p-3.5 rounded-xl border border-gray-200 dark:border-[#40285e] bg-gray-50/60 dark:bg-[#090611]/60 flex flex-col justify-between space-y-2.5">
                     <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-2">
                             <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 shrink-0">
@@ -38,7 +38,7 @@ export function SettingsQuickToggles({ api }: { api: InstanceSettingsApi }) {
                         </span>
                     </div>
 
-                    <div className="flex items-center rounded-lg bg-gray-100 dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] p-0.5 divide-x divide-gray-200 dark:divide-[#15334d] shadow-2xs">
+                    <div className="flex items-center rounded-lg bg-gray-100 dark:bg-[#171025] border border-gray-200 dark:border-[#40285e] p-0.5 divide-x divide-gray-200 dark:divide-[#40285e] shadow-2xs">
                         <button
                             type="button"
                             disabled={isOperating}
@@ -48,7 +48,7 @@ export function SettingsQuickToggles({ api }: { api: InstanceSettingsApi }) {
                                 'flex-1 py-1 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5',
                                 isTurboMode
                                     ? 'bg-amber-600 text-white shadow-xs'
-                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#15334d]'
+                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#40285e]'
                             )}
                         >
                             <Zap className="w-3.5 h-3.5 fill-current" />
@@ -58,7 +58,7 @@ export function SettingsQuickToggles({ api }: { api: InstanceSettingsApi }) {
                             type="button"
                             disabled={isOperating}
                             onClick={() => handleSetTurboMode(true)}
-                            className="py-1 px-2.5 text-xs font-medium text-blue-600 dark:text-cyan-400 hover:bg-gray-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer shrink-0 flex items-center gap-1"
+                            className="py-1 px-2.5 text-xs font-medium text-blue-600 dark:text-cyan-400 hover:bg-gray-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer shrink-0 flex items-center gap-1"
                             title="Apply this Auto-Confirm state across all instances"
                         >
                             <Sliders className="w-3 h-3" />
@@ -68,7 +68,7 @@ export function SettingsQuickToggles({ api }: { api: InstanceSettingsApi }) {
                 </div>
 
                 {/* Plan Review Card */}
-                <div className="p-3.5 rounded-xl border border-gray-200 dark:border-[#15334d] bg-gray-50/60 dark:bg-[#071a27]/60 flex flex-col justify-between space-y-2.5">
+                <div className="p-3.5 rounded-xl border border-gray-200 dark:border-[#40285e] bg-gray-50/60 dark:bg-[#090611]/60 flex flex-col justify-between space-y-2.5">
                     <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-2">
                             <div className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 shrink-0">
@@ -91,7 +91,7 @@ export function SettingsQuickToggles({ api }: { api: InstanceSettingsApi }) {
                         </span>
                     </div>
 
-                    <div className="flex items-center rounded-lg bg-gray-100 dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] p-0.5 divide-x divide-gray-200 dark:divide-[#15334d] shadow-2xs">
+                    <div className="flex items-center rounded-lg bg-gray-100 dark:bg-[#171025] border border-gray-200 dark:border-[#40285e] p-0.5 divide-x divide-gray-200 dark:divide-[#40285e] shadow-2xs">
                         <button
                             type="button"
                             disabled={isOperating}
@@ -109,7 +109,7 @@ export function SettingsQuickToggles({ api }: { api: InstanceSettingsApi }) {
                             type="button"
                             disabled={isOperating}
                             onClick={() => handleSetPlanReview(true, isAlwaysProceed)}
-                            className="py-1 px-2.5 text-xs font-medium text-blue-600 dark:text-cyan-400 hover:bg-gray-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer shrink-0 flex items-center gap-1"
+                            className="py-1 px-2.5 text-xs font-medium text-blue-600 dark:text-cyan-400 hover:bg-gray-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer shrink-0 flex items-center gap-1"
                             title="Apply current Plan Review setting across all instances"
                         >
                             <Sliders className="w-3 h-3" />
@@ -120,7 +120,7 @@ export function SettingsQuickToggles({ api }: { api: InstanceSettingsApi }) {
             </div>
 
             {/* Enforce Baseline Defaults Action */}
-            <div className="mt-3 p-3 rounded-xl border border-gray-200 dark:border-[#15334d] bg-gray-50/40 dark:bg-[#071a27]/40 flex items-center justify-between gap-3 flex-wrap">
+            <div className="mt-3 p-3 rounded-xl border border-gray-200 dark:border-[#40285e] bg-gray-50/40 dark:bg-[#090611]/40 flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-indigo-500 shrink-0" />
                     <div>
@@ -132,13 +132,13 @@ export function SettingsQuickToggles({ api }: { api: InstanceSettingsApi }) {
                         </div>
                     </div>
                 </div>
-                <div className="flex items-center rounded-lg bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] p-0.5 divide-x divide-gray-200 dark:divide-[#15334d] shadow-2xs shrink-0">
+                <div className="flex items-center rounded-lg bg-white dark:bg-[#171025] border border-gray-200 dark:border-[#40285e] p-0.5 divide-x divide-gray-200 dark:divide-[#40285e] shadow-2xs shrink-0">
                     <button
                         type="button"
                         disabled={isOperating}
                         onClick={() => handleEnforceDefaults(false)}
                         title="Enforce baseline settings onto target profile"
-                        className="px-2.5 py-1 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#15334d] rounded-l-md transition-colors cursor-pointer flex items-center gap-1"
+                        className="px-2.5 py-1 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#40285e] rounded-l-md transition-colors cursor-pointer flex items-center gap-1"
                     >
                         <Sparkles className="w-3 h-3 text-indigo-500" />
                         <span>Enforce Target</span>

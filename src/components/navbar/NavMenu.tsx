@@ -102,7 +102,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
     };
 
     return (
-        <div className="flex items-center rounded-full bg-gray-100 dark:bg-[#0c2438] border border-gray-200/60 dark:border-[#15334d] p-0.5 shadow-xs divide-x divide-gray-200/70 dark:divide-[#15334d]/70">
+        <div className="flex items-center rounded-full bg-gray-100 dark:bg-[#171025] border border-gray-200/60 dark:border-[#40285e] p-0.5 shadow-xs divide-x divide-gray-200/70 dark:divide-[#40285e]/70">
             {/* 1. Accounts direct button (Icon-only with tooltip) */}
             {accountsItem && (
                 <div className="relative group">
@@ -114,7 +114,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
                             segRounding(accountsItem),
                             isAccountsActive
                                 ? "bg-blue-600 text-white shadow-xs"
-                                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#15334d]"
+                                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#40285e]"
                         )}
                         aria-label="Accounts (Profile Vault)"
                         title="Accounts (Profile Vault)"
@@ -138,7 +138,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
                             segRounding(instancesItem),
                             isInstancesActive
                                 ? "bg-blue-600 text-white shadow-xs"
-                                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#15334d]"
+                                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#40285e]"
                         )}
                         aria-label="Instances (Engine Runner)"
                         title="Instances (Engine Runner)"
@@ -161,7 +161,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
                         segRounding(settingsItem),
                         isSettingsActive
                             ? "bg-blue-600 text-white shadow-xs"
-                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#15334d]"
+                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#40285e]"
                     )}
                     title={settingsItem.label}
                 >
@@ -185,7 +185,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
                         "w-7 h-7 rounded-full flex items-center justify-center transition-all duration-150 cursor-pointer ml-0.5",
                         isDropdownRouteActive || isMenuOpen
                             ? "bg-blue-600 text-white shadow-xs"
-                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#15334d]"
+                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#40285e]"
                     )}
                     title={activeDropdownItem ? `${activeDropdownItem.label} (More)` : t('common.menu', 'More Views')}
                     aria-label="More Navigation"

@@ -82,9 +82,9 @@ export default function InstanceAuditTrailModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 sm:p-6 animate-in fade-in duration-200">
-            <div className="flex h-[90vh] max-h-[860px] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 dark:border-[#15334d] bg-white dark:bg-[#0c2438] shadow-2xl">
+            <div className="flex h-[90vh] max-h-[860px] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025] shadow-2xl">
                 {/* Header */}
-                <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-[#15334d] px-6 py-4 bg-slate-50/80 dark:bg-[#071a27]">
+                <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-[#40285e] px-6 py-4 bg-slate-50/80 dark:bg-[#090611]">
                     <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shadow-2xs">
                             <History className="h-5 w-5 text-amber-500" />
@@ -112,12 +112,12 @@ export default function InstanceAuditTrailModal({
 
                     {/* Header Action Capsule */}
                     <div className="flex items-center gap-2">
-                        <div className="flex items-center rounded-full bg-slate-100 dark:bg-[#0c2438] border border-slate-200 dark:border-[#15334d] p-0.5 shadow-2xs">
+                        <div className="flex items-center rounded-full bg-slate-100 dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] p-0.5 shadow-2xs">
                             <button
                                 type="button"
                                 onClick={loadAuditHistory}
                                 disabled={isLoading}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] rounded-full transition-colors cursor-pointer"
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] rounded-full transition-colors cursor-pointer"
                                 title="Refresh Switch History"
                             >
                                 <RotateCw className={cn("w-3.5 h-3.5 text-amber-500", isLoading && "animate-spin")} />
@@ -128,7 +128,7 @@ export default function InstanceAuditTrailModal({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                            className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
                             title="Close modal"
                         >
                             <X className="w-5 h-5" />
@@ -159,7 +159,7 @@ export default function InstanceAuditTrailModal({
                         </div>
                     ) : !history?.recent_switches || history.recent_switches.length === 0 ? (
                         /* Clean Empty State */
-                        <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-2xl border border-dashed border-slate-200 dark:border-[#15334d] bg-white/60 dark:bg-[#0c2438]/60">
+                        <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-2xl border border-dashed border-slate-200 dark:border-[#40285e] bg-white/60 dark:bg-[#171025]/60">
                             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 mb-3">
                                 <History className="w-6 h-6" />
                             </div>
@@ -169,7 +169,7 @@ export default function InstanceAuditTrailModal({
                             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mb-4 leading-relaxed">
                                 This instance has not undergone any automated or manual account switch cycles yet. When rotation or quota fallback occurs, the full 4-step backup and verification trail will be logged here.
                             </p>
-                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-[#071a27] text-slate-600 dark:text-slate-400 text-xs border border-slate-200 dark:border-[#15334d]">
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-[#090611] text-slate-600 dark:text-slate-400 text-xs border border-slate-200 dark:border-[#40285e]">
                                 <Info className="w-3.5 h-3.5 text-blue-500" />
                                 <span>Monitors: Prompts Backup • Reset • Restore • Worker PIDs</span>
                             </div>
@@ -201,7 +201,7 @@ export default function InstanceAuditTrailModal({
                 </div>
 
                 {/* Footer */}
-                <div className="border-t border-slate-200/80 dark:border-[#15334d] px-6 py-3.5 bg-slate-50/80 dark:bg-[#071a27] flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                <div className="border-t border-slate-200/80 dark:border-[#40285e] px-6 py-3.5 bg-slate-50/80 dark:bg-[#090611] flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                     <span className="flex items-center gap-1.5">
                         <History className="w-3.5 h-3.5 text-amber-500" />
                         <span>All account rotation cycles, process restarts, and PID verifications are audited.</span>
@@ -209,7 +209,7 @@ export default function InstanceAuditTrailModal({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="px-4 py-1.5 rounded-full bg-slate-200 hover:bg-slate-300 dark:bg-[#15334d] dark:hover:bg-[#1d4366] text-slate-700 dark:text-slate-200 font-semibold transition-colors cursor-pointer"
+                        className="px-4 py-1.5 rounded-full bg-slate-200 hover:bg-slate-300 dark:bg-[#40285e] dark:hover:bg-[#1d4366] text-slate-700 dark:text-slate-200 font-semibold transition-colors cursor-pointer"
                     >
                         Close
                     </button>

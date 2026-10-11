@@ -122,7 +122,7 @@ function ConversationListWithGrouping({
                                             "relative flex items-center justify-between rounded-[5px] px-2 py-1 text-xs cursor-pointer transition-colors group",
                                             isSubSelected
                                                 ? "bg-purple-600 text-white font-medium shadow-2xs"
-                                                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#0c2438]"
+                                                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#171025]"
                                         )}
                                         title={`AI Subagent Task · ${subNode.primaryNode.title || 'Subagent'} · ${subNode.primaryNode.step_count || 1} steps · Click to view`}
                                     >
@@ -141,7 +141,7 @@ function ConversationListWithGrouping({
                                                     'text-[9px] font-mono px-1 py-0.2 rounded-[3px] shrink-0 font-medium whitespace-nowrap',
                                                     isSubSelected
                                                         ? 'bg-purple-700 text-white'
-                                                        : 'bg-slate-200/90 dark:bg-[#15334d] text-slate-600 dark:text-cyan-300'
+                                                        : 'bg-slate-200/90 dark:bg-[#40285e] text-slate-600 dark:text-cyan-300'
                                                 )}
                                                 title={subNode.primaryNode.short_id ? `GitMap SHA: ${subNode.primaryNode.short_id}` : (subNode.primaryNode.gitmap_seq_code ? `GitMap: ${subNode.primaryNode.gitmap_seq_code}` : undefined)}
                                             >
@@ -268,7 +268,7 @@ export function ProjectNode(props: ProjectNodeProps) {
                     'group flex items-center justify-between rounded-[5px] px-2.5 py-1.5 text-xs font-semibold cursor-pointer transition-colors',
                     isSelected
                         ? 'bg-blue-100/70 text-blue-900 dark:bg-blue-950/60 dark:text-cyan-300'
-                        : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#0c2438]'
+                        : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#171025]'
                 )}
                 title={`Project: ${project.repo_name} · ${totalProjectPrompts} prompts total`}
             >
@@ -284,7 +284,7 @@ export function ProjectNode(props: ProjectNodeProps) {
                             'text-[9px] font-mono px-1 py-0.2 rounded-[3px] shrink-0 font-medium whitespace-nowrap',
                             isSelected
                                 ? 'bg-blue-600/20 text-blue-700 dark:text-cyan-300 border border-blue-500/30'
-                                : 'bg-slate-200 dark:bg-[#15334d] text-slate-600 dark:text-cyan-400'
+                                : 'bg-slate-200 dark:bg-[#40285e] text-slate-600 dark:text-cyan-400'
                         )}
                         title={project.gitmap_seq_code || (project.seq_id ? `Project #${project.seq_id}` : undefined)}
                     >
@@ -323,7 +323,7 @@ export function ProjectNode(props: ProjectNodeProps) {
                             type="button"
                             onClick={(e) => onRefresh(project.project_id, e)}
                             disabled={isRefreshing}
-                            className="p-1 rounded-[5px] text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                            className="p-1 rounded-[5px] text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
                             title="Refresh this project"
                         >
                             <RotateCw className={cn("w-3 h-3", isRefreshing && "animate-spin text-blue-500")} />
@@ -335,7 +335,7 @@ export function ProjectNode(props: ProjectNodeProps) {
                                 "p-1 rounded-[5px] transition-colors cursor-pointer",
                                 isPinned
                                     ? "text-amber-500 bg-amber-50 dark:bg-amber-950/40"
-                                    : "text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#15334d]"
+                                    : "text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#40285e]"
                             )}
                             title={isPinned ? "Unpin project" : "Pin project to top"}
                         >
@@ -348,7 +348,7 @@ export function ProjectNode(props: ProjectNodeProps) {
                                 "p-1 rounded-[5px] transition-colors cursor-pointer",
                                 isArchived
                                     ? "text-rose-500 bg-rose-50 dark:bg-rose-950/40"
-                                    : "text-slate-400 hover:text-rose-500 hover:bg-slate-200 dark:hover:bg-[#15334d]"
+                                    : "text-slate-400 hover:text-rose-500 hover:bg-slate-200 dark:hover:bg-[#40285e]"
                             )}
                             title={isArchived ? "Unarchive project" : "Archive / Less Favorite (Thumbs Down)"}
                         >
@@ -364,16 +364,16 @@ export function ProjectNode(props: ProjectNodeProps) {
 
             {/* Layer 2: Conversations List */}
             {isExpanded && (
-                <div className="ml-4 pl-2 border-l border-slate-200 dark:border-[#15334d]/60 space-y-0.5 py-0.5">
+                <div className="ml-4 pl-2 border-l border-slate-200 dark:border-[#40285e]/60 space-y-0.5 py-0.5">
                     {/* Active Conversations */}
                     <ConversationListWithGrouping convList={activeConversations} {...listProps} />
 
                     {/* Collapsible Stale / Empty Prompts Node */}
                     {staleConversations.length > 0 && (
-                        <div className="space-y-0.5 mt-1 pt-1 border-t border-slate-200/50 dark:border-[#15334d]/40">
+                        <div className="space-y-0.5 mt-1 pt-1 border-t border-slate-200/50 dark:border-[#40285e]/40">
                             <div
                                 onClick={() => onToggleStaleGroup(project.project_id)}
-                                className="group flex items-center justify-between rounded-[5px] px-2 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#0c2438] cursor-pointer transition-colors"
+                                className="group flex items-center justify-between rounded-[5px] px-2 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#171025] cursor-pointer transition-colors"
                                 title="Toggle Archived / Stale Prompts"
                             >
                                 <div className="flex items-center gap-1.5 min-w-0">
@@ -393,7 +393,7 @@ export function ProjectNode(props: ProjectNodeProps) {
                             </div>
 
                             {isStaleGroupExpanded && (
-                                <div className="ml-4 pl-2 border-l border-dashed border-slate-200 dark:border-[#15334d]/60 space-y-0.5 py-0.5">
+                                <div className="ml-4 pl-2 border-l border-dashed border-slate-200 dark:border-[#40285e]/60 space-y-0.5 py-0.5">
                                     <ConversationListWithGrouping convList={staleConversations} {...listProps} />
                                 </div>
                             )}
