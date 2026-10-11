@@ -5,7 +5,11 @@ use super::*;
 
 /// Normalize version string: e.g., "4.162" or "v4.162" -> "4.162.0".
 pub fn normalize_version_string(raw: &str) -> String {
-    let clean = raw.trim().trim_start_matches(['v', 'V']).trim();
+    let clean = raw
+        .trim()
+        .trim_matches(['\'', '"'])
+        .trim_start_matches(['v', 'V'])
+        .trim();
     let base = clean.split('-').next().unwrap_or(clean);
     let parts: Vec<&str> = base.split('.').collect();
     if parts.len() == 2
@@ -36,6 +40,15 @@ pub fn unwrap_sandbox_path(raw_path: &str) -> String {
             return prefix.to_string();
         }
     }
+    let alt_marker = ".antigravity_tools\\instances\\";
+    if let Some(idx) = lower.find(alt_marker) {
+        if idx > 0 {
+            let prefix = raw_path[..idx].trim_end_matches(['\\', '/']);
+            if !prefix.is_empty() {
+                return prefix.to_string();
+            }
+        }
+    }
     raw_path.to_string()
 }
 
@@ -50,7 +63,7 @@ pub fn strip_instance_sandbox_local_appdata(raw_path: &Path) -> PathBuf {
     raw_path.to_path_buf()
 }
 
-fn is_instance_sandbox_path(path: &Path) -> bool {
+pub fn is_instance_sandbox_path(path: &Path) -> bool {
     let raw_str = path.to_string_lossy();
     unwrap_sandbox_path(&raw_str).len() != raw_str.len()
 }
@@ -94,7 +107,10 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
             }
             "--version" | "-v" => {
                 if i + 1 < args.len() {
-                    let v = args[i + 1].trim().trim_start_matches(['v', 'V']);
+                    let v = args[i + 1]
+                        .trim()
+                        .trim_matches(['\'', '"'])
+                        .trim_start_matches(['v', 'V']);
                     opts.target_version = Some(normalize_version_string(v));
                     i += 1;
                 }
@@ -102,19 +118,50 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
             "--delegated-worker" => {
                 opts.is_delegated_worker = true;
             }
-            arg if arg.starts_with("--version=") => {
+            arg if arg.starts_with("--version=") || arg.starts_with("-v=") => {
+                let prefix = if arg.starts_with("--version=") {
+                    "--version="
+                } else {
+                    "-v="
+                };
                 let v = arg
-                    .trim_start_matches("--version=")
+                    .trim_start_matches(prefix)
                     .trim()
+                    .trim_matches(['\'', '"'])
                     .trim_start_matches(['v', 'V']);
                 opts.target_version = Some(normalize_version_string(v));
             }
+            arg if arg.starts_with("--to=")
+                || arg.starts_with("-to=")
+                || arg.starts_with("--revert=")
+                || arg.starts_with("-revert=")
+                || arg.starts_with("--downgrade=")
+                || arg.starts_with("-downgrade=") =>
+            {
+                let prefix_len = arg.find('=').map(|idx| idx + 1).unwrap_or(0);
+                let v = arg[prefix_len..]
+                    .trim()
+                    .trim_matches(['\'', '"'])
+                    .trim_start_matches(['v', 'V']);
+                if !v.is_empty() {
+                    opts.target_version = Some(normalize_version_string(v));
+                }
+            }
             arg if arg.eq_ignore_ascii_case("to")
+                || arg.eq_ignore_ascii_case("--to")
+                || arg.eq_ignore_ascii_case("-to")
                 || arg.eq_ignore_ascii_case("revert")
-                || arg.eq_ignore_ascii_case("downgrade") =>
+                || arg.eq_ignore_ascii_case("--revert")
+                || arg.eq_ignore_ascii_case("-revert")
+                || arg.eq_ignore_ascii_case("downgrade")
+                || arg.eq_ignore_ascii_case("--downgrade")
+                || arg.eq_ignore_ascii_case("-downgrade") =>
             {
                 if i + 1 < args.len() {
-                    let v = args[i + 1].trim().trim_start_matches(['v', 'V']);
+                    let v = args[i + 1]
+                        .trim()
+                        .trim_matches(['\'', '"'])
+                        .trim_start_matches(['v', 'V']);
                     if !v.is_empty()
                         && v.chars()
                             .next()
@@ -128,7 +175,7 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
             }
             _ => {
                 if opts.target_version.is_none() && !args[i].starts_with('-') {
-                    let clean = args[i].trim();
+                    let clean = args[i].trim().trim_matches(['\'', '"']);
                     let v = clean.trim_start_matches(['v', 'V']);
                     if v.contains('.')
                         && v.chars()
@@ -145,6 +192,10 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
     }
 
     opts
+}
+
+pub fn parse_update_args(args: &[String]) -> DelegateUpdateOptions {
+    parse_delegate_args(args)
 }
 
 pub fn resolve_default_install_dir(

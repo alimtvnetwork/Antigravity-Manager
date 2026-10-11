@@ -14,7 +14,11 @@ use std::time::Duration;
 
 /// Normalize version string: e.g., "4.162" or "v4.162" -> "4.162.0".
 pub(crate) fn normalize_version_string(raw: &str) -> String {
-    let clean = raw.trim().trim_start_matches(['v', 'V']).trim();
+    let clean = raw
+        .trim()
+        .trim_matches(['\'', '"'])
+        .trim_start_matches(['v', 'V'])
+        .trim();
     let base = clean.split('-').next().unwrap_or(clean);
     let parts: Vec<&str> = base.split('.').collect();
     if parts.len() == 2
@@ -41,15 +45,22 @@ pub(crate) fn normalize_version_str(raw: &str) -> String {
 pub(crate) fn extract_target_version(args: &[String]) -> Option<String> {
     let mut iter = args.iter().peekable();
     while let Some(arg) = iter.next() {
-        let clean = arg.trim();
+        let clean = arg.trim().trim_matches(['\'', '"']);
         if clean.eq_ignore_ascii_case("to")
             || clean.eq_ignore_ascii_case("--to")
             || clean.eq_ignore_ascii_case("-to")
             || clean.eq_ignore_ascii_case("revert")
+            || clean.eq_ignore_ascii_case("--revert")
+            || clean.eq_ignore_ascii_case("-revert")
             || clean.eq_ignore_ascii_case("downgrade")
+            || clean.eq_ignore_ascii_case("--downgrade")
+            || clean.eq_ignore_ascii_case("-downgrade")
         {
             if let Some(next_arg) = iter.next() {
-                let v = next_arg.trim().trim_start_matches(['v', 'V']);
+                let v = next_arg
+                    .trim()
+                    .trim_matches(['\'', '"'])
+                    .trim_start_matches(['v', 'V']);
                 if !v.is_empty()
                     && v.chars()
                         .next()
@@ -61,7 +72,10 @@ pub(crate) fn extract_target_version(args: &[String]) -> Option<String> {
             }
         } else if clean == "--version" || clean == "-v" {
             if let Some(next_arg) = iter.next() {
-                let v = next_arg.trim().trim_start_matches(['v', 'V']);
+                let v = next_arg
+                    .trim()
+                    .trim_matches(['\'', '"'])
+                    .trim_start_matches(['v', 'V']);
                 if !v.is_empty()
                     && v.chars()
                         .next()
@@ -73,10 +87,18 @@ pub(crate) fn extract_target_version(args: &[String]) -> Option<String> {
             }
         } else if let Some(stripped) = clean
             .strip_prefix("--version=")
+            .or_else(|| clean.strip_prefix("-v="))
             .or_else(|| clean.strip_prefix("--to="))
             .or_else(|| clean.strip_prefix("-to="))
+            .or_else(|| clean.strip_prefix("--revert="))
+            .or_else(|| clean.strip_prefix("-revert="))
+            .or_else(|| clean.strip_prefix("--downgrade="))
+            .or_else(|| clean.strip_prefix("-downgrade="))
         {
-            let v = stripped.trim().trim_start_matches(['v', 'V']);
+            let v = stripped
+                .trim()
+                .trim_matches(['\'', '"'])
+                .trim_start_matches(['v', 'V']);
             if !v.is_empty()
                 && v.chars()
                     .next()
@@ -93,7 +115,9 @@ pub(crate) fn extract_target_version(args: &[String]) -> Option<String> {
             && !clean.eq_ignore_ascii_case("export-zip")
             && !clean.eq_ignore_ascii_case("help")
         {
-            let v = clean.trim_start_matches(['v', 'V']);
+            let v = clean
+                .trim_matches(['\'', '"'])
+                .trim_start_matches(['v', 'V']);
             if v.contains('.')
                 && v.chars()
                     .next()
@@ -257,64 +281,160 @@ pub(crate) fn cmd_update(args: &[String]) {
         std::process::exit(if ok { 0 } else { 1 });
     }
 
-    let (api_url, updater_cdn_url) = if let Some(ref target) = requested_version {
-        (
-            format!(
-                "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases/tags/v{}",
-                target
-            ),
-            format!(
-                "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v{}/updater.json",
-                target
-            ),
-        )
-    } else {
-        (
-            "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases/latest"
-                .to_string(),
-            "https://github.com/alimtvnetwork/Antigravity-Manager/releases/latest/download/updater.json"
-                .to_string(),
-        )
-    };
+    let mut candidate_tags = Vec::new();
+    if let Some(ref target) = requested_version {
+        candidate_tags.push(format!("v{}", target));
+        if let Some(short_ver) = target.strip_suffix(".0") {
+            if short_ver.contains('.') {
+                candidate_tags.push(format!("v{}", short_ver));
+            }
+        }
+    }
 
     let mut tag_name = String::new();
     let mut release_html_url =
         "https://github.com/alimtvnetwork/Antigravity-Manager/releases".to_string();
     let mut release_name = String::new();
 
-    if let Ok(resp) = client.get(&api_url).send() {
-        if resp.status().is_success() {
-            if let Ok(json) = resp.json::<serde_json::Value>() {
-                tag_name = json["tag_name"]
-                    .as_str()
-                    .unwrap_or("")
-                    .trim_start_matches('v')
-                    .to_string();
-                if let Some(u) = json["html_url"].as_str() {
-                    release_html_url = u.to_string();
-                }
-                if let Some(n) = json["name"].as_str() {
-                    release_name = n.to_string();
+    if let Some(ref target) = requested_version {
+        // Tier 1: Direct GitHub Release API Tag Query
+        for cand_tag in &candidate_tags {
+            let api_url = format!(
+                "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases/tags/{}",
+                cand_tag
+            );
+            if let Ok(resp) = client.get(&api_url).send() {
+                if resp.status().is_success() {
+                    if let Ok(json) = resp.json::<serde_json::Value>() {
+                        tag_name = json["tag_name"]
+                            .as_str()
+                            .unwrap_or("")
+                            .trim_start_matches(['v', 'V'])
+                            .to_string();
+                        if let Some(u) = json["html_url"].as_str() {
+                            release_html_url = u.to_string();
+                        }
+                        if let Some(n) = json["name"].as_str() {
+                            release_name = n.to_string();
+                        }
+                        if !tag_name.is_empty() {
+                            break;
+                        }
+                    }
                 }
             }
         }
-    }
 
-    if tag_name.is_empty() {
-        if let Ok(resp) = client.get(&updater_cdn_url).send() {
+        // Tier 2: Release Asset CDN updater.json Query
+        if tag_name.is_empty() {
+            for cand_tag in &candidate_tags {
+                let cdn_url = format!(
+                    "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/{}/updater.json",
+                    cand_tag
+                );
+                if let Ok(resp) = client.get(&cdn_url).send() {
+                    if resp.status().is_success() {
+                        if let Ok(json) = resp.json::<serde_json::Value>() {
+                            tag_name = json["version"]
+                                .as_str()
+                                .unwrap_or("")
+                                .trim_start_matches(['v', 'V'])
+                                .to_string();
+                            if !tag_name.is_empty() {
+                                release_html_url = format!(
+                                    "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/{}",
+                                    cand_tag
+                                );
+                                release_name = cand_tag.clone();
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Tier 3: Releases Index Pagination Fallback
+        if tag_name.is_empty() {
+            let list_url =
+                "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases?per_page=100";
+            if let Ok(resp) = client.get(list_url).send() {
+                if resp.status().is_success() {
+                    if let Ok(releases) = resp.json::<Vec<serde_json::Value>>() {
+                        let target_short = target.strip_suffix(".0");
+                        for rel in releases {
+                            let rel_tag = rel["tag_name"]
+                                .as_str()
+                                .unwrap_or("")
+                                .trim_start_matches(['v', 'V']);
+                            let is_match = rel_tag == target
+                                || target_short.map(|s| rel_tag == s).unwrap_or(false)
+                                || rel_tag.starts_with(target);
+                            if is_match {
+                                tag_name = rel_tag.to_string();
+                                if let Some(u) = rel["html_url"].as_str() {
+                                    release_html_url = u.to_string();
+                                }
+                                if let Some(n) = rel["name"].as_str() {
+                                    release_name = n.to_string();
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Tier 4: Direct fallback to normalized requested version if network queries were rate-limited
+        if tag_name.is_empty() {
+            tag_name = target.clone();
+            release_html_url = format!(
+                "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v{}",
+                target
+            );
+            release_name = format!("v{}", target);
+        }
+    } else {
+        let api_url =
+            "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases/latest";
+        let updater_cdn_url =
+            "https://github.com/alimtvnetwork/Antigravity-Manager/releases/latest/download/updater.json";
+
+        if let Ok(resp) = client.get(api_url).send() {
             if resp.status().is_success() {
                 if let Ok(json) = resp.json::<serde_json::Value>() {
-                    tag_name = json["version"]
+                    tag_name = json["tag_name"]
                         .as_str()
                         .unwrap_or("")
-                        .trim_start_matches('v')
+                        .trim_start_matches(['v', 'V'])
                         .to_string();
-                    if !tag_name.is_empty() {
-                        release_html_url = format!(
-                            "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v{}",
-                            tag_name
-                        );
-                        release_name = format!("v{}", tag_name);
+                    if let Some(u) = json["html_url"].as_str() {
+                        release_html_url = u.to_string();
+                    }
+                    if let Some(n) = json["name"].as_str() {
+                        release_name = n.to_string();
+                    }
+                }
+            }
+        }
+
+        if tag_name.is_empty() {
+            if let Ok(resp) = client.get(updater_cdn_url).send() {
+                if resp.status().is_success() {
+                    if let Ok(json) = resp.json::<serde_json::Value>() {
+                        tag_name = json["version"]
+                            .as_str()
+                            .unwrap_or("")
+                            .trim_start_matches(['v', 'V'])
+                            .to_string();
+                        if !tag_name.is_empty() {
+                            release_html_url = format!(
+                                "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v{}",
+                                tag_name
+                            );
+                            release_name = format!("v{}", tag_name);
+                        }
                     }
                 }
             }
@@ -322,14 +442,6 @@ pub(crate) fn cmd_update(args: &[String]) {
     }
 
     if tag_name.is_empty() {
-        if let Some(ref target) = requested_version {
-            tag_name = target.clone();
-            release_html_url = format!(
-                "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v{}",
-                target
-            );
-            release_name = format!("v{}", target);
-        } else {
             if is_json {
                 let err_obj = serde_json::json!({
                     "success": false,

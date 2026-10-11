@@ -248,9 +248,10 @@ if (-not $Arch) {
 function Resolve-HostUserProfile {
     param(
         [string]$RawProfile,
-        [string]$RawLocalAppData
+        [string]$RawLocalAppData,
+        [string]$RawAppData
     )
-    foreach ($candidate in @($RawProfile, $RawLocalAppData)) {
+    foreach ($candidate in @($RawProfile, $RawLocalAppData, $RawAppData)) {
         if (-not [string]::IsNullOrWhiteSpace($candidate) -and $candidate -match '^(.+?)[\\/]\.antigravity_tools[\\/]instances[\\/]') {
             return $Matches[1]
         }
@@ -261,7 +262,7 @@ function Resolve-HostUserProfile {
     return [Environment]::GetFolderPath("UserProfile")
 }
 
-$RealUserProfile = Resolve-HostUserProfile -RawProfile $env:USERPROFILE -RawLocalAppData $env:LOCALAPPDATA
+$RealUserProfile = Resolve-HostUserProfile -RawProfile $env:USERPROFILE -RawLocalAppData $env:LOCALAPPDATA -RawAppData $env:APPDATA
 if (-not [string]::IsNullOrWhiteSpace($RealUserProfile)) {
     $RealLocalAppData = Join-Path $RealUserProfile "AppData\Local"
     $RealAppData = Join-Path $RealUserProfile "AppData\Roaming"
@@ -283,8 +284,12 @@ $cliDir = Join-Path $RealLocalAppData "agm-cli"
 $StartMenuDir = if (-not [string]::IsNullOrWhiteSpace($RealAppData)) { Join-Path $RealAppData "Microsoft\Windows\Start Menu\Programs" } else { $null }
 $StartMenuShortcut = if (-not [string]::IsNullOrWhiteSpace($StartMenuDir)) { Join-Path $StartMenuDir "$ShortcutName.lnk" } else { $null }
 $DesktopDir = [Environment]::GetFolderPath("Desktop")
-if ([string]::IsNullOrWhiteSpace($DesktopDir) -and -not [string]::IsNullOrWhiteSpace($RealUserProfile)) {
-    $DesktopDir = Join-Path $RealUserProfile "Desktop"
+if ([string]::IsNullOrWhiteSpace($DesktopDir)) {
+    if (-not [string]::IsNullOrWhiteSpace($RealUserProfile)) {
+        $DesktopDir = Join-Path $RealUserProfile "Desktop"
+    } else {
+        $DesktopDir = $null
+    }
 }
 $DesktopShortcut = if (-not [string]::IsNullOrWhiteSpace($DesktopDir)) { Join-Path $DesktopDir "$ShortcutName.lnk" } else { $null }
 $TaskbarDir = if (-not [string]::IsNullOrWhiteSpace($RealAppData)) { Join-Path $RealAppData "Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar" } else { $null }
@@ -587,7 +592,7 @@ function Remove-PreviousInstallations {
             (Join-Path $StartMenuDir "Anti-Gravity Tools.lnk")
         )
     }
-    if (-not [string]::IsNullOrWhiteSpace($DesktopDir)) {
+    if (-not [string]::IsNullOrWhiteSpace($DesktopDir) -and (Test-Path $DesktopDir)) {
         $prevShortcuts += @(
             (Join-Path $DesktopDir "Antigravity Tools.lnk"),
             (Join-Path $DesktopDir "antigravity-tools.lnk"),
@@ -1312,9 +1317,15 @@ $isPinned = $false
 $cleanPinned = $null
 if ($Version) {
     $cleanPinned = ($Version -replace "^v", "").Trim()
-    $parts = $cleanPinned.Split("-")[0].Split(".")
+    $baseVer = $cleanPinned.Split("-")[0]
+    $parts = $baseVer.Split(".")
     if ($parts.Length -eq 2) {
-        $cleanPinned = "$cleanPinned.0"
+        $dashIdx = $cleanPinned.IndexOf("-")
+        if ($dashIdx -ge 0) {
+            $cleanPinned = "$baseVer.0" + $cleanPinned.Substring($dashIdx)
+        } else {
+            $cleanPinned = "$cleanPinned.0"
+        }
     }
     $candidateVersions.Add($cleanPinned)
     $isPinned = $true
@@ -1590,9 +1601,16 @@ foreach ($candVersion in $versionQueue) {
         } else {
             $relData = $releaseMetadataMap[$candVersion]
             if (-not $relData) {
-                try {
-                    $relData = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/tags/v$candVersion" -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
-                } catch {}
+                $tagCandidates = @("v$candVersion")
+                if ($candVersion -match '^(\d+\.\d+)\.0$') {
+                    $tagCandidates += "v$($Matches[1])"
+                }
+                foreach ($tc in $tagCandidates) {
+                    try {
+                        $relData = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/tags/$tc" -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
+                        if ($relData) { break }
+                    } catch {}
+                }
             }
 
             $matchedAsset = Get-WindowsReleaseAsset -ReleaseData $relData -Architecture $Arch -PreferZip:$isPinned
@@ -1711,10 +1729,18 @@ foreach ($candVersion in $versionQueue) {
             # If NSIS setup did not bundle agm.exe (e.g. v4.162.x), extract agm.exe from companion release .zip
             $installedAgmCheck = Join-Path $InstallDir "agm.exe"
             if (-not (Test-Path $installedAgmCheck)) {
-                $zipUrls = @(
-                    "https://github.com/$Repo/releases/download/v$candVersion/agm-alim_${candVersion}_windows_${Arch}.zip",
-                    "https://github.com/$Repo/releases/download/v$candVersion/agm-alim_${candVersion}_windows_x64.zip"
-                )
+                $zipVersions = @($candVersion)
+                if ($candVersion -match '^(\d+\.\d+)\.0$') {
+                    $zipVersions += $Matches[1]
+                }
+                $zipUrls = @()
+                foreach ($zv in $zipVersions) {
+                    $zipUrls += @(
+                        "https://github.com/$Repo/releases/download/v$zv/agm-alim_${zv}_windows_${Arch}.zip",
+                        "https://github.com/$Repo/releases/download/v$zv/agm-alim_${zv}_windows_x64.zip",
+                        "https://github.com/$Repo/releases/download/v$zv/agm-alim_${zv}_x64.zip"
+                    )
+                }
                 foreach ($zUrl in ($zipUrls | Select-Object -Unique)) {
                     if (Test-UrlReachable -Url $zUrl -TimeoutSec 4) {
                         $tempZip = Join-Path $TempDir "agm-cli-bundle-$candVersion.zip"
@@ -1878,6 +1904,39 @@ try {
     $globalAgm = Join-Path $cliDir "agm.exe"
     $globalUpdateCli = Join-Path $cliDir "agm-update-cli.exe"
 
+    if (-not (Test-Path $installedAgm) -and $isPinned -and $TargetVersion) {
+        $zipVersions = @($TargetVersion)
+        if ($TargetVersion -match '^(\d+\.\d+)\.0$') {
+            $zipVersions += $Matches[1]
+        }
+        foreach ($zv in $zipVersions) {
+            $directZipUrls = @(
+                "https://github.com/$Repo/releases/download/v$zv/agm-alim_${zv}_windows_${Arch}.zip",
+                "https://github.com/$Repo/releases/download/v$zv/agm-alim_${zv}_windows_x64.zip"
+            )
+            foreach ($zUrl in $directZipUrls) {
+                if (Test-UrlReachable -Url $zUrl -TimeoutSec 4) {
+                    $tempZip = Join-Path $TempDir "agm-cli-fallback-$zv.zip"
+                    $tempExtract = Join-Path $TempDir "agm-cli-extract-fallback-$zv"
+                    if (Invoke-FastDownload -Url $zUrl -DestinationPath $tempZip) {
+                        try {
+                            if (Test-Path $tempExtract) { Remove-Item -Path $tempExtract -Recurse -Force -ErrorAction SilentlyContinue }
+                            Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force
+                            $extractedAgm = Get-ChildItem -Path $tempExtract -Filter "agm.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+                            if ($extractedAgm) {
+                                Copy-Item -Path $extractedAgm.FullName -Destination $installedAgm -Force -ErrorAction SilentlyContinue
+                            }
+                        } catch {}
+                        Remove-Item -Path $tempZip -Force -ErrorAction SilentlyContinue
+                        Remove-Item -Path $tempExtract -Recurse -Force -ErrorAction SilentlyContinue
+                        if (Test-Path $installedAgm) { break }
+                    }
+                }
+            }
+            if (Test-Path $installedAgm) { break }
+        }
+    }
+
     if (Test-Path $installedAgm) {
         Copy-Item -Path $installedAgm -Destination $globalAgm -Force -ErrorAction SilentlyContinue
         Copy-Item -Path $installedAgm -Destination $globalUpdateCli -Force -ErrorAction SilentlyContinue
@@ -1919,7 +1978,7 @@ if (-not $NoShortcut) {
                 # Clean any remaining legacy shortcut on Desktop or Start Menu (strictly preserving TaskbarDir so pinned items remain intact)
                 $oldLnks = @("Agm - Alim.lnk", "agm-alim.lnk", "Anti-Gravity Tools by Alim.lnk", "Antigravity Tools.lnk", "antigravity-tools.lnk")
                 foreach ($old in $oldLnks) {
-                    if (-not [string]::IsNullOrWhiteSpace($DesktopDir)) {
+                    if (-not [string]::IsNullOrWhiteSpace($DesktopDir) -and (Test-Path $DesktopDir)) {
                         $f1 = Join-Path $DesktopDir $old
                         if (Test-Path $f1) { Remove-Item -Path $f1 -Force -ErrorAction SilentlyContinue }
                     }
