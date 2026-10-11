@@ -71,3 +71,39 @@ pub async fn download_telegram_photo(bot_token: &str, msg: &Value) -> Option<Pat
         None
     }
 }
+
+/// Upload an image to Catbox for free, permanent public hosting
+pub async fn upload_image_to_catbox(img_bytes: &[u8], filename: &str) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+    let part = reqwest::multipart::Part::bytes(img_bytes.to_vec())
+        .file_name(filename.to_string())
+        .mime_str("image/png")
+        .map_err(|e| format!("Invalid multipart part: {}", e))?;
+
+    let form = reqwest::multipart::Form::new()
+        .text("reqtype", "fileupload")
+        .part("fileToUpload", part);
+
+    let resp = client
+        .post("https://catbox.moe/user/api.php")
+        .multipart(form)
+        .send()
+        .await
+        .map_err(|e| format!("Catbox upload request failed: {}", e))?;
+
+    if resp.status().is_success() {
+        let url = resp.text().await.map_err(|e| e.to_string())?;
+        let clean = url.trim().to_string();
+        if clean.starts_with("http") {
+            Ok(clean)
+        } else {
+            Err(format!("Catbox returned error: {}", clean))
+        }
+    } else {
+        Err(format!("Catbox HTTP error {}", resp.status()))
+    }
+}

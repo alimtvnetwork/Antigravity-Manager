@@ -3,6 +3,14 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.187.0 (2026-10-11)**:
+        -   **Full Process Termination on Application Close**:
+            -   **Description**: Resolved lingering background processes and sockets remaining in Windows Task Manager after closing the application window. Refactored `WindowEvent::CloseRequested`, `RunEvent::ExitRequested`, native window close buttons (`cmd_window.rs`), and system tray quit action (`tray.rs`) to unconditionally route through `exit_app_fully(&AppHandle)`. Gracefully halts Cloudflared tunnels, Admin Server listeners, and Proxy instances before invoking `std::process::exit(0)`, providing immediate, zero-residual Task Manager process teardown. (Thanks to @aukgit)
+        -   **Profile Switch Spawn Crash & Access Denied (os error 5) Remediation**:
+            -   **Description**: Fixed account and profile switching failures where spawning cloned instance binaries failed with `Access is denied (os error 5)` inside restricted Windows Job Objects. Architected a robust 4-stage launch fallback ladder in `src-tauri/src/modules/instance/launch.rs` and `src-tauri/src/modules/process/launch.rs`: direct binary execution with job breakaway fallback -> detected base executable -> Windows Command Shell (`cmd.exe /s /c start`) -> PowerShell `Start-Process` (leveraging Win32 `ShellExecuteEx` for guaranteed job breakaway). Hardened `switch_account_to_instance` so that auto-launch errors are logged gracefully without failing the already-persisted switch transaction. (Thanks to @aukgit)
+        -   **Telegram Rich Formatting Cards, Custom Copy Button & Fleet Identity**:
+            -   **Description**: Upgraded Telegram notification cards to structured HTML markup with `<pre><code>...</code></pre>` blocks for active prompts. Implemented Telegram Bot API inline keyboards with native `copy_text` buttons for one-click prompt copying on mobile and desktop. Added free image storage support via Catbox and Telegram permanent `file_id` caching. Introduced standalone Fleet Identity and discovery commands (`/fleet`, `/whoami`, `/instances`, `/accounts`), providing complete machine, instance, and account visibility directly within Telegram and Email even when Supabase is disconnected or offline. (Thanks to @aukgit)
+
     *   **v4.186.0 (2026-10-11)**:
         -   **Update CLI Command & Pipeline Fixes**:
             -   **Description**: Implemented universal detached self-delegation for `agm update` to eliminate Windows file locks (`os error 5: Access is denied` / sharing violation `0x20`); unified CLI prompt verbs (`agm prompt send`, `agm prompt queue`, `qe` alias) with destination session targeting (`--conversation`, `--new`, `--existing`); expanded in-flight prompt backup coverage across profile rotations; and added UI conversation choice capsule ("Existing Conv" vs "New Conv"). (Thanks to @aukgit)

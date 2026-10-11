@@ -142,11 +142,12 @@ pub fn chunk_telegram_text(text: &str, max_chars: usize) -> Vec<String> {
     balanced_chunks
 }
 
-/// Send a text message to a Telegram chat, automatically chunking messages longer than 3800 characters
-pub async fn send_telegram_message(
+/// Send a text message to a Telegram chat with optional reply markup (e.g. inline keyboard)
+pub async fn send_telegram_message_with_markup(
     bot_token: &str,
     chat_id: i64,
     text: &str,
+    reply_markup: Option<serde_json::Value>,
 ) -> Result<(), AppError> {
     let clean_token = bot_token.trim();
     if clean_token.is_empty() {
@@ -160,17 +161,24 @@ pub async fn send_telegram_message(
         .map_err(|e| AppError::Network(e.to_string(), None))?;
 
     let url = format!("https://api.telegram.org/bot{}/sendMessage", clean_token);
+    let total = chunks.len();
 
     for (idx, chunk) in chunks.iter().enumerate() {
         if idx > 0 {
             tokio::time::sleep(Duration::from_millis(80)).await;
         }
 
-        let payload_html = json!({
+        let is_last = idx + 1 == total;
+        let mut payload_html = json!({
             "chat_id": chat_id,
             "text": chunk,
             "parse_mode": "HTML"
         });
+        if is_last {
+            if let Some(ref markup) = reply_markup {
+                payload_html["reply_markup"] = markup.clone();
+            }
+        }
 
         let resp = client.post(&url).json(&payload_html).send().await;
         match resp {
@@ -178,10 +186,15 @@ pub async fn send_telegram_message(
             Ok(r) if r.status().as_u16() == 400 => {
                 // If HTML parse error occurred, strip HTML tags and retry sending chunk as clean plain text
                 let clean_plain = strip_telegram_html_tags(chunk);
-                let payload_plain = json!({
+                let mut payload_plain = json!({
                     "chat_id": chat_id,
                     "text": clean_plain
                 });
+                if is_last {
+                    if let Some(ref markup) = reply_markup {
+                        payload_plain["reply_markup"] = markup.clone();
+                    }
+                }
                 let retry_resp = client
                     .post(&url)
                     .json(&payload_plain)
@@ -213,6 +226,15 @@ pub async fn send_telegram_message(
     }
 
     Ok(())
+}
+
+/// Send a text message to a Telegram chat, automatically chunking messages longer than 3800 characters
+pub async fn send_telegram_message(
+    bot_token: &str,
+    chat_id: i64,
+    text: &str,
+) -> Result<(), AppError> {
+    send_telegram_message_with_markup(bot_token, chat_id, text, None).await
 }
 
 /// Convenience alias for send_telegram_message with automatic chunking

@@ -551,54 +551,129 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
                             || initial_err.kind() == std::io::ErrorKind::PermissionDenied
                         {
                             crate::modules::logger::log_warn(
-                                "[Instance] Direct process spawn returned Access Denied (os error 5). Attempting Windows Shell dispatch (cmd.exe /c start)..."
+                                "[Instance] Direct process spawn returned Access Denied (os error 5). Attempting Windows Shell dispatch ladder..."
                             );
-                            let target_bin = if Path::new(&exe_str).exists() {
-                                exe_str.clone()
-                            } else if let Ok(base_exe) =
+                            // Prefer base detected executable to avoid permissions/defender issues on cloned binaries
+                            let target_bin = if let Ok(base_exe) =
                                 crate::modules::process::detect_antigravity_with_diagnostics(None)
                             {
-                                base_exe.to_string_lossy().to_string()
+                                if base_exe.exists() {
+                                    base_exe.to_string_lossy().to_string()
+                                } else if Path::new(&exe_str).exists() {
+                                    exe_str.clone()
+                                } else {
+                                    base_exe.to_string_lossy().to_string()
+                                }
                             } else {
                                 exe_str.clone()
                             };
 
-                            let mut shell_cmd = Command::new("cmd.exe");
-                            shell_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW for transient cmd
-                            shell_cmd.arg("/c").arg("start").arg("").arg(&target_bin);
+                            let mut shell_args = Vec::new();
                             if has_custom_data {
-                                shell_cmd.arg(format!("--user-data-dir={}", data_dir));
-                                shell_cmd.arg("--password-store=basic");
-                                shell_cmd.arg("--remote-debugging-port=0");
+                                shell_args.push(format!("--user-data-dir={}", data_dir));
+                                shell_args.push("--password-store=basic".to_string());
+                                shell_args.push("--remote-debugging-port=0".to_string());
                             }
                             if let Some(ref ext_dir) = extensions_dir {
-                                shell_cmd.arg(format!("--extensions-dir={}", ext_dir));
+                                shell_args.push(format!("--extensions-dir={}", ext_dir));
                             }
                             if !workspace_folders.is_empty() {
                                 for folder in &workspace_folders {
-                                    shell_cmd.arg(folder);
+                                    shell_args.push(folder.clone());
                                 }
                             } else {
-                                shell_cmd.arg("--new-window");
+                                shell_args.push("--new-window".to_string());
+                            }
+
+                            // Ladder 3: Windows Command Shell dispatch (cmd.exe /s /c start)
+                            let mut shell_cmd = Command::new("cmd.exe");
+                            shell_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW for transient cmd
+                            shell_cmd
+                                .arg("/s")
+                                .arg("/c")
+                                .arg("start")
+                                .arg("")
+                                .arg(&target_bin);
+                            for a in &shell_args {
+                                shell_cmd.arg(a);
+                            }
+                            if has_custom_data {
+                                if let Some(ref inst_home) = inst_home_opt {
+                                    shell_cmd.env("USERPROFILE", inst_home);
+                                    shell_cmd
+                                        .env("APPDATA", inst_home.join("AppData").join("Roaming"));
+                                    shell_cmd.env(
+                                        "LOCALAPPDATA",
+                                        inst_home.join("AppData").join("Local"),
+                                    );
+                                }
+                                if let Some(ref acc) = resolved_account {
+                                    shell_cmd.env("JETSKI_OAUTH_TOKEN", &acc.token.access_token);
+                                    shell_cmd
+                                        .env("GEMINI_CLI_OAUTH_TOKEN", &acc.token.access_token);
+                                }
+                            }
+                            if let Some(parent) = Path::new(&target_bin).parent() {
+                                shell_cmd.current_dir(parent);
                             }
                             shell_cmd
                                 .stdin(std::process::Stdio::null())
                                 .stdout(std::process::Stdio::null())
                                 .stderr(std::process::Stdio::null());
 
-                            if let Ok(status) = shell_cmd.status() {
-                                if status.success() {
-                                    std::thread::sleep(std::time::Duration::from_millis(600));
-                                    let pids = find_pids_for_data_dir(&data_dir, is_default);
-                                    let detected_pid = pids.first().copied().unwrap_or(0);
-                                    record_spawned_instance_process(
-                                        instance_id,
-                                        &data_dir,
-                                        reinject_prompts,
-                                        detected_pid,
-                                    )?;
-                                    return Ok(());
+                            let cmd_dispatched =
+                                crate::modules::process::spawn_with_job_breakaway_fallback(
+                                    &mut shell_cmd,
+                                )
+                                .is_ok();
+
+                            // Ladder 4: PowerShell Start-Process (uses ShellExecuteEx for guaranteed breakaway)
+                            let ps_dispatched = if !cmd_dispatched {
+                                let mut ps_cmd = Command::new("powershell.exe");
+                                ps_cmd.creation_flags(0x08000000);
+                                ps_cmd
+                                    .arg("-NoProfile")
+                                    .arg("-NonInteractive")
+                                    .arg("-WindowStyle")
+                                    .arg("Hidden")
+                                    .arg("-Command");
+                                let escaped_bin = target_bin.replace('\'', "''");
+                                let arg_list = shell_args
+                                    .iter()
+                                    .map(|a| format!("'{}'", a.replace('\'', "''")))
+                                    .collect::<Vec<_>>()
+                                    .join(",");
+                                let ps_script = format!(
+                                    "Start-Process -FilePath '{}' -ArgumentList @({})",
+                                    escaped_bin, arg_list
+                                );
+                                ps_cmd.arg(&ps_script);
+                                if let Some(parent) = Path::new(&target_bin).parent() {
+                                    ps_cmd.current_dir(parent);
                                 }
+                                ps_cmd
+                                    .stdin(std::process::Stdio::null())
+                                    .stdout(std::process::Stdio::null())
+                                    .stderr(std::process::Stdio::null());
+                                crate::modules::process::spawn_with_job_breakaway_fallback(
+                                    &mut ps_cmd,
+                                )
+                                .is_ok()
+                            } else {
+                                true
+                            };
+
+                            if cmd_dispatched || ps_dispatched {
+                                std::thread::sleep(std::time::Duration::from_millis(800));
+                                let pids = find_pids_for_data_dir(&data_dir, is_default);
+                                let detected_pid = pids.first().copied().unwrap_or(0);
+                                record_spawned_instance_process(
+                                    instance_id,
+                                    &data_dir,
+                                    reinject_prompts,
+                                    detected_pid,
+                                )?;
+                                return Ok(());
                             }
                         }
                     }

@@ -91,7 +91,10 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
             match event.id().as_ref() {
                 "show" => {
                     // Justification: best-effort call; failure logged without changing control flow
-                    crate::error::record_ignored(modules::lightweight::exit_lightweight_mode(&app_handle), "exit_lightweight_mode");
+                    crate::error::record_ignored(
+                        modules::lightweight::exit_lightweight_mode(&app_handle),
+                        "exit_lightweight_mode",
+                    );
                     if let Some(window) = app.get_webview_window("main") {
                         crate::restore_and_focus_window(&window);
                     }
@@ -111,64 +114,17 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
                                     config.lightweight_mode
                                 ));
                                 // Justification: best-effort frontend event; a dropped event only skips a UI refresh
-                                crate::error::record_ignored(app_handle.emit("config://updated", ()), "emit config://updated");
+                                crate::error::record_ignored(
+                                    app_handle.emit("config://updated", ()),
+                                    "emit config://updated",
+                                );
                             }
                         }
                     });
                 }
                 "quit" => {
                     let app_handle = app.clone();
-                    tauri::async_runtime::spawn(async move {
-                        tracing::info!("[Tray] Gateway exit triggered, cleaning up services and releasing ports...");
-
-                        let state = app_handle.state::<crate::commands::proxy::ProxyServiceState>();
-                        let cf_state =
-                            app_handle.state::<crate::commands::cloudflared::CloudflaredState>();
-
-                        // 1. Terminate cloudflared tunnel subprocess
-                        // Justification: best-effort guarded wait; a timeout or inner failure is logged
-                        crate::error::record_ignored(tokio::time::timeout(
-                            std::time::Duration::from_millis(500),
-                            cf_state.stop(),
-                        )
-                        .await, "timeout wait");
-
-                        // 2. Stop Admin Server (close TCP listener and active connections)
-                        if let Ok(mut lock) = tokio::time::timeout(
-                            std::time::Duration::from_millis(1000),
-                            state.admin_server.write(),
-                        )
-                        .await
-                        {
-                            if let Some(admin) = lock.take() {
-                                admin.stop().await;
-                            }
-                        }
-
-                        // 3. Stop proxy instances and background tasks
-                        if let Ok(mut lock) = tokio::time::timeout(
-                            std::time::Duration::from_millis(1000),
-                            state.instance.write(),
-                        )
-                        .await
-                        {
-                            if let Some(inst) = lock.take() {
-                                // Justification: best-effort guarded wait; a timeout or inner failure is logged
-                                crate::error::record_ignored(tokio::time::timeout(
-                                    std::time::Duration::from_millis(500),
-                                    inst.token_manager
-                                        .graceful_shutdown(std::time::Duration::from_millis(400)),
-                                )
-                                .await, "timeout wait");
-                                inst.axum_server.set_running(false).await;
-                                inst.axum_server.stop();
-                            }
-                        }
-
-                        // 4. Short grace period for socket unregistration before clean process exit
-                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                        std::process::exit(0);
-                    });
+                    crate::modules::process::exit_app_fully(&app_handle);
                 }
                 "refresh_curr" => {
                     // Execute refresh asynchronously
@@ -176,7 +132,10 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
                         if let Ok(Some(account_id)) = modules::get_current_account_id() {
                             // Notify frontend to start
                             // Justification: best-effort frontend event; a dropped event only skips a UI refresh
-                            crate::error::record_ignored(app_handle.emit("tray://refresh-current", ()), "emit tray://refresh-current");
+                            crate::error::record_ignored(
+                                app_handle.emit("tray://refresh-current", ()),
+                                "emit tray://refresh-current",
+                            );
 
                             // Execute refresh logic
                             if let Ok(mut account) = modules::load_account(&account_id) {
@@ -185,7 +144,10 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
                                     Ok(quota) => {
                                         // Save
                                         // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-                                        crate::error::record_ignored(modules::update_account_quota(&account.id, quota), "update_account_quota");
+                                        crate::error::record_ignored(
+                                            modules::update_account_quota(&account.id, quota),
+                                            "update_account_quota",
+                                        );
                                         // Update tray display
                                         update_tray_menus(&app_handle);
                                     }
@@ -227,8 +189,11 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
                             {
                                 // 3. Notify frontend
                                 // Justification: best-effort frontend event; a dropped event only skips a UI refresh
-                                crate::error::record_ignored(app_handle
-                                    .emit("tray://account-switched", next_account.id.clone()), "emit event");
+                                crate::error::record_ignored(
+                                    app_handle
+                                        .emit("tray://account-switched", next_account.id.clone()),
+                                    "emit event",
+                                );
                                 // 4. Update tray
                                 update_tray_menus(&app_handle);
                             }
@@ -249,7 +214,10 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
             } => {
                 let app = tray.app_handle();
                 // Justification: best-effort call; failure logged without changing control flow
-                crate::error::record_ignored(modules::lightweight::exit_lightweight_mode(app), "exit_lightweight_mode");
+                crate::error::record_ignored(
+                    modules::lightweight::exit_lightweight_mode(app),
+                    "exit_lightweight_mode",
+                );
                 if let Some(window) = app.get_webview_window("main") {
                     crate::restore_and_focus_window(&window);
                 }

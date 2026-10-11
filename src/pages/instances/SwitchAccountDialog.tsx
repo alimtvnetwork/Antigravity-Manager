@@ -42,7 +42,9 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
             showToast(`Switched ${switchTargetInstance.config.name} to ${acc.email}`, 'success');
             close();
         } catch (e: unknown) {
-            setActionError((e as Error)?.toString?.() || 'Failed to switch account');
+            const msg = (e as Error)?.toString?.() || 'Failed to switch account';
+            setActionError(msg);
+            showToast(msg, 'error');
         } finally {
             setActionState((prev) => ({ ...prev, [targetId]: null }));
         }

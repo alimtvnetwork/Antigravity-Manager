@@ -161,6 +161,9 @@ pub fn format_help_manual() -> String {
         <code>v{} | commit {} | branch {} | release {}</code>\n\n\
         📌 <b>Core Telemetry &amp; Dual-Sequence Tree View (AGM + GitMap):</b>\n\
         • <code>/help</code> or <code>/start</code> — Display this full interactive command manual\n\
+        • <code>/fleet</code> or <code>/whoami</code> — Standalone Machine, Instance &amp; Bound Account identity card (No Supabase required)\n\
+        • <code>/instances</code> — List all instance profiles on this machine and live process states\n\
+        • <code>/accounts</code> — List all registered accounts, subscription tiers &amp; quota headroom\n\
         • <code>/ping</code> — Check node connectivity, IP, Git build &amp; uptime\n\
         • <code>/tree</code> — Running Project → Conversation → [≤200w Prompt] tree (<code>[AGM:P001 | GM:#1]</code>, <code>[AGM:C001 | GM:&lt;cid&gt;]</code>)\n\
         • <code>/tree all</code> — Full tree of all workspaces &amp; conversations across all instances\n\

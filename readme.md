@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.186.0-3B82F6?style=flat-square" alt="Version v4.186.0">
+    <img src="https://img.shields.io/badge/Version-v4.187.0-3B82F6?style=flat-square" alt="Version v4.187.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -115,7 +115,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.186.0)**
+**Bar 2: Version-Based Installation (v4.187.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -559,6 +559,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
+> Latest version **v4.187.0**: Full Task Manager Termination & Profile Switch Spawn Fallback — Enforced full application and background thread process termination in Windows Task Manager on window close and tray quit by routing all teardowns through `exit_app_fully(&AppHandle)` and cleanly halting Cloudflared tunnels, Admin Server listeners, and Proxy instances before invoking `std::process::exit(0)`; resolved profile and account switch crashes (`Access is denied (os error 5)`) in restricted Windows Job Objects with a 4-stage launch fallback ladder (direct breakaway fallback -> detected base executable -> `cmd.exe /s /c start` -> PowerShell `Start-Process` with `ShellExecuteEx`); upgraded Telegram notifications with structured HTML cards, `<pre><code>` prompt blocks, native inline copy buttons, free image hosting, and standalone Fleet Identity discovery (`/fleet`, `/whoami`, `/instances`, `/accounts`). (Thanks to @aukgit)
 > Latest version **v4.186.0**: Update CLI Command & Pipeline Fixes — Universal Windows self-delegation for `agm update` to detached temp executables (`%TEMP%\agm-updater\agm-update-cli-<pid>.exe`) with immediate caller exit code 0 to prevent Windows executable image lock (`os error 5` / sharing violation `0x20`); enhanced installer process discovery for `antigravity-manager.exe` and `agm.exe`; fixed prompt pipeline dispatch and FIFO queueing (`agm prompt send`, `agm prompt queue`, `qe` alias, and `agm instance prompt`) with destination conversation target resolution (`--conversation <id>`, `--new`, `--existing`), working directory auto-fallback, and Tier 2 graceful degradation; unified Prompt Tree View UI with an inline segmented capsule selector for Existing Conv vs New Conv; resolved switch and auto-rotation prompt loss by expanding backup query status coverage (`running`, `in_flight`, `dispatched`), enabling cross-instance prompt re-attribution on profile rotation, and restoring `backed_up` prompts upon recovery. (Thanks to @aukgit)
 > Latest version **v4.185.0**: Comprehensive compiler and pipeline error resolution — resolved 600+ compilation and visibility errors from god-module refactorings across proxy rate limiting, signature cache, token manager, session store, upstream client, and mappers; restored Axum 0.7 ServiceExt router compatibility; added Windows process flag gating; pre-flight cargo fmt and manifest synchronization verified clean. (Thanks to @aukgit)
 > Latest version **v4.184.0**: Switch/fast-forward reliability hardening — new `close_instance_verified` kills, polls the OS process table and retries stragglers instead of bricking on surviving orphan PIDs; credential injection now retries over the dying IDE's SQLite-lock release window; fast-forward errors are captured into the Error Manager for diagnostics. Also fixed the clipboard `Document is not focused` warnings in the prompt send flow via the shared copy helper with execCommand fallback. (Thanks to @aukgit)

@@ -392,16 +392,9 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|app_handle, event| {
             match event {
-                // Prevent app from exiting when window is destroyed in lightweight mode
-                tauri::RunEvent::ExitRequested { api, .. } => {
-                    let tray_enabled = app_handle
-                        .try_state::<AppRuntimeFlags>()
-                        .map(|flags| flags.tray_enabled)
-                        .unwrap_or(true);
-
-                    if tray_enabled {
-                        api.prevent_exit();
-                    }
+                // Cleanly exit application process when exit requested
+                tauri::RunEvent::ExitRequested { .. } => {
+                    crate::modules::process::exit_app_fully(app_handle);
                 }
                 // Handle app exit - cleanup background tasks and release ports
                 tauri::RunEvent::Exit => {

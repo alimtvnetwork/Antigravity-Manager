@@ -302,3 +302,56 @@ pub fn wait_for_language_server_respawn(target_ide: Option<&str>, timeout_secs: 
 
     false
 }
+
+/// Terminate the application fully from the operating system:
+/// 1. Stops the cloudflared tunnel subprocess.
+/// 2. Stops the Admin Server and releases TCP listening sockets.
+/// 3. Stops proxy instances and performs token manager shutdown.
+/// 4. Invokes `std::process::exit(0)` ensuring zero lingering processes in Task Manager.
+pub fn exit_app_fully(app_handle: &tauri::AppHandle) -> ! {
+    use tauri::Manager;
+    tracing::info!("[Shutdown] Initiating clean and complete application shutdown...");
+    let app = app_handle.clone();
+    tauri::async_runtime::block_on(async {
+        // 1. Terminate cloudflared tunnel subprocess
+        if let Some(cf_state) = app.try_state::<crate::commands::cloudflared::CloudflaredState>() {
+            // Justification: best-effort guarded wait; a timeout or inner failure is logged
+            crate::error::record_ignored(
+                tokio::time::timeout(Duration::from_millis(500), cf_state.stop()).await,
+                "stop cloudflared",
+            );
+        }
+
+        // 2. Stop Admin Server & Proxy Services
+        if let Some(state) = app.try_state::<crate::commands::proxy::ProxyServiceState>() {
+            if let Ok(mut lock) =
+                tokio::time::timeout(Duration::from_millis(500), state.admin_server.write()).await
+            {
+                if let Some(admin) = lock.take() {
+                    admin.stop().await;
+                }
+            }
+            if let Ok(mut lock) =
+                tokio::time::timeout(Duration::from_millis(500), state.instance.write()).await
+            {
+                if let Some(inst) = lock.take() {
+                    // Justification: best-effort guarded wait; a timeout or inner failure is logged
+                    crate::error::record_ignored(
+                        tokio::time::timeout(
+                            Duration::from_millis(400),
+                            inst.token_manager
+                                .graceful_shutdown(Duration::from_millis(300)),
+                        )
+                        .await,
+                        "token manager graceful shutdown",
+                    );
+                    inst.axum_server.set_running(false).await;
+                    inst.axum_server.stop();
+                }
+            }
+        }
+    });
+
+    tracing::info!("[Shutdown] Application terminating OS process cleanly (exit code 0).");
+    std::process::exit(0);
+}

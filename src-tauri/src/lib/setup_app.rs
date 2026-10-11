@@ -253,39 +253,9 @@ pub(crate) fn setup_app(
 /// Extracted from `run()` to keep file sizes manageable.
 pub(crate) fn handle_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
     match event {
-        tauri::WindowEvent::CloseRequested { api, .. } => {
-            let tray_enabled = window
-                .app_handle()
-                .try_state::<AppRuntimeFlags>()
-                .map(|flags| flags.tray_enabled)
-                .unwrap_or(true);
-
-            if tray_enabled {
-                api.prevent_close();
-
-                let is_lightweight = modules::load_app_config()
-                    .map(|c| c.lightweight_mode)
-                    .unwrap_or(false);
-
-                if is_lightweight {
-                    // Justification: best-effort call; failure logged without changing control flow
-                    crate::error::record_ignored(
-                        modules::lightweight::enter_lightweight_mode(window.app_handle()),
-                        "enter_lightweight_mode",
-                    );
-                } else {
-                    // Justification: best-effort window operation; the UI continues without it
-                    crate::error::record_ignored(window.hide(), "window.hide");
-                    #[cfg(target_os = "macos")]
-                    {
-                        use tauri::Manager;
-                        window
-                            .app_handle()
-                            .set_activation_policy(tauri::ActivationPolicy::Accessory)
-                            .unwrap_or(());
-                    }
-                }
-            }
+        tauri::WindowEvent::CloseRequested { .. } => {
+            // Unconditional full application exit: cleans up background services and terminates OS process cleanly
+            crate::modules::process::exit_app_fully(window.app_handle());
         }
         tauri::WindowEvent::Focused(focused) => {
             if *focused {

@@ -53,10 +53,10 @@ pub async fn toggle_maximize_window(window: tauri::Window) -> Result<bool, Strin
     }
 }
 
-/// 关闭窗口
+/// 关闭窗口并完全退出应用
 #[tauri::command]
 pub async fn close_window(window: tauri::Window) -> Result<(), String> {
-    window.close().map_err(|e| e.to_string())
+    crate::modules::process::exit_app_fully(&window.app_handle());
 }
 
 /// 查询窗口是否处于最大化状态

@@ -113,7 +113,7 @@ pub(crate) async fn dispatch_telegram_switch_alert(
 
     let prompt_section = if !prompt_preview_text.is_empty() {
         format!(
-            "\n💬 <b>Active Prompt:</b> ({} words)\n<code>{}</code>\n",
+            "\n💬 <b>Active Prompt:</b> ({} words)\n<pre><code>{}</code></pre>\n",
             prompt_words_count,
             crate::modules::telegram_inbound::clean_for_telegram_html(&prompt_preview_text, 1500)
         )
@@ -157,7 +157,31 @@ pub(crate) async fn dispatch_telegram_switch_alert(
         prompt_section
     );
 
-    match telegram_inbound::send_telegram_message(&config.bot_token, chat_id, &text).await {
+    let reply_markup = if !prompt_preview_text.is_empty() {
+        Some(serde_json::json!({
+            "inline_keyboard": [
+                [
+                    {
+                        "text": "📋 Copy Prompt",
+                        "copy_text": {
+                            "text": prompt_preview_text
+                        }
+                    }
+                ]
+            ]
+        }))
+    } else {
+        None
+    };
+
+    match telegram_inbound::send_telegram_message_with_markup(
+        &config.bot_token,
+        chat_id,
+        &text,
+        reply_markup,
+    )
+    .await
+    {
         Ok(()) => Ok(format!("sent to chat {}", chat_id)),
         Err(e) => Err(redact_secrets(&e.to_string())),
     }

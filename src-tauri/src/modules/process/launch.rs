@@ -380,6 +380,65 @@ pub fn start_antigravity_with_fallback_path(
                 #[cfg(target_os = "linux")]
                 clean_appimage_env(&mut cmd);
 
+                #[cfg(target_os = "windows")]
+                {
+                    if let Err(initial_err) = spawn_with_job_breakaway_fallback(&mut cmd) {
+                        crate::modules::logger::log_warn(&format!(
+                            "[Process] Direct spawn failed ({}), attempting Windows shell dispatch ladder...",
+                            initial_err
+                        ));
+                        let target_str = detected_path.to_string_lossy().to_string();
+                        let mut shell_cmd = Command::new("cmd.exe");
+                        shell_cmd.creation_flags(0x08000000);
+                        shell_cmd
+                            .arg("/s")
+                            .arg("/c")
+                            .arg("start")
+                            .arg("")
+                            .arg(&target_str);
+                        if let Some(ref args) = args {
+                            for arg in args {
+                                shell_cmd.arg(arg);
+                            }
+                        }
+                        if let Some(parent) = detected_path.parent() {
+                            shell_cmd.current_dir(parent);
+                        }
+                        if spawn_with_job_breakaway_fallback(&mut shell_cmd).is_err() {
+                            let mut ps_cmd = Command::new("powershell.exe");
+                            ps_cmd.creation_flags(0x08000000);
+                            ps_cmd
+                                .arg("-NoProfile")
+                                .arg("-NonInteractive")
+                                .arg("-WindowStyle")
+                                .arg("Hidden")
+                                .arg("-Command");
+                            let arg_list = args
+                                .as_ref()
+                                .map(|a| {
+                                    a.iter()
+                                        .map(|s| format!("'{}'", s.replace('\'', "''")))
+                                        .collect::<Vec<_>>()
+                                        .join(",")
+                                })
+                                .unwrap_or_default();
+                            let ps_script = format!(
+                                "Start-Process -FilePath '{}' -ArgumentList @({})",
+                                target_str.replace('\'', "''"),
+                                arg_list
+                            );
+                            ps_cmd.arg(&ps_script);
+                            if let Some(parent) = detected_path.parent() {
+                                ps_cmd.current_dir(parent);
+                            }
+                            spawn_with_job_breakaway_fallback(&mut ps_cmd).map_err(|e| {
+                                format!("Startup failed (detected path {:?}): {}", detected_path, e)
+                            })?;
+                        }
+                    }
+                }
+
+                #[cfg(not(target_os = "windows"))]
                 spawn_with_job_breakaway_fallback(&mut cmd).map_err(|e| {
                     format!("Startup failed (detected path {:?}): {}", detected_path, e)
                 })?;

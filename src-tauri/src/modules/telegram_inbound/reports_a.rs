@@ -315,3 +315,163 @@ pub fn format_observe_report() -> String {
         body_sections
     )
 }
+
+/// Format standalone Fleet & Machine Identity report without requiring Supabase
+pub fn format_fleet_identity_report() -> String {
+    let machine_name = std::env::var("COMPUTERNAME")
+        .or_else(|_| std::env::var("HOSTNAME"))
+        .unwrap_or_else(|_| email_watcher::detect_machine_name());
+    let local_ip = email_watcher::detect_local_ip();
+    let ver = git_info::get_app_version();
+
+    let reg = crate::modules::instance::load_registry().unwrap_or_default();
+    let active_inst = reg
+        .instances
+        .iter()
+        .find(|i| i.id == reg.active_instance_id || i.is_default);
+    let active_inst_name = active_inst.map(|i| i.name.as_str()).unwrap_or("default");
+    let active_inst_id = active_inst.map(|i| i.id.as_str()).unwrap_or("default");
+    let active_email = active_inst
+        .and_then(|i| i.bound_email.as_deref())
+        .unwrap_or("none");
+
+    let instances_count = reg.instances.len();
+    let accounts_count = account::load_account_index()
+        .map(|idx| idx.accounts.len())
+        .unwrap_or(0);
+
+    let (live_pids, is_running) = active_inst
+        .map(|i| {
+            let pids = crate::modules::instance::find_pids_for_data_dir(&i.data_dir, i.is_default);
+            let running = !pids.is_empty();
+            (pids, running)
+        })
+        .unwrap_or_default();
+
+    let running_tag = if is_running {
+        "🟢 RUNNING"
+    } else {
+        "⚪ IDLE"
+    };
+    let pid_str = if live_pids.is_empty() {
+        "-".to_string()
+    } else {
+        live_pids
+            .iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+
+    format!(
+        "🌐 <b>Standalone Fleet Identity Card</b>\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        🖥️ <b>Machine:</b> <code>{}</code>\n\
+        📡 <b>LAN IP:</b> <code>{}</code>\n\
+        📦 <b>AGM Version:</b> <code>v{}</code>\n\
+        ⚙️ <b>Active Instance:</b> <code>{}</code> (<code>{}</code>)\n\
+        🚦 <b>Instance State:</b> {} (PIDs: <code>{}</code>)\n\
+        👤 <b>Bound Account:</b> <code>{}</code>\n\
+        📊 <b>Fleet Inventory:</b> {} instances | {} accounts\n\n\
+        💡 <b>Available Commands:</b>\n\
+        • <code>/instances</code> — List all instance profiles on this machine\n\
+        • <code>/accounts</code> — List all registered accounts and quota levels\n\
+        • <code>/observe</code> — Live running prompts and status\n\
+        • <code>/whoami</code> — Quick node identity",
+        clean_for_telegram_html(&machine_name, 64),
+        clean_for_telegram_html(&local_ip, 48),
+        clean_for_telegram_html(&ver, 24),
+        clean_for_telegram_html(active_inst_name, 48),
+        clean_for_telegram_html(active_inst_id, 48),
+        running_tag,
+        clean_for_telegram_html(&pid_str, 48),
+        clean_for_telegram_html(active_email, 64),
+        instances_count,
+        accounts_count
+    )
+}
+
+/// Format instances report listing all local instance profiles and their bound accounts
+pub fn format_instances_report() -> String {
+    let reg = crate::modules::instance::load_registry().unwrap_or_default();
+    if reg.instances.is_empty() {
+        return "📁 <b>Instances:</b> No instances registered.".to_string();
+    }
+
+    let mut out = format!(
+        "💻 <b>Registered Instance Profiles ({} total)</b>\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━\n",
+        reg.instances.len()
+    );
+
+    for (idx, inst) in reg.instances.iter().enumerate() {
+        let is_active = reg.active_instance_id == inst.id;
+        let is_running =
+            crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
+        let status_emoji = if is_running { "🟢" } else { "⚪" };
+        let active_badge = if is_active { " <i>[ACTIVE]</i>" } else { "" };
+        let bound = inst.bound_email.as_deref().unwrap_or("(none)");
+
+        out.push_str(&format!(
+            "{}. {} <b>{}</b> (<code>{}</code>){}\n   👤 Bound: <code>{}</code>\n   📁 Data: <code>{}</code>\n",
+            idx + 1,
+            status_emoji,
+            clean_for_telegram_html(&inst.name, 48),
+            clean_for_telegram_html(&inst.id, 48),
+            active_badge,
+            clean_for_telegram_html(bound, 64),
+            clean_for_telegram_html(&inst.data_dir, 64)
+        ));
+    }
+
+    out
+}
+
+/// Format accounts report listing all accounts and their quota balances
+pub fn format_accounts_report() -> String {
+    let accounts = match crate::modules::account::list_accounts() {
+        Ok(accs) => accs,
+        Err(e) => {
+            return format!(
+                "❌ <b>Failed to load accounts:</b> {}",
+                escape_telegram_html(&e)
+            )
+        }
+    };
+
+    if accounts.is_empty() {
+        return "👥 <b>Accounts:</b> No accounts registered.".to_string();
+    }
+
+    let curr_id = crate::modules::account::get_current_account_id().unwrap_or_default();
+
+    let mut out = format!(
+        "👥 <b>Registered Accounts ({} total)</b>\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━\n",
+        accounts.len()
+    );
+
+    for (idx, acc) in accounts.iter().enumerate() {
+        let is_current = curr_id.as_deref() == Some(&acc.id);
+        let curr_badge = if is_current { " <i>[ACTIVE]</i>" } else { "" };
+        let tier = acc.token.subscription_tier.as_deref().unwrap_or("Standard");
+        let (q_4h, q_weekly) =
+            crate::modules::auto_switcher::extract_dual_window_quotas(acc, "gemini-2.5-pro");
+        let q_str = match (q_4h, q_weekly) {
+            (Some(h), Some(w)) => format!("4h: {:.1}% | Weekly: {:.1}%", h, w),
+            (Some(h), None) => format!("4h: {:.1}%", h),
+            _ => "Quota: active".to_string(),
+        };
+
+        out.push_str(&format!(
+            "{}. <b>{}</b>{}\n   🏷️ Tier: <code>{}</code> | 📊 <code>{}</code>\n",
+            idx + 1,
+            clean_for_telegram_html(&acc.email, 64),
+            curr_badge,
+            clean_for_telegram_html(tier, 32),
+            clean_for_telegram_html(&q_str, 48)
+        ));
+    }
+
+    out
+}
