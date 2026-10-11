@@ -51,6 +51,7 @@ export function usePromptTreePromptActions({
         setIsEnqueueing,
         setIsFocusing,
         confirmationSuffix,
+        conversationTargetMode,
         selectedConversationRef,
         selectedProjectRef,
         activePromptTextRef,
@@ -233,8 +234,9 @@ export function usePromptTreePromptActions({
             const targetInstId = proj?.instance_id || instanceId || 'default';
             let dispatchOk = false;
             let dispatchErr: unknown = null;
+            const targetConvId = conversationTargetMode === 'new' ? undefined : conv?.conversation_id;
             try {
-                await sendPromptNow(targetInstId, repoPath, promptContent, conv?.conversation_id);
+                await sendPromptNow(targetInstId, repoPath, promptContent, targetConvId);
                 dispatchOk = true;
             } catch (sendErr) {
                 dispatchErr = sendErr;
@@ -273,7 +275,7 @@ export function usePromptTreePromptActions({
         }
     }, [
         selectedConversation, selectedProject, treeData, archivedProjectIds,
-        editedPromptText, activePromptText, confirmationSuffix, instanceId,
+        editedPromptText, activePromptText, confirmationSuffix, conversationTargetMode, instanceId,
         selectConversation, selectedConversationRef, selectedProjectRef,
         activePromptTextRef, setSelectedProject, setActionMsg, setError, setIsResending,
     ]);
