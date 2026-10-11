@@ -23,3 +23,6 @@ pub use prompts::{CONTEXT_SUMMARY_PROMPT, INTERNAL_BACKGROUND_TASK, SUMMARY_REQU
 pub use request::wrap_request;
 pub use request_v2::wrap_request_v2;
 pub use response::{inject_ids_to_response, unwrap_response};
+
+#[cfg(test)]
+pub(crate) use request::TEST_MUTEX;

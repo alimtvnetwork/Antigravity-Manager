@@ -105,7 +105,7 @@ pub(crate) fn phase_finalize(
 
     (
         final_body,
-        setup.session_id,
+        setup.session_id.clone(),
         setup.message_count,
         prefix_hash,
     )

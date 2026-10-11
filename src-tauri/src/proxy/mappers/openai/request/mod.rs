@@ -32,4 +32,4 @@ pub use transform::{enforce_uppercase_types, transform_openai_request};
 #[cfg(test)]
 pub(crate) use super::models::*;
 #[cfg(test)]
-pub(crate) use serde_json::json;
+pub(crate) use serde_json::{json, Value};

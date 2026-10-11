@@ -171,8 +171,8 @@ mod tests_defense;
 mod tests_grounding;
 
 pub use image_config::{
-    clean_image_model_name, image_aspect_ratio_from_size, parse_image_config,
-    parse_image_config_with_params, try_parse_image_config_with_params,
+    calculate_aspect_ratio_from_size, clean_image_model_name, image_aspect_ratio_from_size,
+    parse_image_config, parse_image_config_with_params, try_parse_image_config_with_params,
 };
 pub use multimodal::{
     create_gemini_inline_part, detect_mime_from_bytes, enhance_gemini_skills_prompt,

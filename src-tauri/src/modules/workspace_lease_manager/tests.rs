@@ -5,6 +5,7 @@ use super::*;
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use crate::modules::supabase_sync;
 
     #[test]
     pub(crate) fn test_is_account_or_email_leased_by_other() {

@@ -1,6 +1,7 @@
 // Claude request tests (split from request.rs).
 // Test-only module, declared #[cfg(test)] in mod.rs.
 use super::*;
+use crate::proxy::config::ThinkingBudgetConfig;
 use serde_json::json;
 
 #[test]

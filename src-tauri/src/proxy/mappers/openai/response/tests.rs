@@ -1,6 +1,9 @@
 #[cfg(test)]
 mod tests {
+    use super::sanitize::normalize_and_sanitize_tool_args;
+    use super::transform::transform_openai_response;
     use super::*;
+    use crate::proxy::mappers::openai::OpenAIContent;
     use serde_json::json;
 
     #[test]

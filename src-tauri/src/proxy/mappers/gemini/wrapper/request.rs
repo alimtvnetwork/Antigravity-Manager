@@ -22,7 +22,8 @@ pub fn wrap_request(
     )
 }
 
-static TEST_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+#[cfg(test)]
+pub(crate) static TEST_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[cfg(test)]
 mod test_fixes {

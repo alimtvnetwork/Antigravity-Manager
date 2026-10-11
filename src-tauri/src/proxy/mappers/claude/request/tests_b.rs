@@ -1,6 +1,7 @@
 // Claude request tests (split from request.rs).
 // Test-only module, declared #[cfg(test)] in mod.rs.
 use super::*;
+use crate::proxy::mappers::claude::request::messages::sort_thinking_blocks_first;
 use serde_json::json;
 
 #[test]

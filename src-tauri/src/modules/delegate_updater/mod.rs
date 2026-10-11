@@ -18,6 +18,7 @@ pub use help::*;
 pub use prepare::*;
 pub use process::*;
 pub use run::*;
-pub use tests::*;
+#[cfg(test)]
+pub(crate) use tests::*;
 pub use types::*;
 pub use ui::*;

@@ -15,5 +15,6 @@ pub use csv::*;
 pub use encoding::*;
 pub use excel::*;
 pub use json::*;
-pub use tests::*;
+#[cfg(test)]
+pub(crate) use tests::*;
 pub use types::*;

@@ -1,6 +1,8 @@
 // Claude request tests (split from request.rs).
 // Test-only module, declared #[cfg(test)] in mod.rs.
 use super::*;
+use crate::proxy::common::json_schema::clean_json_schema;
+use crate::proxy::mappers::claude::request::messages::normalize_claude_client_identity;
 use serde_json::json;
 
 #[test]

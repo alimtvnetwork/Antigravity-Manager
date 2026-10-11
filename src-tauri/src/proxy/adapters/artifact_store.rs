@@ -26,3 +26,5 @@ pub(crate) use storedtoolartifact::ArtifactStoreInner;
 pub use storedtoolartifact::StoredToolArtifact;
 pub use storedtoolartifact::ToolArtifactRecord;
 pub use storedtoolartifact::ToolArtifactStore;
+#[cfg(test)]
+pub(crate) use storedtoolartifact::DEFAULT_PERSISTED_TTL;

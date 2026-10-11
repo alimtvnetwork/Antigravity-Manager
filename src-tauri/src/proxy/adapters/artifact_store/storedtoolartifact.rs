@@ -2,7 +2,7 @@ use super::*;
 
 const SCHEMA_VERSION: i64 = 1;
 
-const DEFAULT_PERSISTED_TTL: Duration = Duration::from_secs(30 * 24 * 3600);
+pub(crate) const DEFAULT_PERSISTED_TTL: Duration = Duration::from_secs(30 * 24 * 3600);
 
 const DEFAULT_L1_SIZE: usize = 64;
 

@@ -227,6 +227,8 @@ pub fn normalize_to_standard_id(model_name: &str) -> Option<String> {
 mod tests {
     use super::super::map_claude_model_to_gemini;
     use super::*;
+    use crate::proxy::common::model_mapping::get_all_dynamic_models;
+    use std::collections::HashMap;
 
     #[test]
     fn test_model_mapping() {

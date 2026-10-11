@@ -11,5 +11,6 @@ pub use db::*;
 pub use green_projects::*;
 pub use listing::*;
 pub use restore::*;
-pub use tests::*;
+#[cfg(test)]
+pub(crate) use tests::*;
 pub use types::*;
