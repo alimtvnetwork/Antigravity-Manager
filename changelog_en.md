@@ -2,6 +2,14 @@
 
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
+    *   **v4.190.0 (2026-10-12)**:
+        -   **Royal Violet UI Theme**:
+            -   **Description**: Implemented the approved Royal Violet design system across the app — daisyUI dark theme tokens, semantic CSS variables, and legacy navy hex remap. (Thanks to @aukgit)
+        -   **Account Switch Relaunch Verification**:
+            -   **Description**: Added post-relaunch IDE verification to the account-switch flow (`switch_account_to_instance` and the 5-step desktop switch); a spawn that returns Ok no longer reports success when no IDE window materializes. (Thanks to @aukgit)
+        -   **Running Prompt Backup/Restore & Rerun Root-Cause Fix**:
+            -   **Description**: Fixed `agm restore` silently restoring nothing after an instance switch (strict per-instance filter matched the current active instance instead of the instance recorded at backup time) — unscoped restore now covers all instances in FIFO order, with `-i <id>` for strict single-instance scoping. Fixed `agm rerun [N]` selecting the oldest N prompts instead of the most recent N and marking them dispatched without re-sending — rerun now re-queues as `backed_up` and dispatches via agy. Added `test_restore_scoping_across_instances` regression test. (Thanks to @aukgit)
+
     *   **v4.189.0 (2026-10-12)**:
         -   **Auto-Switch & Fast-Forward Scoring and Process Isolation**:
             -   **Description**: Replaced strict 100% quota requirement in Step 3 fallback with proportional quota headroom scoring (`score_candidate_account_fallback`), eliminating auto-rotation deadlocks when all fleet accounts have sub-100% quota. Enforced conscious instance root PID isolation in `pid_scan.rs` (`matched_set.contains(&p)`), preventing stopped sibling instances from falsely reporting as running or having their processes terminated during neighbor instance restarts. (Thanks to @aukgit)
