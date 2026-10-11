@@ -186,6 +186,10 @@ impl<T: Serialize> CliEnvelope<T> {
         }
     }
 
+    pub fn error(command: &str, instance_id: Option<String>, message: &str) -> Self {
+        Self::err(command, instance_id, "ERROR", message)
+    }
+
     pub fn print_and_exit(&self) -> ! {
         let json_str = serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".to_string());
         println!("{}", json_str);

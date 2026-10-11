@@ -241,7 +241,8 @@ pub(crate) fn cmd_prompts_send(args: &[String]) {
         }
         Err(e) => {
             if ctx.json_output {
-                CliEnvelope::error("prompt send", Some(target_instance), &e).print_and_exit();
+                CliEnvelope::<()>::err("prompt send", Some(target_instance), "DISPATCH_FAILED", &e)
+                    .print_and_exit();
             }
             eprintln!("[ERROR] Failed to dispatch prompt: {}", e);
             std::process::exit(1);
@@ -382,7 +383,8 @@ pub(crate) fn cmd_prompts_queue(args: &[String]) {
         }
         Err(e) => {
             if ctx.json_output {
-                CliEnvelope::error("prompt queue", Some(target_instance), &e).print_and_exit();
+                CliEnvelope::<()>::err("prompt queue", Some(target_instance), "QUEUE_FAILED", &e)
+                    .print_and_exit();
             }
             eprintln!("[ERROR] Failed to queue prompt: {}", e);
             std::process::exit(1);
