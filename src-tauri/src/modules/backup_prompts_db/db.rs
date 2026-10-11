@@ -39,6 +39,11 @@ pub fn get_backup_prompts_db_path(custom_file: Option<&str>) -> Result<PathBuf, 
     Ok(backup_dir.join("backup-prompts.db"))
 }
 
+/// Convenience alias for connecting to the default backup prompts database
+pub fn connect_db() -> Result<Connection, String> {
+    connect_backup_db(None)
+}
+
 /// Open and initialize the split SQLite database connection
 pub fn connect_backup_db(custom_file: Option<&str>) -> Result<Connection, String> {
     let db_path = get_backup_prompts_db_path(custom_file)?;
