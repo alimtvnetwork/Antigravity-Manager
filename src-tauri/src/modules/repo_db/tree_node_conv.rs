@@ -25,7 +25,7 @@ pub(crate) fn build_transcript_conv_nodes(
     let conn_opt = ctx.conn_opt;
     let registry = ctx.registry;
     // Instance identity for the current project (used when conv_inst_id matches proj.instance_id)
-    let instance_seq_num: Option<i64> = None;
+    let instance_seq_num: Option<u32> = None;
     let instance_name: String = proj.instance_id.clone();
     let instance_exe_name: String =
         crate::modules::instance::resolve_instance_exe_name(&proj.instance_id, None);
@@ -73,7 +73,7 @@ pub(crate) fn build_transcript_conv_nodes(
                 )
             } else if item.conv_inst_id == "default" || item.conv_inst_id == "__default__" {
                 (
-                    Some(1i64),
+                    Some(1),
                     "default".to_string(),
                     crate::modules::instance::resolve_instance_exe_name("default", None),
                 )
@@ -83,7 +83,7 @@ pub(crate) fn build_transcript_conv_nodes(
                 .find(|i| i.id == item.conv_inst_id || i.name == item.conv_inst_id)
             {
                 (
-                    inst.seq_num.map(|v| v as i64),
+                    inst.seq_num,
                     inst.name.clone(),
                     crate::modules::instance::resolve_instance_exe_name(
                         &inst.id,
@@ -292,7 +292,7 @@ pub(crate) fn build_active_prompt_conv_nodes(
                 )
             } else if ap.instance_id == "default" || ap.instance_id == "__default__" {
                 (
-                    Some(1i64),
+                    Some(1),
                     "default".to_string(),
                     crate::modules::instance::resolve_instance_exe_name("default", None),
                 )
@@ -302,7 +302,7 @@ pub(crate) fn build_active_prompt_conv_nodes(
                 .find(|i| i.id == ap.instance_id || i.name == ap.instance_id)
             {
                 (
-                    inst.seq_num.map(|v| v as i64),
+                    inst.seq_num,
                     inst.name.clone(),
                     crate::modules::instance::resolve_instance_exe_name(
                         &inst.id,
