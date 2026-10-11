@@ -283,7 +283,7 @@ pub fn read_config_state(proxy_url: Option<String>) -> HermesConfigState {
         discover_models: true,
         ..HermesConfigState::default()
     };
-    let Some(path) = get_config_path() else {
+    let Ok(path) = get_config_path() else {
         return state;
     };
     let Ok(source) = read_hermes_source(&path) else {

@@ -355,10 +355,10 @@ pub(crate) async fn completions_success_stream(
                     if store_response {
                         crate::proxy::http_session_store::save_session_delta(
                             response_id_for_save.clone(),
-                            session_parent,
-                            session_save_input,
+                            session_parent.take(),
+                            session_save_input.clone(),
                             outputs,
-                            session_save_instructions,
+                            session_save_instructions.clone(),
                             openai_req.model.clone(),
                             routing_session_id.clone(),
                         )
