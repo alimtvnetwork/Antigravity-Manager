@@ -286,7 +286,7 @@ pub fn read_config_state(proxy_url: Option<String>) -> HermesConfigState {
     let Some(path) = get_config_path() else {
         return state;
     };
-    let Ok(source) = read_hermes_source(&path) else {
+    let Some(source) = read_hermes_source(&path) else {
         return state;
     };
     let Ok(doc) = parse_doc(&source) else {

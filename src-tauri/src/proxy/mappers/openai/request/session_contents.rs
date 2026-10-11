@@ -471,4 +471,6 @@ pub(crate) fn phase_contents(
             }),
         );
     }
+
+    contents
 }

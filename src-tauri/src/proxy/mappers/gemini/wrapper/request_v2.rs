@@ -104,5 +104,5 @@ pub fn wrap_request_v2(
         session_id,
         project_id,
         prep.is_under_v3,
-    );
+    )
 }

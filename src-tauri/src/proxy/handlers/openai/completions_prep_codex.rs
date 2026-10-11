@@ -235,7 +235,10 @@ pub(crate) fn completions_prep_codex(
     }
     // [FIX] 在 openai_req 反序列化之前，从 body 中捕获原始 input 和 instructions
     // 用于后续 session 保存时，保留完整的工具调用历史（而非从 openai_req.messages 重建丢失信息）
-    let normalized_interaction_ledger = body.get("_interaction_ledger").cloned();
+    let normalized_interaction_ledger = body
+        .get("_interaction_ledger")
+        .cloned()
+        .and_then(|v| serde_json::from_value(v).ok());
     let (session_save_input, session_save_instructions) = if let Some(obj) = body.as_object_mut() {
         let input = bounded_session_input.take().unwrap_or_default();
         obj.remove("input");

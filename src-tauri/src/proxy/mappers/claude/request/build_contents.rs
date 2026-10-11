@@ -423,7 +423,7 @@ pub(crate) fn build_contents(
                         }
 
                         // [优化] 如果结果为空，注入显式确认信号，防止模型幻觉
-                        merged_content = empty_tool_result_fallback(&merged_content, is_error);
+                        merged_content = empty_tool_result_fallback(&merged_content, *is_error);
 
                         let part = json!({
                             "functionResponse": {

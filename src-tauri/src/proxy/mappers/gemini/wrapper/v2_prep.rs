@@ -48,7 +48,8 @@ pub(crate) fn phase_thinking_prep(
                 .or_else(|| tc.get("reasoningEffort"))
                 .or_else(|| tc.get("effort"))
         })
-        .and_then(|v| v.as_str());
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
 
     let client_switch = crate::proxy::pipeline::extract_client_thinking_switch(
         None,
