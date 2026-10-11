@@ -514,3 +514,13 @@ pub fn start_telegram_daemon() {
         }
     });
 }
+
+/// Stop background Telegram polling daemon
+pub fn stop_telegram_daemon() {
+    TELEGRAM_RUNNING.store(false, Ordering::SeqCst);
+}
+
+/// Get latest Telegram watcher status
+pub async fn get_telegram_status() -> TelegramWatcherStatus {
+    LAST_TELEGRAM_STATUS.read().await.clone()
+}

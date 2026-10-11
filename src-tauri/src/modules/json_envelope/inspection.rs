@@ -441,7 +441,7 @@ pub(crate) fn describe_format(
             )
         }
         KnownDataType::SshNodes => {
-            let count = if let Some(arr) = data.get("nodes").and_then(|e| e.as_array()) {
+            let count = if let Some(arr) = data.get("nodes").and_then(|n| n.as_array()) {
                 arr.len()
             } else if let Some(arr) = data.as_array() {
                 arr.len()
@@ -449,12 +449,12 @@ pub(crate) fn describe_format(
                 1
             };
             (
-                "SSH Cluster Fleet Nodes".to_string(),
+                "SSH Cluster Nodes".to_string(),
                 format!(
-                    "Registers/updates {} SSH node(s) for multi-node cluster delegation",
+                    "Imports {} SSH remote node profile(s) into local cluster registry",
                     count
                 ),
-                format!("agm ssh load-json \"{}\" -y", clean_path),
+                format!("agm ssh nodes import-json \"{}\" -y", clean_path),
                 count,
             )
         }

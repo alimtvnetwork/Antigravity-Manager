@@ -336,9 +336,7 @@ pub fn format_fleet_identity_report() -> String {
         .unwrap_or("none");
 
     let instances_count = reg.instances.len();
-    let accounts = account::load_account_index()
-        .map(|idx| idx.accounts)
-        .unwrap_or_default();
+    let accounts = crate::modules::account::list_accounts().unwrap_or_default();
     let accounts_count = accounts.len();
 
     let (live_pids, is_running) = active_inst
