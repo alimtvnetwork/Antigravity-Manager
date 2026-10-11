@@ -14,6 +14,7 @@ use axum::{
     routing::{any, get, post},
     Router,
 };
+use axum::response::IntoResponse;
 
 /// Health check handler
 pub(crate) async fn health_check_handler() -> Response {

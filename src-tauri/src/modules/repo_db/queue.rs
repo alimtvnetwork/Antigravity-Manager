@@ -10,6 +10,7 @@ use super::state::get_memory_prompts_map;
 use super::tree::invalidate_prompt_tree_cache;
 use crate::error::AppError;
 use chrono::Utc;
+use rusqlite::OptionalExtension;
 use rusqlite::params;
 use rusqlite::Connection;
 use std::fs;

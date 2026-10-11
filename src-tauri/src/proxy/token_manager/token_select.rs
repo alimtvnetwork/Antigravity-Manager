@@ -209,7 +209,7 @@ impl TokenManager {
             if target_token.is_none() {
                 // 先过滤出未限流的账号
                 let mut non_limited: Vec<ProxyToken> = Vec::new();
-                for t in &tokens_snapshot {
+                for t in tokens_snapshot {
                     if !self
                         .is_rate_limited(&t.account_id, Some(&normalized_target))
                         .await
@@ -235,7 +235,7 @@ impl TokenManager {
 
             // 先过滤出未限流的账号
             let mut non_limited: Vec<ProxyToken> = Vec::new();
-            for t in &tokens_snapshot {
+            for t in tokens_snapshot {
                 if !self
                     .is_rate_limited(&t.account_id, Some(&normalized_target))
                     .await
@@ -318,7 +318,7 @@ impl TokenManager {
 
                         // 重新尝试选择账号
                         let mut retry_token = None;
-                        for token in &tokens_snapshot {
+                        for token in tokens_snapshot {
                             if attempted.contains(&token.account_id)
                                 || self
                                     .is_rate_limited(&token.account_id, Some(&normalized_target))
@@ -355,7 +355,7 @@ impl TokenManager {
                                         .rate_limit_tracker
                                         .is_rate_limited(&t.account_id, Some(&normalized_target))
                                     && !(quota_protection_enabled
-                                        && t.protected_models.contains(&normalized_target))
+                                        && t.protected_models.contains(normalized_target))
                                     && !self
                                         .rate_limit_tracker
                                         .is_rate_limited(&t.account_id, Some(&normalized_target))
@@ -366,7 +366,7 @@ impl TokenManager {
                                     "✅ Optimistic reset successful! Using account: {}",
                                     t.email
                                 );
-                                t.clone()
+                                Ok(t.clone())
                             } else {
                                 return Err(
                                     "All accounts failed after optimistic reset.".to_string()

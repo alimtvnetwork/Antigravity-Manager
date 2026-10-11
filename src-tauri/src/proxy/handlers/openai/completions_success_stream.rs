@@ -24,6 +24,7 @@ use crate::proxy::thinking_store::SessionScope;
 use super::chat_conversion::convert_chat_response_to_responses;
 use super::responses_history::into_history_without_inline_media;
 use super::responses_media::stream_chunk_has_error_event;
+use axum::response::IntoResponse;
 
 pub(crate) enum CompletionsStreamOutcome {
     Respond(Response),

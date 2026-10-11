@@ -7,6 +7,7 @@ use super::gemini_dirs::gemini_dirs_for_instance;
 use super::models::ActivePrompt;
 use super::transcript::{inspect_conversation_transcript, resolve_transcript_path};
 use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use chrono::Utc;
 use rusqlite::Connection;
 use std::collections::HashSet;

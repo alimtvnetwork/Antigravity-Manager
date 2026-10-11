@@ -20,6 +20,7 @@ use crate::proxy::server::UpstreamClient;
 use crate::proxy::TokenManager;
 
 use super::responses_history::{debug_value_without_inline_data, serialized_json_len};
+use axum::response::IntoResponse;
 
 /// Values produced by the send phase for the success/error phases.
 pub(crate) struct CompletionsSendOutput {
@@ -100,7 +101,7 @@ pub(crate) async fn completions_send(
             match token_manager
                 .get_token(
                     &config.request_type,
-                    force_rotate,
+                    *force_rotate,
                     session_id,
                     &mapped_model,
                 )
@@ -291,7 +292,7 @@ pub(crate) async fn completions_send(
         project_id,
         client_wants_stream,
         list_response,
-        causal_anchor,
+        causal_anchor: Some(causal_anchor),
         upstream_req_start,
         gemini_body_for_debug,
     })

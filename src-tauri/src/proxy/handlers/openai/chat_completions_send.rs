@@ -337,7 +337,7 @@ pub(crate) async fn chat_completions_send(
         project_id,
         client_wants_stream,
         actual_stream,
-        causal_anchor,
+        causal_anchor: Some(causal_anchor),
         upstream_req_start,
         gemini_body_for_debug,
         prefix_hash: _prefix_hash,

@@ -1,6 +1,6 @@
 use super::*;
-use crate::modules::supabase_sync::config_a::get_config_path;
 use crate::proxy::hermes_sync::detect::get_backup_path;
+use crate::proxy::hermes_sync::detect::get_config_path;
 use crate::proxy::hermes_sync::detect::normalize_base_url;
 use crate::proxy::hermes_sync::sync_logic::apply_clear_losslessly;
 use crate::proxy::hermes_sync::sync_logic::apply_restore_losslessly;

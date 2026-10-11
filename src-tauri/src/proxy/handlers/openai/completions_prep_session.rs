@@ -8,6 +8,7 @@ use super::chat_conversion::responses_routing_session_id;
 use super::responses_history::omit_media_before_latest_user_turn;
 use super::responses_media::validate_responses_input_image_limits;
 use crate::proxy::http_session_store::SessionParent;
+use axum::response::IntoResponse;
 
 pub(crate) struct CompletionsSessionPrep {
     pub body: Value,

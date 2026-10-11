@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::StatusCode;
-use axum::response::Response;
+use axum::response::{IntoResponse, Response};
 use bytes::Bytes;
 use serde_json::{json, Value};
 use tracing::{debug, error, info};
@@ -96,7 +96,7 @@ pub(crate) async fn chat_completions_success(
             message_count,
             Some(client_tool_names.clone()),
             include_usage,
-            Some(causal_anchor),
+            causal_anchor,
         );
 
         let mut first_data_chunk = None;

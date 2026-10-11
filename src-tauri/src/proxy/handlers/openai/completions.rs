@@ -122,7 +122,7 @@ pub async fn handle_completions(
                 setup.trace_id.clone(),
                 original_body.clone(),
                 setup.client_tool_names.clone(),
-                &uri,
+                &axum::extract::OriginalUri(uri.clone()),
                 &setup.response_id_for_save,
                 setup.routing_session_id.clone(),
                 &setup.session_id_str,

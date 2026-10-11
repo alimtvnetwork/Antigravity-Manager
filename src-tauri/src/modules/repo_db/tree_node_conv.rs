@@ -206,7 +206,7 @@ pub(crate) fn build_active_prompt_conv_nodes(
 
             let has_non_idle_summary = if let Some(ref session_id) = ap.session_id {
                 let mut is_non_idle = false;
-                for (owning_inst_id, base) in &candidate_dirs {
+                for (owning_inst_id, base) in candidate_dirs {
                     let norm_owning =
                         if owning_inst_id == "__default__" || owning_inst_id.is_empty() {
                             "default"
