@@ -434,7 +434,7 @@ pub fn format_accounts_report() -> String {
         Err(e) => {
             return format!(
                 "❌ <b>Failed to load accounts:</b> {}",
-                escape_telegram_html(&e)
+                clean_for_telegram_html(&e.to_string(), 200)
             )
         }
     };
@@ -454,7 +454,11 @@ pub fn format_accounts_report() -> String {
     for (idx, acc) in accounts.iter().enumerate() {
         let is_current = curr_id.as_deref() == Some(&acc.id);
         let curr_badge = if is_current { " <i>[ACTIVE]</i>" } else { "" };
-        let tier = acc.token.subscription_tier.as_deref().unwrap_or("Standard");
+        let tier = acc
+            .quota
+            .as_ref()
+            .and_then(|q| q.subscription_tier.as_deref())
+            .unwrap_or("Standard");
         let (q_4h, q_weekly) =
             crate::modules::auto_switcher::extract_dual_window_quotas(acc, "gemini-2.5-pro");
         let q_str = match (q_4h, q_weekly) {
