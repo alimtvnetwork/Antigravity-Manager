@@ -9,53 +9,29 @@ pub(crate) fn check_cached_pid_alive(
     instance_id: &str,
     canonical_id: &str,
 ) -> Option<(bool, Option<u32>, Vec<u32>)> {
-    let mut entry = get_cached_instance_process(canonical_id)
+    let entry = get_cached_instance_process(canonical_id)
         .or_else(|| get_cached_instance_process(instance_id))?;
 
-    // 1. Verify primary PID
+    // 1. Verify primary PID strictly — never promote residual helper/crashpad child PIDs when primary_pid exits
     if let Some(primary) = entry.primary_pid {
-        if is_pid_alive_targeted(primary) && saved_pid_matches(primary) {
-            return Some((true, Some(primary), entry.pids));
+        if primary > 0 && is_pid_alive_targeted(primary) && saved_pid_matches(primary) {
+            let live_pids: Vec<u32> = entry
+                .pids
+                .iter()
+                .copied()
+                .filter(|&pid| pid > 0 && is_pid_alive_targeted(pid) && saved_pid_matches(pid))
+                .collect();
+            let pids = if live_pids.is_empty() {
+                vec![primary]
+            } else {
+                live_pids
+            };
+            return Some((true, Some(primary), pids));
         }
     }
 
-    // 2. Multi-PID Vitality Fallback: Check all surviving PIDs
-    let surviving_pids: Vec<u32> = entry
-        .pids
-        .iter()
-        .copied()
-        .filter(|&pid| pid > 0 && is_pid_alive_targeted(pid) && saved_pid_matches(pid))
-        .collect();
-
-    if !surviving_pids.is_empty() {
-        let promoted_pid = surviving_pids[0];
-        crate::modules::logger::log_info(&format!(
-            "[SmartProcessCache] Primary PID {:?} exited for instance '{}'. Promoted surviving child PID {} from {} candidates.",
-            entry.primary_pid, canonical_id, promoted_pid, surviving_pids.len()
-        ));
-
-        // Promote new primary PID and update cache
-        entry.primary_pid = Some(promoted_pid);
-        entry.pid = promoted_pid;
-        entry.pids = surviving_pids.clone();
-        entry.last_verified_at = chrono::Utc::now().timestamp();
-        entry.is_alive = true;
-
-        if let Ok(mut cache) = INSTANCE_PROCESS_CACHE.write() {
-            cache.insert(canonical_id.to_string(), entry.clone());
-            if instance_id != canonical_id {
-                cache.insert(instance_id.to_string(), entry.clone());
-            }
-        }
-        // Justification: PID cache bookkeeping; staleness is tolerated via the OS-level re-detect fallback
-        crate::error::record_ignored(
-            record_instance_pid(canonical_id, promoted_pid, &entry.data_dir),
-            "record instance pid",
-        );
-        return Some((true, Some(promoted_pid), surviving_pids));
-    }
-
-    // 3. Only invalidate cache when all candidate PIDs are dead
+    // 2. Primary PID is no longer alive: invalidate cache and fall back to authoritative OS PID scan
+    //    rather than promoting a surviving child/crashpad helper PID to primary_pid.
     invalidate_instance_process_cache(canonical_id);
     if instance_id != canonical_id {
         invalidate_instance_process_cache(instance_id);

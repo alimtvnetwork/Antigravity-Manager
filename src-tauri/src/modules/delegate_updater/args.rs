@@ -8,7 +8,11 @@ pub fn normalize_version_string(raw: &str) -> String {
     let clean = raw.trim().trim_start_matches(['v', 'V']).trim();
     let base = clean.split('-').next().unwrap_or(clean);
     let parts: Vec<&str> = base.split('.').collect();
-    if parts.len() == 2 && parts.iter().all(|p| p.chars().all(|c| c.is_ascii_digit())) {
+    if parts.len() == 2
+        && parts
+            .iter()
+            .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
+    {
         if let Some(suffix_idx) = clean.find('-') {
             format!("{}.0{}", &clean[..suffix_idx], &clean[suffix_idx..])
         } else {
@@ -17,6 +21,38 @@ pub fn normalize_version_string(raw: &str) -> String {
     } else {
         clean.to_string()
     }
+}
+
+/// Unwrap an Antigravity multi-instance sandbox path back to the real host user profile root.
+/// If `raw_path` contains `.antigravity_tools/instances/` or `.antigravity_tools\instances\`,
+/// returns the host user profile prefix before that marker; otherwise returns `raw_path` unchanged.
+pub fn unwrap_sandbox_path(raw_path: &str) -> String {
+    let normalized = raw_path.replace('/', "\\");
+    let lower = normalized.to_ascii_lowercase();
+    let marker = "\\.antigravity_tools\\instances\\";
+    if let Some(idx) = lower.find(marker) {
+        let prefix = &raw_path[..idx];
+        if !prefix.is_empty() {
+            return prefix.to_string();
+        }
+    }
+    raw_path.to_string()
+}
+
+/// Strip `.antigravity_tools/instances/<id>/...` sandbox redirection from a `LOCALAPPDATA` or profile path,
+/// returning `<real_user_root>/AppData/Local` when sandboxed or `raw_path` unchanged otherwise.
+pub fn strip_instance_sandbox_local_appdata(raw_path: &Path) -> PathBuf {
+    let raw_str = raw_path.to_string_lossy();
+    let unwrapped = unwrap_sandbox_path(&raw_str);
+    if unwrapped.len() != raw_str.len() {
+        return PathBuf::from(unwrapped).join("AppData").join("Local");
+    }
+    raw_path.to_path_buf()
+}
+
+fn is_instance_sandbox_path(path: &Path) -> bool {
+    let raw_str = path.to_string_lossy();
+    unwrap_sandbox_path(&raw_str).len() != raw_str.len()
 }
 
 pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
@@ -116,26 +152,40 @@ pub fn resolve_default_install_dir(
     target_exe: Option<&PathBuf>,
 ) -> PathBuf {
     install_dir
+        .map(|dir| {
+            if is_instance_sandbox_path(&dir) {
+                strip_instance_sandbox_local_appdata(&dir)
+                    .join("Programs")
+                    .join("agm-alim")
+            } else {
+                dir
+            }
+        })
         .or_else(|| {
             target_exe
                 .and_then(|p| p.parent().map(|d| d.to_path_buf()))
-                .filter(|d| !d.to_string_lossy().to_lowercase().contains("agm-updater"))
+                .filter(|d| {
+                    !d.to_string_lossy().to_lowercase().contains("agm-updater")
+                        && !is_instance_sandbox_path(d)
+                })
         })
         .unwrap_or_else(|| {
             #[cfg(target_os = "windows")]
             {
                 if let Ok(local) = env::var("LOCALAPPDATA") {
-                    let cand1 = PathBuf::from(&local).join("Programs").join("agm-alim");
+                    let real_local = strip_instance_sandbox_local_appdata(Path::new(&local));
+                    let cand1 = real_local.join("Programs").join("agm-alim");
                     if cand1.exists() {
                         return cand1;
                     }
-                    let cand2 = PathBuf::from(&local)
-                        .join("Programs")
-                        .join("Antigravity-Tools");
+                    let cand2 = real_local.join("Programs").join("Antigravity-Tools");
                     if cand2.exists() {
                         return cand2;
                     }
                     cand1
+                } else if let Ok(profile) = env::var("USERPROFILE") {
+                    let real_local = strip_instance_sandbox_local_appdata(Path::new(&profile));
+                    real_local.join("Programs").join("agm-alim")
                 } else {
                     PathBuf::from(".")
                 }
@@ -155,7 +205,7 @@ pub fn resolve_default_install_dir(
             {
                 dirs::home_dir()
                     .map(|h| h.join(".local/bin"))
-                    .unwrap_or_else(|| PathBuf::from("/usr/local/bin"))
+                    .unwrap_or_else(|| PathBuf::from("."))
             }
         })
 }
@@ -169,6 +219,7 @@ pub fn resolve_default_target_exe(
         if !exe_str.contains("agm-update-cli")
             && !exe_str.contains("agm-updater")
             && !exe_str.contains(".trash")
+            && !is_instance_sandbox_path(&exe)
         {
             return exe;
         }

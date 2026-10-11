@@ -15,12 +15,25 @@ use std::time::Duration;
 /// Normalize version string: e.g., "4.162" or "v4.162" -> "4.162.0".
 pub(crate) fn normalize_version_string(raw: &str) -> String {
     let clean = raw.trim().trim_start_matches(['v', 'V']).trim();
-    let parts: Vec<&str> = clean.split('.').collect();
-    if parts.len() == 2 && parts.iter().all(|p| p.chars().all(|c| c.is_ascii_digit())) {
-        format!("{}.0", clean)
+    let base = clean.split('-').next().unwrap_or(clean);
+    let parts: Vec<&str> = base.split('.').collect();
+    if parts.len() == 2
+        && parts
+            .iter()
+            .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
+    {
+        if let Some(suffix_idx) = clean.find('-') {
+            format!("{}.0{}", &clean[..suffix_idx], &clean[suffix_idx..])
+        } else {
+            format!("{}.0", clean)
+        }
     } else {
         clean.to_string()
     }
+}
+
+pub(crate) fn normalize_version_str(raw: &str) -> String {
+    normalize_version_string(raw)
 }
 
 /// Extract target version string from command-line arguments.
@@ -165,23 +178,31 @@ pub(crate) fn cmd_update(args: &[String]) {
 
     if is_gitmap && !is_all {
         println!("[*] Updating GitMap CLI via 'gitmap self-update'...");
-        let _ = Command::new("gitmap")
-            .arg("self-update")
-            .stdin(Stdio::inherit())
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit())
-            .status();
+        // Justification: interactive gitmap self-update inherits stdio; spawn failure is non-fatal to caller
+        antigravity_tools_lib::error::record_ignored(
+            Command::new("gitmap")
+                .arg("self-update")
+                .stdin(Stdio::inherit())
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .status(),
+            "gitmap self-update",
+        );
         return;
     }
 
     if is_ssh_fleet {
         println!("[*] Updating AGM across SSH cluster machines via 'gitmap ssh update agm'...");
-        let _ = Command::new("gitmap")
-            .args(["ssh", "update", "agm"])
-            .stdin(Stdio::inherit())
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit())
-            .status();
+        // Justification: interactive gitmap ssh update inherits stdio; spawn failure is non-fatal to caller
+        antigravity_tools_lib::error::record_ignored(
+            Command::new("gitmap")
+                .args(["ssh", "update", "agm"])
+                .stdin(Stdio::inherit())
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .status(),
+            "gitmap ssh update agm",
+        );
         return;
     }
 
@@ -189,7 +210,11 @@ pub(crate) fn cmd_update(args: &[String]) {
         if !is_json {
             println!("[*] Checking GitMap CLI for updates (gitmap self-update)...");
         }
-        let _ = Command::new("gitmap").arg("self-update").output();
+        // Justification: optional gitmap self-update during update-all is best-effort
+        antigravity_tools_lib::error::record_ignored(
+            Command::new("gitmap").arg("self-update").output(),
+            "gitmap self-update in update-all",
+        );
     }
 
     if !is_json {
@@ -383,6 +408,19 @@ pub(crate) fn cmd_update(args: &[String]) {
             println!("[*] Triggering automatic update installation...");
         }
 
+        let mut explicit_install_dir = None;
+        for i in 0..args.len() {
+            if args[i] == "--install-dir" && i + 1 < args.len() {
+                explicit_install_dir = Some(PathBuf::from(&args[i + 1]));
+                break;
+            }
+        }
+        let resolved_install_dir =
+            antigravity_tools_lib::modules::delegate_updater::resolve_default_install_dir(
+                explicit_install_dir,
+                None,
+            );
+
         #[cfg(target_os = "windows")]
         {
             let current_exe = std::env::current_exe().unwrap_or_default();
@@ -396,16 +434,11 @@ pub(crate) fn cmd_update(args: &[String]) {
                     "--relaunch".to_string(),
                     "--version".to_string(),
                     tag_name.clone(),
+                    "--install-dir".to_string(),
+                    resolved_install_dir.to_string_lossy().to_string(),
                 ];
                 if is_force || has_explicit_target {
                     delegate_args.push("--force".to_string());
-                }
-                for i in 0..args.len() {
-                    if args[i] == "--install-dir" && i + 1 < args.len() {
-                        delegate_args.push("--install-dir".to_string());
-                        delegate_args.push(args[i + 1].clone());
-                        break;
-                    }
                 }
                 antigravity_tools_lib::modules::delegate_updater::run(&delegate_args);
                 std::process::exit(0);
@@ -425,6 +458,8 @@ pub(crate) fn cmd_update(args: &[String]) {
                 "--relaunch".to_string(),
                 "--version".to_string(),
                 tag_name.clone(),
+                "--install-dir".to_string(),
+                resolved_install_dir.to_string_lossy().to_string(),
             ];
             if is_force || has_explicit_target {
                 delegate_args.push("--force".to_string());
@@ -433,19 +468,14 @@ pub(crate) fn cmd_update(args: &[String]) {
             return;
         }
 
-        let mut cli_update_args = vec![
+        let cli_update_args = vec![
             "--force".to_string(),
             "--no-launch".to_string(),
             "--version".to_string(),
             tag_name.clone(),
+            "--install-dir".to_string(),
+            resolved_install_dir.to_string_lossy().to_string(),
         ];
-        for i in 0..args.len() {
-            if args[i] == "--install-dir" && i + 1 < args.len() {
-                cli_update_args.push("--install-dir".to_string());
-                cli_update_args.push(args[i + 1].clone());
-                break;
-            }
-        }
         updated =
             antigravity_tools_lib::modules::delegate_updater::run_cli_update(&cli_update_args);
     }

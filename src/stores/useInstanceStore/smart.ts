@@ -40,16 +40,19 @@ export function createSmartSlice(set: SetState, get: GetState): Pick<InstanceSta
                 accounts = useAccountStore.getState().accounts;
             }
 
+            const tierMultipliers = instanceService.tierMultipliersFromSettings(
+                useConfigStore.getState().config?.auto_profile_switcher
+            );
             let candidate = instanceService.pickBestCandidateAccount(
                 accounts,
                 activeInUseAccountIds,
                 cur?.config.bound_account_id,
-                instanceService.tierMultipliersFromSettings(useConfigStore.getState().config?.auto_profile_switcher)
+                tierMultipliers
             );
 
             if (!candidate) {
                 set({ isLoading: false });
-                throw new Error('No accounts verified with 100% 4-hour quota available to play this profile.');
+                throw new Error('No eligible accounts with remaining quota available to play this profile.');
             }
 
             let targetIdeParam: string | undefined;
@@ -155,12 +158,15 @@ export function createSmartSlice(set: SetState, get: GetState): Pick<InstanceSta
             }
 
             // 4. Rank candidate accounts based on Normalized Multiplicative Scoring (÷ 1000):
-            //    < 100% 4h quota = 0; 100% 4h quota = (S_active * M_tier * Q_weekly) / 1000
+            //    Primary pass ranks >= 100% 4h quota; fallback pass ranks > 0% 4h quota proportionally
+            const tierMultipliers = instanceService.tierMultipliersFromSettings(
+                useConfigStore.getState().config?.auto_profile_switcher
+            );
             let candidatePool = instanceService.rankSmartCandidates(
                 eligibleAccounts,
                 activeInUseAccountIds,
                 currentAccountId,
-                instanceService.tierMultipliersFromSettings(useConfigStore.getState().config?.auto_profile_switcher)
+                tierMultipliers
             );
 
             const hasCandidates = candidatePool.length > 0;
@@ -170,9 +176,11 @@ export function createSmartSlice(set: SetState, get: GetState): Pick<InstanceSta
             }
 
             // 5. Pre-activation Live Quota Refresh Verification Loop:
-            //    Confirm candidate actually has 100% quota for the 4-hour rolling window,
-            //    then pass the verified candidate directly to the unified 5-Step Switch Button handler!
+            //    Step 1/2: Prefer candidates verified at 100% 4-hour rolling window quota.
+            //    Step 3 (Proportional Sub-100% Fallback): Track the highest-scoring candidate with > 0% 4h quota
+            //    when all probed candidates are below 100%.
             let verifiedCandidate: Account | null = null;
+            let bestFallbackCandidate: { account: Account; score: number } | null = null;
             const triedAccountIds = new Set<string>();
 
             while (candidatePool.length > 0) {
@@ -206,7 +214,7 @@ export function createSmartSlice(set: SetState, get: GetState): Pick<InstanceSta
                         `[useInstanceStore] Pre-switch live verification: ${updatedAccount.email} -> 4h quota: ${fresh4hQuota}%, weekly: ${freshWeeklyQuota}%`
                     );
 
-                    // User invariant: Must confirm 100% for 4-hour window!
+                    // Primary pass: confirm 100% for 4-hour window
                     if (!isForbidden && !isBlocked && fresh4hQuota >= 100 && isWeeklyHealthy) {
                         console.log(
                             `[useInstanceStore] Candidate ${updatedAccount.email} confirmed with 100% 4h window quota. Selected for switch!`
@@ -215,8 +223,28 @@ export function createSmartSlice(set: SetState, get: GetState): Pick<InstanceSta
                         break;
                     }
 
+                    // Step 3 Sub-100% Proportional Fallback tracking
+                    if (!isForbidden && !isBlocked && fresh4hQuota > 0 && freshWeeklyQuota >= 8) {
+                        const fallbackRes = instanceService.calculateFallbackMultiplicativeScore(
+                            updatedAccount,
+                            activeInUseAccountIds,
+                            currentAccountId,
+                            undefined,
+                            tierMultipliers
+                        );
+                        if (
+                            fallbackRes.score > 0 &&
+                            (!bestFallbackCandidate || fallbackRes.score > bestFallbackCandidate.score)
+                        ) {
+                            bestFallbackCandidate = {
+                                account: updatedAccount,
+                                score: fallbackRes.score,
+                            };
+                        }
+                    }
+
                     console.warn(
-                        `[useInstanceStore] Candidate ${updatedAccount.email} live 4h window quota is ${fresh4hQuota}% (< 100%). Strictly rejecting (<100% treated as zero). Checking next candidate...`
+                        `[useInstanceStore] Candidate ${updatedAccount.email} live 4h window quota is ${fresh4hQuota}% (< 100%). Checking next candidate...`
                     );
 
                     // Remove current candidate and advance to next best
@@ -230,9 +258,27 @@ export function createSmartSlice(set: SetState, get: GetState): Pick<InstanceSta
                 }
             }
 
+            // Step 3 (Proportional Sub-100% Fallback): use best live-probed or refreshed sub-100% account
+            if (!verifiedCandidate && bestFallbackCandidate) {
+                console.log(
+                    `[useInstanceStore] Using Step 3 proportional fallback candidate ${bestFallbackCandidate.account.email} (score: ${bestFallbackCandidate.score}).`
+                );
+                verifiedCandidate = bestFallbackCandidate.account;
+            }
+
+            if (!verifiedCandidate) {
+                const refreshedAccounts = useAccountStore.getState().accounts;
+                verifiedCandidate = instanceService.pickBestCandidateAccount(
+                    refreshedAccounts.length > 0 ? refreshedAccounts : eligibleAccounts,
+                    activeInUseAccountIds,
+                    currentAccountId,
+                    tierMultipliers
+                );
+            }
+
             if (!verifiedCandidate) {
                 set({ isLoading: false });
-                throw new Error('No accounts verified with 100% 4-hour quota in pool. All available accounts are below 100%.');
+                throw new Error('No eligible accounts with remaining 4-hour and weekly quota available in pool.');
             }
 
             const targetCandidate = verifiedCandidate as Account & { instanceId?: string };
@@ -260,6 +306,9 @@ export function createSmartSlice(set: SetState, get: GetState): Pick<InstanceSta
                 }
             }
             await useAccountStore.getState().switchAccount(targetCandidate.id, targetIdeParam);
+
+            // Refresh instance state FIRST before checking is_running to avoid duplicate launch after switchAccount relaunched
+            await get().fetchInstances(true);
 
             const isTargetRunning = get().instances.find(i => i.config.id === effectiveInstanceId)?.is_running;
             if (!isTargetRunning) {

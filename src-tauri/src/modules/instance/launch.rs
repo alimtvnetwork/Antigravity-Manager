@@ -50,10 +50,13 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
 
     // Close only the existing process for THIS target instance if running, allowing OS to unmap locks
     // and ensuring credentials can be cleanly injected without database contention or singleton focus handoffs.
+    // Justification: best-effort close; verification ensures process is terminated if it was running
     crate::error::record_ignored(
         close_instance_verified(instance_id, std::time::Duration::from_millis(3000)),
         "close_instance_verified before launch",
-    ); // Justification: best-effort close; verification ensures process is terminated if it was running
+    );
+
+    // Always clean any orphaned lock files in the target instance data directory before credential injection and spawn
     clear_stale_instance_lockfiles(&target_data_path);
 
     // If an account is bound to this instance profile, sync credentials and inject token directly into isolated state.vscdb and system keyring AFTER process exit.

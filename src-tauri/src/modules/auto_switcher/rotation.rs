@@ -174,11 +174,6 @@ pub async fn execute_profile_rotation_with_context(
 
     // Delegate directly to the exact account switch pipeline (the exact ⇄ button handler)
     let app_handle_opt = crate::modules::log_bridge::get_app_handle();
-    let integration = match app_handle_opt.as_ref() {
-        Some(h) => crate::modules::integration::SystemManager::Desktop(h.clone()),
-        None => crate::modules::integration::SystemManager::Headless,
-    };
-
     let app_config = config::load_app_config().unwrap_or_default();
 
     // Snapshot active workspace folders from current_instance_id before closing it
@@ -296,8 +291,11 @@ pub async fn execute_profile_rotation_with_context(
             current_instance_id, target.account_id, target.email
         ));
         if inst_id == "default" {
-            let service = crate::modules::account_service::AccountService::new(integration);
-            service.switch_account(&target.account_id, None).await?;
+            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+            crate::error::record_ignored(
+                crate::modules::account::set_current_account_id(&target.account_id),
+                "set_current_account_id",
+            );
             // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
             crate::error::record_ignored(
                 crate::modules::instance::bind_account_to_instance(
@@ -307,9 +305,8 @@ pub async fn execute_profile_rotation_with_context(
                 ),
                 "bind_account_to_instance",
             );
-        } else {
-            instance::switch_account_to_instance(&target.account_id, Some(inst_id)).await?;
         }
+        instance::switch_account_to_instance(&target.account_id, Some(inst_id)).await?;
 
         if !app_config.auto_profile_switcher.auto_reopen_on_switch {
             // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run

@@ -318,26 +318,35 @@ pub async fn switch_account_to_instance(
                 "[Instance] start_antigravity_with_fallback_path returned ({}), falling back to launch_instance",
                 e
             ));
-            if let Err(launch_err) = launch_instance_without_prompt_reinject(&instance.id) {
-                crate::modules::logger::log_warn(&format!(
-                    "[INSTANCE_SWITCH] Account switched successfully, but auto-relaunch failed: {}. User can launch the instance manually.",
-                    launch_err
+            launch_instance_without_prompt_reinject(&instance.id).map_err(|launch_err| {
+                let err_msg = format!(
+                    "Account switched for '{}', but auto-relaunch failed: {}",
+                    instance.id, launch_err
+                );
+                crate::modules::logger::log_error(&format!(
+                    "[INSTANCE_SWITCH:ERROR] {}",
+                    err_msg
                 ));
-            }
+                err_msg
+            })?;
         }
         if let Some(h) = crate::modules::log_bridge::get_app_handle() {
             let integration = crate::modules::integration::SystemManager::Desktop(h);
             integration.update_tray();
         }
     } else {
-        if let Err(launch_err) =
-            launch_instance_with_workspaces(&instance.id, inherited_workspaces.as_deref(), false)
-        {
-            crate::modules::logger::log_warn(&format!(
-                "[INSTANCE_SWITCH] Account switched successfully, but auto-relaunch failed: {}. User can launch the instance manually.",
-                launch_err
-            ));
-        }
+        launch_instance_with_workspaces(&instance.id, inherited_workspaces.as_deref(), false)
+            .map_err(|launch_err| {
+                let err_msg = format!(
+                    "Account switched for '{}', but auto-relaunch failed: {}",
+                    instance.id, launch_err
+                );
+                crate::modules::logger::log_error(&format!(
+                    "[INSTANCE_SWITCH:ERROR] {}",
+                    err_msg
+                ));
+                err_msg
+            })?;
     }
 
     let target_inst_id = instance.id.clone();

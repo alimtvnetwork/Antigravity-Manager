@@ -72,6 +72,7 @@ pub fn close_instance_verified(
     instance_id: &str,
     timeout: std::time::Duration,
 ) -> Result<bool, String> {
+    super::pid_scan::force_refresh_process_cache();
     let registry = load_registry()?;
     let config = registry
         .instances
@@ -82,6 +83,7 @@ pub fn close_instance_verified(
     let is_default = config.is_default || instance_id == "default";
 
     let live_pids = || {
+        super::pid_scan::force_refresh_process_cache();
         find_pids_for_data_dir(&data_dir, is_default)
             .into_iter()
             .filter(|&pid| is_pid_alive_targeted(pid))
@@ -112,6 +114,7 @@ pub fn close_instance_verified(
                     instance_id, elapsed_ms
                 ));
                 invalidate_instance_process_cache(instance_id);
+                super::pid_scan::force_refresh_process_cache();
                 return Ok(true);
             }
             // Log the first poll immediately, then at most once per second to bound output.
@@ -148,11 +151,13 @@ pub fn close_instance_verified(
         remaining, instance_id
     ));
     invalidate_instance_process_cache(instance_id);
+    super::pid_scan::force_refresh_process_cache();
     Ok(false)
 }
 
 /// Close only the process associated with this instance
 pub fn close_instance(instance_id: &str) -> Result<(), String> {
+    super::pid_scan::force_refresh_process_cache();
     let registry = load_registry()?;
     let config = registry
         .instances

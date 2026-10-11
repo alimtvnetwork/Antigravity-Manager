@@ -108,7 +108,20 @@ export const useAccountStore = create<AccountState>((set, get) => ({
         set({ loading: true, error: null });
         try {
             await accountService.switchAccount(accountId, targetIde);
-            await get().fetchCurrentAccount();
+            await Promise.all([
+                get().fetchCurrentAccount(),
+                get().fetchAccounts(),
+            ]);
+            try {
+                const { useInstanceStore } = await import('./useInstanceStore');
+                await useInstanceStore.getState().fetchInstances(true);
+            } catch (refreshErr) {
+                const { useErrorStore } = await import('./error-store');
+                useErrorStore.getState().trackWarning(refreshErr, {
+                    source: 'useAccountStore.switchAccount',
+                    triggerAction: 'fetchInstances',
+                });
+            }
             set({ loading: false });
         } catch (error) {
             set({ error: String(error), loading: false });

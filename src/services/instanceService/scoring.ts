@@ -23,7 +23,16 @@ export function findBestSmartPlayAccount(
     });
 
     scored.sort((a, b) => b.score - a.score);
-    return scored[0]?.account || null;
+    if ((scored[0]?.score ?? 0) > 0) {
+        return scored[0]?.account || null;
+    }
+
+    const fallbackScored = available.map(acc => {
+        const res = calculateFallbackMultiplicativeScore(acc, [], undefined, targetModel);
+        return { account: acc, score: res.score };
+    });
+    fallbackScored.sort((a, b) => b.score - a.score);
+    return fallbackScored[0]?.account || null;
 }
 
 /**
@@ -308,13 +317,118 @@ export function calculateMultiplicativeScore(
     };
 }
 
+/**
+ * Proportional Sub-100% Fallback Candidate Scoring Algorithm (matches backend Step 3 fallback in selection.rs / scoring.rs):
+ * Used when no candidate account has >= 100% 4-hour rolling window quota.
+ * Scales the primary score proportionally by `(weeklyQuotaPercent / 100) * (effectiveFourHourPercent / 100) * 100`.
+ */
+export function calculateFallbackMultiplicativeScore(
+    acc: Account,
+    activeInUseAccountIds: string[] = [],
+    currentAccountId?: string,
+    targetModel?: string,
+    tierMultipliers: TierMultipliers = DEFAULT_TIER_MULTIPLIERS
+): MultiplicativeCandidateResult {
+    const isInUse = activeInUseAccountIds.includes(acc.id);
+    const isCurrent = Boolean(currentAccountId && acc.id === currentAccountId);
+    const activeFactor = isInUse || isCurrent ? 0 : 1;
+
+    const isDisabled = Boolean(acc.disabled) || Boolean(acc.proxy_disabled);
+    const isForbidden = Boolean(acc.quota?.is_forbidden);
+    const isBlocked = Boolean(acc.validation_blocked);
+
+    const tierMultiplier = getSubscriptionTierMultiplier(acc.quota?.subscription_tier, tierMultipliers);
+    const weeklyQuotaPercent = extractWeeklyQuotaPercent(acc);
+    const fourHourQuotaPercent = extract4hWindowQuotaPercent(acc, targetModel);
+
+    const nowMs = Date.now();
+    const hasResetTimePassed = (acc.quota?.models || []).some(m => {
+        if (!m.reset_time) return false;
+        const rDate = parseFlexibleDate(m.reset_time);
+        return rDate ? rDate.getTime() <= nowMs : false;
+    });
+
+    const effectiveFourHour = hasResetTimePassed ? 100 : fourHourQuotaPercent;
+    if (
+        activeFactor === 0 ||
+        isDisabled ||
+        isForbidden ||
+        isBlocked ||
+        effectiveFourHour <= 0 ||
+        weeklyQuotaPercent < 8
+    ) {
+        return {
+            account: acc,
+            score: 0,
+            activeFactor: 0,
+            tierMultiplier,
+            weeklyQuotaPercent,
+            fourHourQuotaPercent,
+            daysUntilRefill: 0,
+            quotaPercentage: 0,
+            idleHours: 999,
+        };
+    }
+
+    const proportionalQuota = (weeklyQuotaPercent / 100) * (effectiveFourHour / 100) * 100;
+    const rawScore = activeFactor * tierMultiplier * proportionalQuota;
+    const score = Number((rawScore / 1000).toFixed(4));
+
+    const daysUntilRefill = calculateAccountRefillDays(acc, nowMs);
+    const nowSec = Math.floor(nowMs / 1000);
+    const idleSec = acc.last_used ? Math.max(0, nowSec - acc.last_used) : 0;
+    const idleHours = acc.last_used ? Math.round((idleSec / 3600) * 10) / 10 : 999;
+
+    return {
+        account: acc,
+        score,
+        activeFactor,
+        tierMultiplier,
+        weeklyQuotaPercent,
+        fourHourQuotaPercent: effectiveFourHour,
+        daysUntilRefill,
+        quotaPercentage: effectiveFourHour,
+        idleHours,
+    };
+}
+
+export function scoreAccountForSelectionFallback(
+    acc: Account,
+    targetModel?: string,
+    tierMultipliers: TierMultipliers = DEFAULT_TIER_MULTIPLIERS
+): number {
+    return calculateFallbackMultiplicativeScore(acc, [], undefined, targetModel, tierMultipliers).score;
+}
+
+function compareScoredCandidates(a: MultiplicativeCandidateResult, b: MultiplicativeCandidateResult): number {
+    // 1. Highest normalized score first
+    if (b.score !== a.score) {
+        return b.score - a.score;
+    }
+
+    // 2. 4-hour quota comparison
+    if (b.fourHourQuotaPercent !== a.fourHourQuotaPercent) {
+        return b.fourHourQuotaPercent - a.fourHourQuotaPercent;
+    }
+
+    // 3. Weekly quota comparison
+    if (b.weeklyQuotaPercent !== a.weeklyQuotaPercent) {
+        return b.weeklyQuotaPercent - a.weeklyQuotaPercent;
+    }
+
+    // 4. Deterministic tie-breaker
+    const emailA = (a.account.email || '').toLowerCase();
+    const emailB = (b.account.email || '').toLowerCase();
+    return emailA.localeCompare(emailB);
+}
+
 export function rankSmartCandidates(
     accounts: Account[],
     activeInUseAccountIds: string[] = [],
     currentAccountId?: string,
     tierMultipliers: TierMultipliers = DEFAULT_TIER_MULTIPLIERS
 ): MultiplicativeCandidateResult[] {
-    const eligible = accounts.filter(acc => {
+    const baseEligible = accounts.filter(acc => {
         // Never allow the current account or active in-use accounts to be considered as candidates to rotate into
         if (currentAccountId && acc.id === currentAccountId) return false;
         if (activeInUseAccountIds.includes(acc.id)) return false;
@@ -326,6 +440,13 @@ export function rankSmartCandidates(
         const isBlocked = Boolean(acc.validation_blocked);
         if (isBlocked) return false;
 
+        return true;
+    });
+
+    if (baseEligible.length === 0) return [];
+
+    // Pass 1 (Primary): Rank candidates with >= 100% 4-hour rolling window quota
+    const primaryEligible = baseEligible.filter(acc => {
         const q4h = extract4hWindowQuotaPercent(acc);
         const nowMs = Date.now();
         const hasResetTimePassed = (acc.quota?.models || []).some(m => {
@@ -333,48 +454,41 @@ export function rankSmartCandidates(
             const rDate = parseFlexibleDate(m.reset_time);
             return rDate ? rDate.getTime() <= nowMs : false;
         });
-        if (q4h < 100 && !hasResetTimePassed) return false;
-        return true;
+        return q4h >= 100 || hasResetTimePassed;
     });
 
-    const hasEligible = eligible.length > 0;
-    if (!hasEligible) return [];
-
-    const scored = eligible
-        .map(acc => {
-            return calculateMultiplicativeScore(
+    const primaryScored = primaryEligible
+        .map(acc =>
+            calculateMultiplicativeScore(
                 acc,
                 activeInUseAccountIds,
                 currentAccountId,
                 undefined,
                 tierMultipliers
-            );
-        })
+            )
+        )
         .filter(item => item.score > 0 && item.activeFactor > 0);
 
-    scored.sort((a, b) => {
-        // 1. Highest normalized score first (M_tier * Q_weekly / 1000)
-        if (b.score !== a.score) {
-            return b.score - a.score;
-        }
+    if (primaryScored.length > 0) {
+        primaryScored.sort(compareScoredCandidates);
+        return primaryScored;
+    }
 
-        // 2. 4-hour quota comparison
-        if (b.fourHourQuotaPercent !== a.fourHourQuotaPercent) {
-            return b.fourHourQuotaPercent - a.fourHourQuotaPercent;
-        }
+    // Pass 2 (Sub-100% Proportional Fallback): When no account has 100% 4h quota, rank accounts with > 0% 4h quota
+    const fallbackScored = baseEligible
+        .map(acc =>
+            calculateFallbackMultiplicativeScore(
+                acc,
+                activeInUseAccountIds,
+                currentAccountId,
+                undefined,
+                tierMultipliers
+            )
+        )
+        .filter(item => item.score > 0 && item.activeFactor > 0);
 
-        // 3. Weekly quota comparison
-        if (b.weeklyQuotaPercent !== a.weeklyQuotaPercent) {
-            return b.weeklyQuotaPercent - a.weeklyQuotaPercent;
-        }
-
-        // 4. Deterministic tie-breaker
-        const emailA = (a.account.email || '').toLowerCase();
-        const emailB = (b.account.email || '').toLowerCase();
-        return emailA.localeCompare(emailB);
-    });
-
-    return scored;
+    fallbackScored.sort(compareScoredCandidates);
+    return fallbackScored;
 }
 
 export function findSmartRotationAccount(
@@ -401,7 +515,7 @@ export function pickBestCandidateAccount(
     tierMultipliers: TierMultipliers = DEFAULT_TIER_MULTIPLIERS
 ): Account | null {
     const smart = findSmartRotationAccount(accounts, currentAccountId, activeInUseAccountIds, tierMultipliers);
-    if (smart?.account && (smart.fourHourQuotaPercent ?? 0) >= 100) {
+    if (smart?.account && (smart.fourHourQuotaPercent ?? 0) > 0) {
         return smart.account;
     }
     return null;
