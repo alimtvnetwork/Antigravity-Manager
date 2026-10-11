@@ -9,10 +9,11 @@ if exist "%AGM_RELEASE%" (
 ) else if exist "%AGM_DEBUG%" (
     "%AGM_DEBUG%" %*
 ) else (
-    where agm >nul 2>&1
-    if %ERRORLEVEL% equ 0 (
-        agm %*
-    ) else (
-        cargo run --manifest-path "%SCRIPT_DIR%src-tauri\Cargo.toml" --bin agm -- %*
+    for /f "delims=" %%I in ('where.exe agm.exe 2^>nul') do (
+        if exist "%%I" (
+            "%%I" %*
+            exit /b %ERRORLEVEL%
+        )
     )
+    cargo run --manifest-path "%SCRIPT_DIR%src-tauri\Cargo.toml" --bin agm -- %*
 )
