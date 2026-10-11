@@ -33,6 +33,14 @@ pub(crate) fn extract_positional_args(args: &[String]) -> Vec<String> {
             || arg == "--limit"
             || arg == "-k"
             || arg == "--keep"
+            || arg == "-c"
+            || arg == "--conversation"
+            || arg == "--conv"
+            || arg == "--session"
+            || arg == "-m"
+            || arg == "--model"
+            || arg == "--prefix"
+            || arg == "--suffix"
         {
             is_skipping_next = true;
             continue;

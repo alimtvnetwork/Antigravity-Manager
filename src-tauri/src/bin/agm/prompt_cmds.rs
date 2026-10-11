@@ -96,6 +96,63 @@ pub(crate) fn cmd_prompts_inspect(args: &[String]) {
     crate::prompt_goals::cmd_observe(args);
 }
 
+fn resolve_destination_session(args: &[String], repo_path: &str) -> Option<String> {
+    let mut conv_arg: Option<String> = None;
+    let mut is_explicit_new = false;
+    let mut is_explicit_existing = false;
+
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if (arg == "--conversation" || arg == "-c" || arg == "--conv" || arg == "--session")
+            && i + 1 < args.len()
+        {
+            conv_arg = Some(args[i + 1].clone());
+            i += 2;
+            continue;
+        } else if arg.starts_with("--conversation=")
+            || arg.starts_with("--conv=")
+            || arg.starts_with("--session=")
+        {
+            if let Some((_, val)) = arg.split_once('=') {
+                conv_arg = Some(val.to_string());
+            }
+        } else if arg == "--new" || arg == "--new-conversation" || arg == "--new-session" {
+            is_explicit_new = true;
+        } else if arg == "--existing" || arg == "--existing-conversation" || arg == "--resume" {
+            is_explicit_existing = true;
+        }
+        i += 1;
+    }
+
+    if let Some(conv) = conv_arg {
+        return Some(conv);
+    }
+    if is_explicit_new {
+        return Some(format!("conv-{}", uuid::Uuid::new_v4()));
+    }
+    if is_explicit_existing {
+        if let Ok(conn) = repo_db::connect_db() {
+            let session_found: Option<String> = conn
+                .query_row(
+                    "SELECT session_id FROM active_prompts 
+                     WHERE (repo_path = ?1 OR project_id = ?1) 
+                       AND session_id IS NOT NULL 
+                       AND session_id != '' 
+                     ORDER BY created_at DESC, id DESC 
+                     LIMIT 1",
+                    rusqlite::params![repo_path],
+                    |row| row.get(0),
+                )
+                .ok();
+            if session_found.is_some() {
+                return session_found;
+            }
+        }
+    }
+    None
+}
+
 pub(crate) fn cmd_prompts_send(args: &[String]) {
     let ctx = CliContext::parse(args);
     let target_instance = ctx
@@ -103,10 +160,11 @@ pub(crate) fn cmd_prompts_send(args: &[String]) {
         .unwrap_or_else(|_| "default".to_string());
     let resolved_inst =
         instance::resolve_instance_id(&target_instance).unwrap_or_else(|_| target_instance.clone());
-    let repo_path = ctx
-        .repo_path
-        .clone()
-        .unwrap_or_else(|| "scratch/test-repo".to_string());
+    let repo_path = ctx.repo_path.clone().unwrap_or_else(|| {
+        std::env::current_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| "scratch/test-repo".to_string())
+    });
 
     let raw_prompt = if ctx.instance_id.is_none() && ctx.positional_args.len() >= 2 {
         let first = &ctx.positional_args[0];
@@ -131,12 +189,8 @@ pub(crate) fn cmd_prompts_send(args: &[String]) {
         final_prompt = format!("{} {}", final_prompt, suff);
     }
 
-    let now = chrono::Utc::now().timestamp();
-    let prompt_id = format!("prompt-{}", uuid::Uuid::new_v4());
-    let model = ctx
-        .model
-        .clone()
-        .unwrap_or_else(|| "gemini-3.8-flash-high".to_string());
+    let session_id = resolve_destination_session(args, &repo_path)
+        .or_else(|| Some(format!("conv-{}", uuid::Uuid::new_v4())));
 
     // Query smart process cache / OS process table
     let cached_proc = instance::get_or_detect_instance_process(&resolved_inst);
@@ -147,71 +201,52 @@ pub(crate) fn cmd_prompts_send(args: &[String]) {
         "cold_launched"
     };
 
-    // Guarantee instance running and focused without relaunching existing IDE windows
     let active_pid =
         match instance::ensure_instance_running_for_dispatch(&resolved_inst, Some(&repo_path)) {
             Ok(pid) => Some(pid),
             Err(_) => cached_proc.map(|r| r.pid),
         };
 
-    let active_prompt = ActivePrompt {
-        id: prompt_id.clone(),
-        project_id: repo_path.clone(),
-        instance_id: resolved_inst.clone(),
-        repo_path: repo_path.clone(),
-        prompt_content: final_prompt.clone(),
-        model: Some(model),
-        session_id: Some(format!("conv-{}", uuid::Uuid::new_v4())),
-        status: "in_flight".to_string(),
-        created_at: now,
-        updated_at: now,
-        image_payload: None,
-    };
+    match repo_db::send_prompt_now_for_instance(
+        &resolved_inst,
+        &repo_path,
+        &final_prompt,
+        session_id.as_deref(),
+    ) {
+        Ok(dispatched) => {
+            let res_data = serde_json::json!({
+                "id": dispatched.id,
+                "project_id": dispatched.project_id,
+                "instance_id": dispatched.instance_id,
+                "repo_path": dispatched.repo_path,
+                "prompt_content": dispatched.prompt_content,
+                "model": dispatched.model,
+                "session_id": dispatched.session_id,
+                "status": dispatched.status,
+                "created_at": dispatched.created_at,
+                "updated_at": dispatched.updated_at,
+                "image_payload": dispatched.image_payload,
+                "pid": active_pid,
+                "process_action": process_action,
+            });
 
-    let _ = repo_db::insert_active_prompt(&active_prompt);
+            if ctx.json_output {
+                CliEnvelope::ok("prompt send", Some(target_instance), res_data).print_and_exit();
+            }
 
-    let target_dir = PathBuf::from(&repo_path);
-    let _ = fs::create_dir_all(&target_dir);
-    let task_file = target_dir.join(".antigravity_resume_task.json");
-    let task_payload = serde_json::json!({
-        "prompt_id": prompt_id,
-        "instance_id": resolved_inst,
-        "repo_path": repo_path,
-        "prompt_content": final_prompt,
-        "auto_boot": true,
-        "dispatched_at": now,
-        "pid": active_pid,
-        "process_action": process_action,
-    });
-    let _ = fs::write(
-        task_file,
-        serde_json::to_string_pretty(&task_payload).unwrap_or_default(),
-    );
-
-    let res_data = serde_json::json!({
-        "id": active_prompt.id,
-        "project_id": active_prompt.project_id,
-        "instance_id": active_prompt.instance_id,
-        "repo_path": active_prompt.repo_path,
-        "prompt_content": active_prompt.prompt_content,
-        "model": active_prompt.model,
-        "session_id": active_prompt.session_id,
-        "status": active_prompt.status,
-        "created_at": active_prompt.created_at,
-        "updated_at": active_prompt.updated_at,
-        "image_payload": active_prompt.image_payload,
-        "pid": active_pid,
-        "process_action": process_action,
-    });
-
-    if ctx.json_output {
-        CliEnvelope::ok("prompt send", Some(target_instance), res_data).print_and_exit();
+            println!(
+                "[SUCCESS] Prompt dispatched to instance '{}' (id: {}, conv: {:?}, pid: {:?}).",
+                target_instance, dispatched.id, dispatched.session_id, active_pid
+            );
+        }
+        Err(e) => {
+            if ctx.json_output {
+                CliEnvelope::error("prompt send", Some(target_instance), &e).print_and_exit();
+            }
+            eprintln!("[ERROR] Failed to dispatch prompt: {}", e);
+            std::process::exit(1);
+        }
     }
-
-    println!(
-        "[SUCCESS] Prompt dispatched to instance '{}' (id: {}, action: {}, pid: {:?}).",
-        target_instance, prompt_id, process_action, active_pid
-    );
 }
 
 pub(crate) fn cmd_prompts_running(args: &[String]) {
@@ -285,10 +320,11 @@ pub(crate) fn cmd_prompts_queue(args: &[String]) {
         .unwrap_or_else(|_| "default".to_string());
     let resolved_inst =
         instance::resolve_instance_id(&target_instance).unwrap_or_else(|_| target_instance.clone());
-    let repo_path = ctx
-        .repo_path
-        .clone()
-        .unwrap_or_else(|| "scratch/test-repo".to_string());
+    let repo_path = ctx.repo_path.clone().unwrap_or_else(|| {
+        std::env::current_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| "scratch/test-repo".to_string())
+    });
 
     let raw_prompt = if ctx.instance_id.is_none() && ctx.positional_args.len() >= 2 {
         let first = &ctx.positional_args[0];
@@ -313,64 +349,45 @@ pub(crate) fn cmd_prompts_queue(args: &[String]) {
         final_prompt = format!("{} {}", final_prompt, suff);
     }
 
-    let now = chrono::Utc::now().timestamp();
-    let prompt_id = format!("queued-{}-{}", resolved_inst, uuid::Uuid::new_v4());
-    let model = ctx
-        .model
-        .clone()
-        .unwrap_or_else(|| "gemini-3.8-flash-high".to_string());
+    let session_id = resolve_destination_session(args, &repo_path);
 
-    let conn_res = repo_db::connect_db();
-    if let Ok(ref conn) = conn_res {
-        let _ = conn.execute(
-            "INSERT INTO active_prompts (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, 'queued', ?7, ?8)",
-            rusqlite::params![
-                &prompt_id,
-                &repo_path,
-                &resolved_inst,
-                &repo_path,
-                &final_prompt,
-                &model,
-                now,
-                now,
-            ],
-        );
+    match repo_db::enqueue_prompt_for_instance(
+        &resolved_inst,
+        &repo_path,
+        &final_prompt,
+        session_id.as_deref(),
+    ) {
+        Ok(queued) => {
+            let queue_position = repo_db::count_enqueued_prompts(Some(&resolved_inst));
+            let data = serde_json::json!({
+                "id": queued.id,
+                "instance_id": queued.instance_id,
+                "repo_path": queued.repo_path,
+                "prompt_content": queued.prompt_content,
+                "session_id": queued.session_id,
+                "status": queued.status,
+                "queue_position": queue_position,
+                "created_at": queued.created_at,
+                "fifo_ordered": true,
+            });
+
+            if ctx.json_output {
+                CliEnvelope::ok("prompt queue", Some(target_instance), data).print_and_exit();
+            }
+
+            println!(
+                "[SUCCESS] Prompt queued for instance '{}' at position #{} (id: {}, conv: {:?}).",
+                target_instance, queue_position, queued.id, queued.session_id
+            );
+        }
+        Err(e) => {
+            if ctx.json_output {
+                CliEnvelope::error("prompt queue", Some(target_instance), &e).print_and_exit();
+            }
+            eprintln!("[ERROR] Failed to queue prompt: {}", e);
+            std::process::exit(1);
+        }
     }
-
-    let queue_position: usize = if let Ok(ref conn) = conn_res {
-        conn.query_row(
-            "SELECT COUNT(*) FROM active_prompts
-             WHERE (instance_id = ?1 OR (?1 = 'default' AND (instance_id = 'default' OR instance_id = '__default__' OR instance_id = '')))
-               AND status IN ('queued', 'pending', 'backed_up')
-               AND (created_at < ?2 OR (created_at = ?2 AND id <= ?3))",
-            rusqlite::params![&resolved_inst, now, &prompt_id],
-            |r| r.get(0),
-        )
-        .unwrap_or(1)
-    } else {
-        1
-    };
-
-    let data = serde_json::json!({
-        "id": prompt_id,
-        "instance_id": resolved_inst,
-        "repo_path": repo_path,
-        "prompt_content": final_prompt,
-        "status": "queued",
-        "queue_position": queue_position,
-        "created_at": now,
-        "fifo_ordered": true,
-    });
-
-    if ctx.json_output {
-        CliEnvelope::ok("prompt queue", Some(target_instance), data).print_and_exit();
-    }
-
-    println!(
-        "[SUCCESS] Prompt queued for instance '{}' at position #{} (id: {}).",
-        target_instance, queue_position, prompt_id
-    );
 }
 
 pub(crate) fn cmd_prompts_history(args: &[String]) {
