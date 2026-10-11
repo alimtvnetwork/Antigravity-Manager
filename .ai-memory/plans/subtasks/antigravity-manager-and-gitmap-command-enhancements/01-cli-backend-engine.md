@@ -47,7 +47,7 @@ Implement the native Rust compaction, storage, and CLI engine for Antigravity-Ma
   2. Environment variable (`AGM_WORK_DIR`).
   3. GitMap database lookup (`gitmap.db` workdir table if available).
   4. Git ancestor root discovery (walk up directories checking for `.git` directory without spawning `git`).
-  5. Fallback platform default (`D:\work` on Windows, `~/work` on Unix).
+  5. Fallback platform default (`work` on Windows, `~/work` on Unix).
 - Implement path transformation helpers:
   - `to_relative_path(target_path, base_work_dir) -> Result<String, AppError>`
   - `to_template_path(relative_path) -> String` (`${workDir}/<relative_path>`)

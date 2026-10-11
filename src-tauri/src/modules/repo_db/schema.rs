@@ -222,9 +222,17 @@ pub(crate) fn init_tables(conn: &Connection) -> Result<(), String> {
 
 /// Purge corrupted and un-namespaced running_projects rows and clear stale prompt tree cache
 pub fn purge_corrupted_running_projects(conn: &Connection) -> Result<(usize, usize), String> {
-    // 1. Delete any active_prompts referencing corrupted/un-namespaced running_projects to prevent FK constraint failures
-    let _ = conn.execute(
-        "DELETE FROM active_prompts 
+    // Justification: best effort foreign keys pragma toggle during startup purge
+    crate::error::record_ignored(
+        conn.execute_batch("PRAGMA foreign_keys = OFF;"),
+        "disable foreign keys for purge",
+    );
+
+    // 1. Delete any active_prompts referencing corrupted/un-namespaced running_projects
+    // Justification: best effort active_prompts delete; table may be empty or unmigrated
+    crate::error::record_ignored(
+        conn.execute(
+            "DELETE FROM active_prompts 
          WHERE project_id IN (
              SELECT id FROM running_projects 
              WHERE workspace_storage_path IS NULL 
@@ -232,7 +240,9 @@ pub fn purge_corrupted_running_projects(conn: &Connection) -> Result<(usize, usi
                 OR instr(id, '__') = 0 
                 OR trim(instance_id) = ''
          )",
-        [],
+            [],
+        ),
+        "purge orphaned active prompts",
     );
 
     let deleted_projects = conn
@@ -245,6 +255,13 @@ pub fn purge_corrupted_running_projects(conn: &Connection) -> Result<(usize, usi
             [],
         )
         .map_err(|e| format!("Failed to purge corrupted running_projects: {}", e))?;
+
+    // Re-enable foreign keys
+    // Justification: best effort foreign keys pragma toggle after startup purge
+    crate::error::record_ignored(
+        conn.execute_batch("PRAGMA foreign_keys = ON;"),
+        "enable foreign keys after purge",
+    );
 
     conn.execute("UPDATE running_projects SET is_running = 0", [])
         .map_err(|e| format!("Failed to reset running flags during purge: {}", e))?;

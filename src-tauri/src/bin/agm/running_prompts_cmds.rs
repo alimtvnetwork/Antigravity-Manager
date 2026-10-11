@@ -253,6 +253,11 @@ pub(crate) fn cmd_running_prompts_export(args: &[String]) {
             }));
         }
         let json_str = serde_json::to_string_pretty(&export_items).unwrap_or_default();
+        if let Some(parent) = std::path::Path::new(&file_path).parent() {
+            if !parent.as_os_str().is_empty() {
+                let _ = fs::create_dir_all(parent);
+            }
+        }
         if let Err(e) = fs::write(&file_path, json_str) {
             eprintln!("[ERROR] Failed to write JSON export: {}", e);
             std::process::exit(1);

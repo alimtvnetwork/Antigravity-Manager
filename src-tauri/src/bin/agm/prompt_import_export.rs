@@ -136,6 +136,11 @@ pub(crate) fn cmd_prompts_export(args: &[String]) {
     });
 
     let json_str = serde_json::to_string_pretty(&bundle).unwrap_or_else(|_| "{}".to_string());
+    if let Some(parent) = Path::new(&out_path).parent() {
+        if !parent.as_os_str().is_empty() {
+            let _ = fs::create_dir_all(parent);
+        }
+    }
     if let Err(e) = fs::write(&out_path, &json_str) {
         eprintln!(
             "[ERROR] Failed to write prompts export to {:?}: {}",

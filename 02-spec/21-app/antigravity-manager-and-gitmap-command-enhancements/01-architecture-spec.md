@@ -25,7 +25,7 @@ Your responsibility is to author modular, comprehensive specifications and subta
 
 ### Core Content to Specify:
 1. Dynamic Work Directory Resolution:
-   - Priority hierarchy: CLI param `--work-dir` -> env `AGM_WORK_DIR` -> GitMap SQLite `gitmap.db` default work directory -> git root ancestor -> default `D:\work` / `~/work`.
+   - Priority hierarchy: CLI param `--work-dir` -> env `AGM_WORK_DIR` -> GitMap SQLite `gitmap.db` default work directory -> git root ancestor -> default `${workDir}` / `~/work`.
    - Relative path transformation: calculate `relativePath` from work directory and `${workDir}\<rel>` template. Support switching work directory seamlessly.
 2. Compact SQLite Schema & Storage:
    - Standalone portable `.db` file containing `meta`, `pinned_projects`, `conversations`, `running_prompts`, `prompt_history`.
@@ -51,7 +51,7 @@ Write both files using `write_to_file`, verify their contents, and report comple
 
 ## 1. Architectural Overview & System Boundary
 
-The Antigravity-Manager and GitMap ecosystem operates across diverse operating environments (Windows developer workstations with `D:\work`, Linux/Ubuntu cloud VMs with `~/work` or `/work`, and macOS developer environments with `/Users/<user>/work`). Storing host-specific absolute filesystem paths (`D:\work\Antigravity-Manager\...` or `C:\Users\...`) creates fragile, non-portable snapshots that fail when imported across machines, accounts, or work directory reconfigurations.
+The Antigravity-Manager and GitMap ecosystem operates across diverse operating environments (Windows developer workstations with `${workDir}`, Linux/Ubuntu cloud VMs with `~/work` or `/work`, and macOS developer environments with `/Users/<user>/work`). Storing host-specific absolute filesystem paths (`${workDir}/Antigravity-Manager/...` or `C:\Users\...`) creates fragile, non-portable snapshots that fail when imported across machines, accounts, or work directory reconfigurations.
 
 The **CLI & Backend Compaction Engine** establishes a unified mechanism to package, export, inspect, and import active workspaces, pinned projects, conversation transcripts, in-flight prompts, and execution history into self-contained portable formats.
 
@@ -113,7 +113,7 @@ To eliminate path rigidity, the engine resolves the active work directory `workD
 | **P2** | **Environment Variable** | `std::env::var("AGM_WORK_DIR")` | If set and non-empty, canonicalize path and use. |
 | **P3** | **GitMap Master Store** | Query `gitmap.db` master store table `Workdir` or `Config` (`cli/db/gitmap.db`) | Read default active work directory record if database exists. |
 | **P4** | **Git Ancestor Root** | Ancestor scan upwards from current working directory (`cwd`) for `.git` | If within a Git repository worktree, use Git root parent directory. |
-| **P5** | **Platform Default** | OS-specific canonical workspace location | Windows: `D:\work` (or `C:\work` if `D:` does not exist); Linux/macOS: `~/work`. |
+| **P5** | **Platform Default** | OS-specific canonical workspace location | Windows: `work` (or relative workspace); Linux/macOS: `~/work`. |
 
 ```rust
 pub struct WorkDirResolver;
@@ -157,8 +157,8 @@ impl WorkDirResolver {
 When exporting projects, active prompts, or conversation records:
 1. **Normalization**: All paths are converted to forward slashes (`/`), stripping trailing slashes.
 2. **Relative Extraction**: If a target path starts with the resolved `workDir`, the prefix is stripped to produce `relativePath`:
-   - Absolute: `D:\work\Antigravity-Manager\src-tauri`
-   - Active `workDir`: `D:\work`
+   - Target: `${workDir}/Antigravity-Manager/src-tauri`
+   - Active `workDir`: `${workDir}`
    - Calculated `relativePath`: `Antigravity-Manager/src-tauri`
 3. **Template Variable**: The path is stored using the canonical variable template `${workDir}/<relativePath>`.
 4. **Cross-Machine Import Re-binding**: When importing on a target machine where `--work-dir /home/ubuntu/work` is supplied:
@@ -282,11 +282,11 @@ The compaction format integrates directly with the AGM Two-Tier JSON Envelope v2
     "agmVersion": "4.162.0",
     "workDirectory": {
       "path": "${workDir}",
-      "defaultPath": "D:\\work",
+      "defaultPath": "${workDir}",
       "isApplied": true,
       "isEnforced": false
     },
-    "defaultWorkDirectory": "D:\\work",
+    "defaultWorkDirectory": "${workDir}",
     "isWorkDirectoryApplied": true,
     "isWorkDirectoryEnforced": false,
     "importCommand": "agm import-compact agm-workspace-compact.json -y",
@@ -295,15 +295,15 @@ The compaction format integrates directly with the AGM Two-Tier JSON Envelope v2
     "description": "Portable workspace compaction snapshot including pinned projects, conversations, running prompts, and execution history."
   },
   "variables": {
-    "workDir": "D:\\work",
-    "repoDir": "${workDir}\\Antigravity-Manager"
+    "workDir": "work",
+    "repoDir": "${workDir}/Antigravity-Manager"
   },
   "data": {
     "meta": {
       "schemaVersion": "2.0",
       "createdAt": "2026-10-11T15:00:00Z",
       "sourceMachine": "DEV-WORKSTATION-01",
-      "sourceWorkDir": "D:\\work",
+      "sourceWorkDir": "${workDir}",
       "isPortable": true
     },
     "pinnedProjects": [
@@ -398,7 +398,7 @@ Options:
 Examples:
   agm export-compact
   agm export-compact -f backup-compact.json
-  agm export-compact -f portable.db --work-dir D:\work
+  agm export-compact -f portable.db --work-dir work
   agm export-compact --no-pinned -f prompts-only.json
 ```
 

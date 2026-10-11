@@ -48,9 +48,7 @@
 | `153` | [153-verify-running-prompts-instance-section.md](./153-verify-running-prompts-instance-section.md) | `DONE` | Verified end-to-end running prompts visibility in instance section: backend liveness gating (`is_inst_alive`), `isNodeOwnedByInstance` sandbox isolation, `hasActiveTask` pulsing emerald header button, active project hoisting with `[● RUNNING]` badges, and Prompt Tree auto-selection. |
 | `154` | [auto-switch-and-rotate-fix.md](./auto-switch-and-rotate-fix.md) | `DONE` | Root cause remediation for auto-switch, auto-rotate, fast-forward, and CLI downgrade/revert: eliminate cross-instance PID contamination, unblock fallback candidate scoring, enable explicit version downgrades in agm update & install.ps1, and resolve CI compiler errors. |
 | `155` | [application-performance-and-synchronization-issues.md](./application-performance-and-synchronization-issues.md) | `DONE` | Executable path column in instance list view, error swallowing audit and elimination across instance lifecycle & frontend, launch/switch freeze latency reduction, and decentralized headless fleet synchronization over Email and Telegram with internal SQLite tracking. |
-
-
-
+| `156` | [antigravity-manager-and-gitmap-command-enhancements.md](./antigravity-manager-and-gitmap-command-enhancements.md) | `DONE` | Workspace compaction engine (JSON & SQLite) with dynamic work directory resolution & relative path conversion, CLI commands `agm export-compact` & `import-compact`, icon-only Accounts/Instances header buttons with rich tooltips, dropdown search filter, compact Prompt Tree inspector controls, and SWR history caching. |
 
 ## Recent Completed Tasks Register (last 20, newest first)
 
