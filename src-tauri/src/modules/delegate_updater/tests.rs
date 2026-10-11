@@ -70,8 +70,7 @@ pub(crate) mod tests {
             PathBuf::from(r"users\alice").join("AppData").join("Local")
         );
 
-        let sandboxed_slash =
-            "users/bob/.antigravity_tools/instances/inst-01/home/AppData/Local";
+        let sandboxed_slash = "users/bob/.antigravity_tools/instances/inst-01/home/AppData/Local";
         assert_eq!(unwrap_sandbox_path(sandboxed_slash), "users/bob");
         assert_eq!(
             strip_instance_sandbox_local_appdata(Path::new(sandboxed_slash)),

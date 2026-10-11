@@ -323,10 +323,7 @@ pub async fn switch_account_to_instance(
                     "Account switched for '{}', but auto-relaunch failed: {}",
                     instance.id, launch_err
                 );
-                crate::modules::logger::log_error(&format!(
-                    "[INSTANCE_SWITCH:ERROR] {}",
-                    err_msg
-                ));
+                crate::modules::logger::log_error(&format!("[INSTANCE_SWITCH:ERROR] {}", err_msg));
                 err_msg
             })?;
         }
@@ -341,10 +338,7 @@ pub async fn switch_account_to_instance(
                     "Account switched for '{}', but auto-relaunch failed: {}",
                     instance.id, launch_err
                 );
-                crate::modules::logger::log_error(&format!(
-                    "[INSTANCE_SWITCH:ERROR] {}",
-                    err_msg
-                ));
+                crate::modules::logger::log_error(&format!("[INSTANCE_SWITCH:ERROR] {}", err_msg));
                 err_msg
             })?;
     }
