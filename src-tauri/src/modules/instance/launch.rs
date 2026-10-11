@@ -380,11 +380,15 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
         cmd.env("RUST_BACKTRACE", "1");
 
         let has_custom_data = !is_default;
+        let inst_home_opt = if has_custom_data {
+            get_instance_home_dir(instance_id).ok()
+        } else {
+            None
+        };
         if has_custom_data {
             cmd.arg(format!("--user-data-dir={}", data_dir));
             cmd.arg("--password-store=basic");
             cmd.arg("--remote-debugging-port=0");
-            let inst_home_opt = get_instance_home_dir(instance_id).ok();
             write_keyring_bypass_markers(&target_data_path, inst_home_opt.as_deref());
 
             if let Some(ref inst_home) = inst_home_opt {
