@@ -20,65 +20,65 @@ pub(crate) struct ErrorResponse {
 
 #[derive(Serialize)]
 pub(crate) struct AccountResponse {
-    id: String,
-    email: String,
-    name: Option<String>,
-    priority: u8,
-    is_current: bool,
-    disabled: bool,
-    disabled_reason: Option<String>,
-    disabled_at: Option<i64>,
-    proxy_disabled: bool,
-    proxy_disabled_reason: Option<String>,
-    proxy_disabled_at: Option<i64>,
-    protected_models: Vec<String>,
-    live_limited_models: HashMap<String, crate::models::account::LiveLimitStatus>,
+    pub(crate) id: String,
+    pub(crate) email: String,
+    pub(crate) name: Option<String>,
+    pub(crate) priority: u8,
+    pub(crate) is_current: bool,
+    pub(crate) disabled: bool,
+    pub(crate) disabled_reason: Option<String>,
+    pub(crate) disabled_at: Option<i64>,
+    pub(crate) proxy_disabled: bool,
+    pub(crate) proxy_disabled_reason: Option<String>,
+    pub(crate) proxy_disabled_at: Option<i64>,
+    pub(crate) protected_models: Vec<String>,
+    pub(crate) live_limited_models: HashMap<String, crate::models::account::LiveLimitStatus>,
     /// [NEW] 403 validation blocked state
-    validation_blocked: bool,
-    validation_blocked_until: Option<i64>,
-    validation_blocked_reason: Option<String>,
-    quota: Option<QuotaResponse>,
-    device_bound: bool,
-    last_used: i64,
+    pub(crate) validation_blocked: bool,
+    pub(crate) validation_blocked_until: Option<i64>,
+    pub(crate) validation_blocked_reason: Option<String>,
+    pub(crate) quota: Option<QuotaResponse>,
+    pub(crate) device_bound: bool,
+    pub(crate) last_used: i64,
 }
 
 #[derive(Serialize)]
 pub(crate) struct QuotaResponse {
-    models: Vec<ModelQuota>,
-    last_updated: i64,
-    subscription_tier: Option<String>,
-    is_forbidden: bool,
+    pub(crate) models: Vec<ModelQuota>,
+    pub(crate) last_updated: i64,
+    pub(crate) subscription_tier: Option<String>,
+    pub(crate) is_forbidden: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    quota_groups: Option<Vec<QuotaGroupDto>>,
+    pub(crate) quota_groups: Option<Vec<QuotaGroupDto>>,
 }
 
 #[derive(Serialize)]
 pub(crate) struct ModelQuota {
-    name: String,
-    percentage: i32,
-    reset_time: String,
+    pub(crate) name: String,
+    pub(crate) percentage: i32,
+    pub(crate) reset_time: String,
 }
 
 #[derive(Serialize)]
 pub(crate) struct QuotaGroupDto {
-    display_name: String,
+    pub(crate) display_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    description: Option<String>,
-    buckets: Vec<QuotaBucketDto>,
+    pub(crate) description: Option<String>,
+    pub(crate) buckets: Vec<QuotaBucketDto>,
 }
 
 #[derive(Serialize)]
 pub(crate) struct QuotaBucketDto {
-    bucket_id: String,
-    window: String,
-    remaining_fraction: f64,
-    reset_time: String,
+    pub(crate) bucket_id: String,
+    pub(crate) window: String,
+    pub(crate) remaining_fraction: f64,
+    pub(crate) reset_time: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    cycle_tokens: Option<u64>,
+    pub(crate) cycle_tokens: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    display_name: Option<String>,
+    pub(crate) display_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    description: Option<String>,
+    pub(crate) description: Option<String>,
 }
 
 /// Map a model-side QuotaGroup to the API DTO.
@@ -104,8 +104,8 @@ pub(crate) fn quota_group_to_dto(g: &crate::models::quota::QuotaGroup) -> QuotaG
 
 #[derive(Serialize)]
 pub(crate) struct AccountListResponse {
-    accounts: Vec<AccountResponse>,
-    current_account_id: Option<String>,
+    pub(crate) accounts: Vec<AccountResponse>,
+    pub(crate) current_account_id: Option<String>,
 }
 
 pub(crate) fn to_account_response(
