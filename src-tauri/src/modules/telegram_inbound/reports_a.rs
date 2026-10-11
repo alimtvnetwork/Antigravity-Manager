@@ -42,25 +42,28 @@ pub fn format_ping_report() -> String {
         .unwrap_or_else(|| "None".to_string());
 
     format!(
-        "🏓 <b>PONG — AGM v{} Online</b>\n\n\
-        • <b>Machine:</b> <code>{}</code>\n\
-        • <b>Alias:</b> <code>{}</code>\n\
-        • <b>IP:</b> <code>{}</code>\n\
-        • <b>Build:</b> <code>v{}</code> (commit <code>{}</code>)\n\
-        • <b>Branch:</b> <code>{}</code> | <b>Release:</b> <code>{}</code>\n\
-        • <b>Uptime:</b> <code>{}m</code>\n\
-        • <b>Active Account:</b> <code>{}</code>\n\n\
-        💡 Send <code>/observe</code> for live workspaces &amp; prompts or <code>/help</code> for all commands.",
+        "🏓 <b>PONG — AGM v{} Online</b> ⚡\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        🖥️ <b>Machine:</b> <code>{}</code> (<code>{}</code>) | 🏷️ <b>Alias:</b> <code>{}</code>\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        <b>📊 NODE TELEMETRY &amp; LIFECYCLE</b>\n\
+        <blockquote>\
+        • <b>Active Account:</b> <code>{}</code>\n\
+        • <b>App Build:</b> <code>v{}</code> (commit <code>{}</code>)\n\
+        • <b>Git Branch:</b> <code>{}</code> | <b>Release:</b> <code>{}</code>\n\
+        • <b>System Uptime:</b> <code>{}m</code>\
+        </blockquote>\n\n\
+        💡 Send <code>/observe</code> for live workspaces or <code>/fleet</code> for instance map.",
         clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&machine_name, 48),
-        clean_for_telegram_html(&display_alias, 48),
         clean_for_telegram_html(&local_ip, 48),
+        clean_for_telegram_html(&display_alias, 48),
+        clean_for_telegram_html(&active_acc, 64),
         clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&hash, 24),
         clean_for_telegram_html(&branch, 24),
         clean_for_telegram_html(&last_rel, 24),
-        uptime_min,
-        clean_for_telegram_html(&active_acc, 64)
+        uptime_min
     )
 }
 

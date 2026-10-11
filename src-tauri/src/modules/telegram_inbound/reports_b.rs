@@ -52,19 +52,56 @@ pub fn format_expand_prompt_report(query_str: &str) -> String {
             } else {
                 "⚪"
             };
+            let m_name = crate::modules::email_watcher::detect_machine_name();
+            let m_ip = crate::modules::email_watcher::detect_local_ip();
+            let inst_id = if p.instance_id.is_empty() {
+                "default"
+            } else {
+                &p.instance_id
+            };
+            let (_, detected_images) = repo_db::extract_image_payload_or_path(&p.prompt_content);
+            let (_, word_count) = repo_db::extract_prompt_words_preview(&p.prompt_content, 200);
+
+            let attached_images_section = if !detected_images.is_empty() {
+                let mut links = Vec::new();
+                for (idx, url) in detected_images.iter().enumerate() {
+                    let clean_url = clean_for_telegram_html(url, 200);
+                    links.push(format!("<a href=\"{}\">🖼️ Image #{}</a>", clean_url, idx + 1));
+                }
+                format!(
+                    "\n🖼️ <b>Attached Media ({}):</b> {}\n",
+                    detected_images.len(),
+                    links.join(" &bull; ")
+                )
+            } else {
+                String::new()
+            };
 
             format!(
-                "📄 <b>Expanded Prompt Details:</b>\n\n\
-                • <b>ID:</b> <code>{}</code>\n\
-                • <b>Project:</b> <b>{}</b>\n\
-                • <b>Status:</b> {} {}\n\
-                • <b>Path:</b> <code>{}</code>\n\n\
-                <b>Full Prompt Instructions:</b>\n{}\n",
+                "📄 <b>Expanded Prompt: <code>{}</code></b> ⚡\n\
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
+                🖥️ <b>Machine:</b> <code>{}</code> (<code>{}</code>) | 🏷️ <b>Instance:</b> <code>{}</code>\n\
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
+                <b>📋 PROMPT METADATA &amp; CONTEXT</b>\n\
+                <blockquote>\
+                • <b>Workspace Project:</b> <b>{}</b>\n\
+                • <b>Lifecycle Status:</b> {} <code>{}</code> ({})\n\
+                • <b>Workspace Path:</b> <code>{}</code>\n\
+                • <b>Word Count:</b> <code>{} words</code>\
+                </blockquote>{}\n\
+                <blockquote expandable><b>💬 Instructions:</b>\n\
+                <code>{}</code></blockquote>",
                 clean_for_telegram_html(&p.id, 48),
+                clean_for_telegram_html(&m_name, 48),
+                clean_for_telegram_html(&m_ip, 48),
+                clean_for_telegram_html(inst_id, 32),
                 clean_for_telegram_html(&short_ws, 32),
                 badge,
+                clean_for_telegram_html(&p.status, 24),
                 duration,
                 clean_for_telegram_html(&p.repo_path, 80),
+                word_count,
+                attached_images_section,
                 clean_for_telegram_html(&p.prompt_content, 3500)
             )
         }
@@ -74,6 +111,37 @@ pub fn format_expand_prompt_report(query_str: &str) -> String {
             clean_for_telegram_html(query, 32)
         ),
     }
+}
+
+/// Resolve inline reply markup with Copy Prompt button for expanded prompt
+pub fn resolve_expand_prompt_markup(query_str: &str) -> Option<serde_json::Value> {
+    let prompts = repo_db::list_all_prompts().ok()?;
+    let query = query_str.trim();
+    let target = if query.is_empty() {
+        prompts
+            .iter()
+            .find(|p| p.status == "running" || p.status == "dispatched")
+            .or_else(|| prompts.first())
+    } else if let Ok(idx) = query.parse::<usize>() {
+        if idx >= 1 && idx <= prompts.len() {
+            prompts.get(idx - 1)
+        } else {
+            None
+        }
+    } else {
+        prompts.iter().find(|p| {
+            p.id.starts_with(query)
+                || p.id.eq_ignore_ascii_case(query)
+                || p.project_id.contains(query)
+        })
+    }?;
+
+    let (_, detected_images) = repo_db::extract_image_payload_or_path(&target.prompt_content);
+    Some(build_copy_prompt_reply_markup(
+        &target.prompt_content,
+        &detected_images,
+        None,
+    ))
 }
 
 /// Format prompts query report with ≥200 words preview for Telegram

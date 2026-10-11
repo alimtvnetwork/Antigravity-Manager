@@ -4,7 +4,172 @@ use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
+use std::path::PathBuf;
+
 use super::*;
+
+/// Resolve unified command response and interactive inline reply markup (copy buttons, navigation buttons)
+pub(crate) async fn resolve_telegram_command_reply_and_markup(
+    text_raw: &str,
+    saved_media_opt: &Option<(PathBuf, Option<String>)>,
+) -> (Option<String>, Option<serde_json::Value>) {
+    let trimmed = text_raw.trim();
+
+    // 1. If photo upload with empty caption
+    if trimmed.is_empty() {
+        if let Some((img_path, public_url_opt)) = saved_media_opt.as_ref() {
+            if let Some(url) = public_url_opt {
+                let msg_text = format!(
+                    "📸 <b>Image Uploaded &amp; Ready for Reuse!</b>\n\
+                    ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+                    🔗 <b>Direct CDN URL:</b> <a href=\"{}\">{}</a>\n\
+                    📁 <b>Local File:</b> <code>{}</code>\n\n\
+                    📝 <b>Markdown Embed:</b>\n\
+                    <code>![image]({})</code>\n\n\
+                    💡 Send <code>/prompt &lt;project&gt; \"instruction\"</code> to run tasks with this image.",
+                    url,
+                    url,
+                    img_path.display(),
+                    url
+                );
+                let markup = json!({
+                    "inline_keyboard": [
+                        [
+                            {
+                                "text": "📋 Copy Markdown",
+                                "copy_text": {
+                                    "text": format!("![image]({})", url)
+                                }
+                            },
+                            {
+                                "text": "🔗 Copy URL",
+                                "copy_text": {
+                                    "text": url
+                                }
+                            }
+                        ]
+                    ]
+                });
+                return (Some(msg_text), Some(markup));
+            } else {
+                let msg_text = format!(
+                    "📸 <b>Screenshot Saved Successfully</b>\n\n\
+                    • <b>Path:</b> <code>{}</code>\n\n\
+                    💡 To execute with instruction: <code>/prompt &lt;project&gt; \"instruction\"</code>",
+                    img_path.display()
+                );
+                return (Some(msg_text), None);
+            }
+        }
+        return (None, None);
+    }
+
+    // 2. Command with text
+    let base_reply = process_telegram_command_text(trimmed).await;
+    let (cmd_raw, rest) = match trimmed.split_once(char::is_whitespace) {
+        Some((c, r)) => (c, r.trim()),
+        None => (trimmed, ""),
+    };
+    let cmd_no_slash = cmd_raw.strip_prefix('/').unwrap_or(cmd_raw);
+    let cmd_base = cmd_no_slash
+        .split('@')
+        .next()
+        .unwrap_or(cmd_no_slash)
+        .to_lowercase();
+
+    let mut markup_opt = match cmd_base.as_str() {
+        "expand" | "exp" => reports_b::resolve_expand_prompt_markup(rest),
+        "fleet" | "whoami" => Some(json!({
+            "inline_keyboard": [
+                [
+                    { "text": "🔄 Refresh Fleet", "callback_data": "cmd:fleet" },
+                    { "text": "🏷️ Instances", "callback_data": "cmd:instances" },
+                    { "text": "👤 Accounts", "callback_data": "cmd:accounts" }
+                ]
+            ]
+        })),
+        "instances" | "inst" => Some(json!({
+            "inline_keyboard": [
+                [
+                    { "text": "🔄 Refresh", "callback_data": "cmd:instances" },
+                    { "text": "🌐 Fleet Identity", "callback_data": "cmd:fleet" },
+                    { "text": "👤 Accounts", "callback_data": "cmd:accounts" }
+                ]
+            ]
+        })),
+        "accounts" | "acc" => Some(json!({
+            "inline_keyboard": [
+                [
+                    { "text": "🔄 Refresh", "callback_data": "cmd:accounts" },
+                    { "text": "🌐 Fleet Identity", "callback_data": "cmd:fleet" },
+                    { "text": "🏷️ Instances", "callback_data": "cmd:instances" }
+                ]
+            ]
+        })),
+        "help" | "start" => Some(json!({
+            "inline_keyboard": [
+                [
+                    { "text": "🌐 Fleet Identity", "callback_data": "cmd:fleet" },
+                    { "text": "📊 Live Observe", "callback_data": "cmd:observe" }
+                ],
+                [
+                    { "text": "🏷️ Instances", "callback_data": "cmd:instances" },
+                    { "text": "👤 Accounts", "callback_data": "cmd:accounts" }
+                ]
+            ]
+        })),
+        "ping" => Some(json!({
+            "inline_keyboard": [
+                [
+                    { "text": "🌐 Fleet Identity", "callback_data": "cmd:fleet" },
+                    { "text": "📊 Live Observe", "callback_data": "cmd:observe" }
+                ]
+            ]
+        })),
+        _ => None,
+    };
+
+    // If media was uploaded along with this command
+    if let Some((img_path, public_url_opt)) = saved_media_opt.as_ref() {
+        let banner = if let Some(url) = public_url_opt {
+            format!(
+                "📸 <b>Image Uploaded:</b> <a href=\"{}\">{}</a>\n📁 <b>Local File:</b> <code>{}</code>\n\n",
+                url, url, img_path.display()
+            )
+        } else {
+            format!(
+                "📸 <b>Image Saved:</b> <code>{}</code>\n\n",
+                img_path.display()
+            )
+        };
+
+        if markup_opt.is_none() {
+            if let Some(url) = public_url_opt {
+                markup_opt = Some(json!({
+                    "inline_keyboard": [
+                        [
+                            {
+                                "text": "📋 Copy Markdown",
+                                "copy_text": {
+                                    "text": format!("![image]({})", url)
+                                }
+                            },
+                            {
+                                "text": "🔗 Copy URL",
+                                "copy_text": {
+                                    "text": url.clone()
+                                }
+                            }
+                        ]
+                    ]
+                }));
+            }
+        }
+        return (base_reply.map(|r| format!("{}{}", banner, r)), markup_opt);
+    }
+
+    (base_reply, markup_opt)
+}
 
 /// Poll pending Telegram updates once, execute commands, reply, and advance update offset
 pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, AppError> {
@@ -69,11 +234,19 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
                                 data.to_string()
                             };
 
-                            if let Some(reply) = process_telegram_command_text(&cmd_str).await {
+                            let (reply_opt, markup_opt) =
+                                resolve_telegram_command_reply_and_markup(&cmd_str, &None).await;
+                            if let Some(reply) = reply_opt {
                                 // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
                                 crate::error::record_ignored(
-                                    send_telegram_message(&clean_token, chat_id, &reply).await,
-                                    "send callback query reply",
+                                    send_telegram_message_with_markup(
+                                        &clean_token,
+                                        chat_id,
+                                        &reply,
+                                        markup_opt,
+                                    )
+                                    .await,
+                                    "send callback query reply with markup",
                                 );
                                 processed.push((chat_id, cmd_str, reply));
                             }
@@ -128,70 +301,8 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
                 }
             }
 
-            let (reply_opt, reply_markup_opt) = if !text_raw.is_empty() {
-                let base_reply = process_telegram_command_text(text_raw).await;
-                if let Some((img_path, public_url_opt)) = saved_media_opt.as_ref() {
-                    let banner = if let Some(url) = public_url_opt {
-                        format!(
-                            "📸 <b>Image Uploaded:</b> <a href=\"{}\">{}</a>\n📁 <b>Local File:</b> <code>{}</code>\n\n",
-                            url, url, img_path.display()
-                        )
-                    } else {
-                        format!(
-                            "📸 <b>Image Saved:</b> <code>{}</code>\n\n",
-                            img_path.display()
-                        )
-                    };
-                    (base_reply.map(|r| format!("{}{}", banner, r)), None)
-                } else {
-                    (base_reply, None)
-                }
-            } else if let Some((img_path, public_url_opt)) = saved_media_opt.as_ref() {
-                if let Some(url) = public_url_opt {
-                    let msg_text = format!(
-                        "📸 <b>Image Uploaded &amp; Ready for Reuse!</b>\n\
-                        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
-                        🔗 <b>Direct CDN URL:</b> <a href=\"{}\">{}</a>\n\
-                        📁 <b>Local File:</b> <code>{}</code>\n\n\
-                        📝 <b>Markdown Embed:</b>\n\
-                        <code>![image]({})</code>\n\n\
-                        💡 Send <code>/prompt &lt;project&gt; \"instruction\"</code> to run tasks with this image.",
-                        url,
-                        url,
-                        img_path.display(),
-                        url
-                    );
-                    let markup = json!({
-                        "inline_keyboard": [
-                            [
-                                {
-                                    "text": "📋 Copy Markdown",
-                                    "copy_text": {
-                                        "text": format!("![image]({})", url)
-                                    }
-                                },
-                                {
-                                    "text": "🔗 Copy URL",
-                                    "copy_text": {
-                                        "text": url
-                                    }
-                                }
-                            ]
-                        ]
-                    });
-                    (Some(msg_text), Some(markup))
-                } else {
-                    let msg_text = format!(
-                        "📸 <b>Screenshot Saved Successfully</b>\n\n\
-                        • <b>Path:</b> <code>{}</code>\n\n\
-                        💡 To execute with instruction: <code>/prompt &lt;project&gt; \"instruction\"</code>",
-                        img_path.display()
-                    );
-                    (Some(msg_text), None)
-                }
-            } else {
-                (None, None)
-            };
+            let (reply_opt, reply_markup_opt) =
+                resolve_telegram_command_reply_and_markup(text_raw, &saved_media_opt).await;
 
             if let Some(reply) = reply_opt {
                 // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
@@ -335,19 +446,23 @@ pub fn start_telegram_daemon() {
                                                         data.to_string()
                                                     };
 
-                                                    if let Some(reply) =
-                                                        process_telegram_command_text(&cmd_str)
-                                                            .await
-                                                    {
+                                                    let (reply_opt, markup_opt) =
+                                                        resolve_telegram_command_reply_and_markup(
+                                                            &cmd_str, &None,
+                                                        )
+                                                        .await;
+
+                                                    if let Some(reply) = reply_opt {
                                                         // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
                                                         crate::error::record_ignored(
-                                                            send_telegram_message(
+                                                            send_telegram_message_with_markup(
                                                                 &clean_token,
                                                                 chat_id,
                                                                 &reply,
+                                                                markup_opt,
                                                             )
                                                             .await,
-                                                            "send callback reply",
+                                                            "send callback reply with markup",
                                                         );
                                                     }
 
@@ -415,75 +530,12 @@ pub fn start_telegram_daemon() {
                                         st.last_update_id = last_update_id;
                                     }
 
-                                    let (reply_opt, reply_markup_opt) = if !text_raw.is_empty() {
-                                        let base_reply =
-                                            process_telegram_command_text(text_raw).await;
-                                        if let Some((img_path, public_url_opt)) =
-                                            saved_media_opt.as_ref()
-                                        {
-                                            let banner = if let Some(url) = public_url_opt {
-                                                format!(
-                                                    "📸 <b>Image Uploaded:</b> <a href=\"{}\">{}</a>\n📁 <b>Local File:</b> <code>{}</code>\n\n",
-                                                    url, url, img_path.display()
-                                                )
-                                            } else {
-                                                format!(
-                                                    "📸 <b>Image Saved:</b> <code>{}</code>\n\n",
-                                                    img_path.display()
-                                                )
-                                            };
-                                            (base_reply.map(|r| format!("{}{}", banner, r)), None)
-                                        } else {
-                                            (base_reply, None)
-                                        }
-                                    } else if let Some((img_path, public_url_opt)) =
-                                        saved_media_opt.as_ref()
-                                    {
-                                        if let Some(url) = public_url_opt {
-                                            let msg_text = format!(
-                                                "📸 <b>Image Uploaded &amp; Ready for Reuse!</b>\n\
-                                                ━━━━━━━━━━━━━━━━━━━━━━━━\n\
-                                                🔗 <b>Direct CDN URL:</b> <a href=\"{}\">{}</a>\n\
-                                                📁 <b>Local File:</b> <code>{}</code>\n\n\
-                                                📝 <b>Markdown Embed:</b>\n\
-                                                <code>![image]({})</code>\n\n\
-                                                💡 Send <code>/prompt &lt;project&gt; \"instruction\"</code> to run tasks with this image.",
-                                                url,
-                                                url,
-                                                img_path.display(),
-                                                url
-                                            );
-                                            let markup = json!({
-                                                "inline_keyboard": [
-                                                    [
-                                                        {
-                                                            "text": "📋 Copy Markdown",
-                                                            "copy_text": {
-                                                                "text": format!("![image]({})", url)
-                                                            }
-                                                        },
-                                                        {
-                                                            "text": "🔗 Copy URL",
-                                                            "copy_text": {
-                                                                "text": url
-                                                            }
-                                                        }
-                                                    ]
-                                                ]
-                                            });
-                                            (Some(msg_text), Some(markup))
-                                        } else {
-                                            let msg_text = format!(
-                                                "📸 <b>Screenshot Saved Successfully</b>\n\n\
-                                                • <b>Path:</b> <code>{}</code>\n\n\
-                                                💡 To execute with instruction: <code>/prompt &lt;project&gt; \"instruction\"</code>",
-                                                img_path.display()
-                                            );
-                                            (Some(msg_text), None)
-                                        }
-                                    } else {
-                                        (None, None)
-                                    };
+                                    let (reply_opt, reply_markup_opt) =
+                                        resolve_telegram_command_reply_and_markup(
+                                            text_raw,
+                                            &saved_media_opt,
+                                        )
+                                        .await;
 
                                     if let Some(reply) = reply_opt {
                                         // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run

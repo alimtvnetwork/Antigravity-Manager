@@ -61,26 +61,50 @@ async fn dispatch_post_switch_prompt_telemetry(
                 );
 
                 // Look up active running or backed up prompt preview for this instance
-                let (prompt_preview_text, prompt_words_count) = if let Ok(all_prompts) =
-                    crate::modules::repo_db::list_all_prompts()
-                {
-                    let matched_prompt = all_prompts.into_iter().find(|p| {
-                        (p.status == "running"
-                            || p.status == "backed_up"
-                            || p.status == "dispatched")
-                            && (p.instance_id.eq_ignore_ascii_case(instance_id)
-                                || (instance_id == "default"
-                                    && (p.instance_id.is_empty() || p.instance_id == "default")))
-                    });
+                let (prompt_preview_text, prompt_words_count, full_prompt_content, detected_images) =
+                    if let Ok(all_prompts) = crate::modules::repo_db::list_all_prompts() {
+                        let matched_prompt = all_prompts.into_iter().find(|p| {
+                            (p.status == "running"
+                                || p.status == "backed_up"
+                                || p.status == "dispatched")
+                                && (p.instance_id.eq_ignore_ascii_case(instance_id)
+                                    || (instance_id == "default"
+                                        && (p.instance_id.is_empty()
+                                            || p.instance_id == "default")))
+                        });
 
-                    if let Some(p) = matched_prompt {
-                        let (preview, words) = extract_words_preview(&p.prompt_content, 200);
-                        (preview, words)
+                        if let Some(p) = matched_prompt {
+                            let (_, images) =
+                                crate::modules::repo_db::extract_image_payload_or_path(
+                                    &p.prompt_content,
+                                );
+                            let (preview, words) = extract_words_preview(&p.prompt_content, 200);
+                            (preview, words, p.prompt_content, images)
+                        } else {
+                            (String::new(), 0, String::new(), Vec::new())
+                        }
                     } else {
-                        (String::new(), 0)
+                        (String::new(), 0, String::new(), Vec::new())
+                    };
+
+                let attached_images_section = if !detected_images.is_empty() {
+                    let mut links = Vec::new();
+                    for (idx, url) in detected_images.iter().enumerate() {
+                        let clean_url =
+                            crate::modules::telegram_inbound::clean_for_telegram_html(url, 200);
+                        links.push(format!(
+                            "<a href=\"{}\">🖼️ Image #{}</a>",
+                            clean_url,
+                            idx + 1
+                        ));
                     }
+                    format!(
+                        "\n🖼️ <b>Attached Media ({}):</b> {}\n",
+                        detected_images.len(),
+                        links.join(" &bull; ")
+                    )
                 } else {
-                    (String::new(), 0)
+                    String::new()
                 };
 
                 let prompt_section = if !prompt_preview_text.is_empty() {
@@ -107,13 +131,14 @@ async fn dispatch_post_switch_prompt_telemetry(
                         • <b>Projects:</b> <code>{}</code>\n\
                         • <b>Version &amp; Timestamp:</b> <code>{}</code> | <code>{}</code>\n\
                         • <b>Action:</b> Run <code>agm prompts status</code> or <code>agm prompts restore</code>\
-                        </blockquote>{}",
+                        </blockquote>{}{}",
                         telemetry_header,
                         backed_up_count,
                         restored_count,
                         escape_telegram_html(&projects_display),
                         escape_telegram_html(&pkg_ver),
                         escape_telegram_html(&now_str),
+                        attached_images_section,
                         prompt_section
                     )
                 } else {
@@ -127,22 +152,39 @@ async fn dispatch_post_switch_prompt_telemetry(
                         • <b>Verified Running Prompts:</b> <code>{}</code> (of {} backed up)\n\
                         • <b>Active Projects:</b> <code>{}</code>\n\
                         • <b>Version &amp; Timestamp:</b> <code>{}</code> | <code>{}</code>\
-                        </blockquote>{}",
+                        </blockquote>{}{}",
                         telemetry_header,
                         verified_running,
                         backed_up_count,
                         escape_telegram_html(&projects_display),
                         escape_telegram_html(&pkg_ver),
                         escape_telegram_html(&now_str),
+                        attached_images_section,
                         prompt_section
                     )
                 };
 
+                let reply_markup =
+                    if !full_prompt_content.trim().is_empty() || !detected_images.is_empty() {
+                        Some(telegram_inbound::build_copy_prompt_reply_markup(
+                            &full_prompt_content,
+                            &detected_images,
+                            None,
+                        ))
+                    } else {
+                        None
+                    };
+
                 // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
                 crate::error::record_ignored(
-                    telegram_inbound::send_telegram_message(&config.bot_token, chat_id, &tg_text)
-                        .await,
-                    "send_telegram_message",
+                    telegram_inbound::send_telegram_message_with_markup(
+                        &config.bot_token,
+                        chat_id,
+                        &tg_text,
+                        reply_markup,
+                    )
+                    .await,
+                    "send_telegram_message_with_markup",
                 );
             }
         }
