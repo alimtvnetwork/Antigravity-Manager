@@ -1,5 +1,15 @@
 # Changelog
 
+## [v4.186.0] - 2026-10-11
+
+### Fixed
+- **CLI Self-Delegating Updater & Windows Sharing Violation Remediation**: Implemented universal detached self-delegation for `agm update` to temporary process binaries (`%TEMP%\agm-updater\agm-update-cli-<pid>.exe`) with immediate caller termination (exit code 0), eliminating Windows binary image file locks (`os error 5: Access is denied` / sharing violation `0x20`). Enhanced process detection in `delegate_updater/process.rs` and `install.ps1` to actively identify and terminate running `antigravity-manager.exe` and `agm.exe` processes. (Thanks to @aukgit)
+- **Prompt Pipeline Dispatch & Multi-Destination Queue Architecture**: Restored and unified CLI prompt verbs (`agm prompt send`, `agm prompt queue`, `qe` alias, and `agm instance prompt`) with destination session targeting (`--conversation <id>`, `--new`, `--existing`), automatic working directory resolution, and robust argument parsing (`-c`, `--session`, `-m`, `--model`). Implemented Tier 2 resilient prompt dispatch in `repo_db::send_prompt_now_for_instance` with automatic task file persistence (`.antigravity_resume_task.json`), clipboard synchronization, and IDE window activation. (Thanks to @aukgit)
+- **Prompt Backup & Cross-Instance Recovery during Account Switching**: Expanded in-flight prompt status capture in `backup_running_prompts` to `WHERE status IN ('running', 'in_flight', 'dispatched')`. Added atomic SQLite re-attribution of backed-up prompts from source instances to target instances during profile rotation (`rotation.rs`), and recovered `backed_up` prompts in `auto_resume_recent_prompts`. (Thanks to @aukgit)
+- **Prompt Tree View Destination Conversation Capsule Selector**: Added an inline segmented capsule selector in `DetailHeader.tsx` allowing developers to explicitly select between "Existing Conv" and "New Conv" before dispatching or enqueueing prompts, wired end-to-end to `usePromptTreePromptActions.ts` and `useInstanceStore.ts`. (Thanks to @aukgit)
+
+---
+
 ## [v4.185.0] - 2026-10-11
 
 ### Fixed
@@ -120,6 +130,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.186.0 (2026-10-11)**:
+        -   **Update CLI Command & Pipeline Fixes**:
+            -   **Description**: Implemented universal detached self-delegation for `agm update` to eliminate Windows file locks (`os error 5: Access is denied` / sharing violation `0x20`); unified CLI prompt verbs (`agm prompt send`, `agm prompt queue`, `qe` alias) with destination session targeting (`--conversation`, `--new`, `--existing`); expanded in-flight prompt backup coverage across profile rotations; and added UI conversation choice capsule ("Existing Conv" vs "New Conv"). (Thanks to @aukgit)
+
+
     *   **v4.185.0 (2026-10-11)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

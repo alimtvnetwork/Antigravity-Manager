@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.186.0 (2026-10-11)**:
+        -   **Update CLI Command & Pipeline Fixes**:
+            -   **Description**: Implemented universal detached self-delegation for `agm update` to eliminate Windows file locks (`os error 5: Access is denied` / sharing violation `0x20`); unified CLI prompt verbs (`agm prompt send`, `agm prompt queue`, `qe` alias) with destination session targeting (`--conversation`, `--new`, `--existing`); expanded in-flight prompt backup coverage across profile rotations; and added UI conversation choice capsule ("Existing Conv" vs "New Conv"). (Thanks to @aukgit)
+
     *   **v4.185.0 (2026-10-11)**:
         -   **Comprehensive Compiler & Pipeline Error Resolution**:
             -   **Description**: Resolved all compilation, visibility, and trait bound errors reported by CI across proxy rate limiting (`RateLimitTracker`), signature cache (`SignatureCache::new`), token manager helpers, HTTP session store (`SessionParent`), upstream client (`build_url`), and mappers. Restored Axum 0.7 `ServiceExt::map_request` trait bounds on `assemble_app`, added `#[cfg(target_os = "windows")]` guards for Win32 creation flags and console attachments, and enforced clean Rust formatting across all touched proxy modules. (Thanks to @aukgit)
