@@ -187,8 +187,20 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
             );
         }
 
-        // Spawn prompt via agy
+        // Spawn prompt via agy with task file fallback
         let sent = spawn_prompt_via_agy(&prompt);
+        let task_file_written = task_file.exists();
+        if !sent && !task_file_written {
+            crate::modules::logger::log_warn(&format!(
+                "[PromptQueueScheduler] Prompt '{}' could not be dispatched (agy failed, task file write failed); keeping in queue",
+                prompt.id
+            ));
+            continue;
+        }
+
+        if !sent {
+            let _ = crate::modules::instance::ensure_instance_running_for_dispatch(&inst_id, Some(&repo_path));
+        }
 
         // Update active_prompts status to 'dispatched'
         // Justification: dispatch state update; a missed update leaves the prompt backed_up so it is retried on the next dispatch
