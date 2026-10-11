@@ -1,5 +1,14 @@
 # Changelog
 
+## [v4.189.0] - 2026-10-12
+
+### Fixed
+- **Auto-Switch & Fast-Forward Scoring and Process Isolation**: Replaced strict 100% quota requirement in Step 3 fallback with proportional quota headroom scoring (`score_candidate_account_fallback`), eliminating auto-rotation deadlocks when all fleet accounts have sub-100% quota. Enforced conscious instance root PID isolation in `pid_scan.rs` (`matched_set.contains(&p)`), preventing stopped sibling instances from falsely reporting as running or having their processes terminated during neighbor instance restarts. (Thanks to @aukgit)
+- **CLI Update Revert & Downgrade Engine**: Fully parameterized `agm update <ver>` / `agm update to <ver>` to parse positional and prefixed version arguments, normalize 2-part SemVer (`4.162` -> `4.162.0`), query GitHub release tag endpoints directly rather than hardcoding `/releases/latest`, and pass `-isPinned`/`-Force` flags through the 3-stage self-delegating updater and `install.ps1` to bypass downgrade suppression gates. Added fallback probing for historical NSIS asset filenames (`Antigravity.Manager.Tools_4.162.0_x64-setup.exe` and `agm-alim-setup.exe`). (Thanks to @aukgit)
+- **Cross-Platform CI/CD Compiler & Quality Gate**: Fixed 7 compile and Clippy errors across Ubuntu, macOS, and Windows runners including rusqlite statement borrow lifetimes in `compact_engine/workdir.rs`, non-exhaustive `KnownDataType::SshNodes` pattern matching in `json_envelope/inspection.rs`, re-exported Telegram daemon lifecycle controls (`stop_telegram_daemon`, `get_telegram_status`), and normalized full `Account` quota resolution in `reports_a.rs`. All 7 GitHub Actions matrix jobs verified 100% green. (Thanks to @aukgit)
+
+---
+
 ## [v4.188.0] - 2026-10-11
 
 ### Fixed
@@ -155,6 +164,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.189.0 (2026-10-12)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.188.0 (2026-10-11)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
