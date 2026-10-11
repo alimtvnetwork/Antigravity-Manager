@@ -1,5 +1,19 @@
 # Changelog
 
+## [v4.188.0] - 2026-10-11
+
+### Fixed
+- **Auto-Switch & Fast-Forward PID Contamination and Quota Gate Fix**: Eliminated cross-instance PID contamination in `pid_scan.rs` where ancestor walking accumulated across all instances caused stopped sibling instances to falsely report as running and trigger collision guards. Resolved candidate evaluation freeze in `selection.rs` and `scoring.rs` by unblocking Step 3 fallback candidates when `cooldown_pool` is non-empty, and applying proportional scaling for accounts with sub-100% quota. (Thanks to @aukgit)
+- **CLI Version Downgrade & 2-Part SemVer Normalization**: Enabled version rollbacks and downgrades via `agm update <ver>` / `agm update to <ver>`. Automatically normalizes 2-part version numbers (e.g. `4.162` -> `4.162.0`) in CLI arguments and `install.ps1`, parameterizes `download_release_zip` to target explicit release tags rather than hardcoding `releases/latest`, and bypasses installer downgrade checks when a pinned version is specified. (Thanks to @aukgit)
+- **Launch & Switch Latency Optimization**: Eliminated synchronous 6,000ms delay in `wait_for_instance_prompt_channel` during IDE launch, replacing it with an adaptive 100ms readiness probe capped at 1,200ms. Reduced loop sleep intervals in `close_instance_verified` from 200ms down to 50ms to eliminate Tokio worker thread blocking. (Thanks to @aukgit)
+- **Error Visibility & Swallowed Error Elimination**: Audited and eliminated silent error discards across `instance_fastforward.rs`, `instance.rs`, and `switch.rs` by routing through `record_ignored` with justification comments and logging warnings; connected frontend errors in `useAutoSwitcher.ts` and `useInstanceSettings.ts` to `useErrorStore.getState().trackWarning`. (Thanks to @aukgit)
+
+### Added
+- **Instance List View IDE Executable Path Column**: Added a dedicated `IDE Executable` column in the instance list view table displaying the ending executable path via `formatShortPath`, accompanied by a Terminal icon, tooltip with the full path, and clipboard copy button. (Thanks to @aukgit)
+- **Decentralized Headless Fleet Sync via Email & Telegram**: Introduced `fleet_sync.rs` and IPC commands (`get_fleet_sync_machines`, `generate_fleet_sync_json`, `ingest_fleet_sync_json`) enabling decentralized machine, instance, and workspace state synchronization over Email and Telegram without requiring Supabase. (Thanks to @aukgit)
+
+---
+
 ## [v4.187.0] - 2026-10-11
 
 ### Fixed
@@ -141,6 +155,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.188.0 (2026-10-11)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.187.0 (2026-10-11)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

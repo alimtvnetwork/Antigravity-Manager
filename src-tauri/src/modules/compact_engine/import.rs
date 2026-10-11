@@ -252,3 +252,18 @@ pub fn import_compact(options: &ImportOptions) -> Result<ImportResult, AppError>
         duration_ms,
     })
 }
+
+/// Ingests a standalone portable SQLite database file and parses `CompactExportData`.
+pub fn import_from_sqlite_file(path: &Path) -> Result<CompactExportData, AppError> {
+    db::read_compact_db(path)
+}
+
+/// Unpacks a Two-Tier JSON Envelope v2.0 file and returns `CompactExportData`.
+pub fn import_from_json_envelope(path: &Path) -> Result<CompactExportData, AppError> {
+    let raw_content = fs::read_to_string(path).map_err(|e| {
+        AppError::Config(format!("Failed to read compact JSON file {:?}: {e}", path))
+    })?;
+    let (data, _attrs) = extract_payload::<CompactExportData>(&raw_content)
+        .map_err(|e| AppError::Config(format!("Failed to parse compact JSON envelope: {e}")))?;
+    Ok(data)
+}
