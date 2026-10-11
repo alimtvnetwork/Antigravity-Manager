@@ -337,7 +337,7 @@ impl TokenManager {
                                 "✅ Buffer delay successful! Found available account: {}",
                                 t.email
                             );
-                            t.clone()
+                            Ok(t.clone())
                         } else {
                             // Layer 2: 缓冲后仍无可用账号,执行乐观重置
                             tracing::warn!(

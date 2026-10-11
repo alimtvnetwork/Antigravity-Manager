@@ -30,7 +30,7 @@ pub(crate) fn build_transcript_conv_nodes(
     let instance_exe_name: String =
         crate::modules::instance::resolve_instance_exe_name(&proj.instance_id, None);
     if let Some(raw_convs) =
-        convs_by_inst_and_path.get(&(norm_proj_inst.clone(), norm_path.clone()))
+        convs_by_inst_and_path.get(&(norm_proj_inst.to_string(), norm_path.to_string()))
     {
         for item in raw_convs {
             let (preview_200w, word_count) = extract_prompt_words_preview(&item.prompt, word_cap);
@@ -73,7 +73,7 @@ pub(crate) fn build_transcript_conv_nodes(
                 )
             } else if item.conv_inst_id == "default" || item.conv_inst_id == "__default__" {
                 (
-                    Some(1),
+                    Some(1i64),
                     "default".to_string(),
                     crate::modules::instance::resolve_instance_exe_name("default", None),
                 )
@@ -83,7 +83,7 @@ pub(crate) fn build_transcript_conv_nodes(
                 .find(|i| i.id == item.conv_inst_id || i.name == item.conv_inst_id)
             {
                 (
-                    inst.seq_num,
+                    inst.seq_num.map(|v| v as i64),
                     inst.name.clone(),
                     crate::modules::instance::resolve_instance_exe_name(
                         &inst.id,
@@ -161,7 +161,7 @@ pub(crate) fn build_active_prompt_conv_nodes(
     let registry = ctx.registry;
     let now = ctx.now;
     if let Some(aps) =
-        active_prompts_by_inst_and_path.get(&(norm_proj_inst.clone(), norm_path.clone()))
+        active_prompts_by_inst_and_path.get(&(norm_proj_inst.to_string(), norm_path.to_string()))
     {
         for ap in aps {
             let cid = ap.session_id.clone().unwrap_or_else(|| ap.id.clone());
@@ -292,7 +292,7 @@ pub(crate) fn build_active_prompt_conv_nodes(
                 )
             } else if ap.instance_id == "default" || ap.instance_id == "__default__" {
                 (
-                    Some(1),
+                    Some(1i64),
                     "default".to_string(),
                     crate::modules::instance::resolve_instance_exe_name("default", None),
                 )
@@ -302,7 +302,7 @@ pub(crate) fn build_active_prompt_conv_nodes(
                 .find(|i| i.id == ap.instance_id || i.name == ap.instance_id)
             {
                 (
-                    inst.seq_num,
+                    inst.seq_num.map(|v| v as i64),
                     inst.name.clone(),
                     crate::modules::instance::resolve_instance_exe_name(
                         &inst.id,

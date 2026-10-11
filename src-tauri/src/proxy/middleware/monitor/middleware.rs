@@ -305,7 +305,7 @@ async fn handle_non_streaming_response(
                 } else if let Ok(json) = serde_json::from_str::<Value>(&s) {
                     // 🌟 非流式响应入库统一转换为满血简要版 (包含网关权威签名回填与防雪崩确定性 Tool ID)
                     if let Some(canonical) =
-                        consolidate_non_streaming_response(&json, log, &headers_map)
+                        consolidate_non_streaming_response(&json, &log, &headers_map)
                     {
                         log.response_body = serde_json::to_string_pretty(&canonical)
                             .ok()
@@ -344,7 +344,7 @@ async fn handle_non_streaming_response(
             }
 
             // Record User Token Usage
-            record_user_token_usage(&user_token_identity, log, user_agent.clone());
+            record_user_token_usage(&user_token_identity, &log, user_agent.clone());
 
             monitor.log_request(log).await;
             Response::from_parts(parts, Body::from(bytes))
@@ -353,7 +353,7 @@ async fn handle_non_streaming_response(
             log.response_body = Some("[Response too large (>100MB)]".to_string());
 
             // Record User Token Usage (even if too large)
-            record_user_token_usage(&user_token_identity, log, user_agent.clone());
+            record_user_token_usage(&user_token_identity, &log, user_agent.clone());
 
             monitor.log_request(log).await;
             Response::from_parts(parts, Body::empty())

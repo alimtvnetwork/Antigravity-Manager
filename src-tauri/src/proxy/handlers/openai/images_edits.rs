@@ -180,6 +180,7 @@ pub async fn handle_images_edits(
     let selected: Vec<(usize, String, String, String, String, u64)> = Vec::new();
     let extra_headers = axum::http::HeaderMap::new();
     let debug_cfg = state.debug_logging.clone();
+    let debug_cfg_read = debug_cfg.read().unwrap();
     let trace_id = uuid::Uuid::new_v4().to_string();
     let attempt_no: usize = 0;
 
@@ -192,7 +193,7 @@ pub async fn handle_images_edits(
         &input_images,
         &selected,
         &extra_headers,
-        &debug_cfg,
+        &debug_cfg_read,
         &trace_id,
         attempt_no,
         &state,
