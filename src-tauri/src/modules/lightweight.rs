@@ -73,9 +73,7 @@ pub fn ensure_main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
     // 5. Restore window state (remembered positions and dimensions)
     // Justification: best-effort call; failure logged without changing control flow
     crate::error::record_ignored(
-        window.restore_state(
-            StateFlags::all().difference(StateFlags::VISIBLE | StateFlags::MINIMIZED),
-        ),
+        window.restore_state(StateFlags::all().difference(StateFlags::VISIBLE)),
         "restore_state",
     );
 
@@ -124,9 +122,7 @@ pub fn enter_lightweight_mode(app: &AppHandle) -> Result<(), String> {
         // 1. Save window state
         // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
         crate::error::record_ignored(
-            app.save_window_state(
-                StateFlags::all().difference(StateFlags::VISIBLE | StateFlags::MINIMIZED),
-            ),
+            app.save_window_state(StateFlags::all().difference(StateFlags::VISIBLE)),
             "save_window_state",
         );
 
