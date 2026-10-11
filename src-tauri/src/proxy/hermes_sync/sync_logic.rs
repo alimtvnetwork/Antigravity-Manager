@@ -267,14 +267,14 @@ pub fn read_provider_entry(
 }
 
 #[derive(Default)]
-struct HermesConfigState {
-    pub(crate) is_synced: bool,
-    pub(crate) has_backup: bool,
-    pub(crate) current_base_url: Option<String>,
-    pub(crate) discover_models: bool,
-    pub(crate) configured_models: Vec<String>,
-    pub(crate) is_active: bool,
-    pub(crate) default_model: Option<String>,
+pub struct HermesConfigState {
+    pub is_synced: bool,
+    pub has_backup: bool,
+    pub current_base_url: Option<String>,
+    pub discover_models: bool,
+    pub configured_models: Vec<String>,
+    pub is_active: bool,
+    pub default_model: Option<String>,
 }
 
 pub fn read_config_state(proxy_url: Option<String>) -> HermesConfigState {

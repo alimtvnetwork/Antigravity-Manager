@@ -7,14 +7,14 @@ use tokio_util::sync::CancellationToken;
 /// Axum server instance
 #[derive(Clone)]
 pub struct AxumServer {
-    cancel_token: tokio_util::sync::CancellationToken,
-    custom_mapping: Arc<tokio::sync::RwLock<std::collections::HashMap<String, String>>>,
-    proxy_state: Arc<tokio::sync::RwLock<crate::proxy::config::UpstreamProxyConfig>>,
-    upstream: Arc<crate::proxy::upstream::client::UpstreamClient>,
-    security_state: Arc<RwLock<crate::proxy::ProxySecurityConfig>>,
-    zai_state: Arc<RwLock<crate::proxy::ZaiConfig>>,
-    experimental: Arc<RwLock<crate::proxy::config::ExperimentalConfig>>,
-    debug_logging: Arc<RwLock<crate::proxy::config::DebugLoggingConfig>>,
+    pub(crate) cancel_token: tokio_util::sync::CancellationToken,
+    pub(crate) custom_mapping: Arc<tokio::sync::RwLock<std::collections::HashMap<String, String>>>,
+    pub(crate) proxy_state: Arc<tokio::sync::RwLock<crate::proxy::config::UpstreamProxyConfig>>,
+    pub(crate) upstream: Arc<crate::proxy::upstream::client::UpstreamClient>,
+    pub(crate) security_state: Arc<RwLock<crate::proxy::ProxySecurityConfig>>,
+    pub(crate) zai_state: Arc<RwLock<crate::proxy::ZaiConfig>>,
+    pub(crate) experimental: Arc<RwLock<crate::proxy::config::ExperimentalConfig>>,
+    pub(crate) debug_logging: Arc<RwLock<crate::proxy::config::DebugLoggingConfig>>,
     #[allow(dead_code)] // Reserved for cloudflared status queries and future control
     pub cloudflared_state: Arc<crate::commands::cloudflared::CloudflaredState>,
     pub is_running: Arc<RwLock<bool>>,

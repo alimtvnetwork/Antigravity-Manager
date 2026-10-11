@@ -208,9 +208,9 @@ impl ContextManager {
 
 /// Represents a tool call round (assistant tool_use + user tool_result(s))
 #[derive(Debug)]
-struct ToolRound {
-    _assistant_index: usize,
-    tool_result_indices: Vec<usize>,
+pub(crate) struct ToolRound {
+    pub(crate) _assistant_index: usize,
+    pub(crate) tool_result_indices: Vec<usize>,
     pub(crate) indices: Vec<usize>, // All indices in this round
 }
 

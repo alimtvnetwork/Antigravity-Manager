@@ -15,7 +15,7 @@ impl axum::extract::FromRef<AppState> for Arc<RwLock<crate::proxy::ProxySecurity
 
 #[derive(Serialize)]
 pub(crate) struct ErrorResponse {
-    error: String,
+    pub(crate) error: String,
 }
 
 #[derive(Serialize)]
