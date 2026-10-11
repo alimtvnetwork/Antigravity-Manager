@@ -20,6 +20,7 @@ pub use handle_detect_model::handle_detect_model;
 pub use handle_detect_model::is_model_not_found_error;
 pub(crate) use handle_detect_model::map_status_code_to_gemini_status;
 pub use handle_detect_model::parse_raw_upstream_error;
+#[cfg(test)]
 pub(crate) use handle_detect_model::retry_after_tests;
 pub use retrystrategy::apply_retry_strategy;
 pub use retrystrategy::calculate_max_retry_attempts;
@@ -28,6 +29,7 @@ pub use retrystrategy::determine_retry_strategy_adaptive;
 pub use retrystrategy::determine_retry_strategy_with_grace;
 pub use retrystrategy::next_rotation_attempt;
 pub use retrystrategy::should_rotate_account;
+#[cfg(test)]
 pub(crate) use retrystrategy::tests;
 pub use retrystrategy::FailureStatusTracker;
 pub use retrystrategy::RequestRetryState;

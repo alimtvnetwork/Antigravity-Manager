@@ -30,8 +30,10 @@ mod setup_app;
 pub(crate) use appruntimeflags::configure_linux_graphics;
 pub(crate) use appruntimeflags::credential_state;
 pub(crate) use appruntimeflags::env_flag_enabled;
+#[cfg(target_os = "windows")]
 pub use appruntimeflags::force_restore_and_focus_win32;
 pub(crate) use appruntimeflags::greet;
+#[cfg(target_os = "macos")]
 pub(crate) use appruntimeflags::increase_nofile_limit;
 pub(crate) use appruntimeflags::is_wayland_session;
 pub(crate) use appruntimeflags::nvidia_proprietary_loaded;

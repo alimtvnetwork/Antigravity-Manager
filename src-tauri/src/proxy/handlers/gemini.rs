@@ -31,6 +31,7 @@ pub use handle_list_models::handle_count_tokens;
 pub use handle_list_models::handle_get_model;
 pub use handle_list_models::handle_list_models;
 pub(crate) use response_has_inline_image_data::handle_generate_success;
+#[cfg(test)]
 pub(crate) use response_has_inline_image_data::image_success_tests;
 pub(crate) use response_has_inline_image_data::response_has_inline_image_data;
 pub(crate) use response_has_inline_image_data::ErrorOutcome;

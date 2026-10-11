@@ -1,6 +1,6 @@
 use super::*;
 
-async fn internal_refresh_account_quota(
+pub(crate) async fn internal_refresh_account_quota(
     app: &tauri::AppHandle,
     account: &mut Account,
 ) -> Result<QuotaData, String> {

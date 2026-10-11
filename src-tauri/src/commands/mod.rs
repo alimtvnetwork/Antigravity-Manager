@@ -50,7 +50,7 @@ mod cmd_maintenance;
 mod cmd_network;
 mod cmd_oauth;
 mod cmd_paths;
-mod cmd_quota;
+pub(crate) mod cmd_quota;
 mod cmd_task_history;
 mod cmd_token_stats;
 mod cmd_training;

@@ -8,6 +8,7 @@ use tokio::sync::{RwLock, Semaphore};
 mod proxymonitor_impl;
 mod proxyrequestlog;
 
+#[cfg(test)]
 pub(crate) use proxyrequestlog::prompt_log_tests;
 pub(crate) use proxyrequestlog::sanitize_upstream_debug_value;
 pub use proxyrequestlog::ProxyMonitor;
