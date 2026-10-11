@@ -3,6 +3,69 @@ use crate::modules::{account, config, instance, logger};
 
 use super::*;
 
+/// Robust check if an account's quota reset period has completed for the target model or buckets
+pub(crate) fn is_account_period_finished(acc: &Account, target_model: &str, now_sec: i64) -> bool {
+    let period_stat = evaluate_account_period_status(acc, target_model, 20.0, now_sec);
+    if let Some(ref stat) = period_stat {
+        if stat.is_period_finished {
+            return true;
+        }
+    }
+    // Check quota_groups short-window and weekly buckets directly
+    if let Some(ref quota_data) = acc.quota {
+        if let Some(ref groups) = quota_data.quota_groups {
+            for g in groups {
+                for b in &g.buckets {
+                    if !b.reset_time.is_empty() {
+                        if let Some(ts) = parse_reset_time_to_unix(&b.reset_time) {
+                            if ts <= now_sec {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for m in &quota_data.models {
+            if is_model_matching_target(&m.name, target_model) && !m.reset_time.is_empty() {
+                if let Some(ts) = parse_reset_time_to_unix(&m.reset_time) {
+                    if ts <= now_sec {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+/// Check if account is in proxy rate limit cooldown for target model (or account-wide 429)
+pub(crate) fn is_account_rate_limited(acc: &Account, target_model: &str, now_sec: i64) -> bool {
+    let target = target_model.trim().to_lowercase();
+    acc.live_limited_models.iter().any(|(model, status)| {
+        if status.until <= now_sec {
+            return false;
+        }
+        let m = model.trim().to_lowercase();
+        m.is_empty()
+            || m == target
+            || (!target.is_empty() && (m.contains(&target) || target.contains(&m)))
+            || (target.contains("flash") && m.contains("flash"))
+            || (target.contains("pro") && m.contains("pro"))
+    })
+}
+
+/// Check if validation block on account is active
+pub(crate) fn is_account_validation_blocked(acc: &Account, now_sec: i64) -> bool {
+    if !acc.validation_blocked {
+        return false;
+    }
+    match acc.validation_blocked_until {
+        Some(until) => until > now_sec,
+        None => true,
+    }
+}
+
 /// Discover, score, and rank candidate profiles with 100% 4h quota accounts prioritized
 pub fn select_candidate_profiles(
     current_instance_id: &str,
@@ -77,7 +140,14 @@ pub fn select_candidate_profiles(
             if is_account_excluded(&effective_exclusions, &acc.id, &acc.email) {
                 continue;
             }
-            if acc.disabled || acc.proxy_disabled || acc.validation_blocked {
+            if acc.disabled || acc.proxy_disabled || is_account_validation_blocked(&acc, now_sec) {
+                continue;
+            }
+            if is_account_rate_limited(&acc, target_model, now_sec) {
+                logger::log_info(&format!(
+                    "[AutoSwitcher] Bound account '{}' is currently in proxy rate-limit cooldown for model '{}'. Skipping...",
+                    acc.email, target_model
+                ));
                 continue;
             }
             // Strictly skip accounts leased by another active machine/node
@@ -87,16 +157,7 @@ pub fn select_candidate_profiles(
                 continue;
             }
 
-            let is_period_finished = acc
-                .quota
-                .as_ref()
-                .and_then(|q| q.models.first())
-                .map(|m| {
-                    parse_reset_time_to_unix(&m.reset_time)
-                        .map(|ts| ts <= now_sec)
-                        .unwrap_or(false)
-                })
-                .unwrap_or(false);
+            let is_period_finished = is_account_period_finished(&acc, target_model, now_sec);
             let quota = if is_period_finished {
                 100.0
             } else {
@@ -133,7 +194,14 @@ pub fn select_candidate_profiles(
         if is_account_excluded(&effective_exclusions, &acc.id, &acc.email) {
             continue;
         }
-        if acc.disabled || acc.proxy_disabled || acc.validation_blocked {
+        if acc.disabled || acc.proxy_disabled || is_account_validation_blocked(acc, now_sec) {
+            continue;
+        }
+        if is_account_rate_limited(acc, target_model, now_sec) {
+            logger::log_info(&format!(
+                "[AutoSwitcher] Account '{}' is currently in proxy rate-limit cooldown for model '{}'. Skipping...",
+                acc.email, target_model
+            ));
             continue;
         }
         // Strictly skip accounts leased by another active machine/node
@@ -156,16 +224,7 @@ pub fn select_candidate_profiles(
             }
         }
 
-        let is_period_finished = acc
-            .quota
-            .as_ref()
-            .and_then(|q| q.models.first())
-            .map(|m| {
-                parse_reset_time_to_unix(&m.reset_time)
-                    .map(|ts| ts <= now_sec)
-                    .unwrap_or(false)
-            })
-            .unwrap_or(false);
+        let is_period_finished = is_account_period_finished(acc, target_model, now_sec);
         let quota = if is_period_finished {
             100.0
         } else {
@@ -200,7 +259,10 @@ pub fn select_candidate_profiles(
             if is_account_excluded(&effective_exclusions, &acc.id, &acc.email) {
                 continue;
             }
-            if acc.disabled || acc.proxy_disabled || acc.validation_blocked {
+            if acc.disabled || acc.proxy_disabled || is_account_validation_blocked(acc, now_sec) {
+                continue;
+            }
+            if is_account_rate_limited(acc, target_model, now_sec) {
                 continue;
             }
             // Strictly skip accounts leased by another active machine/node
@@ -352,11 +414,22 @@ pub async fn select_and_verify_next_best_profile(
             }
         };
 
-        // Strict disabled immunity check
-        if cand_acc.disabled || cand_acc.proxy_disabled || cand_acc.validation_blocked {
+        // Strict eligibility check (disabled, validation-blocked, or rate-limited)
+        let now_sec = chrono::Utc::now().timestamp();
+        if cand_acc.disabled
+            || cand_acc.proxy_disabled
+            || is_account_validation_blocked(&cand_acc, now_sec)
+        {
             logger::log_warn(&format!(
-                "[AutoSwitcher] Candidate '{}' is disabled (proxy_disabled: {}, disabled: {}). Skipping...",
-                candidate.email, cand_acc.proxy_disabled, cand_acc.disabled
+                "[AutoSwitcher] Candidate '{}' is disabled or validation-blocked. Skipping...",
+                candidate.email
+            ));
+            continue;
+        }
+        if is_account_rate_limited(&cand_acc, target_model, now_sec) {
+            logger::log_warn(&format!(
+                "[AutoSwitcher] Candidate '{}' is in active proxy rate-limit cooldown for model '{}'. Skipping...",
+                candidate.email, target_model
             ));
             continue;
         }
@@ -453,4 +526,70 @@ pub async fn select_and_verify_next_best_profile(
         "[AutoSwitcher] All candidate profiles examined. Zero profiles verified with usable quota. Aborting rotation.",
     );
     Ok(None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_account_rate_limited_detection() {
+        let now_sec = 1790090000;
+        let token = TokenData::new(
+            "a".to_string(),
+            "r".to_string(),
+            3600,
+            None,
+            None,
+            None,
+            false,
+            None,
+        );
+        let mut acc = Account::new("acc-rl".to_string(), "rl@test.local".to_string(), token);
+        acc.live_limited_models.insert(
+            "gemini-2.5-pro".to_string(),
+            crate::models::account::LiveLimitStatus {
+                model: "gemini-2.5-pro".to_string(),
+                status: 429,
+                reason: "QUOTA_EXHAUSTED".to_string(),
+                until: now_sec + 600,
+                detected_at: now_sec,
+                message: None,
+            },
+        );
+
+        assert!(is_account_rate_limited(&acc, "gemini-2.5-pro", now_sec));
+        assert!(!is_account_rate_limited(&acc, "claude-sonnet-4-6", now_sec));
+
+        // Expired cooldown
+        acc.live_limited_models
+            .get_mut("gemini-2.5-pro")
+            .unwrap()
+            .until = now_sec - 10;
+        assert!(!is_account_rate_limited(&acc, "gemini-2.5-pro", now_sec));
+    }
+
+    #[test]
+    fn test_is_account_validation_blocked_detection() {
+        let now_sec = 1790090000;
+        let token = TokenData::new(
+            "a".to_string(),
+            "r".to_string(),
+            3600,
+            None,
+            None,
+            None,
+            false,
+            None,
+        );
+        let mut acc = Account::new("acc-vb".to_string(), "vb@test.local".to_string(), token);
+        assert!(!is_account_validation_blocked(&acc, now_sec));
+
+        acc.validation_blocked = true;
+        acc.validation_blocked_until = Some(now_sec + 300);
+        assert!(is_account_validation_blocked(&acc, now_sec));
+
+        acc.validation_blocked_until = Some(now_sec - 10);
+        assert!(!is_account_validation_blocked(&acc, now_sec));
+    }
 }

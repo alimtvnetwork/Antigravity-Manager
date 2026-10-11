@@ -78,6 +78,7 @@ export function useInstancePage(): InstancePageApi {
     const [deleteModalTarget, setDeleteModalTarget] = useState<InstanceStatus | null>(null);
     const [wipeModalTarget, setWipeModalTarget] = useState<InstanceStatus | null>(null);
     const activeCardRef = useRef<HTMLDivElement>(null);
+    const isFetchingRef = useRef<boolean>(false);
 
     const [viewMode, setViewMode] = useState<'card' | 'list'>(() => {
         return (localStorage.getItem('agm_instance_view_mode') as 'card' | 'list') || 'card';
@@ -160,12 +161,27 @@ export function useInstancePage(): InstancePageApi {
         fetchAccounts();
         fetchRunningTasks();
         fetchDaemonTelemetry();
+        const performThrottledPoll = async () => {
+            if (isFetchingRef.current) return;
+            isFetchingRef.current = true;
+            try {
+                await Promise.all([
+                    fetchInstances(true),
+                    fetchSwitcherStatus(),
+                    fetchRunningTasks(),
+                    fetchDaemonTelemetry(),
+                ]);
+            } catch (err) {
+                // Justification: periodic background polling failure is non-fatal and retried on next interval
+                useErrorStore.getState().trackWarning(err, { source: 'useInstancePage.poll', triggerAction: 'periodic_status_poll' });
+            } finally {
+                isFetchingRef.current = false;
+            }
+        };
+
         const timer = setInterval(() => {
-            fetchInstances(true);
-            fetchSwitcherStatus();
-            fetchRunningTasks();
-            fetchDaemonTelemetry();
-        }, 3000);
+            performThrottledPoll();
+        }, 15000);
 
         let unlistenList: (() => void)[] = [];
         import('@tauri-apps/api/event').then(({ listen }) => {

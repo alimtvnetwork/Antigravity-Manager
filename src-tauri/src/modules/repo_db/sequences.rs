@@ -6,6 +6,74 @@ use chrono::Utc;
 use rusqlite::params;
 use rusqlite::Connection;
 
+/// Batch item for conversation sequence operations
+#[derive(Debug, Clone)]
+pub struct ConversationSequenceBatchItem<'a> {
+    pub conversation_id: &'a str,
+    pub project_key: &'a str,
+    pub title: &'a str,
+    pub instance_id: &'a str,
+}
+
+/// Batch update sequence entries within an atomic SQLite transaction to eliminate multiple fsync stalls.
+pub(crate) fn batch_ensure_sequences(
+    conn: &mut Connection,
+    items: &[ConversationSequenceBatchItem<'_>],
+) -> Result<Vec<i64>, rusqlite::Error> {
+    let tx = conn.transaction()?;
+    let now = Utc::now().timestamp();
+    let mut results = Vec::with_capacity(items.len());
+
+    for item in items {
+        if let Ok(existing) = tx.query_row(
+            "SELECT seq_id FROM agm_conversation_sequences WHERE conversation_id = ?1",
+            params![item.conversation_id],
+            |row| row.get::<_, i64>(0),
+        ) {
+            // Justification: metadata refresh on an existing sequence row in batch; sequence id is retained
+            crate::error::record_ignored(
+                tx.execute(
+                    "UPDATE agm_conversation_sequences SET project_key = ?2, title = ?3, instance_id = ?4, updated_at = ?5 WHERE conversation_id = ?1",
+                    params![item.conversation_id, item.project_key, item.title, item.instance_id, now],
+                ),
+                "refresh conversation sequence metadata in batch",
+            );
+            results.push(existing);
+            continue;
+        }
+
+        let next_seq: i64 = tx
+            .query_row(
+                "SELECT COALESCE(MAX(seq_id), 0) + 1 FROM agm_conversation_sequences",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(1);
+
+        // Justification: INSERT OR IGNORE is race-safe in transaction batch; follow-up SELECT re-reads the row
+        crate::error::record_ignored(
+            tx.execute(
+                "INSERT OR IGNORE INTO agm_conversation_sequences (conversation_id, seq_id, project_key, title, instance_id, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![item.conversation_id, next_seq, item.project_key, item.title, item.instance_id, now],
+            ),
+            "insert conversation sequence row in batch",
+        );
+
+        let final_seq = tx
+            .query_row(
+                "SELECT seq_id FROM agm_conversation_sequences WHERE conversation_id = ?1",
+                params![item.conversation_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(next_seq);
+        results.push(final_seq);
+    }
+
+    tx.commit()?;
+    Ok(results)
+}
+
 pub(crate) fn ensure_project_sequence_in_conn(
     conn: &Connection,
     project_key: &str,
@@ -15,46 +83,92 @@ pub(crate) fn ensure_project_sequence_in_conn(
     instance_id: &str,
 ) -> i64 {
     let now = Utc::now().timestamp();
-    if let Ok(existing) = conn.query_row(
-        "SELECT seq_id FROM agm_project_sequences WHERE project_key = ?1",
-        params![project_key],
-        |row| row.get::<_, i64>(0),
-    ) {
-        // Justification: metadata refresh on an existing sequence row; the sequence id is returned regardless
+    if let Ok(tx) = conn.unchecked_transaction() {
+        let seq = if let Ok(existing) = tx.query_row(
+            "SELECT seq_id FROM agm_project_sequences WHERE project_key = ?1",
+            params![project_key],
+            |row| row.get::<_, i64>(0),
+        ) {
+            // Justification: metadata refresh on an existing sequence row; the sequence id is returned regardless
+            crate::error::record_ignored(
+                tx.execute(
+                    "UPDATE agm_project_sequences SET project_id = ?2, repo_name = ?3, repo_path = ?4, instance_id = ?5, updated_at = ?6 WHERE project_key = ?1",
+                    params![project_key, project_id, repo_name, repo_path, instance_id, now],
+                ),
+                "refresh project sequence metadata",
+            );
+            existing
+        } else {
+            let next_seq: i64 = tx
+                .query_row(
+                    "SELECT COALESCE(MAX(seq_id), 0) + 1 FROM agm_project_sequences",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap_or(1);
+
+            // Justification: INSERT OR IGNORE is race-safe; the follow-up SELECT re-reads the row
+            crate::error::record_ignored(
+                tx.execute(
+                    "INSERT OR IGNORE INTO agm_project_sequences (project_key, seq_id, project_id, repo_name, repo_path, instance_id, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    params![project_key, next_seq, project_id, repo_name, repo_path, instance_id, now],
+                ),
+                "insert project sequence row",
+            );
+
+            tx.query_row(
+                "SELECT seq_id FROM agm_project_sequences WHERE project_key = ?1",
+                params![project_key],
+                |row| row.get(0),
+            )
+            .unwrap_or(next_seq)
+        };
+        // Justification: commit project sequence transaction; sequence id is returned regardless
+        crate::error::record_ignored(tx.commit(), "commit project sequence transaction");
+        seq
+    } else {
+        if let Ok(existing) = conn.query_row(
+            "SELECT seq_id FROM agm_project_sequences WHERE project_key = ?1",
+            params![project_key],
+            |row| row.get::<_, i64>(0),
+        ) {
+            // Justification: metadata refresh on an existing sequence row; the sequence id is returned regardless
+            crate::error::record_ignored(
+                conn.execute(
+                    "UPDATE agm_project_sequences SET project_id = ?2, repo_name = ?3, repo_path = ?4, instance_id = ?5, updated_at = ?6 WHERE project_key = ?1",
+                    params![project_key, project_id, repo_name, repo_path, instance_id, now],
+                ),
+                "refresh project sequence metadata",
+            );
+            return existing;
+        }
+
+        let next_seq: i64 = conn
+            .query_row(
+                "SELECT COALESCE(MAX(seq_id), 0) + 1 FROM agm_project_sequences",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(1);
+
+        // Justification: INSERT OR IGNORE is race-safe; the follow-up SELECT re-reads the row
         crate::error::record_ignored(
             conn.execute(
-            "UPDATE agm_project_sequences SET project_id = ?2, repo_name = ?3, repo_path = ?4, instance_id = ?5, updated_at = ?6 WHERE project_key = ?1",
-            params![project_key, project_id, repo_name, repo_path, instance_id, now],
-        ),
-            "refresh project sequence metadata",
+                "INSERT OR IGNORE INTO agm_project_sequences (project_key, seq_id, project_id, repo_name, repo_path, instance_id, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![project_key, next_seq, project_id, repo_name, repo_path, instance_id, now],
+            ),
+            "insert project sequence row",
         );
-        return existing;
-    }
 
-    let next_seq: i64 = conn
-        .query_row(
-            "SELECT COALESCE(MAX(seq_id), 0) + 1 FROM agm_project_sequences",
-            [],
+        conn.query_row(
+            "SELECT seq_id FROM agm_project_sequences WHERE project_key = ?1",
+            params![project_key],
             |row| row.get(0),
         )
-        .unwrap_or(1);
-
-    // Justification: INSERT OR IGNORE is race-safe; the follow-up SELECT re-reads the row
-    crate::error::record_ignored(
-        conn.execute(
-        "INSERT OR IGNORE INTO agm_project_sequences (project_key, seq_id, project_id, repo_name, repo_path, instance_id, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        params![project_key, next_seq, project_id, repo_name, repo_path, instance_id, now],
-    ),
-        "insert project sequence row",
-    );
-
-    conn.query_row(
-        "SELECT seq_id FROM agm_project_sequences WHERE project_key = ?1",
-        params![project_key],
-        |row| row.get(0),
-    )
-    .unwrap_or(next_seq)
+        .unwrap_or(next_seq)
+    }
 }
 
 pub(crate) fn ensure_conversation_sequence_in_conn(
@@ -65,46 +179,92 @@ pub(crate) fn ensure_conversation_sequence_in_conn(
     instance_id: &str,
 ) -> i64 {
     let now = Utc::now().timestamp();
-    if let Ok(existing) = conn.query_row(
-        "SELECT seq_id FROM agm_conversation_sequences WHERE conversation_id = ?1",
-        params![conversation_id],
-        |row| row.get::<_, i64>(0),
-    ) {
-        // Justification: metadata refresh on an existing sequence row; the sequence id is returned regardless
+    if let Ok(tx) = conn.unchecked_transaction() {
+        let seq = if let Ok(existing) = tx.query_row(
+            "SELECT seq_id FROM agm_conversation_sequences WHERE conversation_id = ?1",
+            params![conversation_id],
+            |row| row.get::<_, i64>(0),
+        ) {
+            // Justification: metadata refresh on an existing sequence row; the sequence id is returned regardless
+            crate::error::record_ignored(
+                tx.execute(
+                    "UPDATE agm_conversation_sequences SET project_key = ?2, title = ?3, instance_id = ?4, updated_at = ?5 WHERE conversation_id = ?1",
+                    params![conversation_id, project_key, title, instance_id, now],
+                ),
+                "refresh conversation sequence metadata",
+            );
+            existing
+        } else {
+            let next_seq: i64 = tx
+                .query_row(
+                    "SELECT COALESCE(MAX(seq_id), 0) + 1 FROM agm_conversation_sequences",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap_or(1);
+
+            // Justification: INSERT OR IGNORE is race-safe; the follow-up SELECT re-reads the row
+            crate::error::record_ignored(
+                tx.execute(
+                    "INSERT OR IGNORE INTO agm_conversation_sequences (conversation_id, seq_id, project_key, title, instance_id, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    params![conversation_id, next_seq, project_key, title, instance_id, now],
+                ),
+                "insert conversation sequence row",
+            );
+
+            tx.query_row(
+                "SELECT seq_id FROM agm_conversation_sequences WHERE conversation_id = ?1",
+                params![conversation_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(next_seq)
+        };
+        // Justification: commit conversation sequence transaction; sequence id is returned regardless
+        crate::error::record_ignored(tx.commit(), "commit conversation sequence transaction");
+        seq
+    } else {
+        if let Ok(existing) = conn.query_row(
+            "SELECT seq_id FROM agm_conversation_sequences WHERE conversation_id = ?1",
+            params![conversation_id],
+            |row| row.get::<_, i64>(0),
+        ) {
+            // Justification: metadata refresh on an existing sequence row; the sequence id is returned regardless
+            crate::error::record_ignored(
+                conn.execute(
+                    "UPDATE agm_conversation_sequences SET project_key = ?2, title = ?3, instance_id = ?4, updated_at = ?5 WHERE conversation_id = ?1",
+                    params![conversation_id, project_key, title, instance_id, now],
+                ),
+                "refresh conversation sequence metadata",
+            );
+            return existing;
+        }
+
+        let next_seq: i64 = conn
+            .query_row(
+                "SELECT COALESCE(MAX(seq_id), 0) + 1 FROM agm_conversation_sequences",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(1);
+
+        // Justification: INSERT OR IGNORE is race-safe; the follow-up SELECT re-reads the row
         crate::error::record_ignored(
             conn.execute(
-            "UPDATE agm_conversation_sequences SET project_key = ?2, title = ?3, instance_id = ?4, updated_at = ?5 WHERE conversation_id = ?1",
-            params![conversation_id, project_key, title, instance_id, now],
-        ),
-            "refresh conversation sequence metadata",
+                "INSERT OR IGNORE INTO agm_conversation_sequences (conversation_id, seq_id, project_key, title, instance_id, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![conversation_id, next_seq, project_key, title, instance_id, now],
+            ),
+            "insert conversation sequence row",
         );
-        return existing;
-    }
 
-    let next_seq: i64 = conn
-        .query_row(
-            "SELECT COALESCE(MAX(seq_id), 0) + 1 FROM agm_conversation_sequences",
-            [],
+        conn.query_row(
+            "SELECT seq_id FROM agm_conversation_sequences WHERE conversation_id = ?1",
+            params![conversation_id],
             |row| row.get(0),
         )
-        .unwrap_or(1);
-
-    // Justification: INSERT OR IGNORE is race-safe; the follow-up SELECT re-reads the row
-    crate::error::record_ignored(
-        conn.execute(
-        "INSERT OR IGNORE INTO agm_conversation_sequences (conversation_id, seq_id, project_key, title, instance_id, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![conversation_id, next_seq, project_key, title, instance_id, now],
-    ),
-        "insert conversation sequence row",
-    );
-
-    conn.query_row(
-        "SELECT seq_id FROM agm_conversation_sequences WHERE conversation_id = ?1",
-        params![conversation_id],
-        |row| row.get(0),
-    )
-    .unwrap_or(next_seq)
+        .unwrap_or(next_seq)
+    }
 }
 
 /// Extract clean user prompt up to `max_words` (e.g. 200 words) and return `(preview_text, total_word_count)`.
@@ -262,5 +422,35 @@ mod tests {
 
         let empty_snippet = extract_prompt_tail_snippet("   ", 12);
         assert_eq!(empty_snippet, "");
+    }
+
+    #[test]
+    fn test_batch_ensure_sequences() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        assert!(init_tables(&conn).is_ok());
+
+        let items = vec![
+            ConversationSequenceBatchItem {
+                conversation_id: "batch-c1",
+                project_key: "d:/work/test",
+                title: "Task 1",
+                instance_id: "default",
+            },
+            ConversationSequenceBatchItem {
+                conversation_id: "batch-c2",
+                project_key: "d:/work/test",
+                title: "Task 2",
+                instance_id: "default",
+            },
+        ];
+
+        let results = batch_ensure_sequences(&mut conn, &items).expect("batch sequence update");
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0], 1);
+        assert_eq!(results[1], 2);
+
+        // Repeat batch to verify idempotency and metadata refresh
+        let repeat = batch_ensure_sequences(&mut conn, &items).expect("repeat batch update");
+        assert_eq!(repeat, vec![1, 2]);
     }
 }

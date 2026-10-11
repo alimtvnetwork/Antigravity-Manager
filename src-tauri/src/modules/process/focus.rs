@@ -1,9 +1,81 @@
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
+#[cfg(not(target_os = "windows"))]
 use std::process::Command;
-use sysinfo::System;
 
 use super::*;
+
+#[cfg(target_os = "windows")]
+mod win32 {
+    use std::ffi::c_void;
+
+    pub type HWND = *mut c_void;
+    pub type BOOL = i32;
+    pub type LPARAM = isize;
+    pub type WNDENUMPROC = unsafe extern "system" fn(HWND, LPARAM) -> BOOL;
+
+    #[link(name = "user32")]
+    extern "system" {
+        pub fn SetForegroundWindow(hWnd: HWND) -> BOOL;
+        pub fn ShowWindow(hWnd: HWND, nCmdShow: i32) -> BOOL;
+        pub fn BringWindowToTop(hWnd: HWND) -> BOOL;
+        pub fn SwitchToThisWindow(hWnd: HWND, fAltTab: BOOL);
+        pub fn GetWindowTextW(hWnd: HWND, lpString: *mut u16, nMaxCount: i32) -> i32;
+        pub fn GetWindowThreadProcessId(hWnd: HWND, lpdwProcessId: *mut u32) -> u32;
+        pub fn EnumWindows(lpEnumFunc: WNDENUMPROC, lParam: LPARAM) -> BOOL;
+        pub fn IsWindowVisible(hWnd: HWND) -> BOOL;
+        pub fn IsIconic(hWnd: HWND) -> BOOL;
+        pub fn OpenIcon(hWnd: HWND) -> BOOL;
+        pub fn GetCurrentThreadId() -> u32;
+        pub fn GetForegroundWindow() -> HWND;
+        pub fn AttachThreadInput(idAttach: u32, idAttachTo: u32, fAttach: BOOL) -> BOOL;
+    }
+
+    pub unsafe fn activate_hwnd(hwnd: HWND) -> bool {
+        if hwnd.is_null() {
+            return false;
+        }
+
+        let is_minimized = IsIconic(hwnd) != 0;
+        if is_minimized {
+            OpenIcon(hwnd);
+            ShowWindow(hwnd, 9); // SW_RESTORE
+        } else {
+            ShowWindow(hwnd, 5); // SW_SHOW
+        }
+        BringWindowToTop(hwnd);
+
+        let fg_hwnd = GetForegroundWindow();
+        let cur_thread_id = GetCurrentThreadId();
+        let fg_thread_id = if !fg_hwnd.is_null() {
+            GetWindowThreadProcessId(fg_hwnd, std::ptr::null_mut())
+        } else {
+            0
+        };
+        let target_thread_id = GetWindowThreadProcessId(hwnd, std::ptr::null_mut());
+
+        let has_attached_fg = if fg_thread_id != 0 && fg_thread_id != cur_thread_id {
+            AttachThreadInput(cur_thread_id, fg_thread_id, 1) != 0
+        } else {
+            false
+        };
+        let has_attached_target = if target_thread_id != 0 && target_thread_id != cur_thread_id {
+            AttachThreadInput(cur_thread_id, target_thread_id, 1) != 0
+        } else {
+            false
+        };
+
+        let is_foreground = SetForegroundWindow(hwnd) != 0;
+        SwitchToThisWindow(hwnd, 1);
+
+        if has_attached_fg {
+            AttachThreadInput(cur_thread_id, fg_thread_id, 0);
+        }
+        if has_attached_target {
+            AttachThreadInput(cur_thread_id, target_thread_id, 0);
+        }
+
+        is_foreground || !hwnd.is_null()
+    }
+}
 
 /// Bring any instance window in the process list to the foreground
 #[cfg(target_os = "windows")]
@@ -11,45 +83,54 @@ pub fn focus_instance_pids(pids: &[u32]) -> bool {
     if pids.is_empty() {
         return false;
     }
-    const CREATE_NO_WINDOW: u32 = 0x08000000;
-    let pid_list = pids
-        .iter()
-        .map(|p| p.to_string())
-        .collect::<Vec<_>>()
-        .join(",");
 
-    let ps_cmd = format!(
-        r#"$pids = @({});
-$ws = New-Object -ComObject WScript.Shell;
-$act = $false;
-foreach ($p in $pids) {{
-    if ($ws.AppActivate($p)) {{ $act = $true; break }}
-}}
-if (-not $act) {{
-    foreach ($p in $pids) {{
-        $proc = Get-Process -Id $p -ErrorAction SilentlyContinue;
-        if ($proc -and $proc.MainWindowHandle -ne 0) {{
-            Add-Type '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd); [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);' -Name 'Win32Focus' -Namespace 'Antigravity';
-            [Antigravity.Win32Focus]::ShowWindow($proc.MainWindowHandle, 9);
-            [Antigravity.Win32Focus]::SetForegroundWindow($proc.MainWindowHandle);
-            $act = $true;
-            break;
-        }}
-    }}
-}}
-exit $(if ($act) {{ 0 }} else {{ 1 }})"#,
-        pid_list
-    );
-
-    let output = Command::new("powershell")
-        .args(["-NoProfile", "-NonInteractive", "-Command", &ps_cmd])
-        .creation_flags(CREATE_NO_WINDOW)
-        .output();
-
-    match output {
-        Ok(out) => out.status.success(),
-        Err(_) => false,
+    struct PidSearchContext<'a> {
+        target_pids: &'a [u32],
+        best_hwnd: Option<win32::HWND>,
+        fallback_hwnd: Option<win32::HWND>,
     }
+
+    unsafe extern "system" fn enum_pid_proc(
+        hwnd: win32::HWND,
+        lparam: win32::LPARAM,
+    ) -> win32::BOOL {
+        let ctx = &mut *(lparam as *mut PidSearchContext);
+        if win32::IsWindowVisible(hwnd) == 0 {
+            return 1;
+        }
+
+        let mut proc_id = 0u32;
+        win32::GetWindowThreadProcessId(hwnd, &mut proc_id);
+        if ctx.target_pids.contains(&proc_id) {
+            let mut title_buf = [0u16; 512];
+            let len = win32::GetWindowTextW(hwnd, title_buf.as_mut_ptr(), 512);
+            if len > 0 {
+                ctx.best_hwnd = Some(hwnd);
+                return 0; // Stop enumeration: found visible window with title belonging to PID
+            } else if ctx.fallback_hwnd.is_none() {
+                ctx.fallback_hwnd = Some(hwnd);
+            }
+        }
+        1
+    }
+
+    let mut ctx = PidSearchContext {
+        target_pids: pids,
+        best_hwnd: None,
+        fallback_hwnd: None,
+    };
+
+    unsafe {
+        win32::EnumWindows(
+            enum_pid_proc,
+            &mut ctx as *mut PidSearchContext as win32::LPARAM,
+        );
+        if let Some(hwnd) = ctx.best_hwnd.or(ctx.fallback_hwnd) {
+            return win32::activate_hwnd(hwnd);
+        }
+    }
+
+    false
 }
 
 /// Bring an instance window to the foreground by PID
@@ -122,101 +203,63 @@ pub fn focus_instance_workspace_window(pids: &[u32], repo_name: &str) -> bool {
     if pids.is_empty() {
         return false;
     }
-    const CREATE_NO_WINDOW: u32 = 0x08000000;
-    let pid_list = pids
-        .iter()
-        .map(|p| p.to_string())
-        .collect::<Vec<_>>()
-        .join(",");
 
-    let safe_repo = repo_name.replace('\'', "''").replace('"', "");
-
-    let ps_cmd = format!(
-        r#"$pids = @({});
-$repo = '{}';
-$act = $false;
-
-if (-not ([System.Management.Automation.PSTypeName]'Antigravity.Win32WorkspaceWindow').Type) {{
-    Add-Type @'
-    using System;
-    using System.Runtime.InteropServices;
-    using System.Text;
-
-    namespace Antigravity {{
-        public class Win32WorkspaceWindow {{
-            [DllImport("user32.dll")]
-            public static extern bool SetForegroundWindow(IntPtr hWnd);
-
-            [DllImport("user32.dll")]
-            public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-            [DllImport("user32.dll")]
-            public static extern bool BringWindowToTop(IntPtr hWnd);
-
-            [DllImport("user32.dll")]
-            public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
-
-            [DllImport("user32.dll")]
-            public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
-
-            [DllImport("user32.dll")]
-            public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
-
-            public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
-        }}
-    }}
-'@;
-}}
-
-# 1. First pass: Search top-level windows belonging to target PIDs matching repo name
-[Antigravity.Win32WorkspaceWindow]::EnumWindows({{
-    param($hwnd, $lparam)
-    $procId = 0;
-    [Antigravity.Win32WorkspaceWindow]::GetWindowThreadProcessId($hwnd, [ref]$procId);
-    if ($pids -contains $procId) {{
-        $sb = New-Object System.Text.StringBuilder 512;
-        [Antigravity.Win32WorkspaceWindow]::GetWindowText($hwnd, $sb, 512) | Out-Null;
-        $title = $sb.ToString();
-        if ($title -and ($title -like "*$repo*")) {{
-            [Antigravity.Win32WorkspaceWindow]::ShowWindow($hwnd, 9);
-            [Antigravity.Win32WorkspaceWindow]::BringWindowToTop($hwnd);
-            [Antigravity.Win32WorkspaceWindow]::SetForegroundWindow($hwnd);
-            $global:act = $true;
-            $script:act = $true;
-            return $false;
-        }}
-    }}
-    return $true;
-}}, [IntPtr]::Zero);
-
-# 2. Second pass: Fallback to any MainWindowHandle if exact repo title not found
-if (-not $global:act -and -not $script:act -and -not $act) {{
-    foreach ($p in $pids) {{
-        $proc = Get-Process -Id $p -ErrorAction SilentlyContinue;
-        if ($proc -and $proc.MainWindowHandle -ne 0) {{
-            [Antigravity.Win32WorkspaceWindow]::ShowWindow($proc.MainWindowHandle, 9);
-            [Antigravity.Win32WorkspaceWindow]::BringWindowToTop($proc.MainWindowHandle);
-            [Antigravity.Win32WorkspaceWindow]::SetForegroundWindow($proc.MainWindowHandle);
-            $global:act = $true;
-            $script:act = $true;
-            $act = $true;
-            break;
-        }}
-    }}
-}}
-exit $(if ($global:act -or $script:act -or $act) {{ 0 }} else {{ 1 }})"#,
-        pid_list, safe_repo
-    );
-
-    let output = Command::new("powershell")
-        .args(["-NoProfile", "-NonInteractive", "-Command", &ps_cmd])
-        .creation_flags(CREATE_NO_WINDOW)
-        .output();
-
-    match output {
-        Ok(out) => out.status.success(),
-        Err(_) => false,
+    struct WorkspaceSearchContext<'a> {
+        target_pids: &'a [u32],
+        repo_name: &'a str,
+        matched_title_hwnd: Option<win32::HWND>,
+        fallback_hwnd: Option<win32::HWND>,
     }
+
+    unsafe extern "system" fn enum_workspace_proc(
+        hwnd: win32::HWND,
+        lparam: win32::LPARAM,
+    ) -> win32::BOOL {
+        let ctx = &mut *(lparam as *mut WorkspaceSearchContext);
+        if win32::IsWindowVisible(hwnd) == 0 {
+            return 1;
+        }
+
+        let mut proc_id = 0u32;
+        win32::GetWindowThreadProcessId(hwnd, &mut proc_id);
+        if ctx.target_pids.contains(&proc_id) {
+            let mut title_buf = [0u16; 512];
+            let len = win32::GetWindowTextW(hwnd, title_buf.as_mut_ptr(), 512);
+            if len > 0 {
+                let title = String::from_utf16_lossy(&title_buf[..len as usize]);
+                let is_matching_repo = title.to_lowercase().contains(&ctx.repo_name.to_lowercase());
+                if is_matching_repo {
+                    ctx.matched_title_hwnd = Some(hwnd);
+                    return 0; // Stop enumeration: found exact workspace title match!
+                }
+                if ctx.fallback_hwnd.is_none() {
+                    ctx.fallback_hwnd = Some(hwnd);
+                }
+            } else if ctx.fallback_hwnd.is_none() {
+                ctx.fallback_hwnd = Some(hwnd);
+            }
+        }
+        1
+    }
+
+    let mut ctx = WorkspaceSearchContext {
+        target_pids: pids,
+        repo_name,
+        matched_title_hwnd: None,
+        fallback_hwnd: None,
+    };
+
+    unsafe {
+        win32::EnumWindows(
+            enum_workspace_proc,
+            &mut ctx as *mut WorkspaceSearchContext as win32::LPARAM,
+        );
+        if let Some(hwnd) = ctx.matched_title_hwnd.or(ctx.fallback_hwnd) {
+            return win32::activate_hwnd(hwnd);
+        }
+    }
+
+    false
 }
 
 #[cfg(target_os = "macos")]
@@ -282,4 +325,15 @@ pub fn focus_instance_workspace_window(pids: &[u32], repo_name: &str) -> bool {
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
 pub fn focus_instance_workspace_window(_pids: &[u32], _repo_name: &str) -> bool {
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_focus_empty_pids() {
+        assert!(!focus_instance_pids(&[]));
+        assert!(!focus_instance_workspace_window(&[], "test-repo"));
+    }
 }

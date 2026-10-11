@@ -8,20 +8,185 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
-/// Helper to read a specific un-truncated line content from transcript_full.jsonl
-fn get_line_from_full_transcript(full_path: &Path, target_line_idx: usize) -> Option<String> {
+use std::io::{Read, Seek, SeekFrom};
+
+/// Bounded tail reading avoids loading 100MB+ into RAM
+const MAX_TAIL_BYTES: u64 = 256 * 1024; // 256 KB
+const MAX_TAIL_LINES: usize = 100;
+
+/// Inspect strictly line 0 of transcript to determine if conversation was initiated
+/// as an autonomous subagent without loading the whole file into RAM.
+fn inspect_first_line_is_subagent(path: &Path) -> bool {
+    use std::io::{BufRead, BufReader};
+    let file = match std::fs::File::open(path) {
+        Ok(f) => f,
+        Err(_) => return false,
+    };
+    let mut reader = BufReader::new(file);
+    let mut first_line = String::new();
+    if reader.read_line(&mut first_line).is_err() || first_line.trim().is_empty() {
+        return false;
+    }
+    if let Ok(first_val) = serde_json::from_str::<serde_json::Value>(first_line.trim()) {
+        let src = first_val
+            .get("source")
+            .and_then(|s| s.as_str())
+            .unwrap_or("");
+        let tp = first_val.get("type").and_then(|t| t.as_str()).unwrap_or("");
+        if src == "SYSTEM" || tp == "SYSTEM_MESSAGE" {
+            let txt = first_val
+                .get("content")
+                .and_then(|c| c.as_str())
+                .unwrap_or("");
+            let txt_lower = txt.to_lowercase();
+            return txt.contains("You are ")
+                || txt_lower.contains("subagent")
+                || txt_lower.contains("worker")
+                || txt_lower.contains("author")
+                || txt_lower.contains("research")
+                || txt_lower.contains("debugger")
+                || txt_lower.contains("analysis")
+                || txt_lower.contains("architect")
+                || txt_lower.contains("invoked by a caller agent")
+                || txt_lower.contains("execute enhanced read memory");
+        }
+    }
+    false
+}
+
+fn count_lines_fast(file: &mut std::fs::File) -> std::io::Result<usize> {
+    file.seek(SeekFrom::Start(0))?;
+    let mut reader = std::io::BufReader::with_capacity(64 * 1024, file);
+    let mut count = 0;
+    let mut buf = [0u8; 64 * 1024];
+    loop {
+        let n = reader.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        count += buf[..n].iter().filter(|&&b| b == b'\n').count();
+    }
+    Ok(count)
+}
+
+/// Read up to `max_bytes` from the tail of `path` and return the most recent `max_lines` non-empty lines,
+/// along with an accurate or bounded step count estimate.
+fn read_bounded_tail_lines(path: &Path, max_bytes: u64, max_lines: usize) -> (Vec<String>, usize) {
+    let mut file = match std::fs::File::open(path) {
+        Ok(f) => f,
+        Err(_) => return (Vec::new(), 0),
+    };
+
+    let meta = match file.metadata() {
+        Ok(m) => m,
+        Err(_) => return (Vec::new(), 0),
+    };
+
+    let file_len = meta.len();
+    if file_len == 0 {
+        return (Vec::new(), 0);
+    }
+
+    let (read_start, is_full_file) = if file_len <= max_bytes {
+        (0u64, true)
+    } else {
+        (file_len - max_bytes, false)
+    };
+
+    if file.seek(SeekFrom::Start(read_start)).is_err() {
+        return (Vec::new(), 0);
+    }
+
+    let to_read = (file_len - read_start) as usize;
+    let mut buffer = vec![0u8; to_read];
+    if file.read_exact(&mut buffer).is_err() {
+        return (Vec::new(), 0);
+    }
+
+    let content_slice = String::from_utf8_lossy(&buffer);
+    let mut all_lines: Vec<&str> = content_slice.lines().collect();
+
+    // Discard initial partial line if we sought into middle of the file
+    if !is_full_file && !all_lines.is_empty() {
+        all_lines.remove(0);
+    }
+
+    let non_empty: Vec<String> = all_lines
+        .into_iter()
+        .filter(|l| !l.trim().is_empty())
+        .map(|s| s.to_string())
+        .collect();
+
+    let last_step_index = non_empty.last().and_then(|last_line| {
+        serde_json::from_str::<serde_json::Value>(last_line)
+            .ok()
+            .and_then(|v| v.get("step_index").and_then(|s| s.as_u64()))
+    });
+
+    let total_steps = if let Some(last_idx) = last_step_index {
+        (last_idx + 1) as usize
+    } else if is_full_file {
+        non_empty.len()
+    } else {
+        count_lines_fast(&mut file).unwrap_or(non_empty.len())
+    };
+
+    let tail = if non_empty.len() > max_lines {
+        non_empty[non_empty.len() - max_lines..].to_vec()
+    } else {
+        non_empty
+    };
+
+    (tail, total_steps)
+}
+
+/// Pre-load tail content of transcript_full.jsonl into a map keyed by step_index
+/// to guarantee O(1) single-pass lookup for truncated lines without rescanning from line 0.
+fn load_full_transcript_tail_map(full_path: &Path, max_bytes: u64) -> HashMap<usize, String> {
+    let mut map = HashMap::new();
+    let (lines, _) = read_bounded_tail_lines(full_path, max_bytes, MAX_TAIL_LINES);
+    for line in lines {
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&line) {
+            if let Some(c) = val.get("content").and_then(|v| v.as_str()) {
+                if let Some(step_idx) = val.get("step_index").and_then(|s| s.as_u64()) {
+                    map.insert(step_idx as usize, c.to_string());
+                }
+            }
+        }
+    }
+    map
+}
+
+/// Helper to read a specific un-truncated line content from transcript_full.jsonl.
+/// Checks the tail map first; only falls back to a forward buffered pass if not found in tail.
+fn get_line_from_full_transcript(
+    full_path: &Path,
+    target_idx: usize,
+    tail_map: &HashMap<usize, String>,
+) -> Option<String> {
+    if let Some(content) = tail_map.get(&target_idx) {
+        return Some(content.clone());
+    }
+
     use std::io::{BufRead, BufReader};
     let file = std::fs::File::open(full_path).ok()?;
     let reader = BufReader::new(file);
     for (idx, line_res) in reader.lines().enumerate() {
-        if idx == target_line_idx {
-            if let Ok(l) = line_res {
-                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&l) {
+        if let Ok(l) = line_res {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&l) {
+                let step_idx = val
+                    .get("step_index")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize)
+                    .unwrap_or(idx);
+                if step_idx == target_idx {
                     if let Some(c) = val.get("content").and_then(|v| v.as_str()) {
                         return Some(c.to_string());
                     }
                 }
             }
+        }
+        if idx > target_idx + 100 {
             break;
         }
     }
@@ -80,26 +245,21 @@ pub(crate) fn inspect_conversation_transcript(
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0);
 
-    let content = match std::fs::read_to_string(&chosen_path) {
-        Ok(c) => c,
-        Err(_) => {
-            return TranscriptInspection {
-                step_count: 0,
-                latest_prompt: None,
-                latest_response: None,
-                execution_results: None,
-                tool_calls_summary: None,
-                latest_step_summary: None,
-                is_subagent: false,
-                is_recent_active: false,
-                is_non_prompt: true,
-                is_terminal_done: false,
-            };
-        }
-    };
-
-    let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
-    let step_count = lines.len();
+    let (lines, step_count) = read_bounded_tail_lines(&chosen_path, MAX_TAIL_BYTES, MAX_TAIL_LINES);
+    if lines.is_empty() {
+        return TranscriptInspection {
+            step_count: 0,
+            latest_prompt: None,
+            latest_response: None,
+            execution_results: None,
+            tool_calls_summary: None,
+            latest_step_summary: None,
+            is_subagent: false,
+            is_recent_active: false,
+            is_non_prompt: true,
+            is_terminal_done: false,
+        };
+    }
 
     // Check if the conversation turn has completed or is waiting for user
     let mut is_completed_or_waiting = false;
@@ -154,39 +314,9 @@ pub(crate) fn inspect_conversation_transcript(
     let mut latest_step_summary: Option<String> = None;
     let mut tool_counts: std::collections::HashMap<String, usize> =
         std::collections::HashMap::new();
-    let mut is_subagent = false;
+    let mut is_subagent = inspect_first_line_is_subagent(&chosen_path);
     let mut has_real_user_prompt = false;
-
-    // Check first step to see if this conversation was initiated as an autonomous subagent
-    if let Some(first_line) = lines.first() {
-        if let Ok(first_val) = serde_json::from_str::<serde_json::Value>(first_line) {
-            let src = first_val
-                .get("source")
-                .and_then(|s| s.as_str())
-                .unwrap_or("");
-            let tp = first_val.get("type").and_then(|t| t.as_str()).unwrap_or("");
-            if src == "SYSTEM" || tp == "SYSTEM_MESSAGE" {
-                let txt = first_val
-                    .get("content")
-                    .and_then(|c| c.as_str())
-                    .unwrap_or("");
-                let txt_lower = txt.to_lowercase();
-                if txt.contains("You are ")
-                    || txt_lower.contains("subagent")
-                    || txt_lower.contains("worker")
-                    || txt_lower.contains("author")
-                    || txt_lower.contains("research")
-                    || txt_lower.contains("debugger")
-                    || txt_lower.contains("analysis")
-                    || txt_lower.contains("architect")
-                    || txt_lower.contains("invoked by a caller agent")
-                    || txt_lower.contains("execute enhanced read memory")
-                {
-                    is_subagent = true;
-                }
-            }
-        }
-    }
+    let mut full_tail_map: Option<HashMap<usize, String>> = None;
 
     for (line_idx, line) in lines.iter().enumerate() {
         let trimmed = line.trim();
@@ -210,7 +340,15 @@ pub(crate) fn inspect_conversation_transcript(
                             .unwrap_or(false)
                             && transcript_full_path.exists()
                         {
-                            get_line_from_full_transcript(&transcript_full_path, line_idx)
+                            let target_idx = val
+                                .get("step_index")
+                                .and_then(|v| v.as_u64())
+                                .map(|v| v as usize)
+                                .unwrap_or(line_idx);
+                            let map = full_tail_map.get_or_insert_with(|| {
+                                load_full_transcript_tail_map(&transcript_full_path, MAX_TAIL_BYTES)
+                            });
+                            get_line_from_full_transcript(&transcript_full_path, target_idx, map)
                                 .unwrap_or_else(|| c.to_string())
                         } else {
                             c.to_string()
@@ -250,7 +388,15 @@ pub(crate) fn inspect_conversation_transcript(
                             .unwrap_or(false)
                             && transcript_full_path.exists()
                         {
-                            get_line_from_full_transcript(&transcript_full_path, line_idx)
+                            let target_idx = val
+                                .get("step_index")
+                                .and_then(|v| v.as_u64())
+                                .map(|v| v as usize)
+                                .unwrap_or(line_idx);
+                            let map = full_tail_map.get_or_insert_with(|| {
+                                load_full_transcript_tail_map(&transcript_full_path, MAX_TAIL_BYTES)
+                            });
+                            get_line_from_full_transcript(&transcript_full_path, target_idx, map)
                                 .unwrap_or_else(|| resp_txt.to_string())
                         } else {
                             resp_txt.to_string()

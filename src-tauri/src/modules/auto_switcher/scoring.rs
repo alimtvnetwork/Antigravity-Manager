@@ -12,6 +12,50 @@ pub struct ProfileCandidate {
     pub score: f64,
 }
 
+/// Helper to check if a model name matches target_model or family wildcards
+pub fn is_model_matching_target(model_name: &str, target_model: &str) -> bool {
+    let m = model_name.trim().to_lowercase();
+    let t = target_model.trim().to_lowercase();
+    if t.is_empty() {
+        return true;
+    }
+    if m == t || m.contains(&t) || t.contains(&m) {
+        return true;
+    }
+    let is_target_flash = t.contains("flash");
+    let is_target_pro = t.contains("pro");
+    let is_target_claude = t.contains("claude") || t.contains("sonnet");
+    if is_target_flash && m.contains("flash") {
+        return true;
+    }
+    if is_target_pro && m.contains("pro") && !m.contains("flash") {
+        return true;
+    }
+    if is_target_claude && (m.contains("claude") || m.contains("sonnet")) {
+        return true;
+    }
+    false
+}
+
+/// Compute remaining headroom hours until the weekly quota cycle resets for a given bucket.
+/// Returns remaining hours (0.0..=168.0), or `168.0` as fallback if reset_time is unparseable or finished.
+pub(crate) fn compute_weekly_remaining_headroom_hours(
+    bucket: &crate::models::quota::QuotaBucket,
+    now_sec: i64,
+) -> f64 {
+    const TOTAL_WEEK_HOURS: f64 = 168.0;
+    let reset_ts = match parse_reset_time_to_unix(&bucket.reset_time) {
+        Some(ts) => ts,
+        None => return TOTAL_WEEK_HOURS, // fallback: assume full cycle remaining
+    };
+    if reset_ts <= now_sec {
+        return TOTAL_WEEK_HOURS; // period finished, fresh cycle
+    }
+    let remaining_secs = (reset_ts - now_sec).max(0);
+    let remaining_hours = remaining_secs as f64 / 3600.0;
+    remaining_hours.max(0.0).min(TOTAL_WEEK_HOURS)
+}
+
 /// Compute hours elapsed since the weekly quota cycle started for a given bucket.
 /// Returns hours elapsed (0.0..=168.0), or `168.0` as fallback if reset_time is unparseable.
 pub(crate) fn compute_weekly_hours_elapsed(
@@ -19,31 +63,21 @@ pub(crate) fn compute_weekly_hours_elapsed(
     now_sec: i64,
 ) -> f64 {
     const TOTAL_WEEK_HOURS: f64 = 168.0;
-    let reset_ts = match parse_reset_time_to_unix(&bucket.reset_time) {
-        Some(ts) => ts,
-        None => return TOTAL_WEEK_HOURS, // fallback: assume full week elapsed
-    };
-    let remaining_secs = reset_ts.saturating_sub(now_sec).max(0);
-    let remaining_hours = remaining_secs as f64 / 3600.0;
+    let remaining_hours = compute_weekly_remaining_headroom_hours(bucket, now_sec);
     (TOTAL_WEEK_HOURS - remaining_hours)
         .max(0.0)
         .min(TOTAL_WEEK_HOURS)
 }
 
-/// Hours-elapsed-weighted weekly quota scoring algorithm:
+/// Headroom-weighted weekly quota scoring algorithm:
 /// - Any candidate with < 100% 4-hour quota (and period not finished) evaluates to `0.0`.
-/// - Otherwise: `Score = (S_active * M_tier * (weekly_quota_pct × hours_elapsed)) / 16800.0`
-///   where S_active = 1.0, M_tier is user-configurable via Settings → Algorithm
-///   (defaults: Ultra 4.0, Pro 2.0, Free 1.0).
-/// - Sorting direction: ASCENDING (lowest score = account just reset = selected first).
+/// - Fresh accounts with 168h headroom receive maximum scaling (Headroom Multiplier = 2.0).
+/// - Accounts nearing reset boundary receive minimal headroom multiplier (Headroom Multiplier = 1.0).
+/// - Formula: `Score = (tier_multiplier * weekly_effective_score) / 100.0`
+///   where weekly_effective_score = effective_weekly_pct * remaining_hours (or 168.0 * 100.0 on reset).
+/// - Sorting direction: DESCENDING (highest score = freshly reset 100% account = selected first).
 /// - Weekly quota < 8% treated as 0 (below viable threshold for Gemini).
-/// - Claude/3p buckets are excluded (TODO: define Claude weekly scoring algorithm).
-/// Compute the base weekly score ("score what we have"):
-/// Formula: (tier_multiplier * weekly_effective_score) / 100.0
-/// where weekly_effective_score = effective_weekly_pct * (168.0 - hours_remaining).
-/// Accounts with weekly quota < 8% strictly score 0.0 (Gemini threshold).
-/// If period is finished (reset time elapsed), weekly_effective_score = 168.0 * 100.0 (maximum fresh credits).
-/// TODO(claude): Claude/3p weekly scoring algorithm undefined — 3p buckets excluded with ambiguity marker.
+/// - Claude/3p buckets are excluded.
 pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
     let period_stat = evaluate_account_period_status(acc, target_model, 20.0, now_sec);
     let is_period_finished = period_stat
@@ -76,7 +110,10 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
 
     let mut weekly_effective_score = 0.0_f64;
 
-    if let Some(quota_data) = acc.quota.as_ref() {
+    if is_period_finished {
+        // Reset boundary: credits refresh to full 100% capacity with maximum headroom
+        weekly_effective_score = TOTAL_WEEK_HOURS * 100.0;
+    } else if let Some(quota_data) = acc.quota.as_ref() {
         let mut gemini_weekly_scores: Vec<f64> = Vec::new();
 
         if let Some(ref groups) = quota_data.quota_groups {
@@ -95,9 +132,9 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
                         } else {
                             pct
                         };
-                        // hours_elapsed = 168 − hours_remaining (compute_weekly_hours_elapsed returns this distance)
-                        let hours_elapsed = compute_weekly_hours_elapsed(b, now_sec);
-                        gemini_weekly_scores.push(eff_pct * hours_elapsed);
+                        // Modernized: remaining cycle headroom gives highest score to freshly reset accounts
+                        let remaining_hours = compute_weekly_remaining_headroom_hours(b, now_sec);
+                        gemini_weekly_scores.push(eff_pct * remaining_hours);
                     }
                 }
             }
@@ -109,31 +146,39 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
                 .into_iter()
                 .fold(f64::INFINITY, f64::min);
         } else {
-            // Fallback: legacy model percentage × half-week elapsed (assume mid-cycle)
-            let valid_models: Vec<_> = quota_data
+            // Fallback: evaluate target model or models
+            let target_pct = quota_data
                 .models
                 .iter()
-                .filter(|m| {
-                    let n = m.name.to_lowercase();
-                    !n.contains("claude") && !n.contains("3p")
-                })
-                .collect();
-            if !valid_models.is_empty() {
-                let sum: i32 = valid_models.iter().map(|m| m.percentage).sum();
-                let avg_pct = (sum as f64 / valid_models.len() as f64).round();
-                let eff_pct = if avg_pct < WEEKLY_ZERO_THRESHOLD {
-                    0.0
-                } else {
-                    avg_pct
-                };
-                weekly_effective_score = eff_pct * (TOTAL_WEEK_HOURS / 2.0);
-            }
+                .find(|m| is_model_matching_target(&m.name, target_model))
+                .map(|m| m.percentage as f64);
+            let eff_pct = match target_pct {
+                Some(pct) if pct < WEEKLY_ZERO_THRESHOLD => 0.0,
+                Some(pct) => pct,
+                None => {
+                    let valid_models: Vec<_> = quota_data
+                        .models
+                        .iter()
+                        .filter(|m| {
+                            let n = m.name.to_lowercase();
+                            !n.contains("claude") && !n.contains("3p")
+                        })
+                        .collect();
+                    if !valid_models.is_empty() {
+                        let sum: i32 = valid_models.iter().map(|m| m.percentage).sum();
+                        let avg_pct = (sum as f64 / valid_models.len() as f64).round();
+                        if avg_pct < WEEKLY_ZERO_THRESHOLD {
+                            0.0
+                        } else {
+                            avg_pct
+                        }
+                    } else {
+                        100.0
+                    }
+                }
+            };
+            weekly_effective_score = eff_pct * TOTAL_WEEK_HOURS;
         }
-    }
-
-    // Reset boundary: if period has finished, credits refresh to full 100% capacity
-    if is_period_finished {
-        weekly_effective_score = TOTAL_WEEK_HOURS * 100.0;
     }
 
     (tier_multiplier * weekly_effective_score) / 100.0
@@ -141,7 +186,7 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
 
 /// Primary candidate scoring ("usually"):
 /// - If 4h quota is less than 100% (and period not finished): strictly returns 0.0.
-/// - Otherwise (4h quota == 100% or period finished): returns base weekly score floor.
+/// - Otherwise (4h quota == 100% or period finished): returns base weekly score.
 /// Sort direction: DESCENDING (highest score selected first).
 pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
     let period_stat = evaluate_account_period_status(acc, target_model, 20.0, now_sec);
@@ -161,13 +206,12 @@ pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) 
         return 0.0;
     }
 
-    let base_score = calculate_weekly_base_score(acc, target_model, now_sec);
-    base_score.floor()
+    calculate_weekly_base_score(acc, target_model, now_sec)
 }
 
 /// Fallback candidate scoring ("unless there is another option / if nothing found"):
 /// - When no account has 100% 4h quota, evaluate partial 4h quota:
-///   Score = 4h percentage % × (score what we have) = ((q_4h / 100.0) * base_weekly_score).floor().
+///   Score = 4h percentage % × (score what we have) = ((q_4h / 100.0) * base_weekly_score).
 /// - Accounts with weekly quota < 8% strictly evaluate to 0.0.
 pub fn score_candidate_account_fallback(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
     let period_stat = evaluate_account_period_status(acc, target_model, 20.0, now_sec);
@@ -190,7 +234,7 @@ pub fn score_candidate_account_fallback(acc: &Account, target_model: &str, now_s
     }
 
     let base_score = calculate_weekly_base_score(acc, target_model, now_sec);
-    ((q_4h / 100.0) * base_score).floor()
+    (q_4h / 100.0) * base_score
 }
 
 /// Specifically evaluate the 4-hour / 5-hour immediate rolling window quota (0-100%)
@@ -200,13 +244,28 @@ pub fn calculate_4h_window_quota(account: &Account, target_model: &str) -> Optio
         return Some(0.0);
     }
     let target = target_model.to_lowercase();
-    let is_flash_target = target.contains("flash");
+    let is_claude_or_gpt_target =
+        target.contains("claude") || target.contains("gpt") || target.contains("sonnet");
 
     let mut min_pct: Option<f64> = None;
 
-    // 1. Check quota_groups for 4h / 5h short-window buckets
+    // 1. Check quota_groups for 4h / 5h short-window buckets matching target group
     if let Some(ref groups) = quota_data.quota_groups {
         for g in groups {
+            let gname = g.display_name.to_lowercase();
+            let is_group_claude_or_gpt =
+                gname.contains("claude") || gname.contains("gpt") || gname.contains("3p");
+            let is_group_gemini = gname.contains("gemini") || (!is_group_claude_or_gpt);
+
+            let group_matches = if is_claude_or_gpt_target {
+                is_group_claude_or_gpt
+            } else {
+                is_group_gemini
+            };
+            if !group_matches {
+                continue; // Isolate target group
+            }
+
             for b in &g.buckets {
                 let win = b.window.to_lowercase();
                 let bid = b.bucket_id.to_lowercase();
@@ -226,20 +285,9 @@ pub fn calculate_4h_window_quota(account: &Account, target_model: &str) -> Optio
         }
     }
 
-    // 2. Minimum across models matching target (and flash models when target is flash)
+    // 2. Minimum across models matching target (strict target model isolation)
     for m in &quota_data.models {
-        let name_lower = m.name.to_lowercase();
-        let is_direct = name_lower.contains(&target);
-        let is_flash = is_flash_target && name_lower.contains("flash");
-        if is_direct || is_flash {
-            let pct = m.percentage as f64;
-            min_pct = Some(min_pct.map_or(pct, |cur| cur.min(pct)));
-        }
-    }
-
-    // 3. Minimum across any actively consumed models (percentage < 100)
-    for m in &quota_data.models {
-        if m.percentage < 100 {
+        if is_model_matching_target(&m.name, target_model) {
             let pct = m.percentage as f64;
             min_pct = Some(min_pct.map_or(pct, |cur| cur.min(pct)));
         }
@@ -249,6 +297,11 @@ pub fn calculate_4h_window_quota(account: &Account, target_model: &str) -> Optio
         return Some(pct);
     }
 
+    // If account has valid quota and target model has no consumed usage records, it is 100% available
+    if !quota_data.models.is_empty() {
+        return Some(100.0);
+    }
+
     // Fallback: general calculate_account_quota
     calculate_account_quota(account, target_model)
 }
@@ -256,10 +309,26 @@ pub fn calculate_4h_window_quota(account: &Account, target_model: &str) -> Optio
 /// Specifically evaluate the 7-day weekly total allowance window quota (0-100%)
 pub fn calculate_weekly_window_quota(account: &Account, target_model: &str) -> Option<f64> {
     let quota_data = account.quota.as_ref()?;
+    let target = target_model.to_lowercase();
+    let is_claude_or_gpt_target =
+        target.contains("claude") || target.contains("gpt") || target.contains("sonnet");
     let mut weekly_values: Vec<f64> = Vec::new();
 
     if let Some(ref groups) = quota_data.quota_groups {
         for g in groups {
+            let gname = g.display_name.to_lowercase();
+            let is_group_claude_or_gpt =
+                gname.contains("claude") || gname.contains("gpt") || gname.contains("3p");
+            let is_group_gemini = gname.contains("gemini") || (!is_group_claude_or_gpt);
+            let group_matches = if is_claude_or_gpt_target {
+                is_group_claude_or_gpt
+            } else {
+                is_group_gemini
+            };
+            if !group_matches {
+                continue;
+            }
+
             for b in &g.buckets {
                 let win = b.window.to_lowercase();
                 let bid = b.bucket_id.to_lowercase();
@@ -278,12 +347,15 @@ pub fn calculate_weekly_window_quota(account: &Account, target_model: &str) -> O
         return Some(weekly_values.into_iter().fold(100.0, f64::min));
     }
 
-    // Fallback across models
-    let valid_models: Vec<_> = quota_data.models.iter().collect();
+    // Model-level match
+    for m in &quota_data.models {
+        if is_model_matching_target(&m.name, target_model) {
+            return Some(m.percentage as f64);
+        }
+    }
 
-    if !valid_models.is_empty() {
-        let sum: i32 = valid_models.iter().map(|m| m.percentage).sum();
-        return Some((sum as f64 / valid_models.len() as f64).round());
+    if !quota_data.models.is_empty() {
+        return Some(100.0);
     }
 
     calculate_account_quota(account, target_model)
@@ -308,4 +380,107 @@ pub fn is_account_excluded(exclusions: &[String], id: &str, email: &str) -> bool
         (!clean_id.is_empty() && clean_ex.eq_ignore_ascii_case(clean_id))
             || (!clean_email.is_empty() && clean_ex.eq_ignore_ascii_case(clean_email))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_scoring_formula_rewards_headroom() {
+        let now_sec = 1790090000;
+        let future_time_fresh = "2026-09-29T14:30:00Z";
+        let future_time_low = "2026-09-22T17:30:00Z";
+
+        let mut acc_fresh = make_test_account(
+            "acc-fresh",
+            "fresh@test.local",
+            "gemini-pro",
+            100,
+            future_time_fresh,
+        );
+        if let Some(ref mut q) = acc_fresh.quota {
+            q.quota_groups = Some(vec![crate::models::quota::QuotaGroup {
+                display_name: "Gemini Models".to_string(),
+                description: None,
+                buckets: vec![crate::models::quota::QuotaBucket {
+                    bucket_id: "gemini-weekly".to_string(),
+                    window: "weekly".to_string(),
+                    remaining_fraction: 1.0,
+                    reset_time: future_time_fresh.to_string(),
+                    observed_at: None,
+                    cycle_tokens: None,
+                    display_name: None,
+                    description: None,
+                }],
+            }]);
+        }
+
+        let mut acc_low = make_test_account(
+            "acc-low",
+            "low@test.local",
+            "gemini-pro",
+            100,
+            future_time_low,
+        );
+        if let Some(ref mut q) = acc_low.quota {
+            q.quota_groups = Some(vec![crate::models::quota::QuotaGroup {
+                display_name: "Gemini Models".to_string(),
+                description: None,
+                buckets: vec![crate::models::quota::QuotaBucket {
+                    bucket_id: "gemini-weekly".to_string(),
+                    window: "weekly".to_string(),
+                    remaining_fraction: 1.0,
+                    reset_time: future_time_low.to_string(),
+                    observed_at: None,
+                    cycle_tokens: None,
+                    display_name: None,
+                    description: None,
+                }],
+            }]);
+        }
+
+        let score_fresh = score_candidate_account(&acc_fresh, "gemini-pro", now_sec);
+        let score_low = score_candidate_account(&acc_low, "gemini-pro", now_sec);
+
+        assert!(
+            score_fresh > score_low,
+            "Freshly reset accounts must rank higher than low headroom accounts: fresh={} low={}",
+            score_fresh,
+            score_low
+        );
+    }
+
+    #[test]
+    fn test_calculate_4h_window_quota_model_isolation() {
+        let mut acc = make_test_account(
+            "acc-iso",
+            "iso@test.local",
+            "gemini-1.5-flash",
+            0,
+            "2026-09-30T14:30:00Z",
+        );
+        if let Some(ref mut q) = acc.quota {
+            q.models = vec![crate::models::quota::ModelQuota {
+                name: "gemini-1.5-flash".to_string(),
+                percentage: 0,
+                reset_time: "2026-09-30T14:30:00Z".to_string(),
+                display_name: None,
+                supports_images: None,
+                supports_thinking: None,
+                thinking_budget: None,
+                recommended: None,
+                max_tokens: None,
+                max_output_tokens: None,
+                supported_mime_types: None,
+            }];
+        }
+
+        let q_4h_pro = calculate_4h_window_quota(&acc, "gemini-2.5-pro");
+        assert_eq!(
+            q_4h_pro,
+            Some(100.0),
+            "Target gemini-2.5-pro must be isolated from exhausted gemini-1.5-flash"
+        );
+    }
 }

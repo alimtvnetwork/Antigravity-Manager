@@ -420,20 +420,29 @@ pub fn count_instances() -> Result<serde_json::Value, String> {
 }
 
 #[tauri::command]
-pub fn get_project_conversation_tree(
+pub async fn get_project_conversation_tree(
     instance_id: Option<String>,
     max_words: Option<usize>,
     only_running: Option<bool>,
     force: Option<bool>,
 ) -> Result<Vec<crate::modules::repo_db::AgmProjectTreeNode>, String> {
-    Ok(
-        crate::modules::repo_db::get_project_conversation_tree_cached(
-            instance_id.as_deref(),
-            max_words.unwrap_or(200),
-            only_running.unwrap_or(false),
-            force.unwrap_or(false),
-        ),
-    )
+    tokio::task::spawn_blocking(move || {
+        Ok(
+            crate::modules::repo_db::get_project_conversation_tree_cached(
+                instance_id.as_deref(),
+                max_words.unwrap_or(200),
+                only_running.unwrap_or(false),
+                force.unwrap_or(false),
+            ),
+        )
+    })
+    .await
+    .map_err(|e| {
+        format!(
+            "Failed to compute conversation tree in blocking task: {}",
+            e
+        )
+    })?
 }
 
 #[tauri::command]

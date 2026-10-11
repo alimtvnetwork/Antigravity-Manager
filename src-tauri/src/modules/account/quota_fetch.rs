@@ -3,13 +3,103 @@ pub use crate::models::{
     TokenData,
 };
 use crate::modules;
+use once_cell::sync::Lazy;
+use std::collections::HashMap;
+use std::sync::RwLock;
 
 use super::*;
+
+/// L1 in-memory quota cache entry (60s TTL)
+#[derive(Debug, Clone)]
+pub struct L1QuotaCacheEntry {
+    pub quota_data: QuotaData,
+    pub cached_at_sec: i64,
+    pub ttl_seconds: i64,
+    pub reset_time_unix: Option<i64>,
+}
+
+pub static L1_QUOTA_CACHE: Lazy<RwLock<HashMap<String, L1QuotaCacheEntry>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
+/// Invalidate L1 quota cache entry for a specific account ID
+pub fn invalidate_l1_quota_cache_for_account(account_id: &str) {
+    if let Ok(mut cache) = L1_QUOTA_CACHE.write() {
+        cache.remove(account_id);
+    }
+}
+
+/// Invalidate all entries in the L1 quota cache
+pub fn invalidate_all_l1_quota_cache() {
+    if let Ok(mut cache) = L1_QUOTA_CACHE.write() {
+        cache.clear();
+    }
+}
+
+/// Helper to store quota data into L1 cache with proactive reset time extraction
+pub(crate) fn store_l1_quota_cache(account_id: &str, quota_data: &QuotaData, now_sec: i64) {
+    let earliest_reset_unix = quota_data
+        .models
+        .iter()
+        .filter_map(|m| {
+            if !m.reset_time.is_empty() {
+                crate::modules::auto_switcher::parse_reset_time_to_unix(&m.reset_time)
+            } else {
+                None
+            }
+        })
+        .chain(
+            quota_data
+                .quota_groups
+                .as_ref()
+                .into_iter()
+                .flat_map(|groups| groups.iter())
+                .flat_map(|g| g.buckets.iter())
+                .filter_map(|b| {
+                    if !b.reset_time.is_empty() {
+                        crate::modules::auto_switcher::parse_reset_time_to_unix(&b.reset_time)
+                    } else {
+                        None
+                    }
+                }),
+        )
+        .min();
+
+    if let Ok(mut cache) = L1_QUOTA_CACHE.write() {
+        cache.insert(
+            account_id.to_string(),
+            L1QuotaCacheEntry {
+                quota_data: quota_data.clone(),
+                cached_at_sec: now_sec,
+                ttl_seconds: 60,
+                reset_time_unix: earliest_reset_unix,
+            },
+        );
+    }
+}
 
 /// Quota query with retry (moved from commands to modules for reuse)
 pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppResult<QuotaData> {
     use crate::error::AppError;
     use crate::modules::oauth;
+
+    let now_sec = chrono::Utc::now().timestamp();
+
+    // Check in-memory L1 cache (60s TTL)
+    if let Ok(cache) = L1_QUOTA_CACHE.read() {
+        if let Some(entry) = cache.get(&account.id) {
+            let is_expired_by_ttl = (now_sec - entry.cached_at_sec) >= entry.ttl_seconds;
+            let is_expired_by_reset = entry.reset_time_unix.map_or(false, |rts| now_sec >= rts);
+            if !is_expired_by_ttl && !is_expired_by_reset {
+                modules::logger::log_info(&format!(
+                    "[L1QuotaCache] Serving cached quota for {} ({}) - age: {}s",
+                    account.email,
+                    account.id,
+                    now_sec - entry.cached_at_sec
+                ));
+                return Ok(entry.quota_data.clone());
+            }
+        }
+    }
 
     // 1. Time-based check - ensure Token is valid first
     let token = match oauth::ensure_fresh_token(&account.token, Some(&account.id)).await {
@@ -27,6 +117,7 @@ pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppR
                 crate::error::record_ignored(save_account(account), "save_account");
                 crate::proxy::server::trigger_account_reload(&account.id);
             }
+            invalidate_l1_quota_cache_for_account(&account.id);
             return Err(AppError::OAuth(e));
         }
     };
@@ -127,9 +218,9 @@ pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppR
             Err(e) => {
                 if e.contains("invalid_grant") {
                     modules::logger::log_error(&format!(
-                                "Disabling account {} due to invalid_grant during forced refresh (quota check)",
-                                account.email
-                            ));
+                        "Disabling account {} due to invalid_grant during forced refresh (quota check)",
+                        account.email
+                    ));
                     account.disabled = true;
                     account.disabled_at = Some(chrono::Utc::now().timestamp());
                     account.disabled_reason = Some(format!("invalid_grant: {}", e));
@@ -137,6 +228,7 @@ pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppR
                     crate::error::record_ignored(save_account(account), "save_account");
                     crate::proxy::server::trigger_account_reload(&account.id);
                 }
+                invalidate_l1_quota_cache_for_account(&account.id);
                 return Err(AppError::OAuth(e));
             }
         };
@@ -207,6 +299,7 @@ pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppR
         }
 
         if let Err(AppError::Network(_, Some(403))) = retry_result {
+            invalidate_l1_quota_cache_for_account(&account.id);
             let mut q = QuotaData::new();
             q.is_forbidden = true;
             return Ok(q);
@@ -215,9 +308,11 @@ pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppR
         match retry_result {
             Ok((q, _)) => {
                 clear_validation_blocked(account);
+                store_l1_quota_cache(&account.id, &q, now_sec);
                 return Ok(q);
             }
             Err(e) => {
+                invalidate_l1_quota_cache_for_account(&account.id);
                 if is_validation_required_error(&e) {
                     mark_validation_blocked(account, &e.to_string());
                 }
@@ -238,9 +333,11 @@ pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppR
     match result {
         Ok((q, _)) => {
             clear_validation_blocked(account);
+            store_l1_quota_cache(&account.id, &q, now_sec);
             Ok(q)
         }
         Err(e) => {
+            invalidate_l1_quota_cache_for_account(&account.id);
             if is_validation_required_error(&e) {
                 mark_validation_blocked(account, &e.to_string());
             }
@@ -253,6 +350,39 @@ pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppR
                 return Ok(cached);
             }
             Err(e)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_l1_quota_cache_roundtrip_and_invalidation() {
+        let now_sec = 1790090000;
+        let account_id = "test_l1_acc";
+        let mut quota_data = QuotaData::new();
+        quota_data.subscription_tier = Some("pro".to_string());
+
+        // 1. Store into cache
+        store_l1_quota_cache(account_id, &quota_data, now_sec);
+
+        // 2. Read from cache
+        {
+            let cache = L1_QUOTA_CACHE.read().unwrap();
+            let entry = cache.get(account_id);
+            assert!(entry.is_some());
+            let entry = entry.unwrap();
+            assert_eq!(entry.quota_data.subscription_tier.as_deref(), Some("pro"));
+            assert_eq!(entry.ttl_seconds, 60);
+        }
+
+        // 3. Invalidate
+        invalidate_l1_quota_cache_for_account(account_id);
+        {
+            let cache = L1_QUOTA_CACHE.read().unwrap();
+            assert!(cache.get(account_id).is_none());
         }
     }
 }

@@ -8,31 +8,36 @@ pub fn calculate_account_quota(account: &Account, target_model: &str) -> Option<
     let quota_data = account.quota.as_ref()?;
     let target = target_model.to_lowercase();
     let is_flash_target = target.contains("flash");
+    let is_claude_or_gpt_target =
+        target.contains("claude") || target.contains("gpt") || target.contains("sonnet");
 
     let mut min_pct: Option<f64> = None;
 
-    // 1. Minimum across models matching target (and flash models when target is flash)
+    // 1. Target model match (strict target model and family isolation)
     for m in &quota_data.models {
-        let name_lower = m.name.to_lowercase();
-        let is_direct = name_lower.contains(&target);
-        let is_flash = is_flash_target && name_lower.contains("flash");
-        if is_direct || is_flash {
+        if is_model_matching_target(&m.name, target_model) {
             let pct = m.percentage as f64;
             min_pct = Some(min_pct.map_or(pct, |cur| cur.min(pct)));
         }
     }
 
-    // 2. Minimum across any actively consumed models (percentage < 100)
-    for m in &quota_data.models {
-        if m.percentage < 100 {
-            let pct = m.percentage as f64;
-            min_pct = Some(min_pct.map_or(pct, |cur| cur.min(pct)));
-        }
-    }
-
-    // 3. Minimum across 4h / 5h short-window quota_groups buckets (immediate rolling quota)
+    // 2. Short-window quota_groups buckets matching target group (4h / 5h rolling quota)
     if let Some(ref groups) = quota_data.quota_groups {
         for g in groups {
+            let gname = g.display_name.to_lowercase();
+            let is_group_claude_or_gpt =
+                gname.contains("claude") || gname.contains("gpt") || gname.contains("3p");
+            let is_group_gemini = gname.contains("gemini") || (!is_group_claude_or_gpt);
+
+            let group_matches = if is_claude_or_gpt_target {
+                is_group_claude_or_gpt
+            } else {
+                is_group_gemini
+            };
+            if !group_matches {
+                continue; // Group isolation
+            }
+
             for b in &g.buckets {
                 let win = b.window.to_lowercase();
                 let bid = b.bucket_id.to_lowercase();
@@ -63,11 +68,9 @@ pub fn calculate_account_quota(account: &Account, target_model: &str) -> Option<
         }
     }
 
-    // Fallback: average percentage across all models
+    // If account has valid models but target model has no consumed usage records, it is 100% available
     if !quota_data.models.is_empty() {
-        let total: i32 = quota_data.models.iter().map(|m| m.percentage).sum();
-        let avg = total as f64 / quota_data.models.len() as f64;
-        return Some(avg);
+        return Some(100.0);
     }
 
     None
@@ -122,13 +125,12 @@ pub fn calculate_candidate_quota(account: &Account, target_model: &str) -> Optio
     let quota_data = account.quota.as_ref()?;
     let target = target_model.to_lowercase();
     let is_flash_target = target.contains("flash");
+    let is_claude_or_gpt_target =
+        target.contains("claude") || target.contains("gpt") || target.contains("sonnet");
 
-    // 1. Direct target model match (and flash models when target is flash)
+    // 1. Direct target model match (and family wildcards)
     for m in &quota_data.models {
-        let name_lower = m.name.to_lowercase();
-        let is_direct = name_lower.contains(&target);
-        let is_flash = is_flash_target && name_lower.contains("flash");
-        if is_direct || is_flash {
+        if is_model_matching_target(&m.name, target_model) {
             return Some(m.percentage as f64);
         }
     }
@@ -136,6 +138,20 @@ pub fn calculate_candidate_quota(account: &Account, target_model: &str) -> Optio
     // 2. Short-window buckets matching target or 4h/5h
     if let Some(ref groups) = quota_data.quota_groups {
         for g in groups {
+            let gname = g.display_name.to_lowercase();
+            let is_group_claude_or_gpt =
+                gname.contains("claude") || gname.contains("gpt") || gname.contains("3p");
+            let is_group_gemini = gname.contains("gemini") || (!is_group_claude_or_gpt);
+
+            let group_matches = if is_claude_or_gpt_target {
+                is_group_claude_or_gpt
+            } else {
+                is_group_gemini
+            };
+            if !group_matches {
+                continue;
+            }
+
             for b in &g.buckets {
                 let win = b.window.to_lowercase();
                 let bid = b.bucket_id.to_lowercase();
@@ -151,15 +167,15 @@ pub fn calculate_candidate_quota(account: &Account, target_model: &str) -> Optio
     }
 
     // 3. Hierarchical match (Gemini Flash -> Claude Sonnet -> other Gemini)
-    if let Some((_, pct, _)) = evaluate_hierarchical_quota(account) {
-        return Some(pct);
+    if is_flash_target {
+        if let Some((_, pct, _)) = evaluate_hierarchical_quota(account) {
+            return Some(pct);
+        }
     }
 
-    // 4. Fallback: average percentage across models
+    // 4. If account has models but target has no consumed usage records, it is 100% available
     if !quota_data.models.is_empty() {
-        let total: i32 = quota_data.models.iter().map(|m| m.percentage).sum();
-        let avg = total as f64 / quota_data.models.len() as f64;
-        return Some(avg);
+        return Some(100.0);
     }
 
     None
@@ -193,25 +209,13 @@ pub fn evaluate_account_period_status(
     let quota_data = account.quota.as_ref()?;
     let target = target_model.to_lowercase();
     let is_flash_target = target.contains("flash");
+    let is_claude_or_gpt_target =
+        target.contains("claude") || target.contains("gpt") || target.contains("sonnet");
 
     let mut matched_model: Option<&crate::models::quota::ModelQuota> = None;
-    // 1. Evaluate configured target_model first
+    // 1. Evaluate configured target_model first with strict model isolation
     for m in &quota_data.models {
-        let name_lower = m.name.to_lowercase();
-        let is_direct = name_lower.contains(&target);
-        let is_flash = is_flash_target && name_lower.contains("flash");
-        if is_direct || is_flash {
-            match matched_model {
-                Some(cur) if m.percentage < cur.percentage => matched_model = Some(m),
-                None => matched_model = Some(m),
-                _ => {}
-            }
-        }
-    }
-
-    // 2. In addition, evaluate lowest remaining quota across all models that are actively consumed (remaining < 100%)
-    for m in &quota_data.models {
-        if m.percentage < 100 || (m.percentage as f64) <= threshold_percent {
+        if is_model_matching_target(&m.name, target_model) {
             match matched_model {
                 Some(cur) if m.percentage < cur.percentage => matched_model = Some(m),
                 None => matched_model = Some(m),
@@ -222,16 +226,23 @@ pub fn evaluate_account_period_status(
 
     let (mut quota_percent, mut reset_time_str) = if let Some(m) = matched_model {
         (m.percentage as f64, m.reset_time.as_str())
+    } else if is_flash_target {
+        if let Some((mname, pct, _)) = evaluate_hierarchical_quota(account) {
+            let reset = quota_data
+                .models
+                .iter()
+                .find(|m| m.name == mname)
+                .map(|m| m.reset_time.as_str())
+                .unwrap_or("");
+            (pct, reset)
+        } else if !quota_data.models.is_empty() {
+            (100.0, "")
+        } else {
+            return None;
+        }
     } else if !quota_data.models.is_empty() {
-        let total: i32 = quota_data.models.iter().map(|m| m.percentage).sum();
-        let avg = total as f64 / quota_data.models.len() as f64;
-        let first_reset = quota_data
-            .models
-            .iter()
-            .find(|m| !m.reset_time.is_empty())
-            .map(|m| m.reset_time.as_str())
-            .unwrap_or("");
-        (avg, first_reset)
+        // Target model has no usage records: treat as 100% fresh quota
+        (100.0, "")
     } else if quota_data
         .quota_groups
         .as_ref()
@@ -244,6 +255,20 @@ pub fn evaluate_account_period_status(
 
     if let Some(ref groups) = quota_data.quota_groups {
         for g in groups {
+            let gname = g.display_name.to_lowercase();
+            let is_group_claude_or_gpt =
+                gname.contains("claude") || gname.contains("gpt") || gname.contains("3p");
+            let is_group_gemini = gname.contains("gemini") || (!is_group_claude_or_gpt);
+
+            let group_matches = if is_claude_or_gpt_target {
+                is_group_claude_or_gpt
+            } else {
+                is_group_gemini
+            };
+            if !group_matches {
+                continue;
+            }
+
             for b in &g.buckets {
                 let win = b.window.to_lowercase();
                 let bid = b.bucket_id.to_lowercase();

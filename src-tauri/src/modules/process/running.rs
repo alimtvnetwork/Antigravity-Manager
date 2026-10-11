@@ -4,160 +4,36 @@ use super::*;
 
 /// Check if Antigravity is running
 pub fn is_antigravity_running(target_ide: Option<&str>) -> bool {
-    let mut system = System::new();
-    system.refresh_processes(sysinfo::ProcessesToUpdate::All);
-    let ide_exe_paths = get_ide_exe_paths(&system);
+    let cached_procs = crate::modules::instance::pid_scan::get_cached_antigravity_processes();
+    if cached_procs.is_empty() {
+        return false;
+    }
 
-    let current_exe = get_current_exe_path();
-    let current_pid = std::process::id();
+    if target_ide.is_none() {
+        let default_dir = crate::modules::instance::get_default_antigravity_data_dir();
+        return !crate::modules::instance::find_pids_for_data_dir(&default_dir, true).is_empty();
+    }
 
-    // Load both manual paths from config
-    let config = crate::modules::config::load_app_config().ok();
-    let manual_path = config
-        .as_ref()
-        .and_then(|c| c.antigravity_executable.as_ref())
-        .and_then(|p| std::path::PathBuf::from(p).canonicalize().ok());
-    let ide_manual_path = config
-        .as_ref()
-        .and_then(|c| c.antigravity_ide_executable.as_ref())
-        .and_then(|p| std::path::PathBuf::from(p).canonicalize().ok());
-
-    for (pid, process) in system.processes() {
-        let pid_u32 = pid.as_u32();
-        if pid_u32 == current_pid {
-            continue;
-        }
-
-        let name = process.name().to_string_lossy().to_lowercase();
-        let exe_path = process
-            .exe()
-            .and_then(|p| p.to_str())
-            .unwrap_or("")
-            .to_lowercase();
-
-        // Exclude own path (handles case where manager is mistaken for Antigravity on Linux)
-        if let (Some(ref my_path), Some(p_exe)) = (&current_exe, process.exe()) {
-            if let Ok(p_path) = p_exe.canonicalize() {
-                if my_path == &p_path {
-                    continue;
+    if let Some(target) = target_ide {
+        if let Some(inst_id) = target.strip_prefix("instance:") {
+            if inst_id == "default" {
+                let default_dir = crate::modules::instance::get_default_antigravity_data_dir();
+                return !crate::modules::instance::find_pids_for_data_dir(&default_dir, true)
+                    .is_empty();
+            } else if let Ok(reg) = crate::modules::instance::load_registry() {
+                if let Some(cfg) = reg.instances.into_iter().find(|i| i.id == inst_id) {
+                    return !crate::modules::instance::find_pids_for_data_dir(&cfg.data_dir, false)
+                        .is_empty();
                 }
             }
-        }
-
-        // Common helper process exclusion logic
-        let args = process.cmd();
-        let args_str = args
-            .iter()
-            .map(|arg| arg.to_string_lossy().to_lowercase())
-            .collect::<Vec<String>>()
-            .join(" ");
-
-        let is_helper = is_helper_process(&name, &args_str, &exe_path);
-
-        if is_helper || is_non_ide_binary(&name, &exe_path, &args_str) {
-            continue;
-        }
-
-        // Recognition ref 2: If targeting IDE and ide_manual_path is configured, check it first
-        if target_ide == Some("ide") {
-            if let (Some(ref ide_m_path), Some(p_exe)) = (&ide_manual_path, process.exe()) {
-                if let Ok(p_path) = p_exe.canonicalize() {
-                    #[cfg(target_os = "macos")]
-                    {
-                        let m = ide_m_path.to_string_lossy();
-                        let p = p_path.to_string_lossy();
-                        if let (Some(mi), Some(pi)) = (m.find(".app"), p.find(".app")) {
-                            if m[..mi + 4] == p[..pi + 4] {
-                                return true;
-                            }
-                        }
-                    }
-                    #[cfg(not(target_os = "macos"))]
-                    if ide_m_path == &p_path {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        // Recognition ref 3: Priority check for manual path match (client)
-        if target_ide != Some("ide") {
-            if let (Some(ref m_path), Some(p_exe)) = (&manual_path, process.exe()) {
-                if let Ok(p_path) = p_exe.canonicalize() {
-                    // macOS: Check if within the same .app bundle
-                    #[cfg(target_os = "macos")]
-                    {
-                        let m_path_str = m_path.to_string_lossy();
-                        let p_path_str = p_path.to_string_lossy();
-                        if let (Some(m_idx), Some(p_idx)) =
-                            (m_path_str.find(".app"), p_path_str.find(".app"))
-                        {
-                            if m_path_str[..m_idx + 4] == p_path_str[..p_idx + 4] {
-                                return true;
-                            }
-                        }
-                    }
-
-                    #[cfg(not(target_os = "macos"))]
-                    if m_path == &p_path {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        // 3. Strict mode: If the relevant manual path is configured, we strictly enforce it
-        // and DO NOT fallback to fuzzy string matching.
-        if manual_path.is_some() && target_ide != Some("ide") {
-            continue;
-        }
-        if ide_manual_path.is_some() && target_ide == Some("ide") {
-            continue;
-        }
-
-        // If checking default (target_ide != Some("ide") and not starting with instance:),
-        // we MUST ignore any process whose command line points to an isolated sandbox instance
-        if target_ide != Some("ide")
-            && !target_ide
-                .map(|t| t.starts_with("instance:"))
-                .unwrap_or(false)
-        {
-            let is_instance_sandbox = args_str.contains(".antigravity_tools")
-                || args_str.contains("/instances/")
-                || args_str.contains("\\instances\\");
-            if is_instance_sandbox {
-                continue;
-            }
-        }
-
-        // Check if the process matches target_ide
-        let exe_file = exe_file_name(&exe_path);
-        let has_antigravity_name = name.contains("antigravity") || exe_file.contains("antigravity");
-
-        let is_ide_match = if target_ide == Some("ide") {
-            exe_path.contains("antigravity ide")
-                || exe_path.contains("antigravity-ide")
-                || name.contains("antigravity ide")
-                || name.contains("antigravity-ide")
-                || ide_exe_paths.contains(&exe_path)
-        } else {
-            if ide_exe_paths.contains(&exe_path) {
-                false // Explicitly immune (it is an IDE)
-            } else {
-                has_antigravity_name
-                    && !exe_path.contains("antigravity ide")
-                    && !exe_path.contains("antigravity-ide")
-                    && !name.contains("antigravity ide")
-                    && !name.contains("antigravity-ide")
-            }
-        };
-
-        if is_ide_match {
-            return true;
+            return false;
+        } else if target == "ide" {
+            return !get_antigravity_pids(Some("ide")).is_empty();
         }
     }
 
-    false
+    // Fallback for any non-standard target_ide string: inspect running PIDs
+    !get_antigravity_pids(target_ide).is_empty()
 }
 
 #[cfg(target_os = "linux")]

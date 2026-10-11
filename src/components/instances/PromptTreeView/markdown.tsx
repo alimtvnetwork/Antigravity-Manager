@@ -1,16 +1,41 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type React from 'react';
 import { Check, Copy } from 'lucide-react';
 import { TruncatedContextCallout } from './TruncatedContextCallout';
 import { formatPromptForMarkdown } from './formatters';
 
+// Hoisted static regular expression with explicit character exclusions to eliminate catastrophic backtracking
+const TOKEN_REGEX =
+    /(!\[([^\]]*)\]\(([^)]*)\)|\[([^\]]+)\]\(([^)]+)\)|<truncated\s+(\d+)\s+(bytes|lines)>|`([^`]+)`|\*\*([^*]+)\*\*|__([^_]+)__|~~([^~]+)~~|\*([^*]+)\*|_([^_]+)_)/gi;
+
+// Maximum bytes cap for inline regex parsing to protect UI thread and prevent virtual DOM bloat
+const MAX_INLINE_BLOCK_BYTES = 50 * 1024; // 50 KB
+
 function parseInlineMarkdown(text: string, onToggleExpand?: () => void): React.ReactNode[] {
+    // Length guard: for large conversation excerpts, avoid regex parsing explosion
+    if (text.length > MAX_INLINE_BLOCK_BYTES) {
+        return [
+            <span key="oversized-text" className="text-xs text-slate-700 dark:text-slate-300">
+                {text.substring(0, 2000)}
+            </span>,
+            <span
+                key="oversized-trunc-notice"
+                onClick={onToggleExpand}
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 my-1 rounded-full text-[10px] font-mono font-medium bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30 shadow-2xs cursor-pointer hover:bg-amber-500/25 transition-all"
+                title={`Omitted ${text.length - 2000} bytes of context - Click to inspect/expand`}
+            >
+                <span className="text-amber-500 font-bold">⚡</span>
+                <span>Omitted {((text.length - 2000) / 1024).toFixed(1)} KB transcript context · Click to expand</span>
+            </span>
+        ];
+    }
+
     const rawNodes: React.ReactNode[] = [];
-    const tokenRegex = /(!\[(.*?)\]\((.*?)\)|\[(.*?)\]\((.*?)\)|<truncated\s+(\d+)\s+(bytes|lines)>|`([^`]+)`|\*\*([^*]+)\*\*|__([^_]+)__|~~([^~]+)~~|\*([^*]+)\*|_([^_]+)_)/gi;
+    TOKEN_REGEX.lastIndex = 0;
     let lastIndex = 0;
     let match: RegExpExecArray | null;
 
-    while ((match = tokenRegex.exec(text)) !== null) {
+    while ((match = TOKEN_REGEX.exec(text)) !== null) {
         if (match.index > lastIndex) {
             rawNodes.push(text.substring(lastIndex, match.index));
         }
@@ -89,7 +114,7 @@ function parseInlineMarkdown(text: string, onToggleExpand?: () => void): React.R
             rawNodes.push(full);
         }
 
-        lastIndex = tokenRegex.lastIndex;
+        lastIndex = TOKEN_REGEX.lastIndex;
     }
 
     if (lastIndex < text.length) {
@@ -119,7 +144,6 @@ function parseInlineMarkdown(text: string, onToggleExpand?: () => void): React.R
     return nodes.length > 0 ? nodes : [text];
 }
 
-
 interface RichMarkdownRendererProps {
     content: string;
     showAllWords?: boolean;
@@ -137,13 +161,29 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
         setTimeout(() => setCopiedBlockIndex(null), 2000);
     };
 
-    if (!content.trim()) {
-        return <div className="text-xs text-slate-400 italic">No content to preview.</div>;
-    }
+    const renderedContent = useMemo(() => {
+        if (!content.trim()) {
+            return <div className="text-xs text-slate-400 italic">No content to preview.</div>;
+        }
 
-    const formattedContent = formatPromptForMarkdown(content);
-    const lines = formattedContent.split('\n');
-    const elements: React.ReactNode[] = [];
+        // For massive content exceeding 50 KB without showAllWords, render preview callout
+        if (content.length > MAX_INLINE_BLOCK_BYTES && !showAllWords) {
+            return (
+                <div className="space-y-2">
+                    <p className="text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words">
+                        {parseInlineMarkdown(content.slice(0, 2000), onToggleExpand)}
+                    </p>
+                    <TruncatedContextCallout
+                        omittedBytes={content.length - 2000}
+                        onExpandFull={onToggleExpand}
+                    />
+                </div>
+            );
+        }
+
+        const formattedContent = formatPromptForMarkdown(content);
+        const lines = formattedContent.split('\n');
+        const elements: React.ReactNode[] = [];
     let inCodeBlock = false;
     let codeLanguage = '';
     let codeBuffer: string[] = [];
@@ -411,6 +451,9 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
         );
     }
 
-    return <div className="space-y-1">{elements}</div>;
+        return <div className="space-y-1">{elements}</div>;
+    }, [content, showAllWords, onToggleExpand, isTruncated, copiedBlockIndex]);
+
+    return renderedContent;
 }
 
