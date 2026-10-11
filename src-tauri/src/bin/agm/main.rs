@@ -347,7 +347,9 @@ fn main() {
         "test-email" | "email-test" | "check-email" => crate::test_cmds::cmd_test_email(&cmd_args),
         "test-training" | "training" | "train" => crate::test_cmds::cmd_test_training(&cmd_args),
         "install" => crate::install_cmds::cmd_install(&cmd_args),
-        "update" | "update-all" | "ua" => crate::update_cmds::cmd_update(&cmd_args),
+        "update" | "update-all" | "ua" | "revert" | "downgrade" => {
+            crate::update_cmds::cmd_update(&cmd_args)
+        }
         "delegate-update" | "update-ui" | "ui-update-runner" => {
             crate::update_cmds::cmd_delegate_update(&cmd_args);
         }

@@ -111,11 +111,13 @@ impl SystemIntegration for DesktopIntegration {
         crate::modules::logger::log_info(
             "[Desktop] [Step 2/5] Closing running Antigravity IDE processes...",
         );
-        // Justification: IDE close is best-effort; the credential injection and relaunch below drive the outcome
         crate::error::record_ignored(
-            crate::modules::instance::close_instance("default"),
-            "close Antigravity IDE before account switch",
-        );
+            crate::modules::instance::close_instance_verified(
+                "default",
+                std::time::Duration::from_millis(5000),
+            ),
+            "close Antigravity IDE verified before account switch",
+        ); // Justification: verified IDE close ensures dying process exits before credential injection
 
         // =========================================================================
         // STEP 3: Switch the Account Credentials (OS Keyring + state.vscdb + storage.json)

@@ -91,7 +91,9 @@ pub fn is_main_window_alive(window: &WebviewWindow) -> bool {
 
 /// Dynamically destroy a dead or unresponsive main window and rebuild it cleanly from config.
 pub fn rebuild_main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
-    tracing::warn!("[Recovery] Rebuilding WebviewWindow('main') after webview invalidation or crash...");
+    tracing::warn!(
+        "[Recovery] Rebuilding WebviewWindow('main') after webview invalidation or crash..."
+    );
     if let Some(window) = app.get_webview_window("main") {
         // Justification: best-effort destruction of corrupted window; rebuilding follows immediately
         crate::error::record_ignored(window.destroy(), "destroy dead main window");

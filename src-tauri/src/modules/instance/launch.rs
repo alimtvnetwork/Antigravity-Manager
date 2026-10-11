@@ -48,32 +48,13 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
     // Determine executable FIRST while running processes are alive for discovery
     let exe_path = resolve_launch_executable(instance_id, is_default, custom_exe.as_deref())?;
 
-    // Guard against killing running instances:
-    // If the instance process is verified to be alive and running, NEVER kill it with close_instance!
-    let (is_already_running, _, _) = is_instance_process_running_smart(instance_id);
-    if !is_already_running {
-        // Guard: do not kill running processes when !is_already_running if another instance is alive
-        let (other_pids, _) = other_instance_protection(instance_id);
-        let has_other_alive = other_pids.iter().any(|&p| is_pid_alive_targeted(p));
-        if !has_other_alive {
-            // Close only the existing process for THIS target instance if running, allowing OS to unmap locks
-            // Justification: best-effort close; close is idempotent and re-attempted on the next action
-            crate::error::record_ignored(close_instance(instance_id), "close instance");
-            std::thread::sleep(std::time::Duration::from_millis(300));
-        } else {
-            crate::modules::logger::log_info(&format!(
-                "[Instance] Another instance is currently alive; bypassing close_instance for '{}' to protect active processes.",
-                instance_id
-            ));
-        }
-        // Clean any orphaned lock files in the target instance data directory
-        clear_stale_instance_lockfiles(&target_data_path);
-    } else {
-        crate::modules::logger::log_info(&format!(
-            "[Instance] Target instance '{}' is already running; bypassing close_instance and preserving active process locks.",
-            instance_id
-        ));
-    }
+    // Close only the existing process for THIS target instance if running, allowing OS to unmap locks
+    // and ensuring credentials can be cleanly injected without database contention or singleton focus handoffs.
+    crate::error::record_ignored(
+        close_instance_verified(instance_id, std::time::Duration::from_millis(3000)),
+        "close_instance_verified before launch",
+    ); // Justification: best-effort close; verification ensures process is terminated if it was running
+    clear_stale_instance_lockfiles(&target_data_path);
 
     // If an account is bound to this instance profile, sync credentials and inject token directly into isolated state.vscdb and system keyring AFTER process exit.
     let resolved_account = if let Some(ref account_id) = bound_acc {

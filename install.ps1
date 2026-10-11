@@ -1715,6 +1715,11 @@ if (-not $installedOk) {
         $existingExe = Join-Path $InstallDir "agm-alim.exe"
     }
     if (Test-Path $existingExe) {
+        if ($isPinned) {
+            Write-Err "Target pinned version '$TargetVersion' could not be downloaded across all attempts. Downgrade/Update aborted."
+            $global:LASTEXITCODE = 1
+            exit 1
+        }
         Write-Warn "All $maxAttempts download attempts failed, but existing installation verified at $existingExe. Retaining current installation."
         $ExePath = $existingExe
         $installedOk = $true

@@ -344,7 +344,8 @@ pub fn update_tray_menus(app: &tauri::AppHandle) {
         );
 
         let show_i = MenuItem::with_id(&app_clone, "show", &texts.show_window, true, None::<&str>);
-        let reload_ui_i = MenuItem::with_id(&app_clone, "reload_ui", "Reload UI", true, None::<&str>);
+        let reload_ui_i =
+            MenuItem::with_id(&app_clone, "reload_ui", "Reload UI", true, None::<&str>);
         let lightweight_i = CheckMenuItem::with_id(
             &app_clone,
             "toggle_lightweight",

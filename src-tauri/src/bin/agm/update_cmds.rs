@@ -24,12 +24,14 @@ pub(crate) fn normalize_version_string(raw: &str) -> String {
 }
 
 /// Extract target version string from command-line arguments.
-/// Supports: 'to v4.162', 'to 4.162', 'revert v4.162', 'downgrade 4.162', '4.162', 'v4.162', '--version 4.162', '-v 4.162'.
+/// Supports: 'to v4.162', '--to v4.162', '-to v4.162', 'revert v4.162', 'downgrade 4.162', '4.162', 'v4.162', '--version 4.162', '-v 4.162'.
 pub(crate) fn extract_target_version(args: &[String]) -> Option<String> {
     let mut iter = args.iter().peekable();
     while let Some(arg) = iter.next() {
         let clean = arg.trim();
         if clean.eq_ignore_ascii_case("to")
+            || clean.eq_ignore_ascii_case("--to")
+            || clean.eq_ignore_ascii_case("-to")
             || clean.eq_ignore_ascii_case("revert")
             || clean.eq_ignore_ascii_case("downgrade")
         {
@@ -56,7 +58,11 @@ pub(crate) fn extract_target_version(args: &[String]) -> Option<String> {
                     return Some(normalize_version_string(v));
                 }
             }
-        } else if let Some(stripped) = clean.strip_prefix("--version=") {
+        } else if let Some(stripped) = clean
+            .strip_prefix("--version=")
+            .or_else(|| clean.strip_prefix("--to="))
+            .or_else(|| clean.strip_prefix("-to="))
+        {
             let v = stripped.trim().trim_start_matches(['v', 'V']);
             if !v.is_empty()
                 && v.chars()
