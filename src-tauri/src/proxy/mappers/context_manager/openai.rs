@@ -210,7 +210,7 @@ impl ContextManager {
 struct ToolRound {
     _assistant_index: usize,
     tool_result_indices: Vec<usize>,
-    indices: Vec<usize>, // All indices in this round
+    pub(crate) indices: Vec<usize>, // All indices in this round
 }
 
 /// Identify tool call rounds in the message history

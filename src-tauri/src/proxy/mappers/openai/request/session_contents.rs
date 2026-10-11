@@ -437,6 +437,7 @@ pub(crate) fn phase_contents(
     } else {
         crate::proxy::pipeline::ProxyProtocol::OpenAIChat
     };
+    let thinking_store_key = String::new();
     crate::proxy::pipeline::InboundThinkingPipeline::process_contents(
         &mut merged_contents,
         protocol,

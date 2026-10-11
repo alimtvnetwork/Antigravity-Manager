@@ -117,6 +117,7 @@ pub(crate) fn phase_compression(
             let body_clone = inner_request.clone();
             let trace_id_clone = trace_id.clone();
             let proj_clone = project_id.to_string();
+            let account_id: Option<&str> = None;
             let acc_clone = account_id.unwrap_or_default().to_string();
 
             // 两个依赖缺一不可：token_manager 取凭据，upstream 选对代理

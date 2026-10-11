@@ -29,12 +29,12 @@ pub(crate) fn phase_finalize(
 
     // [NEW] 动态检测是否需要标记为 agent 请求
     // 只有在请求携带 tools，或上下文包含工具调用交互时才打上 agent 标签
-    let has_tools = reordered_request
+    let has_tools = inner_request
         .get("tools")
         .and_then(|t| t.as_array())
         .map(|arr| !arr.is_empty())
         .unwrap_or(false);
-    let has_tool_interactions = reordered_request
+    let has_tool_interactions = inner_request
         .get("contents")
         .map(super::super::common_utils::contents_has_tool_interactions)
         .unwrap_or(false);
@@ -44,7 +44,7 @@ pub(crate) fn phase_finalize(
     let mut final_body = json!({
         "project": project_id,
         // [CACHE] 使用重排后的字段顺序，稳定前缀在前
-        "request": reordered_request,
+        "request": inner_request,
         "model": setup.config.final_model,
         "userAgent": official_user_agent,
         // [CACHE] requestId stays last so its per-attempt value does not disturb the stable prefix.
@@ -77,7 +77,7 @@ pub(crate) fn phase_finalize(
             "[Cache-Opt:L3-Prefix] prefix_hash={} model={} sid={} tokens_in_msg={}",
             &hash[..hash.len().min(16)],
             setup.config.final_model,
-            &setup.session_id[..session_id.len().min(8)],
+            &setup.session_id[..setup.session_id.len().min(8)],
             setup.message_count
         );
         hash

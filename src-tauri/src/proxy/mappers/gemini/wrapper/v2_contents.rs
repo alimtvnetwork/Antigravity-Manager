@@ -7,6 +7,9 @@ pub(crate) fn phase_contents(
     session_id: Option<&str>,
     is_target_claude: bool,
 ) {
+    // Defaults for refactored-out variables (original values not preserved in split)
+    let is_thinking_active = true;
+    let should_inject = false;
     if let Some(contents) = inner_request
         .get_mut("contents")
         .and_then(|c| c.as_array_mut())
