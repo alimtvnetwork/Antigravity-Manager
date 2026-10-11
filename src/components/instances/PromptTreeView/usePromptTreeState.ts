@@ -43,6 +43,8 @@ export interface PromptTreeState {
     setRefreshingProjectId: React.Dispatch<React.SetStateAction<string | null>>;
     confirmationSuffix: string;
     setConfirmationSuffix: React.Dispatch<React.SetStateAction<string>>;
+    conversationTargetMode: 'current' | 'new';
+    setConversationTargetMode: React.Dispatch<React.SetStateAction<'current' | 'new'>>;
     isCopiedText: boolean;
     setIsCopiedText: React.Dispatch<React.SetStateAction<boolean>>;
     isCopiedRaw: boolean;
@@ -125,6 +127,7 @@ export function usePromptTreeState(instanceId: string): PromptTreeState {
 
     const [refreshingProjectId, setRefreshingProjectId] = useState<string | null>(null);
     const [confirmationSuffix, setConfirmationSuffix] = useState<string>('None (Send as is)');
+    const [conversationTargetMode, setConversationTargetMode] = useState<'current' | 'new'>('current');
     const [isCopiedText, setIsCopiedText] = useState(false);
     const [isCopiedRaw, setIsCopiedRaw] = useState(false);
 
@@ -180,6 +183,7 @@ export function usePromptTreeState(instanceId: string): PromptTreeState {
         isArchivedProjectsExpanded, setIsArchivedProjectsExpanded,
         refreshingProjectId, setRefreshingProjectId,
         confirmationSuffix, setConfirmationSuffix,
+        conversationTargetMode, setConversationTargetMode,
         isCopiedText, setIsCopiedText,
         isCopiedRaw, setIsCopiedRaw,
         selectedProjectScope, setSelectedProjectScope,

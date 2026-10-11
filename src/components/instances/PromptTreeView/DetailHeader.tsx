@@ -10,6 +10,8 @@ export interface DetailHeaderProps {
     activePromptText: string;
     confirmationSuffix: string;
     setConfirmationSuffix: (v: string) => void;
+    conversationTargetMode?: 'current' | 'new';
+    setConversationTargetMode?: (v: 'current' | 'new') => void;
     isCopiedText: boolean;
     setIsCopiedText: (v: boolean) => void;
     isCopiedRaw: boolean;
@@ -40,6 +42,7 @@ export function DetailHeader(props: DetailHeaderProps) {
     const {
         selectedConversation, activePromptText,
         confirmationSuffix, setConfirmationSuffix,
+        conversationTargetMode = 'current', setConversationTargetMode,
         isCopiedText, setIsCopiedText, isCopiedRaw,
         isEnqueueing, isResending, isFocusing,
         isExportMenuOpen, setIsExportMenuOpen,
@@ -206,6 +209,19 @@ export function DetailHeader(props: DetailHeaderProps) {
                         <option value="Are you sure about it?" className="bg-white dark:bg-[#0c2438]">Sure?</option>
                         <option value="Double check all edge cases" className="bg-white dark:bg-[#0c2438]">Edge cases</option>
                         <option value="Verify build and tests" className="bg-white dark:bg-[#0c2438]">Verify tests</option>
+                    </select>
+                </div>
+
+                {/* Destination Conversation Mode Dropdown */}
+                <div className="flex items-center px-1.5 py-0.5">
+                    <select
+                        value={conversationTargetMode}
+                        onChange={(e) => setConversationTargetMode?.(e.target.value as 'current' | 'new')}
+                        className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-[10.5px] font-semibold focus:ring-0 focus:outline-none cursor-pointer max-w-[90px] truncate pr-1 py-0"
+                        title="Destination conversation mode for Send and Queue"
+                    >
+                        <option value="current" className="bg-white dark:bg-[#0c2438]">Existing Conv</option>
+                        <option value="new" className="bg-white dark:bg-[#0c2438]">New Conv</option>
                     </select>
                 </div>
 
