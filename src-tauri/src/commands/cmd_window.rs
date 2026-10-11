@@ -55,7 +55,7 @@ pub async fn toggle_maximize_window(window: tauri::Window) -> Result<bool, Strin
 
 /// 关闭窗口并完全退出应用
 #[tauri::command]
-pub async fn close_window(window: tauri::Window) -> Result<(), String> {
+pub fn close_window(window: tauri::Window) -> Result<(), String> {
     crate::modules::process::exit_app_fully(&window.app_handle());
 }
 

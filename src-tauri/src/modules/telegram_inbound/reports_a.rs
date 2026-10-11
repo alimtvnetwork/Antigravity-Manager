@@ -336,9 +336,10 @@ pub fn format_fleet_identity_report() -> String {
         .unwrap_or("none");
 
     let instances_count = reg.instances.len();
-    let accounts_count = account::load_account_index()
-        .map(|idx| idx.accounts.len())
-        .unwrap_or(0);
+    let accounts = account::load_account_index()
+        .map(|idx| idx.accounts)
+        .unwrap_or_default();
+    let accounts_count = accounts.len();
 
     let (live_pids, is_running) = active_inst
         .map(|i| {
@@ -363,30 +364,104 @@ pub fn format_fleet_identity_report() -> String {
             .join(", ")
     };
 
+    let proxy_port = crate::modules::config::load_app_config()
+        .map(|c| c.proxy.port)
+        .unwrap_or(8045);
+
+    // Extract bound account details: tier and dual quotas (4h rolling & weekly)
+    let bound_acc = accounts
+        .iter()
+        .find(|a| a.email.eq_ignore_ascii_case(active_email))
+        .or_else(|| {
+            let curr_id = account::get_current_account_id().unwrap_or_default();
+            accounts.iter().find(|a| Some(&a.id) == curr_id.as_ref())
+        });
+
+    let (tier_str, quota_str) = if let Some(acc) = bound_acc {
+        let t = acc
+            .quota
+            .as_ref()
+            .and_then(|q| q.subscription_tier.as_deref())
+            .unwrap_or("PRO");
+        let (q_4h, q_weekly) =
+            crate::modules::auto_switcher::extract_dual_window_quotas(acc, "gemini-2.5-pro");
+        let q_formatted = match (q_4h, q_weekly) {
+            (Some(h), Some(w)) => format!("4h: {:.1}% | Weekly: {:.1}%", h, w),
+            (Some(h), None) => format!("4h: {:.1}%", h),
+            (None, Some(w)) => format!("Weekly: {:.1}%", w),
+            _ => "Active".to_string(),
+        };
+        (t.to_string(), q_formatted)
+    } else {
+        ("Standard".to_string(), "Active".to_string())
+    };
+
+    let mut inst_summary = String::new();
+    for (_idx, inst) in reg.instances.iter().take(6).enumerate() {
+        let is_act = reg.active_instance_id == inst.id;
+        let pids =
+            crate::modules::instance::find_pids_for_data_dir(&inst.data_dir, inst.is_default);
+        let is_run = !pids.is_empty()
+            || crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
+        let tag = if is_run { "🟢" } else { "⚪" };
+        let act_mark = if is_act { " <i>[ACTIVE]</i>" } else { "" };
+        let bound = inst.bound_email.as_deref().unwrap_or("(none)");
+        let pid_display = if pids.is_empty() {
+            String::new()
+        } else {
+            format!(
+                " (PIDs: {})",
+                pids.iter()
+                    .map(|p| p.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        };
+        inst_summary.push_str(&format!(
+            "  • {} <b>{}</b>{}{} → <code>{}</code>\n",
+            tag,
+            clean_for_telegram_html(&inst.name, 32),
+            act_mark,
+            clean_for_telegram_html(&pid_display, 32),
+            clean_for_telegram_html(bound, 48)
+        ));
+    }
+
     format!(
         "🌐 <b>Standalone Fleet Identity Card</b>\n\
         ━━━━━━━━━━━━━━━━━━━━━━━━\n\
-        🖥️ <b>Machine:</b> <code>{}</code>\n\
-        📡 <b>LAN IP:</b> <code>{}</code>\n\
-        📦 <b>AGM Version:</b> <code>v{}</code>\n\
-        ⚙️ <b>Active Instance:</b> <code>{}</code> (<code>{}</code>)\n\
-        🚦 <b>Instance State:</b> {} (PIDs: <code>{}</code>)\n\
+        🖥️ <b>Machine:</b> <code>{}</code> (IP: <code>{}</code>)\n\
+        📦 <b>Version:</b> <code>v{}</code> | <b>Platform:</b> <code>{}/{}</code>\n\
+        ⚙️ <b>Active Instance:</b> <code>{}</code> (ID: <code>{}</code>)\n\
+        🚦 <b>State:</b> {} (PIDs: <code>{}</code>) | 🔌 <b>Proxy Port:</b> <code>{}</code>\n\
         👤 <b>Bound Account:</b> <code>{}</code>\n\
-        📊 <b>Fleet Inventory:</b> {} instances | {} accounts\n\n\
-        💡 <b>Available Commands:</b>\n\
-        • <code>/instances</code> — List all instance profiles on this machine\n\
-        • <code>/accounts</code> — List all registered accounts and quota levels\n\
-        • <code>/observe</code> — Live running prompts and status\n\
-        • <code>/whoami</code> — Quick node identity",
+        🏷️ <b>Tier:</b> <code>{}</code> | 📊 <b>Quota:</b> <code>{}</code>\n\n\
+        📁 <b>Local Instances ({}):</b>\n{}\n\
+        👥 <b>Total Accounts Registered:</b> {}\n\n\
+        💡 <b>Instant Commands:</b>\n\
+        • <code>/instances</code> — Full instance profiles\n\
+        • <code>/accounts</code> — Account quota levels\n\
+        • <code>/observe</code> — Live in-flight prompts\n\
+        • <code>/whoami</code> — Fast identity ping",
         clean_for_telegram_html(&machine_name, 64),
         clean_for_telegram_html(&local_ip, 48),
         clean_for_telegram_html(&ver, 24),
+        std::env::consts::OS,
+        std::env::consts::ARCH,
         clean_for_telegram_html(active_inst_name, 48),
         clean_for_telegram_html(active_inst_id, 48),
         running_tag,
         clean_for_telegram_html(&pid_str, 48),
+        proxy_port,
         clean_for_telegram_html(active_email, 64),
+        clean_for_telegram_html(&tier_str, 32),
+        clean_for_telegram_html(&quota_str, 48),
         instances_count,
+        if inst_summary.is_empty() {
+            "  • (none registered)\n".to_string()
+        } else {
+            inst_summary
+        },
         accounts_count
     )
 }
@@ -406,20 +481,31 @@ pub fn format_instances_report() -> String {
 
     for (idx, inst) in reg.instances.iter().enumerate() {
         let is_active = reg.active_instance_id == inst.id;
-        let is_running =
-            crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
+        let pids =
+            crate::modules::instance::find_pids_for_data_dir(&inst.data_dir, inst.is_default);
+        let is_running = !pids.is_empty()
+            || crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
         let status_emoji = if is_running { "🟢" } else { "⚪" };
         let active_badge = if is_active { " <i>[ACTIVE]</i>" } else { "" };
         let bound = inst.bound_email.as_deref().unwrap_or("(none)");
+        let pid_str = if pids.is_empty() {
+            "-".to_string()
+        } else {
+            pids.iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
 
         out.push_str(&format!(
-            "{}. {} <b>{}</b> (<code>{}</code>){}\n   👤 Bound: <code>{}</code>\n   📁 Data: <code>{}</code>\n",
+            "{}. {} <b>{}</b> (<code>{}</code>){}\n   👤 Bound: <code>{}</code>\n   🚦 PIDs: <code>{}</code>\n   📁 Data: <code>{}</code>\n",
             idx + 1,
             status_emoji,
             clean_for_telegram_html(&inst.name, 48),
             clean_for_telegram_html(&inst.id, 48),
             active_badge,
             clean_for_telegram_html(bound, 64),
+            clean_for_telegram_html(&pid_str, 48),
             clean_for_telegram_html(&inst.data_dir, 64)
         ));
     }
@@ -464,7 +550,8 @@ pub fn format_accounts_report() -> String {
         let q_str = match (q_4h, q_weekly) {
             (Some(h), Some(w)) => format!("4h: {:.1}% | Weekly: {:.1}%", h, w),
             (Some(h), None) => format!("4h: {:.1}%", h),
-            _ => "Quota: active".to_string(),
+            (None, Some(w)) => format!("Weekly: {:.1}%", w),
+            _ => "Active".to_string(),
         };
 
         out.push_str(&format!(

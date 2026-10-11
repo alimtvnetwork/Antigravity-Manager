@@ -218,7 +218,10 @@ pub fn default_commands_for_type(
             Some("agm which-format gitmap-ssh-nodes.json".to_string()),
             Some("SSH cluster fleet nodes configuration. Cross-platform compatible across Windows, Linux, Ubuntu, and macOS.".to_string()),
         )
-    } else if lower.contains("compact-export") || lower.contains("compact_export") || lower.contains("compact") {
+    } else if lower.contains("compact-export")
+        || lower.contains("compact_export")
+        || lower.contains("compact")
+    {
         (
             Some("agm import-compact agm-workspace-compact.json -y".to_string()),
             Some("agm export-compact --file agm-workspace-compact.json".to_string()),

@@ -136,7 +136,14 @@ pub(crate) fn parse_legacy_prefix_command(
         return InboundAction::MultiNodeSnapshotQuery;
     }
 
-    if lower_subj == "status" || lower_subj.starts_with("query") {
+    if lower_subj == "status"
+        || lower_subj.starts_with("query")
+        || lower_subj == "fleet"
+        || lower_subj == "whoami"
+        || lower_subj == "machines"
+        || lower_subj == "agm fleet"
+        || lower_subj == "agm whoami"
+    {
         return InboundAction::StatusQuery {
             target: "*".to_string(),
         };

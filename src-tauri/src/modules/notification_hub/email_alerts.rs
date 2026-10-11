@@ -97,7 +97,7 @@ pub(crate) fn dispatch_email_switch_alert(
 
     let subject = format!(
         "[AGM {} | {} | {}] [JSON] Account Switched: {} -> {}",
-        pkg_ver, m_name, m_ip, from_display, selected_display
+        pkg_ver, m_name, details.instance_name, from_display, selected_display
     );
 
     // Extract active running prompt, reinjection status, and image payload for the switched instance
@@ -359,7 +359,7 @@ pub(crate) fn dispatch_email_switch_alert(
 </html>"#,
         pkg_ver,
         m_name,
-        m_ip,
+        details.instance_name,
         pkg_ver,
         from_display,
         prev_4h_str,

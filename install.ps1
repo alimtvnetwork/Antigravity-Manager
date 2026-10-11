@@ -494,7 +494,7 @@ function Remove-PreviousInstallations {
                     } catch {}
                 }
 
-                if ($isSameDir) {
+                if ($isSameDir -and -not $Force -and -not $isPinned) {
                     Write-Step "Previous installation is in the current target directory ($InstallDir); preserving installation files and pinned shortcuts for in-place upgrade."
                     continue
                 }
@@ -1426,7 +1426,9 @@ if ($isPinned) {
     if (-not $manifestAssetUrlMap.ContainsKey($cleanPinned) -and -not $releaseMetadataMap.ContainsKey($cleanPinned)) {
         $candidateAssetFiles = @(
             "agm-alim-setup.exe",
+            "Antigravity.Manager.Tools_${cleanPinned}_x64-setup.exe",
             "agm-alim_${cleanPinned}_x64-setup.exe",
+            "Antigravity-Manager_${cleanPinned}_x64-setup.exe",
             "agm-alim_${cleanPinned}_windows_x64.zip"
         )
         foreach ($cFile in $candidateAssetFiles) {

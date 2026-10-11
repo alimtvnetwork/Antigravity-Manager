@@ -35,7 +35,10 @@ pub fn import_compact(options: &ImportOptions) -> Result<ImportResult, AppError>
         db::read_compact_db(&file_path)?
     } else {
         let raw_content = fs::read_to_string(&file_path).map_err(|e| {
-            AppError::Config(format!("Failed to read compact JSON file {:?}: {e}", file_path))
+            AppError::Config(format!(
+                "Failed to read compact JSON file {:?}: {e}",
+                file_path
+            ))
         })?;
         let (extracted_data, _attrs) = extract_payload::<CompactExportData>(&raw_content)
             .map_err(|e| AppError::Config(format!("Failed to parse compact JSON envelope: {e}")))?;
@@ -114,12 +117,7 @@ pub fn import_compact(options: &ImportOptions) -> Result<ImportResult, AppError>
                 let (repo_name, repo_path) = project_key_to_abs_path
                     .get(&r.project_key)
                     .cloned()
-                    .unwrap_or_else(|| {
-                        (
-                            "Unknown-Project".to_string(),
-                            target_work_clean.clone(),
-                        )
-                    });
+                    .unwrap_or_else(|| ("Unknown-Project".to_string(), target_work_clean.clone()));
                 let proj_id = format!("proj-{}", r.project_key.to_lowercase());
 
                 let _ = tx.execute(
@@ -144,7 +142,9 @@ pub fn import_compact(options: &ImportOptions) -> Result<ImportResult, AppError>
 
             // Justification: committing transactions to repo_prompts.db during import; failure returns early
             if let Err(e) = tx.commit() {
-                return Err(AppError::Config(format!("Failed to commit import transaction to repo_prompts.db: {e}")));
+                return Err(AppError::Config(format!(
+                    "Failed to commit import transaction to repo_prompts.db: {e}"
+                )));
             }
         }
     }
@@ -171,12 +171,7 @@ pub fn import_compact(options: &ImportOptions) -> Result<ImportResult, AppError>
                 let (repo_name, repo_path) = project_key_to_abs_path
                     .get(&r.project_key)
                     .cloned()
-                    .unwrap_or_else(|| {
-                        (
-                            "Unknown-Project".to_string(),
-                            target_work_clean.clone(),
-                        )
-                    });
+                    .unwrap_or_else(|| ("Unknown-Project".to_string(), target_work_clean.clone()));
                 let proj_id = format!("proj-{}", r.project_key.to_lowercase());
 
                 let _ = tx.execute(
@@ -206,12 +201,7 @@ pub fn import_compact(options: &ImportOptions) -> Result<ImportResult, AppError>
                 let (repo_name, repo_path) = project_key_to_abs_path
                     .get(&h.project_key)
                     .cloned()
-                    .unwrap_or_else(|| {
-                        (
-                            "Unknown-Project".to_string(),
-                            target_work_clean.clone(),
-                        )
-                    });
+                    .unwrap_or_else(|| ("Unknown-Project".to_string(), target_work_clean.clone()));
                 let proj_id = format!("proj-{}", h.project_key.to_lowercase());
 
                 let _ = tx.execute(
@@ -235,7 +225,9 @@ pub fn import_compact(options: &ImportOptions) -> Result<ImportResult, AppError>
 
             // Justification: committing transactions to backup-prompts.db during import; failure returns early
             if let Err(e) = tx.commit() {
-                return Err(AppError::Config(format!("Failed to commit import transaction to backup-prompts.db: {e}")));
+                return Err(AppError::Config(format!(
+                    "Failed to commit import transaction to backup-prompts.db: {e}"
+                )));
             }
         }
     }

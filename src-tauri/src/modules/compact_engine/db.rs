@@ -89,8 +89,9 @@ pub fn init_compact_schema(conn: &Connection) -> Result<(), AppError> {
 pub fn connect_compact_db(path: &Path, is_create: bool) -> Result<Connection, AppError> {
     if is_create {
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| AppError::Config(format!("Failed to create directory {parent:?}: {e}")))?;
+            fs::create_dir_all(parent).map_err(|e| {
+                AppError::Config(format!("Failed to create directory {parent:?}: {e}"))
+            })?;
         }
     }
 
@@ -105,8 +106,11 @@ pub fn connect_compact_db(path: &Path, is_create: bool) -> Result<Connection, Ap
 pub fn write_compact_db(path: &Path, data: &CompactExportData) -> Result<(), AppError> {
     // If destination already exists, remove it first to ensure clean snapshot
     if path.exists() {
-        fs::remove_file(path)
-            .map_err(|e| AppError::Config(format!("Failed to remove existing compact DB {path:?}: {e}")))?;
+        fs::remove_file(path).map_err(|e| {
+            AppError::Config(format!(
+                "Failed to remove existing compact DB {path:?}: {e}"
+            ))
+        })?;
     }
 
     let mut conn = connect_compact_db(path, true)?;
@@ -220,7 +224,9 @@ pub fn write_compact_db(path: &Path, data: &CompactExportData) -> Result<(), App
 /// Reads a standalone compact SQLite database file into `CompactExportData`.
 pub fn read_compact_db(path: &Path) -> Result<CompactExportData, AppError> {
     if !path.exists() {
-        return Err(AppError::Config(format!("Compact database file not found: {path:?}")));
+        return Err(AppError::Config(format!(
+            "Compact database file not found: {path:?}"
+        )));
     }
 
     let conn = Connection::open_with_flags(

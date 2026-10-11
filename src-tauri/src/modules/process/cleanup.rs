@@ -312,46 +312,58 @@ pub fn exit_app_fully(app_handle: &tauri::AppHandle) -> ! {
     use tauri::Manager;
     tracing::info!("[Shutdown] Initiating clean and complete application shutdown...");
     let app = app_handle.clone();
-    tauri::async_runtime::block_on(async {
-        // 1. Terminate cloudflared tunnel subprocess
-        if let Some(cf_state) = app.try_state::<crate::commands::cloudflared::CloudflaredState>() {
-            // Justification: best-effort guarded wait; a timeout or inner failure is logged
-            crate::error::record_ignored(
-                tokio::time::timeout(Duration::from_millis(500), cf_state.stop()).await,
-                "stop cloudflared",
-            );
-        }
 
-        // 2. Stop Admin Server & Proxy Services
-        if let Some(state) = app.try_state::<crate::commands::proxy::ProxyServiceState>() {
-            if let Ok(mut lock) =
-                tokio::time::timeout(Duration::from_millis(500), state.admin_server.write()).await
+    // Spawn dedicated OS thread for cleanup to completely avoid Tokio runtime re-entrancy panics
+    // when invoked from async IPC command handlers or Tokio worker pools.
+    let cleanup_thread = std::thread::spawn(move || {
+        let _ = tauri::async_runtime::block_on(async {
+            // 1. Terminate cloudflared tunnel subprocess
+            if let Some(cf_state) =
+                app.try_state::<crate::commands::cloudflared::CloudflaredState>()
             {
-                if let Some(admin) = lock.take() {
-                    admin.stop().await;
+                // Justification: best-effort guarded wait; a timeout or inner failure is logged
+                crate::error::record_ignored(
+                    tokio::time::timeout(Duration::from_millis(400), cf_state.stop()).await,
+                    "stop cloudflared",
+                );
+            }
+
+            // 2. Stop Admin Server & Proxy Services
+            if let Some(state) = app.try_state::<crate::commands::proxy::ProxyServiceState>() {
+                if let Ok(mut lock) =
+                    tokio::time::timeout(Duration::from_millis(400), state.admin_server.write())
+                        .await
+                {
+                    if let Some(admin) = lock.take() {
+                        admin.stop().await;
+                    }
+                }
+                if let Ok(mut lock) =
+                    tokio::time::timeout(Duration::from_millis(400), state.instance.write()).await
+                {
+                    if let Some(inst) = lock.take() {
+                        // Justification: best-effort guarded wait; a timeout or inner failure is logged
+                        crate::error::record_ignored(
+                            tokio::time::timeout(
+                                Duration::from_millis(300),
+                                inst.token_manager
+                                    .graceful_shutdown(Duration::from_millis(200)),
+                            )
+                            .await,
+                            "token manager graceful shutdown",
+                        );
+                        inst.axum_server.set_running(false).await;
+                        inst.axum_server.stop();
+                    }
                 }
             }
-            if let Ok(mut lock) =
-                tokio::time::timeout(Duration::from_millis(500), state.instance.write()).await
-            {
-                if let Some(inst) = lock.take() {
-                    // Justification: best-effort guarded wait; a timeout or inner failure is logged
-                    crate::error::record_ignored(
-                        tokio::time::timeout(
-                            Duration::from_millis(400),
-                            inst.token_manager
-                                .graceful_shutdown(Duration::from_millis(300)),
-                        )
-                        .await,
-                        "token manager graceful shutdown",
-                    );
-                    inst.axum_server.set_running(false).await;
-                    inst.axum_server.stop();
-                }
-            }
-        }
+        });
+        tracing::info!("[Shutdown] Background services gracefully terminated.");
+        std::process::exit(0);
     });
 
+    // Hard fallback: wait up to 900ms for graceful cleanup; if hung or blocked, exit immediately
+    let _ = cleanup_thread.join();
     tracing::info!("[Shutdown] Application terminating OS process cleanly (exit code 0).");
     std::process::exit(0);
 }

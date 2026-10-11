@@ -247,15 +247,34 @@ pub(crate) fn detect_legacy_signature(root: &Value) -> Option<(KnownDataType, Va
             || (map.get("conversations").is_some() && map.get("runningPrompts").is_some())
             || (map.get("conversations").is_some() && map.get("running_prompts").is_some())
         {
-            let p_count = map.get("pinnedProjects").or_else(|| map.get("pinned_projects"))
-                .and_then(|p| p.as_array()).map(|a| a.len()).unwrap_or(0);
-            let c_count = map.get("conversations")
-                .and_then(|c| c.as_array()).map(|a| a.len()).unwrap_or(0);
-            let r_count = map.get("runningPrompts").or_else(|| map.get("running_prompts"))
-                .and_then(|r| r.as_array()).map(|a| a.len()).unwrap_or(0);
-            let h_count = map.get("promptHistory").or_else(|| map.get("prompt_history"))
-                .and_then(|h| h.as_array()).map(|a| a.len()).unwrap_or(0);
-            return Some((KnownDataType::CompactExport, root.clone(), p_count + c_count + r_count + h_count));
+            let p_count = map
+                .get("pinnedProjects")
+                .or_else(|| map.get("pinned_projects"))
+                .and_then(|p| p.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0);
+            let c_count = map
+                .get("conversations")
+                .and_then(|c| c.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0);
+            let r_count = map
+                .get("runningPrompts")
+                .or_else(|| map.get("running_prompts"))
+                .and_then(|r| r.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0);
+            let h_count = map
+                .get("promptHistory")
+                .or_else(|| map.get("prompt_history"))
+                .and_then(|h| h.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0);
+            return Some((
+                KnownDataType::CompactExport,
+                root.clone(),
+                p_count + c_count + r_count + h_count,
+            ));
         }
     } else if let Value::Array(arr) = root {
         if arr

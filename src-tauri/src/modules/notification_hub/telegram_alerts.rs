@@ -1,3 +1,6 @@
+use std::path::Path;
+use std::time::Duration;
+
 use crate::modules::email_watcher;
 use crate::modules::telegram_inbound;
 
@@ -98,22 +101,78 @@ pub(crate) async fn dispatch_telegram_switch_alert(
         (None, None) => "preserved (SQLite split db)".to_string(),
     };
 
-    let (prompt_preview_text, prompt_words_count) =
+    // Extract active running prompt and any associated images for this instance
+    let (prompt_preview_text, prompt_words_count, full_prompt_content, detected_images) =
         if let Ok(all_prompts) = crate::modules::repo_db::list_all_prompts() {
-            if let Some(p) = all_prompts.into_iter().find(|p| {
-                p.status == "running" || p.status == "backed_up" || p.status == "dispatched"
-            }) {
-                extract_words_preview(&p.prompt_content, 200)
+            let matched_prompt = all_prompts.into_iter().find(|p| {
+                (p.status == "running" || p.status == "backed_up" || p.status == "dispatched")
+                    && (p.instance_id.eq_ignore_ascii_case(&details.instance_name)
+                        || p.instance_id.eq_ignore_ascii_case(&details.instance_id)
+                        || (details.instance_id == "default"
+                            && (p.instance_id.is_empty() || p.instance_id == "default")))
+            });
+
+            if let Some(p) = matched_prompt {
+                let (_, images) =
+                    crate::modules::repo_db::extract_image_payload_or_path(&p.prompt_content);
+                let (preview, words) = extract_words_preview(&p.prompt_content, 200);
+                (preview, words, p.prompt_content, images)
             } else {
-                (String::new(), 0)
+                (String::new(), 0, String::new(), Vec::new())
             }
         } else {
-            (String::new(), 0)
+            (String::new(), 0, String::new(), Vec::new())
         };
+
+    // Resolve or upload detected images to free CDN
+    let mut resolved_image_urls: Vec<String> = Vec::new();
+    for img_ref in &detected_images {
+        let trimmed = img_ref.trim();
+        if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+            resolved_image_urls.push(trimmed.to_string());
+        } else {
+            let path = Path::new(trimmed);
+            if path.exists() {
+                // Attempt cached lookup or upload with short timeout
+                if let Ok(url_res) = tokio::time::timeout(
+                    Duration::from_secs(3),
+                    telegram_inbound::upload_local_image_file(path),
+                )
+                .await
+                {
+                    if let Ok(public_url) = url_res {
+                        resolved_image_urls.push(public_url);
+                    }
+                }
+            }
+        }
+    }
+
+    let attached_images_section = if !resolved_image_urls.is_empty() {
+        let mut links = Vec::new();
+        for (idx, url) in resolved_image_urls.iter().enumerate() {
+            links.push(format!("<a href=\"{}\">🖼️ Image #{}</a>", url, idx + 1));
+        }
+        format!(
+            "\n🖼️ <b>Attached Media ({}):</b> {}\n",
+            resolved_image_urls.len(),
+            links.join(" &bull; ")
+        )
+    } else {
+        String::new()
+    };
+
+    let telemetry_banner = format!(
+        "🖥️ <b>Machine:</b> <code>{}</code> (<code>{}</code>) | 🏷️ <b>Instance:</b> <code>{}</code> | 👤 <b>Bound:</b> <code>{}</code>",
+        escape_telegram_html(&m_name),
+        escape_telegram_html(&m_ip),
+        escape_telegram_html(&details.instance_name),
+        escape_telegram_html(&details.selected_email)
+    );
 
     let prompt_section = if !prompt_preview_text.is_empty() {
         format!(
-            "\n💬 <b>Active Prompt:</b> ({} words)\n<pre><code>{}</code></pre>\n",
+            "\n<blockquote expandable><b>💬 Active Prompt ({} words):</b>\n<code>{}</code></blockquote>\n",
             prompt_words_count,
             crate::modules::telegram_inbound::clean_for_telegram_html(&prompt_preview_text, 1500)
         )
@@ -122,22 +181,26 @@ pub(crate) async fn dispatch_telegram_switch_alert(
     };
 
     let text = format!(
-        "🔄 <b>Antigravity Manager: Account Switched</b>\n\
-        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
-        📦 <b>Version:</b> <code>{}</code>\n\
-        👤 <b>Previous Account:</b> <code>{}</code>\n\
-        📉 <b>Previous Balances:</b> <code>4h: {} | Weekly: {}</code>\n\
-        ✅ <b>Selected Account:</b> <code>{}</code>\n\
-        📈 <b>Target Balances:</b> <code>4h: {} | Weekly: {}</code>\n\
-        ⚙️ <b>Threshold:</b> <code>{}</code>\n\
-        💻 <b>Target Instance:</b> <code>{}</code> ({})\n\
-        📁 <b>Projects:</b> <code>{}</code>\n\
-        💾 <b>Prompt Backup:</b> <code>{}</code>\n\
-        🏷️ <b>Trigger:</b> {}\n\
-        📝 <b>Reason:</b> {}\n\
-        🖥️ <b>Host:</b> <code>{}</code> ({})\n\
-        ⏰ <b>Timestamp:</b> {}{}",
-        escape_telegram_html(&pkg_ver),
+        "🔄 <b>Antigravity Manager: Account Rotation</b> ⚡\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        {}\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        <b>📊 QUOTA DELTA &amp; ROTATION STATUS</b>\n\
+        <blockquote>\
+        • <b>Previous Account:</b> <code>{}</code>\n\
+        &nbsp;&nbsp;└ <i>Balances:</i> <code>4h: {} | Weekly: {}</code>\n\
+        • <b>Selected Account:</b> <code>{}</code>\n\
+        &nbsp;&nbsp;└ <i>Balances:</i> <code>4h: {} | Weekly: {}</code>\n\
+        • <b>Threshold Guard:</b> <code>{}</code> (Trigger: <i>{}</i>)\
+        </blockquote>\n\n\
+        <b>📁 WORKSPACE &amp; SYSTEM CONTEXT</b>\n\
+        <blockquote>\
+        • <b>Projects:</b> <code>{}</code>\n\
+        • <b>Prompt Vault:</b> <code>{}</code>\n\
+        • <b>Event Reason:</b> <i>{}</i>\n\
+        • <b>Version &amp; Timestamp:</b> <code>{}</code> | <code>{}</code>\
+        </blockquote>{}{}",
+        telemetry_banner,
         escape_telegram_html(&from_display),
         escape_telegram_html(&prev_4h_str),
         escape_telegram_html(&prev_weekly_str),
@@ -145,31 +208,23 @@ pub(crate) async fn dispatch_telegram_switch_alert(
         escape_telegram_html(&target_4h_str),
         escape_telegram_html(&target_weekly_str),
         escape_telegram_html(&threshold_display),
-        escape_telegram_html(&details.instance_name),
-        escape_telegram_html(&details.instance_id),
+        escape_telegram_html(&trigger_label),
         escape_telegram_html(&projects_display),
         escape_telegram_html(&backup_stats),
-        escape_telegram_html(&trigger_label),
         escape_telegram_html(&details.reason),
-        escape_telegram_html(&m_name),
-        escape_telegram_html(&m_ip),
+        escape_telegram_html(&pkg_ver),
         escape_telegram_html(&now_str),
+        attached_images_section,
         prompt_section
     );
 
-    let reply_markup = if !prompt_preview_text.is_empty() {
-        Some(serde_json::json!({
-            "inline_keyboard": [
-                [
-                    {
-                        "text": "📋 Copy Prompt",
-                        "copy_text": {
-                            "text": prompt_preview_text
-                        }
-                    }
-                ]
-            ]
-        }))
+    let reply_markup = if !full_prompt_content.trim().is_empty() || !resolved_image_urls.is_empty()
+    {
+        Some(telegram_inbound::build_copy_prompt_reply_markup(
+            &full_prompt_content,
+            &resolved_image_urls,
+            None,
+        ))
     } else {
         None
     };

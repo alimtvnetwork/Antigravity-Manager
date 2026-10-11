@@ -34,12 +34,16 @@ mod tests {
         assert_eq!(rel, "Antigravity-Manager/src-tauri");
 
         let reanchored = from_relative_work_path(&rel, base);
-        assert_eq!(clean_path_str(&reanchored), "D:/work/Antigravity-Manager/src-tauri");
+        assert_eq!(
+            clean_path_str(&reanchored),
+            "D:/work/Antigravity-Manager/src-tauri"
+        );
     }
 
     #[test]
     fn test_compact_db_roundtrip() {
-        let temp_dir = std::env::temp_dir().join(format!("agm_test_compact_{}", uuid::Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("agm_test_compact_{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&temp_dir).expect("create temp dir");
         let db_file = temp_dir.join("test-compact.db");
 

@@ -167,9 +167,8 @@ pub fn init_db(conn: &Connection) -> Result<(), rusqlite::Error> {
 
 /// Ingest an incoming fleet sync JSON payload from any transport channel (e.g. Email, Telegram)
 pub fn ingest_fleet_sync_payload(payload_json: &str, transport: &str) -> Result<(), AppError> {
-    let mut payload: FleetSyncPayload = serde_json::from_str(payload_json).map_err(|e| {
-        AppError::Config(format!("Failed to deserialize fleet sync payload: {e}"))
-    })?;
+    let mut payload: FleetSyncPayload = serde_json::from_str(payload_json)
+        .map_err(|e| AppError::Config(format!("Failed to deserialize fleet sync payload: {e}")))?;
 
     if !transport.trim().is_empty() {
         payload.node.sync_transport = transport.trim().to_string();
@@ -365,17 +364,16 @@ pub fn generate_local_fleet_sync_payload() -> Result<FleetSyncPayload, AppError>
     match crate::modules::repo_db::project_queries::list_running_projects() {
         Ok(projects) => {
             for p in projects {
-                let prompts =
-                    crate::modules::repo_db::discover_running_prompts_from_antigravity(
-                        &p.instance_id,
-                    );
+                let prompts = crate::modules::repo_db::discover_running_prompts_from_antigravity(
+                    &p.instance_id,
+                );
                 let running_count = prompts
                     .iter()
                     .filter(|pr| pr.status == "running" || pr.status == "executing")
                     .count() as u32;
-                let snippet = prompts.first().map(|pr| {
-                    pr.prompt_content.chars().take(120).collect::<String>()
-                });
+                let snippet = prompts
+                    .first()
+                    .map(|pr| pr.prompt_content.chars().take(120).collect::<String>());
 
                 workspaces.push(FleetWorkspaceSync {
                     project_id: p.id,
@@ -485,10 +483,7 @@ fn get_local_ip() -> String {
             },
             Err(e) => {
                 // Justification: best-effort network probe fallback to loopback
-                crate::error::record_ignored(
-                    Err::<(), _>(&e),
-                    "connect udp socket for local ip",
-                );
+                crate::error::record_ignored(Err::<(), _>(&e), "connect udp socket for local ip");
             }
         },
         Err(e) => {

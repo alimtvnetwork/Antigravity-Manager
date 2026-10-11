@@ -24,11 +24,21 @@ pub fn gather_compact_data(
 
     // 1. Gather Pinned Projects (if included)
     if is_pinned_included {
-        gather_pinned_projects(work_dir, is_relative, &mut pinned_projects, &mut project_key_map)?;
+        gather_pinned_projects(
+            work_dir,
+            is_relative,
+            &mut pinned_projects,
+            &mut project_key_map,
+        )?;
     }
 
     // 2. Gather Running Prompts (FIFO order)
-    gather_running_prompts(work_dir, is_relative, &project_key_map, &mut running_prompts)?;
+    gather_running_prompts(
+        work_dir,
+        is_relative,
+        &project_key_map,
+        &mut running_prompts,
+    )?;
 
     // 3. Gather Conversations
     gather_conversations(work_dir, is_relative, &project_key_map, &mut conversations)?;
@@ -78,7 +88,8 @@ fn gather_pinned_projects(
                 &repo_db_path,
                 rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
             ) {
-                let sql = "SELECT project_key, seq_id, project_id, repo_name, repo_path, updated_at 
+                let sql =
+                    "SELECT project_key, seq_id, project_id, repo_name, repo_path, updated_at 
                            FROM agm_project_sequences ORDER BY seq_id ASC";
                 if let Ok(mut stmt) = conn.prepare(sql) {
                     if let Ok(rows) = stmt.query_map([], |row| {
@@ -99,7 +110,8 @@ fn gather_pinned_projects(
                             seen_keys.insert(pkey.clone());
 
                             let rel_path = if is_relative {
-                                to_relative_work_path(&PathBuf::from(&rpath), work_dir).unwrap_or(rpath.clone())
+                                to_relative_work_path(&PathBuf::from(&rpath), work_dir)
+                                    .unwrap_or(rpath.clone())
                             } else {
                                 clean_path_str(&PathBuf::from(&rpath))
                             };
@@ -148,7 +160,8 @@ fn gather_pinned_projects(
                             seen_keys.insert(pkey.clone());
 
                             let rel_path = if is_relative {
-                                to_relative_work_path(&PathBuf::from(&rpath), work_dir).unwrap_or(rpath.clone())
+                                to_relative_work_path(&PathBuf::from(&rpath), work_dir)
+                                    .unwrap_or(rpath.clone())
                             } else {
                                 clean_rp.clone()
                             };
@@ -182,11 +195,15 @@ fn gather_pinned_projects(
         if let Some(gitmap_dir) = WorkDirResolver::query_gitmap_default_workdir() {
             // Find gitmap.db path
             if let Some(local_app_data) = dirs::data_local_dir() {
-                let db_path = local_app_data.join("gitmap-cli").join("data").join("gitmap.db");
+                let db_path = local_app_data
+                    .join("gitmap-cli")
+                    .join("data")
+                    .join("gitmap.db");
                 if db_path.exists() {
                     if let Ok(conn) = Connection::open_with_flags(
                         &db_path,
-                        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+                        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                            | rusqlite::OpenFlags::SQLITE_OPEN_URI,
                     ) {
                         let sql = "SELECT project_id, project_name, workspace_path, sequence_num, created_at 
                                    FROM AgyProjectSequence ORDER BY sequence_num ASC";
@@ -209,13 +226,17 @@ fn gather_pinned_projects(
                                     seen_keys.insert(pkey.clone());
 
                                     let rel_path = if is_relative {
-                                        to_relative_work_path(&PathBuf::from(&rpath), work_dir).unwrap_or(rpath.clone())
+                                        to_relative_work_path(&PathBuf::from(&rpath), work_dir)
+                                            .unwrap_or(rpath.clone())
                                     } else {
                                         clean_path_str(&PathBuf::from(&rpath))
                                     };
 
                                     key_map.insert(pid.clone(), pkey.clone());
-                                    key_map.insert(clean_path_str(&PathBuf::from(&rpath)), pkey.clone());
+                                    key_map.insert(
+                                        clean_path_str(&PathBuf::from(&rpath)),
+                                        pkey.clone(),
+                                    );
                                     key_map.insert(rname.clone(), pkey.clone());
 
                                     out.push(CompactPinnedProject {
@@ -274,7 +295,18 @@ fn gather_running_prompts(
                         ))
                     }) {
                         for item in rows.flatten() {
-                            let (id, pid, rpath, content, model, sess_id, status, c_epoch, u_epoch, img) = item;
+                            let (
+                                id,
+                                pid,
+                                rpath,
+                                content,
+                                model,
+                                sess_id,
+                                status,
+                                c_epoch,
+                                u_epoch,
+                                img,
+                            ) = item;
                             if seen_ids.contains(&id) {
                                 continue;
                             }
@@ -314,7 +346,8 @@ fn gather_running_prompts(
     }
 
     // Source B: `prompt_backups` in backup-prompts.db where is_restored = 0
-    if let Ok(backup_db_path) = crate::modules::backup_prompts_db::get_backup_prompts_db_path(None) {
+    if let Ok(backup_db_path) = crate::modules::backup_prompts_db::get_backup_prompts_db_path(None)
+    {
         if backup_db_path.exists() {
             if let Ok(conn) = Connection::open_with_flags(
                 &backup_db_path,
@@ -480,7 +513,8 @@ fn gather_conversations(
                                         pkey = k.clone();
                                     }
                                     rel_path = if is_relative {
-                                        to_relative_work_path(&PathBuf::from(&raw_path), work_dir).unwrap_or(raw_path)
+                                        to_relative_work_path(&PathBuf::from(&raw_path), work_dir)
+                                            .unwrap_or(raw_path)
                                     } else {
                                         clean_p
                                     };
@@ -514,7 +548,8 @@ fn gather_prompt_history(
     key_map: &HashMap<String, String>,
     out: &mut Vec<CompactPromptHistory>,
 ) -> Result<(), AppError> {
-    if let Ok(backup_db_path) = crate::modules::backup_prompts_db::get_backup_prompts_db_path(None) {
+    if let Ok(backup_db_path) = crate::modules::backup_prompts_db::get_backup_prompts_db_path(None)
+    {
         if backup_db_path.exists() {
             if let Ok(conn) = Connection::open_with_flags(
                 &backup_db_path,
@@ -536,7 +571,8 @@ fn gather_prompt_history(
                         ))
                     }) {
                         for item in rows.flatten() {
-                            let (id, _pid, pname, ppath, conv_id, text, c_epoch, is_restored) = item;
+                            let (id, _pid, pname, ppath, conv_id, text, c_epoch, is_restored) =
+                                item;
                             let pkey = key_map
                                 .get(&clean_path_str(&PathBuf::from(&ppath)))
                                 .or_else(|| key_map.get(&pname))
@@ -615,8 +651,9 @@ pub fn export_to_json_envelope(
 ) -> Result<(), AppError> {
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent)
-                .map_err(|e| AppError::Config(format!("Failed to create export folder {parent:?}: {e}")))?;
+            fs::create_dir_all(parent).map_err(|e| {
+                AppError::Config(format!("Failed to create export folder {parent:?}: {e}"))
+            })?;
         }
     }
 
@@ -649,9 +686,13 @@ pub fn export_to_json_envelope(
         )
         .with_source("agm-cli");
 
-    let filename = path.file_name().and_then(|f| f.to_str()).unwrap_or("export.json");
+    let filename = path
+        .file_name()
+        .and_then(|f| f.to_str())
+        .unwrap_or("export.json");
     envelope.attributes.import_command = Some(format!("agm import-compact \"{}\" -y", filename));
-    envelope.attributes.export_command = Some(format!("agm export-compact --file \"{}\"", filename));
+    envelope.attributes.export_command =
+        Some(format!("agm export-compact --file \"{}\"", filename));
     envelope.attributes.help_command = Some(format!("agm which-format \"{}\"", filename));
 
     let json_bytes = serde_json::to_string_pretty(&envelope)

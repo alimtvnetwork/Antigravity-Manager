@@ -33,10 +33,7 @@ pub fn create_instance(
                     e
                 );
             }
-            crate::error::record_ignored(
-                switch_res,
-                "create_instance: switch_account_to_instance",
-            ); // Justification: best-effort account binding after cloning; instance was created successfully
+            crate::error::record_ignored(switch_res, "create_instance: switch_account_to_instance"); // Justification: best-effort account binding after cloning; instance was created successfully
             if let Ok(acc) = crate::modules::account::load_account(acc_id) {
                 cfg.bound_account_id = Some(acc.id);
                 cfg.bound_email = Some(acc.email);

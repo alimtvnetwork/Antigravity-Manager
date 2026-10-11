@@ -124,15 +124,31 @@ fn get_gitmap_db_candidate_paths() -> Vec<PathBuf> {
     let mut candidates = Vec::new();
 
     if let Some(local_app_data) = dirs::data_local_dir() {
-        candidates.push(local_app_data.join("gitmap-cli").join("data").join("gitmap.db"));
+        candidates.push(
+            local_app_data
+                .join("gitmap-cli")
+                .join("data")
+                .join("gitmap.db"),
+        );
     }
     #[cfg(target_os = "windows")]
     if let Ok(local_env) = std::env::var("LOCALAPPDATA") {
-        candidates.push(PathBuf::from(local_env).join("gitmap-cli").join("data").join("gitmap.db"));
+        candidates.push(
+            PathBuf::from(local_env)
+                .join("gitmap-cli")
+                .join("data")
+                .join("gitmap.db"),
+        );
     }
     if let Some(home) = dirs::home_dir() {
         candidates.push(home.join(".gitmap").join("gitmap.db"));
-        candidates.push(home.join(".local").join("share").join("gitmap-cli").join("data").join("gitmap.db"));
+        candidates.push(
+            home.join(".local")
+                .join("share")
+                .join("gitmap-cli")
+                .join("data")
+                .join("gitmap.db"),
+        );
     }
     candidates.push(PathBuf::from("cli").join("db").join("gitmap.db"));
     candidates.push(PathBuf::from("data").join("gitmap.db"));
@@ -153,9 +169,7 @@ pub fn normalize_canonical_path(path: &Path) -> PathBuf {
 
 /// Cleans a path string: strips Windows UNC prefix and normalizes backslashes to forward slashes.
 pub fn clean_path_string(input: &str) -> String {
-    let stripped = input
-        .trim_start_matches(r"\\?\")
-        .trim_start_matches("//?/");
+    let stripped = input.trim_start_matches(r"\\?\").trim_start_matches("//?/");
     let replaced = stripped.replace('\\', "/");
     let trimmed = replaced.trim_end_matches('/');
     if trimmed.is_empty() {
@@ -191,7 +205,9 @@ pub fn to_relative_work_path(abs_path: &Path, work_dir: &Path) -> Result<String,
 
     let work_prefix = format!("{}/", work_clean);
     #[cfg(target_os = "windows")]
-    let starts_with_work = target_clean.to_lowercase().starts_with(&work_prefix.to_lowercase());
+    let starts_with_work = target_clean
+        .to_lowercase()
+        .starts_with(&work_prefix.to_lowercase());
     #[cfg(not(target_os = "windows"))]
     let starts_with_work = target_clean.starts_with(&work_prefix);
 
@@ -232,7 +248,10 @@ pub fn from_relative_work_path(rel_path: &str, work_dir: &Path) -> PathBuf {
     };
 
     let p = Path::new(path_part);
-    if p.is_absolute() || path_part.contains(':') || (path_part.starts_with('/') && !cfg!(target_os = "windows")) {
+    if p.is_absolute()
+        || path_part.contains(':')
+        || (path_part.starts_with('/') && !cfg!(target_os = "windows"))
+    {
         PathBuf::from(path_part)
     } else {
         work_dir.join(path_part)
@@ -261,7 +280,10 @@ mod tests {
 
     #[test]
     fn test_clean_path_string() {
-        assert_eq!(clean_path_string(r"D:\work\Antigravity-Manager\"), "D:/work/Antigravity-Manager");
+        assert_eq!(
+            clean_path_string(r"D:\work\Antigravity-Manager\"),
+            "D:/work/Antigravity-Manager"
+        );
         assert_eq!(clean_path_string(r"\\?\D:\work\app"), "D:/work/app");
     }
 
@@ -288,7 +310,10 @@ mod tests {
 
     #[test]
     fn test_template_conversions() {
-        assert_eq!(to_template_path("Antigravity-Manager/src"), "${workDir}/Antigravity-Manager/src");
+        assert_eq!(
+            to_template_path("Antigravity-Manager/src"),
+            "${workDir}/Antigravity-Manager/src"
+        );
         assert_eq!(to_template_path("."), "${workDir}");
     }
 }

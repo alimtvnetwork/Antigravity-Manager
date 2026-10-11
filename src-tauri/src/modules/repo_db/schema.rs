@@ -168,6 +168,29 @@ pub(crate) fn init_tables(conn: &Connection) -> Result<(), String> {
     )
     .map_err(|e| format!("Failed to create prompt_tree_cache table: {}", e))?;
 
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS media_vault (
+            id TEXT PRIMARY KEY,
+            sha256 TEXT NOT NULL UNIQUE,
+            local_path TEXT,
+            public_url TEXT,
+            telegram_file_id TEXT,
+            mime_type TEXT,
+            created_at INTEGER NOT NULL
+        )",
+        [],
+    )
+    .map_err(|e| format!("Failed to create media_vault table: {}", e))?;
+
+    // Justification: lookup index is a performance accelerator; queries work without it
+    crate::error::record_ignored(
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_media_vault_sha256 ON media_vault(sha256)",
+            [],
+        ),
+        "create idx_media_vault_sha256 index",
+    );
+
     // Justification: lookup index is a performance accelerator; queries work without it
     crate::error::record_ignored(
         conn.execute(

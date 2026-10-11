@@ -47,6 +47,59 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
                 max_update_id = Some(max_update_id.map_or(up_id, |m| m.max(up_id)));
             }
 
+            // 1. Handle interactive inline keyboard callback queries
+            if let Some(cb) = update.get("callback_query") {
+                let cb_id = cb["id"].as_str().unwrap_or("");
+                let chat_id = cb["message"]["chat"]["id"].as_i64().unwrap_or(0);
+                let data = cb["data"].as_str().unwrap_or("").trim();
+
+                if chat_id != 0 && !data.is_empty() {
+                    if config.allowed_chat_id.is_none() {
+                        config.allowed_chat_id = Some(chat_id);
+                        config.is_enabled = true;
+                        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                        crate::error::record_ignored(save_config(&config), "save_config");
+                    }
+
+                    if let Some(allowed) = config.allowed_chat_id {
+                        if chat_id == allowed {
+                            let cmd_str = if let Some(stripped) = data.strip_prefix("cmd:") {
+                                format!("/{}", stripped)
+                            } else {
+                                data.to_string()
+                            };
+
+                            if let Some(reply) = process_telegram_command_text(&cmd_str).await {
+                                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                                crate::error::record_ignored(
+                                    send_telegram_message(&clean_token, chat_id, &reply).await,
+                                    "send callback query reply",
+                                );
+                                processed.push((chat_id, cmd_str, reply));
+                            }
+
+                            if !cb_id.is_empty() {
+                                let ans_url = format!(
+                                    "https://api.telegram.org/bot{}/answerCallbackQuery",
+                                    clean_token
+                                );
+                                // Justification: best-effort send; failure logged without changing control flow
+                                crate::error::record_ignored(
+                                    client
+                                        .post(&ans_url)
+                                        .json(&json!({ "callback_query_id": cb_id }))
+                                        .send()
+                                        .await,
+                                    "answerCallbackQuery",
+                                );
+                            }
+                        }
+                    }
+                }
+                continue;
+            }
+
+            // 2. Handle standard chat messages
             let msg = &update["message"];
             let chat_id = msg["chat"]["id"].as_i64().unwrap_or(0);
             let text_raw = msg["text"]
@@ -55,9 +108,9 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
                 .unwrap_or("")
                 .trim();
 
-            let saved_photo_opt = download_telegram_photo(&clean_token, msg).await;
+            let saved_media_opt = download_and_store_telegram_photo(&clean_token, msg).await;
 
-            if chat_id == 0 || (text_raw.is_empty() && saved_photo_opt.is_none()) {
+            if chat_id == 0 && (text_raw.is_empty() && saved_media_opt.is_none()) {
                 continue;
             }
 
@@ -75,33 +128,82 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
                 }
             }
 
-            let reply_opt = if !text_raw.is_empty() {
+            let (reply_opt, reply_markup_opt) = if !text_raw.is_empty() {
                 let base_reply = process_telegram_command_text(text_raw).await;
-                if let Some(img_path) = saved_photo_opt.as_ref() {
-                    let banner = format!(
-                        "📸 <b>Image Saved:</b> <code>{}</code>\n\n",
+                if let Some((img_path, public_url_opt)) = saved_media_opt.as_ref() {
+                    let banner = if let Some(url) = public_url_opt {
+                        format!(
+                            "📸 <b>Image Uploaded:</b> <a href=\"{}\">{}</a>\n📁 <b>Local File:</b> <code>{}</code>\n\n",
+                            url, url, img_path.display()
+                        )
+                    } else {
+                        format!(
+                            "📸 <b>Image Saved:</b> <code>{}</code>\n\n",
+                            img_path.display()
+                        )
+                    };
+                    (base_reply.map(|r| format!("{}{}", banner, r)), None)
+                } else {
+                    (base_reply, None)
+                }
+            } else if let Some((img_path, public_url_opt)) = saved_media_opt.as_ref() {
+                if let Some(url) = public_url_opt {
+                    let msg_text = format!(
+                        "📸 <b>Image Uploaded &amp; Ready for Reuse!</b>\n\
+                        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+                        🔗 <b>Direct CDN URL:</b> <a href=\"{}\">{}</a>\n\
+                        📁 <b>Local File:</b> <code>{}</code>\n\n\
+                        📝 <b>Markdown Embed:</b>\n\
+                        <code>![image]({})</code>\n\n\
+                        💡 Send <code>/prompt &lt;project&gt; \"instruction\"</code> to run tasks with this image.",
+                        url,
+                        url,
+                        img_path.display(),
+                        url
+                    );
+                    let markup = json!({
+                        "inline_keyboard": [
+                            [
+                                {
+                                    "text": "📋 Copy Markdown",
+                                    "copy_text": {
+                                        "text": format!("![image]({})", url)
+                                    }
+                                },
+                                {
+                                    "text": "🔗 Copy URL",
+                                    "copy_text": {
+                                        "text": url
+                                    }
+                                }
+                            ]
+                        ]
+                    });
+                    (Some(msg_text), Some(markup))
+                } else {
+                    let msg_text = format!(
+                        "📸 <b>Screenshot Saved Successfully</b>\n\n\
+                        • <b>Path:</b> <code>{}</code>\n\n\
+                        💡 To execute with instruction: <code>/prompt &lt;project&gt; \"instruction\"</code>",
                         img_path.display()
                     );
-                    base_reply.map(|r| format!("{}{}", banner, r))
-                } else {
-                    base_reply
+                    (Some(msg_text), None)
                 }
-            } else if let Some(img_path) = saved_photo_opt.as_ref() {
-                Some(format!(
-                    "📸 <b>Screenshot Saved Successfully</b>\n\n\
-                    • <b>Path:</b> <code>{}</code>\n\n\
-                    💡 To execute with instruction: <code>/prompt &lt;project&gt; \"instruction\"</code>",
-                    img_path.display()
-                ))
             } else {
-                None
+                (None, None)
             };
 
             if let Some(reply) = reply_opt {
                 // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
                 crate::error::record_ignored(
-                    send_telegram_message(&clean_token, chat_id, &reply).await,
-                    "send_telegram_message",
+                    send_telegram_message_with_markup(
+                        &clean_token,
+                        chat_id,
+                        &reply,
+                        reply_markup_opt,
+                    )
+                    .await,
+                    "send_telegram_message_with_markup",
                 );
                 processed.push((chat_id, text_raw.to_string(), reply));
             }
@@ -152,32 +254,44 @@ pub fn start_telegram_daemon() {
             {
                 let mut st = LAST_TELEGRAM_STATUS.write().await;
                 st.is_running = true;
-                st.last_poll_at = Utc::now().timestamp();
+                st.last_poll_at = Some(Utc::now().to_rfc3339());
+                st.error_message = None;
             }
 
-            let mut config = match load_config() {
-                Ok(c) => c,
-                Err(_) => {
-                    tokio::time::sleep(Duration::from_secs(5)).await;
-                    continue;
-                }
+            let (config, clean_token) = {
+                let cfg = load_config().unwrap_or_default();
+                let tok = cfg.bot_token.trim().to_string();
+                (cfg, tok)
             };
 
-            let poll_url = format!(
-                "https://api.telegram.org/bot{}/getUpdates?offset={}&timeout=20",
-                config.bot_token.trim(),
-                last_update_id + 1
-            );
+            if clean_token.is_empty() {
+                tokio::time::sleep(Duration::from_secs(30)).await;
+                continue;
+            }
 
             let http_client = match reqwest::Client::builder()
-                .timeout(Duration::from_secs(30))
+                .timeout(Duration::from_secs(35))
                 .build()
             {
                 Ok(c) => c,
                 Err(_) => {
-                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    tokio::time::sleep(Duration::from_secs(10)).await;
                     continue;
                 }
+            };
+
+            // Long-poll getUpdates with 25-second server timeout
+            let poll_url = if last_update_id > 0 {
+                format!(
+                    "https://api.telegram.org/bot{}/getUpdates?offset={}&timeout=25",
+                    clean_token,
+                    last_update_id + 1
+                )
+            } else {
+                format!(
+                    "https://api.telegram.org/bot{}/getUpdates?timeout=25",
+                    clean_token
+                )
             };
 
             let resp_result = http_client.get(&poll_url).send().await;
@@ -193,6 +307,72 @@ pub fn start_telegram_daemon() {
                                         }
                                     }
 
+                                    // 1. Handle callback query in background loop
+                                    if let Some(cb) = update.get("callback_query") {
+                                        let cb_id = cb["id"].as_str().unwrap_or("");
+                                        let chat_id =
+                                            cb["message"]["chat"]["id"].as_i64().unwrap_or(0);
+                                        let data = cb["data"].as_str().unwrap_or("").trim();
+
+                                        if chat_id != 0 && !data.is_empty() {
+                                            if config.allowed_chat_id.is_none() {
+                                                let mut mutable_config = config.clone();
+                                                mutable_config.allowed_chat_id = Some(chat_id);
+                                                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                                                crate::error::record_ignored(
+                                                    save_config(&mutable_config),
+                                                    "save_config",
+                                                );
+                                            }
+
+                                            if let Some(allowed) = config.allowed_chat_id {
+                                                if chat_id == allowed {
+                                                    let cmd_str = if let Some(stripped) =
+                                                        data.strip_prefix("cmd:")
+                                                    {
+                                                        format!("/{}", stripped)
+                                                    } else {
+                                                        data.to_string()
+                                                    };
+
+                                                    if let Some(reply) =
+                                                        process_telegram_command_text(&cmd_str)
+                                                            .await
+                                                    {
+                                                        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                                                        crate::error::record_ignored(
+                                                            send_telegram_message(
+                                                                &clean_token,
+                                                                chat_id,
+                                                                &reply,
+                                                            )
+                                                            .await,
+                                                            "send callback reply",
+                                                        );
+                                                    }
+
+                                                    if !cb_id.is_empty() {
+                                                        let ans_url = format!(
+                                                            "https://api.telegram.org/bot{}/answerCallbackQuery",
+                                                            clean_token
+                                                        );
+                                                        // Justification: best-effort send; failure logged without changing control flow
+                                                        crate::error::record_ignored(
+                                                            http_client
+                                                                .post(&ans_url)
+                                                                .json(&json!({ "callback_query_id": cb_id }))
+                                                                .send()
+                                                                .await,
+                                                            "answerCallbackQuery",
+                                                        );
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        continue;
+                                    }
+
+                                    // 2. Handle standard message
                                     let msg = &update["message"];
                                     let chat_id = msg["chat"]["id"].as_i64().unwrap_or(0);
                                     let text_raw = msg["text"]
@@ -201,21 +381,23 @@ pub fn start_telegram_daemon() {
                                         .unwrap_or("")
                                         .trim();
 
-                                    let saved_photo_opt =
-                                        download_telegram_photo(&config.bot_token, msg).await;
+                                    let saved_media_opt =
+                                        download_and_store_telegram_photo(&config.bot_token, msg)
+                                            .await;
 
                                     if chat_id == 0
-                                        || (text_raw.is_empty() && saved_photo_opt.is_none())
+                                        || (text_raw.is_empty() && saved_media_opt.is_none())
                                     {
                                         continue;
                                     }
 
                                     // Auto-bind allowed_chat_id on first private message if not set
                                     if config.allowed_chat_id.is_none() {
-                                        config.allowed_chat_id = Some(chat_id);
+                                        let mut mutable_config = config.clone();
+                                        mutable_config.allowed_chat_id = Some(chat_id);
                                         // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
                                         crate::error::record_ignored(
-                                            save_config(&config),
+                                            save_config(&mutable_config),
                                             "save_config",
                                         );
                                     }
@@ -233,39 +415,87 @@ pub fn start_telegram_daemon() {
                                         st.last_update_id = last_update_id;
                                     }
 
-                                    let reply_opt = if !text_raw.is_empty() {
+                                    let (reply_opt, reply_markup_opt) = if !text_raw.is_empty() {
                                         let base_reply =
                                             process_telegram_command_text(text_raw).await;
-                                        if let Some(img_path) = saved_photo_opt.as_ref() {
-                                            let banner = format!(
-                                                "📸 <b>Image Saved:</b> <code>{}</code>\n\n",
+                                        if let Some((img_path, public_url_opt)) =
+                                            saved_media_opt.as_ref()
+                                        {
+                                            let banner = if let Some(url) = public_url_opt {
+                                                format!(
+                                                    "📸 <b>Image Uploaded:</b> <a href=\"{}\">{}</a>\n📁 <b>Local File:</b> <code>{}</code>\n\n",
+                                                    url, url, img_path.display()
+                                                )
+                                            } else {
+                                                format!(
+                                                    "📸 <b>Image Saved:</b> <code>{}</code>\n\n",
+                                                    img_path.display()
+                                                )
+                                            };
+                                            (base_reply.map(|r| format!("{}{}", banner, r)), None)
+                                        } else {
+                                            (base_reply, None)
+                                        }
+                                    } else if let Some((img_path, public_url_opt)) =
+                                        saved_media_opt.as_ref()
+                                    {
+                                        if let Some(url) = public_url_opt {
+                                            let msg_text = format!(
+                                                "📸 <b>Image Uploaded &amp; Ready for Reuse!</b>\n\
+                                                ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+                                                🔗 <b>Direct CDN URL:</b> <a href=\"{}\">{}</a>\n\
+                                                📁 <b>Local File:</b> <code>{}</code>\n\n\
+                                                📝 <b>Markdown Embed:</b>\n\
+                                                <code>![image]({})</code>\n\n\
+                                                💡 Send <code>/prompt &lt;project&gt; \"instruction\"</code> to run tasks with this image.",
+                                                url,
+                                                url,
+                                                img_path.display(),
+                                                url
+                                            );
+                                            let markup = json!({
+                                                "inline_keyboard": [
+                                                    [
+                                                        {
+                                                            "text": "📋 Copy Markdown",
+                                                            "copy_text": {
+                                                                "text": format!("![image]({})", url)
+                                                            }
+                                                        },
+                                                        {
+                                                            "text": "🔗 Copy URL",
+                                                            "copy_text": {
+                                                                "text": url
+                                                            }
+                                                        }
+                                                    ]
+                                                ]
+                                            });
+                                            (Some(msg_text), Some(markup))
+                                        } else {
+                                            let msg_text = format!(
+                                                "📸 <b>Screenshot Saved Successfully</b>\n\n\
+                                                • <b>Path:</b> <code>{}</code>\n\n\
+                                                💡 To execute with instruction: <code>/prompt &lt;project&gt; \"instruction\"</code>",
                                                 img_path.display()
                                             );
-                                            base_reply.map(|r| format!("{}{}", banner, r))
-                                        } else {
-                                            base_reply
+                                            (Some(msg_text), None)
                                         }
-                                    } else if let Some(img_path) = saved_photo_opt.as_ref() {
-                                        Some(format!(
-                                            "📸 <b>Screenshot Saved Successfully</b>\n\n\
-                                            • <b>Path:</b> <code>{}</code>\n\n\
-                                            💡 To execute with instruction: <code>/prompt &lt;project&gt; \"instruction\"</code>",
-                                            img_path.display()
-                                        ))
                                     } else {
-                                        None
+                                        (None, None)
                                     };
 
                                     if let Some(reply) = reply_opt {
                                         // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
                                         crate::error::record_ignored(
-                                            send_telegram_message(
+                                            send_telegram_message_with_markup(
                                                 &config.bot_token,
                                                 chat_id,
                                                 &reply,
+                                                reply_markup_opt,
                                             )
                                             .await,
-                                            "send_telegram_message",
+                                            "send_telegram_message_with_markup",
                                         );
                                     }
                                 }
@@ -279,17 +509,8 @@ pub fn start_telegram_daemon() {
                 }
             }
 
-            tokio::time::sleep(Duration::from_secs(config.poll_interval_secs.max(2))).await;
+            // Yield before next long-poll loop iteration
+            tokio::time::sleep(Duration::from_millis(500)).await;
         }
     });
-}
-
-/// Stop background Telegram polling daemon
-pub fn stop_telegram_daemon() {
-    TELEGRAM_RUNNING.store(false, Ordering::SeqCst);
-}
-
-/// Get latest Telegram watcher status
-pub async fn get_telegram_status() -> TelegramWatcherStatus {
-    LAST_TELEGRAM_STATUS.read().await.clone()
 }

@@ -75,10 +75,10 @@ pub fn restart_instance(instance_id: &str) -> AppResult<InstanceStatus> {
         ok
     };
     if !launched {
-        return Err(AppError::Process(format!(
-            "Instance '{}' relaunch did not produce a live process",
+        crate::modules::logger::log_warn(&format!(
+            "[Instance] Instance '{}' did not confirm running within 8s; process may still be initializing",
             resolved_id
-        )));
+        ));
     }
 
     // 7. Return updated InstanceStatus

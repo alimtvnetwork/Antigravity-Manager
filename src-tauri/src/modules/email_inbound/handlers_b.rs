@@ -252,11 +252,64 @@ pub(crate) fn handle_status_query(
         status = "skipped".to_string();
         result_summary = format!("Status target mismatch: {}", target);
     } else {
+        let reg = crate::modules::instance::load_registry().unwrap_or_default();
+        let active_inst = reg
+            .instances
+            .iter()
+            .find(|i| i.id == reg.active_instance_id || i.is_default);
+        let active_inst_name = active_inst.map(|i| i.name.as_str()).unwrap_or("default");
+        let active_inst_id = active_inst.map(|i| i.id.as_str()).unwrap_or("default");
+        let active_bound_email = active_inst
+            .and_then(|i| i.bound_email.as_deref())
+            .unwrap_or("none");
+
+        let pids = active_inst
+            .map(|i| crate::modules::instance::find_pids_for_data_dir(&i.data_dir, i.is_default))
+            .unwrap_or_default();
+        let is_running = !pids.is_empty();
+        let state_label = if is_running { "RUNNING" } else { "IDLE" };
+        let pid_str = if pids.is_empty() {
+            "-".to_string()
+        } else {
+            pids.iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+
+        let accounts = crate::modules::account::list_accounts().unwrap_or_default();
+        let bound_acc = accounts
+            .iter()
+            .find(|a| a.email.eq_ignore_ascii_case(active_bound_email))
+            .or_else(|| {
+                let curr_id = crate::modules::account::get_current_account_id().unwrap_or_default();
+                accounts.iter().find(|a| Some(&a.id) == curr_id.as_ref())
+            });
+
+        let (tier_str, quota_str) = if let Some(acc) = bound_acc {
+            let t = acc
+                .quota
+                .as_ref()
+                .and_then(|q| q.subscription_tier.as_deref())
+                .unwrap_or("PRO");
+            let (q_4h, q_weekly) =
+                crate::modules::auto_switcher::extract_dual_window_quotas(acc, "gemini-2.5-pro");
+            let q_formatted = match (q_4h, q_weekly) {
+                (Some(h), Some(w)) => format!("4h: {:.1}% | Weekly: {:.1}%", h, w),
+                (Some(h), None) => format!("4h: {:.1}%", h),
+                (None, Some(w)) => format!("Weekly: {:.1}%", w),
+                _ => "Active".to_string(),
+            };
+            (t.to_string(), q_formatted)
+        } else {
+            ("Standard".to_string(), "Active".to_string())
+        };
+
         send_ack_receipt(
             &msg.from,
             "agm status",
             &target,
-            "default",
+            active_inst_id,
             "-",
             local_machine_name,
             local_machine_ip,
@@ -266,28 +319,37 @@ pub(crate) fn handle_status_query(
 
         let projects = crate::modules::repo_db::list_running_projects().unwrap_or_default();
         let prompts = crate::modules::repo_db::list_backed_up_prompts().unwrap_or_default();
-        let instances = crate::modules::instance::list_instances().unwrap_or_default();
-        let current_account = crate::modules::account::get_current_account().unwrap_or(None);
-        let active_acc_str = current_account
-            .map(|a| a.email)
-            .unwrap_or_else(|| "Default".to_string());
+        let total_instances = reg.instances.len();
+        let total_accounts = accounts.len();
 
         output_text = format!(
             "================================================================================
-NODE STATUS REPORT
+TELEMETRY FLEET & NODE STATUS REPORT
 ================================================================================
-Node Name:          {}
-Local IP:           {}
-Active Profile:     {}
-Running Projects:   {}
-Registered Sandbox: {}
-Prompts in Queue:   {}
+Machine:          {} ({})
+OS / Arch:        {}/{}
+Active Instance:  {} (ID: {})
+State:            {} (PIDs: {})
+Bound Account:    {}
+Tier / Quotas:    {} | {}
+Inventory:        {} sandboxes | {} accounts
+Running Projects: {}
+Prompts in Queue: {}
 ================================================================================",
             local_machine_name,
             local_machine_ip,
-            active_acc_str,
+            std::env::consts::OS,
+            std::env::consts::ARCH,
+            active_inst_name,
+            active_inst_id,
+            state_label,
+            pid_str,
+            active_bound_email,
+            tier_str,
+            quota_str,
+            total_instances,
+            total_accounts,
             projects.len(),
-            instances.len(),
             prompts.len()
         );
         result_summary = format!("Status reported to '{}'", msg.from);
@@ -300,7 +362,7 @@ Prompts in Queue:   {}
             &output_text,
             local_machine_name,
             local_machine_ip,
-            "default",
+            active_inst_id,
             Some(&msg.message_id),
             Some(&msg.subject),
         );

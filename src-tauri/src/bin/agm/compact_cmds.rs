@@ -71,11 +71,15 @@ pub(crate) fn cmd_export_compact(args: &[String]) {
             println!("  Active Prompts:{} prompt(s)", res.running_count);
             println!("  History Log:   {} record(s)", res.history_count);
             println!("  Duration:      {} ms", res.duration_ms);
-            println!("================================================================================");
+            println!(
+                "================================================================================"
+            );
         }
         Err(e) => {
             eprintln!("  ✖ Export failed: {}", e);
-            println!("================================================================================");
+            println!(
+                "================================================================================"
+            );
             std::process::exit(2);
         }
     }
@@ -151,11 +155,15 @@ pub(crate) fn cmd_import_compact(args: &[String]) {
             println!("  Active Prompts:{} restored", res.running_restored);
             println!("  History Log:   {} restored", res.history_restored);
             println!("  Duration:      {} ms", res.duration_ms);
-            println!("================================================================================");
+            println!(
+                "================================================================================"
+            );
         }
         Err(e) => {
             eprintln!("  ✖ Import failed: {}", e);
-            println!("================================================================================");
+            println!(
+                "================================================================================"
+            );
             std::process::exit(2);
         }
     }
@@ -168,7 +176,9 @@ fn print_export_help() {
     println!("Options:");
     println!("  -f, --file <PATH>       Target output file path (.json or .db).");
     println!("                          Defaults to: agm-workspace-compact-<date>.json");
-    println!("  -w, --work-dir <PATH>   Base workspace directory to calculate relative paths against.");
+    println!(
+        "  -w, --work-dir <PATH>   Base workspace directory to calculate relative paths against."
+    );
     println!("      --no-pinned         Skip exporting pinned projects; export only prompts and history.");
     println!("      --absolute          Preserve raw absolute filesystem paths instead of relative templates.");
     println!("  -h, --help              Print this help documentation.");
@@ -184,10 +194,14 @@ fn print_import_help() {
     println!("  agm import-compact <FILE> [OPTIONS]");
     println!();
     println!("Arguments:");
-    println!("  <FILE>                  Path to compact JSON envelope or SQLite database to import.");
+    println!(
+        "  <FILE>                  Path to compact JSON envelope or SQLite database to import."
+    );
     println!();
     println!("Options:");
-    println!("  -w, --work-dir <PATH>   Target base workspace directory. Re-anchors all relative paths.");
+    println!(
+        "  -w, --work-dir <PATH>   Target base workspace directory. Re-anchors all relative paths."
+    );
     println!("  -y, --yes               Bypass confirmation prompt; automatically execute import.");
     println!("  -h, --help              Print this help documentation.");
     println!();

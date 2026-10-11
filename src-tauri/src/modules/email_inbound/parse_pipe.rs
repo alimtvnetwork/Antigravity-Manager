@@ -173,7 +173,14 @@ pub(crate) fn parse_pipe_delimited_command(
             });
         }
 
-        if lower_cmd == "status" || lower_cmd == "agm status" {
+        if lower_cmd == "status"
+            || lower_cmd == "agm status"
+            || lower_cmd == "fleet"
+            || lower_cmd == "agm fleet"
+            || lower_cmd == "whoami"
+            || lower_cmd == "agm whoami"
+            || lower_cmd == "machines"
+        {
             return Some(InboundAction::StatusQuery {
                 target: target.to_string(),
             });

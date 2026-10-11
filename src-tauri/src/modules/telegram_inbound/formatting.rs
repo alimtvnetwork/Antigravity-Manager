@@ -24,7 +24,9 @@ pub(crate) fn get_unclosed_html_tags(s: &str) -> Vec<String> {
                     .next()
                     .unwrap_or("")
                     .to_lowercase();
-                if let Some(pos) = stack.iter().rposition(|t| t == &closing) {
+                if let Some(pos) = stack.iter().rposition(|t| {
+                    t == &closing || t.split_whitespace().next().unwrap_or("") == closing.as_str()
+                }) {
                     stack.remove(pos);
                 }
             } else if !tag_content.is_empty() && !tag_content.ends_with('/') {
@@ -122,13 +124,28 @@ pub fn chunk_telegram_text(text: &str, max_chars: usize) -> Vec<String> {
         if !carry_over_tags.is_empty() {
             let mut prefix = String::new();
             for tag in &carry_over_tags {
-                prefix.push_str(&format!("<{}>", tag));
+                if tag == "blockquote expandable" {
+                    prefix.push_str("<blockquote expandable>");
+                } else {
+                    prefix.push_str(&format!("<{}>", tag));
+                }
             }
             chunk = format!("{}{}", prefix, chunk);
         }
 
         let unclosed = get_unclosed_html_tags(&chunk);
-        carry_over_tags = unclosed.clone();
+        let has_expandable_blockquote = chunk.to_lowercase().contains("<blockquote expandable");
+
+        carry_over_tags = unclosed
+            .iter()
+            .map(|t| {
+                if t == "blockquote" && has_expandable_blockquote {
+                    "blockquote expandable".to_string()
+                } else {
+                    t.clone()
+                }
+            })
+            .collect();
 
         if !unclosed.is_empty() && idx + 1 < total {
             for tag in unclosed.iter().rev() {
@@ -140,6 +157,77 @@ pub fn chunk_telegram_text(text: &str, max_chars: usize) -> Vec<String> {
     }
 
     balanced_chunks
+}
+
+/// Helper to clamp prompt and clipboard text safely on UTF-8 char boundaries (<= 3,900 chars)
+pub fn clamp_telegram_copy_text(text: &str, max_chars: usize) -> String {
+    let limit = if max_chars == 0 || max_chars > 3900 {
+        3900
+    } else {
+        max_chars
+    };
+    if text.len() <= limit {
+        text.to_string()
+    } else {
+        let mut end = limit.saturating_sub(3);
+        while end > 0 && !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        format!("{}...", &text[..end])
+    }
+}
+
+/// Build Telegram Bot API 7.8+ inline keyboard markup with native copy_text button
+pub fn build_copy_prompt_reply_markup(
+    prompt_text: &str,
+    asset_urls: &[String],
+    dashboard_url: Option<&str>,
+) -> serde_json::Value {
+    let clamped_text = clamp_telegram_copy_text(prompt_text, 3900);
+    let mut keyboard_rows: Vec<Vec<serde_json::Value>> = Vec::new();
+
+    if !clamped_text.trim().is_empty() {
+        keyboard_rows.push(vec![json!({
+            "text": "📋 Copy Prompt",
+            "copy_text": {
+                "text": clamped_text
+            }
+        })]);
+
+        if !asset_urls.is_empty() {
+            let mut composite = clamped_text.clone();
+            composite.push_str("\n\n---\n### Attached Images:\n");
+            for url in asset_urls {
+                composite.push_str(&format!("![image]({})\n", url));
+            }
+            let clamped_composite = clamp_telegram_copy_text(&composite, 3900);
+            keyboard_rows.push(vec![json!({
+                "text": "🖼️ Copy Prompt + Images",
+                "copy_text": {
+                    "text": clamped_composite
+                }
+            })]);
+        }
+    }
+
+    let mut action_row: Vec<serde_json::Value> = Vec::new();
+    if let Some(dash_url) = dashboard_url {
+        let trimmed = dash_url.trim();
+        if !trimmed.is_empty() {
+            action_row.push(json!({
+                "text": "📊 Open Dashboard",
+                "url": trimmed
+            }));
+        }
+    }
+
+    if !action_row.is_empty() {
+        keyboard_rows.push(action_row);
+    }
+
+    json!({
+        "inline_keyboard": keyboard_rows
+    })
 }
 
 /// Send a text message to a Telegram chat with optional reply markup (e.g. inline keyboard)
@@ -163,6 +251,14 @@ pub async fn send_telegram_message_with_markup(
     let url = format!("https://api.telegram.org/bot{}/sendMessage", clean_token);
     let total = chunks.len();
 
+    // Only attach reply_markup if it contains non-empty buttons
+    let valid_markup = reply_markup.filter(|m| {
+        m.get("inline_keyboard")
+            .and_then(|k| k.as_array())
+            .map(|arr| !arr.is_empty())
+            .unwrap_or(true)
+    });
+
     for (idx, chunk) in chunks.iter().enumerate() {
         if idx > 0 {
             tokio::time::sleep(Duration::from_millis(80)).await;
@@ -175,7 +271,7 @@ pub async fn send_telegram_message_with_markup(
             "parse_mode": "HTML"
         });
         if is_last {
-            if let Some(ref markup) = reply_markup {
+            if let Some(ref markup) = valid_markup {
                 payload_html["reply_markup"] = markup.clone();
             }
         }
@@ -191,7 +287,7 @@ pub async fn send_telegram_message_with_markup(
                     "text": clean_plain
                 });
                 if is_last {
-                    if let Some(ref markup) = reply_markup {
+                    if let Some(ref markup) = valid_markup {
                         payload_plain["reply_markup"] = markup.clone();
                     }
                 }
@@ -337,5 +433,46 @@ pub fn format_running_duration(created_at: i64) -> String {
         let hours = elapsed / 3600;
         let mins = (elapsed % 3600) / 60;
         format!("(running {}h {}m)", hours, mins)
+    }
+}
+
+#[cfg(test)]
+mod formatting_tests {
+    use super::*;
+
+    #[test]
+    fn test_unclosed_tags_with_blockquote_expandable() {
+        let unclosed = get_unclosed_html_tags("<blockquote expandable>Hello world");
+        assert_eq!(unclosed, vec!["blockquote"]);
+
+        let closed = get_unclosed_html_tags("<blockquote expandable>Hello world</blockquote>");
+        assert!(closed.is_empty());
+    }
+
+    #[test]
+    fn test_clamp_telegram_copy_text() {
+        let short = "Short prompt";
+        assert_eq!(clamp_telegram_copy_text(short, 3900), short);
+
+        let long = "a".repeat(4500);
+        let clamped = clamp_telegram_copy_text(&long, 3900);
+        assert!(clamped.len() <= 3900);
+        assert!(clamped.ends_with("..."));
+    }
+
+    #[test]
+    fn test_build_copy_prompt_reply_markup() {
+        let markup = build_copy_prompt_reply_markup(
+            "My active prompt",
+            &["https://example.com/img1.png".to_string()],
+            Some("https://dashboard.example.com"),
+        );
+        let rows = markup["inline_keyboard"].as_array().expect("rows array");
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0][0]["text"], "📋 Copy Prompt");
+        assert_eq!(rows[0][0]["copy_text"]["text"], "My active prompt");
+        assert_eq!(rows[1][0]["text"], "🖼️ Copy Prompt + Images");
+        assert_eq!(rows[2][0]["text"], "📊 Open Dashboard");
+        assert_eq!(rows[2][0]["url"], "https://dashboard.example.com");
     }
 }

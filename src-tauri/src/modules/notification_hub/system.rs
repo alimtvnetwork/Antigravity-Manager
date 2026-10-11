@@ -111,21 +111,35 @@ async fn dispatch_telegram_update_alert(
 
     let status_notes = details.unwrap_or("System update successfully applied.");
 
+    let active_inst_id = crate::modules::instance::load_registry()
+        .map(|r| r.active_instance_id)
+        .unwrap_or_else(|_| "default".to_string());
+
+    let telemetry_header = format!(
+        "🖥️ <b>Machine:</b> <code>{}</code> (<code>{}</code>) | 🏷️ <b>Instance:</b> <code>{}</code>",
+        escape_telegram_html(&m_name),
+        escape_telegram_html(&m_ip),
+        escape_telegram_html(&active_inst_id)
+    );
+
     let text = format!(
         "🚀 <b>Antigravity Manager: System Updated!</b>\n\
-        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
-        📦 <b>New Version:</b> <code>v{}</code>\n\
-        ⏮️ <b>Previous Version:</b> <code>v{}</code>\n\
-        🖥️ <b>Host:</b> <code>{}</code> ({})\n\
-        ⏰ <b>Timestamp:</b> {}\n\
-        📝 <b>Status:</b> {}\n\
-        🔗 <a href=\"https://github.com/alimtvnetwork/Antigravity-Manager/releases\">Release Notes &amp; Changelog</a>",
-        current_version,
-        previous_version,
-        m_name,
-        m_ip,
-        now_str,
-        status_notes
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        {}\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        <b>📦 RELEASE DETAILS</b>\n\
+        <blockquote>\
+        • <b>New Version:</b> <code>v{}</code>\n\
+        • <b>Previous Version:</b> <code>v{}</code>\n\
+        • <b>Status:</b> <i>{}</i>\n\
+        • <b>Timestamp:</b> <code>{}</code>\
+        </blockquote>\n\n\
+        🔗 <a href=\"https://github.com/alimtvnetwork/Antigravity-Manager/releases\"><b>Release Notes &amp; Changelog</b></a>",
+        telemetry_header,
+        escape_telegram_html(current_version),
+        escape_telegram_html(previous_version),
+        escape_telegram_html(status_notes),
+        escape_telegram_html(&now_str)
     );
 
     if let Err(e) = telegram_inbound::send_telegram_message(&config.bot_token, chat_id, &text).await

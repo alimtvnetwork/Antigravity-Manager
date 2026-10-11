@@ -621,11 +621,7 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
                                 .stdout(std::process::Stdio::null())
                                 .stderr(std::process::Stdio::null());
 
-                            let cmd_dispatched =
-                                crate::modules::process::spawn_with_job_breakaway_fallback(
-                                    &mut shell_cmd,
-                                )
-                                .is_ok();
+                            let cmd_dispatched = shell_cmd.spawn().is_ok();
 
                             // Ladder 4: PowerShell Start-Process (uses ShellExecuteEx for guaranteed breakaway)
                             let ps_dispatched = if !cmd_dispatched {
@@ -655,10 +651,7 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
                                     .stdin(std::process::Stdio::null())
                                     .stdout(std::process::Stdio::null())
                                     .stderr(std::process::Stdio::null());
-                                crate::modules::process::spawn_with_job_breakaway_fallback(
-                                    &mut ps_cmd,
-                                )
-                                .is_ok()
+                                ps_cmd.spawn().is_ok()
                             } else {
                                 true
                             };

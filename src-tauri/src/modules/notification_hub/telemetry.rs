@@ -53,47 +53,88 @@ async fn dispatch_post_switch_prompt_telemetry(
     if let Ok(config) = telegram_inbound::load_config() {
         if config.is_enabled && !config.bot_token.trim().is_empty() {
             if let Some(chat_id) = config.allowed_chat_id {
+                let telemetry_header = format!(
+                    "🖥️ <b>Machine:</b> <code>{}</code> (<code>{}</code>) | 🏷️ <b>Instance:</b> <code>{}</code>",
+                    escape_telegram_html(&m_name),
+                    escape_telegram_html(&m_ip),
+                    escape_telegram_html(instance_id)
+                );
+
+                // Look up active running or backed up prompt preview for this instance
+                let (prompt_preview_text, prompt_words_count) = if let Ok(all_prompts) =
+                    crate::modules::repo_db::list_all_prompts()
+                {
+                    let matched_prompt = all_prompts.into_iter().find(|p| {
+                        (p.status == "running"
+                            || p.status == "backed_up"
+                            || p.status == "dispatched")
+                            && (p.instance_id.eq_ignore_ascii_case(instance_id)
+                                || (instance_id == "default"
+                                    && (p.instance_id.is_empty() || p.instance_id == "default")))
+                    });
+
+                    if let Some(p) = matched_prompt {
+                        let (preview, words) = extract_words_preview(&p.prompt_content, 200);
+                        (preview, words)
+                    } else {
+                        (String::new(), 0)
+                    }
+                } else {
+                    (String::new(), 0)
+                };
+
+                let prompt_section = if !prompt_preview_text.is_empty() {
+                    format!(
+                        "\n<blockquote expandable><b>💬 Active Prompt ({} words):</b>\n<code>{}</code></blockquote>\n",
+                        prompt_words_count,
+                        crate::modules::telegram_inbound::clean_for_telegram_html(&prompt_preview_text, 1500)
+                    )
+                } else {
+                    String::new()
+                };
+
                 let tg_text = if is_emergency {
                     format!(
                         "🚨 <b>Antigravity Manager: EMERGENCY ALERT</b>\n\
-                        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
+                        {}\n\
+                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
                         ⚠️ <b>Prompts Failed to Resume After Switch!</b>\n\
-                        📦 <b>Version:</b> <code>{}</code>\n\
-                        💻 <b>Instance:</b> <code>{}</code>\n\
-                        💾 <b>Backed Up Prompts:</b> <code>{}</code>\n\
-                        🔄 <b>Restored Records:</b> <code>{}</code>\n\
-                        🛑 <b>Verified Running:</b> <code>0 (FAILED TO DETECT RUNNING PROMPT)</code>\n\
-                        📁 <b>Projects:</b> <code>{}</code>\n\
-                        🖥️ <b>Host:</b> <code>{}</code> ({})\n\
-                        ⏰ <b>Timestamp:</b> {}\n\
-                        ⚡ <b>Action:</b> Run <code>agm prompts status</code> or <code>agm prompts restore</code>.",
-                        escape_telegram_html(&pkg_ver),
-                        escape_telegram_html(instance_id),
+                        <blockquote>\
+                        • <b>Backed Up Prompts:</b> <code>{}</code>\n\
+                        • <b>Restored Records:</b> <code>{}</code>\n\
+                        • <b>Verified Running:</b> <code>0 (FAILED TO DETECT RUNNING PROMPT)</code>\n\
+                        • <b>Projects:</b> <code>{}</code>\n\
+                        • <b>Version &amp; Timestamp:</b> <code>{}</code> | <code>{}</code>\n\
+                        • <b>Action:</b> Run <code>agm prompts status</code> or <code>agm prompts restore</code>\
+                        </blockquote>{}",
+                        telemetry_header,
                         backed_up_count,
                         restored_count,
                         escape_telegram_html(&projects_display),
-                        escape_telegram_html(&m_name),
-                        escape_telegram_html(&m_ip),
-                        escape_telegram_html(&now_str)
+                        escape_telegram_html(&pkg_ver),
+                        escape_telegram_html(&now_str),
+                        prompt_section
                     )
                 } else {
                     format!(
                         "✅ <b>Antigravity Manager: Post-Switch Liveness Confirmed</b>\n\
-                        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
-                        📦 <b>Version:</b> <code>{}</code>\n\
-                        💻 <b>Instance:</b> <code>{}</code>\n\
-                        🟢 <b>Verified Running Prompts:</b> <code>{}</code> (of {} backed up)\n\
-                        📁 <b>Active Projects:</b> <code>{}</code>\n\
-                        🖥️ <b>Host:</b> <code>{}</code> ({})\n\
-                        ⏰ <b>Timestamp:</b> {}",
-                        escape_telegram_html(&pkg_ver),
-                        escape_telegram_html(instance_id),
+                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
+                        {}\n\
+                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
+                        <b>🟢 EXECUTION STATUS</b>\n\
+                        <blockquote>\
+                        • <b>Verified Running Prompts:</b> <code>{}</code> (of {} backed up)\n\
+                        • <b>Active Projects:</b> <code>{}</code>\n\
+                        • <b>Version &amp; Timestamp:</b> <code>{}</code> | <code>{}</code>\
+                        </blockquote>{}",
+                        telemetry_header,
                         verified_running,
                         backed_up_count,
                         escape_telegram_html(&projects_display),
-                        escape_telegram_html(&m_name),
-                        escape_telegram_html(&m_ip),
-                        escape_telegram_html(&now_str)
+                        escape_telegram_html(&pkg_ver),
+                        escape_telegram_html(&now_str),
+                        prompt_section
                     )
                 };
 

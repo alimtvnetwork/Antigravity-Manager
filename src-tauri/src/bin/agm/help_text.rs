@@ -209,8 +209,12 @@ pub(crate) fn print_help() {
     );
     println!("    restore, restore-running-prompts [--keep] [--json] [-f file]");
     println!("        Restore and re-enqueue in-flight prompts into active workspaces");
-    println!("    export-compact, compact-export, ec [-f file] [-w dir] [--no-pinned] [--absolute]");
-    println!("        Export portable workspace compaction snapshot to JSON envelope v2.0 or SQLite DB");
+    println!(
+        "    export-compact, compact-export, ec [-f file] [-w dir] [--no-pinned] [--absolute]"
+    );
+    println!(
+        "        Export portable workspace compaction snapshot to JSON envelope v2.0 or SQLite DB"
+    );
     println!("    import-compact, compact-import, ic <file> [-w dir] [-y]");
     println!("        Import portable workspace compaction snapshot into local SQLite databases");
     println!("    queue-scheduler, scheduler, qs [--once] [instance]");

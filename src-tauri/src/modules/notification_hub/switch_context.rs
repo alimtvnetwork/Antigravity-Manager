@@ -103,3 +103,66 @@ pub struct SwitchNotificationDetails {
     pub backed_up_prompts_count: Option<usize>,
     pub restored_prompts_count: Option<usize>,
 }
+
+/// Resolve the current node's physical and instance identity for telemetry broadcasting
+pub fn resolve_current_telemetry_identity() -> (String, String, String, String) {
+    let hostname = std::env::var("COMPUTERNAME")
+        .or_else(|_| std::env::var("HOSTNAME"))
+        .unwrap_or_else(|_| crate::modules::email_watcher::detect_machine_name());
+    let ip = crate::modules::email_watcher::detect_local_ip();
+
+    let mut instance_id = "default".to_string();
+    let mut bound_email = String::new();
+
+    if let Ok(registry) = crate::modules::instance::load_registry() {
+        let active = registry
+            .instances
+            .iter()
+            .find(|i| i.id == registry.active_instance_id)
+            .or_else(|| registry.instances.iter().find(|i| i.is_default))
+            .or_else(|| registry.instances.first());
+
+        if let Some(inst) = active {
+            instance_id = inst.id.clone();
+            if let Some(ref email) = inst.bound_email {
+                if !email.is_empty() {
+                    bound_email = email.clone();
+                }
+            }
+        }
+    }
+
+    if bound_email.is_empty() {
+        if let Ok(Some(acc)) = crate::modules::account::get_current_account() {
+            bound_email = acc.email;
+        } else if let Ok(idx) = crate::modules::account::load_account_index() {
+            if let Some(cid) = idx.current_account_id {
+                if let Some(acc) = idx.accounts.into_iter().find(|a| a.id == cid) {
+                    bound_email = acc.email;
+                }
+            }
+        }
+    }
+
+    if bound_email.is_empty() {
+        bound_email = "none".to_string();
+    }
+
+    (hostname, ip, instance_id, bound_email)
+}
+
+/// Format standardized Telemetry Header in Telegram HTML format
+pub fn format_telemetry_header_telegram_html(
+    hostname: &str,
+    ip: &str,
+    instance_id: &str,
+    bound_email: &str,
+) -> String {
+    format!(
+        "🖥️ <b>Machine:</b> <code>{} ({})</code> | 🏷️ <b>Instance:</b> <code>{}</code> | 👤 <b>Bound:</b> <code>{}</code>",
+        crate::modules::telegram_inbound::clean_for_telegram_html(hostname, 48),
+        crate::modules::telegram_inbound::clean_for_telegram_html(ip, 48),
+        crate::modules::telegram_inbound::clean_for_telegram_html(instance_id, 32),
+        crate::modules::telegram_inbound::clean_for_telegram_html(bound_email, 64)
+    )
+}
