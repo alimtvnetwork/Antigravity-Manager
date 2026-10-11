@@ -36,9 +36,7 @@ pub(crate) mod tests {
     #[test]
     pub(crate) fn test_resolve_default_target_exe_filters_temp_updater() {
         let install_dir = PathBuf::from("users\\test\\AppData\\Local\\Programs\\agm-alim");
-        let temp_exe = Some(PathBuf::from(
-            "temp\\agm-updater\\agm-update-cli-999.exe",
-        ));
+        let temp_exe = Some(PathBuf::from("temp\\agm-updater\\agm-update-cli-999.exe"));
         let resolved = resolve_default_target_exe(temp_exe, &install_dir);
         #[cfg(target_os = "macos")]
         assert!(

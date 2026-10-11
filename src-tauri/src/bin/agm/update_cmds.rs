@@ -442,22 +442,21 @@ pub(crate) fn cmd_update(args: &[String]) {
     }
 
     if tag_name.is_empty() {
-            if is_json {
-                let err_obj = serde_json::json!({
-                    "success": false,
-                    "error": "Failed to fetch latest release metadata from GitHub API and CDN updater.json",
-                    "current_version": crate::common::VERSION,
-                    "timestamp": chrono::Utc::now().timestamp(),
-                });
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&err_obj).unwrap_or_default()
-                );
-            } else {
-                eprintln!("Failed to fetch latest release metadata from GitHub API and CDN.");
-            }
-            return;
+        if is_json {
+            let err_obj = serde_json::json!({
+                "success": false,
+                "error": "Failed to fetch latest release metadata from GitHub API and CDN updater.json",
+                "current_version": crate::common::VERSION,
+                "timestamp": chrono::Utc::now().timestamp(),
+            });
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&err_obj).unwrap_or_default()
+            );
+        } else {
+            eprintln!("Failed to fetch latest release metadata from GitHub API and CDN.");
         }
+        return;
     }
 
     let is_up_to_date = tag_name == crate::common::VERSION;

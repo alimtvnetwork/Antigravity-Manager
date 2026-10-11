@@ -219,10 +219,7 @@ pub fn run_cli_update(args: &[String]) -> bool {
             raw_install_dir
         }
     };
-    let normalized_target_version = opts
-        .target_version
-        .as_deref()
-        .map(normalize_version_string);
+    let normalized_target_version = opts.target_version.as_deref().map(normalize_version_string);
 
     println!(
         "[*] Executing AGM CLI Update for directory: {}",
