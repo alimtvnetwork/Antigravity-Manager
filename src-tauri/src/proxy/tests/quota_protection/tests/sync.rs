@@ -154,7 +154,7 @@ fn test_error_messages_for_quota_protection() {
     assert!(error.contains("claude"));
 
     // 场景 2: 混合情况（部分限流，部分配额保护）
-    let mixed = vec![
+    let mixed = [
         create_mock_token("a1", "a1@example.com", vec!["claude"], Some(30)),
         create_mock_token("a2", "a2@example.com", vec![], Some(20)), // 这个假设被限流
     ];
@@ -278,7 +278,7 @@ fn test_sorting_uses_target_model_quota_not_max() {
     std::fs::write(&path_c, account_c_json.to_string()).unwrap();
 
     // 创建 tokens，remaining_quota 使用 max 值（模拟旧逻辑）
-    let mut tokens = vec![
+    let mut tokens = [
         create_mock_token_with_path(
             "a",
             "carmelioventori@example.com",

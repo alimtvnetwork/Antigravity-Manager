@@ -10,10 +10,10 @@ use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
-struct StatsPeriodQuery {
-    hours: Option<i64>,
-    days: Option<i64>,
-    weeks: Option<i64>,
+pub(crate) struct StatsPeriodQuery {
+    pub(crate) hours: Option<i64>,
+    pub(crate) days: Option<i64>,
+    pub(crate) weeks: Option<i64>,
 }
 
 pub(crate) async fn admin_get_token_stats_hourly(

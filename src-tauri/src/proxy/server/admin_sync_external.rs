@@ -11,9 +11,9 @@ use serde_json::json;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct HermesSyncStatusRequest {
+pub(crate) struct HermesSyncStatusRequest {
     #[serde(default)]
-    proxy_url: Option<String>,
+    pub(crate) proxy_url: Option<String>,
 }
 
 pub(crate) async fn admin_get_hermes_sync_status(
@@ -32,16 +32,16 @@ pub(crate) async fn admin_get_hermes_sync_status(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct HermesSyncRequest {
-    proxy_url: String,
-    api_key: String,
-    discover_models: bool,
+pub(crate) struct HermesSyncRequest {
+    pub(crate) proxy_url: String,
+    pub(crate) api_key: String,
+    pub(crate) discover_models: bool,
     #[serde(default)]
-    models: Vec<String>,
+    pub(crate) models: Vec<String>,
     #[serde(default)]
-    activate: bool,
+    pub(crate) activate: bool,
     #[serde(default)]
-    default_model: Option<String>,
+    pub(crate) default_model: Option<String>,
 }
 
 pub(crate) async fn admin_execute_hermes_sync(
@@ -108,9 +108,9 @@ pub(crate) async fn admin_get_hermes_config_content(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct OpenClawSyncStatusRequest {
+pub(crate) struct OpenClawSyncStatusRequest {
     #[serde(default)]
-    proxy_url: Option<String>,
+    pub(crate) proxy_url: Option<String>,
 }
 
 pub(crate) async fn admin_get_openclaw_sync_status(
@@ -129,17 +129,17 @@ pub(crate) async fn admin_get_openclaw_sync_status(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct OpenClawSyncRequest {
-    proxy_url: String,
-    api_key: String,
+pub(crate) struct OpenClawSyncRequest {
+    pub(crate) proxy_url: String,
+    pub(crate) api_key: String,
     #[serde(default = "default_openclaw_target_version")]
-    target_version: String,
+    pub(crate) target_version: String,
     #[serde(default)]
-    models: Vec<String>,
+    pub(crate) models: Vec<String>,
     #[serde(default)]
-    activate: bool,
+    pub(crate) activate: bool,
     #[serde(default)]
-    default_model: Option<String>,
+    pub(crate) default_model: Option<String>,
 }
 
 fn default_openclaw_target_version() -> String {
@@ -210,8 +210,8 @@ pub(crate) async fn admin_get_openclaw_config_content(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct DroidSyncStatusRequest {
-    proxy_url: String,
+pub(crate) struct DroidSyncStatusRequest {
+    pub(crate) proxy_url: String,
 }
 
 pub(crate) async fn admin_get_droid_sync_status(
@@ -230,8 +230,8 @@ pub(crate) async fn admin_get_droid_sync_status(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct DroidSyncRequest {
-    custom_models: Vec<serde_json::Value>,
+pub(crate) struct DroidSyncRequest {
+    pub(crate) custom_models: Vec<serde_json::Value>,
 }
 
 pub(crate) async fn admin_execute_droid_sync(

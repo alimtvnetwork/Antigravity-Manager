@@ -85,8 +85,8 @@ pub(crate) async fn admin_list_accounts(
 /// Export accounts with refresh tokens (for backup/migration)
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ExportAccountsRequest {
-    account_ids: Vec<String>,
+pub(crate) struct ExportAccountsRequest {
+    pub(crate) account_ids: Vec<String>,
 }
 
 pub(crate) async fn admin_export_accounts(
@@ -165,8 +165,8 @@ pub(crate) async fn admin_get_current_account(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct AddAccountRequest {
-    refresh_token: String,
+pub(crate) struct AddAccountRequest {
+    pub(crate) refresh_token: String,
 }
 
 pub(crate) async fn admin_add_account(
@@ -297,10 +297,10 @@ pub(crate) async fn admin_switch_account(
 }
 
 #[derive(Serialize)]
-struct RotateAccountResponse {
-    is_success: bool,
-    message: String,
-    status: crate::modules::auto_switcher::AutoSwitcherStatus,
+pub(crate) struct RotateAccountResponse {
+    pub(crate) is_success: bool,
+    pub(crate) message: String,
+    pub(crate) status: crate::modules::auto_switcher::AutoSwitcherStatus,
 }
 
 pub(crate) async fn admin_rotate_account(

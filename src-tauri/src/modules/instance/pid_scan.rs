@@ -218,10 +218,10 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
             || (!clean_bslash.is_empty() && args_str.contains(&clean_bslash))
             || canonical_expanded
                 .as_ref()
-                .map_or(false, |c| !c.is_empty() && args_str.contains(c))
+                .is_some_and(|c| !c.is_empty() && args_str.contains(c))
             || short_path_opt
                 .as_ref()
-                .map_or(false, |s| !s.is_empty() && args_str.contains(s));
+                .is_some_and(|s| !s.is_empty() && args_str.contains(s));
 
         let is_default_candidate = is_default
             && !has_instance_marker

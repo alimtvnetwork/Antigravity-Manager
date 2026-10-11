@@ -81,8 +81,8 @@ pub(crate) async fn admin_import_from_db(
 }
 
 #[derive(Deserialize)]
-struct CustomDbRequest {
-    path: String,
+pub(crate) struct CustomDbRequest {
+    pub(crate) path: String,
 }
 
 pub(crate) async fn admin_import_custom_db(
@@ -197,9 +197,9 @@ pub(crate) async fn admin_sync_account_from_db(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct CliSyncStatusRequest {
-    app_type: crate::proxy::cli_sync::CliApp,
-    proxy_url: String,
+pub(crate) struct CliSyncStatusRequest {
+    pub(crate) app_type: crate::proxy::cli_sync::CliApp,
+    pub(crate) proxy_url: String,
 }
 
 pub(crate) async fn admin_get_cli_sync_status(
@@ -218,11 +218,11 @@ pub(crate) async fn admin_get_cli_sync_status(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct CliSyncRequest {
-    app_type: crate::proxy::cli_sync::CliApp,
-    proxy_url: String,
-    api_key: String,
-    pub model: Option<String>,
+pub(crate) struct CliSyncRequest {
+    pub(crate) app_type: crate::proxy::cli_sync::CliApp,
+    pub(crate) proxy_url: String,
+    pub(crate) api_key: String,
+    pub(crate) model: Option<String>,
 }
 
 pub(crate) async fn admin_execute_cli_sync(
@@ -246,8 +246,8 @@ pub(crate) async fn admin_execute_cli_sync(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct CliRestoreRequest {
-    app_type: crate::proxy::cli_sync::CliApp,
+pub(crate) struct CliRestoreRequest {
+    pub(crate) app_type: crate::proxy::cli_sync::CliApp,
 }
 
 pub(crate) async fn admin_execute_cli_restore(
@@ -266,9 +266,9 @@ pub(crate) async fn admin_execute_cli_restore(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct CliConfigContentRequest {
-    app_type: crate::proxy::cli_sync::CliApp,
-    file_name: Option<String>,
+pub(crate) struct CliConfigContentRequest {
+    pub(crate) app_type: crate::proxy::cli_sync::CliApp,
+    pub(crate) file_name: Option<String>,
 }
 
 pub(crate) async fn admin_get_cli_config_content(

@@ -119,7 +119,7 @@ pub fn clone_instance_executable(instance_id: &str) -> Result<String, crate::err
     let instances_dir = get_instances_dir().map_err(crate::error::AppError::Config)?;
     let instance_bin_dir = instances_dir.join(instance_id).join("bin");
     if !instance_bin_dir.exists() {
-        fs::create_dir_all(&instance_bin_dir).map_err(|e| crate::error::AppError::Io(e))?;
+        fs::create_dir_all(&instance_bin_dir).map_err(crate::error::AppError::Io)?;
     }
 
     // 3. Platform-specific cloning logic
@@ -179,8 +179,7 @@ pub fn clone_instance_executable(instance_id: &str) -> Result<String, crate::err
                 appimage_target
             } else {
                 let script_content = format!("#!/bin/sh\nexec \"{}\" \"$@\"\n", base_str);
-                fs::write(&launcher_sh, script_content)
-                    .map_err(|e| crate::error::AppError::Io(e))?;
+                fs::write(&launcher_sh, script_content).map_err(crate::error::AppError::Io)?;
                 use std::os::unix::fs::PermissionsExt;
                 // Justification: permission hardening; the file stays usable with its existing mode if this fails
                 crate::error::record_ignored(
@@ -191,7 +190,7 @@ pub fn clone_instance_executable(instance_id: &str) -> Result<String, crate::err
             }
         } else {
             let script_content = format!("#!/bin/sh\nexec \"{}\" \"$@\"\n", base_str);
-            fs::write(&launcher_sh, script_content).map_err(|e| crate::error::AppError::Io(e))?;
+            fs::write(&launcher_sh, script_content).map_err(crate::error::AppError::Io)?;
             use std::os::unix::fs::PermissionsExt;
             // Justification: permission hardening; the file stays usable with its existing mode if this fails
             crate::error::record_ignored(

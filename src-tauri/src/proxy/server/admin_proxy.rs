@@ -29,9 +29,9 @@ pub(crate) async fn admin_get_all_account_bindings(
 // [FIX Web Mode] Bind account to proxy
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct BindAccountProxyRequest {
-    account_id: String,
-    proxy_id: String,
+pub(crate) struct BindAccountProxyRequest {
+    pub(crate) account_id: String,
+    pub(crate) proxy_id: String,
 }
 
 pub(crate) async fn admin_bind_account_proxy(
@@ -54,8 +54,8 @@ pub(crate) async fn admin_bind_account_proxy(
 // [FIX Web Mode] Unbind account from proxy
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct UnbindAccountProxyRequest {
-    account_id: String,
+pub(crate) struct UnbindAccountProxyRequest {
+    pub(crate) account_id: String,
 }
 
 pub(crate) async fn admin_unbind_account_proxy(
@@ -177,8 +177,8 @@ pub(crate) async fn admin_stop_proxy_service(State(state): State<AppState>) -> i
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct UpdateMappingWrapper {
-    config: crate::proxy::config::ProxyConfig,
+pub(crate) struct UpdateMappingWrapper {
+    pub(crate) config: crate::proxy::config::ProxyConfig,
 }
 
 pub(crate) async fn admin_update_model_mapping(
@@ -261,8 +261,8 @@ pub(crate) async fn admin_get_preferred_account(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct SetPreferredAccountRequest {
-    account_id: Option<String>,
+pub(crate) struct SetPreferredAccountRequest {
+    pub(crate) account_id: Option<String>,
 }
 
 pub(crate) async fn admin_set_preferred_account(

@@ -225,15 +225,15 @@ pub(crate) async fn admin_get_proxy_log_detail(
 
 #[derive(Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
-struct LogsFilterQuery {
+pub(crate) struct LogsFilterQuery {
     #[serde(default)]
-    filter: String,
+    pub(crate) filter: String,
     #[serde(default)]
-    errors_only: bool,
+    pub(crate) errors_only: bool,
     #[serde(default)]
-    limit: usize,
+    pub(crate) limit: usize,
     #[serde(default)]
-    offset: usize,
+    pub(crate) offset: usize,
 }
 
 pub(crate) async fn admin_get_proxy_logs_filtered(
@@ -282,8 +282,8 @@ pub(crate) async fn admin_get_data_dir_path() -> impl IntoResponse {
 }
 
 #[derive(Deserialize)]
-struct SetDataDirRequest {
-    path: String,
+pub(crate) struct SetDataDirRequest {
+    pub(crate) path: String,
 }
 
 pub(crate) async fn admin_set_data_dir(

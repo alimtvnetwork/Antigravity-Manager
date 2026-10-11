@@ -117,9 +117,9 @@ pub(crate) async fn admin_cancel_oauth_login(
 }
 
 #[derive(Deserialize)]
-struct SubmitCodeRequest {
-    code: String,
-    state: Option<String>,
+pub(crate) struct SubmitCodeRequest {
+    pub(crate) code: String,
+    pub(crate) state: Option<String>,
 }
 
 pub(crate) async fn admin_submit_oauth_code(
@@ -140,9 +140,9 @@ pub(crate) async fn admin_submit_oauth_code(
 }
 
 #[derive(Deserialize)]
-struct SetOAuthClientRequest {
+pub(crate) struct SetOAuthClientRequest {
     #[serde(alias = "clientKey", alias = "oauthClientKey")]
-    client_key: String,
+    pub(crate) client_key: String,
 }
 
 pub(crate) async fn admin_list_oauth_clients(
@@ -176,12 +176,12 @@ pub(crate) async fn admin_set_active_oauth_client(
 }
 
 #[derive(Deserialize)]
-struct OAuthParams {
-    code: String,
+pub(crate) struct OAuthParams {
+    pub(crate) code: String,
     #[allow(dead_code)]
-    state: Option<String>,
+    pub(crate) state: Option<String>,
     #[allow(dead_code)]
-    scope: Option<String>,
+    pub(crate) scope: Option<String>,
 }
 
 pub(crate) async fn handle_oauth_callback(
@@ -300,14 +300,14 @@ pub(crate) async fn handle_oauth_callback(
 }
 
 #[derive(Deserialize, Default)]
-struct WebOAuthClientQuery {
+pub(crate) struct WebOAuthClientQuery {
     #[serde(
         default,
         alias = "client_key",
         alias = "clientKey",
         alias = "oauthClientKey"
     )]
-    oauth_client_key: Option<String>,
+    pub(crate) oauth_client_key: Option<String>,
 }
 
 pub(crate) async fn admin_prepare_oauth_url_web(

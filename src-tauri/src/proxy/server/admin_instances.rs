@@ -46,10 +46,10 @@ pub(crate) async fn admin_list_instances(
 }
 
 #[derive(Deserialize, Default)]
-struct CreateInstancePayload {
-    name: String,
-    account: Option<String>,
-    from: Option<String>,
+pub(crate) struct CreateInstancePayload {
+    pub(crate) name: String,
+    pub(crate) account: Option<String>,
+    pub(crate) from: Option<String>,
 }
 
 pub(crate) async fn admin_create_instance(
@@ -168,9 +168,9 @@ pub(crate) async fn admin_get_instance_status(
 }
 
 #[derive(Deserialize, Default)]
-struct LaunchInstancePayload {
+pub(crate) struct LaunchInstancePayload {
     #[serde(rename = "repoPath")]
-    repo_path: Option<String>,
+    pub(crate) repo_path: Option<String>,
 }
 
 pub(crate) async fn admin_start_instance(
@@ -247,10 +247,10 @@ pub(crate) async fn admin_restart_instance(
 }
 
 #[derive(Deserialize)]
-struct SwitchInstanceAccountPayload {
-    account: Option<String>,
+pub(crate) struct SwitchInstanceAccountPayload {
+    pub(crate) account: Option<String>,
     #[serde(rename = "accountId")]
-    account_id: Option<String>,
+    pub(crate) account_id: Option<String>,
 }
 
 pub(crate) async fn admin_switch_instance_account(
@@ -283,8 +283,8 @@ pub(crate) async fn admin_switch_instance_account(
 }
 
 #[derive(Deserialize)]
-struct CloneInstancePayload {
-    name: String,
+pub(crate) struct CloneInstancePayload {
+    pub(crate) name: String,
 }
 
 pub(crate) async fn admin_clone_instance(

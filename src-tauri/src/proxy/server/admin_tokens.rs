@@ -51,8 +51,8 @@ pub(crate) async fn admin_create_user_token(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct RenewTokenRequest {
-    expires_type: String,
+pub(crate) struct RenewTokenRequest {
+    pub(crate) expires_type: String,
 }
 
 pub(crate) async fn admin_renew_user_token(

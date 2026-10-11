@@ -16,15 +16,15 @@ use tokio::sync::RwLock;
 #[derive(Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 #[allow(dead_code)] // Reserved log interface struct
-struct LogsRequest {
+pub(crate) struct LogsRequest {
     #[serde(default)]
-    limit: usize,
+    pub(crate) limit: usize,
     #[serde(default)]
-    offset: usize,
+    pub(crate) offset: usize,
     #[serde(default)]
-    filter: String,
+    pub(crate) filter: String,
     #[serde(default)]
-    errors_only: bool,
+    pub(crate) errors_only: bool,
 }
 
 #[allow(dead_code)] // Reserved log endpoint
@@ -67,8 +67,8 @@ pub(crate) async fn admin_get_config(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct SaveConfigWrapper {
-    config: AppConfig,
+pub(crate) struct SaveConfigWrapper {
+    pub(crate) config: AppConfig,
 }
 
 pub(crate) async fn admin_save_config(

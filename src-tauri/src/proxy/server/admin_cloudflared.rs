@@ -76,8 +76,8 @@ pub(crate) async fn admin_cloudflared_install(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct CloudflaredStartRequest {
-    config: crate::modules::cloudflared::CloudflaredConfig,
+pub(crate) struct CloudflaredStartRequest {
+    pub(crate) config: crate::modules::cloudflared::CloudflaredConfig,
 }
 
 pub(crate) async fn admin_cloudflared_start(

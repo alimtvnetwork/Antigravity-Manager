@@ -15,14 +15,14 @@ use serde_json::json;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct IpAccessLogQuery {
+pub(crate) struct IpAccessLogQuery {
     #[serde(default = "default_page")]
-    page: usize,
+    pub(crate) page: usize,
     #[serde(default = "default_page_size")]
-    page_size: usize,
-    search: Option<String>,
+    pub(crate) page_size: usize,
+    pub(crate) search: Option<String>,
     #[serde(default)]
-    blocked_only: bool,
+    pub(crate) blocked_only: bool,
 }
 
 fn default_page() -> usize {
@@ -33,9 +33,9 @@ fn default_page_size() -> usize {
 }
 
 #[derive(Serialize)]
-struct IpAccessLogResponse {
-    logs: Vec<crate::modules::security_db::IpAccessLog>,
-    total: usize,
+pub(crate) struct IpAccessLogResponse {
+    pub(crate) logs: Vec<crate::modules::security_db::IpAccessLog>,
+    pub(crate) total: usize,
 }
 
 pub(crate) async fn admin_get_ip_access_logs(
@@ -68,11 +68,11 @@ pub(crate) async fn admin_clear_ip_access_logs(
 }
 
 #[derive(Serialize)]
-struct IpStatsResponse {
-    total_requests: usize,
-    unique_ips: usize,
-    blocked_requests: usize,
-    top_ips: Vec<crate::modules::security_db::IpRanking>,
+pub(crate) struct IpStatsResponse {
+    pub(crate) total_requests: usize,
+    pub(crate) unique_ips: usize,
+    pub(crate) blocked_requests: usize,
+    pub(crate) top_ips: Vec<crate::modules::security_db::IpRanking>,
 }
 
 pub(crate) async fn admin_get_ip_stats(
@@ -100,9 +100,9 @@ pub(crate) async fn admin_get_ip_stats(
 }
 
 #[derive(Deserialize)]
-struct IpTokenStatsQuery {
-    limit: Option<usize>,
-    hours: Option<i64>,
+pub(crate) struct IpTokenStatsQuery {
+    pub(crate) limit: Option<usize>,
+    pub(crate) hours: Option<i64>,
 }
 
 pub(crate) async fn admin_get_ip_token_stats(
@@ -131,10 +131,10 @@ pub(crate) async fn admin_get_ip_blacklist(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct AddBlacklistRequest {
-    ip_pattern: String,
-    reason: Option<String>,
-    expires_at: Option<i64>,
+pub(crate) struct AddBlacklistRequest {
+    pub(crate) ip_pattern: String,
+    pub(crate) reason: Option<String>,
+    pub(crate) expires_at: Option<i64>,
 }
 
 pub(crate) async fn admin_add_ip_to_blacklist(
@@ -158,8 +158,8 @@ pub(crate) async fn admin_add_ip_to_blacklist(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct RemoveIpRequest {
-    ip_pattern: String,
+pub(crate) struct RemoveIpRequest {
+    pub(crate) ip_pattern: String,
 }
 
 pub(crate) async fn admin_remove_ip_from_blacklist(
@@ -212,8 +212,8 @@ pub(crate) async fn admin_clear_ip_blacklist(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct CheckIpQuery {
-    ip: String,
+pub(crate) struct CheckIpQuery {
+    pub(crate) ip: String,
 }
 
 pub(crate) async fn admin_check_ip_in_blacklist(
@@ -241,9 +241,9 @@ pub(crate) async fn admin_get_ip_whitelist(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct AddWhitelistRequest {
-    ip_pattern: String,
-    description: Option<String>,
+pub(crate) struct AddWhitelistRequest {
+    pub(crate) ip_pattern: String,
+    pub(crate) description: Option<String>,
 }
 
 pub(crate) async fn admin_add_ip_to_whitelist(
@@ -333,8 +333,8 @@ pub(crate) async fn admin_get_security_config(
 }
 
 #[derive(Deserialize)]
-struct UpdateSecurityConfigWrapper {
-    config: crate::proxy::config::SecurityMonitorConfig,
+pub(crate) struct UpdateSecurityConfigWrapper {
+    pub(crate) config: crate::proxy::config::SecurityMonitorConfig,
 }
 
 pub(crate) async fn admin_update_security_config(

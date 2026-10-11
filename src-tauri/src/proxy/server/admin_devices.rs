@@ -11,9 +11,9 @@ use serde::Deserialize;
 use serde_json::json;
 
 #[derive(Deserialize)]
-struct BindDeviceRequest {
+pub(crate) struct BindDeviceRequest {
     #[serde(default = "default_bind_mode")]
-    mode: String,
+    pub(crate) mode: String,
 }
 
 fn default_bind_mode() -> String {
@@ -74,24 +74,24 @@ pub(crate) async fn admin_preview_generate_profile(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct BindDeviceProfileWrapper {
+pub(crate) struct BindDeviceProfileWrapper {
     #[serde(default)]
-    account_id: String,
+    pub(crate) account_id: String,
     #[serde(alias = "profile")]
-    profile_wrapper: DeviceProfileApiWrapper,
+    pub(crate) profile_wrapper: DeviceProfileApiWrapper,
 }
 
 // API   DeviceProfile  ，  camelCase
 #[derive(Deserialize)]
-struct DeviceProfileApiWrapper {
+pub(crate) struct DeviceProfileApiWrapper {
     #[serde(alias = "machineId")]
-    machine_id: String,
+    pub(crate) machine_id: String,
     #[serde(alias = "macMachineId")]
-    mac_machine_id: String,
+    pub(crate) mac_machine_id: String,
     #[serde(alias = "devDeviceId")]
-    dev_device_id: String,
+    pub(crate) dev_device_id: String,
     #[serde(alias = "sqmId")]
-    sqm_id: String,
+    pub(crate) sqm_id: String,
 }
 
 impl From<DeviceProfileApiWrapper> for crate::models::account::DeviceProfile {

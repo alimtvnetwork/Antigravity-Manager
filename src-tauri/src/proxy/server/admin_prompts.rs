@@ -13,10 +13,10 @@ use serde_json::json;
 // ── Prompt Lifecycle Handlers ──
 
 #[derive(Deserialize, Default)]
-struct PromptQueryParameters {
+pub(crate) struct PromptQueryParameters {
     #[serde(rename = "instanceId")]
-    instance_id: Option<String>,
-    repo: Option<String>,
+    pub(crate) instance_id: Option<String>,
+    pub(crate) repo: Option<String>,
 }
 
 pub(crate) async fn admin_list_prompts(
@@ -81,13 +81,13 @@ pub(crate) async fn admin_get_running_prompts(
 }
 
 #[derive(Deserialize)]
-struct DispatchPromptPayload {
+pub(crate) struct DispatchPromptPayload {
     #[serde(rename = "instanceId")]
-    instance_id: Option<String>,
+    pub(crate) instance_id: Option<String>,
     #[serde(rename = "repoPath")]
-    repo_path: Option<String>,
-    content: String,
-    model: Option<String>,
+    pub(crate) repo_path: Option<String>,
+    pub(crate) content: String,
+    pub(crate) model: Option<String>,
 }
 
 pub(crate) async fn admin_dispatch_prompt(
@@ -144,10 +144,10 @@ pub(crate) async fn admin_tick_prompt_queue(
 }
 
 #[derive(Deserialize, Default)]
-struct PromptScopePayload {
+pub(crate) struct PromptScopePayload {
     #[serde(rename = "instanceId")]
-    instance_id: Option<String>,
-    keep: Option<usize>,
+    pub(crate) instance_id: Option<String>,
+    pub(crate) keep: Option<usize>,
 }
 
 pub(crate) async fn admin_backup_prompts(

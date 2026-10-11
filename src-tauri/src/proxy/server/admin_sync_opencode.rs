@@ -8,8 +8,8 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct OpencodeSyncStatusRequest {
-    proxy_url: String,
+pub(crate) struct OpencodeSyncStatusRequest {
+    pub(crate) proxy_url: String,
 }
 
 pub(crate) async fn admin_get_opencode_sync_status(
@@ -32,12 +32,12 @@ pub(crate) async fn admin_get_opencode_families() -> impl IntoResponse {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct OpencodeSyncRequest {
-    proxy_url: String,
-    api_key: String,
+pub(crate) struct OpencodeSyncRequest {
+    pub(crate) proxy_url: String,
+    pub(crate) api_key: String,
     #[serde(default)]
-    sync_accounts: bool,
-    pub models: Option<Vec<crate::proxy::opencode_sync::ModelInput>>,
+    pub(crate) sync_accounts: bool,
+    pub(crate) models: Option<Vec<crate::proxy::opencode_sync::ModelInput>>,
 }
 
 pub(crate) async fn admin_execute_opencode_sync(
@@ -61,14 +61,14 @@ pub(crate) async fn admin_execute_opencode_sync(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct OpencodeOpenaiSyncRequest {
-    proxy_url: String,
-    api_key: String,
+pub(crate) struct OpencodeOpenaiSyncRequest {
+    pub(crate) proxy_url: String,
+    pub(crate) api_key: String,
     #[serde(default)]
-    provider_id: Option<String>,
+    pub(crate) provider_id: Option<String>,
     #[serde(default)]
-    provider_name: Option<String>,
-    models: Option<Vec<crate::proxy::opencode_sync::ModelInput>>,
+    pub(crate) provider_name: Option<String>,
+    pub(crate) models: Option<Vec<crate::proxy::opencode_sync::ModelInput>>,
 }
 
 pub(crate) async fn admin_execute_opencode_openai_sync(
@@ -108,8 +108,8 @@ pub(crate) async fn admin_get_opencode_providers(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct OpencodeRemoveProviderRequest {
-    provider_id: String,
+pub(crate) struct OpencodeRemoveProviderRequest {
+    pub(crate) provider_id: String,
 }
 
 pub(crate) async fn admin_execute_opencode_remove_provider(
@@ -143,8 +143,8 @@ pub(crate) async fn admin_execute_opencode_restore(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct GetOpencodeConfigRequest {
-    file_name: Option<String>,
+pub(crate) struct GetOpencodeConfigRequest {
+    pub(crate) file_name: Option<String>,
 }
 
 pub(crate) async fn admin_get_opencode_config_content(
@@ -174,9 +174,9 @@ pub(crate) async fn admin_get_opencode_config_content(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct OpencodeClearRequest {
-    proxy_url: Option<String>,
-    clear_legacy: Option<bool>,
+pub(crate) struct OpencodeClearRequest {
+    pub(crate) proxy_url: Option<String>,
+    pub(crate) clear_legacy: Option<bool>,
 }
 
 pub(crate) async fn admin_execute_opencode_clear(

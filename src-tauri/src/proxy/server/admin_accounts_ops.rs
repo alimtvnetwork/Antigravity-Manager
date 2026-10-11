@@ -11,9 +11,9 @@ use axum::{
 use serde::Deserialize;
 
 #[derive(Deserialize)]
-struct BulkDeleteRequest {
+pub(crate) struct BulkDeleteRequest {
     #[serde(rename = "accountIds")]
-    account_ids: Vec<String>,
+    pub(crate) account_ids: Vec<String>,
 }
 
 pub(crate) async fn admin_delete_accounts(
@@ -30,8 +30,8 @@ pub(crate) async fn admin_delete_accounts(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ReorderRequest {
-    account_ids: Vec<String>,
+pub(crate) struct ReorderRequest {
+    pub(crate) account_ids: Vec<String>,
 }
 
 pub(crate) async fn admin_reorder_accounts(
@@ -89,15 +89,15 @@ pub(crate) async fn admin_fetch_account_quota(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ToggleProxyRequest {
-    enable: bool,
-    reason: Option<String>,
+pub(crate) struct ToggleProxyRequest {
+    pub(crate) enable: bool,
+    pub(crate) reason: Option<String>,
 }
 
 #[derive(Deserialize)]
-struct AccountPriorityRequest {
+pub(crate) struct AccountPriorityRequest {
     #[serde(deserialize_with = "crate::models::account::deserialize_priority")]
-    priority: u8,
+    pub(crate) priority: u8,
 }
 
 pub(crate) async fn admin_update_account_priority(
