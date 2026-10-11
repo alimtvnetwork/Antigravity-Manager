@@ -356,6 +356,7 @@ ${activePromptText}
             const promptContent = editedPromptText.trim() || activePromptText || selectedConversation.prompt_preview_200w || '';
             const repoPath = selectedProject?.repo_path || '';
             const targetInstId = selectedProject?.instance_id || instanceId || 'default';
+            const targetConvId = conversationTargetMode === 'new' ? undefined : selectedConversation.conversation_id;
             // Single invoke against the registered backend command. Previous
             // nested fallbacks (re-invoke + disconnected resume-file write)
             // masked real failures while still reporting success.
@@ -363,7 +364,7 @@ ${activePromptText}
                 instanceId: targetInstId,
                 repoPath,
                 promptContent,
-                conversationId: selectedConversation.conversation_id,
+                conversationId: targetConvId,
             });
 
             setActionMsg('Prompt enqueued into FIFO scheduler queue!');
@@ -375,7 +376,7 @@ ${activePromptText}
         }
     }, [
         selectedConversation, selectedProject, editedPromptText, activePromptText,
-        instanceId, setIsEnqueueing, setActionMsg, setError,
+        conversationTargetMode, instanceId, setIsEnqueueing, setActionMsg, setError,
     ]);
 
     const handleFocusIde = useCallback(async () => {

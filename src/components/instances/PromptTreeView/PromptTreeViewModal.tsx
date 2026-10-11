@@ -59,6 +59,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         isArchivedProjectsExpanded, setIsArchivedProjectsExpanded,
         refreshingProjectId,
         confirmationSuffix, setConfirmationSuffix,
+        conversationTargetMode, setConversationTargetMode,
         selectedProjectScope, setSelectedProjectScope,
         isDetailsModalOpen, setIsDetailsModalOpen,
         copiedField, setCopiedField,
@@ -350,6 +351,8 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                     activePromptText={activePromptText}
                                     confirmationSuffix={confirmationSuffix}
                                     setConfirmationSuffix={setConfirmationSuffix}
+                                    conversationTargetMode={conversationTargetMode}
+                                    setConversationTargetMode={setConversationTargetMode}
                                     isCopiedText={false}
                                     setIsCopiedText={() => {}}
                                     isCopiedRaw={false}

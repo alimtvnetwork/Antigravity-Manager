@@ -199,7 +199,10 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
         }
 
         if !sent {
-            let _ = crate::modules::instance::ensure_instance_running_for_dispatch(&inst_id, Some(&repo_path));
+            let _ = crate::modules::instance::ensure_instance_running_for_dispatch(
+                &inst_id,
+                Some(&repo_path),
+            );
         }
 
         // Update active_prompts status to 'dispatched'
