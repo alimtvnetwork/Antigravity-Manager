@@ -6,6 +6,7 @@ use crate::proxy::middleware::{
     service_status_middleware,
 };
 use axum::{
+    Json,
     extract::DefaultBodyLimit,
     response::Response,
     routing::{any, get, post},

@@ -8,8 +8,8 @@ use std::process::Command;
 
 mod get_core_gateway_models;
 mod get_sync_status;
-mod scan_windows_cli_paths;
-mod sync_config;
+pub(crate) mod scan_windows_cli_paths;
+pub(crate) mod sync_config;
 #[cfg(test)]
 mod tests;
 

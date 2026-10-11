@@ -1,6 +1,6 @@
 // Tools phase (split from request.rs).
 // OpenAI → Gemini 请求转换
-use super::super::models::*;
+use super::super::super::models::*;
 use crate::proxy::model_specs;
 use crate::proxy::token_manager::ProxyToken;
 
@@ -11,7 +11,7 @@ use super::session_setup::SetupState;
 use crate::proxy::mappers::openai::request::transform::enforce_uppercase_types;
 
 pub(crate) fn phase_tools(
-    request: &super::models::OpenAIRequest,
+    request: &super::super::models::OpenAIRequest,
     mapped_model: &str,
     token: Option<&crate::proxy::token_manager::ProxyToken>,
     setup: &super::session_setup::SetupState,
@@ -185,7 +185,7 @@ pub(crate) fn phase_tools(
             None
         };
     let system_parts =
-        super::context_blocks::build_system_instruction_parts(&system_instructions, global_prompt);
+        super::super::context_blocks::build_system_instruction_parts(&system_instructions, global_prompt);
     if !system_parts.is_empty() {
         inner_request["systemInstruction"] = json!({
             "role": "user",

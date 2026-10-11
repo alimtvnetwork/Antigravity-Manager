@@ -6,7 +6,7 @@ use tauri::Emitter;
 use tokio::sync::{RwLock, Semaphore};
 
 mod proxymonitor_impl;
-mod proxyrequestlog;
+pub(crate) mod proxyrequestlog;
 
 #[cfg(test)]
 pub(crate) use proxyrequestlog::prompt_log_tests;

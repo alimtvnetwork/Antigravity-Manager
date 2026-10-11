@@ -1,6 +1,6 @@
 // System instructions phase (split from request.rs).
 // OpenAI → Gemini 请求转换
-use super::super::models::*;
+use super::super::super::models::*;
 use crate::proxy::model_specs;
 use crate::proxy::token_manager::ProxyToken;
 
@@ -13,7 +13,7 @@ pub(crate) struct SystemState {
     pub tool_name_to_schema: std::collections::HashMap<String, serde_json::Value>,
 }
 
-pub(crate) fn phase_system(request: &super::models::OpenAIRequest) -> SystemState {
+pub(crate) fn phase_system(request: &super::super::models::OpenAIRequest) -> SystemState {
     let mut system_instructions: Vec<String> = collect_system_instruction_blocks(request);
 
     // 遵循纯透传原则：不替换日期、路径、UUID 等任何动态字段，完整保留客户端与 Agent 的真实环境感知。

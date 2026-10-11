@@ -6,7 +6,7 @@
 
 mod binary;
 mod catalog;
-mod commands;
+pub(crate) mod commands;
 mod config_paths;
 mod dtos;
 pub(crate) mod lock;

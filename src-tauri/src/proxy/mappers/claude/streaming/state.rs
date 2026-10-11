@@ -15,7 +15,7 @@ pub struct StreamingState {
     pub block_index: usize,
     pub message_start_sent: bool,
     pub message_stop_sent: bool,
-    used_tool: bool,
+    pub(crate) used_tool: bool,
     signatures: SignatureManager,
     pub(crate) trailing_signature: Option<String>,
     pub web_search_query: Option<String>,

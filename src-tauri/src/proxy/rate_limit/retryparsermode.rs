@@ -82,7 +82,7 @@ pub struct RateLimitInfo {
 }
 
 /// 失败计数过期时间：1小时（超过此时间未失败则重置计数）
-const FAILURE_COUNT_EXPIRY_SECONDS: u64 = 3600;
+pub(crate) const FAILURE_COUNT_EXPIRY_SECONDS: u64 = 3600;
 
 /// 限流跟踪器
 pub(crate) struct QuotaBucketLimit {

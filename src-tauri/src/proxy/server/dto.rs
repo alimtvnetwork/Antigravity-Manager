@@ -3,6 +3,7 @@ use super::app_state::AppState;
 use axum::extract::FromRef;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::RwLock;
 
 // Implement FromRef for AppState so middleware can extract security state

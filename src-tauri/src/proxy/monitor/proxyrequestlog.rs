@@ -1,7 +1,7 @@
 use super::*;
 
 // Admission happens before spawn_blocking, so queued tasks cannot retain unlimited bodies.
-static LOG_WRITERS: Semaphore = Semaphore::const_new(4);
+pub(crate) static LOG_WRITERS: Semaphore = Semaphore::const_new(4);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProxyRequestLog {

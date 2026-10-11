@@ -4,7 +4,7 @@ use std::{env, fs, path::PathBuf, time::Duration};
 use tokio::process::Command;
 
 mod acquire_openclaw_config_lock;
-mod sync_openclaw_provider;
+pub(crate) mod sync_openclaw_provider;
 
 pub(crate) use acquire_openclaw_config_lock::acquire_openclaw_config_lock;
 pub(crate) use acquire_openclaw_config_lock::atomically_write_config;

@@ -2,11 +2,11 @@ use super::*;
 
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
-const VERSION_PROBE_TIMEOUT: Duration = Duration::from_secs(5);
+pub(crate) const VERSION_PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 
-const HERMES_DIR: &str = ".hermes";
+pub(crate) const HERMES_DIR: &str = ".hermes";
 pub const HERMES_CONFIG_FILE: &str = "config.yaml";
-const BACKUP_SUFFIX: &str = ".antigravity-manager.bak";
+pub(crate) const BACKUP_SUFFIX: &str = ".antigravity-manager.bak";
 const PROVIDER_ID: &str = "antigravity-manager";
 pub const PROVIDER_DISPLAY_NAME: &str = "Antigravity Manager";
 pub const PROVIDER_REF: &str = "custom:antigravity-manager";

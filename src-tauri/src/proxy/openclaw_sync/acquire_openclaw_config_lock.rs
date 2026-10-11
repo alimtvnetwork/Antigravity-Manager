@@ -3,13 +3,13 @@ use super::*;
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-const VERSION_PROBE_TIMEOUT: Duration = Duration::from_secs(5);
+pub(crate) const VERSION_PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 
 const OPENCLAW_DIR: &str = ".openclaw";
 
-const OPENCLAW_CONFIG_FILE: &str = "openclaw.json";
+pub(crate) const OPENCLAW_CONFIG_FILE: &str = "openclaw.json";
 
-const BACKUP_SUFFIX: &str = ".antigravity-manager.bak";
+pub(crate) const BACKUP_SUFFIX: &str = ".antigravity-manager.bak";
 
 pub(crate) const PROVIDER_ID: &str = "antigravity-manager";
 

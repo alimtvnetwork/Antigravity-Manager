@@ -11,7 +11,7 @@ pub(crate) const CODEX_VISIBLE_THOUGHT_MESSAGE_PREFIX: &str = "msg_thought_";
 pub(crate) struct NormalizedInputImage {
     mime_type: String,
     base64_data: String,
-    decoded_len: usize,
+    pub(crate) decoded_len: usize,
 }
 
 pub(crate) fn validate_input_image_limits(

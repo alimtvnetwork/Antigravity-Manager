@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Clone, Copy)]
 pub(crate) struct AppRuntimeFlags {
-    tray_enabled: bool,
+    pub(crate) tray_enabled: bool,
 }
 
 pub(crate) fn env_flag_enabled(name: &str) -> bool {

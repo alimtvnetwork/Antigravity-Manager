@@ -1,13 +1,13 @@
 // Contents building phase (split from request.rs).
 // OpenAI → Gemini 请求转换
-use super::super::models::*;
+use super::super::super::models::*;
 use crate::proxy::model_specs;
 use crate::proxy::token_manager::ProxyToken;
 
 use serde_json::{json, Value};
 
 pub(crate) fn phase_contents(
-    request: &super::models::OpenAIRequest,
+    request: &super::super::models::OpenAIRequest,
     mapped_model: &str,
     is_responses_api: bool,
     actual_include_thinking: bool,

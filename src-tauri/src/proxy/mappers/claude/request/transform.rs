@@ -389,14 +389,14 @@ pub fn transform_claude_request_in_timed(
     // 生成 requestId —— 官方 5 段形态，三适配器共用。
     // 必须含 unixMs：历史实现为 `agent/antigravity/{session[:8]}/{count}`，**不含时间戳**，
     // 同一会话同一轮次重试会拿到完全相同的 ID，从而 pin 到上一次的 429 / 旧缓存。
-    let request_id = super::super::super::super::common_utils::build_official_request_id(
+    let request_id = super::super::super::common_utils::build_official_request_id(
         &session_id,
         message_count as u64,
     );
 
     // 官方客户端指纹（企业 / GCP 账号为 jetski）—— 三适配器共用，避免指纹漂移
     let (official_user_agent, _official_ide_type) =
-        super::super::super::super::common_utils::resolve_official_fingerprint(token);
+        super::super::super::common_utils::resolve_official_fingerprint(token);
 
     // [CACHE] 统一委托进站流水线进行前缀拓扑规范化与对齐（Pipeline First 核心归一）
     crate::proxy::pipeline::InboundThinkingPipeline::align_google_request_prefix_topology(
@@ -412,7 +412,7 @@ pub fn transform_claude_request_in_timed(
         .unwrap_or(false);
     let has_tool_interactions = reordered_inner
         .get("contents")
-        .map(super::super::super::super::common_utils::contents_has_tool_interactions)
+        .map(super::super::super::common_utils::contents_has_tool_interactions)
         .unwrap_or(false);
     let is_agent_request =
         config.request_type != "image_gen" && (has_tools || has_tool_interactions);

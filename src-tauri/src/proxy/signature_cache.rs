@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, SystemTime};
 
-mod cacheentry;
+pub(crate) mod cacheentry;
 mod tests;
 
 pub(crate) use cacheentry::CacheEntry;
