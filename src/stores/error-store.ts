@@ -20,7 +20,8 @@ export interface ErrorContext {
   source?: string;
   triggerComponent?: string;
   triggerAction?: string;
-  [key: string]: string | number | boolean | null | undefined;
+  metadata?: Record<string, any>;
+  [key: string]: any;
 }
 
 export interface EnvelopeErrors {
@@ -59,6 +60,7 @@ export interface CapturedError {
   routeComponent?: string;
   requestedAt?: string;
   envelopeErrors?: EnvelopeErrors;
+  metadata?: Record<string, any>;
 }
 
 export interface CaptureErrorMeta {
@@ -71,6 +73,8 @@ export interface CaptureErrorMeta {
   status?: number;
   requestBody?: string;
   context?: ErrorContext;
+  metadata?: Record<string, any>;
+  stackTrace?: string;
 }
 
 // In-memory ring buffer for the last 10 user clicks
@@ -208,10 +212,30 @@ export function buildCapturedError(
   context?: ErrorContext
 ): CapturedError {
   const norm = normalizeRawError(rawError);
+
+  // Extract full stack trace string from error instances, error-like objects, or synthesized Error
   let stack = rawError instanceof Error ? rawError.stack : undefined;
+  if (!stack && typeof rawError === 'object' && rawError !== null) {
+    const rec = rawError as Record<string, any>;
+    stack = rec.stack || rec.stackTrace || rec.stack_trace || rec.backend_stack_trace;
+  }
+  if (!stack && meta?.stackTrace) {
+    stack = meta.stackTrace;
+  }
   if (!stack) {
     stack = new Error(norm.message).stack;
   }
+
+  // Extract and merge metadata from rawError, meta, and context
+  const rawMeta =
+    typeof rawError === 'object' && rawError !== null
+      ? (rawError as Record<string, any>).metadata
+      : undefined;
+  const mergedMetadata: Record<string, any> = {
+    ...(rawMeta && typeof rawMeta === 'object' ? rawMeta : {}),
+    ...(meta?.metadata && typeof meta.metadata === 'object' ? meta.metadata : {}),
+  };
+
   const parsed = parseFullStackTrace(stack);
   const clicks = getRecentClicks();
   const currentRoute = typeof window !== 'undefined' ? window.location.pathname : '/';
@@ -226,9 +250,10 @@ export function buildCapturedError(
     context: {
       ...meta?.context,
       ...context,
-      source: meta?.source,
-      triggerComponent: meta?.triggerComponent,
-      triggerAction: meta?.triggerAction,
+      source: meta?.source || context?.source,
+      triggerComponent: meta?.triggerComponent || context?.triggerComponent,
+      triggerAction: meta?.triggerAction || context?.triggerAction,
+      ...(Object.keys(mergedMetadata).length > 0 ? { metadata: mergedMetadata } : {}),
     },
     file: parsed.primaryFrame?.file,
     line: parsed.primaryFrame?.line,
@@ -240,13 +265,15 @@ export function buildCapturedError(
     requestBody: meta?.requestBody,
     responseStatus: norm.status || meta?.status,
     invocationChain: parsed.invocationChain,
-    triggerComponent: meta?.triggerComponent,
-    triggerAction: meta?.triggerAction,
+    triggerComponent: meta?.triggerComponent || context?.triggerComponent,
+    triggerAction: meta?.triggerAction || context?.triggerAction,
     backendStackTrace: norm.backendStack,
     uiClickPath: clicks,
+    uiClickPathString: clicks.map((c) => `${c.element} (${c.action})`).join(' → '),
     uiClickPathArrow: formatClickPathArrow(clicks),
     route: currentRoute,
     envelopeErrors: norm.envelopeErrors,
+    metadata: Object.keys(mergedMetadata).length > 0 ? mergedMetadata : undefined,
   };
 }
 
@@ -301,7 +328,15 @@ export const useErrorStore = create<ErrorStoreState>((set, get) => ({
   },
 
   captureException: (error: Error | string, context?: ErrorContext): CapturedError => {
-    const captured = buildCapturedError(error, undefined, context);
+    const meta: CaptureErrorMeta = {
+      context,
+      source: context?.source,
+      triggerComponent: context?.triggerComponent,
+      triggerAction: context?.triggerAction,
+      stackTrace: error instanceof Error ? error.stack : undefined,
+      metadata: context && (context as any).metadata ? (context as any).metadata : undefined,
+    };
+    const captured = buildCapturedError(error, meta, context);
     set((state) => ({
       selectedError: captured,
       isModalOpen: true,

@@ -306,6 +306,7 @@ const TARGET_FILES = [
     {
         name: 'src/pages/Settings.tsx',
         relPath: 'src/pages/Settings.tsx',
+        optional: true,
         replace: (content) => content.replace(
             /(useState<string>\(versionData\.version\s*\|\|\s*versionData\.Version\s*\|\|\s*')[^']+('\))/,
             `$1${newVersion}$2`
@@ -402,12 +403,17 @@ const TARGET_FILES = [
                 return content;
             }
             const anchor = '*   **Version History**:';
-            if (!content.includes(anchor)) {
-                return content;
-            }
             const eol = content.includes('\r\n') ? '\r\n' : '\n';
-            const newBlock = `*   **Version History**:${eol}    *   **v${newVersion} (${today})**:${eol}        -   **[Feature Category] Main Update Summary (PR #xxx)**:${eol}            -   **Description**: Please document update details here; credit contributors inline as \`(Thanks to @aukgit)\`.${eol}`;
-            return content.replace(anchor, newBlock);
+            if (content.includes(anchor)) {
+                const newBlock = `*   **Version History**:${eol}    *   **v${newVersion} (${today})**:${eol}        -   **[Feature Category] Main Update Summary (PR #xxx)**:${eol}            -   **Description**: Please document update details here; credit contributors inline as \`(Thanks to @aukgit)\`.${eol}`;
+                return content.replace(anchor, newBlock);
+            }
+            const firstVersion = content.match(/\s*\*\s+\*\*v\d+\.\d+\.\d+/);
+            if (firstVersion && firstVersion.index !== undefined) {
+                const newBlock = `    *   **v${newVersion} (${today})**:${eol}        -   **[Feature Category] Main Update Summary (PR #xxx)**:${eol}            -   **Description**: Please document update details here; credit contributors inline as \`(Thanks to @aukgit)\`.${eol}${eol}`;
+                return content.slice(0, firstVersion.index) + newBlock + content.slice(firstVersion.index);
+            }
+            return content;
         },
     },
     {
@@ -444,7 +450,9 @@ for (const target of TARGET_FILES) {
     const newContent = target.replace(oldContent);
 
     if (oldContent === newContent) {
-        warn(`File ${target.relPath} contents unchanged (pattern may not have matched).`);
+        if (!target.optional) {
+            warn(`File ${target.relPath} contents unchanged (pattern may not have matched).`);
+        }
     } else {
         if (!isDryRun) {
             fs.writeFileSync(fullPath, newContent, 'utf8');

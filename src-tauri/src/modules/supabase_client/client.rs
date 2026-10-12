@@ -28,6 +28,17 @@ impl SupabaseClient {
             .map_err(|e| AppError::Network(e.to_string(), None))?;
 
         let clean_url = normalize_supabase_url(&endpoint.url);
+        if clean_url.is_empty() {
+            return Err(AppError::Config(
+                "Supabase endpoint URL cannot be empty".to_string(),
+            ));
+        }
+        if !clean_url.starts_with("http://") && !clean_url.starts_with("https://") {
+            return Err(AppError::Config(format!(
+                "Invalid Supabase URL scheme: '{}' (must start with http:// or https://)",
+                clean_url
+            )));
+        }
 
         Ok(Self {
             client: http_client,
@@ -51,9 +62,29 @@ impl SupabaseClient {
         format!("{}/rest/v1/rpc/{}", self.base_url, function_name)
     }
 
+    /// Log a transport error with complete context and stack backtrace
+    pub(crate) fn log_transport_error(&self, op: &str, url: &str, err: &reqwest::Error) {
+        let backtrace = std::backtrace::Backtrace::capture();
+        tracing::error!(
+            target: "supabase_client",
+            operation = op,
+            url = url,
+            error = %err,
+            is_timeout = err.is_timeout(),
+            is_connect = err.is_connect(),
+            status = ?err.status(),
+            backtrace = %backtrace,
+            "Supabase client {} transport error on {}: {}",
+            op,
+            url,
+            err
+        );
+    }
+
     /// Classify a reqwest transport error into an actionable user-facing message
     /// so users see likely causes and next steps instead of a raw error string.
     pub(crate) fn classify_transport_error(&self, e: &reqwest::Error) -> String {
+        self.log_transport_error("test_connection_probe", &self.base_url, e);
         if e.is_timeout() {
             format!(
                 "Connection timed out reaching {}. The Supabase project may be paused (free-tier projects pause after inactivity) or the network may be blocking it. Verify the project is active in the Supabase dashboard, then press Test again.",
@@ -96,12 +127,21 @@ impl SupabaseClient {
                 if status == 401 || status == 403 {
                     let body = resp.text().await.unwrap_or_default();
                     if !body.contains("Secret API key required") {
+                        let err_msg = format!(
+                            "Authentication failed: Invalid API key or Bearer token (HTTP {})",
+                            status
+                        );
+                        let backtrace = std::backtrace::Backtrace::capture();
+                        tracing::warn!(
+                            target: "supabase_client",
+                            endpoint = %self.base_url,
+                            error = %err_msg,
+                            backtrace = %backtrace,
+                            "Supabase connection failed"
+                        );
                         return Ok(EndpointTestResult {
                             is_success: false,
-                            message: format!(
-                                "Authentication failed: Invalid API key or Bearer token (HTTP {})",
-                                status
-                            ),
+                            message: err_msg,
                             status_code: Some(status),
                         });
                     }
@@ -110,6 +150,14 @@ impl SupabaseClient {
                 // Status 404 or other 4xx: proceed to table and auth probes
             }
             Err(e) => {
+                let backtrace = std::backtrace::Backtrace::capture();
+                tracing::warn!(
+                    target: "supabase_client",
+                    endpoint = %self.base_url,
+                    error = %e,
+                    backtrace = %backtrace,
+                    "Supabase connection failed"
+                );
                 return Ok(EndpointTestResult {
                     is_success: false,
                     message: self.classify_transport_error(&e),
@@ -122,56 +170,112 @@ impl SupabaseClient {
         let probe_tables = ["nodes", "command_queue"];
         for table in probe_tables {
             let table_url = format!("{}/rest/v1/{}?limit=0", self.base_url, table);
-            if let Ok(resp) = self.client.get(&table_url).send().await {
-                let status = resp.status().as_u16();
-                if status < 400 {
-                    return Ok(EndpointTestResult {
-                        is_success: true,
-                        message: format!("Connected successfully ({} table verified)", table),
-                        status_code: Some(status),
-                    });
-                }
-                if status == 401 || status == 403 {
-                    return Ok(EndpointTestResult {
-                        is_success: false,
-                        message: format!(
+            match self.client.get(&table_url).send().await {
+                Ok(resp) => {
+                    let status = resp.status().as_u16();
+                    if status < 400 {
+                        return Ok(EndpointTestResult {
+                            is_success: true,
+                            message: format!("Connected successfully ({} table verified)", table),
+                            status_code: Some(status),
+                        });
+                    }
+                    if status == 401 || status == 403 {
+                        let err_msg = format!(
                             "Authentication failed: Invalid API key or Bearer token (HTTP {})",
                             status
-                        ),
-                        status_code: Some(status),
-                    });
+                        );
+                        let backtrace = std::backtrace::Backtrace::capture();
+                        tracing::warn!(
+                            target: "supabase_client",
+                            endpoint = %self.base_url,
+                            error = %err_msg,
+                            backtrace = %backtrace,
+                            "Supabase connection failed"
+                        );
+                        return Ok(EndpointTestResult {
+                            is_success: false,
+                            message: err_msg,
+                            status_code: Some(status),
+                        });
+                    }
+                    let body = resp.text().await.unwrap_or_default();
+                    if body.contains("PGRST")
+                        || body.contains("relation")
+                        || body.contains("does not exist")
+                        || body.contains("schema cache")
+                    {
+                        return Ok(EndpointTestResult {
+                            is_success: true,
+                            message: "Connected successfully (PostgREST responsive; run Schema Migration to create tables)".to_string(),
+                            status_code: Some(200),
+                        });
+                    }
+                    tracing::debug!(
+                        target: "supabase_client",
+                        endpoint = %self.base_url,
+                        table = table,
+                        status = status,
+                        body = %body,
+                        "Probe 2 table check returned non-success response, continuing probe ladder"
+                    );
                 }
-                let body = resp.text().await.unwrap_or_default();
-                if body.contains("PGRST")
-                    || body.contains("relation")
-                    || body.contains("does not exist")
-                    || body.contains("schema cache")
-                {
-                    return Ok(EndpointTestResult {
-                        is_success: true,
-                        message: "Connected successfully (PostgREST responsive; run Schema Migration to create tables)".to_string(),
-                        status_code: Some(200),
-                    });
+                Err(e) => {
+                    self.log_transport_error("probe_table", &table_url, &e);
+                    tracing::debug!(
+                        target: "supabase_client",
+                        endpoint = %self.base_url,
+                        table = table,
+                        error = %e,
+                        "Probe 2 table probe network request failed (non-fatal, continuing probe ladder)"
+                    );
                 }
             }
         }
 
         // Probe 3: Supabase Service Auth Health probe (/auth/v1/health)
         let auth_url = format!("{}/auth/v1/health", self.base_url);
-        if let Ok(resp) = self.client.get(&auth_url).send().await {
-            let status = resp.status().as_u16();
-            if status < 400 {
-                return Ok(EndpointTestResult {
-                    is_success: true,
-                    message: "Connected successfully (Supabase service online)".to_string(),
-                    status_code: Some(status),
-                });
+        match self.client.get(&auth_url).send().await {
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                if status < 400 {
+                    return Ok(EndpointTestResult {
+                        is_success: true,
+                        message: "Connected successfully (Supabase service online)".to_string(),
+                        status_code: Some(status),
+                    });
+                } else {
+                    tracing::debug!(
+                        target: "supabase_client",
+                        endpoint = %self.base_url,
+                        status = status,
+                        "Probe 3 auth health check returned status >= 400, continuing probe ladder"
+                    );
+                }
+            }
+            Err(e) => {
+                self.log_transport_error("probe_auth_health", &auth_url, &e);
+                tracing::debug!(
+                    target: "supabase_client",
+                    endpoint = %self.base_url,
+                    error = %e,
+                    "Probe 3 auth health probe network request failed (non-fatal, continuing probe ladder)"
+                );
             }
         }
 
+        let fail_msg = "Supabase connection test failed with status: 404 (Endpoint not found. Please verify Project URL)";
+        let backtrace = std::backtrace::Backtrace::capture();
+        tracing::warn!(
+            target: "supabase_client",
+            endpoint = %self.base_url,
+            error = %fail_msg,
+            backtrace = %backtrace,
+            "Supabase connection failed"
+        );
         Ok(EndpointTestResult {
             is_success: false,
-            message: "Supabase connection test failed with status: 404 (Endpoint not found. Please verify Project URL)".to_string(),
+            message: fail_msg.to_string(),
             status_code: Some(404),
         })
     }
@@ -179,12 +283,10 @@ impl SupabaseClient {
     /// Check if a specific table exists and is readable via PostgREST
     pub async fn check_table_exists(&self, table: &str) -> Result<bool, AppError> {
         let url = format!("{}/rest/v1/{}?limit=0", self.base_url, table);
-        let resp = self
-            .client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| AppError::Network(e.to_string(), None))?;
+        let resp = self.client.get(&url).send().await.map_err(|e| {
+            self.log_transport_error("check_table_exists", &url, &e);
+            AppError::Network(e.to_string(), None)
+        })?;
 
         let status_code = resp.status().as_u16();
         if status_code == 200 {
@@ -266,17 +368,15 @@ impl SupabaseClient {
             url.push_str(query);
         }
 
-        let resp = self
-            .client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| AppError::Network(e.to_string(), None))?;
+        let resp = self.client.get(&url).send().await.map_err(|e| {
+            self.log_transport_error("select", &url, &e);
+            AppError::Network(e.to_string(), None)
+        })?;
 
-        let parsed: Value = resp
-            .json()
-            .await
-            .map_err(|e| AppError::Network(e.to_string(), None))?;
+        let parsed: Value = resp.json().await.map_err(|e| {
+            self.log_transport_error("select_parse_json", &url, &e);
+            AppError::Network(e.to_string(), None)
+        })?;
         Ok(parsed)
     }
 
@@ -290,12 +390,15 @@ impl SupabaseClient {
             .json(&payload)
             .send()
             .await
-            .map_err(|e| AppError::Network(e.to_string(), None))?;
+            .map_err(|e| {
+                self.log_transport_error("insert", &url, &e);
+                AppError::Network(e.to_string(), None)
+            })?;
 
-        let parsed: Value = resp
-            .json()
-            .await
-            .map_err(|e| AppError::Network(e.to_string(), None))?;
+        let parsed: Value = resp.json().await.map_err(|e| {
+            self.log_transport_error("insert_parse_json", &url, &e);
+            AppError::Network(e.to_string(), None)
+        })?;
         Ok(parsed)
     }
 
@@ -321,12 +424,15 @@ impl SupabaseClient {
             .json(&payload)
             .send()
             .await
-            .map_err(|e| AppError::Network(e.to_string(), None))?;
+            .map_err(|e| {
+                self.log_transport_error("upsert", &url, &e);
+                AppError::Network(e.to_string(), None)
+            })?;
 
-        let parsed: Value = resp
-            .json()
-            .await
-            .map_err(|e| AppError::Network(e.to_string(), None))?;
+        let parsed: Value = resp.json().await.map_err(|e| {
+            self.log_transport_error("upsert_parse_json", &url, &e);
+            AppError::Network(e.to_string(), None)
+        })?;
         Ok(parsed)
     }
 
@@ -350,12 +456,15 @@ impl SupabaseClient {
             .json(&payload)
             .send()
             .await
-            .map_err(|e| AppError::Network(e.to_string(), None))?;
+            .map_err(|e| {
+                self.log_transport_error("update", &url, &e);
+                AppError::Network(e.to_string(), None)
+            })?;
 
-        let parsed: Value = resp
-            .json()
-            .await
-            .map_err(|e| AppError::Network(e.to_string(), None))?;
+        let parsed: Value = resp.json().await.map_err(|e| {
+            self.log_transport_error("update_parse_json", &url, &e);
+            AppError::Network(e.to_string(), None)
+        })?;
         Ok(parsed)
     }
 
@@ -373,12 +482,15 @@ impl SupabaseClient {
             .header("Prefer", "return=representation")
             .send()
             .await
-            .map_err(|e| AppError::Network(e.to_string(), None))?;
+            .map_err(|e| {
+                self.log_transport_error("delete", &url, &e);
+                AppError::Network(e.to_string(), None)
+            })?;
 
-        let parsed: Value = resp
-            .json()
-            .await
-            .map_err(|e| AppError::Network(e.to_string(), None))?;
+        let parsed: Value = resp.json().await.map_err(|e| {
+            self.log_transport_error("delete_parse_json", &url, &e);
+            AppError::Network(e.to_string(), None)
+        })?;
         Ok(parsed)
     }
 
@@ -391,12 +503,15 @@ impl SupabaseClient {
             .json(&payload)
             .send()
             .await
-            .map_err(|e| AppError::Network(e.to_string(), None))?;
+            .map_err(|e| {
+                self.log_transport_error("rpc", &url, &e);
+                AppError::Network(e.to_string(), None)
+            })?;
 
-        let parsed: Value = resp
-            .json()
-            .await
-            .map_err(|e| AppError::Network(e.to_string(), None))?;
+        let parsed: Value = resp.json().await.map_err(|e| {
+            self.log_transport_error("rpc_parse_json", &url, &e);
+            AppError::Network(e.to_string(), None)
+        })?;
         Ok(parsed)
     }
 }

@@ -1,0 +1,24 @@
+{
+  "id": "subtask-05",
+  "name": "Prompt Tree Stability, Clipboard Deadlock Resolution & Action Capsule",
+  "parent_task": "supabase-connection-and-ui-ux-enhancement",
+  "owner": "Worker-02",
+  "status": "READY",
+  "owned_files": [
+    "src-tauri/src/modules/repo_db/agy.rs",
+    "src-tauri/src/modules/process/locations.rs",
+    "src/components/instances/PromptTreeView/PromptTreeViewModal.tsx",
+    "src/components/instances/PromptTreeView/DetailHeader.tsx",
+    "src/components/instances/PromptTreeView/PromptInstructionView.tsx",
+    "src/components/instances/PromptTreeView/InspectorModal.tsx",
+    "src/utils/clipboard.ts"
+  ],
+  "requirements": [
+    "Fix subprocess pipe deadlock in copy_to_system_clipboard inside src-tauri/src/modules/repo_db/agy.rs by explicitly taking and dropping child.stdin before child.wait() in a background thread",
+    "Guard all raw navigator.clipboard calls in DetailHeader.tsx, InspectorModal.tsx, and PromptInstructionView.tsx with safe copyToClipboard fallbacks to eliminate uncaught Promise rejections",
+    "Verify get_antigravity_cli_executable_path 6-stage fallback ladder in src-tauri/src/modules/process/locations.rs",
+    "Add sleek 2px horizontal indeterminate progress bar under ModalHeader in PromptTreeViewModal.tsx active during isLoading",
+    "Consolidate Send Now, Enqueue, destination mode, and suffix buttons into a right-aligned segmented pill capsule in DetailHeader.tsx",
+    "Preserve all v4.190.0 core stability invariants including FIFO dispatch order and sandboxed instance isolation"
+  ]
+}

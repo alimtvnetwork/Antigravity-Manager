@@ -225,7 +225,7 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                                                                         setCardMoreId(null);
                                                                         handleCloneExecutable(inst.config.id);
                                                                     }}
-                                                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#40285e] text-purple-600 dark:text-purple-400 cursor-pointer disabled:opacity-50"
+                                                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#40285e] text-slate-200 dark:text-slate-100 dark:hover:text-amber-300 cursor-pointer disabled:opacity-50"
                                                                 >
                                                                     <Cpu className="w-3.5 h-3.5" />
                                                                     <span>Clone Executable</span>

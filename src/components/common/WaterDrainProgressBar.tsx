@@ -99,14 +99,7 @@ export function WaterDrainProgressBar({
                                     {Math.round(clamped)}%
                                 </span>
                             ) : (
-                                <svg
-                                    className="w-2 h-2 fill-none stroke-current text-white stroke-[2.5]"
-                                    viewBox="0 0 12 12"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                >
-                                    <path d="M2.5 6.5L4.8 8.8L9.5 3.5" />
-                                </svg>
+                                <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_4px_rgba(255,255,255,0.8)]" />
                             )
                         ) : (
                             <span className="w-1 h-1 rounded-full bg-slate-400/40 dark:bg-white/20" />

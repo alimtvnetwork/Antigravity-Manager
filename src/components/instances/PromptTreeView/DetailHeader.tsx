@@ -54,6 +54,7 @@ export function DetailHeader(props: DetailHeaderProps) {
 
     const [localCopiedText, setLocalCopiedText] = useState(false);
     const isCopiedTextActive = isCopiedText || localCopiedText;
+    const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
 
     return (
         <div className="space-y-2 pb-2.5 border-b border-slate-200 dark:border-[#40285e] shrink-0">
@@ -116,7 +117,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                             type="button"
                             onClick={() => {
                                 const cleanText = stripImagesFromPrompt(activePromptText);
-                                navigator.clipboard.writeText(cleanText);
+                                navigator.clipboard.writeText(cleanText).catch((e) => console.warn(e));
                                 setLocalCopiedText(true);
                                 setIsCopiedText(true);
                                 setTimeout(() => {
@@ -201,55 +202,14 @@ export function DetailHeader(props: DetailHeaderProps) {
                         )}
                     </div>
 
-                    {/* Capsule 2: Execution & Workflow */}
-                    <div className="flex items-center rounded-full bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#40285e]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#40285e]/80 shadow-2xs shrink-0">
-                        {/* Confirmation Suffix Dropdown */}
-                        <div className="flex items-center px-1.5 py-0.5 rounded-l-full">
-                            <select
-                                value={confirmationSuffix}
-                                onChange={(e) => setConfirmationSuffix(e.target.value)}
-                                className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-[10.5px] font-semibold focus:ring-0 focus:outline-none cursor-pointer max-w-[85px] truncate pr-1 py-0"
-                                title="Confirmation suffix appended on Resend"
-                            >
-                                <option value="None (Send as is)" className="bg-white dark:bg-[#171025]">Suffix: None</option>
-                                <option value="Is it done?" className="bg-white dark:bg-[#171025]">Done?</option>
-                                <option value="Is it released?" className="bg-white dark:bg-[#171025]">Released?</option>
-                                <option value="Are you sure about it?" className="bg-white dark:bg-[#171025]">Sure?</option>
-                                <option value="Double check all edge cases" className="bg-white dark:bg-[#171025]">Edge cases</option>
-                                <option value="Verify build and tests" className="bg-white dark:bg-[#171025]">Verify tests</option>
-                            </select>
-                        </div>
-
-                        {/* Destination Conversation Mode Dropdown */}
-                        <div className="flex items-center px-1.5 py-0.5">
-                            <select
-                                value={conversationTargetMode}
-                                onChange={(e) => setConversationTargetMode?.(e.target.value as 'current' | 'new')}
-                                className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-[10.5px] font-semibold focus:ring-0 focus:outline-none cursor-pointer max-w-[90px] truncate pr-1 py-0"
-                                title="Destination conversation mode for Send and Queue"
-                            >
-                                <option value="current" className="bg-white dark:bg-[#171025]">Current</option>
-                                <option value="new" className="bg-white dark:bg-[#171025]">New Conv</option>
-                            </select>
-                        </div>
-
-                        {/* Focus IDE Action (Icon-Only) */}
-                        <button
-                            type="button"
-                            onClick={onFocusIde}
-                            disabled={isFocusing}
-                            className="flex items-center justify-center px-2 py-0.5 text-sky-700 dark:text-sky-300 hover:bg-sky-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
-                            title="Focus Antigravity IDE Window or Launch Instance"
-                        >
-                            <ExternalLink className={cn('w-3 h-3 text-sky-500', isFocusing && 'animate-spin')} />
-                        </button>
-
-                        {/* Send Now Action (Primary Dispatch with Hotkey: N) */}
+                    {/* Capsule 2: Segmented Dark-Glass Split-Dropdown Capsule */}
+                    <div className="relative ml-auto flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
+                        {/* Primary Send Button with <kbd>N</kbd> */}
                         <button
                             type="button"
                             onClick={onResend}
                             disabled={isResending}
-                            className="flex items-center gap-1 px-2 py-0.5 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
+                            className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
                             title="Immediately inject prompt to running instance (Hotkey: N)"
                         >
                             <RotateCw className={cn('w-3 h-3 text-emerald-500', isResending && 'animate-spin')} />
@@ -257,26 +217,111 @@ export function DetailHeader(props: DetailHeaderProps) {
                             <kbd className="ml-0.5 px-1 py-0.2 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded text-[8.5px] font-mono font-bold">N</kbd>
                         </button>
 
-                        {/* Enqueue Action (Icon-Only) */}
+                        {/* Split ChevronDown Dropdown Toggle */}
                         <button
                             type="button"
-                            onClick={onEnqueue}
-                            disabled={isEnqueueing}
-                            className="flex items-center justify-center px-2 py-0.5 text-purple-700 dark:text-purple-300 hover:bg-purple-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
-                            title="Enqueue Prompt into FIFO Scheduler Queue"
+                            onClick={() => setIsActionMenuOpen((prev) => !prev)}
+                            className="flex items-center justify-center px-1.5 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            title="More execution, queue, and dispatch options"
                         >
-                            <ListPlus className="w-3.5 h-3.5 text-purple-500" />
+                            <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isActionMenuOpen && "rotate-180")} />
                         </button>
 
-                        {/* Full Inspector Action (Icon-Only) */}
-                        <button
-                            type="button"
-                            onClick={() => onOpenInspector(selectedConversation)}
-                            className="flex items-center justify-center px-2 py-0.5 text-blue-700 dark:text-cyan-300 hover:bg-blue-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer rounded-r-full"
-                            title="Open Full-Screen Conversation Inspector"
-                        >
-                            <Maximize2 className="h-3 w-3 text-blue-500 dark:text-cyan-400" />
-                        </button>
+                        {/* Dropdown Menu for Enqueue, Focus IDE, Full Inspector, Destination Mode, and Confirmation Suffix */}
+                        {isActionMenuOpen && (
+                            <div
+                                className="absolute right-0 top-full mt-1.5 z-50 w-64 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-1"
+                                onMouseLeave={() => setIsActionMenuOpen(false)}
+                            >
+                                {/* Enqueue Action */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onEnqueue();
+                                        setIsActionMenuOpen(false);
+                                    }}
+                                    disabled={isEnqueueing}
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-amber-800 dark:text-amber-200 hover:bg-amber-50 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors disabled:opacity-50"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <ListPlus className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300 shrink-0" />
+                                        <span className="font-medium">Enqueue Prompt</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-mono">FIFO Queue</span>
+                                </button>
+
+                                {/* Focus IDE Action */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onFocusIde();
+                                        setIsActionMenuOpen(false);
+                                    }}
+                                    disabled={isFocusing}
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors disabled:opacity-50"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <ExternalLink className={cn('w-3.5 h-3.5 text-sky-500 shrink-0', isFocusing && 'animate-spin')} />
+                                        <span className="font-medium">Focus IDE Window</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-mono">Launch/Focus</span>
+                                </button>
+
+                                {/* Full Inspector Action */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onOpenInspector(selectedConversation);
+                                        setIsActionMenuOpen(false);
+                                    }}
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-blue-700 dark:text-cyan-300 hover:bg-blue-50 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Maximize2 className="w-3.5 h-3.5 text-blue-500 dark:text-cyan-400 shrink-0" />
+                                        <span className="font-medium">Full Inspector</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-mono">Full-Screen</span>
+                                </button>
+
+                                <div className="border-t border-slate-100 dark:border-[#40285e]/60 my-1" />
+
+                                {/* Destination Conversation Mode */}
+                                <div className="flex items-center justify-between px-2.5 py-1 text-xs">
+                                    <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
+                                        Destination:
+                                    </span>
+                                    <select
+                                        value={conversationTargetMode}
+                                        onChange={(e) => setConversationTargetMode?.(e.target.value as 'current' | 'new')}
+                                        className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:ring-0 focus:outline-none cursor-pointer py-0.5 text-right"
+                                        title="Destination conversation mode for Send and Queue"
+                                    >
+                                        <option value="current" className="bg-white dark:bg-[#171025]">Current Conv</option>
+                                        <option value="new" className="bg-white dark:bg-[#171025]">New Conv</option>
+                                    </select>
+                                </div>
+
+                                {/* Confirmation Suffix */}
+                                <div className="flex items-center justify-between px-2.5 py-1 text-xs">
+                                    <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
+                                        Suffix:
+                                    </span>
+                                    <select
+                                        value={confirmationSuffix}
+                                        onChange={(e) => setConfirmationSuffix(e.target.value)}
+                                        className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:ring-0 focus:outline-none cursor-pointer py-0.5 text-right max-w-[130px] truncate"
+                                        title="Confirmation suffix appended on Send"
+                                    >
+                                        <option value="None (Send as is)" className="bg-white dark:bg-[#171025]">None</option>
+                                        <option value="Is it done?" className="bg-white dark:bg-[#171025]">Done?</option>
+                                        <option value="Is it released?" className="bg-white dark:bg-[#171025]">Released?</option>
+                                        <option value="Are you sure about it?" className="bg-white dark:bg-[#171025]">Sure?</option>
+                                        <option value="Double check all edge cases" className="bg-white dark:bg-[#171025]">Edge cases</option>
+                                        <option value="Verify build and tests" className="bg-white dark:bg-[#171025]">Verify tests</option>
+                                    </select>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

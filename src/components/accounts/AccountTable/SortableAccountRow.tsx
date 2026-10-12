@@ -67,16 +67,16 @@ export function SortableAccountRow({
             ref={setMergedRef}
             style={style as React.CSSProperties}
             className={cn(
-                "group border-b border-slate-200/90 dark:border-slate-800/90 border-l-2 transition-[color,background-color,border-color] duration-[180ms] ease-in-out",
+                "group ui-interactive-row border-b border-slate-200/90 dark:border-slate-800/90 border-l-2 transition-all duration-200 ease-in-out",
                 isFocused
                     ? "bg-teal-50/90 dark:bg-[#171025] text-slate-900 dark:text-cyan-300 font-bold border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/90 dark:border-slate-800/90 shadow-md ring-1 ring-cyan-500/30"
                     : isCurrent
-                    ? cn(SELECTED_ROW_CLASSES, "border-b border-slate-200/90 dark:border-slate-800/90 hover:bg-slate-200/60 dark:hover:bg-[#171025]")
+                    ? cn(SELECTED_ROW_CLASSES, "border-b border-slate-200/90 dark:border-slate-800/90 hover:bg-slate-200/70 dark:hover:bg-[var(--ui-surface-pressed)] hover:shadow-xs")
                     : selected
-                    ? "bg-blue-50/90 dark:bg-[#171025] text-blue-950 dark:text-blue-100 border-l-blue-500 font-semibold shadow-xs ring-1 ring-blue-500/30"
+                    ? "bg-blue-50/90 dark:bg-[#171025] text-blue-950 dark:text-blue-100 border-l-blue-500 font-semibold shadow-xs ring-1 ring-blue-500/30 hover:bg-blue-100/70 dark:hover:bg-[var(--ui-surface-pressed)] hover:shadow-xs"
                     : isDragging
                     ? "bg-blue-100 dark:bg-blue-900/30 shadow-lg"
-                    : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50/80 dark:hover:bg-[#171025]/60 hover:border-l-blue-500/70"
+                    : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-100/80 dark:hover:bg-[var(--ui-surface-hover)] hover:border-l-blue-500/80 dark:hover:border-l-[var(--ui-interactive)] hover:shadow-xs"
             )}
         >
             {/* 拖拽手柄 */}

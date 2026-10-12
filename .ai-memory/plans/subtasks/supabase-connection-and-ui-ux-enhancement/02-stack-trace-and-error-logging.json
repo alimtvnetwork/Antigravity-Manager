@@ -1,0 +1,19 @@
+{
+  "task": "Task-02",
+  "title": "Supabase Stack Trace & Error Logging Hardening",
+  "status": "READY",
+  "filesChanged": [
+    "src-tauri/src/modules/supabase_client/client.rs",
+    "src-tauri/src/modules/supabase_sync/query.rs",
+    "src-tauri/src/modules/supabase_sync/fleet.rs",
+    "src-tauri/src/modules/supabase_command_queue.rs"
+  ],
+  "checks": "cargo test --manifest-path src-tauri/Cargo.toml modules::supabase_sync; cargo clippy --manifest-path src-tauri/Cargo.toml",
+  "acceptance": {
+    "ac1": "PENDING",
+    "ac2": "PENDING",
+    "ac3": "PENDING",
+    "ac4": "PENDING",
+    "ac5": "PENDING"
+  }
+}

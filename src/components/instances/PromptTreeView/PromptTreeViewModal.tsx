@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, Component, type ErrorInfo, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { AlertTriangle } from 'lucide-react';
+import { useErrorStore } from '../../../stores/error-store';
 import { useInstanceStore } from '../../../stores/useInstanceStore';
 import { getTruncatedText, countWords } from './formatters';
 import type { PromptTreeViewModalProps } from './types';
@@ -30,6 +32,61 @@ function formatDuration(secs: number): string {
 function formatByteSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     return `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+interface ErrorBoundaryProps {
+    children: ReactNode;
+    onReset?: () => void;
+}
+
+interface ErrorBoundaryState {
+    hasError: boolean;
+    error: Error | null;
+}
+
+class PromptTreeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+    public override state: ErrorBoundaryState = { hasError: false, error: null };
+
+    public static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+        return { hasError: true, error };
+    }
+
+    public override componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+        useErrorStore.getState().trackWarning(error, {
+            source: 'PromptTreeViewModal.ErrorBoundary',
+            triggerAction: 'render_conversation_transcript',
+            context: { componentStack: errorInfo.componentStack?.slice(0, 500) ?? null },
+        });
+    }
+
+    public override render(): ReactNode {
+        if (this.state.hasError) {
+            return (
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-3 bg-white dark:bg-[#171025]">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                        <AlertTriangle className="w-6 h-6" />
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                        Conversation Transcript Error
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md font-mono bg-slate-50 dark:bg-[#211631] p-3 rounded-lg border border-slate-200 dark:border-[#40285e] overflow-x-auto text-left">
+                        {this.state.error?.message || 'An unexpected error occurred while parsing this conversation transcript.'}
+                    </p>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            this.setState({ hasError: false, error: null });
+                            this.props.onReset?.();
+                        }}
+                        className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                    >
+                        Reset Details View
+                    </button>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
 }
 
 export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
@@ -430,6 +487,13 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                     onRefreshAll={() => loadTree(true, true)}
                 />
 
+                {/* Top Indeterminate Progress Bar */}
+                {(isLoading || isAutoSyncing) && (
+                    <div className="w-full h-0.5 bg-purple-950/40 dark:bg-[#40285e]/40 overflow-hidden shrink-0">
+                        <div className="h-full bg-[#1af18d] shadow-[0_0_8px_#1af18d] animate-pulse w-full" />
+                    </div>
+                )}
+
                 {/* Notification Banner */}
                 {actionMsg && (
                     <div className="bg-emerald-500/10 border-b border-emerald-500/20 px-6 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-300 flex items-center gap-2 shrink-0">
@@ -484,100 +548,137 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
 
                     {/* Right Panel: Prompt Details */}
                     <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#171025]">
-                        {selectedConversation ? (
-                            <div className="flex-1 flex flex-col px-5 py-3.5 overflow-y-auto space-y-3">
-                                <DetailHeader
-                                    selectedConversation={selectedConversation}
-                                    activePromptText={activePromptText}
-                                    confirmationSuffix={confirmationSuffix}
-                                    setConfirmationSuffix={setConfirmationSuffix}
-                                    conversationTargetMode={conversationTargetMode}
-                                    setConversationTargetMode={setConversationTargetMode}
-                                    isCopiedText={false}
-                                    setIsCopiedText={() => {}}
-                                    isCopiedRaw={false}
-                                    isCopied={isCopied}
-                                    setIsCopied={setIsCopied}
-                                    isEnqueueing={isEnqueueing}
-                                    isResending={isResending}
-                                    isFocusing={false}
-                                    isExportMenuOpen={isExportMenuOpen}
-                                    setIsExportMenuOpen={setIsExportMenuOpen}
-                                    hasImages={hasImages}
-                                    instancePid={instancePid}
-                                    instanceSeqNum={instanceSeqNum}
-                                    instanceExeName={instanceExeName}
-                                    instanceNameDisplay={instanceNameDisplay}
-                                    formatDuration={formatDuration}
-                                    elapsedSeconds={elapsedSeconds}
-                                    onCopyWithImages={promptActions.handleCopyWithImagesRich}
-                                    onSaveImages={promptActions.handleSaveImages}
-                                    onExport={promptActions.handleExport}
-                                    onFocusIde={promptActions.handleFocusIde}
-                                    onResend={promptActions.handleResendPrompt}
-                                    onEnqueue={promptActions.handleEnqueuePrompt}
-                                    onOpenInspector={(conv) => promptActions.openInspector(conv, selectedProject?.repo_path || '')}
-                                />
-
-                                <DetailTabs
-                                    previewTab={previewTab}
-                                    setPreviewTab={setPreviewTab}
-                                    selectedConversation={selectedConversation}
-                                    activeWordCount={activeWordCount}
-                                    activeByteCount={activeByteCount}
-                                    formatByteSize={formatByteSize}
-                                    isTruncated={isTruncated}
-                                    activePromptText={activePromptText}
-                                    showAllWords={showAllWords}
-                                    setShowAllWords={setShowAllWords}
-                                    viewMode={viewMode}
-                                    setViewMode={setViewMode}
-                                    setIsDetailsModalOpen={setIsDetailsModalOpen}
-                                />
-
-                                {previewTab === 'instruction' ? (
-                                    <PromptInstructionView
+                        <PromptTreeErrorBoundary onReset={() => setSelectedConversation(null)}>
+                            {selectedConversation ? (
+                                <div className="flex-1 flex flex-col px-5 py-3.5 overflow-y-auto space-y-3">
+                                    <DetailHeader
                                         selectedConversation={selectedConversation}
-                                        previewTab={previewTab}
-                                        viewMode={viewMode}
                                         activePromptText={activePromptText}
-                                        editedPromptText={editedPromptText}
-                                        setEditedPromptText={setEditedPromptText}
-                                        displayedMarkdown={displayedMarkdown}
-                                        showAllWords={showAllWords}
-                                        setShowAllWords={setShowAllWords}
-                                        isTruncated={isTruncated}
-                                        totalWords={totalWords}
-                                        activeWordCount={activeWordCount}
-                                        formatByteSize={formatByteSize}
+                                        confirmationSuffix={confirmationSuffix}
+                                        setConfirmationSuffix={setConfirmationSuffix}
+                                        conversationTargetMode={conversationTargetMode}
+                                        setConversationTargetMode={setConversationTargetMode}
+                                        isCopiedText={false}
+                                        setIsCopiedText={() => {}}
+                                        isCopiedRaw={false}
                                         isCopied={isCopied}
                                         setIsCopied={setIsCopied}
-                                        openInspector={promptActions.openInspector}
-                                        selectedProject={selectedProject}
-                                        activeByteCount={activeByteCount}
-                                        setActivePromptText={setActivePromptText}
-                                        setActionMsg={setActionMsg}
-                                    />
-                                ) : (
-                                    <ResultsView
-                                        selectedConversation={selectedConversation}
-                                        isCopiedResults={isCopiedResults}
-                                        setIsCopiedResults={setIsCopiedResults}
+                                        isEnqueueing={isEnqueueing}
+                                        isResending={isResending}
                                         isFocusing={false}
+                                        isExportMenuOpen={isExportMenuOpen}
+                                        setIsExportMenuOpen={setIsExportMenuOpen}
+                                        hasImages={hasImages}
                                         instancePid={instancePid}
+                                        instanceSeqNum={instanceSeqNum}
+                                        instanceExeName={instanceExeName}
+                                        instanceNameDisplay={instanceNameDisplay}
                                         formatDuration={formatDuration}
-                                        onFocusIde={promptActions.handleFocusIde}
                                         elapsedSeconds={elapsedSeconds}
+                                        onCopyWithImages={promptActions.handleCopyWithImagesRich}
+                                        onSaveImages={promptActions.handleSaveImages}
+                                        onExport={promptActions.handleExport}
+                                        onFocusIde={promptActions.handleFocusIde}
+                                        onResend={promptActions.handleResendPrompt}
+                                        onEnqueue={promptActions.handleEnqueuePrompt}
+                                        onOpenInspector={(conv) => promptActions.openInspector(conv, selectedProject?.repo_path || '')}
                                     />
-                                )}
-                            </div>
-                        ) : (
-                            <DetailEmptyState
-                                selectedProject={selectedProject}
-                                isResending={isResending}
-                                onResend={promptActions.handleResendPrompt}
-                            />
-                        )}
+
+                                    <DetailTabs
+                                        previewTab={previewTab}
+                                        setPreviewTab={setPreviewTab}
+                                        selectedConversation={selectedConversation}
+                                        activeWordCount={activeWordCount}
+                                        activeByteCount={activeByteCount}
+                                        formatByteSize={formatByteSize}
+                                        isTruncated={isTruncated}
+                                        activePromptText={activePromptText}
+                                        showAllWords={showAllWords}
+                                        setShowAllWords={setShowAllWords}
+                                        viewMode={viewMode}
+                                        setViewMode={setViewMode}
+                                        setIsDetailsModalOpen={setIsDetailsModalOpen}
+                                    />
+
+                                    {previewTab === 'instruction' ? (
+                                        <PromptInstructionView
+                                            selectedConversation={selectedConversation}
+                                            previewTab={previewTab}
+                                            viewMode={viewMode}
+                                            activePromptText={activePromptText}
+                                            editedPromptText={editedPromptText}
+                                            setEditedPromptText={setEditedPromptText}
+                                            displayedMarkdown={displayedMarkdown}
+                                            showAllWords={showAllWords}
+                                            setShowAllWords={setShowAllWords}
+                                            isTruncated={isTruncated}
+                                            totalWords={totalWords}
+                                            activeWordCount={activeWordCount}
+                                            formatByteSize={formatByteSize}
+                                            isCopied={isCopied}
+                                            setIsCopied={setIsCopied}
+                                            openInspector={promptActions.openInspector}
+                                            selectedProject={selectedProject}
+                                            activeByteCount={activeByteCount}
+                                            setActivePromptText={setActivePromptText}
+                                            setActionMsg={setActionMsg}
+                                        />
+                                    ) : (
+                                        <ResultsView
+                                            selectedConversation={selectedConversation}
+                                            isCopiedResults={isCopiedResults}
+                                            setIsCopiedResults={setIsCopiedResults}
+                                            isFocusing={false}
+                                            instancePid={instancePid}
+                                            formatDuration={formatDuration}
+                                            onFocusIde={promptActions.handleFocusIde}
+                                            elapsedSeconds={elapsedSeconds}
+                                        />
+                                    )}
+                                </div>
+                            ) : isLoading ? (
+                                <div className="flex-1 flex flex-col px-6 py-5 space-y-4 animate-pulse overflow-hidden bg-white dark:bg-[#171025]">
+                                    {/* Skeleton Header */}
+                                    <div className="space-y-3 pb-3 border-b border-slate-200/70 dark:border-[#40285e]/60">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="flex items-center gap-2 flex-1">
+                                                <div className="h-5 w-16 bg-blue-500/15 rounded-[5px]" />
+                                                <div className="h-5 w-24 bg-slate-200 dark:bg-[#211631] rounded-full" />
+                                                <div className="h-5 w-44 bg-slate-200 dark:bg-[#211631] rounded-md" />
+                                            </div>
+                                            <div className="h-7 w-28 bg-slate-200 dark:bg-[#211631] rounded-full" />
+                                        </div>
+                                    </div>
+                                    {/* Skeleton Tabs */}
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-6 w-24 bg-slate-200 dark:bg-[#211631] rounded-md" />
+                                        <div className="h-6 w-20 bg-slate-100 dark:bg-[#211631]/60 rounded-md" />
+                                        <div className="h-6 w-16 bg-slate-100 dark:bg-[#211631]/60 rounded-md" />
+                                    </div>
+                                    {/* Skeleton Content Area */}
+                                    <div className="flex-1 rounded-xl bg-slate-50/80 dark:bg-[#211631]/40 border border-slate-200/60 dark:border-[#40285e]/40 p-5 space-y-3">
+                                        <div className="h-4 w-3/4 bg-slate-200/80 dark:bg-[#2a1c3f] rounded" />
+                                        <div className="h-4 w-full bg-slate-200/60 dark:bg-[#2a1c3f]/80 rounded" />
+                                        <div className="h-4 w-5/6 bg-slate-200/60 dark:bg-[#2a1c3f]/80 rounded" />
+                                        <div className="h-4 w-2/3 bg-slate-200/40 dark:bg-[#2a1c3f]/60 rounded" />
+                                        <div className="pt-4 space-y-2">
+                                            <div className="h-24 w-full bg-slate-200/30 dark:bg-[#2a1c3f]/40 rounded-lg" />
+                                        </div>
+                                    </div>
+                                    {/* Skeleton Footer */}
+                                    <div className="flex items-center justify-between pt-1">
+                                        <div className="h-3 w-32 bg-slate-200/60 dark:bg-[#211631] rounded" />
+                                        <div className="h-3 w-20 bg-slate-200/60 dark:bg-[#211631] rounded" />
+                                    </div>
+                                </div>
+                            ) : (
+                                <DetailEmptyState
+                                    selectedProject={selectedProject}
+                                    isResending={isResending}
+                                    onResend={promptActions.handleResendPrompt}
+                                />
+                            )}
+                        </PromptTreeErrorBoundary>
                     </div>
                 </div>
             </div>

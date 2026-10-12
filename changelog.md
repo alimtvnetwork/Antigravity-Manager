@@ -1,5 +1,28 @@
 # Changelog
 
+## [v4.194.0] - 2026-10-13
+
+### Fixed
+- **CI/CD Quality Gates & Rust Formatting**: Resolved `cargo fmt` newline discrepancy in `src-tauri/src/modules/supabase_sync/config_a.rs`, restoring clean CI/CD pipeline checks across Linux, macOS, and Windows runners. (Thanks to @aukgit)
+- **Supabase Credentials Eradication & External Vault Isolation**: Completely purged hardcoded Supabase project tokens and credentials from the tracked codebase, scripts, documentation, and test fixtures. Shifted endpoint provisioning to dynamic environment variables (`SUPABASE_ROOT_URL`, `SUPABASE_ROOT_KEY`, `SUPABASE_SECONDARY_URL`, `SUPABASE_SECONDARY_KEY`) and automated Base64 ingestion from `repo-secrets`. Added single-liner import script `scripts/import-supabase-credentials.ps1`. (Thanks to @aukgit)
+
+### Added
+- **Unified Test Automation & Verification**: Comprehensive 56-test regression suite covering Progress Green `#1af18d`, compact quintile progress bar layout, theming contrast, email masking, prompt tree action capsules, and dynamic vault connectivity. (Thanks to @aukgit)
+
+---
+
+## [v4.193.0] - 2026-10-13
+
+### Fixed
+- **CI/CD Quality Gates & Linter Healing**: Resolved TypeScript index signature mismatch on `ErrorContext` in `src/stores/error-store.ts`. Re-formatted `src-tauri/src/modules/supabase_client/client.rs` and `src-tauri/src/modules/supabase_sync/config_a.rs` to satisfy strict `cargo fmt` checks across all OS runners. (Thanks to @aukgit)
+- **Prompt Tree Action Stability & Deadlock Elimination**: Fixed subprocess pipe deadlock in `copy_to_system_clipboard` by properly dropping stdin before awaiting child processes, bounded clipboard execution with timeouts, and eliminated uncaught promise rejections on clipboard operations. (Thanks to @aukgit)
+
+### Added
+- **Progress Bar Modernization & Compacting**: Updated quota progress bar gradient terminal stop to Progress Green `#1af18d` with glowing drop shadow, standardized 5 slots at 20% quintile intervals, replaced misleading SVG glyphs with glowing LED apertures, and compacted bar layout towards the right edge. (Thanks to @aukgit)
+- **Dual Supabase Diagnostics & Theming Contrast**: Integrated structured backtrace logging for connection probes, auto-corrected Lovable endpoint typos, enforced high-contrast typography (no purple on purple), added CSS3 hover micro-elevation, and implemented email privacy masking via `maskEmail`. (Thanks to @aukgit)
+
+---
+
 ## [v4.192.0] - 2026-10-12
 
 ### Added
@@ -189,6 +212,16 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.194.0 (2026-10-13)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
+    *   **v4.193.0 (2026-10-13)**:
+        -   **[CI/CD & Progress Bar] Healing & Modernization**:
+            -   **Description**: Resolved TypeScript index signature mismatch on `ErrorContext` in `error-store.ts` and normalized `cargo fmt` formatting in `client.rs` and `config_a.rs`. Modernized quota progress bar to Progress Green `#1af18d` with 5 slots at 20% quintile intervals, glowing apertures, and compacted right alignment. Resolved subprocess clipboard deadlock in `copy_to_system_clipboard` and added Prompt Tree action improvements and loading bar. Enforced high-contrast theme typography, email masking, and Supabase connection diagnostics. (Thanks to @aukgit)
+
+
     *   **v4.190.0 (2026-10-12)**:
         -   **[Theme] Royal Violet UI**: Implemented the approved Royal Violet design system across the app — daisyUI dark theme tokens, semantic CSS variables, and legacy navy hex remap (canvas `#090611`, panel `#171025`, primary `#7C3AED`, aurora `#A855F7`, highlight `#E879F9`). (Thanks to @aukgit)
         -   **[Fixed] Account Switch Relaunch Verification**: Added post-relaunch IDE verification to the account-switch flow (`switch_account_to_instance` and the 5-step desktop switch). A spawn that returns Ok no longer reports success when no IDE window materializes — the switch now surfaces a diagnosable error instead of a silent no-reopen. (Thanks to @aukgit)
@@ -927,7 +960,9 @@
 
     *   **v4.96.0 (2026-09-28)**:
         -   **[Release v4.96.0: Full Root (Lovable) & Secondary Supabase Integration, Multi-Machine Parent-Child Topology, PowerShell One-Liner Automation & Bidirectional Sync] Fully integrated Root Supabase (Lovable) and Secondary fallback endpoints, delivered parent table `nodes` with cascading foreign keys to `instance_profiles` and `workspace_leases` preventing cross-machine account collisions, implemented comprehensive `agm supabase help` CLI guidance, PowerShell one-liner automation script with dual-directory writing, and verified 100% green PostgREST HTTP 200 connectivity (Thanks to alim, devorg.bd@gmail.com, @aukgit, @lbjlaq, @jeikl)**:
-            -   **Native Root (Lovable) & Secondary Endpoints (`scripts/supabase-accounts.json`, `repo-secrets`)**: Natively integrated Root Supabase (`<ROOT_SUPABASE_URL>`, Priority 1, tagged `lovable` and `root`) and Secondary Supabase (`<SECONDARY_SUPABASE_URL>`, Priority 2, tagged `secondary`), synchronizing credentials with Base64 encoding into `repo-secrets`;
+-   **Native Root (Lovable) & Secondary Endpoints (`scripts/supabase-accounts.json`, `repo-secrets`)**: Natively integrated Root Supabase (`https://[REDACTED_LOVABLE_PROJECT].supabase.co/rest/v1/`, Priority 1, tagged `lovable` and `root`) and Secondary Supabase (`https://[REDACTED_PERSONAL_PROJECT].supabase.co/rest/v1/`, Priority 2, tagged `secondary`), synchronizing credentials with Base64 encoding into `repo-secrets`;
+
+-   **Native Root (Lovable) & Secondary Endpoints (`scripts/supabase-accounts.json`, `repo-secrets`)**: Natively integrated Root Supabase (`<ROOT_SUPABASE_URL>`, Priority 1, tagged `lovable` and `root`) and Secondary Supabase (`<SECONDARY_SUPABASE_URL>`, Priority 2, tagged `secondary`), synchronizing credentials with Base64 encoding into `repo-secrets`;
             -   **Multi-Machine Parent-Child Schema & Atomic Collision Prevention (`src-tauri/src/modules/supabase_schema.rs`, `src-tauri/src/modules/supabase_sync.rs`)**: Designed and implemented PostgreSQL parent table `public.nodes` (tracking machine hardware ID, alias, IPv4 address, and uptime) and foreign-key children `public.instance_profiles` and `public.workspace_leases` (`REFERENCES public.nodes(id) ON DELETE CASCADE`), backed by stored function `acquire_workspace_lease()` to guarantee atomic lease acquisition across machines;
             -   **PowerShell Setup Automation & One-Liner Suite (`scripts/supabase-setup.ps1`, `scripts/supabase-accounts.json`)**: Shipped production-ready PowerShell setup script supporting `-ConfigFile` ingestion or interactive parameters, automatically synchronizing configurations simultaneously to `%APPDATA%\antigravity-manager\supabase_config.json` and `~/.antigravity_tools\supabase_config.json`, complete with one-liner command execution;
             -   **CLI Guided Assistance & Bidirectional Self-Healing Sync (`src-tauri/src/bin/agm.rs`, `src-tauri/src/modules/supabase_sync.rs`)**: Added detailed `agm supabase help` outputting config paths, local machine ID, local IPv4, relational schema topology, and subcommands; implemented automatic fallback and cross-directory mirror sync in the Rust core;

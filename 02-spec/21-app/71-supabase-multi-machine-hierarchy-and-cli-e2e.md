@@ -10,15 +10,15 @@ is it done properly??
 secondary
 
 
-https://<SECONDARY_PROJECT_REF>.supabase.co/rest/v1/
+https://[REDACTED_PERSONAL_URL].supabase.co/rest/v1/
 
-sb_publishable_<SECONDARY_KEY_PLACEHOLDER>
+[REDACTED_PERSONAL_KEY]
 
 Root by Lovable
 
-https://<ROOT_PROJECT_REF>.supabase.co/rest/v1/
+https://[REDACTED_LOVABLE_URL].supabase.co/rest/v1/
 
-sb_publishable_<ROOT_KEY_PLACEHOLDER>
+[REDACTED_LOVABLE_KEY]
 
 ```
 
@@ -85,8 +85,8 @@ Stored in `%APPDATA%\antigravity-manager\supabase_config.json` (Windows) or `~/.
     {
       "id": "ep-root-lovable-01",
       "name": "Root Supabase (Lovable)",
-      "url": "https://<ROOT_PROJECT_REF>.supabase.co/rest/v1/",
-      "api_key": "sb_publishable_<ROOT_KEY_PLACEHOLDER>",
+      "url": "https://[REDACTED_LOVABLE_URL].supabase.co/rest/v1/",
+      "api_key": "[REDACTED_LOVABLE_KEY]",
       "role": "root",
       "is_enabled": true,
       "prune_threshold_mb": 400,
@@ -97,8 +97,8 @@ Stored in `%APPDATA%\antigravity-manager\supabase_config.json` (Windows) or `~/.
     {
       "id": "ep-secondary-01",
       "name": "Secondary Supabase",
-      "url": "https://<SECONDARY_PROJECT_REF>.supabase.co/rest/v1/",
-      "api_key": "sb_publishable_<SECONDARY_KEY_PLACEHOLDER>",
+      "url": "https://[REDACTED_PERSONAL_URL].supabase.co/rest/v1/",
+      "api_key": "[REDACTED_PERSONAL_KEY]",
       "role": "secondary",
       "is_enabled": true,
       "prune_threshold_mb": 200,

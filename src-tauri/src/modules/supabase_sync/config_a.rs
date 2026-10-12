@@ -384,10 +384,91 @@ pub fn auto_seed_from_repo_secrets(cfg: &mut SupabaseConfig) -> bool {
         }
     }
 
+    if !seeded && cfg.endpoints.is_empty() {
+        if seed_default_endpoints(cfg) {
+            seeded = true;
+        }
+    }
+
     if seeded {
         cfg.endpoints.sort_by_key(|e| e.priority);
         cfg.is_sync_enabled = true;
     }
 
     seeded
+}
+
+/// Default seed endpoints reading from environment variables if configured
+pub fn default_seed_endpoints() -> Vec<SupabaseEndpoint> {
+    let mut endpoints = Vec::new();
+
+    if let (Ok(url), Ok(key)) = (
+        std::env::var("SUPABASE_ROOT_URL"),
+        std::env::var("SUPABASE_ROOT_KEY"),
+    ) {
+        let clean_url = url.trim();
+        let clean_key = key.trim();
+        if !clean_url.is_empty() && !clean_key.is_empty() {
+            endpoints.push(SupabaseEndpoint {
+                id: "ep-root-cluster-01".to_string(),
+                name: "Primary Supabase".to_string(),
+                url: normalize_supabase_url(clean_url),
+                api_key: clean_key.to_string(),
+                role: "root".to_string(),
+                is_enabled: true,
+                prune_threshold_mb: 400,
+                priority: 1,
+                notes: Some("Configured from SUPABASE_ROOT_URL environment variable".to_string()),
+                tags: vec!["root".to_string(), "primary".to_string(), "env".to_string()],
+            });
+        }
+    }
+
+    if let (Ok(url), Ok(key)) = (
+        std::env::var("SUPABASE_SECONDARY_URL"),
+        std::env::var("SUPABASE_SECONDARY_KEY"),
+    ) {
+        let clean_url = url.trim();
+        let clean_key = key.trim();
+        if !clean_url.is_empty() && !clean_key.is_empty() {
+            endpoints.push(SupabaseEndpoint {
+                id: "ep-secondary-cluster-01".to_string(),
+                name: "Secondary Supabase".to_string(),
+                url: normalize_supabase_url(clean_url),
+                api_key: clean_key.to_string(),
+                role: "secondary".to_string(),
+                is_enabled: true,
+                prune_threshold_mb: 200,
+                priority: 2,
+                notes: Some(
+                    "Configured from SUPABASE_SECONDARY_URL environment variable".to_string(),
+                ),
+                tags: vec!["secondary".to_string(), "env".to_string()],
+            });
+        }
+    }
+
+    endpoints
+}
+
+/// Seed default endpoints into the configuration if not already present
+pub fn seed_default_endpoints(cfg: &mut SupabaseConfig) -> bool {
+    let mut modified = false;
+    for ep in default_seed_endpoints() {
+        let norm_url = normalize_supabase_url(&ep.url);
+        let id = ep.id.clone();
+        let already_exists = cfg
+            .endpoints
+            .iter()
+            .any(|e| normalize_supabase_url(&e.url) == norm_url || e.id == id);
+        if !already_exists {
+            cfg.endpoints.push(ep);
+            modified = true;
+        }
+    }
+    if modified {
+        cfg.endpoints.sort_by_key(|e| e.priority);
+        cfg.is_sync_enabled = true;
+    }
+    modified
 }

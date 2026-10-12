@@ -1,0 +1,24 @@
+{
+  "id": "subtask-04",
+  "name": "Theming Contrast Modernization, Account Email Privacy Masking & CSS3 Micro-Elevation",
+  "parent_task": "supabase-connection-and-ui-ux-enhancement",
+  "owner": "Worker-02",
+  "status": "READY",
+  "owned_files": [
+    "src/utils/maskEmail.ts",
+    "src/components/accounts/AccountCard.tsx",
+    "src/components/accounts/AccountCard/AccountCardHeader.tsx",
+    "src/components/accounts/AccountCard/AccountCardQuota.tsx",
+    "src/components/accounts/AccountRow.tsx",
+    "src/components/accounts/AccountTable.tsx",
+    "src/components/instances/InstanceTable.tsx",
+    "src/styles/ui-tokens.css"
+  ],
+  "requirements": [
+    "Eliminate low-contrast purple-on-purple text in dark mode, enforcing crisp white, cream, and warm yellow typography",
+    "Integrate maskEmail utility across AccountCardHeader.tsx and AccountRow.tsx for default privacy protection",
+    "Preserve full email disclosure in browser tooltips and through showAllEmails toggle",
+    "Apply CSS3 smooth hover micro-elevation (-translate-y-0.5) with dynamic shadow and border transitions on AccountCard and Instance cards",
+    "Ensure prefers-reduced-motion safety for all micro-elevation transforms"
+  ]
+}

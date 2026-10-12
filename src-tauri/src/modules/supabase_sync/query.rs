@@ -8,7 +8,16 @@ use super::*;
 
 /// Query fleet machines aggregating nodes, instance profiles, and workspace leases across the cluster
 pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
-    let config = load_config().unwrap_or_default();
+    let config = match load_config() {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!(
+                target: "supabase_sync",
+                "Failed to load config for query_fleet_machines: {e}"
+            );
+            return Ok(build_local_fallback_machine());
+        }
+    };
     if !config.is_sync_enabled {
         return Ok(build_local_fallback_machine());
     }
@@ -54,10 +63,18 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
         None => return Ok(build_local_fallback_machine()),
     };
 
-    let profiles_val = client
-        .select("instance_profiles", "select=*")
-        .await
-        .unwrap_or(serde_json::Value::Array(Vec::new()));
+    let profiles_val = match client.select("instance_profiles", "select=*").await {
+        Ok(val) => val,
+        Err(e) => {
+            tracing::warn!(
+                target: "supabase_sync",
+                endpoint = %root_ep.url,
+                error = %e,
+                "Failed to query instance_profiles table from Supabase"
+            );
+            serde_json::Value::Array(Vec::new())
+        }
+    };
 
     let mut profiles_by_node: HashMap<String, Vec<FleetInstanceSummary>> = HashMap::new();
     if let Some(prof_array) = profiles_val.as_array() {
@@ -68,6 +85,10 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
                 .unwrap_or_default()
                 .to_string();
             if node_id.is_empty() {
+                tracing::debug!(
+                    target: "supabase_sync",
+                    "Skipping instance profile row with empty node_id"
+                );
                 continue;
             }
             let profile_id = p
@@ -110,10 +131,18 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
         }
     }
 
-    let leases_val = client
-        .select("workspace_leases", "select=*")
-        .await
-        .unwrap_or(serde_json::Value::Array(Vec::new()));
+    let leases_val = match client.select("workspace_leases", "select=*").await {
+        Ok(val) => val,
+        Err(e) => {
+            tracing::warn!(
+                target: "supabase_sync",
+                endpoint = %root_ep.url,
+                error = %e,
+                "Failed to query workspace_leases table from Supabase"
+            );
+            serde_json::Value::Array(Vec::new())
+        }
+    };
 
     let now = Utc::now().timestamp();
     let mut leases_by_node: HashMap<String, Vec<FleetLeaseInfo>> = HashMap::new();
@@ -125,6 +154,10 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
                 .unwrap_or_default()
                 .to_string();
             if node_id.is_empty() {
+                tracing::debug!(
+                    target: "supabase_sync",
+                    "Skipping lease row with empty node_id"
+                );
                 continue;
             }
             let account_id = l
@@ -171,6 +204,11 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
             .unwrap_or_default()
             .to_string();
         if node_id.is_empty() {
+            tracing::warn!(
+                target: "supabase_sync",
+                row = ?n,
+                "Skipping node row with missing or empty id"
+            );
             continue;
         }
         let is_local = node_id == local_node_id;

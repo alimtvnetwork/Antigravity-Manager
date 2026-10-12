@@ -1,0 +1,23 @@
+{
+  "id": "subtask-03",
+  "name": "Quota Progress Bar Terminal Green, 5-Slot Quintiles & Layout Compacting",
+  "parent_task": "supabase-connection-and-ui-ux-enhancement",
+  "owner": "Worker-02",
+  "status": "READY",
+  "owned_files": [
+    "src/styles/ui-tokens.css",
+    "src/components/accounts/QuotaProgressBar.tsx",
+    "src/components/common/WaterDrainProgressBar.tsx",
+    "src/components/accounts/QuotaItem.tsx",
+    "src/components/instances/InstanceTable.tsx",
+    "src/components/instances/table/InstanceRowCells.tsx"
+  ],
+  "requirements": [
+    "Update --ui-quota-gradient in src/styles/ui-tokens.css to terminate at #1af18d terminal green with 6 stops (20% quintile intervals)",
+    "Standardize checkpoint milestones in QuotaProgressBar.tsx and WaterDrainProgressBar.tsx to exactly 5 slots [100, 80, 60, 40, 20]",
+    "Remove all SVG checkmark and check-bolt glyphs from progress node slots, replacing them with illuminated glowing LED circular apertures",
+    "Support critical state <20% percentage numeral fallback inside lowest node slot",
+    "Compact progress bar containers in QuotaItem.tsx and QuotaCell in InstanceRowCells.tsx to w-36/w-44 ml-auto with strict right alignment",
+    "Ensure table header in InstanceTable.tsx aligns with the compacted right-aligned w-44 quota column"
+  ]
+}

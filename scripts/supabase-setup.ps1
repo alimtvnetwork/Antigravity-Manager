@@ -13,6 +13,10 @@ param (
     [string]$RootKey = $env:AGM_SUPABASE_ROOT_KEY,
     [string]$SecondaryUrl = $env:AGM_SUPABASE_SECONDARY_URL,
     [string]$SecondaryKey = $env:AGM_SUPABASE_SECONDARY_KEY,
+    [string]$RootUrl = $(if ($env:SUPABASE_ROOT_URL) { $env:SUPABASE_ROOT_URL } else { "https://mock-root.supabase.co/rest/v1/" }),
+    [string]$RootKey = $(if ($env:SUPABASE_ROOT_KEY) { $env:SUPABASE_ROOT_KEY } else { "sb_publishable_placeholder_root_key" }),
+    [string]$SecondaryUrl = $(if ($env:SUPABASE_SECONDARY_URL) { $env:SUPABASE_SECONDARY_URL } else { "https://mock-secondary.supabase.co/rest/v1/" }),
+    [string]$SecondaryKey = $(if ($env:SUPABASE_SECONDARY_KEY) { $env:SUPABASE_SECONDARY_KEY } else { "sb_publishable_placeholder_secondary_key" }),
     [string]$NodeAlias = "",
     [switch]$SkipTest = $false
 )
