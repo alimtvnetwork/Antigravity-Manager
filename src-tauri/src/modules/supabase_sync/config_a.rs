@@ -294,8 +294,17 @@ pub fn auto_seed_from_repo_secrets(cfg: &mut SupabaseConfig) -> bool {
             let tag_opt = decode_str(creds.get("tag"));
             let notes_opt = decode_str(creds.get("notes"));
 
-            if let (Some(url), Some(tok)) = (endpoint_url, token) {
+            if let (Some(mut url), Some(tok)) = (endpoint_url, token) {
                 if !url.is_empty() && !tok.is_empty() {
+                    if url.contains("pezjuuddecbyrmqxytrv.supabase.co") {
+                        tracing::info!(
+                            "Auto-correcting known Lovable Supabase URL typo ('rmqxytrv' -> 'fmqxytrv') in endpoint URL"
+                        );
+                        url = url.replace(
+                            "pezjuuddecbyrmqxytrv.supabase.co",
+                            "pezjuuddecbyfmqxytrv.supabase.co",
+                        );
+                    }
                     let norm_url = normalize_supabase_url(&url);
                     let clean_id =
                         format!("ep-{}", service.to_lowercase().replace([' ', '_'], "-"));
@@ -368,6 +377,15 @@ pub fn auto_seed_from_repo_secrets(cfg: &mut SupabaseConfig) -> bool {
                 serde_json::Value::Array(arr.clone()),
             ) {
                 for mut ep in eps {
+                    if ep.url.contains("pezjuuddecbyrmqxytrv.supabase.co") {
+                        tracing::info!(
+                            "Auto-correcting known Lovable Supabase URL typo in endpoint struct"
+                        );
+                        ep.url = ep.url.replace(
+                            "pezjuuddecbyrmqxytrv.supabase.co",
+                            "pezjuuddecbyfmqxytrv.supabase.co",
+                        );
+                    }
                     ep.url = normalize_supabase_url(&ep.url);
                     let norm = ep.url.clone();
                     let id = ep.id.clone();

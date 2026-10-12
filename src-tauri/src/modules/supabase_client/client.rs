@@ -127,12 +127,21 @@ impl SupabaseClient {
                 if status == 401 || status == 403 {
                     let body = resp.text().await.unwrap_or_default();
                     if !body.contains("Secret API key required") {
+                        let err_msg = format!(
+                            "Authentication failed: Invalid API key or Bearer token (HTTP {})",
+                            status
+                        );
+                        let backtrace = std::backtrace::Backtrace::capture();
+                        tracing::warn!(
+                            target: "supabase_client",
+                            endpoint = %self.base_url,
+                            error = %err_msg,
+                            backtrace = %backtrace,
+                            "Supabase connection failed"
+                        );
                         return Ok(EndpointTestResult {
                             is_success: false,
-                            message: format!(
-                                "Authentication failed: Invalid API key or Bearer token (HTTP {})",
-                                status
-                            ),
+                            message: err_msg,
                             status_code: Some(status),
                         });
                     }
@@ -141,6 +150,14 @@ impl SupabaseClient {
                 // Status 404 or other 4xx: proceed to table and auth probes
             }
             Err(e) => {
+                let backtrace = std::backtrace::Backtrace::capture();
+                tracing::warn!(
+                    target: "supabase_client",
+                    endpoint = %self.base_url,
+                    error = %e,
+                    backtrace = %backtrace,
+                    "Supabase connection failed"
+                );
                 return Ok(EndpointTestResult {
                     is_success: false,
                     message: self.classify_transport_error(&e),
@@ -164,12 +181,21 @@ impl SupabaseClient {
                         });
                     }
                     if status == 401 || status == 403 {
+                        let err_msg = format!(
+                            "Authentication failed: Invalid API key or Bearer token (HTTP {})",
+                            status
+                        );
+                        let backtrace = std::backtrace::Backtrace::capture();
+                        tracing::warn!(
+                            target: "supabase_client",
+                            endpoint = %self.base_url,
+                            error = %err_msg,
+                            backtrace = %backtrace,
+                            "Supabase connection failed"
+                        );
                         return Ok(EndpointTestResult {
                             is_success: false,
-                            message: format!(
-                                "Authentication failed: Invalid API key or Bearer token (HTTP {})",
-                                status
-                            ),
+                            message: err_msg,
                             status_code: Some(status),
                         });
                     }
@@ -185,9 +211,24 @@ impl SupabaseClient {
                             status_code: Some(200),
                         });
                     }
+                    tracing::debug!(
+                        target: "supabase_client",
+                        endpoint = %self.base_url,
+                        table = table,
+                        status = status,
+                        body = %body,
+                        "Probe 2 table check returned non-success response, continuing probe ladder"
+                    );
                 }
                 Err(e) => {
                     self.log_transport_error("probe_table", &table_url, &e);
+                    tracing::debug!(
+                        target: "supabase_client",
+                        endpoint = %self.base_url,
+                        table = table,
+                        error = %e,
+                        "Probe 2 table probe network request failed (non-fatal, continuing probe ladder)"
+                    );
                 }
             }
         }
@@ -203,16 +244,38 @@ impl SupabaseClient {
                         message: "Connected successfully (Supabase service online)".to_string(),
                         status_code: Some(status),
                     });
+                } else {
+                    tracing::debug!(
+                        target: "supabase_client",
+                        endpoint = %self.base_url,
+                        status = status,
+                        "Probe 3 auth health check returned status >= 400, continuing probe ladder"
+                    );
                 }
             }
             Err(e) => {
                 self.log_transport_error("probe_auth_health", &auth_url, &e);
+                tracing::debug!(
+                    target: "supabase_client",
+                    endpoint = %self.base_url,
+                    error = %e,
+                    "Probe 3 auth health probe network request failed (non-fatal, continuing probe ladder)"
+                );
             }
         }
 
+        let fail_msg = "Supabase connection test failed with status: 404 (Endpoint not found. Please verify Project URL)";
+        let backtrace = std::backtrace::Backtrace::capture();
+        tracing::warn!(
+            target: "supabase_client",
+            endpoint = %self.base_url,
+            error = %fail_msg,
+            backtrace = %backtrace,
+            "Supabase connection failed"
+        );
         Ok(EndpointTestResult {
             is_success: false,
-            message: "Supabase connection test failed with status: 404 (Endpoint not found. Please verify Project URL)".to_string(),
+            message: fail_msg.to_string(),
             status_code: Some(404),
         })
     }

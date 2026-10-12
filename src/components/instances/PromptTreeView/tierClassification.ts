@@ -117,7 +117,7 @@ export function classifyPromptTier(
             category: 'SUBAGENT_INSTRUCTION',
             label: 'AI Subagent Instruction',
             roleBadge: detectedRole,
-            badgeStyle: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-400/30',
+            badgeStyle: 'text-purple-900 dark:text-amber-200 bg-purple-500/20 border-purple-400/40',
             iconName: 'bot',
             isSubagent: true,
             isNonPrompt: false,

@@ -48,7 +48,15 @@ pub async fn fetch_pending_commands(
     for ep in endpoints {
         let client = match SupabaseClient::new(&ep) {
             Ok(c) => c,
-            Err(_) => continue,
+            Err(e) => {
+                tracing::warn!(
+                    target: "supabase_command_queue",
+                    endpoint = %ep.url,
+                    error = %e,
+                    "Failed to create Supabase client for secondary endpoint"
+                );
+                continue;
+            }
         };
 
         let query = format!(
@@ -56,11 +64,29 @@ pub async fn fetch_pending_commands(
             node_id
         );
 
-        if let Ok(val) = client.select("command_queue", &query).await {
-            if let Ok(cmds) = serde_json::from_value::<Vec<InboundDbCommand>>(val) {
-                if !cmds.is_empty() {
-                    return (Some(client), cmds);
+        match client.select("command_queue", &query).await {
+            Ok(val) => match serde_json::from_value::<Vec<InboundDbCommand>>(val) {
+                Ok(cmds) => {
+                    if !cmds.is_empty() {
+                        return (Some(client), cmds);
+                    }
                 }
+                Err(e) => {
+                    tracing::warn!(
+                        target: "supabase_command_queue",
+                        endpoint = %ep.url,
+                        error = %e,
+                        "Failed to deserialize command_queue payload"
+                    );
+                }
+            },
+            Err(e) => {
+                tracing::warn!(
+                    target: "supabase_command_queue",
+                    endpoint = %ep.url,
+                    error = %e,
+                    "Failed to query command_queue table from secondary endpoint"
+                );
             }
         }
     }
@@ -82,11 +108,14 @@ pub async fn execute_and_report_command(
         "started_at": now
     });
     let query = format!("id=eq.{}", cmd.id);
-    // Justification: best-effort call; failure logged without changing control flow
-    crate::error::record_ignored(
-        client.update("command_queue", &query, run_payload).await,
-        "update",
-    );
+    if let Err(e) = client.update("command_queue", &query, run_payload).await {
+        tracing::warn!(
+            target: "supabase_command_queue",
+            command_id = %cmd.id,
+            error = %e,
+            "Failed to mark command as running in command_queue"
+        );
+    }
 
     // 2. Execute command
     #[cfg(target_os = "windows")]
@@ -108,7 +137,7 @@ pub async fn execute_and_report_command(
         Ok(out) => (
             String::from_utf8_lossy(&out.stdout).to_string(),
             String::from_utf8_lossy(&out.stderr).to_string(),
-            out.status.code().unwrap_or(0),
+            out.status.code().unwrap_or(-1),
         ),
         Err(e) => (String::new(), format!("Process execution error: {}", e), 1),
     };
@@ -130,22 +159,28 @@ pub async fn execute_and_report_command(
         "exit_code": exit_code,
         "created_at": finish_time
     });
-    // Justification: best-effort call; failure logged without changing control flow
-    crate::error::record_ignored(
-        client.insert("command_telemetry", telemetry_payload).await,
-        "insert",
-    );
+    if let Err(e) = client.insert("command_telemetry", telemetry_payload).await {
+        tracing::warn!(
+            target: "supabase_command_queue",
+            command_id = %cmd.id,
+            error = %e,
+            "Failed to insert command telemetry"
+        );
+    }
 
     // 4. Update command queue status
     let finish_payload = json!({
         "status": final_status,
         "completed_at": finish_time
     });
-    // Justification: best-effort call; failure logged without changing control flow
-    crate::error::record_ignored(
-        client.update("command_queue", &query, finish_payload).await,
-        "update",
-    );
+    if let Err(e) = client.update("command_queue", &query, finish_payload).await {
+        tracing::warn!(
+            target: "supabase_command_queue",
+            command_id = %cmd.id,
+            error = %e,
+            "Failed to update final status in command_queue"
+        );
+    }
 
     Ok(())
 }

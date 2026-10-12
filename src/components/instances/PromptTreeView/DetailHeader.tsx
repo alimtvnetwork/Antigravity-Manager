@@ -117,7 +117,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                             type="button"
                             onClick={() => {
                                 const cleanText = stripImagesFromPrompt(activePromptText);
-                                navigator.clipboard.writeText(cleanText);
+                                navigator.clipboard.writeText(cleanText).catch((e) => console.warn(e));
                                 setLocalCopiedText(true);
                                 setIsCopiedText(true);
                                 setTimeout(() => {
@@ -203,7 +203,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                     </div>
 
                     {/* Capsule 2: Segmented Dark-Glass Split-Dropdown Capsule */}
-                    <div className="relative flex items-center rounded-full bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#40285e]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#40285e]/80 shadow-2xs shrink-0">
+                    <div className="relative ml-auto flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
                         {/* Primary Send Button with <kbd>N</kbd> */}
                         <button
                             type="button"

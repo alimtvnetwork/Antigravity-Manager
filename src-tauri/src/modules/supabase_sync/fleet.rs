@@ -121,7 +121,16 @@ pub(crate) fn construct_local_machine_info(
 /// Fetch list of fleet machines with child instance profiles and active leases from Supabase.
 /// Falls back to returning local machine info if Supabase is offline or unconfigured.
 pub async fn fetch_fleet_machines() -> crate::error::AppResult<Vec<FleetMachineInfo>> {
-    let config = load_config().unwrap_or_default();
+    let config = match load_config() {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!(
+                target: "supabase_sync",
+                "Failed to load supabase config in fetch_fleet_machines: {e}"
+            );
+            SupabaseConfig::default()
+        }
+    };
     let local_node_id = get_local_node_id();
     let now = Utc::now().timestamp();
 
@@ -150,17 +159,52 @@ pub async fn fetch_fleet_machines() -> crate::error::AppResult<Vec<FleetMachineI
     let mut raw_leases: Vec<PostgrestLeaseRow> = Vec::new();
 
     if let Some(ref c) = client {
-        if let Ok(val) = c
+        match c
             .select("nodes", "select=*&order=last_heartbeat_at.desc")
             .await
         {
-            raw_nodes = serde_json::from_value(val).unwrap_or_default();
+            Ok(val) => match serde_json::from_value::<Vec<PostgrestNodeRow>>(val) {
+                Ok(parsed) => raw_nodes = parsed,
+                Err(e) => {
+                    tracing::warn!(
+                        target: "supabase_sync",
+                        "Failed to deserialize nodes table: {e}"
+                    );
+                }
+            },
+            Err(e) => {
+                tracing::warn!(target: "supabase_sync", "Failed to fetch fleet table: {e}");
+            }
         }
-        if let Ok(val) = c.select("instance_profiles", "select=*").await {
-            raw_profiles = serde_json::from_value(val).unwrap_or_default();
+
+        match c.select("instance_profiles", "select=*").await {
+            Ok(val) => match serde_json::from_value::<Vec<PostgrestProfileRow>>(val) {
+                Ok(parsed) => raw_profiles = parsed,
+                Err(e) => {
+                    tracing::warn!(
+                        target: "supabase_sync",
+                        "Failed to deserialize instance_profiles table: {e}"
+                    );
+                }
+            },
+            Err(e) => {
+                tracing::warn!(target: "supabase_sync", "Failed to fetch fleet table: {e}");
+            }
         }
-        if let Ok(val) = c.select("workspace_leases", "select=*").await {
-            raw_leases = serde_json::from_value(val).unwrap_or_default();
+
+        match c.select("workspace_leases", "select=*").await {
+            Ok(val) => match serde_json::from_value::<Vec<PostgrestLeaseRow>>(val) {
+                Ok(parsed) => raw_leases = parsed,
+                Err(e) => {
+                    tracing::warn!(
+                        target: "supabase_sync",
+                        "Failed to deserialize workspace_leases table: {e}"
+                    );
+                }
+            },
+            Err(e) => {
+                tracing::warn!(target: "supabase_sync", "Failed to fetch fleet table: {e}");
+            }
         }
     }
 
@@ -321,7 +365,13 @@ pub fn start_sync_worker() {
 
             let config = match load_config() {
                 Ok(c) => c,
-                Err(_) => continue,
+                Err(e) => {
+                    tracing::warn!(
+                        target: "supabase_sync",
+                        "Failed to load config in background sync worker: {e}"
+                    );
+                    continue;
+                }
             };
 
             if !config.is_sync_enabled {

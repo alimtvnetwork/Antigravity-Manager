@@ -86,7 +86,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
             key={inst.config.id}
             ref={isActive ? activeCardRef : undefined}
             className={cn(
-                'group relative rounded-[5px] border transition-all duration-200 flex flex-col justify-between overflow-hidden backdrop-blur-xs hover:-translate-y-0.5 hover:shadow-lg',
+                'group relative rounded-[5px] border transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg flex flex-col justify-between overflow-hidden backdrop-blur-xs',
                 isActive
                     ? SELECTED_CARD_CLASSES
                     : 'bg-white dark:bg-[var(--ui-surface-1)] border-gray-200/50 dark:border-[var(--ui-border-subtle)] hover:border-gray-300/80 dark:hover:border-[var(--ui-interactive-40)] hover:bg-slate-50/90 dark:hover:bg-[var(--ui-surface-hover)] shadow-xs'
@@ -224,7 +224,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                     className={cn(
                                         'px-1.5 py-0.5 rounded-md text-[11px] font-semibold font-mono border flex items-center gap-1 min-w-0 shadow-2xs transition-colors cursor-pointer',
                                         'bg-blue-500/10 text-blue-700 border-blue-500/30',
-                                        'dark:bg-purple-950/50 dark:border-purple-400/30 dark:text-purple-100 hover:dark:bg-purple-900/60'
+                                        'dark:bg-[#1f1433] dark:border-[#40285e] dark:text-amber-200 hover:dark:text-white hover:dark:bg-[#2c1d47]'
                                     )}
                                     title={
                                         isEmailRevealed
@@ -232,7 +232,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                             : `${displayEmail} (Hover or click to reveal)`
                                     }
                                 >
-                                    <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-500 dark:bg-purple-300" />
+                                    <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-500 dark:bg-[#1af18d]" />
                                     <span className="truncate">
                                         {isEmailRevealed || isEmailHovered ? displayEmail : maskEmail(displayEmail)}
                                     </span>

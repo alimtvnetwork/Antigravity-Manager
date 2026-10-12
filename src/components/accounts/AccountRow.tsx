@@ -11,6 +11,7 @@ import { Gemini } from '@lobehub/icons';
 import { TierBadge } from '../common/TierBadge';
 import { PriorityBadge } from './PriorityBadge';
 import { SELECTED_ROW_CLASSES, ACTIVE_PILL_CLASSES } from '../common/selectedState';
+import { maskEmail } from '../../utils/maskEmail';
 
 
 interface AccountRowProps {
@@ -94,7 +95,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                             ? "text-blue-900 dark:text-amber-300 font-bold"
                             : "text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400"
                     )} title={account.email}>
-                        {account.email}
+                        {maskEmail(account.email)}
                     </span>
 
                         {isCurrent && (

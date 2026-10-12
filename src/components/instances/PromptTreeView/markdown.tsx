@@ -156,7 +156,7 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
     const [copiedBlockIndex, setCopiedBlockIndex] = useState<number | null>(null);
 
     const handleCopyCode = (code: string, index: number) => {
-        navigator.clipboard.writeText(code);
+        navigator.clipboard.writeText(code).catch((e) => console.warn(e));
         setCopiedBlockIndex(index);
         setTimeout(() => setCopiedBlockIndex(null), 2000);
     };

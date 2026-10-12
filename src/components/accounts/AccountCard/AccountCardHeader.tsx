@@ -6,6 +6,7 @@ import { formatDateTime } from '../../../utils/date';
 import { TierBadge } from '../../common/TierBadge';
 import { PriorityBadge } from '../PriorityBadge';
 import { ACTIVE_PILL_CLASSES } from '../../common/selectedState';
+import { maskEmail } from '../../../utils/maskEmail';
 
 interface BoundInstance {
     config: { name: string };
@@ -59,7 +60,7 @@ export function AccountCardHeader({
                         ? "text-blue-900 dark:text-amber-300 font-bold"
                         : "text-gray-900 dark:text-gray-100"
                 )} title={account.email}>
-                    {account.email}
+                    {maskEmail(account.email)}
                 </h3>
                 <div className="flex items-center justify-between w-full gap-2">
                     <div className="flex items-center gap-1.5 flex-wrap">

@@ -118,22 +118,86 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
 
         cmd.stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null());
+            .stderr(std::process::Stdio::piped());
 
         match cmd.spawn() {
-            Ok(child) => {
+            Ok(mut child) => {
                 let child_pid = child.id();
                 {
                     let mut workers = get_active_agy_workers().lock().unwrap();
-                    workers.insert(ws_key, child_pid);
+                    workers.insert(ws_key.clone(), child_pid);
                 }
                 crate::modules::logger::log_info(&format!(
                     "[RepoDB] Dispatched agy execution for prompt '{}' (PID: {:?}, inst: '{}') in '{}': {:.60}...",
                     prompt.id, child_pid, prompt.instance_id, prompt.repo_path, clean_prompt
                 ));
+
+                let prompt_id = prompt.id.clone();
+                let ws_key_clone = ws_key.clone();
+                let monitor_res = std::thread::Builder::new()
+                    .name(format!("agy-monitor-{}", prompt_id))
+                    .spawn(move || {
+                        let mut stderr_reader = child.stderr.take();
+                        match child.wait() {
+                            Ok(status) => {
+                                {
+                                    let mut workers = get_active_agy_workers().lock().unwrap();
+                                    workers.remove(&ws_key_clone);
+                                }
+                                if !status.success() {
+                                    let mut err_msg = String::new();
+                                    if let Some(mut reader) = stderr_reader {
+                                        use std::io::Read;
+                                        let _ = reader.read_to_string(&mut err_msg);
+                                    }
+                                    let err_str = err_msg.trim();
+                                    tracing::warn!(
+                                        target: "repo_db",
+                                        prompt_id = %prompt_id,
+                                        exit_code = ?status.code(),
+                                        stderr = %err_str,
+                                        "agy CLI process exited with non-zero status"
+                                    );
+                                    crate::modules::logger::log_warn(&format!(
+                                        "[RepoDB] agy CLI for prompt '{}' exited with status {:?}, stderr: {}",
+                                        prompt_id, status.code(), err_str
+                                    ));
+                                } else {
+                                    tracing::debug!(
+                                        target: "repo_db",
+                                        prompt_id = %prompt_id,
+                                        "agy CLI process exited successfully"
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                {
+                                    let mut workers = get_active_agy_workers().lock().unwrap();
+                                    workers.remove(&ws_key_clone);
+                                }
+                                tracing::warn!(
+                                    target: "repo_db",
+                                    prompt_id = %prompt_id,
+                                    error = %e,
+                                    "Failed to wait on agy CLI child process"
+                                );
+                            }
+                        }
+                    });
+
+                if let Err(e) = monitor_res {
+                    tracing::warn!(target: "repo_db", error = %e, "Failed to spawn agy monitor thread");
+                }
+
                 true
             }
             Err(e) => {
+                tracing::warn!(
+                    target: "repo_db",
+                    prompt_id = %prompt.id,
+                    error = %e,
+                    "Failed to spawn agy execution"
+                );
                 crate::modules::logger::log_error(&format!(
                     "[RepoDB] Failed to spawn agy execution for prompt '{}': {}",
                     prompt.id, e
@@ -149,101 +213,115 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
     }
 }
 
+/// Helper to execute a clipboard helper process, explicitly write data, drop stdin to signal EOF,
+/// and wait with a timeout to prevent deadlocks or indefinite hanging.
+fn run_clipboard_helper_process(
+    mut cmd: std::process::Command,
+    data: &[u8],
+    helper_name: &'static str,
+) -> bool {
+    cmd.stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+
+    match cmd.spawn() {
+        Ok(mut child) => {
+            if let Some(mut stdin) = child.stdin.take() {
+                let write_res = stdin.write_all(data);
+                crate::error::record_ignored(
+                    write_res,
+                    &format!("write clipboard stdin ({helper_name})"),
+                );
+                // Explicitly drop stdin so EOF is sent to the child process pipe
+                drop(stdin);
+            }
+
+            let start = std::time::Instant::now();
+            let timeout = std::time::Duration::from_secs(3);
+            loop {
+                match child.try_wait() {
+                    Ok(Some(status)) => return status.success(),
+                    Ok(None) => {
+                        if start.elapsed() >= timeout {
+                            tracing::warn!(
+                                target: "repo_db",
+                                helper = helper_name,
+                                "Clipboard helper timed out after 3 seconds, terminating process"
+                            );
+                            let _ = child.kill();
+                            return false;
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(50));
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            target: "repo_db",
+                            helper = helper_name,
+                            error = %e,
+                            "Failed to wait for clipboard helper"
+                        );
+                        return false;
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            tracing::debug!(
+                target: "repo_db",
+                helper = helper_name,
+                error = %e,
+                "Clipboard helper command not available or failed to spawn"
+            );
+            false
+        }
+    }
+}
+
 /// Cross-platform helper to copy text content to system clipboard
 pub fn copy_to_system_clipboard(content: &str) {
     if content.trim().is_empty() {
         return;
     }
-    #[cfg(target_os = "windows")]
-    {
-        if let Ok(mut child) = std::process::Command::new("clip")
-            .stdin(std::process::Stdio::piped())
-            .spawn()
-        {
-            if let Some(ref mut stdin) = child.stdin {
-                // Justification: clipboard copy is fire-and-forget; the caller has no recovery path
-                crate::error::record_ignored(
-                    std::io::Write::write_all(stdin, content.as_bytes()),
-                    "write clipboard stdin (clip)",
-                );
-            }
-            // Justification: clipboard copy is fire-and-forget; the caller has no recovery path
-            crate::error::record_ignored(child.wait(), "wait for clipboard helper (clip)");
-        }
-    }
-    #[cfg(target_os = "macos")]
-    {
-        if let Ok(mut child) = std::process::Command::new("pbcopy")
-            .stdin(std::process::Stdio::piped())
-            .spawn()
-        {
-            if let Some(ref mut stdin) = child.stdin {
-                // Justification: clipboard copy is fire-and-forget; the caller has no recovery path
-                crate::error::record_ignored(
-                    std::io::Write::write_all(stdin, content.as_bytes()),
-                    "write clipboard stdin (pbcopy)",
-                );
-            }
-            // Justification: clipboard copy is fire-and-forget; the caller has no recovery path
-            crate::error::record_ignored(child.wait(), "wait for clipboard helper (pbcopy)");
-        }
-    }
-    #[cfg(target_os = "linux")]
-    {
-        let is_wayland = std::env::var("WAYLAND_DISPLAY").is_ok();
-        let mut has_copied = false;
-        if is_wayland {
-            if let Ok(mut child) = std::process::Command::new("wl-copy")
-                .stdin(std::process::Stdio::piped())
-                .spawn()
+    let text = content.to_string();
+    let spawn_res = std::thread::Builder::new()
+        .name("clipboard-writer".into())
+        .spawn(move || {
+            let data = text.as_bytes();
+            #[cfg(target_os = "windows")]
             {
-                if let Some(ref mut stdin) = child.stdin {
-                    // Justification: clipboard copy is fire-and-forget; the caller has no recovery path
-                    crate::error::record_ignored(
-                        std::io::Write::write_all(stdin, content.as_bytes()),
-                        "write clipboard stdin (wl-copy)",
-                    );
-                }
-                if let Ok(status) = child.wait() {
-                    has_copied = status.success();
-                }
+                use std::os::windows::process::CommandExt;
+                let mut cmd = std::process::Command::new("clip");
+                cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+                run_clipboard_helper_process(cmd, data, "clip");
             }
-        }
-        if !has_copied {
-            if let Ok(mut child) = std::process::Command::new("xclip")
-                .args(["-selection", "clipboard"])
-                .stdin(std::process::Stdio::piped())
-                .spawn()
+            #[cfg(target_os = "macos")]
             {
-                if let Some(ref mut stdin) = child.stdin {
-                    // Justification: clipboard copy is fire-and-forget; the caller has no recovery path
-                    crate::error::record_ignored(
-                        std::io::Write::write_all(stdin, content.as_bytes()),
-                        "write clipboard stdin (xclip)",
-                    );
-                }
-                if let Ok(status) = child.wait() {
-                    has_copied = status.success();
-                }
+                let cmd = std::process::Command::new("pbcopy");
+                run_clipboard_helper_process(cmd, data, "pbcopy");
             }
-        }
-        if !has_copied {
-            if let Ok(mut child) = std::process::Command::new("xsel")
-                .args(["--clipboard", "--input"])
-                .stdin(std::process::Stdio::piped())
-                .spawn()
+            #[cfg(target_os = "linux")]
             {
-                if let Some(ref mut stdin) = child.stdin {
-                    // Justification: clipboard copy is fire-and-forget; the caller has no recovery path
-                    crate::error::record_ignored(
-                        std::io::Write::write_all(stdin, content.as_bytes()),
-                        "write clipboard stdin (xsel)",
-                    );
+                let is_wayland = std::env::var("WAYLAND_DISPLAY").is_ok();
+                let mut has_copied = false;
+                if is_wayland {
+                    let cmd = std::process::Command::new("wl-copy");
+                    has_copied = run_clipboard_helper_process(cmd, data, "wl-copy");
                 }
-                // Justification: clipboard copy is fire-and-forget; the caller has no recovery path
-                crate::error::record_ignored(child.wait(), "wait for clipboard helper (xsel)");
+                if !has_copied {
+                    let mut cmd = std::process::Command::new("xclip");
+                    cmd.args(["-selection", "clipboard"]);
+                    has_copied = run_clipboard_helper_process(cmd, data, "xclip");
+                }
+                if !has_copied {
+                    let mut cmd = std::process::Command::new("xsel");
+                    cmd.args(["--clipboard", "--input"]);
+                    run_clipboard_helper_process(cmd, data, "xsel");
+                }
             }
-        }
+        });
+
+    if let Err(e) = spawn_res {
+        tracing::warn!(target: "repo_db", error = %e, "Failed to spawn detached clipboard thread");
     }
 }
 
@@ -335,12 +413,19 @@ pub fn send_prompt_now_for_instance(
     // is running/focused and complete the dispatch successfully.
     let spawned = spawn_prompt_via_agy(&active_prompt);
     if !spawned {
+        tracing::warn!(
+            target: "repo_db",
+            prompt_id = %active_prompt.id,
+            instance_id = %canonical_inst,
+            repo_path = %repo_path,
+            "agy CLI dispatch failed or inactive; degraded to workspace resume task & clipboard fallback"
+        );
         let _ = crate::modules::instance::ensure_instance_running_for_dispatch(
             &canonical_inst,
             Some(repo_path),
         );
-        crate::modules::logger::log_info(&format!(
-            "[RepoDB] agy CLI bridge inactive/busy; prompt '{}' saved to .antigravity_resume_task.json & clipboard, instance '{}' focused",
+        crate::modules::logger::log_warn(&format!(
+            "[RepoDB] agy CLI bridge inactive or busy for prompt '{}'; saved to .antigravity_resume_task.json & clipboard, instance '{}' focused",
             active_prompt.id, canonical_inst
         ));
     } else {
@@ -420,6 +505,17 @@ pub fn enqueue_prompt_for_instance(
                 ),
                 "write per-instance resume task snapshot",
             );
+        } else {
+            tracing::warn!(
+                target: "repo_db",
+                prompt_id = %active_prompt.id,
+                repo_path = %repo_path,
+                "Workspace directory does not exist for enqueue_prompt_for_instance; skipping resume task write"
+            );
+            crate::modules::logger::log_warn(&format!(
+                "[RepoDB] Workspace directory does not exist for prompt '{}': '{}'",
+                active_prompt.id, repo_path
+            ));
         }
     }
 
