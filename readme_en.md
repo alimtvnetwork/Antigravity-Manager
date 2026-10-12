@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.194.0)
+> Professional AI Account Management & Protocol Proxy System (v4.195.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.194.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.195.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,6 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
+> Latest version **v4.195.0**: CI/CD Quality Gates & Macro Syntax Remediation, Window Manager Error Tracking & Complete Supabase/UI Verification — Resolved duplicate variable declaration and expected assertion syntax in json envelope test suite, restoring green Clippy and test compilation across all OS matrix runners; enforced 'No Silent Errors' error tracking in `windowManager.ts`; verified 100% compliance across all 56 automated tests for Progress Green `#1af18d`, 5-slot quintile progress bars, right-compacted layouts, high-contrast theme typography, email privacy masking, prompt tree action capsules, and secure repo-secrets dynamic endpoint discovery. (Thanks to @aukgit)
 > Latest version **v4.194.0**: Supabase Credentials Eradication & External Vault Isolation, CI/CD Rust Formatting Gate & Unified Test Automation — Complete purge of hardcoded Supabase project tokens and credentials from the tracked codebase, scripts, documentation, and test fixtures; shifted endpoint provisioning to dynamic environment variables (`SUPABASE_ROOT_URL`, `SUPABASE_ROOT_KEY`, `SUPABASE_SECONDARY_URL`, `SUPABASE_SECONDARY_KEY`) and automated Base64 ingestion from `repo-secrets`; added single-liner import script `scripts/import-supabase-credentials.ps1`; resolved `cargo fmt` newline discrepancy in `src-tauri/src/modules/supabase_sync/config_a.rs` restoring green CI/CD pipeline checks; validated via 56 automated tests. (Thanks to @aukgit)
 > Latest version **v4.193.0**: CI/CD Quality Gates & Linter Healing, Progress Bar #1af18d Quintile Redesign & Compacting, Dual Supabase Diagnostics & Prompt Tree Stability — Resolved TypeScript index signature mismatch in `error-store.ts`; auto-formatted PostgREST client and Supabase configuration to pass strict `cargo fmt` gates across all platforms; modernized the quota progress bar gradient terminal stop to Progress Green `#1af18d` with blur drop shadows, exactly 5 slots at 20% intervals, illuminated LED apertures replacing misleading SVG checkmarks, and compacted right alignment; added structured backtrace logging for Supabase connection probes and auto-corrected Lovable endpoint typos; resolved system clipboard subprocess pipe deadlock in `copy_to_system_clipboard` by properly dropping stdin before process wait; added Prompt Tree top 2px #1af18d loading bar and compiled action buttons into a sleek right-aligned segmented dropdown; enforced high-contrast typography and email privacy masking across accounts and instances. (Thanks to @aukgit)
 > Latest version **v4.190.0**: Running Prompt Backup/Restore & Rerun Root-Cause Fix, Royal Violet UI & Switch Relaunch Verification — Fixed `agm restore` silently restoring nothing after instance switches (strict per-instance filter matched the wrong instance id; unscoped restore now covers all instances in FIFO order with `-i <id>` for strict scoping); fixed `agm rerun [N]` selecting the oldest prompts instead of the most recent and marking them dispatched without re-sending (now re-queues as `backed_up` and dispatches via agy); added cross-instance restore regression test; implemented the approved Royal Violet design system; added post-relaunch IDE verification to the account-switch flow so silent no-reopen failures surface as diagnosable errors. (Thanks to @aukgit)

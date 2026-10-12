@@ -2,6 +2,17 @@
 
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
+*   **Version History**:
+    *   **v4.195.0 (2026-10-13)**:
+        -   **CI/CD Quality Gates & Macro Syntax Remediation**:
+            -   **Description**: Resolved duplicate variable declaration and expected assertion syntax in json envelope test suite (`src-tauri/src/modules/json_envelope/tests.rs`), ensuring zero-error Clippy and test compilation across Ubuntu, macOS, and Windows matrix runners. (Thanks to @aukgit)
+        -   **Window Manager Error Tracking**:
+            -   **Description**: Enforced strict 'No Silent Errors' discipline in `src/utils/windowManager.ts` by routing all best-effort window operations through `useErrorStore.getState().trackWarning`. (Thanks to @aukgit)
+        -   **Complete Supabase Hardening & UI/UX Polish**:
+            -   **Description**: Verified 100% compliance across all 56 automated tests for Progress Green `#1af18d`, quintile 5-slot progress bars, right-compacted layout, high-contrast theme typography, email privacy masking, prompt tree action capsules, and secure repo-secrets dynamic endpoint discovery. (Thanks to @aukgit)
+
+
+
     *   **v4.194.0 (2026-10-13)**:
         -   **CI/CD Quality Gates & Rust Formatting**:
             -   **Description**: Resolved `cargo fmt` newline discrepancy in `src-tauri/src/modules/supabase_sync/config_a.rs`, restoring clean CI/CD pipeline checks across Linux, macOS, and Windows runners. (Thanks to @aukgit)

@@ -41,7 +41,6 @@ pub(crate) mod tests {
             "variables": {
                 "workDir": "D:\\work",
                 "repoDir": "${workDir}\\antigravity-manager",
-                "baseUrl": "https://sample-mock-project.supabase.co",
                 "baseUrl": "https://sample-mock-root.supabase.co",
                 "restUrl": "${baseUrl}/rest/v1/"
             },
@@ -59,7 +58,6 @@ pub(crate) mod tests {
         );
         assert_eq!(
             data["endpoint"].as_str().unwrap(),
-            "https://sample-mock-project.supabase.co/rest/v1/"
             "https://sample-mock-root.supabase.co/rest/v1/"
         );
         assert_eq!(
