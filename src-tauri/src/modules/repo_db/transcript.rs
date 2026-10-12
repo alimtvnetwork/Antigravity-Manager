@@ -261,11 +261,13 @@ pub(crate) fn inspect_conversation_transcript(
         };
     }
 
-    // Check if the conversation turn has completed or is waiting for user
+    // Check if the conversation turn has completed or is waiting for user.
+    // Invariant: Differentiate step-level tool completion from turn-level assistant completion.
     let mut is_completed_or_waiting = false;
     for line in lines.iter().rev().take(25) {
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
             let s_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("");
+            let s_source = val.get("source").and_then(|v| v.as_str()).unwrap_or("");
             if s_type == "TOKEN_USAGE"
                 || s_type == "TELEMETRY"
                 || s_type == "HEARTBEAT"
@@ -275,18 +277,22 @@ pub(crate) fn inspect_conversation_transcript(
             {
                 continue;
             }
-            let s_status = val.get("status").and_then(|v| v.as_str()).unwrap_or("");
-            if s_status.eq_ignore_ascii_case("done")
-                || s_status.eq_ignore_ascii_case("completed")
-                || s_status.eq_ignore_ascii_case("error")
-                || s_status.eq_ignore_ascii_case("idle")
-            {
-                is_completed_or_waiting = true;
-                break;
+
+            // Step-level outputs (tool execution results) report status: "DONE" on the step itself.
+            // These indicate tool completion, NOT turn completion. Skip them.
+            let is_tool_step = s_type == "GENERIC"
+                || s_type == "TOOL_OUTPUT"
+                || s_type == "TOOL_RESPONSE"
+                || s_source == "TOOL"
+                || val.get("tool_call_id").is_some();
+            if is_tool_step {
+                continue;
             }
-            if s_type == "PLANNER_RESPONSE"
-                || val.get("source").and_then(|s| s.as_str()) == Some("MODEL")
-            {
+
+            let s_status = val.get("status").and_then(|v| v.as_str()).unwrap_or("");
+
+            // Explicit turn-level terminal completion: Planner/Model response with ZERO tool calls
+            if s_type == "PLANNER_RESPONSE" || s_source == "MODEL" {
                 let has_tool_calls = val
                     .get("tool_calls")
                     .and_then(|t| t.as_array())
@@ -296,17 +302,28 @@ pub(crate) fn inspect_conversation_transcript(
                     && (s_status.is_empty()
                         || s_status.eq_ignore_ascii_case("done")
                         || s_status.eq_ignore_ascii_case("completed")
-                        || s_status.eq_ignore_ascii_case("idle"))
+                        || s_status.eq_ignore_ascii_case("idle")
+                        || s_status.eq_ignore_ascii_case("error"))
                 {
                     is_completed_or_waiting = true;
                     break;
                 }
+            } else if s_type == "USER_INPUT" || s_source == "USER_EXPLICIT" {
+                // If the most recent meaningful event is user input awaiting AI, turn is active (not completed)
+                break;
+            } else if s_status.eq_ignore_ascii_case("completed")
+                || s_status.eq_ignore_ascii_case("error")
+                || s_status.eq_ignore_ascii_case("idle")
+            {
+                is_completed_or_waiting = true;
+                break;
             }
         }
     }
 
-    let is_recent_active =
-        !is_completed_or_waiting && mtime_epoch > 0 && (now_epoch - mtime_epoch <= 60);
+    // Adaptive 10-Minute Thinking Window: Expand timestamp window to 600s (10 minutes) when mtime is fresh
+    let is_mtime_fresh = mtime_epoch > 0 && (now_epoch - mtime_epoch <= 600);
+    let is_recent_active = !is_completed_or_waiting && is_mtime_fresh;
 
     let mut latest_prompt: Option<String> = None;
     let mut latest_response: Option<String> = None;
@@ -443,28 +460,85 @@ pub(crate) fn inspect_conversation_transcript(
                 continue;
             }
 
+            // Step-level outputs (tool execution results) report status: "DONE" on the step itself.
+            // These indicate tool completion, NOT turn completion. Skip them.
+            let is_tool_step = s_type == "GENERIC"
+                || s_type == "TOOL_OUTPUT"
+                || s_type == "TOOL_RESPONSE"
+                || s_source == "TOOL"
+                || val.get("tool_call_id").is_some();
+            if is_tool_step {
+                continue;
+            }
+
             let step_idx = val
                 .get("step_index")
                 .and_then(|v| v.as_u64())
                 .unwrap_or(step_count as u64);
             let s_status = val.get("status").and_then(|v| v.as_str()).unwrap_or("");
 
-            // Inspect for terminal completion
+            // Inspect for terminal completion:
+            // Only if PLANNER_RESPONSE (or non-tool MODEL text output) has ZERO tool calls
+            // and explicit terminal status (DONE, COMPLETED, IDLE, ERROR), set is_terminal_done = true.
+            // If has_open_tools is true (the model called tools), explicitly ensure is_terminal_done = false and break!
             if s_type == "PLANNER_RESPONSE" || s_source == "MODEL" {
                 let tool_calls = val.get("tool_calls").and_then(|tc| tc.as_array());
                 let has_open_tools = tool_calls.map(|tc| !tc.is_empty()).unwrap_or(false);
-                let is_explicit_done = s_status.eq_ignore_ascii_case("DONE")
-                    || s_status.eq_ignore_ascii_case("COMPLETED")
-                    || s_status.eq_ignore_ascii_case("IDLE")
-                    || s_status.eq_ignore_ascii_case("ERROR");
-                if !has_open_tools && (is_explicit_done || s_status.is_empty()) {
-                    is_terminal_done = true;
+                if has_open_tools {
+                    is_terminal_done = false;
+                    if let Some(first_tc) = tool_calls.and_then(|tc| tc.first()) {
+                        let tool_name = first_tc
+                            .get("tool_name")
+                            .or_else(|| first_tc.get("name"))
+                            .and_then(|n| n.as_str())
+                            .unwrap_or("action");
+                        if latest_step_summary.is_none() {
+                            latest_step_summary = Some(format!(
+                                "Step {} · Tool: {} ({})",
+                                step_idx, tool_name, s_status
+                            ));
+                        }
+                        if execution_results.is_none() {
+                            if let Some(tc_arr) = tool_calls {
+                                let call_descs: Vec<String> = tc_arr
+                                    .iter()
+                                    .map(|tc| {
+                                        let name = tc
+                                            .get("tool_name")
+                                            .or_else(|| tc.get("name"))
+                                            .and_then(|n| n.as_str())
+                                            .unwrap_or("tool");
+                                        let args = tc
+                                            .get("arguments")
+                                            .or_else(|| tc.get("args"))
+                                            .map(|a| a.to_string())
+                                            .unwrap_or_default();
+                                        format!("{}({})", name, args)
+                                    })
+                                    .collect();
+                                execution_results = Some(format!(
+                                    "In-Flight Tool Execution:\n{}",
+                                    call_descs.join("\n")
+                                ));
+                            }
+                        }
+                    }
+                    break;
+                } else {
+                    let is_explicit_done = s_status.eq_ignore_ascii_case("DONE")
+                        || s_status.eq_ignore_ascii_case("COMPLETED")
+                        || s_status.eq_ignore_ascii_case("IDLE")
+                        || s_status.eq_ignore_ascii_case("ERROR");
+                    if is_explicit_done {
+                        is_terminal_done = true;
+                    }
                 }
             }
 
             // 1. Check for genuine tool_calls
             if let Some(tool_calls) = val.get("tool_calls").and_then(|tc| tc.as_array()) {
                 if let Some(first_tc) = tool_calls.first() {
+                    is_terminal_done = false;
                     let tool_name = first_tc
                         .get("tool_name")
                         .or_else(|| first_tc.get("name"))

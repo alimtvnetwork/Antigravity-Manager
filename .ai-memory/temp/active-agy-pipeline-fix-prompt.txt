@@ -1,154 +1,30 @@
-# Fix CI/CD Pipeline Errors with 4-Part Root Cause Analysis (RCA)
+Is it done properly? Can we check properly the missing items from the task that is mentioned below? Please check it carefully. Do not make any mistakes.
 
-> **Target Repository:** `alimtvnetwork/Antigravity-Manager`
-> **Failing Workflow Run:** `#36454144015`
-> **Commit SHA:** `948093213115b3f170c9052b0517709b43f64952`
+# Auto Switch and Rotate Fix: high priority instruction, non-negotiable task
 
-/goal Autonomously analyze and fix the failing CI/CD pipeline errors documented below using 4-part Root Cause Analysis (RCA), strictly adhere to coding guidelines, and verify all quality gates pass.
+Yeah, I think it's been quite some time that you have been trying to fix the auto switch and rotate. None of this is working. The biggest problem here is that the switch of the account and fast forward, both of this does not work at all. So you can compare with 162, v4.162 version. That's auto-rotate. Auto-rotate and fast forward, restarting instance, all of these functionalities work. So try to go deep, understand very well what is the difference between your code and there, and also fix the CI/CD issues by checking the gitmap.pe. Don't try to run anything. Check the issues, try to find the files, the root cause, and try to fix it. Again, send it to GitHub CI/CD to fix it, okay? Don't try to be over smart at this moment. And try to figure out and write the root cause for me why your account switching is failing. I tried to revert back to the old version, version 1.62, and why I cannot do that automatically using the `Antigravity Manager (`Antigravity Manager (AGM)`)` update to v4.162 or just 4.162. Why I cannot? So that update option from the CLI also does not revert the version. Make sure you fix it properly everything. Okay? It's very crucial. I've been doing this for several time. You have been breaking stuff. This is stupid. Write the root cause, write the problem first, and then try to create the instruction for the AI first, okay? And then you start doing the task. So before doing that, plan it properly, write the instruction properly, find the root problem, go deep inside the code, do the comparison of this, what you have, what is there that is working. It is kind of stupid that you tried several times and it is not working.
 
+## slug: auto-switch-and-rotate-fix
 
-## Recent Git Commit History
+# Actionable Items Must Follow Non-Negotiable
 
-```text
-commit 948093213115b3f170c9052b0517709b43f64952
-Author: MD ALIM UL KARIM <devorg.bd@gmail.com>
-Date:   Tue Sep 29 00:52:12 2026 +0800
+1. Write spec under 02-spec/21-app/auto-switch-and-rotate-fix/ and enqueue plan task in .ai-memory/plans/auto-switch-and-rotate-fix.md (subtasks in .ai-memory/plans/subtasks/auto-switch-and-rotate-fix/) first
+2. Search codebase exclusively via GitMap (gitmap aum search, gitmap find, gitmap cat, gitmap ps, gitmap py, gitmap llm train); TOTAL BAN on rg, ripgrep, grep, git grep, Select-String
+3. Strictly use relative Git paths (02-spec/..., .ai-memory/..., cmd/...); only add the relative paths, never add the absolute path during your work, and ensure this is respected on the release page and in release notes as well
+4. Use `gitmap` AI agents to enter data
+5. Task completion includes committing and pushing to Git
+6. Compare current code with version 162, v4.162 to identify differences in auto-rotate and fast forward functionalities.
+7. Investigate and fix CI/CD issues by checking gitmap.pe.
+8. Identify and document the root cause of account switching failure.
+9. Attempt to revert to version 1.62 using `Antigravity Manager (`Antigravity Manager (AGM)`)` and document why the CLI update option fails to revert the version.
+10. Plan and write detailed instructions for AI before starting the task.
 
-    chore(release): bump version to 4.97.0, fix release workflow actions permission and artifact purge loop
+## Must follow and spawn agent using
 
- .github/workflows/release.yml                      |  4 +++-
- 03-ai-scripts/34-purge-github-actions-artifacts.py | 24 +++++++++++++++++++---
- CHANGELOG.md                                       | 14 +++++++++++++
- CHANGELOG_EN.md                                    |  7 +++++++
- Casks/antigravity-tools.rb                         |  2 +-
- README_EN.md                                       |  6 +++---
- package-lock.json                                  |  4 ++--
- package.json                                       |  2 +-
- readme.md                                          |  4 ++--
- src-tauri/Cargo.lock                               |  2 +-
- src-tauri/Cargo.toml                               |  2 +-
- src-tauri/hooks.nsh                                |  2 +-
- src-tauri/tauri.conf.json                          |  2 +-
- src/components/layout/MiniView.tsx                 |  2 +-
- src/pages/Settings.tsx                             |  2 +-
- version.json                                       |  2 +-
- 16 files changed, 61 insertions(+), 20 deletions(-)
+@[.agents/skills/execute-parent-task-with-n-steps-v6]
 
-commit 33000649c479053ce3d5ceabda9db24b2644d4db
-Author: MD ALIM UL KARIM <devorg.bd@gmail.com>
-Date:   Mon Sep 28 23:34:32 2026 +0800
+## Additional Instructions
 
-    chore(release): bump version to 4.96.0 - full root lovable and secondary supabase multi-machine integration
-    
-    Co-authored-by: alim <devorg.bd@gmail.com>
-    Co-authored-by: aukgit <devorg.bd@gmail.com>
-
- ...supabase-multi-machine-hierarchy-and-cli-e2e.md |  49 +++++++---
- CHANGELOG.md                                       |  16 ++++
- CHANGELOG_EN.md                                    |   8 ++
- Casks/antigravity-tools.rb                         |   2 +-
- README_EN.md                                       |   6 +-
- package-lock.json                                  |   4 +-
- package.json                                       |   2 +-
- readme.md                                          |   4 +-
- scripts/supabase-accounts.json                     |  38 ++++++++
- scripts/supabase-setup.ps1                         | 105 +++++++++++++++++++++
- src-tauri/Cargo.lock                               |   2 +-
- src-tauri/Cargo.toml                               |   2 +-
- src-tauri/hooks.nsh                                |   2 +-
- src-tauri/src/modules/supabase_sync.rs             |  32 ++++++-
- src-tauri/tauri.conf.json                          |   2 +-
- src/components/layout/MiniView.tsx                 |   2 +-
- src/pages/Settings.tsx                             |   2 +-
- version.json                                       |   2 +-
- 18 files changed, 250 insertions(+), 30 deletions(-)
-
-commit 0b937bc1c81a1c21b281cdc3810e34032fc2db75
-Author: MD ALIM UL KARIM <devorg.bd@gmail.com>
-Date:   Mon Sep 28 23:01:32 2026 +0800
-
-    chore(release): bump version to 4.95.0, unify desktop integration across cli and gui, fix prompt restoration cache shadowing, and add supabase atomic claim function
-    
-    Co-authored-by: alim <devorg.bd@gmail.com>
-    Co-authored-by: aukgit <devorg.bd@gmail.com>
-
- CHANGELOG.md                             | 16 ++++++++++++++
- CHANGELOG_EN.md                          |  8 +++++++
- Casks/antigravity-tools.rb               |  2 +-
- README_EN.md                             |  6 +++---
- package-lock.json                        |  4 ++--
- package.json                             |  2 +-
- readme.md                                | 10 +++++++--
- src-tauri/Cargo.lock                     |  2 +-
- src-tauri/Cargo.toml                     |  2 +-
- src-tauri/hooks.nsh                      |  2 +-
- src-tauri/src/bin/agm.rs                 |  7 +++++-
- src-tauri/src/modules/auto_switcher.rs   | 12 ++++++++++-
- src-tauri/src/modules/integration.rs     | 37 ++++++++++++++++++--------------
- src-tauri/src/modules/repo_db.rs         | 11 ++++++++--
- src-tauri/src/modules/supabase_schema.rs | 24 ++++++++++++++++++++-
- src-tauri/src/modules/tray.rs            |  2 +-
- src-tauri/tauri.conf.json                |  2 +-
- src/components/layout/MiniView.tsx       |  2 +-
- src/pages/Settings.tsx                   |  2 +-
- version.json                             |  2 +-
- 20 files changed, 117 insertions(+), 38 deletions(-)
-
-commit ff76ede1f43fc9970169775dad7a8ddf3f6a48d9
-Author: MD ALIM UL KARIM <devorg.bd@gmail.com>
-Date:   Mon Sep 28 22:17:18 2026 +0800
-
-    fix(agm): target specific instance scope when backing up running prompts in fast-forward rotation
-
- src-tauri/src/bin/agm.rs | 13 ++++++++-----
- 1 file changed, 8 insertions(+), 5 deletions(-)
-
-commit e99a648eb9ad7654e9c49cf715711e7f18925d70
-Author: MD ALIM UL KARIM <devorg.bd@gmail.com>
-Date:   Mon Sep 28 22:10:01 2026 +0800
-
-    test(supabase): add comprehensive unit test suites for client, schema, sync, and lease management
-
- src-tauri/src/modules/supabase_client.rs         | 310 +++++++++++++++++++++++
- src-tauri/src/modules/supabase_command_queue.rs  |  93 +++++++
- src-tauri/src/modules/supabase_schema.rs         |  21 ++
- src-tauri/src/modules/supabase_sync.rs           |  58 +++++
- src-tauri/src/modules/workspace_lease_manager.rs | 112 ++++++++
- 5 files changed, 594 insertions(+)
-```
-
-## Failing CI/CD Pipeline Error Logs
-
-```text
-================================================================================
-GITMAP PIPELINE STATUS: CLEAN (No errors found)
-================================================================================
-Repo:                 alimtvnetwork/Antigravity-Manager
-Repo URL:             https://github.com/alimtvnetwork/Antigravity-Manager
-Branch:               main
-Last Commit:          9480932
-Last Release:         v4.97.0
-Open PRs:             0
-Status:               completed (conclusion: success)
-Pipeline Run URL:     https://github.com/alimtvnetwork/Antigravity-Manager/actions/runs/36454144015
-================================================================================
-
-All recent pipeline workflow runs are PASSING (100% green).
-```
-
-# Bug Fix with 4-Part RCA & Regression Verification — Workflow (must follow)
-
-/goal Autonomously fix the failing CI/CD pipeline errors, strictly enforcing coding guidelines, and document the complete RCA before pushing.
-
-## The 4-Part RCA Requirement (Mandatory Memory File)
-Before modifying code, document the issue in .ai-memory/memory/issues/xx-<slug>.md:
-1. Why it happened: High-level architectural breakdown of the failure.
-2. How it happened: Technical execution flow that triggered the error.
-3. Root Cause: Exact file, line, and dependency responsible.
-4. Code Fix: Exact code snippets showing the remediation.
-
-## Non-Negotiable Rules
-- Functions <= 8-15 lines.
-- Affirmative booleans only (is*, has*).
-- Zero naked panics or unhandled errors; wrap with *apperror.AppError.
-- Group all changes into a single atomic commit at the final step.
+- /plan first before doing the work to reduce the credits.
+- /learn from @[.agents/skills/gitmap] skill to leverage GitMap high-speed search, toolchain discovery, and caching.
+- Only add the relative paths, never add the absolute path during your work; this should be respected on the release page and in release notes as well.

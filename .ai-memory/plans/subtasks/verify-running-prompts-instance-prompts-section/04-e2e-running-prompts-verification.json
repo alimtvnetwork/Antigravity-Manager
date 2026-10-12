@@ -1,0 +1,18 @@
+{
+  "task": "Task-04",
+  "status": "DONE",
+  "filesChanged": [
+    "src-tauri/src/modules/repo_db/transcript.rs",
+    "scripts/test-running-prompts-e2e.ps1"
+  ],
+  "checks": "pwsh -File scripts/test-running-prompts-e2e.ps1 -> exit 0; gitmap ps \"Set-Location src-tauri; cargo fmt -- --check\" -> exit 0",
+  "acceptance": {
+    "ac1": "PASS",
+    "has_cli_prompts_tree_evaluation": "PASS",
+    "has_cli_tree_parity": "PASS",
+    "has_running_prompt_assertions": "PASS",
+    "has_ghost_conversation_suppression": "PASS",
+    "has_green_pulse_verification": "PASS",
+    "has_clean_teardown": "PASS"
+  }
+}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useInstanceStore } from '../../../stores/useInstanceStore';
 import { getTruncatedText, countWords } from './formatters';
@@ -7,6 +7,8 @@ import { usePromptTreeState } from './usePromptTreeState';
 import { usePromptTreeData } from './usePromptTreeData';
 import { usePromptTreeCoreActions } from './usePromptTreeCoreActions';
 import { usePromptTreePromptActions } from './usePromptTreePromptActions';
+import { isGhostConversation, isStaleOrEmptyConversation } from './conversationGuards';
+import { classifyPromptTier } from './tierClassification';
 import { ModalHeader } from './ModalHeader';
 import { TreePanel } from './TreePanel';
 import { DetailHeader } from './DetailHeader';
@@ -66,7 +68,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         expandedProjects, setExpandedProjects,
         expandedStaleGroups, setExpandedStaleGroups,
         selectedProject, setSelectedProject,
-        selectedConversation,
+        selectedConversation, setSelectedConversation,
         activePromptText, setActivePromptText,
         editedPromptText, setEditedPromptText,
         viewMode, setViewMode,
@@ -143,6 +145,72 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         return () => clearInterval(timer);
     }, [selectedConversation?.conversation_id, selectedConversation?.is_running, selectedConversation?.last_modified, setElapsedSeconds]);
 
+    // Deep-link auto-expansion & active running conversation selection for initialSelectedProjectId
+    const lastHandledInitialProjectIdRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (!isOpen) {
+            lastHandledInitialProjectIdRef.current = null;
+            return;
+        }
+        if (!initialSelectedProjectId || treeData.length === 0) return;
+        if (lastHandledInitialProjectIdRef.current === initialSelectedProjectId) return;
+
+        const target = treeData.find((p) => p.project_id === initialSelectedProjectId);
+        if (!target) return;
+
+        lastHandledInitialProjectIdRef.current = initialSelectedProjectId;
+        setExpandedProjects((prev) => ({ ...prev, [target.project_id]: true }));
+        setSelectedProject(target);
+
+        if (target.conversations && target.conversations.length > 0) {
+            // Find genuine active running conversation first
+            const runningConv = target.conversations.find(
+                (c) =>
+                    Boolean(c.is_running) &&
+                    !isGhostConversation(c) &&
+                    !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+            );
+            if (runningConv) {
+                selectConversation(runningConv, target);
+                if (isStaleOrEmptyConversation(runningConv)) {
+                    setExpandedStaleGroups((prev) => ({ ...prev, [target.project_id]: true }));
+                }
+                return;
+            }
+
+            // Fallback to latest valid conversation
+            const validConvs = target.conversations.filter(
+                (c) =>
+                    !isGhostConversation(c) &&
+                    !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+            );
+            if (validConvs.length > 0) {
+                const sorted = [...validConvs].sort((a, b) => {
+                    const aTime = new Date(a.last_modified).getTime() || 0;
+                    const bTime = new Date(b.last_modified).getTime() || 0;
+                    return bTime - aTime;
+                });
+                selectConversation(sorted[0], target);
+                if (isStaleOrEmptyConversation(sorted[0])) {
+                    setExpandedStaleGroups((prev) => ({ ...prev, [target.project_id]: true }));
+                }
+            } else {
+                setSelectedConversation(null);
+            }
+        } else {
+            setSelectedConversation(null);
+        }
+    }, [
+        isOpen,
+        initialSelectedProjectId,
+        treeData,
+        selectConversation,
+        setExpandedProjects,
+        setSelectedProject,
+        setSelectedConversation,
+        setExpandedStaleGroups,
+    ]);
+
     // Hotkey: 'N' triggers Send Now
     useEffect(() => {
         if (!isOpen) return;
@@ -205,7 +273,62 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
 
         // 2. Filter Pills
         if (activeFilter === 'running') {
-            list = list.filter((p) => Boolean(p.is_running) || p.conversations.some((c) => Boolean(c.is_running)));
+            list = list
+                .filter(
+                    (p) =>
+                        Boolean(p.is_running) ||
+                        p.conversations.some(
+                            (c) =>
+                                Boolean(c.is_running) &&
+                                !isGhostConversation(c) &&
+                                !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+                        )
+                )
+                .map((p) => {
+                    const hasRunningSubagents = p.conversations.some((c) => {
+                        if (!c.is_running) return false;
+                        const cat = classifyPromptTier(c.prompt_preview_200w, c.title, c);
+                        return cat.tier === 'SUBAGENT_INSTRUCTION';
+                    });
+
+                    if (!hasRunningSubagents) {
+                        return p;
+                    }
+
+                    // Preserve parent user prompts for running subagents so that ProjectNode filter
+                    // does not drop the parent or orphan active subagents
+                    const convs = [...p.conversations];
+                    const chronologicalIndices = convs
+                        .map((c, idx) => ({ c, idx, time: new Date(c.last_modified).getTime() || 0 }))
+                        .sort((a, b) => a.time - b.time);
+
+                    let currentParentIdx: number | null = null;
+                    const parentIndicesWithRunningSubagents = new Set<number>();
+
+                    for (const { c, idx } of chronologicalIndices) {
+                        const cat = classifyPromptTier(c.prompt_preview_200w, c.title, c);
+                        if (cat.tier === 'USER_PROMPT') {
+                            currentParentIdx = idx;
+                        } else if (cat.tier === 'SUBAGENT_INSTRUCTION' && Boolean(c.is_running) && !isGhostConversation(c)) {
+                            if (currentParentIdx !== null) {
+                                parentIndicesWithRunningSubagents.add(currentParentIdx);
+                            }
+                        }
+                    }
+
+                    if (parentIndicesWithRunningSubagents.size === 0) {
+                        return p;
+                    }
+
+                    const updatedConvs = convs.map((c, idx) => {
+                        if (parentIndicesWithRunningSubagents.has(idx) && !c.is_running) {
+                            return { ...c, is_running: true };
+                        }
+                        return c;
+                    });
+
+                    return { ...p, conversations: updatedConvs };
+                });
         } else if (activeFilter === 'queued') {
             list = list.filter((p) => p.conversations.some((c) => Boolean(c.is_queued) || c.status.toLowerCase().includes('queue')));
         } else if (activeFilter === 'pinned') {
@@ -228,6 +351,23 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                 active.push(p);
             }
         }
+
+        // Elevate running projects to top of active list
+        active.sort((a, b) => {
+            const aPinned = pinnedProjectIds.includes(a.project_id);
+            const bPinned = pinnedProjectIds.includes(b.project_id);
+            if (aPinned !== bPinned) return aPinned ? -1 : 1;
+
+            const aRunning = Boolean(a.is_running) || a.conversations.some((c) => Boolean(c.is_running));
+            const bRunning = Boolean(b.is_running) || b.conversations.some((c) => Boolean(c.is_running));
+            if (aRunning !== bRunning) return aRunning ? -1 : 1;
+
+            const aLatest = Math.max(0, ...a.conversations.map((c) => new Date(c.last_modified).getTime() || 0));
+            const bLatest = Math.max(0, ...b.conversations.map((c) => new Date(c.last_modified).getTime() || 0));
+            if (bLatest !== aLatest) return bLatest - aLatest;
+
+            return a.repo_name.localeCompare(b.repo_name);
+        });
 
         return { activeProjects: active, archivedProjects: archived };
     }, [treeData, searchQuery, selectedProjectScope, activeFilter, archivedProjectIds, pinnedProjectIds]);

@@ -274,30 +274,32 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                             continue;
                         }
 
-                        // Strict idle supremacy rule:
-                        // if not_fully_idle == 0 or status contains "IDLE", "COMPLETED", "FAILED", "CANCELLED", it is unconditionally IDLE.
-                        let is_idle_count = not_fully_idle == 0;
-                        let has_idle_status = status.contains("IDLE")
-                            || status.contains("COMPLETED")
+                        // Authoritative not_fully_idle supremacy rule:
+                        // If not_fully_idle > 0, this is definitive empirical proof of active in-flight execution.
+                        // Stale text status strings (e.g. CASCADE_RUN_STATUS_IDLE) must not override not_fully_idle > 0.
+                        let is_zero_idle = not_fully_idle == 0;
+                        let has_terminal_status = status.contains("COMPLETED")
                             || status.contains("FAILED")
                             || status.contains("CANCELLED");
-                        let is_explicit_idle = is_idle_count || has_idle_status;
+                        let is_explicit_idle =
+                            is_zero_idle && (status.contains("IDLE") || has_terminal_status);
 
                         if is_explicit_idle {
                             continue;
                         }
 
-                        // Adaptive 10-Minute Thinking Window: Expand the timestamp cutoff from rigid 120s to 600s (10 minutes)
-                        // for active turns with not_fully_idle > 0 && status.contains("RUNNING"), ensuring reasoning/thinking models
-                        // (Claude 3.7 Thinking, Gemini 2.5 Pro) are not prematurely flipped to IDLE mid-generation!
+                        // Adaptive 10-Minute Thinking Window: Expand timestamp cutoff to 600s (10 minutes)
+                        // for active turns with not_fully_idle > 0, ensuring reasoning/thinking models
+                        // (Claude 3.7 Thinking, Gemini 2.5 Pro) are never prematurely flipped to IDLE mid-generation.
                         let conv_time = parse_flexible_timestamp(&_last_time_str);
-                        let is_recent = conv_time > 0 && (now - conv_time <= 60);
+                        let max_allowed_elapsed = if not_fully_idle > 0 { 600 } else { 60 };
+                        let is_recent = conv_time > 0 && (now - conv_time <= max_allowed_elapsed);
 
                         if !is_recent {
                             continue;
                         }
 
-                        let is_conv_running = not_fully_idle > 0 && status.contains("RUNNING");
+                        let is_conv_running = not_fully_idle > 0;
 
                         if is_conv_running {
                             if let Some(ws_uris_raw) = ws_uris_opt {

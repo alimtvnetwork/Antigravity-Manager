@@ -1,0 +1,16 @@
+{
+  "task": "Task-01",
+  "status": "DONE",
+  "filesChanged": [
+    "src-tauri/src/modules/repo_db/gemini_dirs.rs",
+    "src-tauri/src/modules/repo_db/tree_collect.rs"
+  ],
+  "checks": "gitmap ps \"Set-Location src-tauri; cargo fmt -- --check\" -> exit 0",
+  "acceptance": {
+    "ac1": "PASS",
+    "ac2": "PASS",
+    "ac3": "PASS",
+    "ac4": "PASS",
+    "ac5": "PASS"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "task": "Task-03",
+  "status": "DONE",
+  "filesChanged": [
+    "src/components/instances/PromptTreeView/PromptTreeViewModal.tsx",
+    "src/pages/instances/InstanceCardProjects.tsx"
+  ],
+  "checks": "node scripts/run-frontend-tests.mjs instanceRunningPrompts -> exit 0; gitmap ps \"npm run build\" -> exit 0",
+  "acceptance": {
+    "ac1": "PASS",
+    "ac2": "PASS",
+    "ac3": "PASS",
+    "ac4": "PASS",
+    "ac5": "PASS",
+    "ac6": "PASS",
+    "ac7": "PASS"
+  }
+}

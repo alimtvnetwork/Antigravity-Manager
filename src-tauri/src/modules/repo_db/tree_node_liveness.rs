@@ -16,12 +16,14 @@ pub(crate) fn evaluate_project_liveness(
 ) -> (bool, String) {
     let registry = ctx.registry;
     let now = ctx.now;
+    // Adaptive 10-Minute Thinking Window: For conversations already evaluated as running,
+    // allow up to 600s elapsed window to accommodate extended reasoning and heavy tool execution.
     let has_active_conv = conv_nodes.iter().any(|c| {
         if !c.is_running {
             return false;
         }
         let conv_ts = parse_flexible_timestamp(&c.last_modified);
-        conv_ts > 0 && (now - conv_ts <= 45)
+        conv_ts > 0 && (now - conv_ts <= 600)
     });
     let has_conv_nodes = !conv_nodes.is_empty();
 

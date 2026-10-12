@@ -1,0 +1,18 @@
+{
+  "task": "Task-02",
+  "status": "DONE",
+  "filesChanged": [
+    "src-tauri/src/modules/repo_db/transcript.rs",
+    "src-tauri/src/modules/repo_db/liveness.rs",
+    "src-tauri/src/modules/repo_db/tree_node_liveness.rs"
+  ],
+  "checks": "gitmap ps \"Set-Location src-tauri; cargo fmt -- --check\" -> exit 0",
+  "acceptance": {
+    "ac1": "PASS",
+    "has_turn_level_differentiation": "PASS",
+    "is_not_fully_idle_authoritative": "PASS",
+    "has_600s_thinking_window": "PASS",
+    "is_mtime_heartbeat_corroborated": "PASS",
+    "has_tree_liveness_alignment": "PASS"
+  }
+}
