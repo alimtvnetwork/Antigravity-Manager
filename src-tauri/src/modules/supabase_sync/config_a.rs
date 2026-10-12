@@ -429,7 +429,11 @@ pub fn default_seed_endpoints() -> Vec<SupabaseEndpoint> {
             prune_threshold_mb: 400,
             priority: 1,
             notes: Some("Primary Lovable root cluster endpoint".to_string()),
-            tags: vec!["lovable".to_string(), "root".to_string(), "primary".to_string()],
+            tags: vec![
+                "lovable".to_string(),
+                "root".to_string(),
+                "primary".to_string(),
+            ],
         },
         SupabaseEndpoint {
             id: "ep-secondary-personal-01".to_string(),
@@ -467,4 +471,3 @@ pub fn seed_default_endpoints(cfg: &mut SupabaseConfig) -> bool {
     }
     modified
 }
-

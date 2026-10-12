@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.190.0)
+> Professional AI Account Management & Protocol Proxy System (v4.193.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.190.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.193.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,6 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
+> Latest version **v4.193.0**: CI/CD Quality Gates & Linter Healing, Progress Bar #1af18d Quintile Redesign & Compacting, Dual Supabase Diagnostics & Prompt Tree Stability — Resolved TypeScript index signature mismatch in `error-store.ts`; auto-formatted PostgREST client and Supabase configuration to pass strict `cargo fmt` gates across all platforms; modernized the quota progress bar gradient terminal stop to Progress Green `#1af18d` with blur drop shadows, exactly 5 slots at 20% intervals, illuminated LED apertures replacing misleading SVG checkmarks, and compacted right alignment; added structured backtrace logging for Supabase connection probes and auto-corrected Lovable endpoint typos; resolved system clipboard subprocess pipe deadlock in `copy_to_system_clipboard` by properly dropping stdin before process wait; added Prompt Tree top 2px #1af18d loading bar and compiled action buttons into a sleek right-aligned segmented dropdown; enforced high-contrast typography and email privacy masking across accounts and instances. (Thanks to @aukgit)
 > Latest version **v4.190.0**: Running Prompt Backup/Restore & Rerun Root-Cause Fix, Royal Violet UI & Switch Relaunch Verification — Fixed `agm restore` silently restoring nothing after instance switches (strict per-instance filter matched the wrong instance id; unscoped restore now covers all instances in FIFO order with `-i <id>` for strict scoping); fixed `agm rerun [N]` selecting the oldest prompts instead of the most recent and marking them dispatched without re-sending (now re-queues as `backed_up` and dispatches via agy); added cross-instance restore regression test; implemented the approved Royal Violet design system; added post-relaunch IDE verification to the account-switch flow so silent no-reopen failures surface as diagnosable errors. (Thanks to @aukgit)
 > Latest version **v4.189.0**: Auto-Switch & Fast-Forward Scoring Fallback, Conscious Process Isolation, CLI Revert Engine & Cross-Platform CI Green — Replaced strict 100% quota requirement in Step 3 fallback with proportional quota headroom scoring (`score_candidate_account_fallback`), eliminating rotation lockups when accounts have partial quota; enforced conscious instance root PID isolation in `pid_scan.rs` (`matched_set.contains(&p)`), preventing stopped sibling instances from falsely reporting as running or having their processes terminated; fully enabled CLI update rollbacks (`agm update <ver>` / `agm update to <ver>`) with automatic 2-part SemVer normalization, tag-specific endpoint resolution, and `-isPinned`/`-Force` pass-through in `install.ps1`; and resolved all 7 cross-platform compilation and Clippy errors with 100% green CI gate across Ubuntu, macOS, and Windows matrix runners. (Thanks to @aukgit)
 > Latest version **v4.188.0**: Auto-Switch & Fast-Forward PID Contamination Fix, CLI Version Downgrades, IDE Executable Path & Headless Fleet Sync — Eliminated cross-instance PID contamination in `pid_scan.rs` and unblocked candidate evaluation for sub-100% quota accounts; enabled CLI version downgrades and rollbacks (`agm update <ver>`) with automatic 2-part SemVer normalization; optimized launch latency by eliminating synchronous 6s blocking sleeps in `wait_for_instance_prompt_channel`; added dedicated IDE Executable path column in instance list view; introduced decentralized headless fleet synchronization over Email and Telegram without Supabase; and audited/eliminated silent error discards across instance lifecycle and frontend settings. (Thanks to @aukgit)

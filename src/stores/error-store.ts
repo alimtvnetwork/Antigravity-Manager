@@ -20,7 +20,8 @@ export interface ErrorContext {
   source?: string;
   triggerComponent?: string;
   triggerAction?: string;
-  [key: string]: string | number | boolean | null | undefined;
+  metadata?: Record<string, any>;
+  [key: string]: any;
 }
 
 export interface EnvelopeErrors {

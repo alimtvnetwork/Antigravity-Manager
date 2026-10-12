@@ -283,15 +283,10 @@ impl SupabaseClient {
     /// Check if a specific table exists and is readable via PostgREST
     pub async fn check_table_exists(&self, table: &str) -> Result<bool, AppError> {
         let url = format!("{}/rest/v1/{}?limit=0", self.base_url, table);
-        let resp = self
-            .client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| {
-                self.log_transport_error("check_table_exists", &url, &e);
-                AppError::Network(e.to_string(), None)
-            })?;
+        let resp = self.client.get(&url).send().await.map_err(|e| {
+            self.log_transport_error("check_table_exists", &url, &e);
+            AppError::Network(e.to_string(), None)
+        })?;
 
         let status_code = resp.status().as_u16();
         if status_code == 200 {
@@ -373,23 +368,15 @@ impl SupabaseClient {
             url.push_str(query);
         }
 
-        let resp = self
-            .client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| {
-                self.log_transport_error("select", &url, &e);
-                AppError::Network(e.to_string(), None)
-            })?;
+        let resp = self.client.get(&url).send().await.map_err(|e| {
+            self.log_transport_error("select", &url, &e);
+            AppError::Network(e.to_string(), None)
+        })?;
 
-        let parsed: Value = resp
-            .json()
-            .await
-            .map_err(|e| {
-                self.log_transport_error("select_parse_json", &url, &e);
-                AppError::Network(e.to_string(), None)
-            })?;
+        let parsed: Value = resp.json().await.map_err(|e| {
+            self.log_transport_error("select_parse_json", &url, &e);
+            AppError::Network(e.to_string(), None)
+        })?;
         Ok(parsed)
     }
 
@@ -408,13 +395,10 @@ impl SupabaseClient {
                 AppError::Network(e.to_string(), None)
             })?;
 
-        let parsed: Value = resp
-            .json()
-            .await
-            .map_err(|e| {
-                self.log_transport_error("insert_parse_json", &url, &e);
-                AppError::Network(e.to_string(), None)
-            })?;
+        let parsed: Value = resp.json().await.map_err(|e| {
+            self.log_transport_error("insert_parse_json", &url, &e);
+            AppError::Network(e.to_string(), None)
+        })?;
         Ok(parsed)
     }
 
@@ -445,13 +429,10 @@ impl SupabaseClient {
                 AppError::Network(e.to_string(), None)
             })?;
 
-        let parsed: Value = resp
-            .json()
-            .await
-            .map_err(|e| {
-                self.log_transport_error("upsert_parse_json", &url, &e);
-                AppError::Network(e.to_string(), None)
-            })?;
+        let parsed: Value = resp.json().await.map_err(|e| {
+            self.log_transport_error("upsert_parse_json", &url, &e);
+            AppError::Network(e.to_string(), None)
+        })?;
         Ok(parsed)
     }
 
@@ -480,13 +461,10 @@ impl SupabaseClient {
                 AppError::Network(e.to_string(), None)
             })?;
 
-        let parsed: Value = resp
-            .json()
-            .await
-            .map_err(|e| {
-                self.log_transport_error("update_parse_json", &url, &e);
-                AppError::Network(e.to_string(), None)
-            })?;
+        let parsed: Value = resp.json().await.map_err(|e| {
+            self.log_transport_error("update_parse_json", &url, &e);
+            AppError::Network(e.to_string(), None)
+        })?;
         Ok(parsed)
     }
 
@@ -509,13 +487,10 @@ impl SupabaseClient {
                 AppError::Network(e.to_string(), None)
             })?;
 
-        let parsed: Value = resp
-            .json()
-            .await
-            .map_err(|e| {
-                self.log_transport_error("delete_parse_json", &url, &e);
-                AppError::Network(e.to_string(), None)
-            })?;
+        let parsed: Value = resp.json().await.map_err(|e| {
+            self.log_transport_error("delete_parse_json", &url, &e);
+            AppError::Network(e.to_string(), None)
+        })?;
         Ok(parsed)
     }
 
@@ -533,13 +508,10 @@ impl SupabaseClient {
                 AppError::Network(e.to_string(), None)
             })?;
 
-        let parsed: Value = resp
-            .json()
-            .await
-            .map_err(|e| {
-                self.log_transport_error("rpc_parse_json", &url, &e);
-                AppError::Network(e.to_string(), None)
-            })?;
+        let parsed: Value = resp.json().await.map_err(|e| {
+            self.log_transport_error("rpc_parse_json", &url, &e);
+            AppError::Network(e.to_string(), None)
+        })?;
         Ok(parsed)
     }
 }

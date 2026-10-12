@@ -2,6 +2,19 @@
 
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
+    *   **v4.193.0 (2026-10-13)**:
+        -   **CI/CD Quality Gates & Linter Healing**:
+            -   **Description**: Resolved TypeScript index signature mismatch on `ErrorContext` in `src/stores/error-store.ts`. Re-formatted `src-tauri/src/modules/supabase_client/client.rs` and `src-tauri/src/modules/supabase_sync/config_a.rs` to satisfy strict `cargo fmt` checks across all OS runners. (Thanks to @aukgit)
+        -   **Progress Bar Modernization & Compacting**:
+            -   **Description**: Updated quota progress bar gradient terminal stop to Progress Green `#1af18d` with glowing blur drop shadows, standardized 5 slots at 20% quintile intervals, replaced misleading SVG glyphs with glowing LED apertures, and compacted bar layout towards the right edge (`w-36`/`w-44` `ml-auto`). (Thanks to @aukgit)
+        -   **Prompt Tree Action Stability & Deadlock Elimination**:
+            -   **Description**: Fixed subprocess pipe deadlock in `copy_to_system_clipboard` by properly dropping stdin before awaiting child processes, bounded clipboard execution with timeouts, and eliminated uncaught promise rejections on clipboard operations. Mounted a top 2px `#1af18d` loading bar and compiled toolbar actions into a sleek segmented dropdown capsule. (Thanks to @aukgit)
+        -   **Dual Supabase Diagnostics & Theming Contrast**:
+            -   **Description**: Integrated structured backtrace logging for connection probes, auto-corrected Lovable endpoint typos, enforced high-contrast typography (no purple on purple), added CSS3 hover micro-elevation, and implemented email privacy masking via `maskEmail`. (Thanks to @aukgit)
+
+
+
+
     *   **v4.190.0 (2026-10-12)**:
         -   **Royal Violet UI Theme**:
             -   **Description**: Implemented the approved Royal Violet design system across the app — daisyUI dark theme tokens, semantic CSS variables, and legacy navy hex remap. (Thanks to @aukgit)

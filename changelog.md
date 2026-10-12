@@ -1,5 +1,17 @@
 # Changelog
 
+## [v4.193.0] - 2026-10-13
+
+### Fixed
+- **CI/CD Quality Gates & Linter Healing**: Resolved TypeScript index signature mismatch on `ErrorContext` in `src/stores/error-store.ts`. Re-formatted `src-tauri/src/modules/supabase_client/client.rs` and `src-tauri/src/modules/supabase_sync/config_a.rs` to satisfy strict `cargo fmt` checks across all OS runners. (Thanks to @aukgit)
+- **Prompt Tree Action Stability & Deadlock Elimination**: Fixed subprocess pipe deadlock in `copy_to_system_clipboard` by properly dropping stdin before awaiting child processes, bounded clipboard execution with timeouts, and eliminated uncaught promise rejections on clipboard operations. (Thanks to @aukgit)
+
+### Added
+- **Progress Bar Modernization & Compacting**: Updated quota progress bar gradient terminal stop to Progress Green `#1af18d` with glowing drop shadow, standardized 5 slots at 20% quintile intervals, replaced misleading SVG glyphs with glowing LED apertures, and compacted bar layout towards the right edge. (Thanks to @aukgit)
+- **Dual Supabase Diagnostics & Theming Contrast**: Integrated structured backtrace logging for connection probes, auto-corrected Lovable endpoint typos, enforced high-contrast typography (no purple on purple), added CSS3 hover micro-elevation, and implemented email privacy masking via `maskEmail`. (Thanks to @aukgit)
+
+---
+
 ## [v4.192.0] - 2026-10-12
 
 ### Added
@@ -189,6 +201,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.193.0 (2026-10-13)**:
+        -   **[CI/CD & Progress Bar] Healing & Modernization**:
+            -   **Description**: Resolved TypeScript index signature mismatch on `ErrorContext` in `error-store.ts` and normalized `cargo fmt` formatting in `client.rs` and `config_a.rs`. Modernized quota progress bar to Progress Green `#1af18d` with 5 slots at 20% quintile intervals, glowing apertures, and compacted right alignment. Resolved subprocess clipboard deadlock in `copy_to_system_clipboard` and added Prompt Tree action improvements and loading bar. Enforced high-contrast theme typography, email masking, and Supabase connection diagnostics. (Thanks to @aukgit)
+
+
     *   **v4.190.0 (2026-10-12)**:
         -   **[Theme] Royal Violet UI**: Implemented the approved Royal Violet design system across the app — daisyUI dark theme tokens, semantic CSS variables, and legacy navy hex remap (canvas `#090611`, panel `#171025`, primary `#7C3AED`, aurora `#A855F7`, highlight `#E879F9`). (Thanks to @aukgit)
         -   **[Fixed] Account Switch Relaunch Verification**: Added post-relaunch IDE verification to the account-switch flow (`switch_account_to_instance` and the 5-step desktop switch). A spawn that returns Ok no longer reports success when no IDE window materializes — the switch now surfaces a diagnosable error instead of a silent no-reopen. (Thanks to @aukgit)
