@@ -472,4 +472,3 @@ pub fn seed_default_endpoints(cfg: &mut SupabaseConfig) -> bool {
     }
     modified
 }
-

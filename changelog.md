@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.194.0] - 2026-10-13
+
+### Fixed
+- **CI/CD Quality Gates & Rust Formatting**: Resolved `cargo fmt` newline discrepancy in `src-tauri/src/modules/supabase_sync/config_a.rs`, restoring clean CI/CD pipeline checks across Linux, macOS, and Windows runners. (Thanks to @aukgit)
+- **Supabase Credentials Eradication & External Vault Isolation**: Completely purged hardcoded Supabase project tokens and credentials from the tracked codebase, scripts, documentation, and test fixtures. Shifted endpoint provisioning to dynamic environment variables (`SUPABASE_ROOT_URL`, `SUPABASE_ROOT_KEY`, `SUPABASE_SECONDARY_URL`, `SUPABASE_SECONDARY_KEY`) and automated Base64 ingestion from `repo-secrets`. Added single-liner import script `scripts/import-supabase-credentials.ps1`. (Thanks to @aukgit)
+
+### Added
+- **Unified Test Automation & Verification**: Comprehensive 56-test regression suite covering Progress Green `#1af18d`, compact quintile progress bar layout, theming contrast, email masking, prompt tree action capsules, and dynamic vault connectivity. (Thanks to @aukgit)
+
+---
+
 ## [v4.193.0] - 2026-10-13
 
 ### Fixed
@@ -201,6 +212,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.194.0 (2026-10-13)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.193.0 (2026-10-13)**:
         -   **[CI/CD & Progress Bar] Healing & Modernization**:
             -   **Description**: Resolved TypeScript index signature mismatch on `ErrorContext` in `error-store.ts` and normalized `cargo fmt` formatting in `client.rs` and `config_a.rs`. Modernized quota progress bar to Progress Green `#1af18d` with 5 slots at 20% quintile intervals, glowing apertures, and compacted right alignment. Resolved subprocess clipboard deadlock in `copy_to_system_clipboard` and added Prompt Tree action improvements and loading bar. Enforced high-contrast theme typography, email masking, and Supabase connection diagnostics. (Thanks to @aukgit)

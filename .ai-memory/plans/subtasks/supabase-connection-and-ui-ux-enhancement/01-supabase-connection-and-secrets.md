@@ -70,13 +70,13 @@ The following files are touched by this subtask:
 ### Step 4: Expand CLI Subcommands in `supabase_cmds.rs`
 - Add command `agm supabase reload-secrets` to trigger immediate ladder discovery.
 - Enhance `agm supabase status` to display:
-  - Configured endpoints with masked keys (`sb_publishable_cJd...Y69`).
+  - Configured endpoints with masked keys (`sb_publishable_...`).
   - Active role assignments (`root` vs `secondary`).
   - Probe connectivity status and storage quota thresholds.
 - Enhance `agm supabase load-json <path>` to accept either raw endpoint arrays or two-tier unified envelopes (`{ "attributes": ..., "data": ... }`).
 
 ### Step 5: Unit Testing & Verification
-- Unit test typo classification: assert that checking `pezjuuddecbyrmqxytrv` outputs the suggestion to use `[REDACTED_LOVABLE_PROJECT]`.
+- Unit test typo classification: assert that checking typographical errors outputs actionable replacement suggestions.
 - Unit test timeout classification: assert that a simulated timeout outputs unpause instructions.
 - Unit test configuration round-trip: verify JSON import and normalization.
 

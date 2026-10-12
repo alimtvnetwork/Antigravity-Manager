@@ -2,6 +2,16 @@
 
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
+    *   **v4.194.0 (2026-10-13)**:
+        -   **CI/CD Quality Gates & Rust Formatting**:
+            -   **Description**: Resolved `cargo fmt` newline discrepancy in `src-tauri/src/modules/supabase_sync/config_a.rs`, restoring clean CI/CD pipeline checks across Linux, macOS, and Windows runners. (Thanks to @aukgit)
+        -   **Supabase Credentials Eradication & External Vault Isolation**:
+            -   **Description**: Completely purged hardcoded Supabase project tokens and credentials from the tracked codebase, scripts, documentation, and test fixtures. Shifted endpoint provisioning to dynamic environment variables (`SUPABASE_ROOT_URL`, `SUPABASE_ROOT_KEY`, `SUPABASE_SECONDARY_URL`, `SUPABASE_SECONDARY_KEY`) and automated Base64 ingestion from `repo-secrets`. Added single-liner import script `scripts/import-supabase-credentials.ps1`. (Thanks to @aukgit)
+        -   **Unified Test Automation & Verification**:
+            -   **Description**: Comprehensive 56-test regression suite covering Progress Green `#1af18d`, compact quintile progress bar layout, theming contrast, email masking, prompt tree action capsules, and dynamic vault connectivity. (Thanks to @aukgit)
+
+
+
     *   **v4.193.0 (2026-10-13)**:
         -   **CI/CD Quality Gates & Linter Healing**:
             -   **Description**: Resolved TypeScript index signature mismatch on `ErrorContext` in `src/stores/error-store.ts`. Re-formatted `src-tauri/src/modules/supabase_client/client.rs` and `src-tauri/src/modules/supabase_sync/config_a.rs` to satisfy strict `cargo fmt` checks across all OS runners. (Thanks to @aukgit)
