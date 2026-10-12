@@ -25,20 +25,38 @@ export const enterMiniMode = async (contentHeight: number, shouldCenter: boolean
         }
 
         // Hide window decorations (title bar) first to ensure accurate sizing
-        await win.setDecorations(false);
+        await win.setDecorations(false).catch((e) => {
+            // Best-effort window op; tracked in the error module.
+            useErrorStore.getState().trackWarning(e, { source: 'windowManager.enterMiniMode', triggerAction: 'set_decorations' });
+        });
 
         // Set window size: width 300, height = content height
-        await win.setSize(new LogicalSize(300, contentHeight + 2));
+        await win.setSize(new LogicalSize(300, contentHeight + 2)).catch((e) => {
+            // Best-effort window op; tracked in the error module.
+            useErrorStore.getState().trackWarning(e, { source: 'windowManager.enterMiniMode', triggerAction: 'set_size' });
+        });
 
-        await win.setAlwaysOnTop(true);
+        await win.setAlwaysOnTop(true).catch((e) => {
+            // Best-effort window op; tracked in the error module.
+            useErrorStore.getState().trackWarning(e, { source: 'windowManager.enterMiniMode', triggerAction: 'set_always_on_top' });
+        });
         // Enable window shadow
-        await win.setShadow(true);
+        await win.setShadow(true).catch((e) => {
+            // Best-effort window op; tracked in the error module.
+            useErrorStore.getState().trackWarning(e, { source: 'windowManager.enterMiniMode', triggerAction: 'set_shadow' });
+        });
         // Disable resizing in mini mode
-        await win.setResizable(false);
+        await win.setResizable(false).catch((e) => {
+            // Best-effort window op; tracked in the error module.
+            useErrorStore.getState().trackWarning(e, { source: 'windowManager.enterMiniMode', triggerAction: 'set_resizable' });
+        });
 
         // Center window only if requested (usually on first load)
         if (shouldCenter) {
-            await win.center();
+            await win.center().catch((e) => {
+                // Best-effort window op; tracked in the error module.
+                useErrorStore.getState().trackWarning(e, { source: 'windowManager.enterMiniMode', triggerAction: 'center_window' });
+            });
         }
     } catch (error) {
         console.error('Failed to enter mini mode:', error);
@@ -60,19 +78,40 @@ export const exitMiniMode = async () => {
         const storedBounds = priorBounds || useViewStore.getState().savedBounds;
 
         if (storedBounds && storedBounds.width > 500 && storedBounds.height > 400) {
-            await win.setSize(new PhysicalSize(storedBounds.width, storedBounds.height));
-            await win.setPosition(new PhysicalPosition(storedBounds.x, storedBounds.y));
+            await win.setSize(new PhysicalSize(storedBounds.width, storedBounds.height)).catch((e) => {
+                // Best-effort window op; tracked in the error module.
+                useErrorStore.getState().trackWarning(e, { source: 'windowManager.exitMiniMode', triggerAction: 'set_size' });
+            });
+            await win.setPosition(new PhysicalPosition(storedBounds.x, storedBounds.y)).catch((e) => {
+                // Best-effort window op; tracked in the error module.
+                useErrorStore.getState().trackWarning(e, { source: 'windowManager.exitMiniMode', triggerAction: 'set_position' });
+            });
         } else {
             // Restore to a reasonable default size if prior bounds unavailable
-            await win.setSize(new LogicalSize(1200, 800));
-            await win.center();
+            await win.setSize(new LogicalSize(1200, 800)).catch((e) => {
+                // Best-effort window op; tracked in the error module.
+                useErrorStore.getState().trackWarning(e, { source: 'windowManager.exitMiniMode', triggerAction: 'set_size' });
+            });
+            await win.center().catch((e) => {
+                // Best-effort window op; tracked in the error module.
+                useErrorStore.getState().trackWarning(e, { source: 'windowManager.exitMiniMode', triggerAction: 'center_window' });
+            });
         }
 
-        await win.setAlwaysOnTop(false);
+        await win.setAlwaysOnTop(false).catch((e) => {
+            // Best-effort window op; tracked in the error module.
+            useErrorStore.getState().trackWarning(e, { source: 'windowManager.exitMiniMode', triggerAction: 'set_always_on_top' });
+        });
         // Keep custom title bar decorations disabled
-        await win.setDecorations(false);
+        await win.setDecorations(false).catch((e) => {
+            // Best-effort window op; tracked in the error module.
+            useErrorStore.getState().trackWarning(e, { source: 'windowManager.exitMiniMode', triggerAction: 'set_decorations' });
+        });
         // Re-enable resizing
-        await win.setResizable(true);
+        await win.setResizable(true).catch((e) => {
+            // Best-effort window op; tracked in the error module.
+            useErrorStore.getState().trackWarning(e, { source: 'windowManager.exitMiniMode', triggerAction: 'set_resizable' });
+        });
     } catch (error) {
         console.error('Failed to exit mini mode:', error);
         // Tracked in the error module; window keeps mini-mode state, user can toggle manually.
@@ -125,9 +164,18 @@ export const ensureFullViewState = async () => {
             }
         }
         // Enforce custom title bar (frameless) for Full View
-        await win.setDecorations(false);
-        await win.setResizable(true);
-        await win.setAlwaysOnTop(false);
+        await win.setDecorations(false).catch((e) => {
+            // Best-effort startup self-heal; tracked in the error module.
+            useErrorStore.getState().trackWarning(e, { source: 'windowManager.ensureFullViewState', triggerAction: 'set_decorations' });
+        });
+        await win.setResizable(true).catch((e) => {
+            // Best-effort startup self-heal; tracked in the error module.
+            useErrorStore.getState().trackWarning(e, { source: 'windowManager.ensureFullViewState', triggerAction: 'set_resizable' });
+        });
+        await win.setAlwaysOnTop(false).catch((e) => {
+            // Best-effort startup self-heal; tracked in the error module.
+            useErrorStore.getState().trackWarning(e, { source: 'windowManager.ensureFullViewState', triggerAction: 'set_always_on_top' });
+        });
     } catch (error) {
         console.error('Failed to ensure full view state:', error);
         // Tracked in the error module; startup self-heal is best-effort, app continues regardless.

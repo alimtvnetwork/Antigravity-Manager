@@ -9,10 +9,10 @@
 [CmdletBinding()]
 param (
     [string]$ConfigFile = "",
-    [string]$RootUrl = "https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/",
-    [string]$RootKey = "sb_publishable_cJdJyIEeXc8bpym9TIOU7w_vVU0_Y69",
-    [string]$SecondaryUrl = "https://ikwmurmjynhxdpmhzekt.supabase.co/rest/v1/",
-    [string]$SecondaryKey = "sb_publishable_barsshQom3VcUw1l5soE_A_R1FwQz8o",
+    [string]$RootUrl = $env:AGM_SUPABASE_ROOT_URL,
+    [string]$RootKey = $env:AGM_SUPABASE_ROOT_KEY,
+    [string]$SecondaryUrl = $env:AGM_SUPABASE_SECONDARY_URL,
+    [string]$SecondaryKey = $env:AGM_SUPABASE_SECONDARY_KEY,
     [string]$NodeAlias = "",
     [switch]$SkipTest = $false
 )

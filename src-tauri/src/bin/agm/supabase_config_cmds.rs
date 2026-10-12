@@ -344,7 +344,7 @@ pub(crate) fn cmd_supabase_set_endpoint(args: &[String]) {
     if args.len() < 5 {
         println!("Usage: agm supabase set <id> <name> <url> <api_key> <role> [notes] [tags]");
         println!("Example:");
-        println!("  agm supabase set ep-root-lovable-01 \"Root Lovable\" https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/ sb_publishable_... root \"Root by Lovable\" \"lovable,root\"");
+        println!("  agm supabase set ep-root-lovable-01 \"Root Lovable\" https://<ROOT_PROJECT_REF>.supabase.co/rest/v1/ sb_publishable_... root \"Root by Lovable\" \"lovable,root\"");
         return;
     }
 

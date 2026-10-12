@@ -136,8 +136,8 @@ pub(crate) fn print_supabase_help() {
        {{
          "id": "ep-root-lovable-01",
          "name": "Root Supabase (Lovable)",
-         "url": "https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/",
-         "api_key": "sb_publishable_cJdJyIEeXc8bpym9TIOU7w_vVU0_Y69",
+         "url": "https://<ROOT_PROJECT_REF>.supabase.co/rest/v1/",
+         "api_key": "sb_publishable_<ROOT_KEY_PLACEHOLDER>",
          "role": "root",
          "is_enabled": true,
          "prune_threshold_mb": 400,
@@ -148,8 +148,8 @@ pub(crate) fn print_supabase_help() {
        {{
          "id": "ep-secondary-01",
          "name": "Secondary Supabase",
-         "url": "https://ikwmurmjynhxdpmhzekt.supabase.co/rest/v1/",
-         "api_key": "sb_publishable_barsshQom3VcUw1l5soE_A_R1FwQz8o",
+         "url": "https://<SECONDARY_PROJECT_REF>.supabase.co/rest/v1/",
+         "api_key": "sb_publishable_<SECONDARY_KEY_PLACEHOLDER>",
          "role": "secondary",
          "is_enabled": true,
          "prune_threshold_mb": 200,
