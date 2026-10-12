@@ -241,10 +241,10 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         setIsActionMenuOpen(false);
                                     }}
                                     disabled={isEnqueueing}
-                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors disabled:opacity-50"
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-amber-800 dark:text-amber-200 hover:bg-amber-50 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors disabled:opacity-50"
                                 >
                                     <div className="flex items-center gap-2">
-                                        <ListPlus className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                                        <ListPlus className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300 shrink-0" />
                                         <span className="font-medium">Enqueue Prompt</span>
                                     </div>
                                     <span className="text-[10px] text-slate-400 font-mono">FIFO Queue</span>
