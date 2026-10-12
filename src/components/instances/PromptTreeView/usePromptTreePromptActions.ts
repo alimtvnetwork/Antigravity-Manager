@@ -265,11 +265,20 @@ export function usePromptTreePromptActions({
                 setActionMsg("Prompt dispatched to IDE & copied to clipboard!");
                 setTimeout(() => setActionMsg(null), 3000);
             } else {
-                const errMsg = dispatchErr instanceof Error ? dispatchErr.message : String(dispatchErr);
-                setError(`Send failed: ${errMsg || 'dispatch rejected'} — prompt copied to clipboard; paste it into the IDE manually.`);
+                const errorObj = dispatchErr instanceof Error ? dispatchErr : new Error(String(dispatchErr) || 'dispatch rejected');
+                useErrorStore.getState().captureException(errorObj, {
+                    source: 'PromptTreeViewModal.handleResendPrompt',
+                    triggerAction: 'send_prompt_now',
+                });
+                setError(`Send failed: ${errorObj.message} — prompt copied to clipboard; paste it into the IDE manually.`);
             }
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : String(err) || 'Failed to dispatch prompt');
+            const errorObj = err instanceof Error ? err : new Error(String(err) || 'Failed to dispatch prompt');
+            useErrorStore.getState().captureException(errorObj, {
+                source: 'PromptTreeViewModal.handleResendPrompt',
+                triggerAction: 'resend_prompt',
+            });
+            setError(`Send failed: ${errorObj.message}`);
         } finally {
             setIsResending(false);
         }
@@ -370,7 +379,12 @@ ${activePromptText}
             setActionMsg('Prompt enqueued into FIFO scheduler queue!');
             setTimeout(() => setActionMsg(null), 3500);
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : String(err) || 'Failed to enqueue prompt');
+            const errorObj = err instanceof Error ? err : new Error(String(err) || 'Failed to enqueue prompt');
+            useErrorStore.getState().captureException(errorObj, {
+                source: 'PromptTreeViewModal.handleEnqueuePrompt',
+                triggerAction: 'enqueue_prompt',
+            });
+            setError(`Queue failed: ${errorObj.message}`);
         } finally {
             setIsEnqueueing(false);
         }

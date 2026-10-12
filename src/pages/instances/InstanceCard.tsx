@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
     Star,
     Pencil,
@@ -10,6 +11,7 @@ import {
     ArrowLeftRight,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { maskEmail } from '../../utils/maskEmail';
 import { Gemini } from '@lobehub/icons';
 import { TierBadge } from '../../components/common/TierBadge';
 import { QuotaProgressBar } from '../../components/accounts/QuotaProgressBar';
@@ -50,6 +52,9 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
         refreshQuota,
     } = api;
 
+    const [isEmailRevealed, setIsEmailRevealed] = useState(false);
+    const [isEmailHovered, setIsEmailHovered] = useState(false);
+
     const data = useInstanceCardData(inst, runningTreeNodes, actionState);
     const { boundAccount, displayEmail, geminiModel, weeklyQuota, hasActiveTask, effectiveExePath, currentAction, isBusy } =
         data;
@@ -81,7 +86,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
             key={inst.config.id}
             ref={isActive ? activeCardRef : undefined}
             className={cn(
-                'group relative rounded-[5px] border transition-all duration-200 flex flex-col justify-between overflow-hidden backdrop-blur-xs',
+                'group relative rounded-[5px] border transition-all duration-200 flex flex-col justify-between overflow-hidden backdrop-blur-xs hover:-translate-y-0.5 hover:shadow-lg',
                 isActive
                     ? SELECTED_CARD_CLASSES
                     : 'bg-white dark:bg-[var(--ui-surface-1)] border-gray-200/50 dark:border-[var(--ui-border-subtle)] hover:border-gray-300/80 dark:hover:border-[var(--ui-interactive-40)] hover:bg-slate-50/90 dark:hover:bg-[var(--ui-surface-hover)] shadow-xs'
@@ -208,16 +213,30 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                             <Mail className="w-3 h-3 text-gray-400 dark:text-[var(--ui-text-secondary)] group-hover:text-blue-500 dark:group-hover:text-[var(--ui-interactive)] transition-colors shrink-0" />
                             <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium shrink-0">Account:</span>
                             {displayEmail ? (
-                                <span
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsEmailRevealed((prev) => !prev);
+                                    }}
+                                    onMouseEnter={() => setIsEmailHovered(true)}
+                                    onMouseLeave={() => setIsEmailHovered(false)}
                                     className={cn(
-                                        'px-1.5 py-0.5 rounded-md text-[11px] font-semibold font-mono border flex items-center gap-1 min-w-0 shadow-2xs transition-colors',
-                                        'bg-blue-500/10 text-blue-700 border-blue-500/30 dark:bg-[var(--ui-interactive-soft)] dark:text-[var(--ui-interactive)] dark:border-[var(--ui-interactive-border)]'
+                                        'px-1.5 py-0.5 rounded-md text-[11px] font-semibold font-mono border flex items-center gap-1 min-w-0 shadow-2xs transition-colors cursor-pointer',
+                                        'bg-blue-500/10 text-blue-700 border-blue-500/30',
+                                        'dark:bg-purple-950/50 dark:border-purple-400/30 dark:text-purple-100 hover:dark:bg-purple-900/60'
                                     )}
-                                    title={displayEmail}
+                                    title={
+                                        isEmailRevealed
+                                            ? `${displayEmail} (Click to mask)`
+                                            : `${displayEmail} (Hover or click to reveal)`
+                                    }
                                 >
-                                    <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-500 dark:bg-[var(--ui-interactive)]" />
-                                    <span className="truncate">{displayEmail}</span>
-                                </span>
+                                    <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-500 dark:bg-purple-300" />
+                                    <span className="truncate">
+                                        {isEmailRevealed || isEmailHovered ? displayEmail : maskEmail(displayEmail)}
+                                    </span>
+                                </button>
                             ) : (
                                 <span className="text-[11px] text-gray-400 italic">Unassigned</span>
                             )}

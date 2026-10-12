@@ -28,7 +28,7 @@
   /* ---- Interaction and status colors ---- */
   --ui-interactive: #7c3aed;       /* Links, clickable icons, standard selection */
   --ui-focus-ring: #e879f9;        /* Keyboard focus ring */
-  --ui-success: #31c9a4;           /* Running, healthy, complete */
+  --ui-success: #1af18d;           /* Running, healthy, complete */
   --ui-warning: #f5bf58;           /* Active attention and warning */
   --ui-danger: #ef6a8a;            /* Destructive, error, depleted */
   --ui-info-violet: #a855f7;       /* Secondary informational state only */
@@ -38,7 +38,7 @@
   --ui-interactive-border: rgb(124 58 237 / 0.32); /* Email chip border */
   --ui-interactive-40: rgb(124 58 237 / 0.4);      /* Hover border tint */
   --ui-amber-35: rgb(245 191 88 / 0.35);           /* Active-card edge tint */
-  --ui-success-glow: rgb(49 201 164 / 0.35);       /* Restrained endpoint glow */
+  --ui-success-glow: rgb(26 241 141 / 0.4);        /* Restrained endpoint glow */
 
   /* ---- Quota / progress scale ---- */
   --ui-quota-track: #171025;         /* Bar track background */
@@ -53,8 +53,8 @@
     #f5bf58 40%,
     #e8d67e 52%,
     #a8dcb0 64%,
-    #6fd8b8 78%,
-    #31c9a4 100%
+    #31c9a4 80%,
+    #1af18d 100%
   );
 }
 

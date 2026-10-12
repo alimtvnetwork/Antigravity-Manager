@@ -223,13 +223,15 @@ export function AccountRowContent(props: AccountRowContentProps) {
                         </button>
                     </div>
                 ) : (
-                    <QuotaProgressBar
-                        compact
-                        percentage={fourHourModel?.percentage ?? 0}
-                        resetTime={fourHourModel?.resetTime}
-                        isProtected={fourHourModel?.isProtected}
-                        liveLimit={fourHourModel?.liveLimit}
-                    />
+                    <div className="flex justify-end w-full">
+                        <QuotaProgressBar
+                            compact
+                            percentage={fourHourModel?.percentage ?? 0}
+                            resetTime={fourHourModel?.resetTime}
+                            isProtected={fourHourModel?.isProtected}
+                            liveLimit={fourHourModel?.liveLimit}
+                        />
+                    </div>
                 )}
             </td>
 
@@ -237,12 +239,14 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <span className="text-[10px] text-gray-400 italic">--</span>
                 ) : (
-                    <QuotaProgressBar
-                        compact
-                        isWeekly
-                        percentage={weeklyCell.percentage}
-                        resetTime={weeklyCell.resetTime}
-                    />
+                    <div className="flex justify-end w-full">
+                        <QuotaProgressBar
+                            compact
+                            isWeekly
+                            percentage={weeklyCell.percentage}
+                            resetTime={weeklyCell.resetTime}
+                        />
+                    </div>
                 )}
             </td>
 

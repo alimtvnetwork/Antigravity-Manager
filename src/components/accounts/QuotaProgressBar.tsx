@@ -26,11 +26,11 @@ export interface QuotaProgressBarProps {
  * corresponds to its position on the scale.
  */
 const CHECKPOINT_SCALE_COLORS: Record<number, string> = {
-    100: '#31c9a4',
-    75: '#70ddb0',
-    50: '#e7d36a',
-    25: '#f49a45',
-    0: '#ef6a8a',
+    100: '#1af18d',
+    80: '#1af18d',
+    60: '#31c9a4',
+    40: '#f5bf58',
+    20: '#ef6a8a',
 };
 
 export function QuotaProgressBar({
@@ -43,7 +43,7 @@ export function QuotaProgressBar({
     className,
     compact = false,
     heightClassName = compact ? "h-4" : "h-[18px]",
-    checkpoints = [100, 75, 50, 25, 0],
+    checkpoints = [100, 80, 60, 40, 20],
     showCheckpoints = true,
     Icon,
 }: QuotaProgressBarProps) {
@@ -65,11 +65,11 @@ export function QuotaProgressBar({
         }
     };
 
-    const activeCheckpoints = (checkpoints && checkpoints.length > 0 ? checkpoints : [100, 75, 50, 25, 0]).slice(0, 5);
+    const activeCheckpoints = (checkpoints && checkpoints.length > 0 ? checkpoints : [100, 80, 60, 40, 20]).slice(0, 5);
     const sortedCheckpoints = [...activeCheckpoints].sort((a, b) => b - a);
 
     return (
-        <div className={cn("w-[84%] max-w-[84%] flex items-center", compact ? "gap-1" : "gap-2", className)}>
+        <div className={cn("w-full flex items-center", compact ? "gap-1" : "gap-2", className)}>
             {/* Optional Icon / Label on Left */}
             {(Icon || label) && (
                 <div className="flex items-center gap-1 shrink-0 max-w-[18%] min-w-0 text-slate-700 dark:text-slate-300">
@@ -85,10 +85,11 @@ export function QuotaProgressBar({
             {/* Progress Bar Track — the 8-stop scale gradient spans the FULL track
                 width; a mask reveals only the filled percentage. The gradient is
                 never stretched into a partial fill. */}
-            <div className="relative flex-1 min-w-[60px] flex items-center">
+            <div className="relative flex-1 min-w-0 flex items-center">
                 <div
                     className={cn(
-                        "relative w-full rounded-full overflow-hidden bg-slate-200 dark:bg-[var(--ui-quota-track)] border border-slate-300 dark:border-[var(--ui-quota-track-border)]",
+                        "relative w-full rounded-full overflow-hidden bg-slate-200 dark:bg-[var(--ui-quota-track)] border border-slate-300 dark:border-[var(--ui-quota-track-border)] transition-shadow duration-300",
+                        clamped >= 95 && "shadow-[0_0_12px_rgba(26,241,141,0.8)]",
                         heightClassName
                     )}
                     role="progressbar"
@@ -116,7 +117,6 @@ export function QuotaProgressBar({
                     const isFilled = clamped >= cp;
                     const leftPos = cp >= 100 ? '100%' : cp <= 0 ? '0%' : `${cp}%`;
                     const transform = cp >= 100 ? 'translate(-100%, -50%)' : cp <= 0 ? 'translate(0, -50%)' : 'translate(-50%, -50%)';
-                    const isCritical = clamped < 25;
                     const scaleColor = CHECKPOINT_SCALE_COLORS[cp] ?? '#31c9a4';
 
                     return (
@@ -126,10 +126,11 @@ export function QuotaProgressBar({
                                 "absolute top-1/2 rounded-full flex items-center justify-center transition-all duration-300 z-10 pointer-events-none border-[1.5px]",
                                 compact ? "w-3 h-3" : "w-3.5 h-3.5",
                                 isFilled
-                                    ? (cp >= 50
-                                        // Restrained glow only at the current endpoint in the healthy range
-                                        ? 'shadow-[0_0_8px_rgb(32_217_154/0.35)]'
-                                        : 'shadow-none')
+                                    ? (clamped >= 95
+                                        ? 'shadow-[0_0_12px_rgba(26,241,141,0.8)]'
+                                        : cp >= 60
+                                            ? 'shadow-[0_0_8px_rgba(26,241,141,0.35)]'
+                                            : 'shadow-none')
                                     : 'bg-slate-200/50 dark:bg-[var(--ui-surface-2)] border-slate-300 dark:border-[var(--ui-border-subtle)] shadow-none'
                             )}
                             style={{
@@ -140,20 +141,7 @@ export function QuotaProgressBar({
                             title={`Checkpoint ${cp}%`}
                         >
                             {isFilled ? (
-                                isCritical && cp <= 25 ? (
-                                    <span className={cn("font-black font-mono text-white leading-none tracking-tighter select-none", compact ? "text-[6px]" : "text-[7.5px]")}>
-                                        {Math.round(clamped)}%
-                                    </span>
-                                ) : (
-                                    <svg
-                                        className={cn("fill-none stroke-current text-white stroke-[2.5]", compact ? "w-1.5 h-1.5" : "w-2 h-2")}
-                                        viewBox="0 0 12 12"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                    >
-                                        <path d="M2.5 6.5L4.8 8.8L9.5 3.5" />
-                                    </svg>
-                                )
+                                <span className={cn("rounded-full bg-white shadow-xs", compact ? "w-1 h-1" : "w-1.5 h-1.5")} />
                             ) : (
                                 <span className="w-1 h-1 rounded-full bg-slate-400/40 dark:bg-white/20" />
                             )}
@@ -163,7 +151,7 @@ export function QuotaProgressBar({
             </div>
 
             {/* Single Column for Remaining Time and Percentage */}
-            <div className={cn("flex flex-col items-end shrink-0 w-[16%] max-w-[16%]", compact ? "leading-none" : "leading-tight")}>
+            <div className={cn("flex flex-col items-end shrink-0 ml-2", compact ? "leading-none" : "leading-tight")}>
                 {resetTime ? (
                     <span
                         className={cn(

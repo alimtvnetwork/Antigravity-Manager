@@ -216,7 +216,7 @@ export function QuotaCell({ data }: { data: RowCellData }) {
     return (
         <td className="px-2 py-1 whitespace-nowrap min-w-[150px] max-w-[190px]">
             {data.percentage !== null || data.weeklyQuota !== null ? (
-                <div className="space-y-1 min-w-[150px]">
+                <div className="space-y-1 min-w-[150px] ml-auto">
                     {data.percentage !== null && (
                         <div className="space-y-0.5">
                             <div className="flex items-center justify-between text-[10px] font-mono">
@@ -224,7 +224,9 @@ export function QuotaCell({ data }: { data: RowCellData }) {
                                     {data.modelName || 'Primary Model'} (4H)
                                 </span>
                             </div>
-                            <QuotaProgressBar percentage={data.percentage} resetTime={data.modelResetTime} />
+                            <div className="flex justify-end w-full">
+                                <QuotaProgressBar percentage={data.percentage} resetTime={data.modelResetTime} compact />
+                            </div>
                         </div>
                     )}
                     {data.weeklyQuota !== null && (
@@ -234,11 +236,14 @@ export function QuotaCell({ data }: { data: RowCellData }) {
                                     Weekly Quota
                                 </span>
                             </div>
-                            <QuotaProgressBar
-                                isWeekly
-                                percentage={data.weeklyQuota.percentage}
-                                resetTime={data.weeklyQuota.resetTime}
-                            />
+                            <div className="flex justify-end w-full">
+                                <QuotaProgressBar
+                                    isWeekly
+                                    percentage={data.weeklyQuota.percentage}
+                                    resetTime={data.weeklyQuota.resetTime}
+                                    compact
+                                />
+                            </div>
                         </div>
                     )}
                 </div>

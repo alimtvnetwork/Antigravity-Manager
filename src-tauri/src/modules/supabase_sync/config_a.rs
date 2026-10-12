@@ -384,6 +384,12 @@ pub fn auto_seed_from_repo_secrets(cfg: &mut SupabaseConfig) -> bool {
         }
     }
 
+    if !seeded && cfg.endpoints.is_empty() {
+        if seed_default_endpoints(cfg) {
+            seeded = true;
+        }
+    }
+
     if seeded {
         cfg.endpoints.sort_by_key(|e| e.priority);
         cfg.is_sync_enabled = true;
@@ -391,3 +397,56 @@ pub fn auto_seed_from_repo_secrets(cfg: &mut SupabaseConfig) -> bool {
 
     seeded
 }
+
+/// Default seed endpoints for Primary Lovable and Secondary Personal
+pub fn default_seed_endpoints() -> Vec<SupabaseEndpoint> {
+    vec![
+        SupabaseEndpoint {
+            id: "ep-root-lovable-01".to_string(),
+            name: "Primary Lovable".to_string(),
+            url: normalize_supabase_url("https://pezjuuddecbyfmqxytrv.supabase.co"),
+            api_key: "sb_publishable_cJdJyIEeXc8bpym9TIOU7w_vVU0_Y69".to_string(),
+            role: "root".to_string(),
+            is_enabled: true,
+            prune_threshold_mb: 400,
+            priority: 1,
+            notes: Some("Primary Lovable root cluster endpoint".to_string()),
+            tags: vec!["lovable".to_string(), "root".to_string(), "primary".to_string()],
+        },
+        SupabaseEndpoint {
+            id: "ep-secondary-personal-01".to_string(),
+            name: "Secondary Personal".to_string(),
+            url: normalize_supabase_url("https://ikwmurmjynhxdpmhzekt.supabase.co"),
+            api_key: "sb_publishable_barsshQom3VcUw1l5soE_A_R1FwQz8o".to_string(),
+            role: "secondary".to_string(),
+            is_enabled: true,
+            prune_threshold_mb: 200,
+            priority: 2,
+            notes: Some("Secondary Personal cluster endpoint".to_string()),
+            tags: vec!["secondary".to_string(), "personal".to_string()],
+        },
+    ]
+}
+
+/// Seed default endpoints into the configuration if not already present
+pub fn seed_default_endpoints(cfg: &mut SupabaseConfig) -> bool {
+    let mut modified = false;
+    for ep in default_seed_endpoints() {
+        let norm_url = normalize_supabase_url(&ep.url);
+        let id = ep.id.clone();
+        let already_exists = cfg
+            .endpoints
+            .iter()
+            .any(|e| normalize_supabase_url(&e.url) == norm_url || e.id == id);
+        if !already_exists {
+            cfg.endpoints.push(ep);
+            modified = true;
+        }
+    }
+    if modified {
+        cfg.endpoints.sort_by_key(|e| e.priority);
+        cfg.is_sync_enabled = true;
+    }
+    modified
+}
+

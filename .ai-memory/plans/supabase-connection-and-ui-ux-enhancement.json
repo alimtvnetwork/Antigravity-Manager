@@ -1,0 +1,84 @@
+{
+  "slug": "supabase-connection-and-ui-ux-enhancement",
+  "version": "1.0.0",
+  "parentTaskId": 1,
+  "budget": 300,
+  "status": "ACTIVE",
+  "subtasks": [
+    {
+      "id": "01",
+      "code": "Task-01",
+      "slug": "01-supabase-dual-cluster-and-stacktrace",
+      "title": "Dual Supabase Cluster & Stack Trace Observability",
+      "files": [
+        "src-tauri/src/modules/supabase_client/client.rs",
+        "src-tauri/src/modules/supabase_sync/config_a.rs",
+        "src/stores/error-store.ts"
+      ],
+      "owner": "Worker 01",
+      "status": "PENDING"
+    },
+    {
+      "id": "02",
+      "code": "Task-02",
+      "slug": "02-quota-progress-bar-and-layout",
+      "title": "Quota Progress Bar Glow, 5 Slots & Compact Layout",
+      "files": [
+        "src/components/accounts/QuotaProgressBar.tsx",
+        "src/styles/ui-tokens.css",
+        "src/components/accounts/AccountTable/AccountRowContent.tsx",
+        "src/components/instances/table/InstanceRowCells.tsx"
+      ],
+      "owner": "Worker 01",
+      "status": "PENDING"
+    },
+    {
+      "id": "03",
+      "code": "Task-03",
+      "slug": "03-theming-contrast-and-hover-animations",
+      "title": "Theming, High-Contrast Email Badges & CSS3 Animations",
+      "files": [
+        "src/pages/instances/InstanceCard.tsx",
+        "src/styles/ui-tokens.css",
+        "src/components/accounts/AccountTable/SortableAccountRow.tsx"
+      ],
+      "owner": "Worker 02",
+      "status": "PENDING"
+    },
+    {
+      "id": "04",
+      "code": "Task-04",
+      "slug": "04-prompt-tree-loading-and-actions",
+      "title": "Prompt Tree Loading Progress, Crash Shield & Dropdown Capsule",
+      "files": [
+        "src/components/instances/PromptTreeView/PromptTreeViewModal.tsx",
+        "src/components/instances/PromptTreeView/DetailHeader.tsx",
+        "src/components/instances/PromptTreeView/usePromptTreePromptActions.ts"
+      ],
+      "owner": "Worker 02",
+      "status": "PENDING"
+    },
+    {
+      "id": "05",
+      "code": "Task-05",
+      "slug": "05-image-sharing-public-url",
+      "title": "Public Image Sharing Architecture Specification",
+      "files": [
+        "02-spec/21-app/supabase-connection-and-ui-ux-enhancement/01-architecture-spec.md"
+      ],
+      "owner": "Writer 01",
+      "status": "PENDING"
+    },
+    {
+      "id": "06",
+      "code": "Task-06",
+      "slug": "06-verification-and-preflight",
+      "title": "Verification Script & Pre-flight Gate",
+      "files": [
+        "scripts/verify-supabase-and-ui-ux.ps1"
+      ],
+      "owner": "Lead Orchestrator",
+      "status": "PENDING"
+    }
+  ]
+}
