@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.191.0] - 2026-10-12
+
+### Added
+- scripts - add Linux Antigravity IDE update script
+
+---
+
 ## [v4.190.0] - 2026-10-12
 
 ### Fixed
@@ -180,31 +187,25 @@
         -   **[Fixed] Account Switch Relaunch Verification**: Added post-relaunch IDE verification to the account-switch flow (`switch_account_to_instance` and the 5-step desktop switch). A spawn that returns Ok no longer reports success when no IDE window materializes — the switch now surfaces a diagnosable error instead of a silent no-reopen. (Thanks to @aukgit)
         -   **[Fixed] Running Prompt Backup/Restore & Rerun**: Fixed `agm restore` silently restoring nothing after an instance switch (strict per-instance filter matched the *current* active instance instead of the instance recorded at backup time) — unscoped restore now covers all instances in FIFO order, with `-i <id>` for strict single-instance scoping. Fixed `agm rerun [N]` selecting the oldest N prompts instead of the most recent N and marking them dispatched without re-sending — rerun now re-queues as `backed_up` and dispatches via agy. Added `test_restore_scoping_across_instances` regression test. (Thanks to @aukgit)
 
-
     *   **v4.189.0 (2026-10-12)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.188.0 (2026-10-11)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
 
-
     *   **v4.187.0 (2026-10-11)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.186.0 (2026-10-11)**:
         -   **Update CLI Command & Pipeline Fixes**:
             -   **Description**: Implemented universal detached self-delegation for `agm update` to eliminate Windows file locks (`os error 5: Access is denied` / sharing violation `0x20`); unified CLI prompt verbs (`agm prompt send`, `agm prompt queue`, `qe` alias) with destination session targeting (`--conversation`, `--new`, `--existing`); expanded in-flight prompt backup coverage across profile rotations; and added UI conversation choice capsule ("Existing Conv" vs "New Conv"). (Thanks to @aukgit)
 
-
     *   **v4.185.0 (2026-10-11)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.183.0 (2026-10-10)**:
         -   **Switch / Fast-Forward Reliability Hardening**:

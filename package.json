@@ -1,5 +1,5 @@
 {
-  "version": "4.190.0",
+  "version": "4.191.0",
   "name": "agm-alim",
   "description": "Antigravity Manager Tools - Maintained by Alim, Sponsored by RISEUP ASIA LLC",
   "author": "Alim (Sponsored by RISEUP ASIA LLC)",
@@ -15,6 +15,7 @@
     "bump": "node scripts/bump-version.mjs",
     "tauri": "tauri",
     "tauri:debug": "RUST_LOG=debug npm run tauri dev",
+    "update-ide": "bash ./scripts/update-antigravity-ide.sh",
     "clean": "python 03-ai-scripts/19-artifact-remover.py --clean-all --force",
     "clean:cargo": "python 03-ai-scripts/19-artifact-remover.py --clean-cargo --force",
     "clean:rust": "python 03-ai-scripts/19-artifact-remover.py --clean-rust --force",
