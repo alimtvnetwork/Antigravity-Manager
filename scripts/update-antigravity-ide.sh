@@ -87,11 +87,40 @@ else
         *) ARCH="x64" ;;
     esac
 
+    MANIFEST_URL="https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/manifest/latest-x64-linux.yml"
+    FALLBACK_VER="2.22.0"
+    FALLBACK_BUILD="5446056071266304"
+    TARGET_PLATFORM="linux-x64"
     if [ "$ARCH" = "arm64" ]; then
-        DOWNLOAD_URL="https://storage.googleapis.com/antigravity-public/antigravity-hub/2.19.1-6046815158665216/linux-arm/Antigravity.tar.gz"
-    else
-        DOWNLOAD_URL="https://storage.googleapis.com/antigravity-public/antigravity-hub/2.19.1-6046815158665216/linux-x64/Antigravity.tar.gz"
+        TARGET_PLATFORM="linux-arm"
     fi
+
+    MANIFEST_CONTENT=$(curl -s --connect-timeout 3 "$MANIFEST_URL" 2>/dev/null || true)
+    LIVE_VER=""
+    LIVE_BUILD=""
+    if [ -n "$MANIFEST_CONTENT" ]; then
+        while IFS= read -r line; do
+            case "$line" in
+                version:*)
+                    LIVE_VER="${line#version:}"
+                    LIVE_VER="$(echo "$LIVE_VER" | tr -d ' "'\''\r')"
+                    ;;
+                *antigravity-hub/*)
+                    part="${line#*antigravity-hub/}"
+                    tag="${part%%/*}"
+                    LIVE_BUILD="${tag#*-}"
+                    LIVE_BUILD="$(echo "$LIVE_BUILD" | tr -d ' "'\''\r')"
+                    ;;
+            esac
+        done <<< "$MANIFEST_CONTENT"
+    fi
+
+    if [ -n "$LIVE_VER" ] && [ -n "$LIVE_BUILD" ]; then
+        DOWNLOAD_URL="https://storage.googleapis.com/antigravity-public/antigravity-hub/${LIVE_VER}-${LIVE_BUILD}/${TARGET_PLATFORM}/Antigravity.tar.gz"
+    else
+        DOWNLOAD_URL="https://storage.googleapis.com/antigravity-public/antigravity-hub/${FALLBACK_VER}-${FALLBACK_BUILD}/${TARGET_PLATFORM}/Antigravity.tar.gz"
+    fi
+
 
     TMP_DIR="$(mktemp -d /tmp/antigravity-update-XXXXXX)"
     cleanup() {
