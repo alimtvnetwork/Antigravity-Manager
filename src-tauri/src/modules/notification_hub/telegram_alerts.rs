@@ -234,6 +234,7 @@ pub(crate) async fn dispatch_telegram_switch_alert(
         chat_id,
         &text,
         reply_markup,
+        false,
     )
     .await
     {

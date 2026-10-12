@@ -116,7 +116,7 @@ async fn dispatch_telegram_update_alert(
         .unwrap_or_else(|_| "default".to_string());
 
     let telemetry_header = format!(
-        "🖥️ <b>Machine:</b> <code>{}</code> (<code>{}</code>) | 🏷️ <b>Instance:</b> <code>{}</code>",
+        "🖥️ <b>Machine:</b> <code>{}</code> (<code>{}</code>)\n🏷️ <b>Instance:</b> <code>{}</code>",
         escape_telegram_html(&m_name),
         escape_telegram_html(&m_ip),
         escape_telegram_html(&active_inst_id)
@@ -142,7 +142,8 @@ async fn dispatch_telegram_update_alert(
         escape_telegram_html(&now_str)
     );
 
-    if let Err(e) = telegram_inbound::send_telegram_message(&config.bot_token, chat_id, &text).await
+    if let Err(e) =
+        telegram_inbound::send_telegram_message_no_preview(&config.bot_token, chat_id, &text).await
     {
         logger::log_warn(&format!(
             "[NotificationHub] Telegram update alert failed: {}",

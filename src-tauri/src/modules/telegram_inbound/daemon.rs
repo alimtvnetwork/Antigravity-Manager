@@ -244,6 +244,7 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
                                         chat_id,
                                         &reply,
                                         markup_opt,
+                                        false,
                                     )
                                     .await,
                                     "send callback query reply with markup",

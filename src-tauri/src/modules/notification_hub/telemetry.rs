@@ -182,6 +182,7 @@ async fn dispatch_post_switch_prompt_telemetry(
                         chat_id,
                         &tg_text,
                         reply_markup,
+                        false,
                     )
                     .await,
                     "send_telegram_message_with_markup",

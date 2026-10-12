@@ -231,11 +231,13 @@ pub fn build_copy_prompt_reply_markup(
 }
 
 /// Send a text message to a Telegram chat with optional reply markup (e.g. inline keyboard)
+/// and optional link-preview suppression (for compact status notifications).
 pub async fn send_telegram_message_with_markup(
     bot_token: &str,
     chat_id: i64,
     text: &str,
     reply_markup: Option<serde_json::Value>,
+    disable_preview: bool,
 ) -> Result<(), AppError> {
     let clean_token = bot_token.trim();
     if clean_token.is_empty() {
@@ -268,7 +270,8 @@ pub async fn send_telegram_message_with_markup(
         let mut payload_html = json!({
             "chat_id": chat_id,
             "text": chunk,
-            "parse_mode": "HTML"
+            "parse_mode": "HTML",
+            "disable_web_page_preview": disable_preview
         });
         if is_last {
             if let Some(ref markup) = valid_markup {
@@ -284,7 +287,8 @@ pub async fn send_telegram_message_with_markup(
                 let clean_plain = strip_telegram_html_tags(chunk);
                 let mut payload_plain = json!({
                     "chat_id": chat_id,
-                    "text": clean_plain
+                    "text": clean_plain,
+                    "disable_web_page_preview": disable_preview
                 });
                 if is_last {
                     if let Some(ref markup) = valid_markup {
@@ -330,7 +334,16 @@ pub async fn send_telegram_message(
     chat_id: i64,
     text: &str,
 ) -> Result<(), AppError> {
-    send_telegram_message_with_markup(bot_token, chat_id, text, None).await
+    send_telegram_message_with_markup(bot_token, chat_id, text, None, false).await
+}
+
+/// Send a text message with link previews suppressed (compact status notifications)
+pub async fn send_telegram_message_no_preview(
+    bot_token: &str,
+    chat_id: i64,
+    text: &str,
+) -> Result<(), AppError> {
+    send_telegram_message_with_markup(bot_token, chat_id, text, None, true).await
 }
 
 /// Convenience alias for send_telegram_message with automatic chunking
