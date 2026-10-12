@@ -172,7 +172,19 @@ fi
 RUNNER_SCRIPT="$IDE_DIR/antigravity-runner.sh"
 cat <<'EOF' > "$RUNNER_SCRIPT"
 #!/bin/bash
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve real directory even if invoked via symlink
+REAL_SOURCE="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || realpath "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+DIR="$(cd "$(dirname "$REAL_SOURCE")" && pwd)"
+
+# Safety fallback if DIR is a bin directory
+if [ "$DIR" = "$HOME/.local/bin" ] || [ "$DIR" = "/usr/local/bin" ] || [ "$DIR" = "/usr/bin" ]; then
+    if [ -d "$HOME/.local/share/antigravity-ide" ]; then
+        DIR="$HOME/.local/share/antigravity-ide"
+    elif [ -d "$HOME/.local/share/antigravity" ]; then
+        DIR="$HOME/.local/share/antigravity"
+    fi
+fi
+
 export LD_LIBRARY_PATH="$DIR:$DIR/lib:${LD_LIBRARY_PATH:-}"
 EXEC="$DIR/antigravity"
 [ -f "$EXEC" ] || EXEC="$DIR/Antigravity"

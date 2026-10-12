@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.192.0] - 2026-10-12
+
+### Added
+- scripts - fix symlink resolution in update-antigravity-ide.sh
+
+---
+
 ## [v4.191.0] - 2026-10-12
 
 ### Added
