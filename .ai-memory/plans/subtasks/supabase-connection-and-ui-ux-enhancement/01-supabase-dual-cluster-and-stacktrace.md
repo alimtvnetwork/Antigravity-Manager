@@ -20,7 +20,7 @@ status: pending
 
 Implement the core backend and client-side architecture for the **Dual Supabase Cluster** integration, ensuring automated configuration seeding, resilient multi-cluster routing, universal URL normalization, and end-to-end error stack trace propagation:
 
-1. **Dual Cluster Seeding**: Configure default endpoints for Primary Lovable (`https://pezjuuddecbyfmqxytrv.supabase.co` with key `sb_publishable_cJdJyIEeXc8bpym9TIOU7w_vVU0_Y69`) and Secondary Personal (`https://ikwmurmjynhxdpmhzekt.supabase.co` with key `sb_publishable_barsshQom3VcUw1l5soE_A_R1FwQz8o`).
+1. **Dual Cluster Seeding**: Configure default endpoints for Primary Lovable (`https://[REDACTED_LOVABLE_URL].supabase.co` with key `[REDACTED_LOVABLE_KEY]`) and Secondary Personal (`https://[REDACTED_PERSONAL_URL].supabase.co` with key `[REDACTED_PERSONAL_KEY]`).
 2. **Cluster Failover & Router**: Enable seamless request dispatching across Primary and Secondary endpoints with health checking, fallback escalation, and 400 MB prune threshold guards.
 3. **URL Normalization**: Enforce recursive stripping of trailing slashes and `/rest/v1` suffixes across all endpoint registration, persistence, and request builders.
 4. **Error Observability & Stack Traces**: Implement backend stack trace capture (`std::backtrace::Backtrace`) within `AppError`, propagate traces via `AppErrorPayload` across the Tauri IPC bridge, and render actionable debug frames in `useErrorStore`.
@@ -37,16 +37,16 @@ In `src-tauri/src/modules/supabase_sync/config_a.rs` and `config_b.rs`:
   - **Primary (Lovable Root)**:
     - ID: `ep-lovable-root`
     - Name: `Supabase (Lovable Root)`
-    - Raw URL: `https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/` (normalized to `https://pezjuuddecbyfmqxytrv.supabase.co`)
-    - API Key: `sb_publishable_cJdJyIEeXc8bpym9TIOU7w_vVU0_Y69`
+    - Raw URL: `https://[REDACTED_LOVABLE_URL].supabase.co/rest/v1/` (normalized to `https://[REDACTED_LOVABLE_URL].supabase.co`)
+    - API Key: `[REDACTED_LOVABLE_KEY]`
     - Role: `root`
     - Priority: `1`
     - Prune Threshold: `400` MB
   - **Secondary (Personal Secondary)**:
     - ID: `ep-personal-secondary`
     - Name: `Supabase (Personal Secondary)`
-    - Raw URL: `https://ikwmurmjynhxdpmhzekt.supabase.co/rest/v1/` (normalized to `https://ikwmurmjynhxdpmhzekt.supabase.co`)
-    - API Key: `sb_publishable_barsshQom3VcUw1l5soE_A_R1FwQz8o`
+    - Raw URL: `https://[REDACTED_PERSONAL_URL].supabase.co/rest/v1/` (normalized to `https://[REDACTED_PERSONAL_URL].supabase.co`)
+    - API Key: `[REDACTED_PERSONAL_KEY]`
     - Role: `secondary`
     - Priority: `2`
     - Prune Threshold: `400` MB
@@ -153,7 +153,7 @@ In `src/stores/error-store.ts`:
 | :--- | :--- | :--- | :--- |
 | **TEST-01** | `types::normalize_supabase_url` | Test trailing slashes, `/rest/v1`, ports, and idempotence. | Correct normalized base URL without slashes or `/rest/v1`. |
 | **TEST-02** | `config_a::auto_seed` | Auto-seed when `supabase_config.json` is missing or empty. | Config populated with Lovable (Priority 1) and Personal (Priority 2). |
-| **TEST-03** | `client::test_connection` | Test connectivity against Lovable cluster (`pezjuuddecbyfmqxytrv`). | Returns `Ok(EndpointTestResult { is_success: true, .. })` without modal error. |
-| **TEST-04** | `client::test_connection` | Test connectivity against Personal cluster (`ikwmurmjynhxdpmhzekt`). | Returns `Ok(EndpointTestResult { is_success: true, .. })` without modal error. |
+| **TEST-03** | `client::test_connection` | Test connectivity against Lovable cluster (`[REDACTED_LOVABLE_URL]`). | Returns `Ok(EndpointTestResult { is_success: true, .. })` without modal error. |
+| **TEST-04** | `client::test_connection` | Test connectivity against Personal cluster (`[REDACTED_PERSONAL_URL]`). | Returns `Ok(EndpointTestResult { is_success: true, .. })` without modal error. |
 | **TEST-05** | `error::to_payload` | Trigger invalid key network error and inspect JSON payload. | Payload contains `backend_stack_trace` and structured `Errors.Backend`. |
 | **TEST-06** | `useErrorStore` | Receive backend error payload in frontend store. | Error Modal displays parsed frames, source component, and click trail. |

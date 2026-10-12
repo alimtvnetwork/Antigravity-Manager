@@ -1,0 +1,73 @@
+{
+  "slug": "superbase-information-removal",
+  "version": "1.0.0",
+  "parentTaskId": 1,
+  "budget": 300,
+  "status": "ACTIVE",
+  "subtasks": [
+    {
+      "id": "01",
+      "code": "Task-01",
+      "slug": "01-repo-secrets-vault-and-oneliner",
+      "title": "Repo-Secrets Vault Storage & Single-Liner Import Protocol",
+      "files": [
+        "scripts/import-supabase-credentials.ps1"
+      ],
+      "owner": "Worker 01",
+      "status": "PENDING"
+    },
+    {
+      "id": "02",
+      "code": "Task-02",
+      "slug": "02-source-and-scripts-sanitization",
+      "title": "Source Code, Scripts & Test Fixtures Sanitization",
+      "files": [
+        "src-tauri/src/modules/supabase_sync/config_a.rs",
+        "src-tauri/src/modules/json_envelope/tests.rs",
+        "scripts/verify-supabase-and-ui-ux.ps1",
+        "scripts/setup-supabase.ps1",
+        "scripts/supabase-setup.ps1",
+        "scripts/supabase-endpoints.json",
+        "scripts/supabase-accounts.json"
+      ],
+      "owner": "Worker 01",
+      "status": "PENDING"
+    },
+    {
+      "id": "03",
+      "code": "Task-03",
+      "slug": "03-specs-memory-and-changelogs-sanitization",
+      "title": "Specs, Memory & Changelogs Sanitization",
+      "files": [
+        "02-spec/21-app/supabase-connection-and-ui-ux-enhancement/01-architecture-spec.md",
+        ".ai-memory/plans/supabase-connection-and-ui-ux-enhancement.md",
+        ".ai-memory/plans/subtasks/supabase-connection-and-ui-ux-enhancement/01-supabase-dual-cluster-and-stacktrace.md",
+        ".ai-memory/plans/subtasks/supabase-connection-and-ui-ux-enhancement/05-image-sharing-public-url.md",
+        "02-spec/21-app/71-supabase-multi-machine-hierarchy-and-cli-e2e.md",
+        ".ai-memory/plans/completed/71-supabase-multi-machine-hierarchy-and-cli-e2e.md",
+        "changelog.md",
+        "changelog_en.md"
+      ],
+      "owner": "Worker 02",
+      "status": "PENDING"
+    },
+    {
+      "id": "04",
+      "code": "Task-04",
+      "slug": "04-git-history-rewriting",
+      "title": "Git History Rewriting & Trace Eradication",
+      "files": [],
+      "owner": "Lead Orchestrator",
+      "status": "PENDING"
+    },
+    {
+      "id": "05",
+      "code": "Task-05",
+      "slug": "05-zero-secret-verification-and-push",
+      "title": "Zero-Secret Verification Gate & Force-Push",
+      "files": [],
+      "owner": "Lead Orchestrator",
+      "status": "PENDING"
+    }
+  ]
+}

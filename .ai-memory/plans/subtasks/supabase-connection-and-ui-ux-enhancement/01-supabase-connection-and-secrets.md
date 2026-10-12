@@ -15,7 +15,7 @@ This subtask operationalizes the multi-endpoint Supabase configuration, fixes ty
 ### 1.1 Core Problems Addressed
 1. **Subdomain Typo & NXDOMAIN Failures**: The project reference `pezjuuddecbyrmqxytrv` (`r` instead of `f`) crashes DNS lookups with `WSAHOST_NOT_FOUND`. The client must proactively identify this typo and supply the corrected URL.
 2. **Project Pause Latency**: Inactive free-tier Supabase projects automatically pause after 7 days, resulting in 15-second timeouts or HTTP 503 responses. Transport error handlers must provide explicit dashboard restoration links.
-3. **Multi-Endpoint Provisioning**: Primary Root (Lovable: `https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/`) and Secondary (Personal: `https://ikwmurmjynhxdpmhzekt.supabase.co/rest/v1/`) endpoints must be seamlessly managed with role segregation (`root` vs `secondary`), storage quotas (400MB vs 200MB), and priority cascading.
+3. **Multi-Endpoint Provisioning**: Primary Root (Lovable: `https://[REDACTED_LOVABLE_PROJECT].supabase.co/rest/v1/`) and Secondary (Personal: `https://[REDACTED_PERSONAL_PROJECT].supabase.co/rest/v1/`) endpoints must be seamlessly managed with role segregation (`root` vs `secondary`), storage quotas (400MB vs 200MB), and priority cascading.
 4. **Credential Harvesting**: Seamless discovery across local configuration, `repo-secrets/03-supabase/`, parent relative paths, and GitMap environment variables.
 
 ---
@@ -35,7 +35,7 @@ The following files are touched by this subtask:
 ## 3. Step-by-Step Implementation Plan
 
 ### Step 1: Enhance Transport Error Classifier in `client.rs`
-- Detect known typo subdomain `pezjuuddecbyrmqxytrv` and return an immediate, actionable fix pointing to `pezjuuddecbyfmqxytrv`.
+- Detect known typo subdomain `pezjuuddecbyrmqxytrv` and return an immediate, actionable fix pointing to `[REDACTED_LOVABLE_PROJECT]`.
 - Detect DNS host resolution errors (`No such host is known`, `failed to lookup address`) and label them as `DNS NXDOMAIN`.
 - Detect connection timeouts (`e.is_timeout()`) and provide the direct URL to the Supabase dashboard with instructions to unpause/restore the project.
 
@@ -43,16 +43,16 @@ The following files are touched by this subtask:
 - Ensure that fresh configurations or empty endpoint lists automatically register:
   - **Endpoint 1 (Root / Lovable)**:
     - ID: `ep-root-lovable-01`
-    - URL: `https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/`
-    - API Key: `sb_publishable_cJdJyIEeXc8bpym9TIOU7w_vVU0_Y69`
+    - URL: `https://[REDACTED_LOVABLE_PROJECT].supabase.co/rest/v1/`
+    - API Key: `[REDACTED_LOVABLE_KEY]`
     - Role: `root`
     - Priority: 1
     - Prune Threshold: 400 MB
     - Tags: `["lovable", "root"]`
   - **Endpoint 2 (Secondary / Personal)**:
     - ID: `ep-secondary-personal-01`
-    - URL: `https://ikwmurmjynhxdpmhzekt.supabase.co/rest/v1/`
-    - API Key: `sb_publishable_barsshQom3VcUw1l5soE_A_R1FwQz8o`
+    - URL: `https://[REDACTED_PERSONAL_PROJECT].supabase.co/rest/v1/`
+    - API Key: `[REDACTED_PERSONAL_KEY]`
     - Role: `secondary`
     - Priority: 2
     - Prune Threshold: 200 MB
@@ -76,7 +76,7 @@ The following files are touched by this subtask:
 - Enhance `agm supabase load-json <path>` to accept either raw endpoint arrays or two-tier unified envelopes (`{ "attributes": ..., "data": ... }`).
 
 ### Step 5: Unit Testing & Verification
-- Unit test typo classification: assert that checking `pezjuuddecbyrmqxytrv` outputs the suggestion to use `pezjuuddecbyfmqxytrv`.
+- Unit test typo classification: assert that checking `pezjuuddecbyrmqxytrv` outputs the suggestion to use `[REDACTED_LOVABLE_PROJECT]`.
 - Unit test timeout classification: assert that a simulated timeout outputs unpause instructions.
 - Unit test configuration round-trip: verify JSON import and normalization.
 

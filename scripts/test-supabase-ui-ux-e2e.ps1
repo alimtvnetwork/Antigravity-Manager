@@ -186,15 +186,15 @@ Assert-Condition -Name "SupabaseClient eliminates silent error swallowing in tab
 
 $configAPath = Join-Path $repoRoot "src-tauri/src/modules/supabase_sync/config_a.rs"
 $configAContent = Get-Content $configAPath -Raw
-Assert-Condition -Name "config_a.rs auto-corrects Lovable endpoint typo (pezjuuddecbyrmqxytrv -> pezjuuddecbyfmqxytrv)" `
-    -Condition ($configAContent -match "pezjuuddecbyrmqxytrv" -and $configAContent -match "pezjuuddecbyfmqxytrv") `
-    -Details "Expected auto_seed_from_repo_secrets to normalize typo endpoint"
+Assert-Condition -Name "config_a.rs dynamically discovers endpoints from environment or repo-secrets" `
+    -Condition ($configAContent -match "SUPABASE_ROOT_URL" -and $configAContent -match "default_seed_endpoints") `
+    -Details "Expected config_a.rs to support dynamic environment variable configuration"
 
 $supaTypesPath = Join-Path $repoRoot "src-tauri/src/modules/supabase_client/types.rs"
 $supaTypesContent = Get-Content $supaTypesPath -Raw
-Assert-Condition -Name "normalize_supabase_url normalizes Lovable endpoint typo" `
-    -Condition ($supaTypesContent -match "pezjuuddecbyrmqxytrv" -and $supaTypesContent -match "pezjuuddecbyfmqxytrv") `
-    -Details "Expected normalize_supabase_url to replace typo string"
+Assert-Condition -Name "normalize_supabase_url trims trailing slashes and /rest/v1" `
+    -Condition ($supaTypesContent.Contains("strip_suffix")) `
+    -Details "Expected normalize_supabase_url to clean URL suffixes"
 
 $fleetPath = Join-Path $repoRoot "src-tauri/src/modules/supabase_sync/fleet.rs"
 $fleetContent = Get-Content $fleetPath -Raw
@@ -213,8 +213,8 @@ Assert-Condition -Name "supabase_command_queue.rs logs warnings on poll or repor
 # --------------------------------------------------------------------------
 Write-Host "`n[Suite 5] Live Supabase Network & DNS Diagnostics" -ForegroundColor Yellow
 
-$lovableHost = "pezjuuddecbyfmqxytrv.supabase.co"
-$personalHost = "ikwmurmjynhxdpmhzekt.supabase.co"
+$rootUrlEnv = if ($env:SUPABASE_ROOT_URL) { $env:SUPABASE_ROOT_URL } else { "https://mock-root.supabase.co" }
+$lovableHost = ([System.Uri]$rootUrlEnv).Host
 
 function Test-HostDns {
     param([string]$Hostname)
@@ -227,24 +227,11 @@ function Test-HostDns {
 }
 
 $lovableDns = Test-HostDns -Hostname $lovableHost
-$personalDns = Test-HostDns -Hostname $personalHost
-
 if ($lovableDns) {
-    Assert-Condition -Name "Lovable Supabase DNS ($lovableHost) resolves" -Condition $true
+    Assert-Condition -Name "Supabase Root DNS ($lovableHost) resolves" -Condition $true
 } else {
-    Write-Host "  [DIAGNOSTIC] Lovable Supabase Host ($lovableHost): NXDOMAIN (DNS does not exist)" -ForegroundColor Cyan
-    Write-Host "               -> Root Cause: Project is paused due to free-tier inactivity or deleted." -ForegroundColor Yellow
-    Write-Host "               -> Actionable: Log in to Supabase dashboard and click 'Restore project' to re-bind DNS." -ForegroundColor Yellow
-    Assert-Condition -Name "Lovable Supabase DNS diagnostic identified (paused/deleted state captured)" -Condition $true
-}
-
-if ($personalDns) {
-    Assert-Condition -Name "Personal Supabase DNS ($personalHost) resolves" -Condition $true
-} else {
-    Write-Host "  [DIAGNOSTIC] Personal Supabase Host ($personalHost): NXDOMAIN (DNS does not exist)" -ForegroundColor Cyan
-    Write-Host "               -> Root Cause: Project is paused due to free-tier inactivity or deleted." -ForegroundColor Yellow
-    Write-Host "               -> Actionable: Log in to Supabase dashboard and click 'Restore project' to re-bind DNS." -ForegroundColor Yellow
-    Assert-Condition -Name "Personal Supabase DNS diagnostic identified (paused/deleted state captured)" -Condition $true
+    Write-Host "  [DIAGNOSTIC] Supabase Root Host ($lovableHost): NXDOMAIN (DNS does not exist or mock)" -ForegroundColor Cyan
+    Assert-Condition -Name "Supabase DNS diagnostic identified (mock/paused/deleted state captured)" -Condition $true
 }
 
 # --------------------------------------------------------------------------

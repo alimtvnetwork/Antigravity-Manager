@@ -15,12 +15,12 @@
 Color for Progress green: #1af18d
 
 Lovable:
-https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/
-sb_publishable_cJdJyIEeXc8bpym9TIOU7w_vVU0_Y69
+https://[REDACTED_LOVABLE_PROJECT].supabase.co/rest/v1/
+[REDACTED_LOVABLE_KEY]
 
 Personal Supa
-https://ikwmurmjynhxdpmhzekt.supabase.co/rest/v1/
-sb_publishable_barsshQom3VcUw1l5soE_A_R1FwQz8o
+https://[REDACTED_PERSONAL_PROJECT].supabase.co/rest/v1/
+[REDACTED_PERSONAL_KEY]
 
 https://prnt.sc/IqdxJ1mllS1_
 https://prnt.sc/bsi0PDU0kwsV

@@ -46,8 +46,8 @@ flowchart TD
         IPC_CALL --> ROUTER["Storage Rotator & Quota Guard<br/>(supabase_storage::uploader)"]
         ROUTER --> QUOTA_CHECK{"Primary Usage &lt; 380 MB?"}
         
-        QUOTA_CHECK -->|Yes (Normal)| P_UPLOAD["Upload to Primary (Lovable)<br/>Bucket: prompt-images<br/>Host: pezjuuddecbyfmqxytrv.supabase.co"]
-        QUOTA_CHECK -->|No (Rollover Triggered)| S_UPLOAD["Upload to Secondary (Personal)<br/>Bucket: prompt-images-aux<br/>Host: ikwmurmjynhxdpmhzekt.supabase.co"]
+        QUOTA_CHECK -->|Yes (Normal)| P_UPLOAD["Upload to Primary (Lovable)<br/>Bucket: prompt-images<br/>Host: [REDACTED_LOVABLE_URL].supabase.co"]
+        QUOTA_CHECK -->|No (Rollover Triggered)| S_UPLOAD["Upload to Secondary (Personal)<br/>Bucket: prompt-images-aux<br/>Host: [REDACTED_PERSONAL_URL].supabase.co"]
         
         P_UPLOAD --> CDN_P["Generate Public CDN URL<br/>/storage/v1/object/public/prompt-images/{hash}.png"]
         S_UPLOAD --> CDN_S["Generate Public CDN URL<br/>/storage/v1/object/public/prompt-images-aux/{hash}.png"]
@@ -84,8 +84,8 @@ flowchart TD
 #### 2. Quota Guard & Multi-Cluster Rotator (`quota.rs`)
 - Maintain local cache of bucket utilization (`StorageQuotaCache`) updated every 10 minutes or after every 5 uploads.
 - **Rotation Rules**:
-  - If `primary_used_bytes < 380 * 1024 * 1024`: Route to Primary Cluster (`pezjuuddecbyfmqxytrv`).
-  - If `primary_used_bytes >= 380 * 1024 * 1024` and `secondary_used_bytes < 380 * 1024 * 1024`: Route to Secondary Cluster (`ikwmurmjynhxdpmhzekt`).
+  - If `primary_used_bytes < 380 * 1024 * 1024`: Route to Primary Cluster (`[REDACTED_LOVABLE_URL]`).
+  - If `primary_used_bytes >= 380 * 1024 * 1024` and `secondary_used_bytes < 380 * 1024 * 1024`: Route to Secondary Cluster (`[REDACTED_PERSONAL_URL]`).
   - If both exceed 380 MB: Trigger synchronous LRU prune of assets older than 14 days before attempting upload.
 
 #### 3. Storage Pruner Extension (`src-tauri/src/modules/supabase_pruner.rs`)

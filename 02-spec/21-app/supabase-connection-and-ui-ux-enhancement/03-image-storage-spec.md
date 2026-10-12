@@ -32,10 +32,10 @@ flowchart TD
     Mgr --> CheckCap{Check Storage Usage<br/>against 400 MB cap}
     CheckCap -- Exceeds 400 MB --> Pruner[FIFO Auto-Pruner<br/>Delete oldest objects until < 300 MB]
     Pruner --> UploadPrimary
-    CheckCap -- Within Quota --> UploadPrimary[Upload to Primary Root DB<br/>Lovable: pezjuuddecbyfmqxytrv]
+    CheckCap -- Within Quota --> UploadPrimary[Upload to Primary Root DB<br/>Lovable: [REDACTED_LOVABLE_PROJECT]]
 
     UploadPrimary -->|Success (200 OK)| GenURL[Generate Public CDN URL]
-    UploadPrimary -->|Failure / Quota Error / Network Timeout| Failover[Failover to Secondary DB<br/>Personal: ikwmurmjynhxdpmhzekt]
+    UploadPrimary -->|Failure / Quota Error / Network Timeout| Failover[Failover to Secondary DB<br/>Personal: [REDACTED_PERSONAL_PROJECT]]
     Failover -->|Success (200 OK)| GenURL
     Failover -->|Failure / All Offline| LocalFallback[Graceful Local Data URI Fallback]
 
@@ -56,11 +56,11 @@ Both Primary and Secondary Supabase instances configure a dedicated public stora
 
 ### 2.2 Endpoint Roles & Allocation
 1. **Primary Storage (Root / Lovable)**:
-   - Endpoint: `https://pezjuuddecbyfmqxytrv.supabase.co`
+   - Endpoint: `https://[REDACTED_LOVABLE_PROJECT].supabase.co`
    - Target Bucket: `prompt-attachments`
    - Active Usage Ceiling: 400 MB (leaving 100 MB headroom for PostgreSQL WAL and database storage under the 500 MB free-tier limit)
 2. **Secondary Storage (Fallback / Personal)**:
-   - Endpoint: `https://ikwmurmjynhxdpmhzekt.supabase.co`
+   - Endpoint: `https://[REDACTED_PERSONAL_PROJECT].supabase.co`
    - Target Bucket: `prompt-attachments`
    - Active Usage Ceiling: 200 MB
    - Activated automatically if Primary returns HTTP 4xx/5xx, timeouts, or exceeds its storage cap.
@@ -129,9 +129,9 @@ Supabase Storage exposes public bucket objects through standard REST endpoints w
 
 #### Example Formats:
 - **Primary Root (Lovable)**:
-  `https://pezjuuddecbyfmqxytrv.supabase.co/storage/v1/object/public/prompt-attachments/inst-01/1728800000_8f3a1b2c.png`
+  `https://[REDACTED_LOVABLE_PROJECT].supabase.co/storage/v1/object/public/prompt-attachments/inst-01/1728800000_8f3a1b2c.png`
 - **Secondary (Personal)**:
-  `https://ikwmurmjynhxdpmhzekt.supabase.co/storage/v1/object/public/prompt-attachments/inst-01/1728800000_8f3a1b2c.png`
+  `https://[REDACTED_PERSONAL_PROJECT].supabase.co/storage/v1/object/public/prompt-attachments/inst-01/1728800000_8f3a1b2c.png`
 
 ### 4.2 Object Path Naming Convention
 To prevent key collisions between concurrent instances and ensure deterministic cleanup, object keys adhere to the following schema:
@@ -148,7 +148,7 @@ To prevent key collisions between concurrent instances and ensure deterministic 
 #### 1. Markdown Presentation in Prompt Tree View:
 In prompt inspection trees, history views, and transcript monitors, visual attachments render cleanly via standard markdown:
 ```markdown
-![Attached Screenshot](https://pezjuuddecbyfmqxytrv.supabase.co/storage/v1/object/public/prompt-attachments/inst-01/1728800000_8f3a1b2c.png)
+![Attached Screenshot](https://[REDACTED_LOVABLE_PROJECT].supabase.co/storage/v1/object/public/prompt-attachments/inst-01/1728800000_8f3a1b2c.png)
 ```
 
 #### 2. Multimodal Canonical IR Normalization (Pipeline Stage):
@@ -163,7 +163,7 @@ When compiling prompts for the Gemini / Claude / OpenAI gateway adapters:
     {
       "file_data": {
         "mime_type": "image/png",
-        "file_uri": "https://pezjuuddecbyfmqxytrv.supabase.co/storage/v1/object/public/prompt-attachments/inst-01/1728800000_8f3a1b2c.png"
+        "file_uri": "https://[REDACTED_LOVABLE_PROJECT].supabase.co/storage/v1/object/public/prompt-attachments/inst-01/1728800000_8f3a1b2c.png"
       }
     }
   ]

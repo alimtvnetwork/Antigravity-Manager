@@ -78,13 +78,7 @@ pub struct EndpointTestResult {
 /// Normalize Supabase endpoint URL by trimming whitespace, trailing slashes, redundant `/rest/v1` suffixes,
 /// and auto-correcting known Lovable endpoint domain typos.
 pub fn normalize_supabase_url(raw: &str) -> String {
-    let mut cleaned = raw.trim().to_string();
-    if cleaned.contains("pezjuuddecbyrmqxytrv.supabase.co") {
-        cleaned = cleaned.replace(
-            "pezjuuddecbyrmqxytrv.supabase.co",
-            "pezjuuddecbyfmqxytrv.supabase.co",
-        );
-    }
+    let cleaned = raw.trim().to_string();
     let mut trimmed = cleaned.as_str();
     while trimmed.ends_with('/') {
         trimmed = &trimmed[..trimmed.len() - 1];

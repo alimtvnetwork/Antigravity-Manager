@@ -294,17 +294,8 @@ pub fn auto_seed_from_repo_secrets(cfg: &mut SupabaseConfig) -> bool {
             let tag_opt = decode_str(creds.get("tag"));
             let notes_opt = decode_str(creds.get("notes"));
 
-            if let (Some(mut url), Some(tok)) = (endpoint_url, token) {
+            if let (Some(url), Some(tok)) = (endpoint_url, token) {
                 if !url.is_empty() && !tok.is_empty() {
-                    if url.contains("pezjuuddecbyrmqxytrv.supabase.co") {
-                        tracing::info!(
-                            "Auto-correcting known Lovable Supabase URL typo ('rmqxytrv' -> 'fmqxytrv') in endpoint URL"
-                        );
-                        url = url.replace(
-                            "pezjuuddecbyrmqxytrv.supabase.co",
-                            "pezjuuddecbyfmqxytrv.supabase.co",
-                        );
-                    }
                     let norm_url = normalize_supabase_url(&url);
                     let clean_id =
                         format!("ep-{}", service.to_lowercase().replace([' ', '_'], "-"));
@@ -377,15 +368,6 @@ pub fn auto_seed_from_repo_secrets(cfg: &mut SupabaseConfig) -> bool {
                 serde_json::Value::Array(arr.clone()),
             ) {
                 for mut ep in eps {
-                    if ep.url.contains("pezjuuddecbyrmqxytrv.supabase.co") {
-                        tracing::info!(
-                            "Auto-correcting known Lovable Supabase URL typo in endpoint struct"
-                        );
-                        ep.url = ep.url.replace(
-                            "pezjuuddecbyrmqxytrv.supabase.co",
-                            "pezjuuddecbyfmqxytrv.supabase.co",
-                        );
-                    }
                     ep.url = normalize_supabase_url(&ep.url);
                     let norm = ep.url.clone();
                     let id = ep.id.clone();
@@ -416,38 +398,57 @@ pub fn auto_seed_from_repo_secrets(cfg: &mut SupabaseConfig) -> bool {
     seeded
 }
 
-/// Default seed endpoints for Primary Lovable and Secondary Personal
+/// Default seed endpoints reading from environment variables if configured
 pub fn default_seed_endpoints() -> Vec<SupabaseEndpoint> {
-    vec![
-        SupabaseEndpoint {
-            id: "ep-root-lovable-01".to_string(),
-            name: "Primary Lovable".to_string(),
-            url: normalize_supabase_url("https://pezjuuddecbyfmqxytrv.supabase.co"),
-            api_key: "sb_publishable_cJdJyIEeXc8bpym9TIOU7w_vVU0_Y69".to_string(),
-            role: "root".to_string(),
-            is_enabled: true,
-            prune_threshold_mb: 400,
-            priority: 1,
-            notes: Some("Primary Lovable root cluster endpoint".to_string()),
-            tags: vec![
-                "lovable".to_string(),
-                "root".to_string(),
-                "primary".to_string(),
-            ],
-        },
-        SupabaseEndpoint {
-            id: "ep-secondary-personal-01".to_string(),
-            name: "Secondary Personal".to_string(),
-            url: normalize_supabase_url("https://ikwmurmjynhxdpmhzekt.supabase.co"),
-            api_key: "sb_publishable_barsshQom3VcUw1l5soE_A_R1FwQz8o".to_string(),
-            role: "secondary".to_string(),
-            is_enabled: true,
-            prune_threshold_mb: 200,
-            priority: 2,
-            notes: Some("Secondary Personal cluster endpoint".to_string()),
-            tags: vec!["secondary".to_string(), "personal".to_string()],
-        },
-    ]
+    let mut endpoints = Vec::new();
+
+    if let (Ok(url), Ok(key)) = (
+        std::env::var("SUPABASE_ROOT_URL"),
+        std::env::var("SUPABASE_ROOT_KEY"),
+    ) {
+        let clean_url = url.trim();
+        let clean_key = key.trim();
+        if !clean_url.is_empty() && !clean_key.is_empty() {
+            endpoints.push(SupabaseEndpoint {
+                id: "ep-root-cluster-01".to_string(),
+                name: "Primary Supabase".to_string(),
+                url: normalize_supabase_url(clean_url),
+                api_key: clean_key.to_string(),
+                role: "root".to_string(),
+                is_enabled: true,
+                prune_threshold_mb: 400,
+                priority: 1,
+                notes: Some("Configured from SUPABASE_ROOT_URL environment variable".to_string()),
+                tags: vec!["root".to_string(), "primary".to_string(), "env".to_string()],
+            });
+        }
+    }
+
+    if let (Ok(url), Ok(key)) = (
+        std::env::var("SUPABASE_SECONDARY_URL"),
+        std::env::var("SUPABASE_SECONDARY_KEY"),
+    ) {
+        let clean_url = url.trim();
+        let clean_key = key.trim();
+        if !clean_url.is_empty() && !clean_key.is_empty() {
+            endpoints.push(SupabaseEndpoint {
+                id: "ep-secondary-cluster-01".to_string(),
+                name: "Secondary Supabase".to_string(),
+                url: normalize_supabase_url(clean_url),
+                api_key: clean_key.to_string(),
+                role: "secondary".to_string(),
+                is_enabled: true,
+                prune_threshold_mb: 200,
+                priority: 2,
+                notes: Some(
+                    "Configured from SUPABASE_SECONDARY_URL environment variable".to_string(),
+                ),
+                tags: vec!["secondary".to_string(), "env".to_string()],
+            });
+        }
+    }
+
+    endpoints
 }
 
 /// Seed default endpoints into the configuration if not already present
@@ -471,3 +472,4 @@ pub fn seed_default_endpoints(cfg: &mut SupabaseConfig) -> bool {
     }
     modified
 }
+

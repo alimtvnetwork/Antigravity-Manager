@@ -15,7 +15,7 @@ Antigravity-Manager (AGM) integrates with Supabase PostgreSQL to deliver distrib
 In production and local testing environments, three distinct failure modes were identified:
 
 1. **Endpoint Resolution & Typographical Drift**:
-   - The primary Supabase endpoint registered via Lovable was entered with a typographical error (`pezjuuddecbyrmqxytrv` using letter `r` instead of `pezjuuddecbyfmqxytrv` using letter `f`). This triggered an immediate DNS `NXDOMAIN` (`No such host is known`) failure, terminating network handshakes before reaching PostgREST.
+   - The primary Supabase endpoint registered via Lovable was entered with a typographical error (`pezjuuddecbyrmqxytrv` using letter `r` instead of `[REDACTED_LOVABLE_PROJECT]` using letter `f`). This triggered an immediate DNS `NXDOMAIN` (`No such host is known`) failure, terminating network handshakes before reaching PostgREST.
    - When configured correctly, inactive free-tier Supabase projects automatically enter a paused state after 7 days, resulting in TCP connect timeouts or HTTP 503 responses that require user reactivation.
 
 2. **Credential Fragmentation Across Environments**:
@@ -64,9 +64,9 @@ graph TD
 - **Role**: `root`
 - **Identifier**: `ep-root-lovable-01`
 - **Name**: Root Supabase (Lovable)
-- **Canonical PostgREST URL**: `https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/`
-- **Normalized Base URL**: `https://pezjuuddecbyfmqxytrv.supabase.co`
-- **Publishable API Key**: `sb_publishable_cJdJyIEeXc8bpym9TIOU7w_vVU0_Y69`
+- **Canonical PostgREST URL**: `https://[REDACTED_LOVABLE_PROJECT].supabase.co/rest/v1/`
+- **Normalized Base URL**: `https://[REDACTED_LOVABLE_PROJECT].supabase.co`
+- **Publishable API Key**: `[REDACTED_LOVABLE_KEY]`
 - **Storage Cap**: 400 MB (respects 500 MB free-tier quota with 100 MB headroom)
 - **Priority**: 1
 - **Assigned Tables**:
@@ -80,9 +80,9 @@ graph TD
 - **Role**: `secondary`
 - **Identifier**: `ep-secondary-personal-01`
 - **Name**: Secondary Supabase (Personal)
-- **Canonical PostgREST URL**: `https://ikwmurmjynhxdpmhzekt.supabase.co/rest/v1/`
-- **Normalized Base URL**: `https://ikwmurmjynhxdpmhzekt.supabase.co`
-- **Publishable API Key**: `sb_publishable_barsshQom3VcUw1l5soE_A_R1FwQz8o`
+- **Canonical PostgREST URL**: `https://[REDACTED_PERSONAL_PROJECT].supabase.co/rest/v1/`
+- **Normalized Base URL**: `https://[REDACTED_PERSONAL_PROJECT].supabase.co`
+- **Publishable API Key**: `[REDACTED_PERSONAL_KEY]`
 - **Storage Cap**: 200 MB
 - **Priority**: 2
 - **Assigned Tables**:
@@ -98,7 +98,7 @@ graph TD
 ### 3.1 Typographical Drift & DNS NXDOMAIN Detection
 A critical bug pattern observed during setup was a single-character transposition in the project reference:
 - **Incorrect (Broken DNS)**: `pezjuuddecbyrmqxytrv.supabase.co` (`r` after `by`)
-- **Correct (Valid Project)**: `pezjuuddecbyfmqxytrv.supabase.co` (`f` after `by`)
+- **Correct (Valid Project)**: `[REDACTED_LOVABLE_PROJECT].supabase.co` (`f` after `by`)
 
 When querying the incorrect URL, the OS resolver emits `WSAHOST_NOT_FOUND` (Windows error 11001) or `EAI_NONAME`, manifesting in Rust `reqwest` as a connect error with DNS resolution failure.
 
@@ -109,7 +109,7 @@ flowchart TD
     Probe -- Yes --> ClassifyErr{Error Classification}
     
     ClassifyErr -- is_connect() & DNS host not found --> CheckTypo{Contains 'pezjuuddecbyrmqxytrv'?}
-    CheckTypo -- Yes --> AdviseTypo["Emit Actionable Error:<br/>Detected typo 'r' instead of 'f'. Replace with pezjuuddecbyfmqxytrv"]
+    CheckTypo -- Yes --> AdviseTypo["Emit Actionable Error:<br/>Detected typo 'r' instead of 'f'. Replace with [REDACTED_LOVABLE_PROJECT]"]
     CheckTypo -- No --> AdviseDNS["Emit Actionable Error:<br/>DNS NXDOMAIN. Verify project reference in dashboard"]
     
     ClassifyErr -- is_timeout() --> AdvisePause["Emit Actionable Error:<br/>TCP Connection Timeout (15s).<br/>Project is likely paused due to inactivity"]
@@ -127,7 +127,7 @@ pub(crate) fn classify_transport_error(&self, e: &reqwest::Error) -> String {
     // Check for specific known typo pattern
     if base.contains("pezjuuddecbyrmqxytrv") {
         return format!(
-            "DNS resolution failed for {base}: Typographical error detected. The subdomain contains 'byr' instead of 'byf'. Update the project URL to 'https://pezjuuddecbyfmqxytrv.supabase.co'.",
+            "DNS resolution failed for {base}: Typographical error detected. The subdomain contains 'byr' instead of 'byf'. Update the project URL to 'https://[REDACTED_LOVABLE_PROJECT].supabase.co'.",
         );
     }
 
@@ -159,8 +159,8 @@ pub(crate) fn classify_transport_error(&self, e: &reqwest::Error) -> String {
 When a Supabase project is paused due to inactivity:
 1. HTTP requests to PostgREST endpoints hang until the 15-second client timeout expires or return HTTP 503 Service Unavailable.
 2. The user or automated script must be directed to:
-   - Primary: `https://supabase.com/dashboard/project/pezjuuddecbyfmqxytrv`
-   - Secondary: `https://supabase.com/dashboard/project/ikwmurmjynhxdpmhzekt`
+   - Primary: `https://supabase.com/dashboard/project/[REDACTED_LOVABLE_PROJECT]`
+   - Secondary: `https://supabase.com/dashboard/project/[REDACTED_PERSONAL_PROJECT]`
 3. In the project dashboard overview, an amber warning banner displays: **"This project is paused"**.
 4. Click **"Restore Project"** / **"Unpause Project"**.
 5. Project provisioning completes within 60 to 90 seconds. Once the status pill transitions from `Restoring` to `Active` (green), connection probes will succeed.
@@ -207,8 +207,8 @@ flowchart TD
   "data": {
     "id": "ep-root-lovable-01",
     "name": "Root Supabase (Lovable)",
-    "url": "https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/",
-    "api_key": "sb_publishable_cJdJyIEeXc8bpym9TIOU7w_vVU0_Y69",
+    "url": "https://[REDACTED_LOVABLE_PROJECT].supabase.co/rest/v1/",
+    "api_key": "[REDACTED_LOVABLE_KEY]",
     "role": "root",
     "is_enabled": true,
     "prune_threshold_mb": 400,
@@ -232,8 +232,8 @@ flowchart TD
   "data": {
     "id": "ep-secondary-personal-01",
     "name": "Secondary Supabase (Personal)",
-    "url": "https://ikwmurmjynhxdpmhzekt.supabase.co/rest/v1/",
-    "api_key": "sb_publishable_barsshQom3VcUw1l5soE_A_R1FwQz8o",
+    "url": "https://[REDACTED_PERSONAL_PROJECT].supabase.co/rest/v1/",
+    "api_key": "[REDACTED_PERSONAL_KEY]",
     "role": "secondary",
     "is_enabled": true,
     "prune_threshold_mb": 200,
@@ -348,7 +348,7 @@ In accordance with the repository's core guidelines:
 
 ## 6. Verification & Acceptance Criteria
 
-- [ ] **AC-1 (Topology Registration)**: Both Root (Lovable `https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/`) and Secondary (Personal `https://ikwmurmjynhxdpmhzekt.supabase.co/rest/v1/`) are stored in `supabase_config.json` with correct roles (`root` vs `secondary`), keys, and tags.
+- [ ] **AC-1 (Topology Registration)**: Both Root (Lovable `https://[REDACTED_LOVABLE_PROJECT].supabase.co/rest/v1/`) and Secondary (Personal `https://[REDACTED_PERSONAL_PROJECT].supabase.co/rest/v1/`) are stored in `supabase_config.json` with correct roles (`root` vs `secondary`), keys, and tags.
 - [ ] **AC-2 (DNS Typo Diagnosis)**: Entering `pezjuuddecbyrmqxytrv` triggers an immediate actionable error specifying the `r` vs `f` typo and recommending the exact corrected URL.
 - [ ] **AC-3 (Unpausing Guidance)**: 15-second timeouts or HTTP 503 errors emit step-by-step instructions directing users to the project dashboard to restore paused projects.
 - [ ] **AC-4 (Discovery Ladder)**: AGM successfully auto-populates endpoints from `repo-secrets/03-supabase/` when `supabase_config.json` is initialized or cleared.

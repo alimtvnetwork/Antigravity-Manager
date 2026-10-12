@@ -38,15 +38,15 @@ flowchart TD
         ERROR_SINK["Observability & Tracing Sink<br/>(AppError & useErrorStore)"]
     end
 
-    subgraph Primary Cluster [Primary Lovable Cluster: pezjuuddecbyfmqxytrv]
-        P_REST["PostgREST API<br/>https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1"]
+    subgraph Primary Cluster [Primary Lovable Cluster: [REDACTED_LOVABLE_URL]]
+        P_REST["PostgREST API<br/>https://[REDACTED_LOVABLE_URL].supabase.co/rest/v1"]
         P_DB[("PostgreSQL DB<br/>nodes, instance_profiles, workspace_leases")]
         P_STORE[("Storage Bucket: prompt-images<br/>(Quota Guard &lt; 400MB)")]
         P_REST --> P_DB
     end
 
-    subgraph Secondary Cluster [Secondary Personal Cluster: ikwmurmjynhxdpmhzekt]
-        S_REST["PostgREST API<br/>https://ikwmurmjynhxdpmhzekt.supabase.co/rest/v1"]
+    subgraph Secondary Cluster [Secondary Personal Cluster: [REDACTED_PERSONAL_URL]]
+        S_REST["PostgREST API<br/>https://[REDACTED_PERSONAL_URL].supabase.co/rest/v1"]
         S_DB[("PostgreSQL DB<br/>command_queue, command_telemetry, shared_prompts")]
         S_STORE[("Storage Bucket: prompt-images-aux<br/>(Overflow Storage &lt; 400MB)")]
         S_REST --> S_DB
@@ -68,10 +68,10 @@ flowchart TD
 
 | Attribute | Primary Cluster (Lovable) | Secondary Cluster (Personal) |
 | :--- | :--- | :--- |
-| **Project Identifier** | `pezjuuddecbyfmqxytrv` | `ikwmurmjynhxdpmhzekt` |
-| **Raw Host URL** | `https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/` | `https://ikwmurmjynhxdpmhzekt.supabase.co/rest/v1/` |
-| **Normalized Base URL** | `https://pezjuuddecbyfmqxytrv.supabase.co` | `https://ikwmurmjynhxdpmhzekt.supabase.co` |
-| **Publishable Anon Key** | `sb_publishable_cJdJyIEeXc8bpym9TIOU7w_vVU0_Y69` | `sb_publishable_barsshQom3VcUw1l5soE_A_R1FwQz8o` |
+| **Project Identifier** | `[REDACTED_LOVABLE_URL]` | `[REDACTED_PERSONAL_URL]` |
+| **Raw Host URL** | `https://[REDACTED_LOVABLE_URL].supabase.co/rest/v1/` | `https://[REDACTED_PERSONAL_URL].supabase.co/rest/v1/` |
+| **Normalized Base URL** | `https://[REDACTED_LOVABLE_URL].supabase.co` | `https://[REDACTED_PERSONAL_URL].supabase.co` |
+| **Publishable Anon Key** | `[REDACTED_LOVABLE_KEY]` | `[REDACTED_PERSONAL_KEY]` |
 | **Cluster Role** | `"root"` | `"secondary"` |
 | **Execution Priority** | `1` (Highest Priority / Default) | `2` (Secondary / Failover) |
 | **Storage Quota Boundary** | 400 MB (Hard Prune Trigger: 380 MB) | 400 MB (Hard Prune Trigger: 380 MB) |
@@ -88,8 +88,8 @@ In `supabase_config.json`, the cluster configuration is persisted as a dual-endp
     {
       "id": "ep-lovable-root",
       "name": "Supabase (Lovable Root)",
-      "url": "https://pezjuuddecbyfmqxytrv.supabase.co",
-      "api_key": "sb_publishable_cJdJyIEeXc8bpym9TIOU7w_vVU0_Y69",
+      "url": "https://[REDACTED_LOVABLE_URL].supabase.co",
+      "api_key": "[REDACTED_LOVABLE_KEY]",
       "role": "root",
       "is_enabled": true,
       "prune_threshold_mb": 400,
@@ -100,8 +100,8 @@ In `supabase_config.json`, the cluster configuration is persisted as a dual-endp
     {
       "id": "ep-personal-secondary",
       "name": "Supabase (Personal Secondary)",
-      "url": "https://ikwmurmjynhxdpmhzekt.supabase.co",
-      "api_key": "sb_publishable_barsshQom3VcUw1l5soE_A_R1FwQz8o",
+      "url": "https://[REDACTED_PERSONAL_URL].supabase.co",
+      "api_key": "[REDACTED_PERSONAL_KEY]",
       "role": "secondary",
       "is_enabled": true,
       "prune_threshold_mb": 400,
@@ -154,9 +154,9 @@ pub fn normalize_supabase_url(raw: &str) -> String {
 
 | Input Raw URL | Normalized Base URL | Table URL (`/nodes`) | Storage URL (`/object/prompt-images`) |
 | :--- | :--- | :--- | :--- |
-| `https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/` | `https://pezjuuddecbyfmqxytrv.supabase.co` | `https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/nodes` | `https://pezjuuddecbyfmqxytrv.supabase.co/storage/v1/object/prompt-images` |
-| `https://ikwmurmjynhxdpmhzekt.supabase.co/rest/v1` | `https://ikwmurmjynhxdpmhzekt.supabase.co` | `https://ikwmurmjynhxdpmhzekt.supabase.co/rest/v1/nodes` | `https://ikwmurmjynhxdpmhzekt.supabase.co/storage/v1/object/prompt-images` |
-| `https://pezjuuddecbyfmqxytrv.supabase.co/` | `https://pezjuuddecbyfmqxytrv.supabase.co` | `https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/nodes` | `https://pezjuuddecbyfmqxytrv.supabase.co/storage/v1/object/prompt-images` |
+| `https://[REDACTED_LOVABLE_URL].supabase.co/rest/v1/` | `https://[REDACTED_LOVABLE_URL].supabase.co` | `https://[REDACTED_LOVABLE_URL].supabase.co/rest/v1/nodes` | `https://[REDACTED_LOVABLE_URL].supabase.co/storage/v1/object/prompt-images` |
+| `https://[REDACTED_PERSONAL_URL].supabase.co/rest/v1` | `https://[REDACTED_PERSONAL_URL].supabase.co` | `https://[REDACTED_PERSONAL_URL].supabase.co/rest/v1/nodes` | `https://[REDACTED_PERSONAL_URL].supabase.co/storage/v1/object/prompt-images` |
+| `https://[REDACTED_LOVABLE_URL].supabase.co/` | `https://[REDACTED_LOVABLE_URL].supabase.co` | `https://[REDACTED_LOVABLE_URL].supabase.co/rest/v1/nodes` | `https://[REDACTED_LOVABLE_URL].supabase.co/storage/v1/object/prompt-images` |
 | `http://127.0.0.1:54321/rest/v1/` | `http://127.0.0.1:54321` | `http://127.0.0.1:54321/rest/v1/nodes` | `http://127.0.0.1:54321/storage/v1/object/prompt-images` |
 
 ---
@@ -262,8 +262,8 @@ flowchart TD
     CHECK_QUOTA -->|Yes (Quota OK)| P_BUCKET["Upload to Primary (Lovable)<br/>Bucket: 'prompt-images'"]
     CHECK_QUOTA -->|No (Approaching Limit)| S_BUCKET["Upload to Secondary (Personal)<br/>Bucket: 'prompt-images-aux'"]
     
-    P_BUCKET --> CDN_P["Generate Public CDN URL<br/>https://pezjuuddecbyfmqxytrv.supabase.co/storage/v1/object/public/prompt-images/{hash}.png"]
-    S_BUCKET --> CDN_S["Generate Public CDN URL<br/>https://ikwmurmjynhxdpmhzekt.supabase.co/storage/v1/object/public/prompt-images-aux/{hash}.png"]
+    P_BUCKET --> CDN_P["Generate Public CDN URL<br/>https://[REDACTED_LOVABLE_URL].supabase.co/storage/v1/object/public/prompt-images/{hash}.png"]
+    S_BUCKET --> CDN_S["Generate Public CDN URL<br/>https://[REDACTED_PERSONAL_URL].supabase.co/storage/v1/object/public/prompt-images-aux/{hash}.png"]
     
     CDN_P --> SHARE_REC["Create Shared Prompt Record<br/>public.shared_prompts"]
     CDN_S --> SHARE_REC

@@ -10,8 +10,8 @@ This task established complete, end-to-end multi-machine fleet synchronization a
 
 1. **Repo-Secrets Synchronization (Task-01)**:
    - Pulled `d:\work\repo-secrets`.
-   - Recorded Root Supabase (`https://pezjuuddecbyfmqxytrv.supabase.co/rest/v1/`) with key `sb_publishable_cJdJyIEeXc8bpym9TIOU7w_vVU0_Y69`, role `root`, tag `lovable`, and note `Root account by Lovable`.
-   - Recorded Secondary Supabase (`https://ikwmurmjynhxdpmhzekt.supabase.co/rest/v1/`) with key `sb_publishable_barsshQom3VcUw1l5soE_A_R1FwQz8o`, role `secondary`, tag `secondary`, and note `Secondary fallback and command queue`.
+   - Recorded Root Supabase (`https://[REDACTED_LOVABLE_URL].supabase.co/rest/v1/`) with key `[REDACTED_LOVABLE_KEY]`, role `root`, tag `lovable`, and note `Root account by Lovable`.
+   - Recorded Secondary Supabase (`https://[REDACTED_PERSONAL_URL].supabase.co/rest/v1/`) with key `[REDACTED_PERSONAL_KEY]`, role `secondary`, tag `secondary`, and note `Secondary fallback and command queue`.
    - Verified Base64 encoded format in `03-supabase/02-lovable/supabase-credentials.json` and active configuration in `02-antigravity-manager/vault/supabase_config.json`.
    - Committed and pushed to `repo-secrets` remote repository.
 
