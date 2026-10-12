@@ -44,6 +44,7 @@ This directory contains CI/CD issue tracking and pipeline RCAs.
 - [41-test-inventory-generator-schema-mismatch-rca.md](.ai-memory/cicd-issues/41-test-inventory-generator-schema-mismatch-rca.md)
 - [42-installer-unverified-asset-urls-and-partial-release-rca.md](.ai-memory/cicd-issues/42-installer-unverified-asset-urls-and-partial-release-rca.md)
 - [44-jsx-syntax-error-and-rustfmt-drift-rca.md](.ai-memory/cicd-issues/44-jsx-syntax-error-and-rustfmt-drift-rca.md)
+- [45-json-envelope-macro-syntax-and-error-tracking-rca.md](.ai-memory/cicd-issues/45-json-envelope-macro-syntax-and-error-tracking-rca.md)
 
 ## Recurring Failure Classes (read before committing)
 
