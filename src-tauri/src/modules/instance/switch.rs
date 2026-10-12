@@ -318,26 +318,45 @@ pub async fn switch_account_to_instance(
                 "[Instance] start_antigravity_with_fallback_path returned ({}), falling back to launch_instance",
                 e
             ));
-            if let Err(launch_err) = launch_instance_without_prompt_reinject(&instance.id) {
-                crate::modules::logger::log_warn(&format!(
-                    "[INSTANCE_SWITCH] Account switched successfully, but auto-relaunch failed: {}. User can launch the instance manually.",
-                    launch_err
-                ));
-            }
+            launch_instance_without_prompt_reinject(&instance.id).map_err(|launch_err| {
+                let err_msg = format!(
+                    "Account switched for '{}', but auto-relaunch failed: {}",
+                    instance.id, launch_err
+                );
+                crate::modules::logger::log_error(&format!("[INSTANCE_SWITCH:ERROR] {}", err_msg));
+                err_msg
+            })?;
         }
         if let Some(h) = crate::modules::log_bridge::get_app_handle() {
             let integration = crate::modules::integration::SystemManager::Desktop(h);
             integration.update_tray();
         }
     } else {
-        if let Err(launch_err) =
-            launch_instance_with_workspaces(&instance.id, inherited_workspaces.as_deref(), false)
-        {
-            crate::modules::logger::log_warn(&format!(
-                "[INSTANCE_SWITCH] Account switched successfully, but auto-relaunch failed: {}. User can launch the instance manually.",
-                launch_err
-            ));
-        }
+        launch_instance_with_workspaces(&instance.id, inherited_workspaces.as_deref(), false)
+            .map_err(|launch_err| {
+                let err_msg = format!(
+                    "Account switched for '{}', but auto-relaunch failed: {}",
+                    instance.id, launch_err
+                );
+                crate::modules::logger::log_error(&format!("[INSTANCE_SWITCH:ERROR] {}", err_msg));
+                err_msg
+            })?;
+    }
+
+    // 4b. Verify the relaunched IDE actually materialized. A spawn() that
+    // returns Ok does not guarantee a running window; without this check a
+    // stillborn relaunch reports success while the user sees nothing reopen.
+    if !crate::modules::instance::verify_instance_relaunched(
+        &instance.id,
+        &instance.data_dir,
+        instance.pid,
+    ) {
+        let err_msg = format!(
+            "Account switched for '{}', but the relaunched IDE did not appear within 15s. Credentials were injected; launch the instance manually.",
+            instance.id
+        );
+        crate::modules::logger::log_error(&format!("[INSTANCE_SWITCH:ERROR] {}", err_msg));
+        return Err(err_msg);
     }
 
     let target_inst_id = instance.id.clone();

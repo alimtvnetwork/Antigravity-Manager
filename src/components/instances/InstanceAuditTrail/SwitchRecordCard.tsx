@@ -94,10 +94,10 @@ export function SwitchRecordCard({
         <div
             key={record.id}
             className={cn(
-                "rounded-2xl border transition-all duration-200 overflow-hidden bg-white dark:bg-[#0c2438] shadow-xs",
+                "rounded-2xl border transition-all duration-200 overflow-hidden bg-white dark:bg-[#171025] shadow-xs",
                 isExpanded
                     ? "border-amber-400/50 dark:border-amber-500/40 shadow-md ring-1 ring-amber-400/20"
-                    : "border-slate-200/80 dark:border-[#15334d] hover:border-slate-300 dark:hover:border-slate-600"
+                    : "border-slate-200/80 dark:border-[#40285e] hover:border-slate-300 dark:hover:border-slate-600"
             )}
         >
             {/* Card Header / Summary Row */}
@@ -129,7 +129,7 @@ export function SwitchRecordCard({
                                     e.stopPropagation();
                                     onToggleEmailMask(record.id);
                                 }}
-                                className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors"
+                                className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors"
                                 title={isUnmasked ? "Mask emails" : "Unmask emails"}
                             >
                                 {isUnmasked ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
@@ -148,7 +148,7 @@ export function SwitchRecordCard({
                                 </>
                             )}
                             {record.switch_reason && (
-                                <span className="inline-flex items-center px-2 py-0.2 rounded-full text-[10px] font-medium bg-slate-200/80 dark:bg-[#15334d] text-slate-700 dark:text-slate-300 border border-slate-300/40 dark:border-[#1d4366]">
+                                <span className="inline-flex items-center px-2 py-0.2 rounded-full text-[10px] font-medium bg-slate-200/80 dark:bg-[#40285e] text-slate-700 dark:text-slate-300 border border-slate-300/40 dark:border-[#1d4366]">
                                     {record.switch_reason}
                                 </span>
                             )}
@@ -183,7 +183,7 @@ export function SwitchRecordCard({
 
             {/* Expandable 4-Step Stepper / Timeline */}
             {isExpanded && (
-                <div className="p-5 border-t border-slate-200/70 dark:border-[#15334d] bg-white dark:bg-[#0c2438] space-y-4">
+                <div className="p-5 border-t border-slate-200/70 dark:border-[#40285e] bg-white dark:bg-[#171025] space-y-4">
                     <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
                         <span>4-Step Switch Lifecycle Execution</span>
                         <span className="font-mono text-[10px] lowercase text-slate-500">ID: {record.id}</span>
@@ -191,7 +191,7 @@ export function SwitchRecordCard({
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                         {/* Step 1: Prompts Backup */}
-                        <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-[#15334d] bg-slate-50/70 dark:bg-[#071a27]/70 space-y-2">
+                        <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-[#40285e] bg-slate-50/70 dark:bg-[#090611]/70 space-y-2">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
                                     <div className="p-1 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
@@ -222,7 +222,7 @@ export function SwitchRecordCard({
                                         <span className="text-slate-400 block text-[11px]">Projects:</span>
                                         <div className="flex flex-wrap gap-1 mt-1">
                                             {steps.backup.project_names.map((name, i) => (
-                                                <span key={i} className="px-1.5 py-0.2 rounded bg-slate-200 dark:bg-[#15334d] text-[10px] font-mono text-slate-700 dark:text-slate-300">
+                                                <span key={i} className="px-1.5 py-0.2 rounded bg-slate-200 dark:bg-[#40285e] text-[10px] font-mono text-slate-700 dark:text-slate-300">
                                                     {name}
                                                 </span>
                                             ))}
@@ -233,7 +233,7 @@ export function SwitchRecordCard({
                         </div>
 
                         {/* Step 2: Account Reset */}
-                        <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-[#15334d] bg-slate-50/70 dark:bg-[#071a27]/70 space-y-2">
+                        <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-[#40285e] bg-slate-50/70 dark:bg-[#090611]/70 space-y-2">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
                                     <div className="p-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
@@ -269,7 +269,7 @@ export function SwitchRecordCard({
                         </div>
 
                         {/* Step 3: Prompts Restore */}
-                        <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-[#15334d] bg-slate-50/70 dark:bg-[#071a27]/70 space-y-2">
+                        <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-[#40285e] bg-slate-50/70 dark:bg-[#090611]/70 space-y-2">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
                                     <div className="p-1 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400">
@@ -303,7 +303,7 @@ export function SwitchRecordCard({
                         </div>
 
                         {/* Step 4: Post-Restore Verification */}
-                        <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-[#15334d] bg-slate-50/70 dark:bg-[#071a27]/70 space-y-2">
+                        <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-[#40285e] bg-slate-50/70 dark:bg-[#090611]/70 space-y-2">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
                                     <div className="p-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -343,7 +343,7 @@ export function SwitchRecordCard({
                     </div>
 
                     {/* Raw Facts Drawer Toggle */}
-                    <div className="pt-2 border-t border-slate-100 dark:border-[#15334d]/60">
+                    <div className="pt-2 border-t border-slate-100 dark:border-[#40285e]/60">
                         <button
                             type="button"
                             onClick={() => onToggleRawFacts(record.id)}

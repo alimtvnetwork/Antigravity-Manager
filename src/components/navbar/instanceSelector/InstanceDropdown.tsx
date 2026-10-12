@@ -43,11 +43,11 @@ export function InstanceDropdown({ api }: { api: InstanceSelectorApi }) {
 
     return (
         <div
-            className="absolute top-full right-0 mt-1.5 w-96 max-w-[calc(100vw-24px)] md:w-[420px] rounded-xl shadow-2xl bg-white dark:bg-[#0c2438] border border-gray-200 dark:border-[#15334d] py-2 z-[9999] animate-in fade-in zoom-in-95"
+            className="absolute top-full right-0 mt-1.5 w-96 max-w-[calc(100vw-24px)] md:w-[420px] rounded-xl shadow-2xl bg-white dark:bg-[#171025] border border-gray-200 dark:border-[#40285e] py-2 z-[9999] animate-in fade-in zoom-in-95"
             style={{ isolation: 'isolate' }}
         >
             {/* Dropdown Header Bar with Duplicate and Combined Import / Export Dropdown */}
-            <div className="flex items-center justify-between px-3 py-1 border-b border-gray-100 dark:border-[#15334d] pb-1.5">
+            <div className="flex items-center justify-between px-3 py-1 border-b border-gray-100 dark:border-[#40285e] pb-1.5">
                 <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
                     {t('instances.header_title', 'INSTANCES / PROFILES')}
                 </span>
@@ -135,7 +135,7 @@ export function InstanceDropdown({ api }: { api: InstanceSelectorApi }) {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder={t('instances.search_placeholder', 'Search profiles...')}
-                        className="w-full pl-8 pr-2.5 py-1 text-xs bg-gray-50 dark:bg-[#071a27] border border-gray-200 dark:border-[#15334d] rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900 dark:text-slate-100"
+                        className="w-full pl-8 pr-2.5 py-1 text-xs bg-gray-50 dark:bg-[#090611] border border-gray-200 dark:border-[#40285e] rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900 dark:text-slate-100"
                     />
                 </div>
             </div>
@@ -154,7 +154,7 @@ export function InstanceDropdown({ api }: { api: InstanceSelectorApi }) {
             </div>
 
             {/* Footer Bar: Smart Play / Run Selected Profile */}
-            <div className="p-2 border-t border-gray-100 dark:border-[#15334d]">
+            <div className="p-2 border-t border-gray-100 dark:border-[#40285e]">
                 <button
                     type="button"
                     disabled={launchingId === activeInstance?.config.id}
@@ -221,7 +221,7 @@ function InstanceDropdownItem({ api, instId }: { api: InstanceSelectorApi; instI
                 'w-full group flex items-center justify-between px-3 py-2 text-xs text-left transition-all duration-150',
                 isSelected
                     ? cn(SELECTED_ROW_CLASSES, 'my-1 rounded-r-md ring-1 ring-amber-400/40')
-                    : 'border-l-4 border-l-transparent text-gray-700 dark:text-gray-200 hover:bg-slate-100/70 hover:text-slate-900 dark:hover:bg-[#15334d]/60 dark:hover:text-white hover:border-l-blue-400 dark:hover:border-l-[#19b7c9]'
+                    : 'border-l-4 border-l-transparent text-gray-700 dark:text-gray-200 hover:bg-slate-100/70 hover:text-slate-900 dark:hover:bg-[#40285e]/60 dark:hover:text-white hover:border-l-blue-400 dark:hover:border-l-[#19b7c9]'
             )}
         >
             <SelectInstanceButton api={api} instId={instId} seqNum={seqNum} />

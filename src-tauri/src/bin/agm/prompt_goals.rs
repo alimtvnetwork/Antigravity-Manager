@@ -330,8 +330,12 @@ pub(crate) fn cmd_rerun(args: &[String]) {
         std::process::exit(1);
     }
 
-    prompts.truncate(count_n);
-    prompts.reverse(); // Rerun in chronological ASC order
+    // list_all_prompts returns oldest-first (created_at ASC). Rerun the most
+    // recent N prompts, kept in chronological order. Truncating the head of an
+    // ASC list would rerun the OLDEST prompts instead.
+    if prompts.len() > count_n {
+        prompts = prompts.split_off(prompts.len() - count_n);
+    }
 
     let now = chrono::Utc::now().timestamp();
     let conn_opt = repo_db::connect_db().ok();
@@ -343,9 +347,13 @@ pub(crate) fn cmd_rerun(args: &[String]) {
             suffix_cat.as_deref(),
         );
         if let Some(ref conn) = conn_opt {
-            let _ = conn.execute(
-                "UPDATE active_prompts SET prompt_content = ?1, status = 'dispatched', updated_at = ?2 WHERE id = ?3",
-                rusqlite::params![&wrapped, now, &p.id],
+            // Justification: re-queue is best-effort; resend below re-reads the row and the prompt remains visible for retry
+            antigravity_tools_lib::error::record_ignored(
+                conn.execute(
+                    "UPDATE active_prompts SET prompt_content = ?1, status = 'backed_up', updated_at = ?2 WHERE id = ?3",
+                    rusqlite::params![&wrapped, now, &p.id],
+                ),
+                "re-queue prompt for rerun",
             );
         }
 
@@ -362,7 +370,11 @@ pub(crate) fn cmd_rerun(args: &[String]) {
             "resumed_at": now,
         });
         if let Ok(js) = serde_json::to_string_pretty(&payload) {
-            let _ = fs::write(&task_file, js);
+            // Justification: resume snapshot is a convenience file for the IDE; the database row is the source of truth
+            antigravity_tools_lib::error::record_ignored(
+                fs::write(&task_file, js),
+                "write rerun resume task snapshot",
+            );
         }
 
         let (preview, _) = crate::common::truncate_words(&wrapped, 20);
@@ -374,8 +386,21 @@ pub(crate) fn cmd_rerun(args: &[String]) {
         );
     }
 
+    // Actually dispatch the re-queued prompts through the standard resend pipeline
+    // so they are re-sent via agy. Marking them 'dispatched' without sending (the
+    // old behavior) silently dropped them from every future resend queue.
+    let resent = match repo_db::resend_running_commands_for_instance(None, 20) {
+        Ok(v) => v.len(),
+        Err(e) => {
+            // Best-effort: prompts left backed_up/queued are retried by later resends.
+            eprintln!("[WARN] Failed to resend rerun prompts: {}", e);
+            0
+        }
+    };
+
     println!(
-        "[SUCCESS] Queued and dispatched {} prompt(s) for rerun.",
-        prompts.len()
+        "[SUCCESS] Re-queued {} prompt(s) for rerun, {} re-sent via agy.",
+        prompts.len(),
+        resent
     );
 }

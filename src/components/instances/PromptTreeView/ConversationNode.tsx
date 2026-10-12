@@ -46,7 +46,7 @@ export function ConversationNode({ conv, project, isSelected, onSelect, onOpenIn
                 'group flex items-center justify-between rounded-[5px] px-2 py-1.5 text-xs cursor-pointer transition-colors',
                 isSelected
                     ? 'bg-blue-600 text-white font-medium shadow-2xs'
-                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#0c2438]'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#171025]'
             )}
             title={`${conv.title || 'Conversation'} · ${conv.step_count || 1} steps · Click to view`}
         >
@@ -61,7 +61,7 @@ export function ConversationNode({ conv, project, isSelected, onSelect, onOpenIn
                         'text-[9px] font-mono px-1 py-0.2 rounded-[3px] shrink-0 font-medium whitespace-nowrap',
                         isSelected
                             ? 'bg-blue-700/80 text-white'
-                            : 'bg-slate-200/90 dark:bg-[#15334d] text-slate-600 dark:text-cyan-300'
+                            : 'bg-slate-200/90 dark:bg-[#40285e] text-slate-600 dark:text-cyan-300'
                     )}
                     title={conv.short_id ? `GitMap SHA: ${conv.short_id}` : (conv.gitmap_seq_code ? `GitMap: ${conv.gitmap_seq_code}` : undefined)}
                 >

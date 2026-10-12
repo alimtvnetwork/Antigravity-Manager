@@ -56,7 +56,7 @@ export function TierBadge({ tier, size = 'sm', className }: TierBadgeProps) {
         return (
             <span
                 className={cn(
-                    'inline-flex items-center font-bold bg-gray-100 dark:bg-[#15334d] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-[#15334d] hover:bg-gray-200 dark:hover:bg-[#1a3d5c] transition-colors cursor-default select-none',
+                    'inline-flex items-center font-bold bg-gray-100 dark:bg-[#40285e] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-[#40285e] hover:bg-gray-200 dark:hover:bg-[#1a3d5c] transition-colors cursor-default select-none',
                     sizeClasses,
                     className
                 )}
@@ -76,7 +76,7 @@ export function TierBadge({ tier, size = 'sm', className }: TierBadgeProps) {
     return (
         <span
             className={cn(
-                'inline-flex items-center justify-center font-bold bg-gray-100 dark:bg-[#15334d] text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-[#15334d] cursor-help select-none',
+                'inline-flex items-center justify-center font-bold bg-gray-100 dark:bg-[#40285e] text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-[#40285e] cursor-help select-none',
                 unknownSizeClasses,
                 className
             )}

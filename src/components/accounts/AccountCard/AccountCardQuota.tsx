@@ -33,7 +33,7 @@ export function AccountCardQuota({
     const { t } = useTranslation();
 
     return (
-        <div className="flex-1 px-1.5 mb-1.5 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-[#15334d]/60 scrollbar-track-transparent">
+        <div className="flex-1 px-1.5 mb-1.5 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-[#40285e]/60 scrollbar-track-transparent">
             {isDisabled || account.quota?.is_forbidden || account.proxy_disabled || account.validation_blocked ? (
                 <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 h-full py-4 text-center">
                     <div className={cn(

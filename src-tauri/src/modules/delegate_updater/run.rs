@@ -143,8 +143,9 @@ pub fn run(args: &[String]) {
         resolved_install_dir.to_string_lossy().to_string(),
     ];
     if let Some(ref ver) = opts.target_version {
+        let norm_ver = normalize_version_string(ver);
         update_args.push("--version".to_string());
-        update_args.push(ver.clone());
+        update_args.push(norm_ver);
     }
 
     let update_status = Command::new(&current_exe)
@@ -154,8 +155,10 @@ pub fn run(args: &[String]) {
 
     let update_ok = match update_status {
         Ok(s) if s.success() => true,
-        _ => {
-            // Direct in-process fallback if child invocation failed
+        Ok(_) => run_cli_update(&update_args),
+        Err(e) => {
+            // Justification: child CLI spawn failed; falling back to in-process run_cli_update execution
+            crate::error::record_ignored(Err::<(), _>(e), "spawn child update command");
             run_cli_update(&update_args)
         }
     };
@@ -182,8 +185,14 @@ pub fn run(args: &[String]) {
             .args(&open_args)
             .status();
 
-        if !matches!(open_status, Ok(s) if s.success()) {
-            open_ui(&open_args);
+        match open_status {
+            Ok(s) if s.success() => {}
+            Ok(_) => open_ui(&open_args),
+            Err(e) => {
+                // Justification: child open-ui spawn failed; falling back to in-process open_ui execution
+                crate::error::record_ignored(Err::<(), _>(e), "spawn child open-ui command");
+                open_ui(&open_args);
+            }
         }
     }
 
@@ -200,8 +209,17 @@ pub fn run(args: &[String]) {
 /// Stage 2 implementation: Execute the CLI update (`agm update --force --no-launch --install-dir <DIR>`)
 pub fn run_cli_update(args: &[String]) -> bool {
     let opts = parse_delegate_args(args);
-    let resolved_install_dir =
+    let raw_install_dir =
         resolve_default_install_dir(opts.install_dir.clone(), opts.target_exe.as_ref());
+    let resolved_install_dir = {
+        let stripped = strip_instance_sandbox_local_appdata(&raw_install_dir);
+        if stripped != raw_install_dir {
+            stripped.join("Programs").join("agm-alim")
+        } else {
+            raw_install_dir
+        }
+    };
+    let normalized_target_version = opts.target_version.as_deref().map(normalize_version_string);
 
     println!(
         "[*] Executing AGM CLI Update for directory: {}",
@@ -213,8 +231,7 @@ pub fn run_cli_update(args: &[String]) -> bool {
     #[cfg(target_os = "windows")]
     {
         let dir_arg = format!("-InstallDir \"{}\"", resolved_install_dir.to_string_lossy());
-        let ver_arg = opts
-            .target_version
+        let ver_arg = normalized_target_version
             .as_ref()
             .map(|v| format!("-Version \"{}\"", v))
             .unwrap_or_default();
@@ -263,6 +280,11 @@ pub fn run_cli_update(args: &[String]) -> bool {
                 );
             }
             Err(e) => {
+                // Justification: PowerShell spawn failed; logged and falling back to gitmap agm update
+                crate::error::record_ignored(
+                    Err::<(), _>(&e),
+                    "spawn powershell installer in run_cli_update",
+                );
                 eprintln!(
                     "[WARN] Failed to execute PowerShell installer ({}). Attempting gitmap agm update fallback...",
                     e
@@ -277,8 +299,7 @@ pub fn run_cli_update(args: &[String]) -> bool {
             "--install-dir \"{}\"",
             resolved_install_dir.to_string_lossy()
         );
-        let ver_arg = opts
-            .target_version
+        let ver_arg = normalized_target_version
             .as_ref()
             .map(|v| format!("--version \"{}\"", v))
             .unwrap_or_default();
@@ -295,33 +316,44 @@ pub fn run_cli_update(args: &[String]) -> bool {
         };
 
         let status = Command::new("bash").args(["-c", &sh_script]).status();
-        if let Ok(s) = status {
-            if s.success() {
+        match status {
+            Ok(s) if s.success() => {
                 update_ok = true;
                 println!("[OK] Official shell installer update completed successfully!");
+            }
+            Ok(_) => {}
+            Err(e) => {
+                // Justification: bash installer spawn failed; falling back to gitmap agm update
+                crate::error::record_ignored(Err::<(), _>(e), "spawn bash installer");
             }
         }
     }
 
-    if !update_ok {
+    if !update_ok && normalized_target_version.is_none() {
         let gitmap_status = Command::new("gitmap")
             .args(["agm", "update", "-y"])
             .status();
-        if let Ok(s) = gitmap_status {
-            if s.success() {
+        match gitmap_status {
+            Ok(s) if s.success() => {
                 println!("[OK] GitMap executed Antigravity Manager update successfully!");
                 update_ok = true;
+            }
+            Ok(_) => {}
+            Err(e) => {
+                // Justification: optional gitmap fallback is best-effort when gitmap is not installed
+                crate::error::record_ignored(Err::<(), _>(e), "spawn gitmap agm update fallback");
             }
         }
     }
 
     // Synchronize %LOCALAPPDATA%\agm-cli\agm.exe & agm-update-cli.exe if updated agm.exe exists in install_dir
     #[cfg(target_os = "windows")]
-    {
+    if update_ok {
         let installed_agm = resolved_install_dir.join("agm.exe");
         let installed_ui = resolved_install_dir.join("agm-alim.exe");
         if let Ok(local) = env::var("LOCALAPPDATA") {
-            let cli_dir = PathBuf::from(local).join("agm-cli");
+            let real_local = strip_instance_sandbox_local_appdata(Path::new(&local));
+            let cli_dir = real_local.join("agm-cli");
             // Justification: best-effort directory creation; later file ops fail loudly if the directory is actually needed
             crate::error::record_ignored(fs::create_dir_all(&cli_dir), "create_dir_all");
             if installed_agm.exists() {

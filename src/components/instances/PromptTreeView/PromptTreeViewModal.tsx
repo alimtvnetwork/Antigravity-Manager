@@ -408,9 +408,9 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             className={`fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 ${isFullscreen ? "p-0" : "p-4 sm:p-6"}`}
         >
             <div
-                className={`flex flex-col overflow-hidden bg-white dark:bg-[#0c2438] shadow-2xl transition-all ${isFullscreen
+                className={`flex flex-col overflow-hidden bg-white dark:bg-[#171025] shadow-2xl transition-all ${isFullscreen
                     ? "h-full w-full rounded-none border-0"
-                    : "h-[88vh] w-full max-w-6xl rounded-2xl border border-slate-200 dark:border-[#15334d]"
+                    : "h-[88vh] w-full max-w-6xl rounded-2xl border border-slate-200 dark:border-[#40285e]"
                     }`}
             >
                 <ModalHeader
@@ -483,7 +483,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                     />
 
                     {/* Right Panel: Prompt Details */}
-                    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#0c2438]">
+                    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#171025]">
                         {selectedConversation ? (
                             <div className="flex-1 flex flex-col px-5 py-3.5 overflow-y-auto space-y-3">
                                 <DetailHeader

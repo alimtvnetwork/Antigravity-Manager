@@ -25,7 +25,7 @@ export function DetailEmptyState(props: DetailEmptyStateProps) {
                         type="button"
                         onClick={onResend}
                         disabled={isResending}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] bg-emerald-50 dark:bg-[#0c2438] text-emerald-700 dark:text-emerald-300 border border-emerald-300/60 dark:border-[#15334d] hover:bg-emerald-100 dark:hover:bg-[#15334d] text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50 mt-1"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] bg-emerald-50 dark:bg-[#171025] text-emerald-700 dark:text-emerald-300 border border-emerald-300/60 dark:border-[#40285e] hover:bg-emerald-100 dark:hover:bg-[#40285e] text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50 mt-1"
                         title="Send latest prompt from this project (Hotkey: N)"
                     >
                         <RotateCw className={cn('w-3.5 h-3.5 text-emerald-500', isResending && 'animate-spin')} />

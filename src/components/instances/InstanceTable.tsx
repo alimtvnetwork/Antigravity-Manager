@@ -83,11 +83,11 @@ export default function InstanceTable({
     const moreMenuInstance = openMoreId ? instances.find((i) => i.config.id === openMoreId) : undefined;
 
     return (
-        <div className="w-full overflow-hidden rounded-[5px] border border-slate-200/90 dark:border-slate-800/90 bg-white dark:bg-[#0c2438] shadow-xs">
-            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-[#15334d]">
+        <div className="w-full overflow-hidden rounded-[5px] border border-slate-200/90 dark:border-slate-800/90 bg-white dark:bg-[#171025] shadow-xs">
+            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-[#40285e]">
                 <table className="w-full text-left text-xs">
                     <thead>
-                        <tr className="border-b border-slate-200/90 dark:border-slate-800/90 bg-slate-50/80 dark:bg-[#071a27] text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        <tr className="border-b border-slate-200/90 dark:border-slate-800/90 bg-slate-50/80 dark:bg-[#090611] text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                             <th className="px-2 py-1.5 min-w-[150px] max-w-[190px]">Profile & Account</th>
                             <th className="px-2 py-1.5 min-w-[160px] max-w-[200px]">Model & Weekly Quota</th>
                             <th className="px-2 py-1.5 min-w-[90px] max-w-[110px]">Status & PID</th>

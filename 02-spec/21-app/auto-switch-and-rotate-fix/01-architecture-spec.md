@@ -3,9 +3,9 @@
 > **Target File:** `02-spec/21-app/auto-switch-and-rotate-fix/01-architecture-spec.md`  
 > **Status:** APPROVED  
 > **Author:** @aukgit  
-> **Version:** 2.0.0  
+> **Version:** 3.0.0  
 > **Initiative Slug:** `auto-switch-and-rotate-fix`  
-> **Scope:** Multi-Instance Process Table Sandboxing (`src-tauri/src/modules/instance/pid_scan.rs`), Auto-Switcher Candidate Scoring & Fallback Routing (`src-tauri/src/modules/auto_switcher/`), Delegated CLI Self-Updating & Downgrade Engine (`src-tauri/src/bin/agm/`, `src-tauri/src/modules/delegate_updater/`, `install.ps1`), Pipeline Telemetry Isolation (`gitmap pe -t`)
+> **Scope:** Multi-Instance Process Table Sandboxing & Lifecycle (`src-tauri/src/modules/instance/pid_scan.rs`, `launch.rs`, `close.rs`, `process_cache.rs`, `switch.rs`), Auto-Switcher Candidate Scoring & Fallback Routing (`src-tauri/src/modules/auto_switcher/selection.rs`, `scoring.rs`, `rotation.rs`), Frontend Smart Rotation & Quota Scoring Parity (`src/services/instanceService/scoring.ts`, `src/stores/useInstanceStore/smart.ts`, `src/stores/useAccountStore.ts`), Delegated CLI Self-Updating & Downgrade Engine (`src-tauri/src/bin/agm/`, `src-tauri/src/modules/delegate_updater/`, `install.ps1`), Pipeline Telemetry Isolation (`gitmap pe -t`)
 
 ---
 
@@ -14,29 +14,33 @@
 Antigravity Manager (AGM) acts as an orchestration gateway and runtime supervisor across multiple isolated Antigravity IDE instances, handling credentials synchronization, quota monitoring, proxy translation, prompt dispatching, and self-updating binary lifecycles.
 
 To ensure production stability, the application architecture relies upon two core subsystems:
-1. **The Multi-Instance Process Isolation & Auto-Profile Switcher Subsystem**: Guarantees that each instance profile possesses strict process sandboxing, isolated user data directories (`data_dir`), independent SQLite credential databases (`state.vscdb`), and discrete process trees. When an instance exhausts its Google quota, the auto-switcher autonomously rotates the instance to the next healthiest candidate account without user intervention and without causing collateral damage to neighboring instances.
+1. **The Multi-Instance Process Isolation, Lifecycle & Auto-Profile Switcher Subsystem**: Guarantees that each instance profile possesses strict process sandboxing, fresh process table cache invalidation on close/relaunch, unconditional stale lockfile purging before credential injection, isolated user data directories (`data_dir`), independent SQLite credential databases (`state.vscdb`), and full backend-frontend parity in sub-100% fallback candidate scoring. When an instance exhausts its Google quota or triggers manual/shortcut rotation, the switcher rotates the instance to the healthiest candidate account without user intervention, duplicate process collisions, or collateral damage to neighboring instances.
 2. **The 3-Stage Delegated CLI Update & Downgrade Engine Subsystem**: Enables operators and automated workflows to deterministically inspect, upgrade, downgrade, or pin specific releases across nodes without encountering Windows binary image file locks (`os error 5: Access is denied` / sharing violation `0x20`), asset 404 download errors, or version normalization mismatches.
 
 ```mermaid
 flowchart TD
-    subgraph SubsystemA["Subsystem A: Process Isolation & Auto-Switcher Engine"]
-        PS["OS Process Scanner\n(pid_scan.rs)"]
-        ISO["Instance Isolation Filter\n(Target Root PIDs Only)"]
-        SW_TICK["Switcher Daemon Monitor\n(daemon.rs)"]
-        SCORE["Multi-Tier Scoring & Quota Gate\n(selection.rs & scoring.rs)"]
-        ROT["5-Step Safe Rotation Pipeline\n(rotation.rs & switch.rs)"]
+    subgraph SubsystemA["Subsystem A: Process Isolation, Lifecycle & Auto-Switcher Engine"]
+        PS["OS Process Scanner & Cache\n(pid_scan.rs & process_cache.rs)"]
+        ISO["Instance Isolation & Root-Only Primary PID\n(Target Root PIDs Only)"]
+        CLOSE["Cache-Refreshed Verified Close\n(close.rs -> force_refresh_process_cache)"]
+        LAUNCH["Unconditional Close & Lockfile Purge\n(launch.rs)"]
+        SW_TICK["Switcher Daemon & UI Smart Rotate\n(daemon.rs & smart.ts)"]
+        SCORE["Multi-Tier Scoring & Sub-100% Fallback\n(selection.rs, scoring.rs & scoring.ts)"]
+        ROT["Unified Verified Rotation Pipeline\n(rotation.rs & switch.rs)"]
         
         PS --> ISO
         SW_TICK --> SCORE
         SCORE --> ROT
-        ROT -.->|Verify Process Death| ISO
+        ROT --> CLOSE
+        CLOSE --> LAUNCH
+        LAUNCH -.->|Verify Process Death & Purge Locks| ISO
     end
 
     subgraph SubsystemB["Subsystem B: Delegated CLI Updater & Release Engine"]
         CLI_IN["CLI Invocation:\nagm update [to] [v] [--force]"]
         NORM["SemVer 2-Part Normalizer\n(4.162 -> 4.162.0)"]
         REL_API["GitHub Release Resolution\n(releases/tags/v{target})"]
-        DELEG["3-Stage Isolated Updater\n(%TEMP%\\agm-updater\\agm-update-cli.exe)"]
+        DELEG["3-Stage Isolated Updater\n(<TEMP>/agm-updater/agm-update-cli.exe)"]
         INST_PS1["PowerShell Installer Engine\n(install.ps1)"]
 
         CLI_IN --> NORM
@@ -50,64 +54,87 @@ flowchart TD
 
 ## 2. Deep Comparative Architectural Analysis: v4.162.0 Baseline vs HEAD
 
-Between baseline release `v4.162.0` and current `HEAD` (v4.186.0+), the process management, prompt pipeline, instance sandboxing, and CLI update subsystems underwent major refactoring to handle multi-instance prompt persistence, Supabase fleet clustering, and automated background scheduling.
+Between baseline release `v4.162.0` and current `HEAD` (v4.186.0+ after commit `8873a197`), the process management, instance lifecycle (`launch.rs`, `close.rs`, `process_cache.rs`, `switch.rs`), prompt pipeline, auto-switcher rotation (`rotation.rs`), frontend smart rotation (`scoring.ts`, `smart.ts`, `useAccountStore.ts`), and CLI update subsystems underwent major refactoring. Comparing `v4.162.0` (`src-tauri/src/modules/instance.rs`) line-by-line against `HEAD` exposes both the initial regressions addressed in commit `8873a197` and **4 additional architectural defects (Defects A1–A4)** that break multi-instance switching, restart reliability, and UI Fast-Forward rotation.
 
-### 2.1 Subsystem Architectural Comparison Matrix
+### 2.1 Subsystem Architectural Comparison Matrix (`v4.162.0` vs `HEAD`)
 
-| Architectural Dimension | Baseline `v4.162.0` Architecture | `HEAD` (v4.186.0+) Architecture | Architectural Rationale & Risk Assessment |
+| Architectural Dimension | Baseline `v4.162.0` Architecture | `HEAD` Architecture (Pre-Remediation) | Architectural Rationale & Defect Assessment |
 | :--- | :--- | :--- | :--- |
-| **Process Table Scanning & Matching** | Flat CLI argument substring search for `--user-data-dir`. Only root IDE process PIDs detected; no child tree traversal. | Multi-tier process cache (`PROCESS_SCAN_CACHE`, 4s TTL) with deep parent-child process tree traversal (`parent_map`). | **Advantage**: Detects language servers, workers, renderers.<br>**Risk**: Cross-instance PID contamination if child traversal references global instance roots instead of target roots. |
-| **Instance Process Termination** | Single unverified `taskkill /F /PID` or `SIGKILL`. Process death assumed immediately without polling OS process table. | Hardened "Kill First → Verify Dead → Refresh → Start" pipeline (`close_instance_verified`). | **Advantage**: Eliminates SQLite file lock collision on `state.vscdb` and Chromium singleton lock races.<br>**Risk**: Surviving orphan detection must not deadlock rotation. |
-| **Auto-Switcher Quota Evaluation** | Primitive single-quota snapshot check. Primary scoring evaluated without reset headroom analysis. | Dual-window quota evaluation (4-hour rolling vs 7-day weekly) with configurable tier multipliers (Ultra 4.0, Pro 2.0, Free 1.0) and headroom weight. | **Advantage**: Accurately prioritizes freshly reset accounts.<br>**Risk**: Strict 100% 4-hour gate causes total rotation lockup if fallback candidate scoring fails to activate. |
-| **Candidate Fallback Scoring** | Basic linear sorting by quota percentage. Accounts with sub-100% quota could be selected without cooldown checks. | 3-step candidate pool partitioning: (1) Inactive instances, (2) Unbound accounts, (3) Fallback pool (`score_candidate_account_fallback`). | **Advantage**: Prevents stealing accounts from active instances.<br>**Risk**: Inverted gate in Step 3 evaluated primary scoring (`0.0`), dropping valid fallback candidates. |
-| **CLI Updater & Downgrade Pipeline** | Direct in-process binary replacement via web download. Subject to Windows file locking errors. Hardcoded `releases/latest`. | 3-stage self-delegating updater: (1) Wait UI/CLI exit, (2) Detached temp binary execution in `%TEMP%\agm-updater\`, (3) Auto-reopen UI. | **Advantage**: Bypasses Windows file locks (`0x20`).<br>**Risk**: Drops version parameters or fails 2-part SemVer normalization (`4.162`), breaking downgrade commands. |
-| **Prompt Continuity during Switching** | Prompts in-flight during an account switch were dropped or lost. | Atomic SQLite prompt backup (`backup_running_prompts`), cross-instance re-attribution (`UPDATE active_prompts SET instance_id = ...`), auto-resume. | **Advantage**: Zero prompt loss across profile switches.<br>**Risk**: Cross-instance database connection visibility errors in rotation pipeline. |
-| **Fleet Synchronization & Leases** | Isolated local instances only. No distributed awareness. | Supabase PostgreSQL cluster sync, remote workspace profile leases (`workspace_lease_manager`), 15s heartbeat telemetry. | **Advantage**: Multi-machine coordination.<br>**Risk**: Stale remote leases can block local candidate selection if lease checks lack fallback timeouts. |
+| **Pre-Launch Termination & Lockfile Purge (`launch.rs:53-76`)** | `launch_instance` (`instance.rs:3199-3225`) **unconditionally** called `close_instance(instance_id)` and **unconditionally** purged stale lockfiles (`lockfile`, `code.lock`, `Singleton*`, `*.lock`) prior to credential injection and IDE spawn. | `close_instance` and `clear_stale_instance_lockfiles` are gated behind `if !is_already_running`, and `close_instance` is further gated behind `if !has_other_alive`. | **Defect A1**: When any sibling instance is running (`has_other_alive == true`), `launch_instance` skips `close_instance` (despite `close_instance` already protecting sibling PIDs via `should_spare_pid`). When `is_already_running == true` due to a surviving helper or stale cache, `launch_instance` skips `clear_stale_instance_lockfiles` and injects into a locked `state.vscdb` while spawning a duplicate process. |
+| **Process Cache Freshness & Child Promotion (`close.rs:71-225`, `process_cache.rs:30-56`)** | Direct process scan without stale 4000ms cache interference during close; instance running status relied on primary IDE process existence. | `find_pids_for_data_dir` reads `get_cached_antigravity_processes()` (4000ms TTL) without `close_instance` or `close_instance_verified` calling `force_refresh_process_cache()`. `get_cached_instance_process_state` promotes any surviving `child_pids` entry to `primary_pid`. | **Defect A2**: `close_instance_verified` polls a stale 4s process cache instead of live OS state. Furthermore, when the main window exits, `process_cache.rs:30-56` promotes surviving utility/crashpad child PIDs to `primary_pid`, falsely reporting `running = true`. |
+| **Switch Error Propagation & Default Instance Rotation (`switch.rs:321-340`, `rotation.rs:298-309`)** | `switch_account_to_instance` propagated `launch_instance` errors directly (`?`). Account rotation used uniform close + lockfile cleanup + credential injection. | `switch_account_to_instance` swallows relaunch errors (`if let Err(launch_err)` logs warning and returns `Ok(())` with `switch_ok: true`). `default` instance in `rotation.rs:298-309` routes through `DesktopIntegration::on_account_switch`. | **Defect A3**: Swallowing relaunch failures violates the No Silent Errors invariant and reports fake `switch_ok: true`. Routing `default` rotation through `DesktopIntegration::on_account_switch` bypasses `close_instance_verified`, full lockfile cleanup, and `record_instance_pid`. |
+| **Frontend Quota Scoring & Store Refresh (`scoring.ts`, `smart.ts`, `useAccountStore.ts`)** | Frontend account switching did not enforce an unrecoverable hard 100% 4-hour quota gate or fire duplicate unrefreshed launches. | `scoring.ts` and `smart.ts` enforce a hard `fourHourQuotaPercent >= 100` gate with zero sub-100% fallback. `smart.ts:262-267` checks `is_running` before `fetchInstances(true)`. `useAccountStore.ts:107-117` omits `fetchInstances(true)` and `fetchAccounts()`. | **Defect A4**: UI Fast-Forward and `smartRotateProfileAccount` throw `'No accounts verified with 100% 4-hour quota in pool'` whenever all accounts are `< 100%`. Reading stale `is_running === false` after `switchAccount` triggers a colliding duplicate `launchInstance` call. |
+| **Process Table Child Descent (`pid_scan.rs:302`)** | Flat CLI argument substring search for `--user-data-dir`. | Upward parent-chain walk using `parent_map` (fixed in `8873a197` to check `matched_set.contains(&p)` only). | Prevents cross-instance PID contamination while capturing genuine instance child workers. |
+| **Backend Candidate Fallback Scoring (`selection.rs:294`)** | Basic linear sorting by quota percentage. | 3-step candidate pool partitioning using `score_candidate_account_fallback` in Step 3 (fixed in `8873a197`). | Prevents stealing accounts from active instances while allowing proportional sub-100% fallback on the backend. |
+| **CLI Updater & Downgrade Pipeline (`update_cmds.rs`, `install.ps1`)** | Direct in-process binary replacement; hardcoded `releases/latest`. | 3-stage self-delegating updater in `<TEMP>/agm-updater/` with 2-part SemVer normalization and explicit tag resolution. | Bypasses Windows file locks (`0x20`) and supports deterministic downgrades (`agm update 4.162`). |
 
-### 2.2 In-Depth Subsystem Evolution Breakdown
+---
 
-#### 1. Evolution of Instance Process Sandboxing (`pid_scan.rs`)
-In `v4.162.0`, `find_pids_for_data_dir` checked whether process command line arguments contained the specific `data_dir` string. While effective for detecting the root process of Antigravity IDE, child processes spawned by Electron (e.g., `crashpad_handler.exe`, `ptyHost`, language server workers) omit `--user-data-dir` from their command line arguments. When an instance was stopped or restarted, these orphaned child processes remained active in the background, keeping file handles open on `state.vscdb` and preventing clean credential injection.
+### 2.2 Detailed Root Cause Analysis of the 4 Additional Post-`8873a197` Defects (Defects A1–A4)
 
-To solve orphan retention, HEAD implemented an upward recursive parent-chain resolution algorithm using `parent_map: HashMap<u32, u32>`. However, a defect was introduced at line 302 of `src-tauri/src/modules/instance/pid_scan.rs`: child process matching incorporated `instance_root_pids.contains(&p)`, which contains root PIDs across **all** running instances on the machine, rather than strictly matching `matched_set.contains(&p)` (the root PIDs of the target instance). Consequently, stopped instances falsely claimed child processes of running instances, and restarting instance A inadvertently killed child processes of instance B.
+#### 1. DEFECT A1: Gated Pre-Launch Cleanup & Lockfile Purge Bypass (`src-tauri/src/modules/instance/launch.rs:53-76`)
+- **v4.162.0 Baseline Behavior (`src-tauri/src/modules/instance.rs:3199-3225`)**:
+  In `v4.162.0`, `launch_instance` unconditionally executed `close_instance(instance_id)` followed by unconditional lockfile purging (`lockfile`, `code.lock`, `Singleton*`, `*.lock`) on `target_data_path` before calling `inject_account_credentials` and spawning the IDE binary.
+- **HEAD Regression (`src-tauri/src/modules/instance/launch.rs:53-76`)**:
+  In `HEAD`, pre-launch process cleanup and lockfile removal were wrapped inside nested conditional guards:
+  ```rust
+  if !is_already_running {
+      if !has_other_alive {
+          let _ = close_instance(instance_id);
+      }
+      clear_stale_instance_lockfiles(&target_data_path);
+  }
+  ```
+- **Failure Mechanism**:
+  1. **Sibling Instance Blockade (`!has_other_alive`)**: Whenever any other Antigravity instance is running on the host (`has_other_alive == true`), `launch_instance` skips `close_instance(instance_id)`. This guard is completely redundant and harmful because `close_instance` already computes `other_instance_pids` and protects all sibling processes via `should_spare_pid`. Skipping `close_instance` leaves lingering target-instance processes alive during relaunch.
+  2. **Stale Running State / Orphan Bypass (`!is_already_running`)**: During `restart_instance` or `switch_account_to_instance`, if `is_already_running` evaluates to `true` due to a surviving helper process or a stale 4000ms process cache entry, `launch_instance` skips both `close_instance` and `clear_stale_instance_lockfiles(&target_data_path)`. It then immediately attempts to inject credentials into a locked `state.vscdb` and spawns a colliding duplicate IDE process against locked Chromium singleton files.
+- **Architectural Fix**:
+  In `src-tauri/src/modules/instance/launch.rs:53-76`, restore the `v4.162.0` pre-launch invariant: unconditionally invoke `close_instance(instance_id)` (which safely spares sibling instance PIDs via `should_spare_pid`) and unconditionally invoke `clear_stale_instance_lockfiles(&target_data_path)` prior to `inject_account_credentials` whenever launching/relaunching an instance (or when `is_already_running` is false / after terminating residual target processes).
 
-#### 2. Evolution of Auto-Switcher Quota Gating (`selection.rs` & `scoring.rs`)
-In `v4.162.0`, accounts were scored primarily by their raw instantaneous quota. This led to "thrashing", where an account with 25% quota would be selected, immediately exhaust its quota, and trigger another switch.
+#### 2. DEFECT A2: Stale 4000ms Process Cache on Close & Orphan Child Promotion (`src-tauri/src/modules/instance/close.rs:71-225` & `src-tauri/src/modules/instance/process_cache.rs:30-56`)
+- **HEAD Regression (`close.rs:71-225` & `process_cache.rs:30-56`)**:
+  1. `find_pids_for_data_dir` queries `get_cached_antigravity_processes()`, which caches the OS process snapshot for `4000ms` (`PROCESS_CACHE_TTL_MS = 4000`). Neither `close_instance` nor `close_instance_verified` calls `force_refresh_process_cache()` before scanning or inside the post-kill verification polling loop. As a result, `close_instance_verified` either misses newly spawned processes or repeatedly observes already-terminated PIDs for up to 4 seconds, causing false timeout warnings or premature exit.
+  2. In `src-tauri/src/modules/instance/process_cache.rs:30-56`, `get_cached_instance_process_state` computes `primary_pid` as:
+     ```rust
+     let primary_pid = matched_entry
+         .and_then(|e| e.root_pids.first().copied())
+         .or_else(|| matched_entry.and_then(|e| e.child_pids.first().copied()));
+     ```
+     When the user closes the main IDE window or `close_instance` kills the root process, a lingering child process (e.g., `crashpad_handler.exe` or a utility worker) in `child_pids` is promoted to `primary_pid`, causing `get_cached_instance_process_state` to return `running = true` for a dead instance.
+- **Architectural Fix**:
+  1. In `src-tauri/src/modules/instance/close.rs`: Call `crate::modules::instance::process_cache::force_refresh_process_cache()` at the start of `close_instance`, inside each verification poll iteration of `close_instance_verified`, and after termination completes.
+  2. In `src-tauri/src/modules/instance/process_cache.rs:30-56`: Derive `primary_pid` and `running` status strictly from `root_pids` (and validated `hint_pid` in `root_pids`), never promoting orphaned `child_pids` to `primary_pid` when `root_pids` is empty.
 
-In HEAD, a dual-window evaluation system was introduced:
-- **4-Hour Immediate Rolling Window**: Governs immediate burst capacity. A strict gate requires candidate accounts to possess 100% quota in this window (or have their reset cycle finished) during primary selection.
-- **7-Day Weekly Window**: Governs long-term endurance. Accounts are scored using configurable subscription tier multipliers (`ultra_tier_multiplier`: 4.0, `pro_tier_multiplier`: 2.0, `free_tier_multiplier`: 1.0) multiplied by remaining reset headroom hours:
-  $$\text{Score} = \frac{\text{TierMultiplier} \times \text{EffectiveWeeklyPct} \times \text{RemainingHeadroomHours}}{100.0}$$
+#### 3. DEFECT A3: Swallowed Relaunch Errors & Unverified Default Instance Switch (`src-tauri/src/modules/instance/switch.rs:321-340` & `src-tauri/src/modules/auto_switcher/rotation.rs:298-309`)
+- **HEAD Regression (`switch.rs:321-340` & `rotation.rs:298-309`)**:
+  1. In `src-tauri/src/modules/instance/switch.rs:321-340`, when `was_running` is true and `launch_instance(target_id, true)` returns `Err(launch_err)`, `switch_account_to_instance` logs a warning (`tracing::warn!`) and still returns `Ok(InstanceSwitchOutcome { switch_ok: true, ... })`. In `v4.162.0`, relaunch failure propagated as an error (`?`). Returning `Ok` with `switch_ok: true` when the instance failed to relaunch violates the No Silent Errors invariant and misleads both the auto-switcher and frontend stores into believing the instance is running with the new account.
+  2. In `src-tauri/src/modules/auto_switcher/rotation.rs:298-309`, when `target_instance == "default"`, `execute_profile_rotation_with_context` branches away from `switch_account_to_instance` and instead calls `DesktopIntegration::on_account_switch(&best_account)`. `DesktopIntegration::on_account_switch` performs an unverified close and partial lockfile cleanup, completely bypassing `close_instance_verified`, `clear_stale_instance_lockfiles`, and `record_instance_pid`.
+- **Architectural Fix**:
+  1. In `src-tauri/src/modules/instance/switch.rs:321-340`: Propagate `launch_instance` errors via `Err(format!("Failed to relaunch instance '{}' after account switch: {}", target_id, launch_err))` (and record via `AppError` / tracing) instead of returning fake success.
+  2. In `src-tauri/src/modules/auto_switcher/rotation.rs:298-309`: Unify `default` instance rotation with named instances by routing `"default"` through `crate::modules::instance::switch_account_to_instance("default", &best_account.id)` (which already supports `"default"` across `close_instance_verified`, `clear_stale_instance_lockfiles`, `inject_account_credentials`, and relaunch), followed by any desktop tray/shortcut state sync if needed.
 
-However, in scenarios where **all** accounts in the user's pool have been partially used (e.g., all accounts sitting at 85%–95% quota), Step 1 and Step 2 of `select_candidate_profiles` yield zero candidates. Step 3 (Fallback Pool) was designed to catch this case and score accounts proportionally using `score_candidate_account_fallback`:
-$$\text{FallbackScore} = \left(\frac{q_{\text{4h}}}{100.0}\right) \times \text{BaseWeeklyScore}$$
-A logic flaw in `selection.rs:294` invoked the primary `score_candidate_account` instead of the fallback scorer. Because the primary scoring function enforces $q_{\text{4h}} < 100\% \implies \text{Score} = 0.0$, all fallback candidates evaluated to zero score, causing `select_and_verify_next_best_profile` to return `Ok(None)` and halting the auto-switcher indefinitely.
-
-#### 3. Evolution of the Delegated CLI Updater (`update_cmds.rs`, `update_helpers.rs`, `install.ps1`)
-In `v4.162.0`, updating AGM from the CLI invoked direct downloads that overwrote the running binary in-place. On Windows, executing binaries are locked by the operating system kernel (`IMAGE_FILE_EXECUTION_OPTIONS` / file sharing violation `0x20`), causing updates to fail unless the process was manually terminated.
-
-HEAD resolved Windows file locking by introducing a 3-stage self-delegating updater (`src-tauri/src/modules/delegate_updater/`):
-- **Stage 1**: Caller binary clones itself to `%TEMP%\agm-updater\agm-update-cli-<pid>.exe` and launches the clone. The caller process exits immediately (exit code 0), releasing all file locks on the installation directory.
-- **Stage 2**: The isolated clone waits for the caller PID to exit, executes `install.ps1 -Update -Force -NoLaunch -Version <target>`, and replaces the binary.
-- **Stage 3**: If `--relaunch` was set, the updater restarts the GUI via `agm open-ui`.
-
-However, the downgrade path (`agm update v4.162` or `agm update 4.162`) broke due to three distinct gaps:
-1. `normalize_version_string` handled 2-part SemVer (`4.162` $\to$ `4.162.0`) in `update_cmds.rs`, but `update_helpers.rs:86` hardcoded GitHub queries to `/releases/latest`, ignoring the target tag.
-2. In `install.ps1:1255`, `Resolve-PinnedVersion` was skipped when `$Version` was already passed, preventing 2-part SemVer expansion (`4.162` $\to$ `4.162.0`).
-3. In `install.ps1:1423`, direct fallback URLs guessed asset templates (`agm-alim_${cleanPinned}_x64-setup.exe`), which 404ed for un-normalized tags (`v4.162`) or releases using alternate asset naming (`Antigravity-Manager_...`).
-4. In `install.ps1:1461`, the updater checked `TargetVersion -le CurrentVersion` and aborted with `"Already on the latest version"`, blocking intentional downgrades unless `-Force` was manually passed.
+#### 4. DEFECT A4: Frontend Hard 100% Quota Gate, Duplicate Relaunch Race & Missing Store Sync (`src/services/instanceService/scoring.ts`, `src/stores/useInstanceStore/smart.ts`, `src/stores/useAccountStore.ts`)
+- **HEAD Regression**:
+  1. **Hard 100% Quota Gate in Frontend (`scoring.ts` & `smart.ts`)**: `scoreAccountForSelection` in `src/services/instanceService/scoring.ts:76-78` returns `0` whenever `fourHourQuotaPercent < 100 && !isResetFinished`. Unlike backend `selection.rs` Step 3 (`score_candidate_account_fallback`), `scoring.ts` and `src/stores/useInstanceStore/smart.ts` have zero sub-100% fallback logic. When all accounts in the pool have `< 100%` 4-hour quota (e.g., 85%–95%), UI Fast-Forward (`InstanceSelector.tsx`, `useFastForwardShortcut.ts`) and `smartRotateProfileAccount` (`smart.ts:183-199`) throw `'No accounts verified with 100% 4-hour quota in pool'`.
+  2. **Stale `is_running` Check & Colliding Duplicate Launch (`smart.ts:262-267`)**: After calling `await accountStore.switchAccount(selectedAccount.email, { instanceId })` (which already relaunches the instance on the backend if it was running), `smart.ts:262-267` immediately reads `const instAfter = get().instances.find((i) => i.id === instanceId)` **before** calling `fetchInstances(true)`. If `instAfter?.is_running` was `false` in the stale pre-switch store snapshot, `smart.ts` invokes `await get().launchInstance(instanceId)`, triggering a second concurrent `launch_instance` call that collides with the relaunch already performed by `switch_account_to_instance`.
+  3. **Missing Post-Switch Store Refresh (`useAccountStore.ts:107-117`)**: `useAccountStore.switchAccount` invokes `accountService.switchAccount(email, options)` and only updates `currentAccount` locally without refreshing `await get().fetchAccounts()` or `await useInstanceStore.getState().fetchInstances(true)`, leaving bound instance PIDs, `is_running` flags, and account bindings stale in the React UI.
+- **Architectural Fix**:
+  1. In `src/services/instanceService/scoring.ts`: Export `scoreAccountForSelectionFallback(account: Account, modelName?: string): number` (and update candidate ranking helpers) so accounts with `fourHourQuotaPercent > 0` and `weeklyQuotaPercent >= 8` receive a proportional score `(fourHourQuotaPercent / 100) * weeklyScore` when no 100% candidate exists.
+  2. In `src/stores/useInstanceStore/smart.ts`:
+     - Add a two-tier verification fallback matching backend `selection.rs`: if no candidate verifies at `>= 100%` 4-hour quota, select the highest-scoring fallback candidate with fresh 4-hour quota `> 0%` (and weekly `>= 8%`).
+     - In `smart.ts:260-272`, call `await get().fetchInstances(true)` **before** inspecting `instAfter?.is_running` so `smart.ts` observes the live post-switch running state and only calls `launchInstance` if the instance is genuinely not running after refresh.
+  3. In `src/stores/useAccountStore.ts:107-117`: After `await accountService.switchAccount(email, options)`, refresh `await get().fetchAccounts()` and `await useInstanceStore.getState().fetchInstances(true)` (routing any best-effort refresh error through `useErrorStore.getState().trackWarning`).
 
 ---
 
 ## 3. End-to-End Architectural Data Flows & State Machines
 
-### 3.1 Instance Process Tree Descent & Decontamination State Machine
-
-The process scanner must strictly partition processes belonging to the target instance from neighboring instances and the default IDE.
+### 3.1 Instance Process Tree Descent, Cache Refresh & Unconditional Pre-Launch Cleanup
 
 ```mermaid
 stateDiagram-v2
-    [*] --> SnapshotSystemProcesses: Query OS Process Table (sysinfo)
+    [*] --> ForceRefreshCache: close_instance / close_instance_verified calls force_refresh_process_cache()
+    ForceRefreshCache --> SnapshotSystemProcesses: Query Live OS Process Table (sysinfo)
     SnapshotSystemProcesses --> FilterAntigravityBinaries: Remove Non-IDE & Self Binaries
     FilterAntigravityBinaries --> IdentifyTargetRoots: Match data_dir / cloned exe marker
     
@@ -118,205 +145,128 @@ stateDiagram-v2
         CheckClonedMarker --> TargetRootMatched: Match Found
     }
     
-    TargetRootMatched --> PopulateMatchedSet: Insert into matched_set
+    TargetRootMatched --> PopulateMatchedSet: Insert into root_pids & matched_set
     PopulateMatchedSet --> EvaluateDescendants: Iterate all OS processes
     
     state EvaluateDescendants {
         AscendParentChain: Traverse parent_map up to 10 levels
         CheckAncestorInMatchedSet: Is ancestor p in matched_set?
-        CheckAncestorInMatchedSet --> AdoptChild: YES (Add to matched_pids & matched_set)
+        CheckAncestorInMatchedSet --> AdoptChild: YES (Add to child_pids & matched_set)
         CheckAncestorInMatchedSet --> RejectProcess: NO (Break traversal)
     }
     
-    AdoptChild --> ReturnCleanPIDs: Strict target instance PIDs
-    RejectProcess --> ReturnCleanPIDs
-    ReturnCleanPIDs --> [*]
+    AdoptChild --> PrimaryPidCheck: Derive primary_pid strictly from root_pids (never child_pids)
+    RejectProcess --> PrimaryPidCheck
+    PrimaryPidCheck --> PurgeStaleLocks: launch_instance unconditionally runs close_instance + clear_stale_instance_lockfiles
+    PurgeStaleLocks --> [*]
 ```
 
-### 3.2 Auto-Switcher Candidate Discovery & Verification Sequence
+### 3.2 Unified Backend & Frontend Candidate Discovery & Verified Rotation Sequence
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant D as Switcher Daemon (daemon.rs)
-    participant S as Selection Engine (selection.rs)
-    participant SC as Scoring Engine (scoring.rs)
+    participant Caller as Switcher Daemon / UI Smart Rotate (daemon.rs / smart.ts)
+    participant S as Selection Engine (selection.rs / smart.ts)
+    participant SC as Scoring Engine (scoring.rs / scoring.ts)
     participant G as Google Quota API
-    participant R as Rotation Engine (rotation.rs)
-    participant DB as SQLite Repo DB (repo_db.rs)
-    participant I as Instance Manager (switch.rs)
+    participant R as Rotation / Switch Engine (rotation.rs & switch.rs)
+    participant C as Close & Cache Engine (close.rs & process_cache.rs)
+    participant L as Launch Engine (launch.rs)
 
-    D->>S: select_and_verify_next_best_profile(inst_id, target_model, threshold)
+    Caller->>S: Select next best profile for instanceId (default or custom)
     activate S
-    S->>S: Step 1 & Step 2: Check accounts with >= 100% quota
-    alt Available pool has >= 100% candidates
-        S->>SC: score_candidate_account(acc)
-        SC-->>S: Primary Score (based on weekly headroom)
-    else Available pool empty (all accounts < 100%)
-        S->>S: Step 3: Fallback Pool Evaluation
-        S->>SC: score_candidate_account_fallback(acc)
-        SC-->>S: Proportional Fallback Score ((q_4h / 100.0) * weekly_score)
+    S->>SC: Step 1 & Step 2: Score candidates with >= 100% 4h quota
+    alt Primary pool has >= 100% candidates
+        SC-->>S: Primary Score (TierMultiplier * WeeklyPct * HeadroomHours / 100)
+    else Primary pool empty (all accounts < 100%)
+        S->>SC: Step 3: Score fallback pool (score_candidate_account_fallback / scoreAccountForSelectionFallback)
+        SC-->>S: Proportional Fallback Score ((q_4h / 100.0) * PrimaryWeeklyScore)
     end
-    S->>S: Rank Candidates: Score DESC, deterministic Email ASC
-    
-    loop For each candidate in ranked list
-        S->>G: Live API Refresh (fetch_quota_with_retry)
-        G-->>S: Fresh 4h Quota (q_fresh)
-        alt q_fresh >= 100.0%
-            S-->>S: Direct Selection Confirmed
-        else q_fresh > threshold && q_fresh > highest_fallback
-            S-->>S: Stage Best Fallback Candidate
-        end
-    end
-    
-    S-->>D: Verified ProfileCandidate
+    S->>G: Live Quota Verification (fetch_quota_with_retry / fetchAccountQuota)
+    G-->>S: Confirmed Best Candidate (100% primary or best > threshold fallback)
+    S-->>Caller: Verified Candidate Account
     deactivate S
 
-    D->>R: execute_profile_rotation_with_context(target, reason)
+    Caller->>R: switch_account_to_instance(instance_id, account_id)
     activate R
-    R->>DB: Backup in-flight prompts (status: running/queued)
-    R->>I: close_instance_verified(inst_id, 5000ms)
-    I-->>R: Verified dead (Zero lock collisions)
-    R->>I: Inject fresh credentials & device profile into state.vscdb
-    R->>I: Launch instance fresh
-    R->>DB: Re-attribute and auto-resume backed-up prompts
-    R-->>D: Rotation Successful
-    deactivate R
-```
-
-### 3.3 3-Stage Delegated Update & Downgrade Sequence
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant U as Operator / CLI (agm update 4.162)
-    participant C as Main CLI Binary (update_cmds.rs)
-    participant H as Update Helpers (update_helpers.rs)
-    participant D as Delegated Engine (delegate_updater/run.rs)
-    participant T as Isolated Temp Copy (%TEMP%\agm-updater)
-    participant P as PowerShell Engine (install.ps1)
-    participant G as GitHub Releases / CDN
-
-    U->>C: agm update 4.162
+    R->>C: close_instance_verified(instance_id, 5000ms)
     activate C
-    C->>C: extract_target_version -> normalize_version_string("4.162") -> "4.162.0"
-    C->>G: Query releases/tags/v4.162.0 (Target release metadata)
-    G-->>C: Release tag v4.162.0 metadata confirmed
-    C->>H: download_release_zip(dest, Some("4.162.0"))
-    H->>G: Download tag specific zip archive
-    G-->>H: Archive saved to update-export
-    
-    C->>D: prepare_isolated_update_cli(current_pid)
-    D->>T: Copy binary to %TEMP%\agm-updater\agm-update-cli-<pid>.exe
-    D->>T: Spawn isolated updater with --version 4.162.0 --force
-    C-->>U: Caller exits immediately (exit code 0, file locks released)
+    C->>C: force_refresh_process_cache() on entry & every poll iteration
+    C-->>R: Verified 0 surviving target PIDs
     deactivate C
-
-    activate T
-    T->>T: Stage 1: Wait for monitored PID to terminate
-    T->>P: Stage 2: Execute install.ps1 -Update -Force -NoLaunch -Version "4.162.0"
-    activate P
-    P->>P: Normalize $cleanPinned to "4.162.0"
-    P->>G: Direct download setup installer for v4.162.0
-    G-->>P: Installer downloaded
-    P->>P: Bypass version comparison gate ($Force active)
-    P->>P: Install v4.162.0 binaries into target directory
-    P-->>T: Installation Successful (exit code 0)
-    deactivate P
-
-    opt If --relaunch specified
-        T->>T: Stage 3: Spawn target UI (agm open-ui)
+    R->>R: clear_stale_instance_lockfiles + inject_account_credentials
+    alt Instance was running before switch
+        R->>L: launch_instance(instance_id, true)
+        activate L
+        L->>C: Unconditional close_instance(instance_id) (spares siblings)
+        L->>L: Unconditional clear_stale_instance_lockfiles(&target_data_path)
+        L->>L: Spawn IDE & record_instance_pid
+        L-->>R: Result<InstanceProfile, String> (Errors propagated, never swallowed!)
+        deactivate L
     end
-    T-->>U: Update / Downgrade Complete (v4.162.0 Active)
-    deactivate T
+    R-->>Caller: Switch Outcome (with live PID)
+    deactivate R
+    Caller->>Caller: Refresh fetchAccounts() & fetchInstances(true) before inspecting is_running
 ```
 
 ---
 
 ## 4. Architectural Invariants
 
-Every modification to the process management, auto-switcher, and update subsystems must strictly uphold the following invariants:
+Every modification to the process management, instance lifecycle, auto-switcher, frontend stores, and update subsystems must strictly uphold the following invariants:
 
-- **Invariant I1 (Process Isolation Invariant)**: `find_pids_for_data_dir(data_dir, is_default)` must NEVER return a process PID belonging to a sibling instance. For non-default instances, child process adoption is strictly bounded to the transitive closure of `matched_set` (roots matching the instance's specific `data_dir` or cloned binary marker).
-- **Invariant I2 (Verified Kill Before Write)**: Credentials (`state.vscdb`, `storage.json`, OS keyring) must NEVER be modified while an instance process is alive. Process termination must pass through `close_instance_verified`, verifying zero surviving PIDs before credential injection commences.
-- **Invariant I3 (Non-Zero Fallback Monotonicity)**: When available accounts have sub-100% quota, `score_candidate_account_fallback` must evaluate to a strictly positive number ($> 0.0$) for any account with $q_{\text{4h}} > 0\%$ and weekly quota $\ge 8\%$, proportional to its remaining credit headroom.
-- **Invariant I4 (Cooldown Pool Independence)**: Staging an account into `cooldown_pool` must NEVER prevent Step 3 Fallback Pool execution if `available_pool` is empty. The presence of accounts in cooldown must not block the discovery of healthy, non-cooldown accounts above the fallback threshold.
-- **Invariant I5 (Target SemVer Normalization Parity)**: Any 2-part SemVer string (e.g., `4.162` or `v4.162`) supplied to CLI update commands or installer scripts must be expanded to full 3-part SemVer (`4.162.0`) before querying GitHub API endpoints, downloading assets, or executing version comparisons.
-- **Invariant I6 (Version Parameter Propagation)**: CLI release archive downloads (`download_release_zip`) and delegated updates must propagate the explicit target version parameter. Calling `/releases/latest` is strictly restricted to invocations where no explicit version argument was provided.
-- **Invariant I7 (Explicit Downgrade Override)**: When a specific release version is explicitly requested via `--version`, `-Version`, or positional syntax, installer scripts (`install.ps1`) must bypass the `TargetVersion -le CurrentVersion` short-circuit gate and complete the installation.
-- **Invariant I8 (Zero Git Command Execution)**: Subsystem modules must never invoke raw `git` CLI commands (`git add`, `git commit`, `git status`, `git push`) for internal operations or testing. All repository queries must utilize internal modules or `gitmap` CLI wrappers.
+- **Invariant I1 (Process Isolation & Root-Only Primary PID Invariant)**: `find_pids_for_data_dir(data_dir, is_default)` must NEVER return a process PID belonging to a sibling instance (`matched_set.contains(&p)` only). Furthermore, `get_cached_instance_process_state` in `process_cache.rs` must derive `primary_pid` and `running = true` strictly from `root_pids` (or a verified root `hint_pid`), never promoting orphaned `child_pids` (such as `crashpad_handler`) to `primary_pid` when the main window has exited.
+- **Invariant I2 (Cache-Refreshed Verified Kill & Unconditional Pre-Launch Purge)**:
+  1. `close_instance` and `close_instance_verified` must call `force_refresh_process_cache()` prior to scanning PIDs and inside verification polling loops so termination checks never read stale 4000ms cache state.
+  2. `launch_instance` (`launch.rs:53-76`) must unconditionally invoke `close_instance(instance_id)` (which internally spares sibling PIDs via `should_spare_pid`) and unconditionally call `clear_stale_instance_lockfiles(&target_data_path)` before injecting credentials into `state.vscdb`.
+- **Invariant I3 (No Silent Relaunch Errors & Unified Default Rotation)**:
+  1. `switch_account_to_instance` (`switch.rs:321-340`) must propagate `launch_instance` errors as `Err(...)` rather than logging a warning and returning `Ok` with `switch_ok: true`.
+  2. `execute_profile_rotation_with_context` (`rotation.rs:298-309`) must route `"default"` instance rotation through `switch_account_to_instance("default", &best_account.id)` so default instances receive identical `close_instance_verified`, lockfile cleanup, and PID tracking guarantees.
+- **Invariant I4 (Backend & Frontend Sub-100% Fallback Parity)**: When all candidate accounts have sub-100% 4-hour quota, both backend (`selection.rs` + `scoring.rs`) and frontend (`scoring.ts` + `smart.ts`) must evaluate candidates using proportional fallback scoring (`(q_4h / 100.0) * weekly_score`) rather than failing with a hard 100% gate error.
+- **Invariant I5 (Frontend Store Synchronization Before Launch Decision)**: `useAccountStore.switchAccount` and `useInstanceStore/smart.ts` must refresh `fetchInstances(true)` and `fetchAccounts()` immediately after `switchAccount` and **before** checking `is_running`, preventing duplicate `launchInstance` calls against an already-relaunched instance.
+- **Invariant I6 (Target SemVer Normalization & Downgrade Override)**: Any 2-part SemVer string (`4.162` or `v4.162`) supplied to CLI update commands or `install.ps1` must expand to 3-part SemVer (`4.162.0`), propagate to release zip downloads, and bypass the `TargetVersion -le CurrentVersion` gate when explicitly requested.
+- **Invariant I7 (Zero Git & Raw Search Command Execution)**: Subsystem modules and worker agents must never invoke raw `git` CLI commands or raw search binaries (`rg`, `grep`, `Select-String`, `findstr`).
 
 ---
 
 ## 5. Past CI Failure Telemetry Analysis (`gitmap pe -t`)
 
-Telemetry auditing via `gitmap pe -t` across recent commits revealed critical compiler, visibility, and envelope type failures that previously broke CI/CD pipelines. These failures provide key structural constraints for future implementations.
+Telemetry auditing via `gitmap pe -t` across recent commits revealed critical compiler, visibility, and envelope type failures that previously broke CI/CD pipelines:
 
-```mermaid
-flowchart LR
-    C997["Commit 997b521\nFAIL: CI [FAIL]\nbackup_prompts_db::connect_db\nvisibility/missing"] --> C7EE["Commit 7ee337c\nFAIL: Release [FAIL], CI [CANCEL]\nBuild Tauri App (ubuntu)\ncompile failure cascade"]
-    C7EE --> C295["Commit 295523a\nFAIL: CI [FAIL]\nUnresolved connect_db in\nrotation.rs:238"]
-    C295 --> C019["Commit 019cc2c\nFAIL: Release [FAIL], CI [FAIL]\nCliEnvelope::err vs\nCliEnvelope::error"]
-    C019 --> CE0D["Commit e0dee27\nPASS: 100% Green\nVisibility restored &\nCliEnvelope methods aligned"]
-```
-
-### 5.1 Comprehensive Failure Log Analysis
-
-#### 1. Commits `997b521`, `7ee337c`, and `295523a`: Missing/Inaccessible `connect_db` in `backup_prompts_db`
-- **Affected File:** `src-tauri/src/modules/auto_switcher/rotation.rs:238:62`
-- **Compiler Error Log:**
-  ```text
-  error[E0425]: cannot find function `connect_db` in module `crate::modules::backup_prompts_db`
-     --> src-tauri/src/modules/auto_switcher/rotation.rs:238:62
-      |
-  238 |         if let Ok(conn) = crate::modules::backup_prompts_db::connect_db() {
-      |                                                              ^^^^^^^^^^ not found in `crate::modules::backup_prompts_db`
-  ```
-- **Root Cause Analysis:** During the implementation of prompt backup re-attribution across account switches, `rotation.rs` attempted to connect directly to the SQLite prompt backup database via `backup_prompts_db::connect_db()`. In `src-tauri/src/modules/backup_prompts_db/mod.rs`, the underlying `open_db` or `connect_db` helper was either `pub(crate)` in a submodule or not exported from the module root. Because Rust treats non-exported submodule functions as private, compilation failed across Linux, Windows, and macOS test runners, triggering cancellation cascades across the matrix.
-- **Architectural Safeguard:** Modules interacting with persistent SQLite stores must either call public domain service functions (e.g., `backup_prompts_db::reattribute_backups(from, to)`) or access connection helpers explicitly exported at the module root with uniform `pub(crate)` visibility.
-
-#### 2. Commit `019cc2c`: Mismatched Associated Function in `CliEnvelope`
-- **Affected Files:** `src-tauri/src/bin/agm/prompt_cmds.rs:244:30`, `src-tauri/src/bin/agm/prompt_cmds.rs:385:30`
-- **Compiler Error Log:**
-  ```text
-  error[E0599]: no associated function or constant named `error` found for struct `CliEnvelope<_>`
-     --> src-tauri/src/bin/agm/prompt_cmds.rs:244:30
-      |
-  244 |     CliEnvelope::<()>::error("prompt send", Some(target_instance), &e).print_and_exit();
-      |                        ^^^^^ associated function not found in `antigravity_tools_lib::modules::cli::CliEnvelope<_>`
-      |
-      = note: consider using `CliEnvelope::<T>::err`
-  ```
-- **Root Cause Analysis:** In `src-tauri/src/modules/cli/types.rs`, the canonical constructor for error envelopes is `CliEnvelope::err(command, instance_id, code, message)`. Call sites in `prompt_cmds.rs` called `CliEnvelope::error`, which did not exist on the struct. Because `cargo check` and `cargo test` gates enforce strict zero-warning compilation, the binary failed to build in CI.
-- **Architectural Safeguard:** CLI command handlers must strictly use `CliEnvelope::ok(...)` and `CliEnvelope::err(...)`. New helper methods on core envelope types must be accompanied by comprehensive unit test coverage verifying constructor parity.
+1. **Commits `997b521`, `7ee337c`, and `295523a`**: `error[E0425]: cannot find function connect_db in module crate::modules::backup_prompts_db` at `src-tauri/src/modules/auto_switcher/rotation.rs:238:62`. Ensure any cross-module helper called by `rotation.rs` or `instance/` submodules has explicit `pub` or `pub(crate)` visibility at the module root.
+2. **Commit `019cc2c`**: `error[E0599]: no associated function or constant named error found for struct CliEnvelope<_>` at `src-tauri/src/bin/agm/prompt_cmds.rs:244:30`. Always use `CliEnvelope::ok(...)` and `CliEnvelope::err(...)`.
 
 ---
 
-## 6. Implementation Boundaries & Target Modules
+## 6. Implementation Boundaries & Worker Ownership Matrix
 
 To prevent regressions and cross-module collisions, worker agents must strictly adhere to the following file boundaries:
 
-```
-src-tauri/
-├── src/
-│   ├── bin/
-│   │   └── agm/
-│   │       ├── update_cmds.rs          <-- Target: Version parsing, downgrade routing
-│   │       ├── update_helpers.rs       <-- Target: Parametric download_release_zip
-│   │       └── prompt_cmds.rs          <-- Target: CliEnvelope::err consistency
-│   └── modules/
-│       ├── auto_switcher/
-│       │   ├── selection.rs            <-- Target: Step 3 fallback gate & fallback scoring
-│       │   ├── scoring.rs              <-- Target: 4h quota evaluation & headroom calculation
-│       │   ├── rotation.rs             <-- Target: Verified termination & prompt backup
-│       │   └── daemon.rs               <-- Target: Effective low threshold verification
-│       ├── delegate_updater/
-│       │   ├── args.rs                 <-- Target: Target version argument extraction
-│       │   └── run.rs                  <-- Target: Passing -Version to install.ps1
-│       └── instance/
-│           ├── pid_scan.rs             <-- Target: Line 302 cross-instance PID isolation
-│           └── switch.rs               <-- Target: Sibling running guard verification
-install.ps1                             <-- Target: 2-part SemVer expansion, asset URL resolution, downgrade gate
+```text
+Worker 01 (Backend Instance Lifecycle, Auto-Switcher Rotation & Frontend Smart Scoring):
+├── src-tauri/src/modules/instance/
+│   ├── launch.rs                       <-- Defect A1: Unconditional close_instance & clear_stale_instance_lockfiles
+│   ├── close.rs                        <-- Defect A2: Call force_refresh_process_cache() in close_instance & close_instance_verified
+│   ├── process_cache.rs                <-- Defect A2: Do not promote orphan child_pids to primary_pid when root_pids is empty
+│   └── switch.rs                       <-- Defect A3: Propagate launch_instance error in switch_account_to_instance
+├── src-tauri/src/modules/auto_switcher/
+│   └── rotation.rs                     <-- Defect A3: Route "default" instance through switch_account_to_instance("default", ...)
+└── src/
+    ├── services/instanceService/
+    │   └── scoring.ts                  <-- Defect A4: Add scoreAccountForSelectionFallback for sub-100% 4h quota accounts
+    └── stores/
+        ├── useInstanceStore/smart.ts   <-- Defect A4: Sub-100% fallback pool + await fetchInstances(true) before is_running check
+        └── useAccountStore.ts          <-- Defect A4: Refresh fetchAccounts() & fetchInstances(true) after switchAccount
+
+Worker 02 (CLI Updater, Downgrade Engine & Regression Tests):
+├── src-tauri/src/bin/agm/
+│   ├── update_cmds.rs                  <-- Version parsing, downgrade routing
+│   └── update_helpers.rs               <-- Parametric download_release_zip
+├── src-tauri/src/modules/delegate_updater/
+│   ├── args.rs                         <-- Target version argument extraction
+│   └── run.rs                          <-- Passing -Version to install.ps1
+└── install.ps1                         <-- 2-part SemVer expansion, asset URL resolution, downgrade gate
 ```
 
 ---
@@ -339,9 +289,8 @@ Prior to merging changes or tagging releases, the following verification gates m
    ```
 4. **Targeted Subsystem Unit Test Suite**:
    ```pwsh
-   cd src-tauri && cargo test modules::instance::pid_scan
-   cd src-tauri && cargo test modules::auto_switcher::selection
-   cd src-tauri && cargo test modules::auto_switcher::scoring
+   cd src-tauri && cargo test modules::instance
+   cd src-tauri && cargo test modules::auto_switcher
    ```
 5. **GitMap CI Pipeline Verification**:
    ```pwsh

@@ -88,7 +88,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
             )}
         >
             {isBusy && (
-                <div className="absolute inset-0 bg-white/75 dark:bg-[#071a27]/85 backdrop-blur-[2px] z-30 flex flex-col items-center justify-center gap-2 rounded-[5px] pointer-events-auto cursor-wait select-none">
+                <div className="absolute inset-0 bg-white/75 dark:bg-[#090611]/85 backdrop-blur-[2px] z-30 flex flex-col items-center justify-center gap-2 rounded-[5px] pointer-events-auto cursor-wait select-none">
                     <RotateCw className="w-5 h-5 animate-spin text-blue-500 dark:text-cyan-400" />
                     <span className="text-xs font-bold text-gray-800 dark:text-cyan-200 tracking-wide font-mono">
                         {getActionLabel(currentAction)}
@@ -139,7 +139,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                 <button
                                     disabled={isBusy}
                                     onClick={handleSetDefault}
-                                    className="h-5 px-1.5 rounded-[5px] text-[9px] font-medium text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-dashed border-gray-300 dark:border-[#15334d] transition-colors cursor-pointer flex items-center gap-1 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="h-5 px-1.5 rounded-[5px] text-[9px] font-medium text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-dashed border-gray-300 dark:border-[#40285e] transition-colors cursor-pointer flex items-center gap-1 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                                     title="Set as default profile"
                                 >
                                     <Star className="w-2.5 h-2.5" />
@@ -247,7 +247,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                     </div>
                                 )}
                                 {weeklyQuota && (
-                                    <div className={cn('space-y-0.5', geminiModel && 'pt-1 border-t border-gray-200/60 dark:border-[#15334d]/60')}>
+                                    <div className={cn('space-y-0.5', geminiModel && 'pt-1 border-t border-gray-200/60 dark:border-[#40285e]/60')}>
                                         <div className="flex items-center justify-between text-xs">
                                             <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">
                                                 Weekly Quota
@@ -262,7 +262,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                 )}
                             </div>
                         ) : boundAccount ? (
-                            <div className="p-2 rounded-md bg-gray-50/60 dark:bg-[#0c2438]/90 border border-gray-100 dark:border-[#15334d] flex items-center justify-between text-xs text-gray-500">
+                            <div className="p-2 rounded-md bg-gray-50/60 dark:bg-[#171025]/90 border border-gray-100 dark:border-[#40285e] flex items-center justify-between text-xs text-gray-500">
                                 <div className="flex items-center gap-1.5">
                                     <Gemini.Color className="w-3.5 h-3.5 shrink-0 opacity-70" />
                                     <span className="text-[11px] text-gray-500 dark:text-gray-400">Quota not synced</span>
@@ -276,7 +276,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                 </button>
                             </div>
                         ) : (
-                            <div className="p-2 rounded-md bg-gray-50/40 dark:bg-[#0c2438]/60 border border-dashed border-gray-200 dark:border-[#15334d] flex items-center justify-between text-xs text-gray-400">
+                            <div className="p-2 rounded-md bg-gray-50/40 dark:bg-[#171025]/60 border border-dashed border-gray-200 dark:border-[#40285e] flex items-center justify-between text-xs text-gray-400">
                                 <div className="flex items-center gap-1.5">
                                     <Gemini.Color className="w-3.5 h-3.5 shrink-0 opacity-40 grayscale" />
                                     <span className="text-[10px] italic">No profile bound</span>
@@ -286,7 +286,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                         )}
                     </div>
 
-                    <div className="space-y-1.5 py-2 border-t border-gray-100 dark:border-[#15334d]/80 text-xs">
+                    <div className="space-y-1.5 py-2 border-t border-gray-100 dark:border-[#40285e]/80 text-xs">
                         <div className="flex items-center justify-between gap-1.5 flex-wrap">
                             {inst.is_running ? (
                                 <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[5px] text-[10px] font-semibold bg-[#1af18d]/10 text-emerald-700 dark:text-[#1af18d] border border-[#1af18d]/30 shadow-2xs">
@@ -301,7 +301,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                             )}
 
                             <span
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[5px] text-[10px] font-mono font-medium bg-gray-100 dark:bg-[#0c2438] text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-[#15334d] truncate max-w-[120px]"
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[5px] text-[10px] font-mono font-medium bg-gray-100 dark:bg-[#171025] text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-[#40285e] truncate max-w-[120px]"
                                 title={`Profile ID: ${inst.config.id}`}
                             >
                                 <span className="text-gray-400 dark:text-slate-500">ID:</span>
@@ -309,7 +309,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                             </span>
                         </div>
 
-                        <div className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-[5px] bg-gray-50/80 dark:bg-[#0c2438]/70 border border-gray-200/70 dark:border-[#15334d] text-[10px] group transition-colors hover:border-gray-300 dark:hover:border-blue-500/30">
+                        <div className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-[5px] bg-gray-50/80 dark:bg-[#171025]/70 border border-gray-200/70 dark:border-[#40285e] text-[10px] group transition-colors hover:border-gray-300 dark:hover:border-blue-500/30">
                             <div className="flex items-center gap-1 min-w-0 flex-1 text-gray-500 dark:text-slate-400" title={inst.config.data_dir}>
                                 <Folder className="w-3 h-3 shrink-0 text-blue-500/80" />
                                 <span className="truncate font-mono" title={inst.config.data_dir}>
@@ -319,7 +319,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                             <button
                                 type="button"
                                 onClick={(e) => copyToClipboard(inst.config.data_dir, 'Data dir path copied to clipboard', 'Failed to copy path', e)}
-                                className="opacity-60 group-hover:opacity-100 p-0.5 rounded-[5px] hover:bg-gray-200 dark:hover:bg-[#15334d] text-gray-500 dark:text-gray-300 transition-opacity cursor-pointer shrink-0"
+                                className="opacity-60 group-hover:opacity-100 p-0.5 rounded-[5px] hover:bg-gray-200 dark:hover:bg-[#40285e] text-gray-500 dark:text-gray-300 transition-opacity cursor-pointer shrink-0"
                                 title="Copy directory path"
                             >
                                 <Copy className="w-3 h-3" />
@@ -327,7 +327,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                         </div>
 
                         {effectiveExePath ? (
-                            <div className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-[5px] bg-slate-100/70 dark:bg-slate-900/60 border border-slate-200/80 dark:border-[#15334d] text-[10px] group/exe transition-colors">
+                            <div className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-[5px] bg-slate-100/70 dark:bg-slate-900/60 border border-slate-200/80 dark:border-[#40285e] text-[10px] group/exe transition-colors">
                                 <div className="flex items-center gap-1 min-w-0 flex-1 text-slate-700 dark:text-slate-300" title={effectiveExePath}>
                                     <Cpu className="w-3 h-3 shrink-0 text-cyan-500" />
                                     <span className="truncate font-mono" title={effectiveExePath}>
@@ -337,7 +337,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                 <button
                                     type="button"
                                     onClick={(e) => copyToClipboard(effectiveExePath, 'Executable path copied to clipboard', 'Failed to copy executable path', e)}
-                                    className="opacity-60 group-hover/exe:opacity-100 p-0.5 rounded-[5px] hover:bg-slate-200 dark:hover:bg-[#15334d] text-slate-500 dark:text-slate-300 transition-opacity cursor-pointer shrink-0"
+                                    className="opacity-60 group-hover/exe:opacity-100 p-0.5 rounded-[5px] hover:bg-slate-200 dark:hover:bg-[#40285e] text-slate-500 dark:text-slate-300 transition-opacity cursor-pointer shrink-0"
                                     title="Copy executable path"
                                 >
                                     <Copy className="w-3 h-3" />

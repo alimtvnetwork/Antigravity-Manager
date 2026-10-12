@@ -13,9 +13,9 @@ interface AuditTableProps {
 
 export function AuditTable({ displayItems, filter, revealed, setRevealed, loadDetail }: AuditTableProps) {
     return (
-        <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-[#15334d] bg-white dark:bg-[#0c2438]">
+        <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025]">
             <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-[#071a27] text-slate-700 dark:text-gray-300 border-b border-slate-200 dark:border-[#15334d]">
+                <thead className="bg-slate-50 dark:bg-[#090611] text-slate-700 dark:text-gray-300 border-b border-slate-200 dark:border-[#40285e]">
                     <tr>
                         <th className="px-3 py-2.5 font-semibold">From → To / Subject</th>
                         <th className="px-3 py-2.5 font-semibold">Action</th>
@@ -39,7 +39,7 @@ export function AuditTable({ displayItems, filter, revealed, setRevealed, loadDe
                             <tr
                                 key={item.id}
                                 onDoubleClick={() => loadDetail(item.id)}
-                                className="border-t border-slate-100 dark:border-[#15334d]/60 hover:bg-slate-50/60 dark:hover:bg-[#15334d]/40 transition-colors cursor-pointer select-text"
+                                className="border-t border-slate-100 dark:border-[#40285e]/60 hover:bg-slate-50/60 dark:hover:bg-[#40285e]/40 transition-colors cursor-pointer select-text"
                                 title="Double click row to view detail"
                             >
                                 {/* 1. From -> To / Subject */}
@@ -100,7 +100,7 @@ export function AuditTable({ displayItems, filter, revealed, setRevealed, loadDe
                                             ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300 border-cyan-200/50 dark:border-cyan-800/50'
                                             : /fail|err/i.test(item.status)
                                             ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border-rose-200/60 dark:border-rose-800/60'
-                                            : 'bg-slate-100 text-slate-700 dark:bg-[#071a27] dark:text-slate-300 border-slate-200 dark:border-[#15334d]'
+                                            : 'bg-slate-100 text-slate-700 dark:bg-[#090611] dark:text-slate-300 border-slate-200 dark:border-[#40285e]'
                                     }`}>
                                         {item.status || 'unknown'}
                                     </span>
@@ -129,7 +129,7 @@ export function AuditTable({ displayItems, filter, revealed, setRevealed, loadDe
                                         type="button"
                                         aria-label="Show audit detail"
                                         title="Detail"
-                                        className="inline-flex h-7 w-7 items-center justify-center rounded-[5px] border border-slate-300 dark:border-[#15334d] bg-white dark:bg-[#071a27] text-slate-800 dark:text-gray-200 hover:bg-slate-100 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+                                        className="inline-flex h-7 w-7 items-center justify-center rounded-[5px] border border-slate-300 dark:border-[#40285e] bg-white dark:bg-[#090611] text-slate-800 dark:text-gray-200 hover:bg-slate-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             loadDetail(item.id);

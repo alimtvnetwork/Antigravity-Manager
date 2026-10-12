@@ -225,7 +225,7 @@ export function detailRows(detail: TaskDetail, payload: TaskPayload | null, reve
             {
                 label: 'Prompt Preview',
                 value: promptText ? (
-                    <div className="rounded-lg border border-slate-200 dark:border-[#15334d] bg-slate-50 dark:bg-[#071a27] p-2.5 max-h-48 overflow-y-auto font-mono text-xs text-slate-800 dark:text-slate-200 select-text whitespace-pre-wrap break-words">
+                    <div className="rounded-lg border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#090611] p-2.5 max-h-48 overflow-y-auto font-mono text-xs text-slate-800 dark:text-slate-200 select-text whitespace-pre-wrap break-words">
                         {promptText}
                     </div>
                 ) : (

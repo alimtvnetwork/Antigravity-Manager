@@ -118,7 +118,7 @@ export default function Accounts() {
       <div className="flex items-center gap-2 shrink-0 ml-auto">
         {/* Batch operations if items selected */}
         {selectedIds.size > 0 && (
-          <div className="flex items-center rounded-md bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+          <div className="flex items-center rounded-md bg-slate-100 dark:bg-[#171025] border border-slate-200/80 dark:border-[#40285e] p-0.5 divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs">
             <button
               className="px-2.5 py-1 text-red-600 dark:text-red-400 text-xs font-semibold rounded-l-md hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors flex items-center gap-1.5 cursor-pointer"
               onClick={handleBatchDelete}
@@ -147,7 +147,7 @@ export default function Accounts() {
         )}
 
         {/* Segmented Pill Capsule: Focus, +, Refresh, Warm, Show All Quotas */}
-        <div className="flex items-center rounded-md bg-slate-100 dark:bg-[#0c2438] border border-slate-200/80 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs">
+        <div className="flex items-center rounded-md bg-slate-100 dark:bg-[#171025] border border-slate-200/80 dark:border-[#40285e] p-0.5 divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs">
           {/* Focus Active/Picked Account Button */}
           <button
             type="button"
@@ -169,13 +169,13 @@ export default function Accounts() {
           <AddAccountDialog
             onAdd={handleAddAccount}
             showText={false}
-            triggerClassName="flex items-center justify-center px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors cursor-pointer"
+            triggerClassName="flex items-center justify-center px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
           />
 
           {/* Refresh */}
           <button
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-blue-600 dark:text-cyan-300 hover:bg-blue-50 dark:hover:bg-[#15334d] transition-colors cursor-pointer",
+              "flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-blue-600 dark:text-cyan-300 hover:bg-blue-50 dark:hover:bg-[#40285e] transition-colors cursor-pointer",
               isRefreshing && "opacity-70 cursor-not-allowed"
             )}
             onClick={handleRefreshClick}
@@ -201,7 +201,7 @@ export default function Accounts() {
           {/* Warmup */}
           <button
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-[#15334d] transition-colors cursor-pointer",
+              "flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-[#40285e] transition-colors cursor-pointer",
               isWarmuping && "opacity-70 cursor-not-allowed"
             )}
             onClick={() => setIsWarmupConfirmOpen(true)}
@@ -226,7 +226,7 @@ export default function Accounts() {
 
           {/* Show All Emails */}
           <label
-            className="flex items-center gap-2 cursor-pointer select-none px-3 py-1 rounded-r-md text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#15334d] transition-colors"
+            className="flex items-center gap-2 cursor-pointer select-none px-3 py-1 rounded-r-md text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors"
             title={t("accounts.show_all_emails")}
           >
             <span className="text-xs font-semibold hidden xl:inline">

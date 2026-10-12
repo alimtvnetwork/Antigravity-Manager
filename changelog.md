@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.190.0] - 2026-10-12
+
+### Fixed
+- **Running Prompt Backup/Restore & Rerun Root-Cause Fix**: Fixed `agm restore` / `agm running-prompts restore` silently restoring nothing after an instance switch — the strict per-instance filter introduced in v4.102.0 scoped restores to the *currently* active instance while backups are recorded under the instance that was active at *backup* time, so post-switch restores matched zero rows. `agm restore` without `-i/--instance` now restores all unrestored backups across every instance in FIFO order (each re-injected under its own recorded instance id and resent via agy); an explicit `-i <id>` keeps strict single-instance scoping. Fixed `agm rerun [N]` selecting the *oldest* N prompts instead of the most recent N (`list_all_prompts` returns oldest-first and the head was truncated), and marking prompts `dispatched` without ever re-sending them — rerun now re-queues as `backed_up` and dispatches through the standard resend pipeline via agy. Added `test_restore_scoping_across_instances` regression test covering cross-instance restore and strict scoping. (Thanks to @aukgit)
+- **Account Switch Relaunch Verification**: Added post-relaunch IDE verification to the account-switch flow (`switch_account_to_instance` and the 5-step desktop switch). A spawn that returns Ok no longer reports success when no IDE window materializes — the switch now surfaces a diagnosable error instead of a silent no-reopen. (Thanks to @aukgit)
+
+### Added
+- **Royal Violet UI Theme**: Implemented the approved Royal Violet design system across the app — daisyUI dark theme tokens, semantic CSS variables, and legacy navy hex remap (canvas `#090611`, panel `#171025`, primary `#7C3AED`, aurora `#A855F7`, highlight `#E879F9`). (Thanks to @aukgit)
+
+---
+
 ## [v4.189.0] - 2026-10-12
 
 ### Fixed
@@ -164,6 +175,12 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.190.0 (2026-10-12)**:
+        -   **[Theme] Royal Violet UI**: Implemented the approved Royal Violet design system across the app — daisyUI dark theme tokens, semantic CSS variables, and legacy navy hex remap (canvas `#090611`, panel `#171025`, primary `#7C3AED`, aurora `#A855F7`, highlight `#E879F9`). (Thanks to @aukgit)
+        -   **[Fixed] Account Switch Relaunch Verification**: Added post-relaunch IDE verification to the account-switch flow (`switch_account_to_instance` and the 5-step desktop switch). A spawn that returns Ok no longer reports success when no IDE window materializes — the switch now surfaces a diagnosable error instead of a silent no-reopen. (Thanks to @aukgit)
+        -   **[Fixed] Running Prompt Backup/Restore & Rerun**: Fixed `agm restore` silently restoring nothing after an instance switch (strict per-instance filter matched the *current* active instance instead of the instance recorded at backup time) — unscoped restore now covers all instances in FIFO order, with `-i <id>` for strict single-instance scoping. Fixed `agm rerun [N]` selecting the oldest N prompts instead of the most recent N and marking them dispatched without re-sending — rerun now re-queues as `backed_up` and dispatches via agy. Added `test_restore_scoping_across_instances` regression test. (Thanks to @aukgit)
+
+
     *   **v4.189.0 (2026-10-12)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

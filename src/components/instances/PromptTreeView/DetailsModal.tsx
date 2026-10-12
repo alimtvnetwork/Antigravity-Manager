@@ -38,9 +38,9 @@ export function DetailsModal(props: DetailsModalProps) {
 
     return (
     <div className="fixed inset-0 z-[330] flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-        <div className="w-full max-w-lg overflow-hidden rounded-xl border border-slate-200 dark:border-[#15334d] bg-white dark:bg-[#0c2438] shadow-2xl flex flex-col">
+        <div className="w-full max-w-lg overflow-hidden rounded-xl border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025] shadow-2xl flex flex-col">
             {/* Details Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#15334d] px-5 py-3.5 bg-slate-50 dark:bg-[#071a27] shrink-0">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#40285e] px-5 py-3.5 bg-slate-50 dark:bg-[#090611] shrink-0">
                 <div className="flex items-center gap-2.5">
                     <FileText className="h-4 w-4 text-blue-500" />
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -50,7 +50,7 @@ export function DetailsModal(props: DetailsModalProps) {
                 <button
                     type="button"
                     onClick={onClose}
-                    className="rounded-[5px] p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-[#15334d] dark:hover:text-slate-200 transition-colors cursor-pointer"
+                    className="rounded-[5px] p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-[#40285e] dark:hover:text-slate-200 transition-colors cursor-pointer"
                     title="Close Details"
                 >
                     <X className="h-4 w-4" />
@@ -64,7 +64,7 @@ export function DetailsModal(props: DetailsModalProps) {
                     <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                         Conversation Info
                     </div>
-                    <div className="bg-slate-50 dark:bg-[#071a27] rounded-lg p-3 border border-slate-200/80 dark:border-[#15334d]/80 space-y-2">
+                    <div className="bg-slate-50 dark:bg-[#090611] rounded-lg p-3 border border-slate-200/80 dark:border-[#40285e]/80 space-y-2">
                         <div>
                             <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-mono">Title</span>
                             <span className="font-semibold text-slate-800 dark:text-slate-200">
@@ -83,14 +83,14 @@ export function DetailsModal(props: DetailsModalProps) {
                                         onClick={() => {
                                             handleCopyField('conv_id', selectedConversation.conversation_id);
                                         }}
-                                        className="px-2 py-0.5 rounded-[4px] border border-slate-200 dark:border-[#15334d] bg-white dark:bg-[#0c2438] text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#15334d] shrink-0 cursor-pointer"
+                                        className="px-2 py-0.5 rounded-[4px] border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025] text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#40285e] shrink-0 cursor-pointer"
                                     >
                                         {copiedField === 'conv_id' ? 'Copied!' : 'Copy'}
                                     </button>
                                 )}
                             </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/50 dark:border-[#15334d]/50">
+                        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/50 dark:border-[#40285e]/50">
                             <div>
                                 <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-mono">Status</span>
                                 <span className={cn('font-semibold', selectedConversation?.is_running ? 'text-emerald-500' : 'text-slate-600 dark:text-slate-400')}>
@@ -104,7 +104,7 @@ export function DetailsModal(props: DetailsModalProps) {
                                 </span>
                             </div>
                         </div>
-                        <div className="pt-1 border-t border-slate-200/50 dark:border-[#15334d]/50">
+                        <div className="pt-1 border-t border-slate-200/50 dark:border-[#40285e]/50">
                             <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-mono">Last Modified</span>
                             <span className="font-mono text-[11px] text-slate-700 dark:text-slate-300">
                                 {selectedConversation?.last_modified || 'N/A'}
@@ -119,7 +119,7 @@ export function DetailsModal(props: DetailsModalProps) {
                         <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                             Project & Instance Info
                         </div>
-                        <div className="bg-slate-50 dark:bg-[#071a27] rounded-lg p-3 border border-slate-200/80 dark:border-[#15334d]/80 space-y-2">
+                        <div className="bg-slate-50 dark:bg-[#090611] rounded-lg p-3 border border-slate-200/80 dark:border-[#40285e]/80 space-y-2">
                             <div>
                                 <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-mono">Repository Name</span>
                                 <span className="font-semibold text-slate-800 dark:text-slate-200">
@@ -138,14 +138,14 @@ export function DetailsModal(props: DetailsModalProps) {
                                             onClick={() => {
                                                 handleCopyField('repo_path', selectedProject.repo_path);
                                             }}
-                                            className="px-2 py-0.5 rounded-[4px] border border-slate-200 dark:border-[#15334d] bg-white dark:bg-[#0c2438] text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#15334d] shrink-0 cursor-pointer"
+                                            className="px-2 py-0.5 rounded-[4px] border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025] text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#40285e] shrink-0 cursor-pointer"
                                         >
                                             {copiedField === 'repo_path' ? 'Copied!' : 'Copy'}
                                         </button>
                                     )}
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/50 dark:border-[#15334d]/50">
+                            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/50 dark:border-[#40285e]/50">
                                 <div>
                                     <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-mono">Instance ID</span>
                                     <span className="font-mono text-slate-800 dark:text-slate-200">
@@ -165,11 +165,11 @@ export function DetailsModal(props: DetailsModalProps) {
             </div>
 
             {/* Details Modal Footer */}
-            <div className="flex items-center justify-end border-t border-slate-200 dark:border-[#15334d] px-5 py-3 bg-slate-50 dark:bg-[#071a27] shrink-0">
+            <div className="flex items-center justify-end border-t border-slate-200 dark:border-[#40285e] px-5 py-3 bg-slate-50 dark:bg-[#090611] shrink-0">
                 <button
                     type="button"
                     onClick={onClose}
-                    className="px-4 py-1.5 rounded-[5px] bg-slate-200 dark:bg-[#15334d] text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-[#1c4466] text-xs font-semibold transition-colors cursor-pointer"
+                    className="px-4 py-1.5 rounded-[5px] bg-slate-200 dark:bg-[#40285e] text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-[#1c4466] text-xs font-semibold transition-colors cursor-pointer"
                 >
                     Close
                 </button>

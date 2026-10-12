@@ -56,7 +56,7 @@ export function DetailHeader(props: DetailHeaderProps) {
     const isCopiedTextActive = isCopiedText || localCopiedText;
 
     return (
-        <div className="space-y-2 pb-2.5 border-b border-slate-200 dark:border-[#15334d] shrink-0">
+        <div className="space-y-2 pb-2.5 border-b border-slate-200 dark:border-[#40285e] shrink-0">
             {/* Row 1: Identity, Badges & Actions */}
             <div className="flex items-center justify-between gap-2.5 flex-wrap">
                 {/* Left: Indicator 1 (Sequence + Tier), Indicator 2 (Status Capsule), Title, Instance Context */}
@@ -110,7 +110,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                 {/* Right: The 2 Canonical Segmented Dark-Glass Action Capsules */}
                 <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
                     {/* Capsule 1: Consolidated Content & Export Split Button */}
-                    <div className="relative flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200 dark:border-[#15334d] p-0.5 divide-x divide-slate-200 dark:divide-[#15334d] shadow-2xs shrink-0">
+                    <div className="relative flex items-center rounded-full bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200 dark:border-[#40285e] p-0.5 divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs shrink-0">
                         {/* Primary Click: Copy Clean Text */}
                         <button
                             type="button"
@@ -124,7 +124,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     setIsCopiedText(false);
                                 }, 2000);
                             }}
-                            className="flex items-center gap-1 px-2.5 py-0.5 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="flex items-center gap-1 px-2.5 py-0.5 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             title="Copy clean prompt text (excluding embedded images)"
                         >
                             {isCopiedTextActive ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-slate-500 dark:text-slate-400" />}
@@ -135,7 +135,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                         <button
                             type="button"
                             onClick={() => setIsExportMenuOpen((prev) => !prev)}
-                            className="flex items-center px-1.5 py-0.5 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#15334d] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="flex items-center px-1.5 py-0.5 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             title="More copy and export options"
                         >
                             <ChevronDown className="w-3 h-3 text-slate-400" />
@@ -144,7 +144,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                         {/* Flyout Menu */}
                         {isExportMenuOpen && (
                             <div
-                                className="absolute right-0 top-full mt-1.5 z-50 w-52 rounded-xl bg-white dark:bg-[#0c2438] border border-slate-200 dark:border-[#15334d] shadow-xl py-1 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md"
+                                className="absolute right-0 top-full mt-1.5 z-50 w-52 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl py-1 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md"
                                 onMouseLeave={() => setIsExportMenuOpen(false)}
                             >
                                 <button
@@ -153,7 +153,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         onCopyWithImages();
                                         setIsExportMenuOpen(false);
                                     }}
-                                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#15334d] text-left cursor-pointer transition-colors"
+                                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] text-left cursor-pointer transition-colors"
                                 >
                                     <Copy className="w-3.5 h-3.5 text-indigo-500" />
                                     <span>Copy with Rich Images</span>
@@ -166,7 +166,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                             onSaveImages();
                                             setIsExportMenuOpen(false);
                                         }}
-                                        className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#15334d] text-left cursor-pointer transition-colors"
+                                        className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] text-left cursor-pointer transition-colors"
                                     >
                                         <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
                                         <span>Save Images to Disk</span>
@@ -181,7 +181,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         onExport('md');
                                         setIsExportMenuOpen(false);
                                     }}
-                                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#15334d] text-left cursor-pointer transition-colors"
+                                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] text-left cursor-pointer transition-colors"
                                 >
                                     <FileText className="w-3.5 h-3.5 text-cyan-500" />
                                     <span>Export as Markdown (.md)</span>
@@ -192,7 +192,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         onExport('json');
                                         setIsExportMenuOpen(false);
                                     }}
-                                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#15334d] text-left cursor-pointer transition-colors"
+                                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] text-left cursor-pointer transition-colors"
                                 >
                                     <Code className="w-3.5 h-3.5 text-amber-500" />
                                     <span>Export as JSON (.json)</span>
@@ -202,7 +202,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                     </div>
 
                     {/* Capsule 2: Execution & Workflow */}
-                    <div className="flex items-center rounded-full bg-slate-100/90 dark:bg-[#0c2438]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#15334d]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#15334d]/80 shadow-2xs shrink-0">
+                    <div className="flex items-center rounded-full bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#40285e]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#40285e]/80 shadow-2xs shrink-0">
                         {/* Confirmation Suffix Dropdown */}
                         <div className="flex items-center px-1.5 py-0.5 rounded-l-full">
                             <select
@@ -211,12 +211,12 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-[10.5px] font-semibold focus:ring-0 focus:outline-none cursor-pointer max-w-[85px] truncate pr-1 py-0"
                                 title="Confirmation suffix appended on Resend"
                             >
-                                <option value="None (Send as is)" className="bg-white dark:bg-[#0c2438]">Suffix: None</option>
-                                <option value="Is it done?" className="bg-white dark:bg-[#0c2438]">Done?</option>
-                                <option value="Is it released?" className="bg-white dark:bg-[#0c2438]">Released?</option>
-                                <option value="Are you sure about it?" className="bg-white dark:bg-[#0c2438]">Sure?</option>
-                                <option value="Double check all edge cases" className="bg-white dark:bg-[#0c2438]">Edge cases</option>
-                                <option value="Verify build and tests" className="bg-white dark:bg-[#0c2438]">Verify tests</option>
+                                <option value="None (Send as is)" className="bg-white dark:bg-[#171025]">Suffix: None</option>
+                                <option value="Is it done?" className="bg-white dark:bg-[#171025]">Done?</option>
+                                <option value="Is it released?" className="bg-white dark:bg-[#171025]">Released?</option>
+                                <option value="Are you sure about it?" className="bg-white dark:bg-[#171025]">Sure?</option>
+                                <option value="Double check all edge cases" className="bg-white dark:bg-[#171025]">Edge cases</option>
+                                <option value="Verify build and tests" className="bg-white dark:bg-[#171025]">Verify tests</option>
                             </select>
                         </div>
 
@@ -228,8 +228,8 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-[10.5px] font-semibold focus:ring-0 focus:outline-none cursor-pointer max-w-[90px] truncate pr-1 py-0"
                                 title="Destination conversation mode for Send and Queue"
                             >
-                                <option value="current" className="bg-white dark:bg-[#0c2438]">Current</option>
-                                <option value="new" className="bg-white dark:bg-[#0c2438]">New Conv</option>
+                                <option value="current" className="bg-white dark:bg-[#171025]">Current</option>
+                                <option value="new" className="bg-white dark:bg-[#171025]">New Conv</option>
                             </select>
                         </div>
 
@@ -238,7 +238,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                             type="button"
                             onClick={onFocusIde}
                             disabled={isFocusing}
-                            className="flex items-center justify-center px-2 py-0.5 text-sky-700 dark:text-sky-300 hover:bg-sky-100/80 dark:hover:bg-[#15334d] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
+                            className="flex items-center justify-center px-2 py-0.5 text-sky-700 dark:text-sky-300 hover:bg-sky-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
                             title="Focus Antigravity IDE Window or Launch Instance"
                         >
                             <ExternalLink className={cn('w-3 h-3 text-sky-500', isFocusing && 'animate-spin')} />
@@ -249,7 +249,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                             type="button"
                             onClick={onResend}
                             disabled={isResending}
-                            className="flex items-center gap-1 px-2 py-0.5 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-[#15334d] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
+                            className="flex items-center gap-1 px-2 py-0.5 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
                             title="Immediately inject prompt to running instance (Hotkey: N)"
                         >
                             <RotateCw className={cn('w-3 h-3 text-emerald-500', isResending && 'animate-spin')} />
@@ -262,7 +262,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                             type="button"
                             onClick={onEnqueue}
                             disabled={isEnqueueing}
-                            className="flex items-center justify-center px-2 py-0.5 text-purple-700 dark:text-purple-300 hover:bg-purple-100/80 dark:hover:bg-[#15334d] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
+                            className="flex items-center justify-center px-2 py-0.5 text-purple-700 dark:text-purple-300 hover:bg-purple-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-none"
                             title="Enqueue Prompt into FIFO Scheduler Queue"
                         >
                             <ListPlus className="w-3.5 h-3.5 text-purple-500" />
@@ -272,7 +272,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                         <button
                             type="button"
                             onClick={() => onOpenInspector(selectedConversation)}
-                            className="flex items-center justify-center px-2 py-0.5 text-blue-700 dark:text-cyan-300 hover:bg-blue-100/80 dark:hover:bg-[#15334d] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer rounded-r-full"
+                            className="flex items-center justify-center px-2 py-0.5 text-blue-700 dark:text-cyan-300 hover:bg-blue-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer rounded-r-full"
                             title="Open Full-Screen Conversation Inspector"
                         >
                             <Maximize2 className="h-3 w-3 text-blue-500 dark:text-cyan-400" />

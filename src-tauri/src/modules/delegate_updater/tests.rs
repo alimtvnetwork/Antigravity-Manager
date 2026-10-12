@@ -13,9 +13,9 @@ pub(crate) mod tests {
             "--wait-pid".to_string(),
             "4321".to_string(),
             "--install-dir".to_string(),
-            "C:\\Users\\Test\\AppData\\Local\\Programs\\agm-alim".to_string(),
+            "users\\test\\AppData\\Local\\Programs\\agm-alim".to_string(),
             "--target-exe".to_string(),
-            "C:\\Users\\Test\\AppData\\Local\\Programs\\agm-alim\\agm-alim.exe".to_string(),
+            "users\\test\\AppData\\Local\\Programs\\agm-alim\\agm-alim.exe".to_string(),
             "--relaunch".to_string(),
             "--delegated-worker".to_string(),
         ];
@@ -25,20 +25,18 @@ pub(crate) mod tests {
         assert!(opts.is_delegated_worker);
         assert_eq!(
             opts.install_dir.unwrap().to_string_lossy(),
-            "C:\\Users\\Test\\AppData\\Local\\Programs\\agm-alim"
+            "users\\test\\AppData\\Local\\Programs\\agm-alim"
         );
         assert_eq!(
             opts.target_exe.unwrap().to_string_lossy(),
-            "C:\\Users\\Test\\AppData\\Local\\Programs\\agm-alim\\agm-alim.exe"
+            "users\\test\\AppData\\Local\\Programs\\agm-alim\\agm-alim.exe"
         );
     }
 
     #[test]
     pub(crate) fn test_resolve_default_target_exe_filters_temp_updater() {
-        let install_dir = PathBuf::from("C:\\Users\\Test\\AppData\\Local\\Programs\\agm-alim");
-        let temp_exe = Some(PathBuf::from(
-            "C:\\Temp\\agm-updater\\agm-update-cli-999.exe",
-        ));
+        let install_dir = PathBuf::from("users\\test\\AppData\\Local\\Programs\\agm-alim");
+        let temp_exe = Some(PathBuf::from("temp\\agm-updater\\agm-update-cli-999.exe"));
         let resolved = resolve_default_target_exe(temp_exe, &install_dir);
         #[cfg(target_os = "macos")]
         assert!(
@@ -54,12 +52,44 @@ pub(crate) mod tests {
 
     #[test]
     pub(crate) fn test_resolve_default_target_exe_filters_trash_path() {
-        let install_dir = PathBuf::from("C:\\Users\\Test\\AppData\\Local\\Programs\\agm-alim");
+        let install_dir = PathBuf::from("users\\test\\AppData\\Local\\Programs\\agm-alim");
         let trashed_exe = Some(PathBuf::from(
-            "/Users/test/.Trash/Antigravity Manager Tools 13-20-55-339.app",
+            "users/test/.Trash/Antigravity Manager Tools 13-20-55-339.app",
         ));
         let resolved = resolve_default_target_exe(trashed_exe, &install_dir);
         assert!(!resolved.to_string_lossy().to_lowercase().contains(".trash"));
+    }
+
+    #[test]
+    pub(crate) fn test_unwrap_sandbox_path_and_strip_local_appdata() {
+        let sandboxed_win =
+            r"users\alice\.antigravity_tools\instances\default-copy-9451\home\AppData\Local";
+        assert_eq!(unwrap_sandbox_path(sandboxed_win), r"users\alice");
+        assert_eq!(
+            strip_instance_sandbox_local_appdata(Path::new(sandboxed_win)),
+            PathBuf::from(r"users\alice").join("AppData").join("Local")
+        );
+
+        let sandboxed_slash = "users/bob/.antigravity_tools/instances/inst-01/home/AppData/Local";
+        assert_eq!(unwrap_sandbox_path(sandboxed_slash), "users/bob");
+        assert_eq!(
+            strip_instance_sandbox_local_appdata(Path::new(sandboxed_slash)),
+            PathBuf::from("users/bob").join("AppData").join("Local")
+        );
+
+        let host_path = r"users\alice\AppData\Local";
+        assert_eq!(unwrap_sandbox_path(host_path), host_path);
+        assert_eq!(
+            strip_instance_sandbox_local_appdata(Path::new(host_path)),
+            PathBuf::from(host_path)
+        );
+    }
+
+    #[test]
+    pub(crate) fn test_normalize_version_string() {
+        assert_eq!(normalize_version_string("4.162"), "4.162.0");
+        assert_eq!(normalize_version_string("v4.162"), "4.162.0");
+        assert_eq!(normalize_version_string("4.162.0"), "4.162.0");
     }
 
     #[test]

@@ -26,13 +26,13 @@ export function InstanceCardProjects({ api, inst }: { api: InstancePageApi; inst
     const displayedProjects = sortedProjects.slice(0, maxP);
 
     return (
-        <div className="mt-2 p-2 rounded-[5px] bg-gray-50/80 dark:bg-[#0c2438]/80 border border-gray-200/70 dark:border-[#15334d] text-xs">
-            <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5 pb-1 border-b border-gray-200/60 dark:border-[#15334d]/60">
+        <div className="mt-2 p-2 rounded-[5px] bg-gray-50/80 dark:bg-[#171025]/80 border border-gray-200/70 dark:border-[#40285e] text-xs">
+            <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5 pb-1 border-b border-gray-200/60 dark:border-[#40285e]/60">
                 <span className="flex items-center gap-1">
                     <Folder className="w-3 h-3 text-blue-500" />
                     <span>Active / Recent Projects</span>
                 </span>
-                <span className="px-1.5 py-0.2 rounded-[4px] text-[10px] font-mono bg-gray-200/70 dark:bg-[#15334d] text-slate-600 dark:text-slate-300">
+                <span className="px-1.5 py-0.2 rounded-[4px] text-[10px] font-mono bg-gray-200/70 dark:bg-[#40285e] text-slate-600 dark:text-slate-300">
                     {instanceProjects.length}
                 </span>
             </div>
@@ -56,7 +56,7 @@ export function InstanceCardProjects({ api, inst }: { api: InstancePageApi; inst
                                         executablePath: inst.config.executable_path,
                                     })
                                 }
-                                className="flex items-center justify-between gap-1.5 px-1.5 py-1 rounded-[5px] bg-white dark:bg-[#081a2b] hover:bg-blue-50 dark:hover:bg-[#15334d] border border-gray-200/50 dark:border-[#15334d]/60 transition-colors cursor-pointer group/proj"
+                                className="flex items-center justify-between gap-1.5 px-1.5 py-1 rounded-[5px] bg-white dark:bg-[#081a2b] hover:bg-blue-50 dark:hover:bg-[#40285e] border border-gray-200/50 dark:border-[#40285e]/60 transition-colors cursor-pointer group/proj"
                                 title="Click to view prompts in Prompt Tree"
                             >
                                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
@@ -75,7 +75,7 @@ export function InstanceCardProjects({ api, inst }: { api: InstancePageApi; inst
                                             RUNNING
                                         </span>
                                     )}
-                                    <span className="px-1.5 py-0.2 rounded-[4px] text-[9px] font-mono text-slate-500 dark:text-slate-400 bg-gray-100 dark:bg-[#0c2438] border border-gray-200/50 dark:border-[#15334d]">
+                                    <span className="px-1.5 py-0.2 rounded-[4px] text-[9px] font-mono text-slate-500 dark:text-slate-400 bg-gray-100 dark:bg-[#171025] border border-gray-200/50 dark:border-[#40285e]">
                                         {totalTurns} turns
                                     </span>
                                 </div>

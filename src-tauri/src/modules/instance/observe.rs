@@ -153,3 +153,44 @@ pub fn resolve_instance_id(specifier: &str) -> Result<String, String> {
     }
     Err(format!("Instance '{}' not found", clean))
 }
+
+/// Verify that a relaunched instance's IDE process actually materialized.
+///
+/// `Command::spawn` succeeding does not guarantee a running window: a stale
+/// singleton lock, invalid workspace args, or an immediately-exiting child
+/// all report `Ok` while the user sees nothing reopen. Poll the OS process
+/// table briefly after a relaunch; this turns the "switch closed the IDE but
+/// nothing reopened" symptom into either a confirmed reopen or a diagnosable
+/// error instead of a silent false success.
+pub(crate) fn verify_instance_relaunched(
+    instance_id: &str,
+    data_dir: &str,
+    config_pid: Option<u32>,
+) -> bool {
+    // Give the OS a beat before the first poll so we don't race the spawn.
+    std::thread::sleep(std::time::Duration::from_millis(1000));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+    loop {
+        force_refresh_process_cache();
+        if is_instance_running(instance_id, data_dir, config_pid) {
+            crate::modules::logger::log_info(&format!(
+                "[Instance] Relaunch verified: instance '{}' IDE process is observable",
+                instance_id
+            ));
+            return true;
+        }
+        if std::time::Instant::now() >= deadline {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+    force_refresh_process_cache();
+    let running = is_instance_running(instance_id, data_dir, config_pid);
+    if !running {
+        crate::modules::logger::log_error(&format!(
+                "[Instance] Relaunch verification FAILED: instance '{}' IDE did not appear within 15s of spawn",
+                instance_id
+            ));
+    }
+    running
+}

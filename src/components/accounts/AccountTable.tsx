@@ -194,7 +194,7 @@ export function AccountTable({
                             </th>
                             <th className="px-2 py-0.5 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[260px] whitespace-nowrap">{t('accounts.table.email')}</th>
                             {/* Column 1: 4H Quota with Gemini Icon and Model Toggle */}
-                            <th className="px-2 py-0.5 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[220px] whitespace-nowrap bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#15334d]">
+                            <th className="px-2 py-0.5 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[220px] whitespace-nowrap bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#40285e]">
                                 <div className="flex items-center justify-between gap-1 w-full">
                                     <button
                                         type="button"
@@ -247,7 +247,7 @@ export function AccountTable({
                             </th>
 
                             {/* Column 2: Weekly Quota Column */}
-                            <th className="px-2 py-0.5 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[220px] whitespace-nowrap bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#15334d]">
+                            <th className="px-2 py-0.5 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[220px] whitespace-nowrap bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#40285e]">
                                 <div className="flex items-center gap-1.5">
                                     <Clock className="w-3.5 h-3.5 text-gray-400" />
                                     <span>{t('accounts.table.weekly_quota', 'Weekly Quota')}</span>
@@ -315,9 +315,9 @@ export function AccountTable({
             <DragOverlay>
                 {
                     activeAccount ? (
-                        <table className="w-full bg-white dark:bg-[#0c2438] shadow-2xl rounded-lg border border-blue-500/40 dark:border-blue-700/60">
+                        <table className="w-full bg-white dark:bg-[#171025] shadow-2xl rounded-lg border border-blue-500/40 dark:border-blue-700/60">
                             <tbody>
-                                <tr className="bg-blue-50/90 dark:bg-[#0f273d] border-b border-slate-200/90 dark:border-slate-800/90">
+                                <tr className="bg-blue-50/90 dark:bg-[#171025] border-b border-slate-200/90 dark:border-slate-800/90">
                                     <td className="pl-2 py-0.5 w-7">
                                         <div className="flex items-center justify-center w-5 h-5 text-blue-500">
                                             <GripVertical className="w-3.5 h-3.5" />

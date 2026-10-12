@@ -1,0 +1,36 @@
+# Completed Plan: Auto Switch and Rotate Fix (Comparative Remediation vs v4.162.0)
+
+## User Request (Verbatim)
+```text
+Yeah, I think it's been quite some time that you have been trying to fix the auto switch and rotate. None of this is working. The biggest problem here is that the switch of the account and fast forward, both of this does not work at all. So you can compare with 162, v4.162 version. That's auto-rotate. Auto-rotate and fast forward, restarting instance, all of these functionalities work. So try to go deep, understand very well what is the difference between your code and there, and also fix the CI/CD issues by checking the gitmap.pe. Don't try to run anything. Check the issues, try to find the files, the root cause, and try to fix it. Again, send it to GitHub CI/CD to fix it, okay? Don't try to be over smart at this moment. And try to figure out and write the root cause for me why your account switching is failing. I tried to revert back to the old version, version 1.62, and why I cannot do that automatically using the Antigravity Manager (AGM) update to v4.162 or just 4.162. Why I cannot? So that update option from the CLI also does not revert the version. Make sure you fix it properly everything. Okay? It's very crucial. I've been doing this for several time. You have been breaking stuff. This is stupid. Write the root cause, write the problem first, and then try to create the instruction for the AI first, okay? And then you start doing the task. So before doing that, plan it properly, write the instruction properly, find the root problem, go deep inside the code, do the comparison of this, what you have, what is there that is working. It is kind of stupid that you tried several times and it is not working.
+
+## slug: auto-switch-and-rotate-fix
+
+# Actionable Items Must Follow Non-Negotiable
+1. Write spec under 02-spec/21-app/auto-switch-and-rotate-fix/ and enqueue plan task in .ai-memory/plans/auto-switch-and-rotate-fix.md (subtasks in .ai-memory/plans/subtasks/auto-switch-and-rotate-fix/) first
+2. Search codebase exclusively via GitMap (gitmap aum search, gitmap find, gitmap cat, gitmap ps, gitmap py, gitmap llm train); TOTAL BAN on rg, ripgrep, grep, git grep, Select-String
+3. Strictly use relative Git paths (02-spec/..., .ai-memory/..., cmd/...); only add the relative paths, never add the absolute path during your work, and ensure this is respected on the release page and in release notes as well
+4. Use gitmap AI agents to enter data
+5. Task completion includes committing and pushing to Git
+6. Compare current code with version 162, v4.162 to identify differences in auto-rotate and fast forward functionalities.
+7. Investigate and fix CI/CD issues by checking gitmap.pe.
+8. Identify and document the root cause of account switching failure.
+9. Attempt to revert to version 1.62 using Antigravity Manager (AGM) and document why the CLI update option fails to revert the version.
+10. Plan and write detailed instructions for AI before starting the task.
+
+## Must follow and spawn agent using
+@[.agents/skills/execute-parent-task-with-n-steps-v6]
+```
+
+## Status: COMPLETED
+All subtasks completed and verified:
+1. `02-spec/21-app/auto-switch-and-rotate-fix/01-auto-switch-and-fast-forward-spec.md`
+2. `02-spec/21-app/auto-switch-and-rotate-fix/02-cli-downgrade-and-cicd-spec.md`
+3. `02-spec/22-app-issues/36-auto-switch-fast-forward-downgrade-regression-rca.md` (4-part RCA)
+4. `.ai-memory/plans/subtasks/auto-switch-and-rotate-fix/01-auto-switch-and-fast-forward-remediation.md`
+5. `.ai-memory/plans/subtasks/auto-switch-and-rotate-fix/02-cli-downgrade-and-cicd-fix.md`
+6. `src-tauri/src/modules/instance/pid_scan.rs` (Defect A1 resolved)
+7. `src-tauri/src/modules/auto_switcher/selection.rs` (Defect A2 resolved)
+8. `src-tauri/src/modules/instance/close.rs` (Defect A4 resolved)
+9. `src-tauri/src/bin/agm/update_cmds.rs` & `args.rs` (Defects B1–B5, SemVer normalization, downgrade ladder)
+10. `install.ps1` (Null-safety, sandbox isolation, companion zip fallback)

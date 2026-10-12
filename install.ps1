@@ -245,17 +245,54 @@ if (-not $Arch) {
     }
 }
 
-# Resolve Default Install Directory
-if (-not $InstallDir) {
-    $InstallDir = Join-Path $env:LOCALAPPDATA "Programs\agm-alim"
+function Resolve-HostUserProfile {
+    param(
+        [string]$RawProfile,
+        [string]$RawLocalAppData,
+        [string]$RawAppData
+    )
+    foreach ($candidate in @($RawProfile, $RawLocalAppData, $RawAppData)) {
+        if (-not [string]::IsNullOrWhiteSpace($candidate) -and $candidate -match '^(.+?)[\\/]\.antigravity_tools[\\/]instances[\\/]') {
+            return $Matches[1]
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($RawProfile)) {
+        return $RawProfile
+    }
+    return [Environment]::GetFolderPath("UserProfile")
 }
 
+$RealUserProfile = Resolve-HostUserProfile -RawProfile $env:USERPROFILE -RawLocalAppData $env:LOCALAPPDATA -RawAppData $env:APPDATA
+if (-not [string]::IsNullOrWhiteSpace($RealUserProfile)) {
+    $RealLocalAppData = Join-Path $RealUserProfile "AppData\Local"
+    $RealAppData = Join-Path $RealUserProfile "AppData\Roaming"
+    $env:USERPROFILE = $RealUserProfile
+    $env:LOCALAPPDATA = $RealLocalAppData
+    $env:APPDATA = $RealAppData
+} else {
+    $RealLocalAppData = $env:LOCALAPPDATA
+    $RealAppData = $env:APPDATA
+}
+
+# Resolve Default Install Directory & CLI Directory
+if (-not $InstallDir -or $InstallDir -match '\.antigravity_tools[\\/]instances[\\/]') {
+    $InstallDir = Join-Path $RealLocalAppData "Programs\agm-alim"
+}
+$cliDir = Join-Path $RealLocalAppData "agm-cli"
+
 # Shortcuts paths
-$StartMenuDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
-$StartMenuShortcut = Join-Path $StartMenuDir "$ShortcutName.lnk"
+$StartMenuDir = if (-not [string]::IsNullOrWhiteSpace($RealAppData)) { Join-Path $RealAppData "Microsoft\Windows\Start Menu\Programs" } else { $null }
+$StartMenuShortcut = if (-not [string]::IsNullOrWhiteSpace($StartMenuDir)) { Join-Path $StartMenuDir "$ShortcutName.lnk" } else { $null }
 $DesktopDir = [Environment]::GetFolderPath("Desktop")
-$DesktopShortcut = Join-Path $DesktopDir "$ShortcutName.lnk"
-$TaskbarDir = Join-Path $env:APPDATA "Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
+if ([string]::IsNullOrWhiteSpace($DesktopDir)) {
+    if (-not [string]::IsNullOrWhiteSpace($RealUserProfile)) {
+        $DesktopDir = Join-Path $RealUserProfile "Desktop"
+    } else {
+        $DesktopDir = $null
+    }
+}
+$DesktopShortcut = if (-not [string]::IsNullOrWhiteSpace($DesktopDir)) { Join-Path $DesktopDir "$ShortcutName.lnk" } else { $null }
+$TaskbarDir = if (-not [string]::IsNullOrWhiteSpace($RealAppData)) { Join-Path $RealAppData "Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar" } else { $null }
 
 function Close-ToolProcesses {
     param([string]$Context = "installation")
@@ -546,18 +583,25 @@ function Remove-PreviousInstallations {
     }
 
     # 4. Clean legacy shortcuts from Start Menu and Desktop (strictly preserving TaskbarDir so pinned apps are never removed)
-    $prevShortcuts = @(
-        (Join-Path $StartMenuDir "Antigravity Tools.lnk"),
-        (Join-Path $StartMenuDir "antigravity-tools.lnk"),
-        (Join-Path $StartMenuDir "Anti-Gravity Tools by Alim.lnk"),
-        (Join-Path $StartMenuDir "Anti-Gravity Tools.lnk"),
-        (Join-Path $DesktopDir "Antigravity Tools.lnk"),
-        (Join-Path $DesktopDir "antigravity-tools.lnk"),
-        (Join-Path $DesktopDir "Anti-Gravity Tools by Alim.lnk"),
-        (Join-Path $DesktopDir "Anti-Gravity Tools.lnk")
-    )
+    $prevShortcuts = @()
+    if (-not [string]::IsNullOrWhiteSpace($StartMenuDir)) {
+        $prevShortcuts += @(
+            (Join-Path $StartMenuDir "Antigravity Tools.lnk"),
+            (Join-Path $StartMenuDir "antigravity-tools.lnk"),
+            (Join-Path $StartMenuDir "Anti-Gravity Tools by Alim.lnk"),
+            (Join-Path $StartMenuDir "Anti-Gravity Tools.lnk")
+        )
+    }
+    if (-not [string]::IsNullOrWhiteSpace($DesktopDir) -and (Test-Path $DesktopDir)) {
+        $prevShortcuts += @(
+            (Join-Path $DesktopDir "Antigravity Tools.lnk"),
+            (Join-Path $DesktopDir "antigravity-tools.lnk"),
+            (Join-Path $DesktopDir "Anti-Gravity Tools by Alim.lnk"),
+            (Join-Path $DesktopDir "Anti-Gravity Tools.lnk")
+        )
+    }
     foreach ($sc in $prevShortcuts) {
-        if (Test-Path $sc) {
+        if ($sc -and (Test-Path $sc)) {
             Remove-Item -Path $sc -Force -ErrorAction SilentlyContinue
         }
     }
@@ -567,7 +611,7 @@ function Remove-PreviousInstallations {
 
 function Get-PinnedTaskbarShortcuts {
     $pinned = [System.Collections.Generic.List[PSCustomObject]]::new()
-    if (-not (Test-Path $TaskbarDir)) {
+    if ([string]::IsNullOrWhiteSpace($TaskbarDir) -or -not (Test-Path $TaskbarDir)) {
         return $pinned
     }
     try {
@@ -837,11 +881,11 @@ if ($Uninstall) {
     }
 
     # 2. Remove shortcuts
-    if (Test-Path $StartMenuShortcut) {
+    if ($StartMenuShortcut -and (Test-Path $StartMenuShortcut)) {
         Write-Step "Removing Start Menu shortcut"
         Remove-Item -Path $StartMenuShortcut -Force -ErrorAction SilentlyContinue
     }
-    if (Test-Path $DesktopShortcut) {
+    if ($DesktopShortcut -and (Test-Path $DesktopShortcut)) {
         Write-Step "Removing Desktop shortcut"
         Remove-Item -Path $DesktopShortcut -Force -ErrorAction SilentlyContinue
     }
@@ -971,14 +1015,24 @@ function Test-UrlReachable {
 function Get-WindowsReleaseAsset {
     param(
         [PSCustomObject]$ReleaseData,
-        [string]$Architecture = "x64"
+        [string]$Architecture = "x64",
+        [switch]$PreferZip
     )
     if (-not $ReleaseData -or -not $ReleaseData.assets) { return $null }
 
+    $matched = $null
+    if ($PreferZip) {
+        $matched = $ReleaseData.assets | Where-Object {
+            $_.name -like "*windows*${Architecture}*.zip" -or $_.name -like "*windows*.zip" -or $_.name -like "*win*.zip"
+        } | Select-Object -First 1
+    }
+
     # 1. Look for installer setup exe matching architecture
-    $matched = $ReleaseData.assets | Where-Object { 
-        $_.name -like "*${Architecture}*setup.exe" -or $_.name -like "*setup.exe" 
-    } | Select-Object -First 1
+    if (-not $matched) {
+        $matched = $ReleaseData.assets | Where-Object { 
+            $_.name -like "*${Architecture}*setup.exe" -or $_.name -like "*setup.exe" 
+        } | Select-Object -First 1
+    }
 
     # 2. Look for standalone or installer exe
     if (-not $matched) {
@@ -1263,9 +1317,15 @@ $isPinned = $false
 $cleanPinned = $null
 if ($Version) {
     $cleanPinned = ($Version -replace "^v", "").Trim()
-    $parts = $cleanPinned.Split("-")[0].Split(".")
+    $baseVer = $cleanPinned.Split("-")[0]
+    $parts = $baseVer.Split(".")
     if ($parts.Length -eq 2) {
-        $cleanPinned = "$cleanPinned.0"
+        $dashIdx = $cleanPinned.IndexOf("-")
+        if ($dashIdx -ge 0) {
+            $cleanPinned = "$baseVer.0" + $cleanPinned.Substring($dashIdx)
+        } else {
+            $cleanPinned = "$cleanPinned.0"
+        }
     }
     $candidateVersions.Add($cleanPinned)
     $isPinned = $true
@@ -1305,7 +1365,9 @@ foreach ($mUrl in $manifestEndpoints) {
 
                 $winAsset = $null
                 if ($rel.assets) {
-                    if ($rel.assets.windows_x64_setup) {
+                    if ($isPinned -and $rel.assets.windows_x64_zip) {
+                        $winAsset = $rel.assets.windows_x64_zip
+                    } elseif ($rel.assets.windows_x64_setup) {
                         $winAsset = $rel.assets.windows_x64_setup
                     } elseif ($rel.assets.windows_x64_zip) {
                         $winAsset = $rel.assets.windows_x64_zip
@@ -1399,19 +1461,24 @@ if (-not $isPinned -and (-not $manifestLoaded -or $candidateVersions.Count -lt 5
         } catch {}
     }
 } elseif ($isPinned) {
-    # If pinned, only query the specific release tag endpoint to fetch metadata if not in manifest
+    # If pinned, query the specific release tag endpoint to fetch metadata if not in manifest
     if (-not $manifestAssetUrlMap.ContainsKey($cleanPinned)) {
         $apiEndpoints = @(
             "https://api.github.com/repos/$Repo/releases/tags/v$cleanPinned"
         )
+        if ($cleanPinned -match '^(\d+\.\d+)\.0$') {
+            $apiEndpoints += "https://api.github.com/repos/$Repo/releases/tags/v$($Matches[1])"
+        }
         foreach ($endpoint in $apiEndpoints) {
             try {
                 $resp = Invoke-RestMethod -Uri $endpoint -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
                 if ($resp -and $resp.tag_name) {
                     $tagVer = $resp.tag_name -replace "^v", ""
+                    $releaseMetadataMap[$cleanPinned] = $resp
                     $releaseMetadataMap[$tagVer] = $resp
-                    $matchedAsset = Get-WindowsReleaseAsset -ReleaseData $resp -Architecture $Arch
+                    $matchedAsset = Get-WindowsReleaseAsset -ReleaseData $resp -Architecture $Arch -PreferZip:$isPinned
                     if ($matchedAsset -and $matchedAsset.browser_download_url) {
+                        $manifestAssetUrlMap[$cleanPinned] = $matchedAsset.browser_download_url
                         $manifestAssetUrlMap[$tagVer] = $matchedAsset.browser_download_url
                     }
                     break
@@ -1425,11 +1492,12 @@ if (-not $isPinned -and (-not $manifestLoaded -or $candidateVersions.Count -lt 5
 if ($isPinned) {
     if (-not $manifestAssetUrlMap.ContainsKey($cleanPinned) -and -not $releaseMetadataMap.ContainsKey($cleanPinned)) {
         $candidateAssetFiles = @(
+            "agm-alim_${cleanPinned}_windows_${Arch}.zip",
+            "agm-alim_${cleanPinned}_windows_x64.zip",
             "agm-alim-setup.exe",
             "Antigravity.Manager.Tools_${cleanPinned}_x64-setup.exe",
             "agm-alim_${cleanPinned}_x64-setup.exe",
-            "Antigravity-Manager_${cleanPinned}_x64-setup.exe",
-            "agm-alim_${cleanPinned}_windows_x64.zip"
+            "Antigravity-Manager_${cleanPinned}_x64-setup.exe"
         )
         foreach ($cFile in $candidateAssetFiles) {
             $directSetupUrl = "https://github.com/$Repo/releases/download/v$cleanPinned/$cFile"
@@ -1525,6 +1593,7 @@ foreach ($candVersion in $versionQueue) {
     $candTagUrl = if ($manifestTagUrlMap.ContainsKey($candVersion)) { $manifestTagUrlMap[$candVersion] } else { "https://github.com/$Repo/releases/tag/v$candVersion" }
     Write-Step "Release tag URL     : $candTagUrl"
 
+    $lockCandidates = @()
     try {
         $DownloadUrl = $null
         if ($manifestAssetUrlMap.ContainsKey($candVersion) -and $manifestAssetUrlMap[$candVersion]) {
@@ -1532,12 +1601,19 @@ foreach ($candVersion in $versionQueue) {
         } else {
             $relData = $releaseMetadataMap[$candVersion]
             if (-not $relData) {
-                try {
-                    $relData = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/tags/v$candVersion" -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
-                } catch {}
+                $tagCandidates = @("v$candVersion")
+                if ($candVersion -match '^(\d+\.\d+)\.0$') {
+                    $tagCandidates += "v$($Matches[1])"
+                }
+                foreach ($tc in $tagCandidates) {
+                    try {
+                        $relData = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/tags/$tc" -Headers @{ "User-Agent" = "Antigravity-Installer" } -TimeoutSec 6
+                        if ($relData) { break }
+                    } catch {}
+                }
             }
 
-            $matchedAsset = Get-WindowsReleaseAsset -ReleaseData $relData -Architecture $Arch
+            $matchedAsset = Get-WindowsReleaseAsset -ReleaseData $relData -Architecture $Arch -PreferZip:$isPinned
             if ($matchedAsset) {
                 $DownloadUrl = $matchedAsset.browser_download_url
             }
@@ -1597,10 +1673,14 @@ foreach ($candVersion in $versionQueue) {
                 (Join-Path $InstallDir "Anti-Gravity Tools by Alim.exe"),
                 (Join-Path $InstallDir "antigravity-tools.exe"),
                 (Join-Path $InstallDir "antigravity-manager.exe"),
-                (Join-Path $InstallDir "agm.exe"),
-                (Join-Path $cliDir "agm.exe"),
-                (Join-Path $cliDir "agm-update-cli.exe")
+                (Join-Path $InstallDir "agm.exe")
             )
+            if (-not [string]::IsNullOrWhiteSpace($cliDir)) {
+                $lockCandidates += @(
+                    (Join-Path $cliDir "agm.exe"),
+                    (Join-Path $cliDir "agm-update-cli.exe")
+                )
+            }
             foreach ($lc in $lockCandidates) {
                 if (Test-Path $lc) {
                     $oldBak = "$lc.old"
@@ -1619,6 +1699,15 @@ foreach ($candVersion in $versionQueue) {
         if ($DownloadedFile -like "*.zip") {
             Write-Step "Extracting release zip package..."
             Expand-Archive -Path $DownloadedFile -DestinationPath $InstallDir -Force
+            foreach ($binItem in @("agm-alim.exe", "agm.exe")) {
+                $topBin = Join-Path $InstallDir $binItem
+                if (-not (Test-Path $topBin)) {
+                    $nestedBin = Get-ChildItem -Path $InstallDir -Filter $binItem -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+                    if ($nestedBin -and $nestedBin.FullName -ne $topBin) {
+                        Copy-Item -Path $nestedBin.FullName -Destination $topBin -Force -ErrorAction SilentlyContinue
+                    }
+                }
+            }
         } else {
             # Execute NSIS installer and wait synchronously for full installation completion
             $setupProc = Start-Process -FilePath $DownloadedFile -ArgumentList @("/S", "/D=$InstallDir") -PassThru -Wait -ErrorAction SilentlyContinue
@@ -1636,8 +1725,56 @@ foreach ($candVersion in $versionQueue) {
                 if (-not $lingering) { break }
                 Start-Sleep -Milliseconds 300
             }
+
+            # If NSIS setup did not bundle agm.exe (e.g. v4.162.x), extract agm.exe from companion release .zip
+            $installedAgmCheck = Join-Path $InstallDir "agm.exe"
+            if (-not (Test-Path $installedAgmCheck)) {
+                $zipVersions = @($candVersion)
+                if ($candVersion -match '^(\d+\.\d+)\.0$') {
+                    $zipVersions += $Matches[1]
+                }
+                $zipUrls = @()
+                foreach ($zv in $zipVersions) {
+                    $zipUrls += @(
+                        "https://github.com/$Repo/releases/download/v$zv/agm-alim_${zv}_windows_${Arch}.zip",
+                        "https://github.com/$Repo/releases/download/v$zv/agm-alim_${zv}_windows_x64.zip",
+                        "https://github.com/$Repo/releases/download/v$zv/agm-alim_${zv}_x64.zip"
+                    )
+                }
+                foreach ($zUrl in ($zipUrls | Select-Object -Unique)) {
+                    if (Test-UrlReachable -Url $zUrl -TimeoutSec 4) {
+                        $tempZip = Join-Path $TempDir "agm-cli-bundle-$candVersion.zip"
+                        $tempExtract = Join-Path $TempDir "agm-cli-extract-$candVersion"
+                        if (Invoke-FastDownload -Url $zUrl -DestinationPath $tempZip) {
+                            try {
+                                if (Test-Path $tempExtract) { Remove-Item -Path $tempExtract -Recurse -Force -ErrorAction SilentlyContinue }
+                                Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force
+                                $extractedAgm = Get-ChildItem -Path $tempExtract -Filter "agm.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+                                if ($extractedAgm) {
+                                    Copy-Item -Path $extractedAgm.FullName -Destination $installedAgmCheck -Force -ErrorAction SilentlyContinue
+                                }
+                                $extractedGui = Get-ChildItem -Path $tempExtract -Filter "agm-alim.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+                                if ($extractedGui -and -not (Test-Path (Join-Path $InstallDir "agm-alim.exe"))) {
+                                    Copy-Item -Path $extractedGui.FullName -Destination (Join-Path $InstallDir "agm-alim.exe") -Force -ErrorAction SilentlyContinue
+                                }
+                            } catch {}
+                            Remove-Item -Path $tempZip -Force -ErrorAction SilentlyContinue
+                            Remove-Item -Path $tempExtract -Recurse -Force -ErrorAction SilentlyContinue
+                            break
+                        }
+                    }
+                }
+            }
         }
         Remove-Item $DownloadedFile -Force -ErrorAction SilentlyContinue
+
+        if (-not [string]::IsNullOrWhiteSpace($cliDir) -and (Test-Path (Join-Path $InstallDir "agm.exe"))) {
+            if (-not (Test-Path $cliDir)) {
+                New-Item -ItemType Directory -Path $cliDir -Force | Out-Null
+            }
+            Copy-Item -Path (Join-Path $InstallDir "agm.exe") -Destination (Join-Path $cliDir "agm.exe") -Force -ErrorAction SilentlyContinue
+            Copy-Item -Path (Join-Path $InstallDir "agm.exe") -Destination (Join-Path $cliDir "agm-update-cli.exe") -Force -ErrorAction SilentlyContinue
+        }
 
         # Locate and verify main executable
         $detectedExe = Join-Path $InstallDir $BinaryName
@@ -1701,6 +1838,11 @@ foreach ($candVersion in $versionQueue) {
         Write-Success "Installation of v$candVersion verified successfully!"
         break
     } catch {
+        foreach ($lc in $lockCandidates) {
+            if (-not (Test-Path $lc) -and (Test-Path "$lc.old")) {
+                try { Move-Item -Path "$lc.old" -Destination $lc -Force -ErrorAction SilentlyContinue } catch {}
+            }
+        }
         Write-Warn "Attempt $attempt failed for release v${candVersion}: $($_.Exception.Message)"
         if ($attempt -lt $maxAttempts) {
             Write-Step "Falling back to previous release version in sequence..."
@@ -1709,7 +1851,12 @@ foreach ($candVersion in $versionQueue) {
 }
 
 if (-not $installedOk) {
-    # Resilient fallback: Check if an existing working executable exists in the install dir
+    if ($isPinned -or $Update) {
+        Write-Err "Failed to download and install target release v$TargetVersion. Existing installation was not modified."
+        $global:LASTEXITCODE = 1
+        exit 1
+    }
+    # Resilient fallback (fresh unpinned install only): Check if an existing working executable exists in the install dir
     $existingExe = Join-Path $InstallDir $BinaryName
     if (-not (Test-Path $existingExe)) {
         $existingExe = Join-Path $InstallDir "agm-alim.exe"
@@ -1722,6 +1869,7 @@ if (-not $installedOk) {
         }
         Write-Warn "All $maxAttempts download attempts failed, but existing installation verified at $existingExe. Retaining current installation."
         $ExePath = $existingExe
+        if ($CurrentVersion) { $TargetVersion = $CurrentVersion }
         $installedOk = $true
     } else {
         Write-Err "All $maxAttempts attempts failed and no existing installation found. Installation cannot continue."
@@ -1745,7 +1893,9 @@ if (-not $NoPath) {
 }
 
 # Step 4.1: Synchronize AGM CLI & Update CLI to %LOCALAPPDATA%\agm-cli
-$cliDir = Join-Path $env:LOCALAPPDATA "agm-cli"
+if ([string]::IsNullOrWhiteSpace($cliDir)) {
+    $cliDir = Join-Path $RealLocalAppData "agm-cli"
+}
 try {
     if (-not (Test-Path $cliDir)) {
         New-Item -ItemType Directory -Path $cliDir -Force | Out-Null
@@ -1754,12 +1904,54 @@ try {
     $globalAgm = Join-Path $cliDir "agm.exe"
     $globalUpdateCli = Join-Path $cliDir "agm-update-cli.exe"
 
+    if (-not (Test-Path $installedAgm) -and $isPinned -and $TargetVersion) {
+        $zipVersions = @($TargetVersion)
+        if ($TargetVersion -match '^(\d+\.\d+)\.0$') {
+            $zipVersions += $Matches[1]
+        }
+        foreach ($zv in $zipVersions) {
+            $directZipUrls = @(
+                "https://github.com/$Repo/releases/download/v$zv/agm-alim_${zv}_windows_${Arch}.zip",
+                "https://github.com/$Repo/releases/download/v$zv/agm-alim_${zv}_windows_x64.zip"
+            )
+            foreach ($zUrl in $directZipUrls) {
+                if (Test-UrlReachable -Url $zUrl -TimeoutSec 4) {
+                    $tempZip = Join-Path $TempDir "agm-cli-fallback-$zv.zip"
+                    $tempExtract = Join-Path $TempDir "agm-cli-extract-fallback-$zv"
+                    if (Invoke-FastDownload -Url $zUrl -DestinationPath $tempZip) {
+                        try {
+                            if (Test-Path $tempExtract) { Remove-Item -Path $tempExtract -Recurse -Force -ErrorAction SilentlyContinue }
+                            Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force
+                            $extractedAgm = Get-ChildItem -Path $tempExtract -Filter "agm.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+                            if ($extractedAgm) {
+                                Copy-Item -Path $extractedAgm.FullName -Destination $installedAgm -Force -ErrorAction SilentlyContinue
+                            }
+                        } catch {}
+                        Remove-Item -Path $tempZip -Force -ErrorAction SilentlyContinue
+                        Remove-Item -Path $tempExtract -Recurse -Force -ErrorAction SilentlyContinue
+                        if (Test-Path $installedAgm) { break }
+                    }
+                }
+            }
+            if (Test-Path $installedAgm) { break }
+        }
+    }
+
     if (Test-Path $installedAgm) {
         Copy-Item -Path $installedAgm -Destination $globalAgm -Force -ErrorAction SilentlyContinue
         Copy-Item -Path $installedAgm -Destination $globalUpdateCli -Force -ErrorAction SilentlyContinue
-    } elseif (Test-Path $globalAgm) {
-        Copy-Item -Path $globalAgm -Destination $installedAgm -Force -ErrorAction SilentlyContinue
-        Copy-Item -Path $globalAgm -Destination $globalUpdateCli -Force -ErrorAction SilentlyContinue
+    } elseif (-not $isPinned) {
+        $localRepoAgm = if ($PSScriptRoot) { Join-Path $PSScriptRoot "src-tauri\target\release\agm.exe" } else { $null }
+        if ($localRepoAgm -and (Test-Path $localRepoAgm)) {
+            Copy-Item -Path $localRepoAgm -Destination $installedAgm -Force -ErrorAction SilentlyContinue
+            Copy-Item -Path $localRepoAgm -Destination $globalAgm -Force -ErrorAction SilentlyContinue
+            Copy-Item -Path $localRepoAgm -Destination $globalUpdateCli -Force -ErrorAction SilentlyContinue
+        } elseif (Test-Path $globalAgm) {
+            Copy-Item -Path $globalAgm -Destination $installedAgm -Force -ErrorAction SilentlyContinue
+            Copy-Item -Path $globalAgm -Destination $globalUpdateCli -Force -ErrorAction SilentlyContinue
+        } elseif ($ExePath -and (Test-Path $ExePath)) {
+            Copy-Item -Path $ExePath -Destination $globalUpdateCli -Force -ErrorAction SilentlyContinue
+        }
     } elseif ($ExePath -and (Test-Path $ExePath)) {
         Copy-Item -Path $ExePath -Destination $globalUpdateCli -Force -ErrorAction SilentlyContinue
     }
@@ -1786,28 +1978,34 @@ if (-not $NoShortcut) {
                 # Clean any remaining legacy shortcut on Desktop or Start Menu (strictly preserving TaskbarDir so pinned items remain intact)
                 $oldLnks = @("Agm - Alim.lnk", "agm-alim.lnk", "Anti-Gravity Tools by Alim.lnk", "Antigravity Tools.lnk", "antigravity-tools.lnk")
                 foreach ($old in $oldLnks) {
-                    $f1 = Join-Path $DesktopDir $old
-                    if (Test-Path $f1) { Remove-Item -Path $f1 -Force -ErrorAction SilentlyContinue }
-                    $f2 = Join-Path $StartMenuDir $old
-                    if (Test-Path $f2) { Remove-Item -Path $f2 -Force -ErrorAction SilentlyContinue }
+                    if (-not [string]::IsNullOrWhiteSpace($DesktopDir) -and (Test-Path $DesktopDir)) {
+                        $f1 = Join-Path $DesktopDir $old
+                        if (Test-Path $f1) { Remove-Item -Path $f1 -Force -ErrorAction SilentlyContinue }
+                    }
+                    if (-not [string]::IsNullOrWhiteSpace($StartMenuDir)) {
+                        $f2 = Join-Path $StartMenuDir $old
+                        if (Test-Path $f2) { Remove-Item -Path $f2 -Force -ErrorAction SilentlyContinue }
+                    }
                 }
 
                 # Start Menu
-                if (-not (Test-Path $StartMenuDir)) {
-                    New-Item -ItemType Directory -Path $StartMenuDir -Force | Out-Null
-                }
-                $smShortcut = $WshShell.CreateShortcut($StartMenuShortcut)
-                $smShortcut.TargetPath = $ExePath
-                $smShortcut.WorkingDirectory = $InstallDir
-                $smShortcut.Description = $Tooltip
-                $smShortcut.Save()
-                Write-Success "Configured Start Menu shortcut: $StartMenuShortcut"
+                if (-not [string]::IsNullOrWhiteSpace($StartMenuDir) -and $StartMenuShortcut) {
+                    if (-not (Test-Path $StartMenuDir)) {
+                        New-Item -ItemType Directory -Path $StartMenuDir -Force | Out-Null
+                    }
+                    $smShortcut = $WshShell.CreateShortcut($StartMenuShortcut)
+                    $smShortcut.TargetPath = $ExePath
+                    $smShortcut.WorkingDirectory = $InstallDir
+                    $smShortcut.Description = $Tooltip
+                    $smShortcut.Save()
+                    Write-Success "Configured Start Menu shortcut: $StartMenuShortcut"
 
-                # Step 6: Pin to Start Menu if not exists (one-time setup)
-                Pin-StartMenuOnce -ShortcutPath $StartMenuShortcut -MarkerDir $InstallDir
+                    # Step 6: Pin to Start Menu if not exists (one-time setup)
+                    Pin-StartMenuOnce -ShortcutPath $StartMenuShortcut -MarkerDir $InstallDir
+                }
 
                 # Desktop
-                if (Test-Path $DesktopDir) {
+                if (-not [string]::IsNullOrWhiteSpace($DesktopDir) -and $DesktopShortcut -and (Test-Path $DesktopDir)) {
                     if (Test-Path $DesktopShortcut) {
                         Write-Step "Desktop shortcut already exists: $DesktopShortcut"
                     } else {

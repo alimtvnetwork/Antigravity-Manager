@@ -5,10 +5,18 @@ use super::*;
 
 /// Normalize version string: e.g., "4.162" or "v4.162" -> "4.162.0".
 pub fn normalize_version_string(raw: &str) -> String {
-    let clean = raw.trim().trim_start_matches(['v', 'V']).trim();
+    let clean = raw
+        .trim()
+        .trim_matches(['\'', '"'])
+        .trim_start_matches(['v', 'V'])
+        .trim();
     let base = clean.split('-').next().unwrap_or(clean);
     let parts: Vec<&str> = base.split('.').collect();
-    if parts.len() == 2 && parts.iter().all(|p| p.chars().all(|c| c.is_ascii_digit())) {
+    if parts.len() == 2
+        && parts
+            .iter()
+            .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
+    {
         if let Some(suffix_idx) = clean.find('-') {
             format!("{}.0{}", &clean[..suffix_idx], &clean[suffix_idx..])
         } else {
@@ -17,6 +25,47 @@ pub fn normalize_version_string(raw: &str) -> String {
     } else {
         clean.to_string()
     }
+}
+
+/// Unwrap an Antigravity multi-instance sandbox path back to the real host user profile root.
+/// If `raw_path` contains `.antigravity_tools/instances/` or `.antigravity_tools\instances\`,
+/// returns the host user profile prefix before that marker; otherwise returns `raw_path` unchanged.
+pub fn unwrap_sandbox_path(raw_path: &str) -> String {
+    let normalized = raw_path.replace('/', "\\");
+    let lower = normalized.to_ascii_lowercase();
+    let marker = "\\.antigravity_tools\\instances\\";
+    if let Some(idx) = lower.find(marker) {
+        let prefix = &raw_path[..idx];
+        if !prefix.is_empty() {
+            return prefix.to_string();
+        }
+    }
+    let alt_marker = ".antigravity_tools\\instances\\";
+    if let Some(idx) = lower.find(alt_marker) {
+        if idx > 0 {
+            let prefix = raw_path[..idx].trim_end_matches(['\\', '/']);
+            if !prefix.is_empty() {
+                return prefix.to_string();
+            }
+        }
+    }
+    raw_path.to_string()
+}
+
+/// Strip `.antigravity_tools/instances/<id>/...` sandbox redirection from a `LOCALAPPDATA` or profile path,
+/// returning `<real_user_root>/AppData/Local` when sandboxed or `raw_path` unchanged otherwise.
+pub fn strip_instance_sandbox_local_appdata(raw_path: &Path) -> PathBuf {
+    let raw_str = raw_path.to_string_lossy();
+    let unwrapped = unwrap_sandbox_path(&raw_str);
+    if unwrapped.len() != raw_str.len() {
+        return PathBuf::from(unwrapped).join("AppData").join("Local");
+    }
+    raw_path.to_path_buf()
+}
+
+pub fn is_instance_sandbox_path(path: &Path) -> bool {
+    let raw_str = path.to_string_lossy();
+    unwrap_sandbox_path(&raw_str).len() != raw_str.len()
 }
 
 pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
@@ -58,7 +107,10 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
             }
             "--version" | "-v" => {
                 if i + 1 < args.len() {
-                    let v = args[i + 1].trim().trim_start_matches(['v', 'V']);
+                    let v = args[i + 1]
+                        .trim()
+                        .trim_matches(['\'', '"'])
+                        .trim_start_matches(['v', 'V']);
                     opts.target_version = Some(normalize_version_string(v));
                     i += 1;
                 }
@@ -66,19 +118,50 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
             "--delegated-worker" => {
                 opts.is_delegated_worker = true;
             }
-            arg if arg.starts_with("--version=") => {
+            arg if arg.starts_with("--version=") || arg.starts_with("-v=") => {
+                let prefix = if arg.starts_with("--version=") {
+                    "--version="
+                } else {
+                    "-v="
+                };
                 let v = arg
-                    .trim_start_matches("--version=")
+                    .trim_start_matches(prefix)
                     .trim()
+                    .trim_matches(['\'', '"'])
                     .trim_start_matches(['v', 'V']);
                 opts.target_version = Some(normalize_version_string(v));
             }
+            arg if arg.starts_with("--to=")
+                || arg.starts_with("-to=")
+                || arg.starts_with("--revert=")
+                || arg.starts_with("-revert=")
+                || arg.starts_with("--downgrade=")
+                || arg.starts_with("-downgrade=") =>
+            {
+                let prefix_len = arg.find('=').map(|idx| idx + 1).unwrap_or(0);
+                let v = arg[prefix_len..]
+                    .trim()
+                    .trim_matches(['\'', '"'])
+                    .trim_start_matches(['v', 'V']);
+                if !v.is_empty() {
+                    opts.target_version = Some(normalize_version_string(v));
+                }
+            }
             arg if arg.eq_ignore_ascii_case("to")
+                || arg.eq_ignore_ascii_case("--to")
+                || arg.eq_ignore_ascii_case("-to")
                 || arg.eq_ignore_ascii_case("revert")
-                || arg.eq_ignore_ascii_case("downgrade") =>
+                || arg.eq_ignore_ascii_case("--revert")
+                || arg.eq_ignore_ascii_case("-revert")
+                || arg.eq_ignore_ascii_case("downgrade")
+                || arg.eq_ignore_ascii_case("--downgrade")
+                || arg.eq_ignore_ascii_case("-downgrade") =>
             {
                 if i + 1 < args.len() {
-                    let v = args[i + 1].trim().trim_start_matches(['v', 'V']);
+                    let v = args[i + 1]
+                        .trim()
+                        .trim_matches(['\'', '"'])
+                        .trim_start_matches(['v', 'V']);
                     if !v.is_empty()
                         && v.chars()
                             .next()
@@ -92,7 +175,7 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
             }
             _ => {
                 if opts.target_version.is_none() && !args[i].starts_with('-') {
-                    let clean = args[i].trim();
+                    let clean = args[i].trim().trim_matches(['\'', '"']);
                     let v = clean.trim_start_matches(['v', 'V']);
                     if v.contains('.')
                         && v.chars()
@@ -111,31 +194,49 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
     opts
 }
 
+pub fn parse_update_args(args: &[String]) -> DelegateUpdateOptions {
+    parse_delegate_args(args)
+}
+
 pub fn resolve_default_install_dir(
     install_dir: Option<PathBuf>,
     target_exe: Option<&PathBuf>,
 ) -> PathBuf {
     install_dir
+        .map(|dir| {
+            if is_instance_sandbox_path(&dir) {
+                strip_instance_sandbox_local_appdata(&dir)
+                    .join("Programs")
+                    .join("agm-alim")
+            } else {
+                dir
+            }
+        })
         .or_else(|| {
             target_exe
                 .and_then(|p| p.parent().map(|d| d.to_path_buf()))
-                .filter(|d| !d.to_string_lossy().to_lowercase().contains("agm-updater"))
+                .filter(|d| {
+                    !d.to_string_lossy().to_lowercase().contains("agm-updater")
+                        && !is_instance_sandbox_path(d)
+                })
         })
         .unwrap_or_else(|| {
             #[cfg(target_os = "windows")]
             {
                 if let Ok(local) = env::var("LOCALAPPDATA") {
-                    let cand1 = PathBuf::from(&local).join("Programs").join("agm-alim");
+                    let real_local = strip_instance_sandbox_local_appdata(Path::new(&local));
+                    let cand1 = real_local.join("Programs").join("agm-alim");
                     if cand1.exists() {
                         return cand1;
                     }
-                    let cand2 = PathBuf::from(&local)
-                        .join("Programs")
-                        .join("Antigravity-Tools");
+                    let cand2 = real_local.join("Programs").join("Antigravity-Tools");
                     if cand2.exists() {
                         return cand2;
                     }
                     cand1
+                } else if let Ok(profile) = env::var("USERPROFILE") {
+                    let real_local = strip_instance_sandbox_local_appdata(Path::new(&profile));
+                    real_local.join("Programs").join("agm-alim")
                 } else {
                     PathBuf::from(".")
                 }
@@ -155,7 +256,7 @@ pub fn resolve_default_install_dir(
             {
                 dirs::home_dir()
                     .map(|h| h.join(".local/bin"))
-                    .unwrap_or_else(|| PathBuf::from("/usr/local/bin"))
+                    .unwrap_or_else(|| PathBuf::from("."))
             }
         })
 }
@@ -169,6 +270,7 @@ pub fn resolve_default_target_exe(
         if !exe_str.contains("agm-update-cli")
             && !exe_str.contains("agm-updater")
             && !exe_str.contains(".trash")
+            && !is_instance_sandbox_path(&exe)
         {
             return exe;
         }

@@ -23,7 +23,7 @@ function SourceTargetSelect({
         <select
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className={`w-full truncate bg-white dark:bg-[#0c2438] border ${borderClass} rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 ${focusClass} cursor-pointer`}
+            className={`w-full truncate bg-white dark:bg-[#171025] border ${borderClass} rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 ${focusClass} cursor-pointer`}
         >
             {options.map((inst, idx) => {
                 const seq = inst.config.seq_num ?? idx + 1;
@@ -211,7 +211,7 @@ export function SettingsSyncSection({ api, instances }: { api: InstanceSettingsA
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Copy & Move Settings Card */}
-                <div className="rounded-xl bg-slate-50 dark:bg-[#071a27]/80 border border-gray-200 dark:border-[#15334d] p-3 space-y-2.5 flex flex-col justify-between">
+                <div className="rounded-xl bg-slate-50 dark:bg-[#090611]/80 border border-gray-200 dark:border-[#40285e] p-3 space-y-2.5 flex flex-col justify-between">
                     <div>
                         <div className="flex items-center justify-between gap-2 mb-1.5">
                             <div className="flex items-center gap-2 min-w-0">
@@ -233,7 +233,7 @@ export function SettingsSyncSection({ api, instances }: { api: InstanceSettingsA
                             value={copySettingsSourceId}
                             onChange={setCopySettingsSourceId}
                             options={candidateSources}
-                            borderClass="border-gray-200 dark:border-[#15334d]"
+                            borderClass="border-gray-200 dark:border-[#40285e]"
                             focusClass="focus:ring-blue-500"
                         />
                         <div className="flex items-center gap-2">
@@ -262,7 +262,7 @@ export function SettingsSyncSection({ api, instances }: { api: InstanceSettingsA
                 </div>
 
                 {/* Copy & Move Projects/Workspaces Card */}
-                <div className="rounded-xl bg-slate-50 dark:bg-[#071a27]/80 border border-gray-200 dark:border-[#15334d] p-3 space-y-2.5 flex flex-col justify-between">
+                <div className="rounded-xl bg-slate-50 dark:bg-[#090611]/80 border border-gray-200 dark:border-[#40285e] p-3 space-y-2.5 flex flex-col justify-between">
                     <div>
                         <div className="flex items-center justify-between gap-2 mb-1.5">
                             <div className="flex items-center gap-2 min-w-0">
@@ -284,7 +284,7 @@ export function SettingsSyncSection({ api, instances }: { api: InstanceSettingsA
                             value={copyProjectsSourceId}
                             onChange={setCopyProjectsSourceId}
                             options={candidateSources}
-                            borderClass="border-gray-200 dark:border-[#15334d]"
+                            borderClass="border-gray-200 dark:border-[#40285e]"
                             focusClass="focus:ring-blue-500"
                         />
                         <div className="flex items-center gap-2">

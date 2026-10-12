@@ -29,15 +29,15 @@ h1, h2, h3, h4, .font-heading {
 
 :root,
 .dark {
-  --awan-blue: #2878f0;
-  --awan-green: #16a97a;
-  --awan-cyan: #19b7c9;
-  --awan-mint: #43d6a2;
-  --awan-dark: #071a27;
-  --awan-card: #0c2438;
-  --awan-border: #15334d;
-  --awan-slate: #5d6b76;
-  --awan-light: #f5faf9;
+  --awan-blue: #7c3aed;
+  --awan-green: #31c9a4;
+  --awan-cyan: #a855f7;
+  --awan-mint: #e879f9;
+  --awan-dark: #090611;
+  --awan-card: #171025;
+  --awan-border: #40285e;
+  --awan-slate: #b8accb;
+  --awan-light: #f5f0ff;
 }
 
 :root {
@@ -47,7 +47,7 @@ h1, h2, h3, h4, .font-heading {
 }
 
 .dark {
-  --surface-hover: color-mix(in srgb, var(--surface, #0e2433) 88%, white);
+  --surface-hover: color-mix(in srgb, var(--surface, #171025) 88%, white);
   --primary-hover: color-mix(in srgb, var(--primary, #38bdf8) 85%, white);
   --border-hover: var(--primary, #38bdf8);
 }
@@ -118,7 +118,7 @@ body,
 .dark html,
 .dark body,
 .dark #root {
-  background-color: var(--app-bg, #071a27);
+  background-color: var(--app-bg, #090611);
   color: var(--fg, #e5e7eb);
 }
 
@@ -127,7 +127,7 @@ body,
   background-color: var(--app-surface, #ffffff);
 }
 .dark .theme-surface {
-  background-color: var(--app-surface, #0e2433);
+  background-color: var(--app-surface, #171025);
 }
 
 /* 全局样式 */
@@ -447,8 +447,8 @@ html.palette-vscode-navy-gold {
 
 html[class*="palette-"] .dark\:bg-base-100,
 html[class*="palette-"] .dark\:bg-base-200,
-html[class*="palette-"] .dark\:bg-\[\#0c2438\],
-html[class*="palette-"] .dark\:bg-\[\#071a27\],
+html[class*="palette-"] .dark\:bg-\[\#171025\],
+html[class*="palette-"] .dark\:bg-\[\#090611\],
 html[class*="palette-"] .dark\:bg-\[\#0a1e30\],
 html[class*="palette-"] .dark\:bg-\[\#081826\] {
   background-color: var(--surface) !important;
