@@ -5,6 +5,17 @@ import type { AgmConversationNode } from './types';
 import { formatSeqBadge, stripImagesFromPrompt } from './formatters';
 import { classifyPromptTier } from './tierClassification';
 import { isGhostConversation } from './conversationGuards';
+import { persistClientCrash } from '../../../lib/error-listener';
+import { useErrorStore } from '../../../stores/error-store';
+
+function reportPromptActionError(err: unknown, source: string): void {
+    persistClientCrash(err, source);
+    const errorObj = err instanceof Error ? err : new Error(String(err));
+    useErrorStore.getState().captureException(errorObj, {
+        source,
+        triggerAction: source,
+    });
+}
 
 export interface DetailHeaderProps {
     selectedConversation: AgmConversationNode;
@@ -207,7 +218,11 @@ export function DetailHeader(props: DetailHeaderProps) {
                         {/* Primary Send Button with <kbd>N</kbd> */}
                         <button
                             type="button"
-                            onClick={onResend}
+                            onClick={() => {
+                                void Promise.resolve(onResend()).catch((err) => {
+                                    reportPromptActionError(err, 'DetailHeader.onResend');
+                                });
+                            }}
                             disabled={isResending}
                             className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
                             title="Immediately inject prompt to running instance (Hotkey: N)"
@@ -237,7 +252,9 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        onEnqueue();
+                                        void Promise.resolve(onEnqueue()).catch((err) => {
+                                            reportPromptActionError(err, 'DetailHeader.onEnqueue');
+                                        });
                                         setIsActionMenuOpen(false);
                                     }}
                                     disabled={isEnqueueing}

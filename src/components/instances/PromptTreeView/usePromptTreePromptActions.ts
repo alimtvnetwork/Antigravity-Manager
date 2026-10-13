@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import {
     focusOrLaunchInstance,
     focusInstanceWorkspace,
+    enqueuePrompt,
     sendPromptNow,
 } from '../../../services/instanceService';
 import { copyToClipboard } from '../../../utils/clipboard';
@@ -242,7 +242,6 @@ export function usePromptTreePromptActions({
             } catch (sendErr) {
                 dispatchErr = sendErr;
                 persistClientCrash(sendErr, 'PromptTreeViewModal.handleSend');
-                console.warn('sendPromptNow error', sendErr);
             }
 
             // 2. Copy prompt content to clipboard so user can paste immediately (manual fallback).
@@ -268,10 +267,6 @@ export function usePromptTreePromptActions({
                 setTimeout(() => setActionMsg(null), 3000);
             } else {
                 const errorObj = dispatchErr instanceof Error ? dispatchErr : new Error(String(dispatchErr) || 'dispatch rejected');
-                useErrorStore.getState().captureException(errorObj, {
-                    source: 'PromptTreeViewModal.handleResendPrompt',
-                    triggerAction: 'send_prompt_now',
-                });
                 setError(`Send failed: ${errorObj.message} — prompt copied to clipboard; paste it into the IDE manually.`);
             }
         } catch (err: unknown) {
@@ -368,25 +363,13 @@ ${activePromptText}
             const repoPath = selectedProject?.repo_path || '';
             const targetInstId = selectedProject?.instance_id || instanceId || 'default';
             const targetConvId = conversationTargetMode === 'new' ? undefined : selectedConversation.conversation_id;
-            // Single invoke against the registered backend command. Previous
-            // nested fallbacks (re-invoke + disconnected resume-file write)
-            // masked real failures while still reporting success.
-            await invoke('enqueue_prompt', {
-                instanceId: targetInstId,
-                repoPath,
-                promptContent,
-                conversationId: targetConvId,
-            });
+            await enqueuePrompt(targetInstId, repoPath, promptContent, targetConvId);
 
             setActionMsg('Prompt enqueued into FIFO scheduler queue!');
             setTimeout(() => setActionMsg(null), 3500);
         } catch (err: unknown) {
             const errorObj = err instanceof Error ? err : new Error(String(err) || 'Failed to enqueue prompt');
             persistClientCrash(errorObj, 'PromptTreeViewModal.handleEnqueuePrompt');
-            useErrorStore.getState().captureException(errorObj, {
-                source: 'PromptTreeViewModal.handleEnqueuePrompt',
-                triggerAction: 'enqueue_prompt',
-            });
             setError(`Queue failed: ${errorObj.message}`);
         } finally {
             setIsEnqueueing(false);

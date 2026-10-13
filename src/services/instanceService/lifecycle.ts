@@ -56,13 +56,12 @@ export async function sendPromptNow(
     try {
         return await invoke('send_prompt_now', { instanceId, repoPath, promptContent, conversationId });
     } catch (e: any) {
-        const captured = useErrorStore.getState().captureError(e, {
+        useErrorStore.getState().captureError(e, {
             source: 'instanceService.sendPromptNow',
             endpoint: 'send_prompt_now',
             triggerAction: 'send_prompt_now',
             context: { instanceId, repoPath },
         });
-        useErrorStore.getState().openErrorModal(captured);
         throw e;
     }
 }
@@ -76,13 +75,12 @@ export async function enqueuePrompt(
     try {
         return await invoke('enqueue_prompt', { instanceId, repoPath, promptContent, conversationId });
     } catch (e: any) {
-        const captured = useErrorStore.getState().captureError(e, {
+        useErrorStore.getState().captureError(e, {
             source: 'instanceService.enqueuePrompt',
             endpoint: 'enqueue_prompt',
             triggerAction: 'enqueue_prompt',
             context: { instanceId, repoPath },
         });
-        useErrorStore.getState().openErrorModal(captured);
         throw e;
     }
 }

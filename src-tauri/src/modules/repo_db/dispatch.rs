@@ -98,7 +98,10 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
         let already_dispatched = if prompt.status == "backed_up" {
             false
         } else {
-            let mut cache = get_dispatched_prompts_cache().lock().unwrap();
+            let mut cache = match get_dispatched_prompts_cache().lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            };
             let seen = cache.contains(&prompt.id) || cache.contains(&sig);
             if !seen {
                 cache.insert(prompt.id.clone());

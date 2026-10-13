@@ -154,7 +154,10 @@ pub fn auto_resume_recent_prompts(
 
         let sig = format!("{}:{}", project.repo_path, prompt_text.trim());
         let already_dispatched = {
-            let mut cache = get_dispatched_prompts_cache().lock().unwrap();
+            let mut cache = match get_dispatched_prompts_cache().lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            };
             let seen = cache.contains(&prompt_id) || cache.contains(&sig);
             if !seen {
                 cache.insert(prompt_id.clone());

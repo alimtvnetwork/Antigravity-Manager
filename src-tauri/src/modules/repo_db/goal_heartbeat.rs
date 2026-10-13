@@ -288,7 +288,10 @@ pub fn stop_prompt_goal_workers_for_instance(instance_id: &str, data_dir: &str) 
     );
 
     {
-        let mut workers = get_active_agy_workers().lock().unwrap();
+        let mut workers = match get_active_agy_workers().lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         let inst_prefix = format!("{}:", instance_id);
         workers.retain(|k, _| !k.starts_with(&inst_prefix));
     }
