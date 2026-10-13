@@ -313,6 +313,7 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
                         chat_id,
                         &reply,
                         reply_markup_opt,
+                        false,
                     )
                     .await,
                     "send_telegram_message_with_markup",
@@ -461,6 +462,7 @@ pub fn start_telegram_daemon() {
                                                                 chat_id,
                                                                 &reply,
                                                                 markup_opt,
+                                                                false,
                                                             )
                                                             .await,
                                                             "send callback reply with markup",
@@ -546,6 +548,7 @@ pub fn start_telegram_daemon() {
                                                 chat_id,
                                                 &reply,
                                                 reply_markup_opt,
+                                                false,
                                             )
                                             .await,
                                             "send_telegram_message_with_markup",
