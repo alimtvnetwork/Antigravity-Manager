@@ -88,6 +88,7 @@ Okay. So in most cases, the 4190 has a more stable code. I really appreciate tha
 - [03-progress-bar-and-layout-compacting.md](./subtasks/supabase-connection-and-ui-ux-enhancement/03-progress-bar-and-layout-compacting.md): Quota progress bar terminal green `#1af18d`, exactly 5 slots at 20% intervals, glowing aperture nodes, and right-aligned compacting (`w-36`/`w-44` `ml-auto`).
 - [04-theming-email-masking-and-hover.md](./subtasks/supabase-connection-and-ui-ux-enhancement/04-theming-email-masking-and-hover.md): Theming contrast fixes (no purple-on-purple), email privacy masking via `maskEmail`, and CSS3 hover micro-elevation (`-translate-y-0.5`).
 - [05-prompt-tree-buttons-and-deadlock-fix.md](./subtasks/supabase-connection-and-ui-ux-enhancement/05-prompt-tree-buttons-and-deadlock-fix.md): Prompt tree stability, subprocess clipboard deadlock fix (`take()` / drop stdin before `wait()`), uncaught promise elimination, loading bar, and segmented action capsule.
+- [06-e2e-test-cases-for-ai.md](./subtasks/supabase-connection-and-ui-ux-enhancement/06-e2e-test-cases-for-ai.md): Pending desktop cases for Send, Enqueue, one error modal with a stack, restart replay, quota bar width, update-card green `#1af18d`, and Supabase test. Not yet executed.
 
 ---
 
