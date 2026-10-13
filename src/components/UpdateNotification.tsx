@@ -147,17 +147,17 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
         bg-white/90 dark:bg-[var(--ui-surface-1)]/95
         group
       ">
-        <div className="absolute -top-8 -right-8 w-20 h-20 bg-blue-500/15 rounded-full blur-xl pointer-events-none transition-colors duration-500" />
-        <div className="absolute -bottom-8 -left-8 w-20 h-20 bg-purple-500/15 rounded-full blur-xl pointer-events-none transition-colors duration-500" />
+        <div className="absolute -top-8 -right-8 w-20 h-20 bg-[#1af18d]/20 rounded-full blur-xl pointer-events-none transition-colors duration-500" />
+        <div className="absolute -bottom-8 -left-8 w-20 h-20 bg-[#1af18d]/10 rounded-full blur-xl pointer-events-none transition-colors duration-500" />
 
         <div className="relative z-10">
           <div className="flex items-start justify-between mb-1.5">
             <div className="flex items-center gap-1.5">
-              <div className="p-1 rounded-md bg-gradient-to-br from-blue-500 to-purple-600 shadow-xs">
+              <div className="p-1 rounded-md bg-[#1af18d] shadow-xs">
                 {updateState === 'ready' ? (
-                  <CheckCircle className="w-3 h-3 text-white" />
+                  <CheckCircle className="w-3 h-3 text-slate-950" />
                 ) : (
-                  <Sparkles className="w-3 h-3 text-white" />
+                  <Sparkles className="w-3 h-3 text-slate-950" />
                 )}
               </div>
               <div>
@@ -174,7 +174,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                 </h3>
                 {updateInfo && (
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <p className="text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                    <p className="text-[10px] font-medium text-[#0f8f55] dark:text-[#1af18d]">
                       v{updateInfo.latest_version}
                     </p>
                     {updateInfo.channel === 'beta' && (
@@ -222,7 +222,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
             <div className="mb-2">
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
                 <div
-                  className="bg-gradient-to-r from-blue-500 to-purple-600 h-1.5 rounded-full transition-all duration-300"
+                  className="bg-[#1af18d] h-1.5 rounded-full transition-all duration-300"
                   style={{ width: `${downloadProgress}%` }}
                 />
               </div>
@@ -278,11 +278,11 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                   className="
                     flex-1 group/btn
                     relative overflow-hidden
-                    bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500
-                    disabled:from-blue-400 disabled:to-purple-400 disabled:cursor-not-allowed
-                    text-white font-medium
+                    bg-[#1af18d] hover:bg-[#45f5a8]
+                    disabled:bg-[#1af18d]/50 disabled:cursor-not-allowed
+                    text-slate-950 font-medium
                     py-1 px-2.5 rounded-lg
-                    shadow-xs shadow-blue-500/20
+                    shadow-xs shadow-[#1af18d]/30
                     transition-all duration-300
                     flex items-center justify-center gap-1.5
                     active:scale-[0.98] cursor-pointer text-xs

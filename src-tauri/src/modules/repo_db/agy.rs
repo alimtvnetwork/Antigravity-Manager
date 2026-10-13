@@ -14,6 +14,17 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use uuid::Uuid;
 
+fn truncate_utf8(value: &str, max_bytes: usize) -> &str {
+    if value.len() <= max_bytes {
+        return value;
+    }
+    let mut end = max_bytes;
+    while end > 0 && !value.is_char_boundary(end) {
+        end -= 1;
+    }
+    &value[..end]
+}
+
 /// Helper to spawn `agy` CLI to execute a prompt in a workspace.
 /// Strips prompt envelope wrappers and executes cleanly via -p without failing on GUI trajectory IDs.
 pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
@@ -37,7 +48,10 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
 
     let ws_key = format!("{}:{}", prompt.instance_id, prompt.repo_path);
     {
-        let mut workers = get_active_agy_workers().lock().unwrap();
+        let mut workers = match get_active_agy_workers().lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         if let Some(&existing_pid) = workers.get(&ws_key) {
             let mut sys = sysinfo::System::new();
             let target_pid = sysinfo::Pid::from_u32(existing_pid);
@@ -69,11 +83,7 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
             }
         }
 
-        if clean_prompt.len() <= 24000 {
-            cmd.arg("-p").arg(&clean_prompt);
-        } else {
-            cmd.arg("-p").arg(&clean_prompt[..24000]);
-        }
+        cmd.arg("-p").arg(truncate_utf8(&clean_prompt, 24000));
 
         #[cfg(target_os = "windows")]
         {
@@ -124,7 +134,10 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
             Ok(mut child) => {
                 let child_pid = child.id();
                 {
-                    let mut workers = get_active_agy_workers().lock().unwrap();
+                    let mut workers = match get_active_agy_workers().lock() {
+                        Ok(guard) => guard,
+                        Err(poisoned) => poisoned.into_inner(),
+                    };
                     workers.insert(ws_key.clone(), child_pid);
                 }
                 crate::modules::logger::log_info(&format!(
@@ -141,7 +154,10 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
                         match child.wait() {
                             Ok(status) => {
                                 {
-                                    let mut workers = get_active_agy_workers().lock().unwrap();
+                                    let mut workers = match get_active_agy_workers().lock() {
+                                        Ok(guard) => guard,
+                                        Err(poisoned) => poisoned.into_inner(),
+                                    };
                                     workers.remove(&ws_key_clone);
                                 }
                                 if !status.success() {
@@ -172,7 +188,10 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
                             }
                             Err(e) => {
                                 {
-                                    let mut workers = get_active_agy_workers().lock().unwrap();
+                                    let mut workers = match get_active_agy_workers().lock() {
+                                        Ok(guard) => guard,
+                                        Err(poisoned) => poisoned.into_inner(),
+                                    };
                                     workers.remove(&ws_key_clone);
                                 }
                                 tracing::warn!(

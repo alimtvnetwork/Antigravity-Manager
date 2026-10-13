@@ -7,6 +7,7 @@ import {
 } from '../../../services/instanceService';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
+import { persistClientCrash } from '../../../lib/error-listener';
 import type { AgmConversationNode } from './types';
 import { isGhostConversation } from './conversationGuards';
 import { detectPromptCategory } from './tierClassification';
@@ -240,6 +241,7 @@ export function usePromptTreePromptActions({
                 dispatchOk = true;
             } catch (sendErr) {
                 dispatchErr = sendErr;
+                persistClientCrash(sendErr, 'PromptTreeViewModal.handleSend');
                 console.warn('sendPromptNow error', sendErr);
             }
 
@@ -380,6 +382,7 @@ ${activePromptText}
             setTimeout(() => setActionMsg(null), 3500);
         } catch (err: unknown) {
             const errorObj = err instanceof Error ? err : new Error(String(err) || 'Failed to enqueue prompt');
+            persistClientCrash(errorObj, 'PromptTreeViewModal.handleEnqueuePrompt');
             useErrorStore.getState().captureException(errorObj, {
                 source: 'PromptTreeViewModal.handleEnqueuePrompt',
                 triggerAction: 'enqueue_prompt',

@@ -5,6 +5,38 @@ import {
 
 let isInitialized = false;
 
+const LAST_CLIENT_ERROR_KEY = 'agm.lastClientError';
+
+export function persistClientCrash(err: unknown, source: string): void {
+  try {
+    const errorObj = err instanceof Error ? err : new Error(String(err));
+    const payload = {
+      source,
+      message: errorObj.message,
+      stack: errorObj.stack || '',
+      at: new Date().toISOString(),
+    };
+    localStorage.setItem(LAST_CLIENT_ERROR_KEY, JSON.stringify(payload));
+  } catch (storageError) {
+    useErrorStore.getState().trackWarning(storageError, {
+      source: 'error-listener.persistClientCrash',
+      triggerAction: 'persist_client_crash',
+    });
+  }
+}
+
+function replayPersistedClientError(): void {
+  const raw = localStorage.getItem(LAST_CLIENT_ERROR_KEY);
+  if (!raw) {
+    return;
+  }
+  localStorage.removeItem(LAST_CLIENT_ERROR_KEY);
+  useErrorStore.getState().captureError(new Error(raw), {
+    source: 'persisted-client-crash',
+    triggerAction: 'replay_last_client_error',
+  });
+}
+
 function getElementXPath(element: HTMLElement): string {
   const dataXpath = element.getAttribute('data-xpath');
   if (dataXpath) {
@@ -75,6 +107,7 @@ function handleWindowError(event: ErrorEvent): void {
 
   const err = event.error || new Error(event.message);
 
+  persistClientCrash(err, 'window.onerror');
   useErrorStore.getState().captureError(err, {
     source: 'window.onerror',
     endpoint: event.filename,
@@ -93,6 +126,7 @@ function handleUnhandledRejection(event: PromiseRejectionEvent): void {
     return;
   }
 
+  persistClientCrash(reason, 'window.unhandledrejection');
   useErrorStore.getState().captureError(reason, {
     source: 'window.unhandledrejection',
     triggerAction: 'unhandled_promise_rejection',
@@ -108,6 +142,7 @@ export function initGlobalErrorListeners(): () => void {
   }
 
   isInitialized = true;
+  replayPersistedClientError();
   document.addEventListener('click', handleClickCapture, { capture: true, passive: true });
   window.addEventListener('error', handleWindowError);
   window.addEventListener('unhandledrejection', handleUnhandledRejection);

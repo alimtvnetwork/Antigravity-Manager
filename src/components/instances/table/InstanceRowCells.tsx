@@ -214,36 +214,33 @@ export function ProfileCell({ inst, data, onToggleEmail, onSetActive, onSetDefau
 
 export function QuotaCell({ data }: { data: RowCellData }) {
     return (
-        <td className="px-2 py-1 whitespace-nowrap min-w-[150px] max-w-[190px]">
+        <td className="px-2 py-1 whitespace-nowrap min-w-[280px] w-[34%]">
             {data.percentage !== null || data.weeklyQuota !== null ? (
-                <div className="space-y-1 min-w-[150px] ml-auto">
+                <div className="space-y-1.5 w-full min-w-[240px]">
                     {data.percentage !== null && (
-                        <div className="space-y-0.5">
+                        <div className="space-y-0.5 w-full">
                             <div className="flex items-center justify-between text-[10px] font-mono">
-                                <span className="truncate max-w-[95px] text-slate-600 dark:text-slate-300 font-semibold">
+                                <span className="truncate text-slate-600 dark:text-slate-300 font-semibold">
                                     {data.modelName || 'Primary Model'} (4H)
                                 </span>
                             </div>
-                            <div className="flex justify-end w-full">
-                                <QuotaProgressBar percentage={data.percentage} resetTime={data.modelResetTime} compact />
-                            </div>
+                            <QuotaProgressBar className="w-full" percentage={data.percentage} resetTime={data.modelResetTime} compact />
                         </div>
                     )}
                     {data.weeklyQuota !== null && (
-                        <div className={cn('space-y-0.5', data.percentage !== null && 'pt-1 border-t border-slate-200/50 dark:border-slate-800/50')}>
+                        <div className={cn('space-y-0.5 w-full', data.percentage !== null && 'pt-1 border-t border-slate-200/50 dark:border-slate-800/50')}>
                             <div className="flex items-center justify-between text-[10px] font-mono">
-                                <span className="truncate max-w-[95px] text-slate-500 dark:text-slate-400">
+                                <span className="truncate text-slate-500 dark:text-slate-400">
                                     Weekly Quota
                                 </span>
                             </div>
-                            <div className="flex justify-end w-full">
-                                <QuotaProgressBar
-                                    isWeekly
-                                    percentage={data.weeklyQuota.percentage}
-                                    resetTime={data.weeklyQuota.resetTime}
-                                    compact
-                                />
-                            </div>
+                            <QuotaProgressBar
+                                className="w-full"
+                                isWeekly
+                                percentage={data.weeklyQuota.percentage}
+                                resetTime={data.weeklyQuota.resetTime}
+                                compact
+                            />
                         </div>
                     )}
                 </div>

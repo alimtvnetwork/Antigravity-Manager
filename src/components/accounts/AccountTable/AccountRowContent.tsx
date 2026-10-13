@@ -223,15 +223,14 @@ export function AccountRowContent(props: AccountRowContentProps) {
                         </button>
                     </div>
                 ) : (
-                    <div className="flex justify-end w-full">
-                        <QuotaProgressBar
-                            compact
-                            percentage={fourHourModel?.percentage ?? 0}
-                            resetTime={fourHourModel?.resetTime}
-                            isProtected={fourHourModel?.isProtected}
-                            liveLimit={fourHourModel?.liveLimit}
-                        />
-                    </div>
+                    <QuotaProgressBar
+                        className="w-full"
+                        compact
+                        percentage={fourHourModel?.percentage ?? 0}
+                        resetTime={fourHourModel?.resetTime}
+                        isProtected={fourHourModel?.isProtected}
+                        liveLimit={fourHourModel?.liveLimit}
+                    />
                 )}
             </td>
 
@@ -239,14 +238,13 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <span className="text-[10px] text-gray-400 italic">--</span>
                 ) : (
-                    <div className="flex justify-end w-full">
-                        <QuotaProgressBar
-                            compact
-                            isWeekly
-                            percentage={weeklyCell.percentage}
-                            resetTime={weeklyCell.resetTime}
-                        />
-                    </div>
+                    <QuotaProgressBar
+                        className="w-full"
+                        compact
+                        isWeekly
+                        percentage={weeklyCell.percentage}
+                        resetTime={weeklyCell.resetTime}
+                    />
                 )}
             </td>
 

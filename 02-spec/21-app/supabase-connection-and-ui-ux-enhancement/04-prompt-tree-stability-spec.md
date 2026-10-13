@@ -274,3 +274,9 @@ All changes introduced by this specification must strictly preserve core archite
 - [ ] Sleek 2px horizontal progress bar renders during `isLoading` in `PromptTreeViewModal.tsx`.
 - [ ] Action buttons in `DetailHeader.tsx` are consolidated into a right-aligned segmented pill capsule.
 - [ ] Existing v4.190.0 automated test gates continue to pass without regression.
+
+## 8. Send and enqueue must not kill the window
+
+`send_prompt_now` and `enqueue_prompt` in `src-tauri/src/commands/instance.rs` run the external agy and clipboard work inside `catch_unwind`. A panic returns an error string that includes `Backtrace::force_capture` instead of tearing down the webview. The frontend stores that error in `localStorage` key `agm.lastClientError` and replays it on the next launch.
+
+Instance quota bars in `src/components/instances/table/InstanceRowCells.tsx` fill a column at least 280px wide. The track keeps `min-w-[140px]`. The healthy stop stays `#1af18d`. The update card in `src/components/UpdateNotification.tsx` uses the same green.

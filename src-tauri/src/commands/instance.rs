@@ -295,6 +295,35 @@ pub fn resume_recent_project_prompts(
     crate::modules::repo_db::auto_resume_recent_prompts(&inst_id, max_age)
 }
 
+fn panic_payload_text(payload: &Box<dyn std::any::Any + Send>) -> String {
+    if let Some(text) = payload.downcast_ref::<String>() {
+        return text.clone();
+    }
+    if let Some(text) = payload.downcast_ref::<&str>() {
+        return (*text).to_string();
+    }
+    "unknown panic payload".to_string()
+}
+
+fn prompt_task_error(label: &str, payload: Box<dyn std::any::Any + Send>) -> String {
+    let detail = panic_payload_text(&payload);
+    let trace = std::backtrace::Backtrace::force_capture();
+    let message = format!("{label} panicked: {detail}\n{trace}");
+    tracing::error!(target: "instance", "{message}");
+    message
+}
+
+fn run_caught_prompt_task<F>(label: &str, task: F) -> Result<crate::modules::repo_db::ActivePrompt, String>
+where
+    F: FnOnce() -> Result<crate::modules::repo_db::ActivePrompt, String> + Send,
+{
+    let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(task));
+    match caught {
+        Ok(result) => result,
+        Err(payload) => Err(prompt_task_error(label, payload)),
+    }
+}
+
 #[tauri::command]
 pub async fn send_prompt_now(
     instance_id: String,
@@ -304,15 +333,17 @@ pub async fn send_prompt_now(
 ) -> Result<crate::modules::repo_db::ActivePrompt, String> {
     let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
     tokio::task::spawn_blocking(move || {
-        crate::modules::repo_db::send_prompt_now_for_instance(
-            &resolved_id,
-            &repo_path,
-            &prompt_content,
-            conversation_id.as_deref(),
-        )
+        run_caught_prompt_task("send_prompt_now", move || {
+            crate::modules::repo_db::send_prompt_now_for_instance(
+                &resolved_id,
+                &repo_path,
+                &prompt_content,
+                conversation_id.as_deref(),
+            )
+        })
     })
     .await
-    .map_err(|e| format!("Task execution failed: {}", e))?
+    .map_err(|e| format!("send_prompt_now task failed: {e}"))?
 }
 
 #[tauri::command]
@@ -325,15 +356,17 @@ pub async fn enqueue_prompt(
 ) -> Result<crate::modules::repo_db::ActivePrompt, String> {
     let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
     tokio::task::spawn_blocking(move || {
-        crate::modules::repo_db::enqueue_prompt_for_instance(
-            &resolved_id,
-            &repo_path,
-            &prompt_content,
-            conversation_id.as_deref(),
-        )
+        run_caught_prompt_task("enqueue_prompt", move || {
+            crate::modules::repo_db::enqueue_prompt_for_instance(
+                &resolved_id,
+                &repo_path,
+                &prompt_content,
+                conversation_id.as_deref(),
+            )
+        })
     })
     .await
-    .map_err(|e| format!("Task execution failed: {}", e))?
+    .map_err(|e| format!("enqueue_prompt task failed: {e}"))?
 }
 
 #[tauri::command]

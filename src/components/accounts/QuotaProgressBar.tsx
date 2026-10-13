@@ -89,7 +89,7 @@ export function QuotaProgressBar({
             {/* Progress Bar Track — the 8-stop scale gradient spans the FULL track
                 width; a mask reveals only the filled percentage. The gradient is
                 never stretched into a partial fill. */}
-            <div className="relative flex-1 min-w-0 flex items-center">
+            <div className="relative flex-1 min-w-[140px] flex items-center">
                 <div
                     className={cn(
                         "relative w-full rounded-full overflow-hidden bg-slate-200 dark:bg-[var(--ui-quota-track)] border border-slate-300 dark:border-[var(--ui-quota-track-border)] transition-shadow duration-300",
