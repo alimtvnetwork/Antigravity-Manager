@@ -313,7 +313,10 @@ fn prompt_task_error(label: &str, payload: Box<dyn std::any::Any + Send>) -> Str
     message
 }
 
-fn run_caught_prompt_task<F>(label: &str, task: F) -> Result<crate::modules::repo_db::ActivePrompt, String>
+fn run_caught_prompt_task<F>(
+    label: &str,
+    task: F,
+) -> Result<crate::modules::repo_db::ActivePrompt, String>
 where
     F: FnOnce() -> Result<crate::modules::repo_db::ActivePrompt, String> + Send,
 {
