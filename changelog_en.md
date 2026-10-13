@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.196.0 (2026-10-13)**:
+        -   **[Accounts UI] Quota Column Layout Fix**:
+            -   **Description**: Fixed the Accounts table quota layout so the 4H Model Quota and Weekly Quota bars expand to fill their columns instead of floating as narrow right-aligned bars with dead space. The 5-slot checkpoint design, `#1af18d` progress green, full-width spatial gradient with mask reveal, and compact bar heights are all preserved; this is a layout-width change only. (Thanks to @aukgit)
+
     *   **v4.195.0 (2026-10-13)**:
         -   **CI/CD Quality Gates & Macro Syntax Remediation**:
             -   **Description**: Resolved duplicate variable declaration and expected assertion syntax in json envelope test suite (`src-tauri/src/modules/json_envelope/tests.rs`), ensuring zero-error Clippy and test compilation across Ubuntu, macOS, and Windows matrix runners. (Thanks to @aukgit)

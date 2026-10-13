@@ -73,7 +73,7 @@ export function QuotaProgressBar({
     const sortedCheckpoints = [...activeCheckpoints].sort((a, b) => b - a);
 
     return (
-        <div className={cn("w-36 sm:w-44 ml-auto flex items-center", compact ? "gap-1" : "gap-2", className)}>
+        <div className={cn("w-full flex items-center", compact ? "gap-1" : "gap-2", className)}>
             {/* Optional Icon / Label on Left */}
             {(Icon || label) && (
                 <div className="flex items-center gap-1 shrink-0 max-w-[18%] min-w-0 text-slate-700 dark:text-slate-300">
