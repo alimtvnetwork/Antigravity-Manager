@@ -223,6 +223,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.197.0 (2026-10-14)**:
+        -   **[CI/CD] Formatting Gate Fix & Dispatch Hardening**:
+            -   **Description**: Restored green CI/CD pipeline checks by resolving the `cargo fmt` signature-formatting discrepancy in `src-tauri/src/commands/instance.rs` across all OS matrix runners; includes instance error-modal deduplication with poisoned prompt-lock prevention and pending AI end-to-end test cases for prompt dispatch. (Thanks to @aukgit).
+
+
     *   **v4.196.0 (2026-10-13)**:
         -   **[Accounts UI] Quota Column Layout Fix**:
             -   **Description**: Fixed the Accounts table quota layout so the 4H Model Quota and Weekly Quota bars expand to fill their columns instead of floating as narrow right-aligned bars with dead space. The 5-slot checkpoint design, `#1af18d` progress green, full-width spatial gradient with mask reveal, and compact bar heights are all preserved; this is a layout-width change only. (Thanks to @aukgit)

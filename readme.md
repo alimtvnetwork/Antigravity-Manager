@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.196.0-3B82F6?style=flat-square" alt="Version v4.196.0">
+    <img src="https://img.shields.io/badge/Version-v4.197.0-3B82F6?style=flat-square" alt="Version v4.197.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -115,7 +115,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.196.0)**
+**Bar 2: Version-Based Installation (v4.197.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -559,6 +559,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
+> Latest version **v4.197.0**: CI/CD Formatting Gate Fix & Dispatch Hardening — Resolved the `cargo fmt` signature-formatting discrepancy in `src-tauri/src/commands/instance.rs`, restoring green pipeline checks across all OS matrix runners; includes instance error-modal deduplication with poisoned prompt-lock prevention and pending AI end-to-end test cases for prompt dispatch. (Thanks to @aukgit)
 > Latest version **v4.196.0**: Accounts Quota Column Layout Fix — Fixed the Accounts table quota layout so the 4H Model Quota and Weekly Quota bars expand to fill their columns instead of floating as narrow right-aligned bars with dead space; 5-slot checkpoints, `#1af18d` progress green, full-width spatial gradient with mask reveal, and compact bar heights preserved — layout-width change only. (Thanks to @aukgit)
 > Latest version **v4.195.0**: CI/CD Quality Gates & Macro Syntax Remediation, Window Manager Error Tracking & Complete Supabase/UI Verification — Resolved duplicate variable declaration and expected assertion syntax in json envelope test suite, restoring green Clippy and test compilation across all OS matrix runners; enforced 'No Silent Errors' error tracking in `windowManager.ts`; verified 100% compliance across all 56 automated tests for Progress Green `#1af18d`, 5-slot quintile progress bars, right-compacted layouts, high-contrast theme typography, email privacy masking, prompt tree action capsules, and secure repo-secrets dynamic endpoint discovery. (Thanks to @aukgit)
 > Latest version **v4.194.0**: Supabase Credentials Eradication & External Vault Isolation, CI/CD Rust Formatting Gate & Unified Test Automation — Complete purge of hardcoded Supabase project tokens and credentials from the tracked codebase, scripts, documentation, and test fixtures; shifted endpoint provisioning to dynamic environment variables (`SUPABASE_ROOT_URL`, `SUPABASE_ROOT_KEY`, `SUPABASE_SECONDARY_URL`, `SUPABASE_SECONDARY_KEY`) and automated Base64 ingestion from `repo-secrets`; added single-liner import script `scripts/import-supabase-credentials.ps1`; resolved `cargo fmt` newline discrepancy in `src-tauri/src/modules/supabase_sync/config_a.rs` restoring green CI/CD pipeline checks; validated via 56 automated tests. (Thanks to @aukgit)
