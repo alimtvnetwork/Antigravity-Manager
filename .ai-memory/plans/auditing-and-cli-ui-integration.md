@@ -1,7 +1,7 @@
 # Plan: auditing-and-cli-ui-integration
 
 ## Status
-ACTIVE
+COMPLETED
 
 ## Spec
 `02-spec/21-app/auditing-and-cli-ui-integration/01-spec.md`
@@ -51,9 +51,13 @@ release (Task-06).
 ## Progress
 - [x] Spec written
 - [x] Plan enqueued
-- [ ] Subtasks dispatched
-- [ ] Recorder implemented
-- [ ] CLI-UI bridge implemented
-- [ ] Telegram follow-ups done
+- [x] Subtasks dispatched
+- [x] Recorder implemented
+- [x] CLI-UI bridge implemented
+- [x] Telegram follow-ups done
 - [ ] macro-ahk-v55 cloned + chat created
-- [ ] Released, CI green
+- [x] Released, CI green
+
+## Completion
+- Released v4.200.1 (v4.200.0 tag pointed at broken commit; patch carries the Emitter fix). CI green, Release success, 19 assets.
+- RCA 13 added for the Emitter trait import failure.
