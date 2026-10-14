@@ -84,7 +84,7 @@ pub fn get_project_conversation_tree_for_instance(
     instance_id: &str,
     repo_filter: Option<&str>,
 ) -> Result<Vec<AgmProjectTreeNode>, String> {
-    let mut tree = get_project_conversation_tree_cached(Some(instance_id), 200, false, true);
+    let mut tree = get_project_conversation_tree_cached(Some(instance_id), 200, false, false);
     if let Some(filter) = repo_filter {
         let f_clean = filter.trim().to_lowercase().replace('\\', "/");
         tree.retain(|p| {

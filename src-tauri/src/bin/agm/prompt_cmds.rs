@@ -35,6 +35,7 @@ pub(crate) fn dispatch_prompt_domain(subcommand: &str, args: &[String]) {
     match subcommand {
         "list" | "ls" => cmd_prompts_list(args),
         "tree" => cmd_prompts_tree(args),
+        "reset-tree" | "reset-db" => cmd_prompts_reset_tree(args),
         "inspect" | "observe" => cmd_prompts_inspect(args),
         "send" | "dispatch" => cmd_prompts_send(args),
         "running" | "wpr" => cmd_prompts_running(args),
@@ -68,6 +69,24 @@ pub(crate) fn cmd_prompts_list(args: &[String]) {
     crate::prompt_mgmt::cmd_prompts(args);
 }
 
+pub(crate) fn cmd_prompts_reset_tree(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let target = ctx.resolve_target_instance().ok();
+    repo_db::invalidate_prompt_tree_cache(target.as_deref());
+    if ctx.json_output {
+        CliEnvelope::ok(
+            "prompts reset-tree",
+            target.clone(),
+            serde_json::json!({ "cleared": true, "instance": target }),
+        )
+        .print_and_exit();
+    }
+    println!(
+        "Prompt tree cache cleared for {}",
+        target.as_deref().unwrap_or("all instances")
+    );
+}
+
 pub(crate) fn cmd_prompts_tree(args: &[String]) {
     let ctx = CliContext::parse(args);
     let target_instance = ctx
@@ -92,6 +111,16 @@ pub(crate) fn cmd_prompts_tree(args: &[String]) {
         CliEnvelope::ok("prompts tree", Some(target_instance), tree).print_and_exit();
     }
     crate::misc_cmds::cmd_tree(args);
+}
+
+pub(crate) fn cmd_prompts_reset_tree(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let target = ctx
+        .resolve_target_instance()
+        .unwrap_or_else(|_| "all".to_string());
+    let scope = if target == "all" { None } else { Some(target.as_str()) };
+    repo_db::invalidate_prompt_tree_cache(scope);
+    println!("prompt tree cache cleared for {target}");
 }
 
 pub(crate) fn cmd_prompts_inspect(args: &[String]) {

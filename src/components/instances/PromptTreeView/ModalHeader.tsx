@@ -26,6 +26,7 @@ export interface ModalHeaderProps {
     onRestore: () => void;
     onFileRestore: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onRefreshAll: () => void;
+    onResetTree: () => void;
 }
 
 const SYNC_INTERVALS: { value: SyncInterval; label: string }[] = [
@@ -52,6 +53,7 @@ export function ModalHeader(props: ModalHeaderProps) {
         onRestore,
         onFileRestore,
         onRefreshAll,
+        onResetTree,
     } = props;
 
     return (
@@ -112,6 +114,16 @@ export function ModalHeader(props: ModalHeaderProps) {
                     >
                         <Upload className="w-3.5 h-3.5 text-emerald-500" />
                         <span>Restore</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={onResetTree}
+                        disabled={isLoading}
+                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                        title="Clear the prompt tree cache and reload. Running and queued prompts stay."
+                    >
+                        <span>Reset</span>
                     </button>
 
                     {/* Refresh Button */}

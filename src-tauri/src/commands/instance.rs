@@ -468,22 +468,32 @@ pub async fn get_project_conversation_tree(
     force: Option<bool>,
 ) -> Result<Vec<crate::modules::repo_db::AgmProjectTreeNode>, String> {
     tokio::task::spawn_blocking(move || {
-        Ok(
+        let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             crate::modules::repo_db::get_project_conversation_tree_cached(
                 instance_id.as_deref(),
                 max_words.unwrap_or(200),
                 only_running.unwrap_or(false),
                 force.unwrap_or(false),
-            ),
-        )
+            )
+        }));
+        match caught {
+            Ok(nodes) => Ok(nodes),
+            Err(payload) => Err(prompt_task_error("get_project_conversation_tree", payload)),
+        }
     })
     .await
-    .map_err(|e| {
-        format!(
-            "Failed to compute conversation tree in blocking task: {}",
-            e
-        )
-    })?
+    .map_err(|e| format!("get_project_conversation_tree task failed: {e}"))?
+}
+
+#[tauri::command]
+pub fn reset_prompt_tree_cache(instance_id: Option<String>) -> Result<String, String> {
+    crate::modules::repo_db::invalidate_prompt_tree_cache(instance_id.as_deref());
+    tracing::info!(
+        target: "prompt_tree",
+        instance_id = instance_id.as_deref().unwrap_or("all"),
+        "reset prompt tree cache"
+    );
+    Ok("prompt tree cache cleared".to_string())
 }
 
 #[tauri::command]

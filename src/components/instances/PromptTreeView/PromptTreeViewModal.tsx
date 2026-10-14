@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, Component, type ErrorInfo, type ReactNode } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { createPortal } from 'react-dom';
 import { AlertTriangle } from 'lucide-react';
 import { useErrorStore } from '../../../stores/error-store';
@@ -485,6 +486,18 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                     onRestore={coreActions.handleRestore}
                     onFileRestore={coreActions.handleFileRestore}
                     onRefreshAll={() => loadTree(true, true)}
+                    onResetTree={() => {
+                        void invoke('reset_prompt_tree_cache', { instanceId: instanceId || null })
+                            .catch((err) => {
+                                useErrorStore.getState().captureException(
+                                    err instanceof Error ? err : new Error(String(err)),
+                                    { source: 'PromptTreeViewModal.onResetTree', triggerAction: 'reset_prompt_tree_cache' }
+                                );
+                            })
+                            .finally(() => {
+                                loadTree(true, true);
+                            });
+                    }}
                 />
 
                 {/* Top Indeterminate Progress Bar */}

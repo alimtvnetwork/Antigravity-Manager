@@ -205,7 +205,7 @@ pub(crate) fn init_tables(conn: &Connection) -> Result<(), String> {
         match purge_corrupted_running_projects(conn) {
             Ok((del_proj, del_cache)) => {
                 crate::modules::logger::log_info(&format!(
-                    "[RepoDB] Startup purge executed: {} polluted running_projects rows deleted, {} prompt_tree_cache rows wiped",
+                    "[RepoDB] Startup purge executed: {} polluted running_projects rows deleted, prompt_tree_cache kept ({})",
                     del_proj, del_cache
                 ));
             }
@@ -220,7 +220,7 @@ pub(crate) fn init_tables(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
-/// Purge corrupted and un-namespaced running_projects rows and clear stale prompt tree cache
+/// Purge corrupted and un-namespaced running_projects rows. Prompt tree cache is left in place.
 pub fn purge_corrupted_running_projects(conn: &Connection) -> Result<(usize, usize), String> {
     // Justification: best effort foreign keys pragma toggle during startup purge
     crate::error::record_ignored(
@@ -266,11 +266,9 @@ pub fn purge_corrupted_running_projects(conn: &Connection) -> Result<(usize, usi
     conn.execute("UPDATE running_projects SET is_running = 0", [])
         .map_err(|e| format!("Failed to reset running flags during purge: {}", e))?;
 
-    let deleted_cache = conn
-        .execute("DELETE FROM prompt_tree_cache", [])
-        .map_err(|e| format!("Failed to wipe prompt_tree_cache: {}", e))?;
-
-    Ok((deleted_projects, deleted_cache))
+    // Keep prompt_tree_cache. TTL in get_project_conversation_tree_cached decides freshness.
+    // Wiping it here made every process start rescan every workspace.
+    Ok((deleted_projects, 0))
 }
 
 #[cfg(test)]
