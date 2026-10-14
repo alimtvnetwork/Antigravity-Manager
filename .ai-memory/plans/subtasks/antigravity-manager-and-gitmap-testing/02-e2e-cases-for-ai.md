@@ -62,7 +62,14 @@ Save one screenshot of the tree after Case 05. The header must show Backup, Rest
 ## Result block
 
 ```text
-CLI instances: PASS exit 0. Two profiles, both Idle. Default and Default Copy.
+CLI instances: PASS on local agm v4.197.1. Default is Running. Default Copy is Idle.
+Local binary: same binary as the tree timings (commit 699ef49b). No source change after that build, so it was not recompiled.
+Default Copy tree: 0.70s, log says prompt_tree_cache kept.
+Enqueue on that binary: PASS. queued-25cf7b9a, queue_position 1, fifo_ordered true, version 4.197.1.
+Earlier send p-b5834e4b is now completed. queued-f669d8d6 is still queued.
+Backup on that binary: PASS for default, version 4.197.1.
+Restore on that binary: started and produced no JSON within 78 seconds while Default was running. Not a pass.
+Threshold on that binary: set to 98.0% then restored. Status now reads 15.0%.
 CLI tree: PASS on the locally compiled debug binary agm v4.197.1. First load 1.54s and the log says prompt_tree_cache kept. Second load 0.23s. After reset-tree the next load was 1.46s. The installed 4.197.0 binary still wiped the cache in 1.97s.
 CLI reset: PASS on the locally compiled agm v4.197.1. `agm prompts reset-tree --instance default` printed `Prompt tree cache cleared for default`. The following tree load scanned again (1.46s) and the load before reset did not (0.23s, zero liveness probes).
 CLI send: PASS. Prompt p-b5834e4b status running on default. Antigravity.exe started.
