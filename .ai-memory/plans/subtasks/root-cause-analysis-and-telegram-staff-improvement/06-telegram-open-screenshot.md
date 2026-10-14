@@ -1,7 +1,7 @@
 # Task-06: Telegram — `/open` and `/screenshot` commands
 
 ## Status
-PENDING
+DONE
 
 ## Objective
 Implement two new Telegram bot commands in

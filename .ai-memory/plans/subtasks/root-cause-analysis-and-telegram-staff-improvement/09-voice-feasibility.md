@@ -1,7 +1,7 @@
 # Task-09: Voice command feasibility note (analysis only)
 
 ## Status
-PENDING
+DONE
 
 ## Objective
 Write a feasibility analysis for Telegram voice → prompt dispatch. NO CODE.

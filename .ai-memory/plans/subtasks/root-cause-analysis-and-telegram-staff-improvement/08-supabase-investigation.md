@@ -1,7 +1,7 @@
 # Task-08: Supabase investigation + RCA
 
 ## Status
-PENDING
+DONE
 
 ## Objective
 Reproduce the reported Supabase failure, find its root cause, document it

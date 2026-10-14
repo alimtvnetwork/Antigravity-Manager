@@ -8,12 +8,59 @@ use std::path::PathBuf;
 
 use super::*;
 
+/// Handle `send:*` inline-keyboard callbacks for the `/send` two-step flow.
+/// Returns true when the callback belonged to the flow (caller should `continue`).
+async fn deliver_send_flow_callback(
+    token: &str,
+    chat_id: i64,
+    cb_id: &str,
+    data: &str,
+    client: &reqwest::Client,
+) -> bool {
+    if !data.starts_with("send:") {
+        return false;
+    }
+    let (reply, markup) = super::send_flow::handle_send_callback(chat_id, data).await;
+    // Justification: the picker reply is already computed and flow state is
+    // updated; a Telegram send failure is logged without changing the flow.
+    crate::error::record_ignored(
+        send_telegram_message_with_markup(token, chat_id, &reply, markup, false).await,
+        "send /send picker reply",
+    );
+    if !cb_id.is_empty() {
+        let ans_url = format!("https://api.telegram.org/bot{}/answerCallbackQuery", token);
+        // Justification: best-effort send; failure logged without changing control flow
+        crate::error::record_ignored(
+            client
+                .post(&ans_url)
+                .json(&json!({ "callback_query_id": cb_id }))
+                .send()
+                .await,
+            "answerCallbackQuery",
+        );
+    }
+    true
+}
+
 async fn deliver_ui_or_command(
     token: &str,
     chat_id: i64,
     text_raw: &str,
     saved_media_opt: &Option<(PathBuf, Option<String>)>,
 ) -> Option<String> {
+    // `/send` two-step flow: once the destination is locked, the next plain-text
+    // message is the prompt. Commands (leading `/`) always pass through.
+    if let Some(send) = super::send_flow::consume_send_prompt(token, chat_id, text_raw).await {
+        // Justification: the send-flow reply is already computed; a Telegram
+        // send failure is logged and does not change the dispatched prompt.
+        crate::error::record_ignored(
+            send_telegram_message_with_markup(token, chat_id, &send.reply, send.markup, false)
+                .await,
+            "send /send flow reply",
+        );
+        return Some(send.reply);
+    }
+
     if let Some(action) = super::ui_remote::prepare_local_ui_action(text_raw).await {
         if let Some(png) = action.png.as_deref() {
             if let Err(err) = send_telegram_photo(token, chat_id, png, &action.caption, None).await
@@ -152,6 +199,13 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
             ]
         })),
         "help" | "start" => Some(super::ui_remote::help_copy_markup()),
+        "send" => {
+            if rest.trim().eq_ignore_ascii_case("cancel") {
+                None
+            } else {
+                Some(super::send_flow::send_entry_markup())
+            }
+        }
         "ping" => Some(json!({
             "inline_keyboard": [
                 [
@@ -253,6 +307,11 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
                 let data = cb["data"].as_str().unwrap_or("").trim();
 
                 if chat_id != 0 && !data.is_empty() {
+                    if deliver_send_flow_callback(&clean_token, chat_id, cb_id, data, &client).await
+                    {
+                        continue;
+                    }
+
                     if config.allowed_chat_id.is_none() {
                         config.allowed_chat_id = Some(chat_id);
                         config.is_enabled = true;
@@ -449,6 +508,18 @@ pub fn start_telegram_daemon() {
                                         let data = cb["data"].as_str().unwrap_or("").trim();
 
                                         if chat_id != 0 && !data.is_empty() {
+                                            if deliver_send_flow_callback(
+                                                &clean_token,
+                                                chat_id,
+                                                cb_id,
+                                                data,
+                                                &http_client,
+                                            )
+                                            .await
+                                            {
+                                                continue;
+                                            }
+
                                             if config.allowed_chat_id.is_none() {
                                                 let mut mutable_config = config.clone();
                                                 mutable_config.allowed_chat_id = Some(chat_id);

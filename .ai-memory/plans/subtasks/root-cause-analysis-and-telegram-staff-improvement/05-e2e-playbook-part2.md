@@ -1,7 +1,7 @@
 # Task-05: E2E playbook — prompt flows + master checklist
 
 ## Status
-PENDING
+DONE
 
 ## Objective
 Write `.ai-memory/e2e-playbook/03-prompt-preview.md`,

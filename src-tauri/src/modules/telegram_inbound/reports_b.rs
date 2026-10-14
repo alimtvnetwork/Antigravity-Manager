@@ -217,7 +217,9 @@ pub fn format_prompts_query_report(term: &str) -> String {
     out
 }
 
-/// Format comprehensive Telegram command manual
+/// Format the colorful grouped Telegram command manual (HTML parse mode).
+/// Every command is shown in a tap-to-copy <code> block, and the message
+/// carries native copy-text inline buttons for the essentials.
 pub fn format_help_manual() -> String {
     let ver = git_info::get_app_version();
     let hash = git_info::get_git_hash();
@@ -225,76 +227,68 @@ pub fn format_help_manual() -> String {
     let last_rel = git_info::get_last_release();
 
     format!(
-        "🤖 <b>AGM v{} Telegram Remote Manual</b>\n\
+        "🤖 <b>AGM v{} — Telegram Command Center</b>\n\
         <code>v{} | commit {} | branch {} | release {}</code>\n\
-        {}\n\
-        📌 <b>Core Telemetry &amp; Dual-Sequence Tree View (AGM + GitMap):</b>\n\
-        • <code>/help</code> or <code>/start</code> — Display this full interactive command manual\n\
-        • <code>/fleet</code> or <code>/whoami</code> — Standalone Machine, Instance &amp; Bound Account identity card (No Supabase required)\n\
-        • <code>/instances</code> — List all instance profiles on this machine and live process states\n\
-        • <code>/accounts</code> — List all registered accounts, subscription tiers &amp; quota headroom\n\
-        • <code>/ping</code> — Check node connectivity, IP, Git build &amp; uptime\n\
-        • <code>/tree</code> — Running Project → Conversation → [≤200w Prompt] tree (<code>[AGM:P001 | GM:#1]</code>, <code>[AGM:C001 | GM:&lt;cid&gt;]</code>)\n\
-        • <code>/tree all</code> — Full tree of all workspaces &amp; conversations across all instances\n\
-        • <code>/active</code> or <code>/running</code> — Active running prompts + Dual-Sequence Tree View\n\
-        • <code>/status</code> or <code>/observe</code> — Live workspaces, active account quota &amp; prompts\n\
-        • <code>/query &lt;term&gt;</code> or <code>/prompts query</code> — Search SQLite cached prompts (≥200w preview)\n\
-        • <code>/expand &lt;id&gt;</code> — View full untruncated prompt instructions\n\
-        • <code>/snapshot</code> — Multi-node cluster status snapshot\n\
-        • <code>/projects</code> — List registered workspaces, AGM/GitMap Seq IDs &amp; sample syntax\n\
-        • <code>/queues</code> — Inspect pending workspace prompt queues\n\n\
-        🎯 <b>Prompt Injection (By Dual Seq ID, Instance &amp; Remote Machine):</b>\n\
-        • <code>/prompt C001 Is it done?</code> — Target specific conversation sequence <code>C001</code> (or <code>GM:&lt;cid&gt;</code>)\n\
-        • <code>/prompt P001 Run cargo clippy</code> — Target project sequence <code>P001</code> (or <code>GM:#1</code>)\n\
-        • <code>/prompt C001 --instance #2 Check status</code> — Target specific instance (<code>#1</code>, <code>#2</code>, <code>default</code>) &amp; conv\n\
-        • <code>/prompt C001 --instance #2 --node worker-1 Fix test</code> — Target remote machine + instance + conv\n\
-        • <code>/prompts</code> — List reusable prompt templates (<code>read-all</code>, <code>is-done</code>, <code>ci-cd-fix</code>)\n\
-        • <code>/agy prompt -n read-all -t \"Read memory and continue\"</code> — Dispatch template via GitMap AGY\n\
-        • <code>/agy prompt -n is-done -t \"Verify if all tasks are complete\"</code> — Dispatch verification prompt\n\
-        • <code>/agy prompt-project P001 -n is-done -t \"Check build\"</code> — Target specific project with template\n\
-        • <code>/agy prompt-txt \"Quick hotfix instruction\"</code> — Dispatch direct raw prompt text\n\
-        • <code>/agy prompt ls</code> — List all prompt templates in formatted table\n\
-        • <code>/agy fpug</code> — Loop projects until prompt queues clear &amp; CI/CD green\n\
-        • <code>/agy sug</code> — Monitor projects &amp; trigger OS shutdown when green\n\
-        • <code>/agy rerun 1</code> — Restart IDE &amp; replay prompt + media + queued checks\n\n\
-        🎒 <b>AGY Running Storage Backup &amp; Restore:</b>\n\
-        • <code>/backup</code> or <code>/backpack</code> — Snapshot running prompts to AGM split SQLite DB\n\
-        • <code>/backup ls</code> — List saved AGM prompt backup batches\n\
-        • <code>/restore</code> — Restore &amp; resume backed-up AGM prompts\n\
-        • <code>/gitmap backup-running-prompts</code> — GitMap snapshot of active AGY storage prompts\n\
-        • <code>/gitmap restore-running-prompts</code> — GitMap restore &amp; re-inject backed-up prompts\n\
-        • <code>/agy running-prompts ls</code> — List live AGY running prompts via GitMap\n\
-        • <code>/agy running-prompts backup</code> — Backup active AGY storage prompts via GitMap\n\
-        • <code>/agy running-prompts restore</code> — Restore active AGY storage prompts via GitMap\n\
-        • <code>/agy ccko</code> — Clean runtime cache keeping only 1 conversation\n\
-        • <code>/agy cckf</code> — Clean runtime cache keeping top 5 conversations\n\
-        • <code>/agy cc --keep 10</code> — Clean runtime cache and prune conversation history\n\
-        • <code>/prune [N]</code> or <code>/pr [N]</code> — Safely prune conversations (default: keep 10, guards active prompts &amp; ≥5 sessions)\n\
-        • <code>/clean</code> — Clean application runtime and build caches\n\n\
-        🔄 <b>AGM &amp; GitMap Update Commands:</b>\n\
-        • <code>/update</code> or <code>/update agm</code> — Self-update Antigravity-Manager (delegated updater)\n\
-        • <code>/update gitmap</code> — Update GitMap CLI to latest release (<code>gitmap self-update</code>)\n\
-        • <code>/update all</code> — Concurrently update both AGM and GitMap CLI\n\
-        • <code>/agm update</code> — Run AGM CLI update checker &amp; installer\n\
-        • <code>/gitmap agm update -y</code> — Update AGM via GitMap installer pipeline\n\
-        • <code>/gitmap agm update-all</code> — Distribute AGM update across all SSH nodes\n\
-        • <code>/gitmap ssh update agm</code> — Update AGM across all SSH cluster machines\n\n\
-        🖥️ <b>SSH &amp; Multi-Node Fleet Execution:</b>\n\
-        • <code>/nodes</code> or <code>/ssh nodes</code> — List all registered SSH / cluster VM nodes\n\
-        • <code>/ssh check &lt;node&gt;</code> — Probe connectivity, port 22, and health of remote machine\n\
-        • <code>/ssh &lt;node&gt; &lt;cmd&gt;</code> — Execute command on specific machine via GitMap SSH (e.g. <code>/ssh vm-01 agm status</code>)\n\
-        • <code>/ssh exec \"&lt;cmd&gt;\"</code> — Run command across all remote SSH fleet nodes\n\
-        • <code>/ssh update agm</code> — Update AGM across all remote SSH nodes\n\
-        • <code>/ssh agy active</code> — Run <code>gitmap agy active</code> across remote SSH fleet\n\
-        • <code>/gitmap ssh nodes</code> — Inspect GitMap SSH node inventory &amp; reachability\n\
-        • <code>CMD:&lt;node-alias&gt;:&lt;command&gt;</code> — Direct node command routing\n\n\
-        🧭 <b>GitMap, AGM &amp; Multi-Instance Rotation:</b>\n
-        • <code>/gitmap pe</code> — Check CI/CD pipeline execution status\n\
-        • <code>/agy active</code> or <code>/gitmap agy active</code> — Check Antigravity active prompts via GitMap\n\
-        • <code>/agm tree</code> / <code>/agm wpr</code> / <code>/agm accounts</code> — Run AGM CLI views\n\
-        • <code>/api</code> — Inspect local API proxy (port 8045) &amp; account bindings\n\
-        • <code>/ff</code> — Fast-forward switch to freshest highest-quota account\n\
-        • <code>/email status</code> | <code>/email ping</code> | <code>/email help</code> — Email notifications",
+        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        💡 Every <code>command</code> below is tap-to-copy. Copy buttons for the essentials sit under this message.\n\n\
+        🟢 <b>Send prompts</b>\n\
+        • <code>/send</code> — Guided send: pick machine → instance → conversation, then type the prompt. The destination is always explicit, never guessed\n\
+        • <code>/prompt C001 Is it done?</code> — Inject into a conversation (<code>C001</code>, <code>P001</code>, <code>GM:#1</code>, <code>GM:&lt;cid&gt;</code>)\n\
+        • <code>/prompt C001 --instance #2 --node W3 Fix it</code> — Target remote machine + instance + conversation\n\
+        • <code>C001 your prompt here</code> — Shorthand: Seq ID + text injects directly\n\
+        • <code>/inject …</code> · <code>/p …</code> · <code>/pt …</code> — Aliases of <code>/prompt</code>\n\
+        • <code>/prompts</code> · <code>/prompt_queue</code> · <code>/templates</code> — Reusable prompt templates (<code>read-all</code>, <code>is-done</code>, <code>ci-cd-fix</code>)\n\
+        • <code>/target default C001</code> — Aim the next plain message at a conversation (<code>/target clear</code> forgets, <code>/where</code> shows the aim)\n\n\
+        🔵 <b>Window &amp; screen</b>\n\
+        • <code>/open</code> — Open AGM on this machine (already running → brought to the foreground)\n\
+        • <code>/open W3</code> — Open AGM on fleet machine <code>W3</code> (SSH, Supabase queue fallback)\n\
+        • <code>/screenshot</code> — Photograph every known machine's screen\n\
+        • <code>/screenshot W3</code> — Photograph one machine (<code>local</code> = this machine)\n\
+        • <code>/ui</code> — Open the manager window here · <code>/shot</code> · <code>/screen</code> — Screenshot this machine\n\n\
+        🟣 <b>Fleet telemetry</b>\n\
+        • <code>/fleet</code> · <code>/whoami</code> — Machine, instance &amp; bound account identity card\n\
+        • <code>/ping</code> — Node connectivity, IP, Git build &amp; uptime\n\
+        • <code>/instances</code> · <code>/inst</code> — Instance profiles &amp; live process states\n\
+        • <code>/accounts</code> · <code>/acc</code> — Registered accounts, tiers &amp; quota headroom\n\
+        • <code>/status</code> · <code>/observe</code> — Live workspaces, active account quota &amp; prompts\n\
+        • <code>/tree</code> — Project → conversation → prompt tree (<code>/tree all</code> for everything)\n\
+        • <code>/active</code> · <code>/running</code> — Running prompts + dual-sequence tree view\n\
+        • <code>/queues</code> · <code>/queue</code> — Pending workspace prompt queues\n\
+        • <code>/query &lt;term&gt;</code> · <code>/search &lt;term&gt;</code> — Search cached prompts (200-word preview)\n\
+        • <code>/expand &lt;id&gt;</code> · <code>/exp &lt;id&gt;</code> — Full untruncated prompt instructions\n\
+        • <code>/projects</code> · <code>/workspaces</code> — Registered workspaces, AGM/GitMap Seq IDs &amp; syntax\n\
+        • <code>/snapshot</code> · <code>/cluster</code> — Multi-node cluster status snapshot\n\
+        • <code>/nodes</code> · <code>/node</code> — SSH / cluster VM nodes (<code>/nodes &lt;alias&gt; prompts</code> inspects a node)\n\n\
+        🟠 <b>Fleet execution</b>\n\
+        • <code>/ssh &lt;node&gt; &lt;cmd&gt;</code> — Run a command on one machine (e.g. <code>/ssh vm-01 agm status</code>)\n\
+        • <code>/ssh check &lt;node&gt;</code> — Probe connectivity &amp; health · <code>/ssh nodes</code> — Node inventory\n\
+        • <code>/ssh exec \"&lt;cmd&gt;\"</code> — Run across all remote SSH fleet nodes\n\
+        • <code>CMD:&lt;node&gt;:&lt;command&gt;</code> — Direct node routing · <code>W3: agm status</code> — Shorthand\n\
+        • <code>/gitmap …</code> · <code>/gm …</code> — Any GitMap CLI (<code>/gitmap pe</code> = pipeline status)\n\
+        • <code>/agm …</code> — Any AGM CLI (<code>/agm tree</code>, <code>/agm wpr</code>, <code>/agm accounts</code>)\n\
+        • <code>/agy active</code> — Antigravity active prompts via GitMap\n\
+        • <code>/agy prompt -n read-all -t \"…\"</code> — Dispatch a prompt template\n\
+        • <code>/agy prompt-project P001 -n is-done -t \"Check build\"</code> — Template at a specific project\n\
+        • <code>/agy prompt-txt \"Quick hotfix\"</code> — Dispatch raw prompt text\n\
+        • <code>/agy prompt ls</code> — List templates · <code>/agy fpug</code> — Loop until queues clear &amp; CI green\n\
+        • <code>/agy sug</code> — Watch &amp; shut down when green · <code>/agy rerun 1</code> — Restart IDE &amp; replay\n\
+        • <code>/api</code> · <code>/proxy</code> — Local API proxy (port 8045) &amp; account bindings\n\n\
+        🟡 <b>Backup &amp; cleanup</b>\n\
+        • <code>/backup</code> · <code>/backpack</code> — Snapshot running prompts (<code>/backup ls</code> lists batches)\n\
+        • <code>/restore</code> — Restore &amp; resume backed-up prompts\n\
+        • <code>/prune [N]</code> · <code>/pr [N]</code> — Prune conversations, keep N (default 10; guards active prompts)\n\
+        • <code>/clean</code> — Clean runtime &amp; build caches\n\
+        • <code>/agy ccko</code> — Keep 1 conversation · <code>/agy cckf</code> — Keep top 5 · <code>/agy cc --keep 10</code> — Prune history\n\
+        • <code>/agy running-prompts ls</code> · <code>backup</code> · <code>restore</code> — AGY storage via GitMap\n\n\
+        🔴 <b>Updates</b>\n\
+        • <code>/update</code> · <code>/update agm</code> · <code>/upgrade</code> — Self-update Antigravity-Manager\n\
+        • <code>/update gitmap</code> — Update GitMap CLI · <code>/update all</code> — Update both\n\
+        • <code>/gitmap ssh update agm</code> — Update AGM across all SSH nodes\n\n\
+        📧 <b>Email</b>\n\
+        • <code>/email status</code> · <code>/email ping</code> · <code>/email help</code> — Vault status, test ping, full guide by email (<code>/mail</code> alias)\n\n\
+        ⚡ <b>Fast tools</b>\n\
+        • <code>/ff</code> · <code>/rotate</code> — Fast-forward to the freshest highest-quota account (prompts preserved)\n\n\
+        <blockquote>🛡️ Prompts are never guessed: <code>/send</code> locks machine → instance → conversation first; <code>/target</code> aims the next plain message at one conversation.</blockquote>",
         clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&hash, 24),

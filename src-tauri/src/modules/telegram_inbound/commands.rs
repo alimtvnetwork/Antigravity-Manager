@@ -280,6 +280,23 @@ pub fn execute_backup_command(args_str: &str) -> String {
     }
 }
 
+/// Handle `/open [machine]` — open the AGM UI on the target machine.
+///
+/// No argument targets this machine; a fleet node alias (see `/nodes`)
+/// dispatches via GitMap Cluster SSH with a Supabase queue fallback.
+pub async fn execute_open_command(args_str: &str) -> String {
+    super::open_shot::execute_open_command(args_str).await
+}
+
+/// Handle `/screenshot [machine]` — capture the target machine's screen and
+/// send the image(s) back to the Telegram chat.
+///
+/// No argument captures every known machine; AGM is opened first when needed.
+/// Returns the confirmation text; photos are sent to the chat directly.
+pub async fn execute_screenshot_command(args_str: &str) -> String {
+    super::open_shot::execute_screenshot_command(args_str).await
+}
+
 /// Execute Email status / ping / help command from Telegram
 pub fn execute_email_command(args_str: &str) -> String {
     let sub = args_str.trim().to_lowercase();

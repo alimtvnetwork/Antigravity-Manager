@@ -41,21 +41,35 @@ pub struct LocalUiAction {
     pub caption: String,
 }
 
+/// Copy-paste affordances for the essentials: every button carries the command
+/// template as native `copy_text`, so the user taps, copies, edits, and sends.
 pub fn help_copy_markup() -> Value {
     json!({
         "inline_keyboard": [
             [
-                { "text": "Copy /ui", "copy_text": { "text": "/ui" } },
-                { "text": "Copy /shot", "copy_text": { "text": "/shot" } }
+                { "text": "📋 /send", "copy_text": { "text": "/send" } },
+                { "text": "📋 /prompt", "copy_text": { "text": "/prompt C001 " } },
+                { "text": "📋 /open", "copy_text": { "text": "/open " } }
             ],
             [
-                { "text": "Copy aim", "copy_text": { "text": "/target default C001" } },
-                { "text": "Copy prompt", "copy_text": { "text": "/prompt C001 --instance default " } }
+                { "text": "📋 /screenshot", "copy_text": { "text": "/screenshot " } },
+                { "text": "📋 /shot", "copy_text": { "text": "/shot" } },
+                { "text": "📋 /ui", "copy_text": { "text": "/ui" } }
             ],
             [
-                { "text": "Fleet", "callback_data": "cmd:fleet" },
-                { "text": "Instances", "callback_data": "cmd:instances" },
-                { "text": "Accounts", "callback_data": "cmd:accounts" }
+                { "text": "📋 /target", "copy_text": { "text": "/target default C001" } },
+                { "text": "📋 /tree", "copy_text": { "text": "/tree" } },
+                { "text": "📋 /fleet", "copy_text": { "text": "/fleet" } }
+            ],
+            [
+                { "text": "📋 /status", "copy_text": { "text": "/status" } },
+                { "text": "📋 /active", "copy_text": { "text": "/active" } },
+                { "text": "📋 /nodes", "copy_text": { "text": "/nodes" } }
+            ],
+            [
+                { "text": "📋 /backup", "copy_text": { "text": "/backup" } },
+                { "text": "📋 /update", "copy_text": { "text": "/update" } },
+                { "text": "📋 /help", "copy_text": { "text": "/help" } }
             ]
         ]
     })
@@ -66,8 +80,9 @@ pub fn window_command_section() -> &'static str {
     🎨 <b>Window, screenshot, and where the next prompt goes</b>\n\
     <blockquote>🔵 <b>This machine.</b> <code>/ui</code> opens Antigravity Manager when it is closed. <code>/shot</code> opens it only if needed, then sends a picture of the current manager window back to this chat. Each machine that runs the manager answers for its own screen.</blockquote>\n\
     <pre>/ui\n/shot\n/target default C001</pre>\n\
-    <blockquote>🟢 Send <code>/target &lt;instance&gt; &lt;C001&gt;</code> first. The next plain message is the prompt and goes to that conversation. <code>/target clear</code> forgets the aim. Tap the copy buttons under <code>/help</code>.</blockquote>\n\
-    <blockquote>🟡 Voice notes stay audio. Telegram does not turn them into text. Type the prompt after <code>/target</code>.</blockquote>\n"
+    <blockquote>🟢 Send <code>/target &lt;instance&gt; &lt;C001&gt;</code> first — the next plain message is the prompt and goes to that conversation. <code>/target clear</code> forgets the aim. For a guided machine → instance → conversation picker with screenshot proof of delivery, use <code>/send</code>.</blockquote>\n\
+    <blockquote>🟡 <code>/open &lt;machine&gt;</code> opens AGM on a fleet machine; <code>/screenshot &lt;machine&gt;</code> photographs it. Bare <code>/open</code> / <code>/screenshot</code> stay local.</blockquote>\n\
+    <blockquote>🟣 Voice notes stay audio. Telegram does not turn them into text. Type the prompt after <code>/target</code> or <code>/send</code>.</blockquote>\n"
 }
 
 /// Handle `/ui`, `/shot`, `/target`, and a follow-up prompt. Other text returns None.
@@ -95,8 +110,10 @@ fn classify_ui_verb(text: &str) -> Option<UiVerb> {
         .unwrap_or("")
         .to_ascii_lowercase();
     match cmd.as_str() {
-        "ui" | "open" | "open-ui" | "launch-ui" => Some(UiVerb::Open),
-        "shot" | "screenshot" | "screen" => Some(UiVerb::Shot),
+        "ui" => Some(UiVerb::Open),
+        "open" | "open-ui" | "launch-ui" => open_target_verb(rest),
+        "shot" => Some(UiVerb::Shot),
+        "screenshot" | "screen" => shot_target_verb(rest),
         "where" | "aim" => Some(parse_target_rest(rest)),
         "target" => Some(parse_target_rest(rest)),
         "agm" => match rest.split_once(char::is_whitespace) {
@@ -114,6 +131,25 @@ fn classify_ui_verb(text: &str) -> Option<UiVerb> {
             },
         },
         _ => None,
+    }
+}
+
+/// Machine-targeted `/open` / `/screenshot` belong to the command router's
+/// `open_shot` handlers: when the argument names a NON-local fleet machine,
+/// decline here so `processing.rs` routes it to the machine-targeted handler.
+/// Bare commands, local aliases, and unknown tokens keep the existing local
+/// behavior exactly as before.
+fn open_target_verb(rest: &str) -> Option<UiVerb> {
+    match super::open_shot::resolve_machine_target(rest) {
+        Ok(super::open_shot::OpenShotTarget::Remote(_)) => None,
+        _ => Some(UiVerb::Open),
+    }
+}
+
+fn shot_target_verb(rest: &str) -> Option<UiVerb> {
+    match super::open_shot::resolve_machine_target(rest) {
+        Ok(super::open_shot::OpenShotTarget::Remote(_)) => None,
+        _ => Some(UiVerb::Shot),
     }
 }
 
@@ -475,8 +511,19 @@ mod tests {
     #[test]
     fn classifies_window_commands_and_aim() {
         assert_eq!(classify_ui_verb("/ui"), Some(UiVerb::Open));
+        assert_eq!(classify_ui_verb("/open"), Some(UiVerb::Open));
+        assert_eq!(classify_ui_verb("/screenshot"), Some(UiVerb::Shot));
         assert_eq!(classify_ui_verb("/shot@MyBot"), Some(UiVerb::Shot));
         assert_eq!(classify_ui_verb("/agm ui"), Some(UiVerb::Open));
+        // Unknown machine tokens keep the existing local behavior untouched.
+        assert_eq!(
+            classify_ui_verb("/open definitely-not-a-machine-xyz"),
+            Some(UiVerb::Open)
+        );
+        assert_eq!(
+            classify_ui_verb("/screenshot definitely-not-a-machine-xyz"),
+            Some(UiVerb::Shot)
+        );
         assert_eq!(
             classify_ui_verb("/target default C001"),
             Some(UiVerb::SetAim {
@@ -486,6 +533,7 @@ mod tests {
         );
         assert_eq!(classify_ui_verb("/target clear"), Some(UiVerb::ClearAim));
         assert_eq!(classify_ui_verb("/help"), None);
+        assert_eq!(classify_ui_verb("/send"), None);
         assert_eq!(classify_ui_verb("just a sentence"), None);
     }
 }

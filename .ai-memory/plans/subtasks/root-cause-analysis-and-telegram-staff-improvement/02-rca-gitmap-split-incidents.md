@@ -1,7 +1,7 @@
 # Task-02: RCA batch 2 — gitmap file-split incidents
 
 ## Status
-PENDING
+DONE
 
 ## Objective
 Write detailed root-cause analyses for the four gitmap file-split incidents

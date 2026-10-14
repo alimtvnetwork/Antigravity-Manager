@@ -1,7 +1,7 @@
 # Task-03: RCA batch 3 — CI workflow bugs + RCA index
 
 ## Status
-PENDING
+DONE
 
 ## Objective
 Document the two gitmap CI workflow bugs as RCAs, and write the

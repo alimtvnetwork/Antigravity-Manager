@@ -1,7 +1,7 @@
 # Task-07: Telegram — `/send` flow + colorful `/help`
 
 ## Status
-PENDING
+DONE
 
 ## Objective
 Implement the two-step `/send` flow and a professional colorful `/help` in

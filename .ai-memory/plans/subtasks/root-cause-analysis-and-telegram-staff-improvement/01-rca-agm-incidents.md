@@ -1,7 +1,7 @@
 # Task-01: RCA batch 1 — AGM incidents
 
 ## Status
-PENDING
+DONE
 
 ## Objective
 Write detailed root-cause analyses for the three AGM incidents into

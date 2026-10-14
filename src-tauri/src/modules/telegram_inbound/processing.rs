@@ -33,6 +33,9 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
     match cmd_base.as_str() {
         "start" | "help" => Some(format_help_manual()),
         "ping" => Some(format_ping_report()),
+        "open" => Some(commands::execute_open_command(rest).await),
+        "screenshot" => Some(commands::execute_screenshot_command(rest).await),
+        "send" => Some(super::send_flow::start_send_flow(rest)),
         "fleet" | "whoami" => Some(format_fleet_identity_report()),
         "instances" | "inst" => Some(format_instances_report()),
         "accounts" | "acc" => Some(format_accounts_report()),

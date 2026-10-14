@@ -1,7 +1,7 @@
 # Task-04: E2E playbook — auto-switch + instance open
 
 ## Status
-PENDING
+DONE
 
 ## Objective
 Write `.ai-memory/e2e-playbook/01-auto-switch.md` and
