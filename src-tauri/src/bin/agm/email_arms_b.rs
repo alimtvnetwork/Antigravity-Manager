@@ -67,18 +67,20 @@ pub(crate) fn email_arm_ls(args: &[String], is_json: bool) {
 pub(crate) fn email_arm_add(args: &[String], is_json: bool) {
     let rest = &args[1..];
     if rest.is_empty() {
-        eprintln!("Usage: agm email add <email> [password] [--smtp-host H] [--imap-host H] [--default] [--recipient]");
+        eprintln!("Usage: agm email add <email> [password] [--smtp-host H] [--smtp-port P] [--imap-host H] [--imap-port P] [--encryption SSL|TLS] [--default] [--recipient]");
         std::process::exit(1);
     }
 
     let is_recipient = rest.iter().any(|a| a == "--recipient" || a == "-r");
     let is_default = rest.iter().any(|a| a == "--default" || a == "-d");
+    let ask_password = rest.iter().any(|a| a == "--ask-password");
     let mut email_addr = String::new();
     let mut password: Option<String> = None;
     let mut smtp_host: Option<String> = None;
     let mut smtp_port: u16 = 587;
     let mut imap_host: Option<String> = None;
     let mut imap_port: u16 = 993;
+    let mut encryption_opt: Option<String> = None;
     let mut alias: Option<String> = None;
 
     let mut i = 0;
@@ -100,6 +102,10 @@ pub(crate) fn email_arm_add(args: &[String], is_json: bool) {
             imap_port = rest[i + 1].parse().unwrap_or(993);
             i += 2;
             continue;
+        } else if (arg == "--encryption" || arg == "--security") && i + 1 < rest.len() {
+            encryption_opt = Some(rest[i + 1].trim().to_uppercase());
+            i += 2;
+            continue;
         } else if arg == "--alias" && i + 1 < rest.len() {
             alias = Some(rest[i + 1].clone());
             i += 2;
@@ -118,6 +124,19 @@ pub(crate) fn email_arm_add(args: &[String], is_json: bool) {
     if email_addr.is_empty() {
         eprintln!("[ERROR] Email address is required.");
         std::process::exit(1);
+    }
+
+    if !is_recipient && password.is_none() && (ask_password || smtp_host.is_some()) {
+        use std::io::Write;
+        eprint!("Enter password for {}: ", email_addr);
+        let _ = std::io::stderr().flush();
+        let mut buf = String::new();
+        if std::io::stdin().read_line(&mut buf).is_ok() {
+            let trimmed = buf.trim().to_string();
+            if !trimmed.is_empty() {
+                password = Some(trimmed);
+            }
+        }
     }
 
     if is_recipient || password.is_none() {
@@ -157,6 +176,13 @@ pub(crate) fn email_arm_add(args: &[String], is_json: bool) {
     let eff_alias = alias.unwrap_or_else(|| email_addr.clone());
     let existing = email_vault_db::list_email_accounts().unwrap_or_default();
     let eff_default = is_default || existing.is_empty();
+    let eff_enc = encryption_opt.unwrap_or_else(|| {
+        if smtp_port == 465 || imap_port == 993 {
+            "SSL".to_string()
+        } else {
+            "TLS".to_string()
+        }
+    });
 
     let input = email_vault_db::EmailAccountInput {
         id: None,
@@ -167,7 +193,7 @@ pub(crate) fn email_arm_add(args: &[String], is_json: bool) {
         smtp_port,
         imap_host: eff_imap,
         imap_port,
-        encryption_type: "TLS".to_string(),
+        encryption_type: eff_enc,
         is_default: eff_default,
         is_active: true,
     };
@@ -354,23 +380,73 @@ pub(crate) fn email_arm_export(args: &[String], is_json: bool) {
 }
 
 pub(crate) fn email_arm_import(args: &[String], is_json: bool) {
-    let target_path = args
-        .iter()
-        .skip(1)
-        .find(|a| !a.starts_with('-'))
-        .cloned()
-        .unwrap_or_else(|| "agm-email-config.json".to_string());
-    let payload = match fs::read_to_string(&target_path) {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("[ERROR] Failed to read '{}': {}", target_path, e);
-            std::process::exit(1);
+    let mut target_path: Option<String> = None;
+    let mut inline_json: Option<String> = None;
+    let mut password_opt: Option<String> = None;
+    let mut ask_password = false;
+
+    let mut i = 1;
+    while i < args.len() {
+        let arg = &args[i];
+        if (arg == "-f" || arg == "--file") && i + 1 < args.len() {
+            target_path = Some(args[i + 1].clone());
+            i += 2;
+            continue;
+        } else if (arg == "--json" || arg == "--payload") && i + 1 < args.len() {
+            inline_json = Some(args[i + 1].clone());
+            i += 2;
+            continue;
+        } else if (arg == "-p" || arg == "--password") && i + 1 < args.len() {
+            password_opt = Some(args[i + 1].clone());
+            i += 2;
+            continue;
+        } else if arg == "--ask-password" || arg == "--prompt-password" {
+            ask_password = true;
+            i += 1;
+            continue;
+        } else if !arg.starts_with('-') {
+            if arg.trim_start().starts_with('{') && inline_json.is_none() {
+                inline_json = Some(arg.clone());
+            } else if target_path.is_none() {
+                target_path = Some(arg.clone());
+            }
+        }
+        i += 1;
+    }
+
+    let (source_label, payload) = if let Some(raw_json) = inline_json {
+        ("<inline-json>".to_string(), raw_json)
+    } else {
+        let path_str = target_path.unwrap_or_else(|| "agm-email-config.json".to_string());
+        let resolved = json_envelope::resolve_relative_json_path(&path_str);
+        match fs::read_to_string(&resolved) {
+            Ok(p) => (path_str, p),
+            Err(e) => {
+                eprintln!("[ERROR] Failed to read '{}': {}", path_str, e);
+                std::process::exit(1);
+            }
         }
     };
-    match email_io::import_from_json(&payload) {
+
+    let (detected_email, has_embedded_pwd) = email_io::extract_email_and_has_password(&payload);
+    if password_opt.is_none() && (ask_password || !has_embedded_pwd) {
+        use std::io::Write;
+        let prompt_email = detected_email.as_deref().unwrap_or("email account");
+        eprint!("Enter password for {}: ", prompt_email);
+        let _ = std::io::stderr().flush();
+        let mut buf = String::new();
+        if std::io::stdin().read_line(&mut buf).is_ok() {
+            let trimmed = buf.trim().to_string();
+            if !trimmed.is_empty() {
+                password_opt = Some(trimmed);
+            }
+        }
+    }
+
+    match email_io::import_from_json_with_password(&payload, password_opt.as_deref()) {
         Ok(sum) => println!(
             "[SUCCESS] Imported {} account(s) and {} recipient(s) from '{}'.",
-            sum.accounts_imported, sum.recipients_imported, target_path
+            sum.accounts_imported, sum.recipients_imported, source_label
         ),
         Err(e) => {
             eprintln!("[ERROR] Failed to import email config: {}", e);

@@ -92,7 +92,7 @@ impl SupabaseClient {
             )
         } else if e.is_connect() {
             format!(
-                "Cannot connect to {} (DNS/connection refused). The project URL may be wrong or the project deleted/paused. Verify the project URL in the Supabase dashboard.",
+                "Cannot connect to {} (DNS NXDOMAIN / connection refused). In Supabase Cloud, free-tier projects unpublish their <project_ref>.supabase.co DNS record when paused for inactivity. Unpause/restore the project in the Supabase or Lovable dashboard, or verify the project URL.",
                 self.base_url
             )
         } else {

@@ -78,7 +78,10 @@ pub struct EndpointTestResult {
 /// Normalize Supabase endpoint URL by trimming whitespace, trailing slashes, redundant `/rest/v1` suffixes,
 /// and auto-correcting known Lovable endpoint domain typos.
 pub fn normalize_supabase_url(raw: &str) -> String {
-    let cleaned = raw.trim().to_string();
+    let cleaned = raw.trim().replace(
+        "pezjuuddecbyrmqxytrv.supabase.co",
+        "pezjuuddecbyfmqxytrv.supabase.co",
+    );
     let mut trimmed = cleaned.as_str();
     while trimmed.ends_with('/') {
         trimmed = &trimmed[..trimmed.len() - 1];
@@ -90,6 +93,16 @@ pub fn normalize_supabase_url(raw: &str) -> String {
         }
     }
     trimmed.to_string()
+}
+
+/// Returns true if an endpoint uses a mock/placeholder URL or placeholder API key.
+pub fn is_placeholder_or_mock_endpoint(ep: &SupabaseEndpoint) -> bool {
+    let u = ep.url.to_lowercase();
+    let k = ep.api_key.to_lowercase();
+    u.contains("mock-root.supabase.co")
+        || u.contains("mock-secondary.supabase.co")
+        || u.contains("sample-mock-root.supabase.co")
+        || k.contains("placeholder")
 }
 
 /// Lightweight PostgREST HTTP Client

@@ -8,14 +8,10 @@
 
 [CmdletBinding()]
 param (
-    [string]$RootUrl = $env:AGM_SUPABASE_ROOT_URL,
-    [string]$RootKey = $env:AGM_SUPABASE_ROOT_KEY,
-    [string]$SecondaryUrl = $env:AGM_SUPABASE_SECONDARY_URL,
-    [string]$SecondaryKey = $env:AGM_SUPABASE_SECONDARY_KEY,
-    [string]$RootUrl = $(if ($env:SUPABASE_ROOT_URL) { $env:SUPABASE_ROOT_URL } else { "https://mock-root.supabase.co/rest/v1/" }),
-    [string]$RootKey = $(if ($env:SUPABASE_ROOT_KEY) { $env:SUPABASE_ROOT_KEY } else { "sb_publishable_placeholder_root_key" }),
-    [string]$SecondaryUrl = $(if ($env:SUPABASE_SECONDARY_URL) { $env:SUPABASE_SECONDARY_URL } else { "https://mock-secondary.supabase.co/rest/v1/" }),
-    [string]$SecondaryKey = $(if ($env:SUPABASE_SECONDARY_KEY) { $env:SUPABASE_SECONDARY_KEY } else { "sb_publishable_placeholder_secondary_key" }),
+    [string]$RootUrl = $(if ($env:AGM_SUPABASE_ROOT_URL) { $env:AGM_SUPABASE_ROOT_URL } elseif ($env:SUPABASE_ROOT_URL) { $env:SUPABASE_ROOT_URL } else { "" }),
+    [string]$RootKey = $(if ($env:AGM_SUPABASE_ROOT_KEY) { $env:AGM_SUPABASE_ROOT_KEY } elseif ($env:SUPABASE_ROOT_KEY) { $env:SUPABASE_ROOT_KEY } else { "" }),
+    [string]$SecondaryUrl = $(if ($env:AGM_SUPABASE_SECONDARY_URL) { $env:AGM_SUPABASE_SECONDARY_URL } elseif ($env:SUPABASE_SECONDARY_URL) { $env:SUPABASE_SECONDARY_URL } else { "" }),
+    [string]$SecondaryKey = $(if ($env:AGM_SUPABASE_SECONDARY_KEY) { $env:AGM_SUPABASE_SECONDARY_KEY } elseif ($env:SUPABASE_SECONDARY_KEY) { $env:SUPABASE_SECONDARY_KEY } else { "" }),
     [string]$ConfigFile = "",
     [string]$NodeAlias = "",
     [switch]$SkipTest = $false
@@ -39,7 +35,7 @@ Write-Host "Target Config File: $targetPath" -ForegroundColor Yellow
 
 # 2. Build or read config
 $config = $null
-$defaultVaultPath = "d:\work\repo-secrets\02-antigravity-manager\vault\supabase_config.json"
+$defaultVaultPath = "../repo-secrets/02-antigravity-manager/vault/supabase_config.json"
 if (-not $ConfigFile -and (Test-Path $defaultVaultPath)) {
     $ConfigFile = $defaultVaultPath
 }

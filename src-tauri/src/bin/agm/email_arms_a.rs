@@ -27,7 +27,10 @@ pub(crate) fn email_arm_help(args: &[String], is_json: bool, sub: &str) {
         "  agm email mv <seq|id|email> --default     Promote mailbox account to default sender"
     );
     println!("  agm email export [-f <path>]              Export email config & encrypted secrets to JSON");
-    println!("  agm email import [-f <path>]              Import email config bundle from JSON");
+    println!("  agm email import [-f <path>|--json <str>] [--ask-password] [-p <pwd>]");
+    println!(
+        "                                            Import email config bundle or compact JSON"
+    );
     println!();
     println!("Inbound Email Remote Command Subject Syntax:");
     println!("  <VM_NAME_OR_*> | <INSTANCE_SEQ_OR_REPO> | <ACTION>");

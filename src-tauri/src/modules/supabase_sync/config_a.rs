@@ -343,12 +343,38 @@ pub fn auto_seed_from_repo_secrets(cfg: &mut SupabaseConfig) -> bool {
                         tags,
                     };
 
-                    let already_exists = cfg
-                        .endpoints
-                        .iter()
-                        .any(|e| normalize_supabase_url(&e.url) == norm_url || e.id == clean_id);
+                    let existing_idx = cfg.endpoints.iter().position(|e| {
+                        normalize_supabase_url(&e.url) == norm_url
+                            || e.id == clean_id
+                            || (crate::modules::supabase_client::is_placeholder_or_mock_endpoint(e)
+                                && e.role == role)
+                    });
 
-                    if !already_exists {
+                    if let Some(idx) = existing_idx {
+                        let existing = &mut cfg.endpoints[idx];
+                        let prev_url = existing.url.clone();
+                        let prev_key = existing.api_key.clone();
+                        existing.url = norm_url.clone();
+                        existing.api_key = new_ep.api_key;
+                        existing.role = new_ep.role;
+                        existing.is_enabled = true;
+                        if existing.notes.is_none()
+                            || existing
+                                .notes
+                                .as_deref()
+                                .map_or(false, |n| n.to_lowercase().contains("placeholder"))
+                        {
+                            existing.notes = new_ep.notes;
+                        }
+                        for t in new_ep.tags {
+                            if !existing.tags.contains(&t) {
+                                existing.tags.push(t);
+                            }
+                        }
+                        if prev_url != norm_url || prev_key != existing.api_key {
+                            seeded = true;
+                        }
+                    } else {
                         tracing::info!(
                             "Auto-discovered Supabase endpoint '{}' ({}) from {:?}",
                             clean_id,
@@ -369,18 +395,47 @@ pub fn auto_seed_from_repo_secrets(cfg: &mut SupabaseConfig) -> bool {
             ) {
                 for mut ep in eps {
                     ep.url = normalize_supabase_url(&ep.url);
+                    if crate::modules::supabase_client::is_placeholder_or_mock_endpoint(&ep) {
+                        continue;
+                    }
                     let norm = ep.url.clone();
                     let id = ep.id.clone();
-                    let already_exists = cfg
+                    let existing_idx = cfg
                         .endpoints
                         .iter()
-                        .any(|e| normalize_supabase_url(&e.url) == norm || e.id == id);
-                    if !already_exists {
+                        .position(|e| normalize_supabase_url(&e.url) == norm || e.id == id);
+                    if let Some(idx) = existing_idx {
+                        let prev_url = cfg.endpoints[idx].url.clone();
+                        let prev_key = cfg.endpoints[idx].api_key.clone();
+                        cfg.endpoints[idx] = ep;
+                        if prev_url != cfg.endpoints[idx].url
+                            || prev_key != cfg.endpoints[idx].api_key
+                        {
+                            seeded = true;
+                        }
+                    } else {
                         cfg.endpoints.push(ep);
                         seeded = true;
                     }
                 }
             }
+        }
+    }
+
+    // If real endpoints exist, strip leftover mock/placeholder endpoints and deduplicate by normalized URL
+    if cfg
+        .endpoints
+        .iter()
+        .any(|e| !crate::modules::supabase_client::is_placeholder_or_mock_endpoint(e))
+    {
+        let before_len = cfg.endpoints.len();
+        cfg.endpoints
+            .retain(|e| !crate::modules::supabase_client::is_placeholder_or_mock_endpoint(e));
+        let mut seen_urls = HashSet::new();
+        cfg.endpoints
+            .retain(|e| seen_urls.insert(normalize_supabase_url(&e.url)));
+        if cfg.endpoints.len() != before_len {
+            seeded = true;
         }
     }
 

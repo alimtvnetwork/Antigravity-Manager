@@ -52,7 +52,18 @@ pub fn list_email_accounts() -> Result<Vec<EmailAccount>, String> {
 pub fn upsert_email_account(input: EmailAccountInput) -> Result<EmailAccount, String> {
     let vault_conn = connect_vault_db()?;
     let now = Utc::now().timestamp();
-    let account_id = input.id.unwrap_or_else(|| Uuid::new_v4().to_string());
+    let existing_by_email: Option<String> = vault_conn
+        .query_row(
+            "SELECT id FROM email_accounts WHERE LOWER(TRIM(email)) = LOWER(TRIM(?1)) LIMIT 1",
+            params![&input.email],
+            |r| r.get(0),
+        )
+        .optional()
+        .unwrap_or(None);
+    let account_id = input
+        .id
+        .or(existing_by_email)
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
 
     if input.is_default {
         // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged

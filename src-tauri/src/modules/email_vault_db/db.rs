@@ -116,6 +116,26 @@ pub fn init_vault_tables(conn: &Connection) -> Result<(), String> {
     )
     .map_err(|e| format!("Failed to create notify_recipients table: {}", e))?;
 
+    // Deduplicate any historical duplicate recipients and enforce unique index on normalized email
+    // Justification: best-effort deduplication before unique index creation
+    crate::error::record_ignored(
+        conn.execute(
+            "DELETE FROM notify_recipients WHERE rowid NOT IN (
+                SELECT MIN(rowid) FROM notify_recipients GROUP BY LOWER(TRIM(email))
+            )",
+            [],
+        ),
+        "dedupe notify_recipients on init",
+    );
+    // Justification: best-effort unique index creation
+    crate::error::record_ignored(
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_notify_recipients_email_lower ON notify_recipients (LOWER(TRIM(email)))",
+            [],
+        ),
+        "create idx_notify_recipients_email_lower",
+    );
+
     conn.execute(
         "CREATE TABLE IF NOT EXISTS email_notification_settings (
             id TEXT PRIMARY KEY DEFAULT 'global',
@@ -140,21 +160,50 @@ pub fn init_vault_tables(conn: &Connection) -> Result<(), String> {
     )
     .map_err(|e| format!("Failed to create email_notification_settings table: {}", e))?;
 
-    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
-    crate::error::record_ignored(conn.execute(
-        "ALTER TABLE email_notification_settings ADD COLUMN baseline_polling_interval_minutes INTEGER NOT NULL DEFAULT 4",
-        [],
-    ), "db execute");
-    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
-    crate::error::record_ignored(conn.execute(
-        "ALTER TABLE email_notification_settings ADD COLUMN active_awaiting_interval_seconds INTEGER NOT NULL DEFAULT 10",
-        [],
-    ), "db execute");
-    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
-    crate::error::record_ignored(conn.execute(
-        "ALTER TABLE email_notification_settings ADD COLUMN notify_on_system_update INTEGER NOT NULL DEFAULT 1",
-        [],
-    ), "db execute");
+    let existing_cols: Vec<String> = conn
+        .prepare("PRAGMA table_info(email_notification_settings)")
+        .and_then(|mut s| {
+            let rows = s.query_map([], |r| r.get::<_, String>(1))?;
+            Ok(rows.flatten().collect())
+        })
+        .unwrap_or_default();
+
+    if !existing_cols
+        .iter()
+        .any(|c| c == "baseline_polling_interval_minutes")
+    {
+        // Justification: best-effort DB migration column addition
+        crate::error::record_ignored(
+            conn.execute(
+                "ALTER TABLE email_notification_settings ADD COLUMN baseline_polling_interval_minutes INTEGER NOT NULL DEFAULT 4",
+                [],
+            ),
+            "db execute",
+        );
+    }
+    if !existing_cols
+        .iter()
+        .any(|c| c == "active_awaiting_interval_seconds")
+    {
+        // Justification: best-effort DB migration column addition
+        crate::error::record_ignored(
+            conn.execute(
+                "ALTER TABLE email_notification_settings ADD COLUMN active_awaiting_interval_seconds INTEGER NOT NULL DEFAULT 10",
+                [],
+            ),
+            "db execute",
+        );
+    }
+    if !existing_cols.iter().any(|c| c == "notify_on_system_update") {
+        // Justification: best-effort DB migration column addition
+        crate::error::record_ignored(
+            conn.execute(
+                "ALTER TABLE email_notification_settings ADD COLUMN notify_on_system_update INTEGER NOT NULL DEFAULT 1",
+                [],
+            ),
+            "db execute",
+        );
+    }
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS email_inbound_audit_log (

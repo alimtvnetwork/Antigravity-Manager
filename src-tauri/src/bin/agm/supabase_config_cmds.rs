@@ -216,8 +216,12 @@ pub(crate) fn cmd_supabase_load_json(args: &[String]) {
             if let Ok(eps) = serde_json::from_value::<Vec<supabase_client::SupabaseEndpoint>>(
                 serde_json::Value::Array(arr.clone()),
             ) {
-                for new_ep in eps {
-                    if let Some(pos) = cfg.endpoints.iter().position(|e| e.id == new_ep.id) {
+                for mut new_ep in eps {
+                    new_ep.url = supabase_client::normalize_supabase_url(&new_ep.url);
+                    if let Some(pos) = cfg.endpoints.iter().position(|e| {
+                        e.id == new_ep.id
+                            || supabase_client::normalize_supabase_url(&e.url) == new_ep.url
+                    }) {
                         cfg.endpoints[pos] = new_ep;
                     } else {
                         cfg.endpoints.push(new_ep);
@@ -229,8 +233,12 @@ pub(crate) fn cmd_supabase_load_json(args: &[String]) {
         } else if let Ok(eps) =
             serde_json::from_value::<Vec<supabase_client::SupabaseEndpoint>>(val.clone())
         {
-            for new_ep in eps {
-                if let Some(pos) = cfg.endpoints.iter().position(|e| e.id == new_ep.id) {
+            for mut new_ep in eps {
+                new_ep.url = supabase_client::normalize_supabase_url(&new_ep.url);
+                if let Some(pos) = cfg.endpoints.iter().position(|e| {
+                    e.id == new_ep.id
+                        || supabase_client::normalize_supabase_url(&e.url) == new_ep.url
+                }) {
                     cfg.endpoints[pos] = new_ep;
                 } else {
                     cfg.endpoints.push(new_ep);
@@ -243,37 +251,50 @@ pub(crate) fn cmd_supabase_load_json(args: &[String]) {
             .and_then(|v| v.as_object())
             .or_else(|| val.as_object())
         {
-            let endpoint_url = decode_val(creds.get("endpoint"));
-            let token = decode_val(creds.get("token"));
+            let endpoint_url = decode_val(creds.get("endpoint").or_else(|| creds.get("url")));
+            let token = decode_val(creds.get("token").or_else(|| creds.get("api_key")));
             let service =
                 decode_val(creds.get("service")).unwrap_or_else(|| "supabase-service".to_string());
+            let role_opt = decode_val(creds.get("role"));
+            let tag_opt = decode_val(creds.get("tag"));
+            let notes_opt = decode_val(creds.get("notes"));
             if let (Some(url), Some(tok)) = (endpoint_url, token) {
                 let clean_id = format!("ep-{}", service.to_lowercase().replace([' ', '_'], "-"));
-                let role = if service.to_lowercase().contains("root")
+                let role = if let Some(r) = role_opt.filter(|r| !r.is_empty()) {
+                    r.to_lowercase()
+                } else if service.to_lowercase().contains("root")
                     || service.to_lowercase().contains("lovable")
                 {
-                    "root"
+                    "root".to_string()
                 } else {
-                    "secondary"
+                    "secondary".to_string()
                 };
                 let norm_url = supabase_client::normalize_supabase_url(&url);
+                let mut tags = vec![role.clone()];
+                if let Some(t) = tag_opt {
+                    if !tags.contains(&t) {
+                        tags.push(t);
+                    }
+                }
+                if !tags.contains(&service) {
+                    tags.push(service.clone());
+                }
                 let new_ep = supabase_client::SupabaseEndpoint {
                     id: clean_id.clone(),
                     name: format!("Supabase ({})", service),
                     url: norm_url.clone(),
                     api_key: tok,
-                    role: role.to_string(),
+                    role: role.clone(),
                     is_enabled: true,
                     prune_threshold_mb: if role == "root" { 400 } else { 200 },
                     priority: if role == "root" { 1 } else { 2 },
-                    notes: Some(format!("Imported from credentials JSON ({})", path_str)),
-                    tags: vec![role.to_string(), service],
+                    notes: notes_opt
+                        .or_else(|| Some(format!("Imported from credentials JSON ({})", path_str))),
+                    tags,
                 };
-                if let Some(pos) = cfg
-                    .endpoints
-                    .iter()
-                    .position(|e| e.id == clean_id || e.url == norm_url)
-                {
+                if let Some(pos) = cfg.endpoints.iter().position(|e| {
+                    e.id == clean_id || supabase_client::normalize_supabase_url(&e.url) == norm_url
+                }) {
                     cfg.endpoints[pos] = new_ep;
                 } else {
                     cfg.endpoints.push(new_ep);
@@ -287,6 +308,18 @@ pub(crate) fn cmd_supabase_load_json(args: &[String]) {
         }
     }
 
+    if cfg
+        .endpoints
+        .iter()
+        .any(|e| !supabase_client::is_placeholder_or_mock_endpoint(e))
+    {
+        cfg.endpoints
+            .retain(|e| !supabase_client::is_placeholder_or_mock_endpoint(e));
+        let mut seen_urls = std::collections::HashSet::new();
+        cfg.endpoints
+            .retain(|e| seen_urls.insert(supabase_client::normalize_supabase_url(&e.url)));
+    }
+    cfg.endpoints.sort_by_key(|e| e.priority);
     cfg.is_sync_enabled = true;
     if let Err(e) = supabase_sync::save_config(&cfg) {
         eprintln!("[ERROR] Failed to save config: {}", e);

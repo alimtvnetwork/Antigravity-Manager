@@ -114,13 +114,17 @@ pub fn auto_discover_supabase_credentials() -> crate::error::AppResult<SupabaseC
                             serde_json::from_str::<SupabaseConfig>(clean).map_err(|e| e.to_string())
                         });
                 if let Ok(seed_cfg) = parsed {
-                    for ep in seed_cfg.endpoints {
-                        let norm_url = normalize_supabase_url(&ep.url);
-                        let exists = config
-                            .endpoints
-                            .iter()
-                            .any(|e| normalize_supabase_url(&e.url) == norm_url || e.id == ep.id);
-                        if !exists {
+                    for mut ep in seed_cfg.endpoints {
+                        ep.url = normalize_supabase_url(&ep.url);
+                        if crate::modules::supabase_client::is_placeholder_or_mock_endpoint(&ep) {
+                            continue;
+                        }
+                        let norm_url = ep.url.clone();
+                        if let Some(idx) = config.endpoints.iter().position(|e| {
+                            normalize_supabase_url(&e.url) == norm_url || e.id == ep.id
+                        }) {
+                            config.endpoints[idx] = ep;
+                        } else {
                             config.endpoints.push(ep);
                         }
                     }
@@ -131,6 +135,19 @@ pub fn auto_discover_supabase_credentials() -> crate::error::AppResult<SupabaseC
 
     for ep in &mut config.endpoints {
         ep.url = normalize_supabase_url(&ep.url);
+    }
+    if config
+        .endpoints
+        .iter()
+        .any(|e| !crate::modules::supabase_client::is_placeholder_or_mock_endpoint(e))
+    {
+        config
+            .endpoints
+            .retain(|e| !crate::modules::supabase_client::is_placeholder_or_mock_endpoint(e));
+        let mut seen_urls = std::collections::HashSet::new();
+        config
+            .endpoints
+            .retain(|e| seen_urls.insert(normalize_supabase_url(&e.url)));
     }
     config.endpoints.sort_by_key(|e| e.priority);
     config.is_sync_enabled = true;

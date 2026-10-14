@@ -58,7 +58,7 @@ function Normalize-SupabaseUrl {
     if ([string]::IsNullOrWhiteSpace($Url)) {
         return ""
     }
-    $u = $Url.Trim()
+    $u = $Url.Trim().Replace("pezjuuddecbyrmqxytrv.supabase.co", "pezjuuddecbyfmqxytrv.supabase.co")
     while ($u.EndsWith('/')) {
         $u = $u.Substring(0, $u.Length - 1)
     }
@@ -69,6 +69,24 @@ function Normalize-SupabaseUrl {
         }
     }
     return $u
+}
+
+function Decode-Base64IfNeeded {
+    param (
+        [string]$Value,
+        [bool]$IsBase64
+    )
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return ""
+    }
+    if ($IsBase64) {
+        try {
+            return [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($Value.Trim())).Trim()
+        } catch {
+            return $Value.Trim()
+        }
+    }
+    return $Value.Trim()
 }
 
 function Parse-SupabaseJsonFile {
@@ -87,8 +105,9 @@ function Parse-SupabaseJsonFile {
     $parsed = $raw | ConvertFrom-Json
 
     $cfg = $null
+    $isB64 = ($parsed.encoding_format -eq "base64") -or ($parsed.attributes -and $parsed.attributes.encoding -eq "base64")
 
-    # 1. AGM JSON Envelope Schema (v2.0 / v1.0)
+    # 1. AGM JSON Envelope Schema (v2.0 / v1.0) with endpoints array
     if ($parsed.data -and $parsed.data.endpoints) {
         $cfg = $parsed.data
         if ($parsed.variables) {
@@ -116,27 +135,36 @@ function Parse-SupabaseJsonFile {
     elseif ($parsed.endpoints) {
         $cfg = $parsed
     }
-    # 3. Base64-encoded credentials or flat credentials object
-    elseif ($parsed.credentials -or $parsed.endpoint) {
-        $creds = if ($parsed.credentials) { $parsed.credentials } else { $parsed }
-        $epUrl = if ($creds.endpoint) { $creds.endpoint } else { $creds.url }
-        $epKey = if ($creds.token) { $creds.token } else { $creds.api_key }
-        $epRole = if ($creds.role) { $creds.role } else { "root" }
-        $epName = if ($creds.service) { "Supabase ($($creds.service))" } else { "Supabase Root" }
+    # 3. Base64-encoded credentials envelope or flat credentials object
+    elseif ($parsed.credentials -or $parsed.endpoint -or ($parsed.data -and ($parsed.data.endpoint -or $parsed.data.url))) {
+        $creds = if ($parsed.credentials) { $parsed.credentials } elseif ($parsed.data) { $parsed.data } else { $parsed }
+        $rawUrl = if ($creds.endpoint) { [string]$creds.endpoint } else { [string]$creds.url }
+        $rawKey = if ($creds.token) { [string]$creds.token } else { [string]$creds.api_key }
+        $rawRole = if ($creds.role) { [string]$creds.role } else { "" }
+        $rawService = if ($creds.service) { [string]$creds.service } else { "supabase-service" }
+
+        $epUrl = Normalize-SupabaseUrl (Decode-Base64IfNeeded -Value $rawUrl -IsBase64 $isB64)
+        $epKey = Decode-Base64IfNeeded -Value $rawKey -IsBase64 $isB64
+        $epService = Decode-Base64IfNeeded -Value $rawService -IsBase64 $isB64
+        $epRole = Decode-Base64IfNeeded -Value $rawRole -IsBase64 $isB64
+        if (-not $epRole) {
+            $epRole = if ($epService.ToLower().Contains("root") -or $epService.ToLower().Contains("lovable")) { "root" } else { "secondary" }
+        }
+        $epName = "Supabase ($epService)"
 
         $cfg = [PSCustomObject]@{
             endpoints = @(
                 [PSCustomObject]@{
-                    id = "ep-$($epRole)-01"
+                    id = "ep-$($epService.ToLower().Replace(' ', '-').Replace('_', '-'))"
                     name = $epName
                     url = $epUrl
                     api_key = $epKey
                     role = $epRole
                     is_enabled = $true
-                    prune_threshold_mb = 400
-                    priority = 1
+                    prune_threshold_mb = $(if ($epRole -eq "root") { 400 } else { 200 })
+                    priority = $(if ($epRole -eq "root") { 1 } else { 2 })
                     notes = "Imported from credentials format"
-                    tags = @($epRole)
+                    tags = @($epRole, $epService)
                 }
             )
             node_alias = "Node-$([System.Environment]::MachineName)"
@@ -239,9 +267,8 @@ if (-not $config) {
     if ($env:AGM_SUPABASE_VAULT) {
         $candidateVaults.Add($env:AGM_SUPABASE_VAULT)
     }
-    $candidateVaults.Add("d:\work\repo-secrets\02-antigravity-manager\vault\supabase_config.json")
-    $candidateVaults.Add("c:\work\repo-secrets\02-antigravity-manager\vault\supabase_config.json")
     $candidateVaults.Add("../repo-secrets/02-antigravity-manager/vault/supabase_config.json")
+    $candidateVaults.Add("../repo-secrets/02-antigravity-and-event-manager/vault/supabase_config.json")
     $candidateVaults.Add("../../repo-secrets/02-antigravity-manager/vault/supabase_config.json")
     $candidateVaults.Add("repo-secrets/02-antigravity-manager/vault/supabase_config.json")
     if ($HOME) {
@@ -250,8 +277,6 @@ if (-not $config) {
     }
     $candidateVaults.Add("../repo-secrets/03-supabase/02-lovable/supabase-credentials.json")
     $candidateVaults.Add("../repo-secrets/03-supabase/01-own/supabase-credentials.json")
-    $candidateVaults.Add("d:\work\repo-secrets\03-supabase\02-lovable\supabase-credentials.json")
-    $candidateVaults.Add("c:\work\repo-secrets\03-supabase\02-lovable\supabase-credentials.json")
 
     foreach ($candidate in $candidateVaults) {
         if ($candidate -and (Test-Path $candidate)) {
@@ -457,7 +482,7 @@ Write-Host "1. Auto-discover from local repo-secrets vault:" -ForegroundColor Wh
 Write-Host '   pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/import-supabase-secrets.ps1 -AutoDiscover' -ForegroundColor Gray
 Write-Host ""
 Write-Host "2. Single-line direct vault import (Windows & Linux):" -ForegroundColor White
-Write-Host '   pwsh -NoProfile -ExecutionPolicy Bypass -Command "& { [string]$v = if (Test-Path ''../repo-secrets/02-antigravity-manager/vault/supabase_config.json'') { ''../repo-secrets/02-antigravity-manager/vault/supabase_config.json'' } elseif (Test-Path ''d:\work\repo-secrets\02-antigravity-manager\vault\supabase_config.json'') { ''d:\work\repo-secrets\02-antigravity-manager\vault\supabase_config.json'' } else { '''' }; if ($v) { & ./scripts/import-supabase-secrets.ps1 -VaultFile $v } else { Write-Error ''Vault not found'' } }"' -ForegroundColor Gray
+Write-Host '   pwsh -NoProfile -ExecutionPolicy Bypass -Command "& { [string]$v = if (Test-Path ''../repo-secrets/02-antigravity-manager/vault/supabase_config.json'') { ''../repo-secrets/02-antigravity-manager/vault/supabase_config.json'' } else { '''' }; if ($v) { & ./scripts/import-supabase-secrets.ps1 -VaultFile $v } else { Write-Error ''Vault not found'' } }"' -ForegroundColor Gray
 Write-Host ""
 Write-Host "3. Bootstrap from Environment Variables:" -ForegroundColor White
 Write-Host '   pwsh -NoProfile -ExecutionPolicy Bypass -Command "& ./scripts/import-supabase-secrets.ps1 -RootUrl $env:AGM_SUPABASE_ROOT_URL -RootKey $env:AGM_SUPABASE_ROOT_KEY -SecondaryUrl $env:AGM_SUPABASE_SECONDARY_URL -SecondaryKey $env:AGM_SUPABASE_SECONDARY_KEY"' -ForegroundColor Gray
