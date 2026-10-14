@@ -9,13 +9,13 @@ cask "antigravity-tools" do
   on_macos do
     arch intel: "x64", arm: "aarch64"
 
-    url "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v#{version}/agm-alim_#{version}_#{arch}.dmg"
+    url "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v#{version}/Antigravity.Manager.Tools_#{version}_#{arch}.dmg"
 
-    app "agm-alim.app"
+    app "Antigravity Manager Tools.app"
 
     postflight do
       system_command "/usr/bin/xattr",
-                     args:         ["-rd", "com.apple.quarantine", "#{appdir}/agm-alim.app"],
+                     args:         ["-rd", "com.apple.quarantine", "#{appdir}/Antigravity Manager Tools.app"],
                      must_succeed: false
     end
 
@@ -28,13 +28,8 @@ cask "antigravity-tools" do
   end
 
   on_linux do
-    arch arm: "aarch64", intel: "amd64"
+    arch arm: "arm64", intel: "amd64"
 
-    url "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v#{version}/agm-alim_#{version}_#{arch}.AppImage"
-    binary "agm-alim_#{version}_#{arch}.AppImage", target: "agm-alim"
-
-    preflight do
-      set_permissions "#{staged_path}/agm-alim_#{version}_#{arch}.AppImage", "0755"
-    end
+    url "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v#{version}/Antigravity.Manager.Tools_#{version}_#{arch}.deb"
   end
 end
