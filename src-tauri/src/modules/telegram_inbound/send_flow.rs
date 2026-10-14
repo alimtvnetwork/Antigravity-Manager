@@ -8,6 +8,7 @@
 //! process-local, keyed by Telegram chat id, with the same 10-minute TTL as
 //! the `/target` aim in `ui_remote.rs`.
 
+use once_cell::sync::Lazy;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
@@ -38,7 +39,7 @@ struct SendFlow {
     updated_at: u64,
 }
 
-static SEND_FLOWS: Mutex<HashMap<i64, SendFlow>> = Mutex::new(HashMap::new());
+static SEND_FLOWS: Lazy<Mutex<HashMap<i64, SendFlow>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 /// Bot-side result of consuming a `/send` message: reply text plus optional markup.
 pub struct SendDispatch {
