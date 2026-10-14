@@ -42,10 +42,10 @@ indexes (`.ai-memory/rca/readme.md`, `.ai-memory/e2e-playbook/readme.md`,
 ## Progress
 - [x] Spec written
 - [x] Plan enqueued
-- [ ] Subtasks dispatched (wave 1)
-- [ ] RCAs complete
-- [ ] E2E playbook complete
-- [ ] Telegram commands implemented
-- [ ] Supabase RCA complete
-- [ ] Voice note complete
-- [ ] Committed + pushed
+- [x] Subtasks dispatched (5 waves, 9 workers)
+- [x] RCAs complete (10 files + index)
+- [x] E2E playbook complete (5 files + index)
+- [x] Telegram commands implemented (`/open`, `/screenshot`, `/send`, colorful `/help` with copy-paste)
+- [x] Supabase RCA complete (root cause: paused free-tier projects — user action needed)
+- [x] Voice note complete (analysis only)
+- [x] Committed + pushed (c57b219b)
