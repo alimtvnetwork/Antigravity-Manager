@@ -344,6 +344,115 @@ pub fn copy_to_system_clipboard(content: &str) {
     }
 }
 
+/// Copy text on the calling thread and return the helper failure.
+/// The webview Clipboard API rejects with "Document is not focused" when the
+/// OS window is not the foreground window. `clip` / `pbcopy` / `wl-copy` do not
+/// need that focus.
+pub fn copy_text_to_clipboard_sync(content: &str) -> Result<(), String> {
+    if content.is_empty() {
+        return Err("clipboard text is empty".to_string());
+    }
+    let data = content.as_bytes();
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        let mut cmd = std::process::Command::new("clip");
+        cmd.creation_flags(0x08000000);
+        return run_clipboard_helper_result(cmd, data, "clip");
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let cmd = std::process::Command::new("pbcopy");
+        return run_clipboard_helper_result(cmd, data, "pbcopy");
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let is_wayland = std::env::var("WAYLAND_DISPLAY").is_ok();
+        let mut errors: Vec<String> = Vec::new();
+        if is_wayland {
+            let cmd = std::process::Command::new("wl-copy");
+            match run_clipboard_helper_result(cmd, data, "wl-copy") {
+                Ok(()) => return Ok(()),
+                Err(e) => errors.push(e),
+            }
+        }
+        let mut xclip = std::process::Command::new("xclip");
+        xclip.args(["-selection", "clipboard"]);
+        match run_clipboard_helper_result(xclip, data, "xclip") {
+            Ok(()) => return Ok(()),
+            Err(e) => errors.push(e),
+        }
+        let mut xsel = std::process::Command::new("xsel");
+        xsel.args(["--clipboard", "--input"]);
+        match run_clipboard_helper_result(xsel, data, "xsel") {
+            Ok(()) => return Ok(()),
+            Err(e) => errors.push(e),
+        }
+        return Err(format!(
+            "linux clipboard helpers failed: {}",
+            errors.join(" | ")
+        ));
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        let _ = data;
+        Err("clipboard helper is not implemented for this operating system".to_string())
+    }
+}
+
+fn run_clipboard_helper_result(
+    mut cmd: std::process::Command,
+    data: &[u8],
+    helper_name: &'static str,
+) -> Result<(), String> {
+    cmd.stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("spawn clipboard helper {helper_name}: {e}"))?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(data)
+            .map_err(|e| format!("write clipboard stdin ({helper_name}): {e}"))?;
+        drop(stdin);
+    } else {
+        return Err(format!("clipboard helper {helper_name} has no stdin pipe"));
+    }
+
+    let start = std::time::Instant::now();
+    let timeout = std::time::Duration::from_secs(3);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if status.success() {
+                    return Ok(());
+                }
+                return Err(format!(
+                    "clipboard helper {helper_name} exited with {status}"
+                ));
+            }
+            Ok(None) => {
+                if start.elapsed() >= timeout {
+                    let kill_note = match child.kill() {
+                        Ok(()) => String::new(),
+                        Err(kill_err) => format!("; kill failed: {kill_err}"),
+                    };
+                    return Err(format!(
+                        "clipboard helper {helper_name} timed out after 3 seconds{kill_note}"
+                    ));
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            Err(e) => {
+                return Err(format!("wait for clipboard helper {helper_name}: {e}"));
+            }
+        }
+    }
+}
+
 /// Send a prompt immediately for a specific instance, verifying process liveness,
 /// caching PID, updating SQLite split DB, writing .antigravity_resume_task.json, and executing via agy.
 pub fn send_prompt_now_for_instance(

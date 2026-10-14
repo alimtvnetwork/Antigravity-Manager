@@ -80,6 +80,12 @@ fn validate_user_json_path(path: &str, must_exist: bool) -> Result<PathBuf, Stri
     Ok(resolved)
 }
 
+/// Copy text with the OS clipboard helper. Works when the webview document is not focused.
+#[tauri::command]
+pub fn copy_text_to_clipboard(text: String) -> Result<(), String> {
+    crate::modules::repo_db::copy_text_to_clipboard_sync(&text)
+}
+
 /// 保存文本文件 (绕过前端 Scope 限制)
 #[tauri::command]
 pub async fn save_text_file(path: String, content: String) -> Result<(), String> {

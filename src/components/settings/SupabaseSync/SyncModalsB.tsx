@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../../utils/clipboard';
 import { SupabaseSyncApi } from './useSupabaseSync';
 import { UnifiedBackupModal } from '../../modals/UnifiedBackupModal';
 import ModalDialog from '../../common/ModalDialog';
@@ -25,7 +26,7 @@ export function SyncModalsB(props: SupabaseSyncApi) {
                         <div className="flex justify-end gap-2">
                             <button
                                 onClick={() => {
-                                    navigator.clipboard.writeText(schemaSql);
+                                    copyToClipboard(schemaSql);
                                     showToast('SQL copied to clipboard', 'success');
                                 }}
                                 className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs flex items-center gap-1.5 transition font-medium"
@@ -78,7 +79,7 @@ export function SyncModalsB(props: SupabaseSyncApi) {
                         <div className="flex justify-end gap-2">
                             <button
                                 onClick={() => {
-                                    navigator.clipboard.writeText(exportContent);
+                                    copyToClipboard(exportContent);
                                     showToast('Export configuration copied', 'success');
                                 }}
                                 className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs flex items-center gap-1.5 transition font-medium"
@@ -140,7 +141,7 @@ export function SyncModalsB(props: SupabaseSyncApi) {
                         <div className="flex justify-end gap-2">
                             <button
                                 onClick={() => {
-                                    navigator.clipboard.writeText(aiInstructionTemplate);
+                                    copyToClipboard(aiInstructionTemplate);
                                     showToast('AI Prompt copied to clipboard', 'success');
                                 }}
                                 className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs flex items-center gap-1.5 transition font-medium"

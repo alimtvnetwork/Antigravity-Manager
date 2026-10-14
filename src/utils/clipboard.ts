@@ -1,40 +1,73 @@
+import { invoke } from '@tauri-apps/api/core';
+import { useErrorStore } from '../stores/error-store';
+
+function reportClipboardStage(err: unknown, triggerAction: string): void {
+    useErrorStore.getState().trackWarning(err, {
+        source: 'clipboard.copyToClipboard',
+        triggerAction,
+    });
+}
+
+function copyWithExecCommand(text: string): boolean {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.setAttribute('readonly', 'true');
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-9999px';
+    textArea.style.top = '0';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    const successful = document.execCommand('copy');
+    document.body.removeChild(textArea);
+    return successful;
+}
+
+async function copyWithNativeHelper(text: string): Promise<void> {
+    const tauriWindow = window as Window & { __TAURI_INTERNALS__?: unknown };
+    if (tauriWindow.__TAURI_INTERNALS__ === undefined) {
+        throw new Error('native clipboard helper is unavailable outside the desktop app');
+    }
+    await invoke('copy_text_to_clipboard', { text });
+}
+
 /**
- * 健壮的剪贴板复制工具函数
- *
- * 浏览器限制：在非安全上下文（非 HTTPS 或 localhost）下，navigator.clipboard 是 undefined。
- * 本函数通过 execCommand('copy') 提供回退方案，确保在 HTTP 环境（如 Docker IP 访问）下也能正常工作。
+ * Copy text to the clipboard.
+ * The browser Clipboard API rejects with NotAllowedError when the webview
+ * document is not focused. That failure is recorded, then execCommand and the
+ * OS helper (`clip` / `pbcopy` / `wl-copy`) are tried. The promise does not
+ * reject. A total failure is recorded with captureError and returns false.
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
-    // 1. 尝试现代 Clipboard API
     if (navigator.clipboard && window.isSecureContext) {
         try {
             await navigator.clipboard.writeText(text);
             return true;
         } catch (err) {
-            console.error('Clipboard API 复制失败:', err);
+            reportClipboardStage(err, 'navigator.clipboard.writeText');
         }
     }
 
-    // 2. 回退到传统的 execCommand('copy') 方案
     try {
-        const textArea = document.createElement('textarea');
-        textArea.value = text;
-
-        // 确保 textarea 在页面上不可见，但必须在 DOM 中才能执行 copy
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-9999px';
-        textArea.style.top = '0';
-        document.body.appendChild(textArea);
-
-        textArea.focus();
-        textArea.select();
-
-        const successful = document.execCommand('copy');
-        document.body.removeChild(textArea);
-
-        return successful;
+        if (copyWithExecCommand(text)) {
+            return true;
+        }
+        reportClipboardStage(
+            new Error('document.execCommand("copy") returned false'),
+            'document.execCommand',
+        );
     } catch (err) {
-        console.error('execCommand 复制失败:', err);
+        reportClipboardStage(err, 'document.execCommand');
+    }
+
+    try {
+        await copyWithNativeHelper(text);
+        return true;
+    } catch (err) {
+        useErrorStore.getState().captureError(err, {
+            source: 'clipboard.copyToClipboard',
+            triggerAction: 'copy_text_to_clipboard',
+        });
         return false;
     }
 }

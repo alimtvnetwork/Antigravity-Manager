@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../utils/clipboard';
 import { Copy } from 'lucide-react';
 import { detailRows, renderActionBadge } from './audit-helpers';
 import type { TaskDetail, TaskPayload } from '../../types/audit';
@@ -51,7 +52,10 @@ export function AuditDetailModal({
                                 const lines = rows.map((row) => `${row.label}: ${row.copyValue ?? (typeof row.value === 'string' ? row.value : '')}`);
                                 const raw = detail.payload_json?.trim();
                                 const body = raw ? `${lines.join('\n')}\n\n${raw}` : lines.join('\n');
-                                void navigator.clipboard.writeText(body).then(() => {
+                                void copyToClipboard(body).then((copiedOk) => {
+                                    if (!copiedOk) {
+                                        return;
+                                    }
                                     setCopied(true);
                                     window.setTimeout(() => setCopied(false), 1500);
                                 });

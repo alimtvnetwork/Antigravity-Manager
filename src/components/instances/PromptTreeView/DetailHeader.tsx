@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../../utils/clipboard';
 import { useState } from 'react';
 import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
@@ -128,7 +129,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                             type="button"
                             onClick={() => {
                                 const cleanText = stripImagesFromPrompt(activePromptText);
-                                navigator.clipboard.writeText(cleanText).catch((e) => console.warn(e));
+                                copyToClipboard(cleanText);
                                 setLocalCopiedText(true);
                                 setIsCopiedText(true);
                                 setTimeout(() => {

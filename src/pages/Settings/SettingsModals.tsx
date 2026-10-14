@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../utils/clipboard';
 import { SettingsPageApi } from './useSettingsPage';
 import { Coffee } from 'lucide-react';
 import ModalDialog from '../../components/common/ModalDialog';
@@ -100,7 +101,7 @@ export function SettingsModals(props: SettingsPageApi) {
                             <button
                                 className="shrink-0 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 border border-gray-200 dark:border-base-300 rounded hover:bg-gray-100 dark:hover:bg-base-300 transition-colors"
                                 onClick={() => {
-                                    navigator.clipboard.writeText('brew upgrade --cask antigravity-tools');
+                                    copyToClipboard('brew upgrade --cask antigravity-tools');
                                     showToast(t('common.copied', 'Copied'), 'success');
                                 }}
                             >
@@ -115,7 +116,7 @@ export function SettingsModals(props: SettingsPageApi) {
                             <button
                                 className="shrink-0 px-2 py-1 text-xs text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-200 border border-amber-200 dark:border-amber-700 rounded hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
                                 onClick={() => {
-                                    navigator.clipboard.writeText('sudo xattr -rd com.apple.quarantine "/Applications/Antigravity Tools.app"');
+                                    copyToClipboard('sudo xattr -rd com.apple.quarantine "/Applications/Antigravity Tools.app"');
                                     showToast(t('common.copied', 'Copied'), 'success');
                                 }}
                             >

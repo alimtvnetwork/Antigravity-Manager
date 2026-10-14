@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../../utils/clipboard';
 import React, { useState } from 'react';
 import {
   AlertCircle,
@@ -33,11 +34,15 @@ export function ItemCopyButton({
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-    const msg = successMessage || `${label} copied to clipboard!`;
-    showToast(msg, 'success');
+    void copyToClipboard(text).then((copiedOk) => {
+      if (!copiedOk) {
+        return;
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      const msg = successMessage || `${label} copied to clipboard!`;
+      showToast(msg, 'success');
+    });
   };
 
   return (

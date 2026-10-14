@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../../utils/clipboard';
 import { EmailNotificationsApi } from './useEmailNotifications';
 import { showToast } from '../../common/ToastContainer';
 import { AlertCircle, CheckCircle2, Copy, Loader2, Play, Sparkles, Terminal } from 'lucide-react';
@@ -91,7 +92,7 @@ export function RemoteCommandSection(props: EmailNotificationsApi) {
                             <button
                                 type="button"
                                 onClick={() => {
-                                    navigator.clipboard.writeText(testCliCommand);
+                                    copyToClipboard(testCliCommand);
                                     showToast('Command copied to clipboard', 'info');
                                 }}
                                 className="px-3 py-1.5 text-xs font-medium border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"

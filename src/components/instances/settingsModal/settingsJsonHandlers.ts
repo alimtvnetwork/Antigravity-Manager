@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../../utils/clipboard';
 import { showToast } from '../../common/ToastContainer';
 import * as instanceService from '../../../services/instanceService';
 import { isTauri } from '../../../utils/env';
@@ -30,7 +31,7 @@ export function createJsonHandlers(core: SettingsCore): JsonHandlers {
 
     const handleCopyToClipboard = async () => {
         try {
-            await navigator.clipboard.writeText(jsonContent);
+            await copyToClipboard(jsonContent);
             showToast('Settings JSON copied to clipboard', 'info');
         } catch {
             showToast('Failed to copy to clipboard', 'error');

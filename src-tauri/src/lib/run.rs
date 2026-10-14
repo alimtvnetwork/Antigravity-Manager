@@ -125,6 +125,7 @@ pub fn run() {
             commands::import_from_db,
             commands::import_custom_db,
             commands::sync_account_from_db,
+            commands::copy_text_to_clipboard,
             commands::save_text_file,
             commands::read_text_file,
             commands::clear_log_cache,

@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../utils/clipboard';
 import React, { useState } from 'react';
 import {
   AlertCircle,
@@ -90,15 +91,22 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
   const handleCopySingle = async (error: CapturedError, e: React.MouseEvent) => {
     e.stopPropagation();
     const text = redactSensitiveText(generateCompactReport(error));
+    const copied = await copyToClipboard(text);
+    if (!copied) {
+      showToast('Failed to copy error report', 'error');
+      return;
+    }
     try {
-      await navigator.clipboard.writeText(text);
       setCopiedId(error.id);
       setTimeout(() => {
         setCopiedId((curr) => (curr === error.id ? null : curr));
       }, 2000);
       showToast(`Copied [${error.code}] diagnostic report!`, 'success');
     } catch (err) {
-      console.error('Failed to copy single error report:', err);
+      useErrorStore.getState().trackWarning(err, {
+        source: 'error-history-drawer.handleCopySingle',
+        triggerAction: 'copy_single_report',
+      });
       showToast('Failed to copy error report', 'error');
     }
   };
@@ -113,18 +121,17 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
       ? redactSensitiveText(generateAllErrorsMarkdownReport(recentErrors))
       : JSON.stringify(recentErrors.map(redactErrorObject), null, 2);
 
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedAll(true);
-      setTimeout(() => setCopiedAll(false), 2000);
-      showToast(
-        `Copied ${recentErrors.length} error logs to clipboard (${isMarkdown ? 'Markdown' : 'JSON'})!`,
-        'success'
-      );
-    } catch (err) {
-      console.error('Failed to copy error logs:', err);
+    const copied = await copyToClipboard(text);
+    if (!copied) {
       showToast('Failed to copy to clipboard', 'error');
+      return;
     }
+    setCopiedAll(true);
+    setTimeout(() => setCopiedAll(false), 2000);
+    showToast(
+      `Copied ${recentErrors.length} error logs to clipboard (${isMarkdown ? 'Markdown' : 'JSON'})!`,
+      'success'
+    );
   };
 
   const handleDownloadMd = () => {

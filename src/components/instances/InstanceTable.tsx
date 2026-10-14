@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../utils/clipboard';
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '../../utils/cn';
 import { useAccountStore } from '../../stores/useAccountStore';
@@ -58,7 +59,7 @@ export default function InstanceTable({
 
     const handleCopyPath = async (id: string, path: string) => {
         try {
-            await navigator.clipboard.writeText(path);
+            await copyToClipboard(path);
             setCopiedPathId(id);
             setTimeout(() => setCopiedPathId(null), 1500);
         } catch (err) {

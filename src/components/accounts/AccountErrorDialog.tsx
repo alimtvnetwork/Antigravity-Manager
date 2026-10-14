@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../utils/clipboard';
 import { Ban, Lock, Clock, ExternalLink, Copy, FileText, Terminal, ChevronDown, ChevronRight } from 'lucide-react';
 import { Account } from '../../types/account';
 import { formatDate } from '../../utils/format';
@@ -103,13 +104,21 @@ export default function AccountErrorDialog({ account, onClose }: AccountErrorDia
 
     // Copy utilities
     const handleCopyUrl = (url: string) => {
-        navigator.clipboard.writeText(url);
-        showToast(t('accounts.validation_url_copied', 'Verification URL copied to clipboard'), 'success');
+        void copyToClipboard(url).then((copied) => {
+            if (!copied) {
+                return;
+            }
+            showToast(t('accounts.validation_url_copied', 'Verification URL copied to clipboard'), 'success');
+        });
     };
 
     const handleCopyText = (text: string, msg: string) => {
-        navigator.clipboard.writeText(text);
-        showToast(msg, 'success');
+        void copyToClipboard(text).then((copied) => {
+            if (!copied) {
+                return;
+            }
+            showToast(msg, 'success');
+        });
     };
 
     const renderMessageWithLinks = (text: string) => {

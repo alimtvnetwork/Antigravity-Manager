@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../utils/clipboard';
 import { useState, useMemo } from 'react';
 import {
     Copy,
@@ -86,7 +87,7 @@ export default function MailboxExportModal({
 
     const handleCopy = () => {
         if (!exportedContent) return;
-        navigator.clipboard.writeText(exportedContent);
+        copyToClipboard(exportedContent);
         setIsCopied(true);
         showToast(`Copied ${format.toUpperCase()} to clipboard`, 'success');
         setTimeout(() => setIsCopied(false), 2000);

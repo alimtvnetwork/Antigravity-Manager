@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../utils/clipboard';
 import { useState } from 'react';
 import {
     Sparkles,
@@ -156,7 +157,7 @@ export default function AiSampleTemplatesModal({ isOpen, onClose }: Props) {
     const [copiedTab, setCopiedTab] = useState<string | null>(null);
 
     const handleCopy = (text: string, tabName: string) => {
-        navigator.clipboard.writeText(text);
+        copyToClipboard(text);
         setCopiedTab(tabName);
         showToast('Template copied to clipboard', 'success');
         setTimeout(() => setCopiedTab(null), 2000);

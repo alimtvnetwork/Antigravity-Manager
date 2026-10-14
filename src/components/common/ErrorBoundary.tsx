@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../utils/clipboard';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertCircle, RefreshCw, Home, Copy, Check } from 'lucide-react';
 import { useErrorStore } from '../../stores/error-store';
@@ -52,7 +53,7 @@ export class ErrorBoundary extends Component<Props, State> {
   private handleCopyError = (): void => {
     const { error, errorInfo } = this.state;
     const errorText = `[UI Error]\nMessage: ${error?.message || 'Unknown'}\nStack: ${error?.stack || ''}\nComponent Stack: ${errorInfo?.componentStack || ''}`;
-    navigator.clipboard.writeText(errorText);
+    copyToClipboard(errorText);
     this.setState({ copied: true });
     setTimeout(() => this.setState({ copied: false }), 2000);
   };

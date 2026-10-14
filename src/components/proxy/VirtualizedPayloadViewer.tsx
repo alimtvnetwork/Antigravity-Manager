@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../utils/clipboard';
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -174,7 +175,7 @@ export const VirtualizedPayloadViewer: React.FC<VirtualizedPayloadViewerProps> =
         if (e) e.stopPropagation();
         if (!prettyHeaders) return;
         try {
-            await navigator.clipboard.writeText(prettyHeaders);
+            await copyToClipboard(prettyHeaders);
             setIsHeadersCopied(true);
             setTimeout(() => setIsHeadersCopied(false), 2000);
         } catch {

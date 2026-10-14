@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../utils/clipboard';
 import React, { useState } from 'react';
 import { useErrorStore } from '../../stores/error-store';
 import {
@@ -34,24 +35,36 @@ export function ErrorModal(): React.ReactNode {
 
   const handleCopyAi = () => {
     const text = generateCompactReport(selectedError);
-    navigator.clipboard.writeText(text);
-    setCopiedAi(true);
-    setTimeout(() => setCopiedAi(false), 2000);
-    showToast('Diagnostic AI report copied! Ready to share with AI.', 'success');
+    void copyToClipboard(text).then((copied) => {
+      if (!copied) {
+        return;
+      }
+      setCopiedAi(true);
+      setTimeout(() => setCopiedAi(false), 2000);
+      showToast('Diagnostic AI report copied! Ready to share with AI.', 'success');
+    });
   };
 
   const handleCopyAllData = () => {
     const text = generateComprehensiveAllDataReport(selectedError);
-    navigator.clipboard.writeText(text);
-    setCopiedAll(true);
-    setTimeout(() => setCopiedAll(false), 2000);
-    showToast('All comprehensive error data copied to clipboard!', 'success');
+    void copyToClipboard(text).then((copied) => {
+      if (!copied) {
+        return;
+      }
+      setCopiedAll(true);
+      setTimeout(() => setCopiedAll(false), 2000);
+      showToast('All comprehensive error data copied to clipboard!', 'success');
+    });
   };
 
   const handleCopyJson = () => {
     const text = generateJsonReport(selectedError);
-    navigator.clipboard.writeText(text);
-    showToast('Raw error JSON copied to clipboard.', 'info');
+    void copyToClipboard(text).then((copied) => {
+      if (!copied) {
+        return;
+      }
+      showToast('Raw error JSON copied to clipboard.', 'info');
+    });
   };
 
   const handleRemove = () => {

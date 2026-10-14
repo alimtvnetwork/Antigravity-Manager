@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../../utils/clipboard';
 import { Copy, Check, RotateCcw, ChevronUp, ChevronDown } from 'lucide-react';
 import type { AgmConversationNode, AgmProjectTreeNode, ViewMode } from './types';
 import { RichMarkdownRenderer } from './markdown';
@@ -102,7 +103,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                 <button
                     type="button"
                     onClick={() => {
-                        navigator.clipboard.writeText(activePromptText);
+                        copyToClipboard(activePromptText);
                         setIsCopied(true);
                         setTimeout(() => setIsCopied(false), 2000);
                     }}
@@ -145,7 +146,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
             <button
                 type="button"
                 onClick={() => {
-                    navigator.clipboard.writeText(activePromptText);
+                    copyToClipboard(activePromptText);
                     setIsCopied(true);
                     setTimeout(() => setIsCopied(false), 2000);
                 }}

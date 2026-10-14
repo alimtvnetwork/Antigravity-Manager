@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../../utils/clipboard';
 import { EmailNotificationsApi } from './useEmailNotifications';
 import ModalDialog from '../../common/ModalDialog';
 import { AlertCircle, CheckCircle2, Copy, FileCode, FileJson, FileText, Key, Loader2, RefreshCw, Send, Sparkles, Upload } from 'lucide-react';
@@ -169,7 +170,7 @@ export function AccountModal(props: EmailNotificationsApi) {
         \`\`\`
 
         Instructions: Provide the app-password and verified SMTP/IMAP settings inside the JSON segment so it can be pasted directly into Antigravity-Manager's mailbox import.`;
-                                            navigator.clipboard.writeText(instructions);
+                                            copyToClipboard(instructions);
                                             showToast('AI instructions with embedded JSON syntax copied to clipboard', 'success');
                                         }}
                                         className="px-2.5 py-1 text-[11px] font-semibold bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-md flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"

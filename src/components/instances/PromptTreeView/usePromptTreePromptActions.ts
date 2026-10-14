@@ -118,8 +118,15 @@ export function usePromptTreePromptActions({
                 setIsCopiedRaw(false);
                 setActionMsg(null);
             }, 2500);
-        } catch {
-            await navigator.clipboard.writeText(activePromptText);
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'usePromptTreePromptActions.copyRichPrompt',
+                triggerAction: 'clipboard.write',
+            });
+            const copied = await copyToClipboard(activePromptText);
+            if (!copied) {
+                return;
+            }
             setIsCopiedRaw(true);
             setTimeout(() => setIsCopiedRaw(false), 2000);
         }
@@ -245,7 +252,7 @@ export function usePromptTreePromptActions({
             }
 
             // 2. Copy prompt content to clipboard so user can paste immediately (manual fallback).
-            // Use the robust helper: navigator.clipboard.writeText throws
+            // Use the robust helper: copyToClipboard throws
             // NotAllowedError when the document is not focused (e.g. the IDE
             // window stole focus during dispatch) — the execCommand fallback
             // covers that case instead of just logging a warning.

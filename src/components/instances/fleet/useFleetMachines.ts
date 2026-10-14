@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../../utils/clipboard';
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { supabaseService } from '../../../services/supabaseService';
@@ -166,7 +167,7 @@ export function useFleetMachines(): FleetMachinesState {
     const handleCopyIp = async (ip: string) => {
         if (!ip) return;
         try {
-            await navigator.clipboard.writeText(ip);
+            await copyToClipboard(ip);
             setCopiedIp(ip);
             setTimeout(() => {
                 setCopiedIp(null);

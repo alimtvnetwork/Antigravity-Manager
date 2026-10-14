@@ -25,12 +25,27 @@ export function persistClientCrash(err: unknown, source: string): void {
   }
 }
 
+function isClipboardFocusError(reason: unknown): boolean {
+  const text = reason instanceof Error
+    ? `${reason.message}\n${reason.stack ?? ''}`
+    : String(reason ?? '');
+  return text.includes('Document is not focused')
+    || text.includes("Failed to execute 'writeText'");
+}
+
 function replayPersistedClientError(): void {
   const raw = localStorage.getItem(LAST_CLIENT_ERROR_KEY);
   if (!raw) {
     return;
   }
   localStorage.removeItem(LAST_CLIENT_ERROR_KEY);
+  if (isClipboardFocusError(raw)) {
+    useErrorStore.getState().trackWarning(new Error(raw), {
+      source: 'persisted-client-crash',
+      triggerAction: 'replay_clipboard_not_focused',
+    });
+    return;
+  }
   useErrorStore.getState().captureError(new Error(raw), {
     source: 'persisted-client-crash',
     triggerAction: 'replay_last_client_error',
@@ -123,6 +138,15 @@ function handleUnhandledRejection(event: PromiseRejectionEvent): void {
 
   // If reason is an intentional cancellation, ignore
   if (typeof reason === 'object' && reason !== null && reason.name === 'AbortError') {
+    return;
+  }
+
+  if (isClipboardFocusError(reason)) {
+    event.preventDefault();
+    useErrorStore.getState().trackWarning(reason, {
+      source: 'window.unhandledrejection',
+      triggerAction: 'clipboard_not_focused',
+    });
     return;
   }
 

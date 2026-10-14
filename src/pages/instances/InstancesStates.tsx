@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../utils/clipboard';
 import { useState } from 'react';
 import { Search, Plus, Play, RotateCw, Laptop, AlertCircle, Terminal, ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
 import type { InstancePageApi } from './instancePageTypes';
@@ -183,7 +184,7 @@ export function InstancesCliHelpCard() {
     ];
 
     const copyCommand = (cmd: string) => {
-        navigator.clipboard.writeText(cmd);
+        copyToClipboard(cmd);
         setCopiedCmd(cmd);
         setTimeout(() => setCopiedCmd(null), 2000);
     };

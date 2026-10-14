@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../utils/clipboard';
 import { useState } from 'react';
 import {
     Star,
@@ -71,14 +72,10 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
         }
     };
 
-    const copyToClipboard = async (text: string, successMsg: string, failMsg: string, e: React.MouseEvent) => {
+    const copyInstanceText = async (text: string, successMsg: string, failMsg: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        try {
-            await navigator.clipboard.writeText(text);
-            showToast(successMsg, 'info');
-        } catch {
-            showToast(failMsg, 'error');
-        }
+        const copied = await copyToClipboard(text);
+        showToast(copied ? successMsg : failMsg, copied ? 'info' : 'error');
     };
 
     return (
@@ -337,7 +334,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                             </div>
                             <button
                                 type="button"
-                                onClick={(e) => copyToClipboard(inst.config.data_dir, 'Data dir path copied to clipboard', 'Failed to copy path', e)}
+                                onClick={(e) => copyInstanceText(inst.config.data_dir, 'Data dir path copied to clipboard', 'Failed to copy path', e)}
                                 className="opacity-60 group-hover:opacity-100 p-0.5 rounded-[5px] hover:bg-gray-200 dark:hover:bg-[#40285e] text-gray-500 dark:text-gray-300 transition-opacity cursor-pointer shrink-0"
                                 title="Copy directory path"
                             >
@@ -355,7 +352,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={(e) => copyToClipboard(effectiveExePath, 'Executable path copied to clipboard', 'Failed to copy executable path', e)}
+                                    onClick={(e) => copyInstanceText(effectiveExePath, 'Executable path copied to clipboard', 'Failed to copy executable path', e)}
                                     className="opacity-60 group-hover/exe:opacity-100 p-0.5 rounded-[5px] hover:bg-slate-200 dark:hover:bg-[#40285e] text-slate-500 dark:text-slate-300 transition-opacity cursor-pointer shrink-0"
                                     title="Copy executable path"
                                 >

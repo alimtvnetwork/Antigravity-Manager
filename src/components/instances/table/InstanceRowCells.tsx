@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../../utils/clipboard';
 import { useState } from 'react';
 import { Mail, Folder, Copy, Check, RotateCw, Terminal } from 'lucide-react';
 import { useErrorStore } from '../../../stores/error-store';
@@ -317,7 +318,7 @@ export function ExePathCell({ inst }: { inst: InstanceInfo }) {
 
     const handleCopy = async () => {
         try {
-            await navigator.clipboard.writeText(effectivePath);
+            await copyToClipboard(effectivePath);
             setIsCopied(true);
             setTimeout(() => setIsCopied(false), 1500);
         } catch (err) {

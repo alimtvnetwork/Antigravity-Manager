@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../../utils/clipboard';
 import { EmailNotificationsApi } from './useEmailNotifications';
 import { showToast } from '../../common/ToastContainer';
 import { CheckCircle2, Copy, Eye, EyeOff, Loader2, MessageSquare, RefreshCw, Send, Sparkles, Terminal } from 'lucide-react';
@@ -34,7 +35,7 @@ export function TelegramSection(props: EmailNotificationsApi) {
                             type="button"
                             onClick={() => {
                                 const cmd = `agm telegram connect "${telegramConfig?.bot_token || '<BOT_TOKEN>'}"${telegramConfig?.allowed_chat_id ? ` ${telegramConfig.allowed_chat_id}` : ''}`;
-                                navigator.clipboard.writeText(cmd);
+                                copyToClipboard(cmd);
                                 showToast('AGM CLI connect command copied', 'info');
                             }}
                             className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-sky-200 dark:border-sky-900/50 bg-sky-50/50 dark:bg-sky-950/20 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/40 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
@@ -48,7 +49,7 @@ export function TelegramSection(props: EmailNotificationsApi) {
                             type="button"
                             onClick={() => {
                                 const cmd = `.\\03-ai-scripts\\telegram-bot-helper.ps1 -BotToken "${telegramConfig?.bot_token || 'TOKEN'}" -ChatId "${telegramConfig?.allowed_chat_id || 'CHAT_ID'}"`;
-                                navigator.clipboard.writeText(cmd);
+                                copyToClipboard(cmd);
                                 showToast('PowerShell verification command copied', 'info');
                             }}
                             className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-sky-200 dark:border-sky-900/50 bg-sky-50/50 dark:bg-sky-950/20 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/40 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"

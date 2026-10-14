@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../../utils/clipboard';
 import { useState, useMemo } from 'react';
 import type React from 'react';
 import { Check, Copy } from 'lucide-react';
@@ -156,7 +157,7 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
     const [copiedBlockIndex, setCopiedBlockIndex] = useState<number | null>(null);
 
     const handleCopyCode = (code: string, index: number) => {
-        navigator.clipboard.writeText(code).catch((e) => console.warn(e));
+        copyToClipboard(code);
         setCopiedBlockIndex(index);
         setTimeout(() => setCopiedBlockIndex(null), 2000);
     };

@@ -1,3 +1,4 @@
+import { copyToClipboard } from '../../../utils/clipboard';
 import { X, Copy, Check, Image as ImageIcon, FileText, Folder } from 'lucide-react';
 import { RichMarkdownRenderer } from './markdown';
 import { stripImagesFromPrompt } from './formatters';
@@ -47,7 +48,7 @@ export function InspectorModal(props: InspectorModalProps) {
                         type="button"
                         onClick={() => {
                             const cleanText = stripImagesFromPrompt(inspectorPrompt.text);
-                            navigator.clipboard.writeText(cleanText);
+                            copyToClipboard(cleanText);
                             setIsCopied(true);
                             setTimeout(() => setIsCopied(false), 2000);
                         }}

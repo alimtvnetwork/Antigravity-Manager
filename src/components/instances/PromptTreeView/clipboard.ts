@@ -1,11 +1,12 @@
-export async function copyPromptWithRichImages(markdownText: string): Promise<boolean> {
-    try {
-        if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
-            await navigator.clipboard.writeText(markdownText);
-            return true;
-        }
+import { copyToClipboard } from '../../../utils/clipboard';
+import { useErrorStore } from '../../../stores/error-store';
 
-        // Convert markdown images to HTML <img> tags
+export async function copyPromptWithRichImages(markdownText: string): Promise<boolean> {
+    if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
+        return copyToClipboard(markdownText);
+    }
+
+    try {
         let htmlContent = markdownText
             .replace(/\n\n/g, '</p><p>')
             .replace(/\n/g, '<br/>')
@@ -23,14 +24,11 @@ export async function copyPromptWithRichImages(markdownText: string): Promise<bo
 
         await navigator.clipboard.write([item]);
         return true;
-    } catch {
-        // Fallback to standard text copy if rich clipboard write fails
-        try {
-            await navigator.clipboard.writeText(markdownText);
-            return true;
-        } catch {
-            return false;
-        }
+    } catch (err) {
+        useErrorStore.getState().trackWarning(err, {
+            source: 'PromptTree.copyPromptWithRichImages',
+            triggerAction: 'clipboard.write',
+        });
+        return copyToClipboard(markdownText);
     }
 }
-
