@@ -256,6 +256,15 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.200.0 (2026-10-14)**:
+        -   **[Audit] UI interaction audit recorder (Thanks to @aukgit)**:
+            -   **Description**: New recorder captures every UI interaction (click, navigation, input, scroll) with method name, UI target (route + component + element id), trigger, actor (user/cli/telegram/system), and timestamp. SQLite-backed, with start/stop/clear/export, a recording indicator in the navbar, and a filterable audit panel with JSON/JSONL export for bug reports.
+        -   **[CLI] `agm ui` drives any UI surface (Thanks to @aukgit)**:
+            -   **Description**: New `agm ui open/goto/ls/scroll/click` commands navigate to any page or settings subpage, list the UI element tree, scroll to and focus elements, and click through the same code path as the GUI. Actionable `--help` with examples for every subcommand. Backend `/api/ui/*` endpoints drive the live UI via Tauri events.
+        -   **[Telegram] `/ui goto/ls/scroll` commands (Thanks to @aukgit)**:
+            -   **Description**: The bot can now navigate the UI, list routes, and scroll to elements, with 15 new hardening tests for the `/send` flow and help text.
+
+
     *   **v4.199.0 (2026-10-14)**:
         -   **[Prompt Tree] Send, Backup, and Restore report a real agy result (Thanks to @aukgit)**:
             -   **Description**: Send passes `--conversation` and returns stderr when `agy` exits. Backup and Restore use a native dialog, and Restore dispatches the imported prompts.

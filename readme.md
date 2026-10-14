@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.199.0-3B82F6?style=flat-square" alt="Version v4.199.0">
+    <img src="https://img.shields.io/badge/Version-v4.200.0-3B82F6?style=flat-square" alt="Version v4.200.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -115,7 +115,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.199.0)**
+**Bar 2: Version-Based Installation (v4.200.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -559,6 +559,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
+> Latest version **v4.200.0**: UI interaction audit recorder, `agm ui` CLI bridge, and Telegram `/ui` commands — the recorder captures every UI interaction (click, navigation, input, scroll) with method name, target, trigger, and timestamp in SQLite, with a navbar indicator and filterable audit panel; `agm ui open/goto/ls/scroll/click` drives any UI surface from the CLI with actionable help; backend `/api/ui/*` endpoints navigate the live UI via Tauri events; Telegram `/ui goto/ls/scroll` mirrors the CLI. (Thanks to @aukgit)
 > Latest version **v4.199.0**: Prompt send, account switch, and Telegram window commands — Send starts `agy` with `--conversation` and surfaces an immediate exit; Backup and Restore use a native dialog and Restore dispatches; a live Antigravity window counts as a successful switch while a dead saved process id does not; a copy switch leaves the Default login in the shared keyring; Telegram `/ui`, `/shot`, and `/target` open the manager, return a screenshot, and aim the next message. The UI session recorder guideline is written and the recorder is not implemented. (Thanks to @aukgit)
 > Latest version **v4.198.0**: Prompt Tree WebView2 OOM Crash Fix (`0xe0000008`), Platform Asset-Gated Update Notification & CLI Prompt Copy/Resend Parity — Resolved the infinite `useEffect` render loop in `src/components/instances/PromptTreeView/usePromptTreeData.ts` and serialized uncached workspace scans in `src-tauri/src/modules/repo_db/tree.rs`, eliminating the 565-thread spike and WebView2 `0xe0000008` crash while keeping warm Prompt Tree loads under `200 ms`; gated **Update Available** notifications in `src-tauri/src/modules/update_checker/channels.rs` and `src/stores/use-update-store.ts` on verified platform installer assets (`.exe`/`.msi`, `.dmg`/`.app.tar.gz`, `.AppImage`/`.deb`/`.rpm`) and restyled `src/components/UpdateNotification.tsx` with high-contrast dark-glass and `#1af18d` accents; nulled detached IDE stdio handles in `src-tauri/src/modules/process/launch.rs` so `agm prompts restore` and `agm auto-switch test` complete in `<200 ms` without pipe hangs; and added `agm prompts copy`, `agm prompts resend`, `agm instances open-ui`, and pure JSON stdout when `--json` is passed. (Thanks to @aukgit)
 > Latest version **v4.197.1**: Prompt tree cache and crash log — startup keeps `prompt_tree_cache` for 120 seconds, the CLI tree reads that cache, a tree panic returns a backtrace, and the tree header plus `agm prompts reset-tree` clear only the cache. (Thanks to @aukgit)
