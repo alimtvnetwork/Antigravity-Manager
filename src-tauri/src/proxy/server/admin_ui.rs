@@ -22,6 +22,7 @@ use axum::{
 };
 use serde::Deserialize;
 use std::collections::HashMap;
+use tauri::Emitter;
 
 // ── Route registry ──────────────────────────────────────────────────────────
 // Mirrors `src-tauri/src/bin/agm/ui_cmds.rs` ROUTES (grounded in
