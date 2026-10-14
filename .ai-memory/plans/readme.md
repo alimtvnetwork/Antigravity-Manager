@@ -53,6 +53,7 @@
 | `158` | [superbase-information-removal.md](./superbase-information-removal.md) | `DONE` | Complete Supabase credential removal, codebase & test sanitization, external repo-secrets decoupling, standalone one-liner import helper `scripts/import-supabase-secrets.ps1`, and git commit history blob replacement. |
 | `157` | [verify-running-prompts-instance-prompts-section.md](./verify-running-prompts-instance-prompts-section.md) | `DONE` | Verification and root cause fix for running prompts in instance prompts section: step vs turn completion differentiation in transcript inspection, authoritative not_fully_idle supremacy over CASCADE_RUN_STATUS_IDLE, 600s adaptive thinking window, and E2E verification test harness. |
 | `158` | [supabase-connection-and-ui-ux-enhancement.md](./supabase-connection-and-ui-ux-enhancement.md) | `IN_PROGRESS` | Dual Supabase cluster configuration (Lovable primary, Personal secondary), 3-tier probe ladder & stack trace error propagation, QuotaProgressBar #1af18d green & 5-slot grid, compact right-aligned layout, theming contrast repair, CSS3 hover animations, and Prompt Tree clipboard deadlock fix & loading progress. |
+| `159` | [antigravity-manager-and-gitmap-testing.md](./antigravity-manager-and-gitmap-testing.md) | `IN_PROGRESS` | Prompt tree cache survives process start, 120s TTL, panic backtrace on tree load, Reset control, CLI reset-tree, and CLI E2E of instances, backup, restore, send, and enqueue. |
 
 ## Recent Completed Tasks Register (last 20, newest first)
 

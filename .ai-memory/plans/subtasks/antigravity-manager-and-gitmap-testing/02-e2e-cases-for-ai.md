@@ -1,6 +1,6 @@
 # E2E cases for a blind AI
 
-**Status:** `PENDING`. These steps were not executed on a live window.
+**Status:** CLI cases below were run on 2026-10-14 against the installed `agm` 4.197.0. The Reset button and the cache-keep fix are in source and are not in that binary yet.
 
 Do not mark a case passed by reading code. Use the installed `agm` binary that contains this change. Do not print tokens or prompt bodies.
 
@@ -62,14 +62,17 @@ Save one screenshot of the tree after Case 05. The header must show Backup, Rest
 ## Result block
 
 ```text
-CLI tree:
-CLI reset:
-CLI send:
-CLI enqueue:
-Backup:
-Restore:
-Window first open:
-Window second open:
-Reset button:
-GitMap:
+CLI instances: PASS exit 0. Two profiles, both Idle. Default and Default Copy.
+CLI tree: PASS exit 0 in 1.97s on installed 4.197.0. Log still says prompt_tree_cache rows wiped. That wipe is what the source change removes.
+CLI reset: NOT IN INSTALLED BINARY. Source command is agm prompts reset-tree.
+CLI send: PASS. Prompt p-b5834e4b status running on default. Antigravity.exe started.
+CLI enqueue: PASS exit 0. queued-f669d8d6 status queued, queue_position 1, fifo_ordered true.
+Backup: PASS exit 0 for default and for default-copy-5597. Zero running prompts were snapshotted before the send.
+Restore: PASS exit 0 for default. status restored.
+Switch threshold: PASS. agm auto-switch threshold 98 read back 98.0%. Restored to the previous 15.0% so the live daemon does not rotate on the next tick.
+Window / Reset button: NOT CLICKED. Screenshot assets/screenshots/antigravity-manager-and-gitmap-testing-01.png is the desktop during the CLI run, not the prompt tree header.
+GitMap search: PASS. gitmap aum search printed one hit with bright ANSI color.
+GitMap login email prompt: NOT PRESENT. Login is a token or browser menu. git user add accepts --name and --email.
+Supabase DNS: FAIL. Both configured hosts return "DNS name does not exist". No new project was created.
+Ubuntu: NOT RUN.
 ```

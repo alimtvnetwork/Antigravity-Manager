@@ -221,6 +221,8 @@ pub(crate) fn print_help() {
     println!("        10-minute automated queue bookkeeping: auto-push FIFO prompts when project is idle");
     println!("    tree [all] [--words <W>] [--json]");
     println!("        Render Project → Conversation → 200-Word Prompt tree with Dual Seq IDs ([AGM:P001 | GM:#1], [AGM:C001 | GM:<cid>])");
+    println!("    prompts reset-tree, prompts reset-db [-i <inst>] [--json]");
+    println!("        Clear the prompt tree cache for one instance or all instances. Running and queued prompts stay.");
     println!("    which-prompts-running, wpr [--json]");
     println!("        List running projects, conversation IDs, and prompt queues");
     println!("    query, search [term] [--words <W>] [--limit <N>] [--status <S>] [--json]");
