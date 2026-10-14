@@ -63,8 +63,8 @@ Save one screenshot of the tree after Case 05. The header must show Backup, Rest
 
 ```text
 CLI instances: PASS exit 0. Two profiles, both Idle. Default and Default Copy.
-CLI tree: PASS exit 0 in 1.97s on installed 4.197.0. Log still says prompt_tree_cache rows wiped. That wipe is what the source change removes.
-CLI reset: NOT IN INSTALLED BINARY. Source command is agm prompts reset-tree.
+CLI tree: PASS on the locally compiled debug binary agm v4.197.1. First load 1.54s and the log says prompt_tree_cache kept. Second load 0.23s. After reset-tree the next load was 1.46s. The installed 4.197.0 binary still wiped the cache in 1.97s.
+CLI reset: PASS on the locally compiled agm v4.197.1. `agm prompts reset-tree --instance default` printed `Prompt tree cache cleared for default`. The following tree load scanned again (1.46s) and the load before reset did not (0.23s, zero liveness probes).
 CLI send: PASS. Prompt p-b5834e4b status running on default. Antigravity.exe started.
 CLI enqueue: PASS exit 0. queued-f669d8d6 status queued, queue_position 1, fifo_ordered true.
 Backup: PASS exit 0 for default and for default-copy-5597. Zero running prompts were snapshotted before the send.
