@@ -103,3 +103,7 @@ antigravity_resume_task.json
 scratch/*.txt
 scratch/*.dump
 .antigravity_resume_task.default.json
+
+
+# GitMap & Task Persistence
+.gitmap/backup/
