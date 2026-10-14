@@ -29,14 +29,21 @@ export const useUpdateStore = create<UpdateStoreState>((set, get) => ({
     if (get().isChecking) return get().updateInfo;
     set({ isChecking: true });
     try {
-      const info = await invoke<UpdateInfo>('check_update_via_script').catch(() =>
-        invoke<UpdateInfo>('check_for_updates')
+      const info = await invoke<UpdateInfo>('check_for_updates').catch(() =>
+        invoke<UpdateInfo>('check_update_via_script')
       );
-      set({ updateInfo: info, isChecking: false });
-      if (info && info.has_update) {
+      const hasValidUpdate = Boolean(
+        info &&
+          info.has_update &&
+          info.latest_version &&
+          info.latest_version !== info.current_version
+      );
+      const normalized = info ? { ...info, has_update: hasValidUpdate } : null;
+      set({ updateInfo: normalized, isChecking: false });
+      if (hasValidUpdate) {
         set({ showNotification: true });
       }
-      return info;
+      return normalized;
     } catch (e) {
       console.warn('[useUpdateStore] update check notice:', e);
       set({ isChecking: false });

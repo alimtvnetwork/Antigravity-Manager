@@ -22,6 +22,24 @@ pub fn handle_prompts_subcommand(args: &[String], entry_cmd: &str) {
     match sub.as_str() {
         "ls" | "list" => execute_prompts_list(sub_args),
         "tree" => execute_prompts_tree(sub_args),
+        "reset-tree" | "reset-db" => {
+            let instance_opt = extract_flag_value(sub_args, &["--instance", "-i", "--profile"]);
+            let is_json = is_flag_present(sub_args, &["--json", "-j"]);
+            repo_db::invalidate_prompt_tree_cache(instance_opt.as_deref());
+            if is_json {
+                CliEnvelope::ok(
+                    "prompts reset-tree",
+                    instance_opt.clone(),
+                    serde_json::json!({ "cleared": true, "instance": instance_opt }),
+                )
+                .print_and_exit();
+            }
+            println!(
+                "Prompt tree cache cleared for {}",
+                instance_opt.as_deref().unwrap_or("all instances")
+            );
+            std::process::exit(0);
+        }
         "send" | "run" => execute_prompts_send(sub_args),
         "enqueue" | "queue" => execute_prompts_enqueue(sub_args),
         "backup" => execute_prompts_backup(sub_args),
@@ -99,11 +117,12 @@ pub(crate) fn execute_prompts_list(sub_args: &[String]) {
 pub(crate) fn execute_prompts_tree(sub_args: &[String]) {
     let is_json = is_flag_present(sub_args, &["--json", "-j"]);
     let is_running_only = is_flag_present(sub_args, &["--running", "--only-running"]);
+    let is_force = is_flag_present(sub_args, &["--force", "--refresh", "-f"]);
     let instance_opt = extract_flag_value(sub_args, &["--instance", "-i", "--profile"]);
     let target_inst = instance_opt.as_deref();
 
     let tree =
-        repo_db::get_project_conversation_tree_cached(target_inst, 200, is_running_only, true);
+        repo_db::get_project_conversation_tree_cached(target_inst, 200, is_running_only, is_force);
 
     if is_json {
         let payload = serde_json::json!({

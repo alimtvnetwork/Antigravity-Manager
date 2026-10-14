@@ -141,7 +141,11 @@ pub async fn check_update_via_script() -> Result<UpdateInfo, String> {
             if let Some(start_idx) = stdout.find('{') {
                 if let Some(end_idx) = stdout.rfind('}') {
                     let json_str = &stdout[start_idx..=end_idx];
-                    if let Ok(info) = serde_json::from_str::<UpdateInfo>(json_str) {
+                    if let Ok(mut info) = serde_json::from_str::<UpdateInfo>(json_str) {
+                        info.current_version = CURRENT_VERSION.to_string();
+                        let is_newer = compare_versions(&info.latest_version, CURRENT_VERSION);
+                        info.has_update =
+                            is_newer && verify_tag_has_platform_asset(&info.latest_version).await;
                         return Ok(info);
                     }
                 }
@@ -168,7 +172,11 @@ pub async fn check_update_via_script() -> Result<UpdateInfo, String> {
             if let Some(start_idx) = stdout.find('{') {
                 if let Some(end_idx) = stdout.rfind('}') {
                     let json_str = &stdout[start_idx..=end_idx];
-                    if let Ok(info) = serde_json::from_str::<UpdateInfo>(json_str) {
+                    if let Ok(mut info) = serde_json::from_str::<UpdateInfo>(json_str) {
+                        info.current_version = CURRENT_VERSION.to_string();
+                        let is_newer = compare_versions(&info.latest_version, CURRENT_VERSION);
+                        info.has_update =
+                            is_newer && verify_tag_has_platform_asset(&info.latest_version).await;
                         return Ok(info);
                     }
                 }

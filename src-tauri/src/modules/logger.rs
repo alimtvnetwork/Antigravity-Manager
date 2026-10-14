@@ -45,8 +45,16 @@ pub fn init_logger() {
     let file_appender = tracing_appender::rolling::daily(log_dir, "app.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
-    // 2. Console output layer (using local timezone)
+    // 2. Console output layer (route to stderr when --json/-j is passed so stdout stays pure JSON)
+    let is_json_cli = std::env::args().any(|a| a == "--json" || a == "-j");
     let console_layer = fmt::Layer::new()
+        .with_writer(move || -> Box<dyn std::io::Write + Send> {
+            if is_json_cli {
+                Box::new(std::io::stderr())
+            } else {
+                Box::new(std::io::stdout())
+            }
+        })
         .with_target(false)
         .with_thread_ids(false)
         .with_level(true)

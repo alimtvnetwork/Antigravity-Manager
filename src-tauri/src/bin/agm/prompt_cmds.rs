@@ -46,6 +46,10 @@ pub(crate) fn dispatch_prompt_domain(subcommand: &str, args: &[String]) {
         "import-compact" | "compact-import" => crate::compact_cmds::cmd_import_compact(args),
         "backup" | "brp" => cmd_prompts_backup(args),
         "restore" | "rrp" => cmd_prompts_restore(args),
+        "resend" | "rrc" | "resend-running" => {
+            crate::prompt_resend::cmd_resend_running_commands(args)
+        }
+        "copy" | "cp" => cmd_prompts_copy(args),
         "purge" | "clean" => cmd_prompts_purge(args),
         _ => crate::common::handle_unknown_domain_command("prompts", subcommand, args),
     }
@@ -466,4 +470,176 @@ pub(crate) fn cmd_prompts_restore(args: &[String]) {
 
 pub(crate) fn cmd_prompts_purge(args: &[String]) {
     crate::cache_cmds::cmd_clear_cache(args);
+}
+
+pub(crate) fn cmd_prompts_copy(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let target_instance = ctx
+        .resolve_target_instance()
+        .unwrap_or_else(|_| "default".to_string());
+    let resolved_inst =
+        instance::resolve_instance_id(&target_instance).unwrap_or_else(|_| target_instance.clone());
+    let selector = ctx.positional_args.first().map(|s| s.trim().to_string());
+
+    let all_prompts = repo_db::list_all_prompts().unwrap_or_default();
+    let matched_active = all_prompts
+        .iter()
+        .rev()
+        .find(|p| {
+            let inst_ok = p.instance_id == resolved_inst
+                || (resolved_inst == "default"
+                    && (p.instance_id == "__default__" || p.instance_id.is_empty()));
+            if !inst_ok {
+                return false;
+            }
+            match selector.as_deref() {
+                Some(sel) if !sel.is_empty() => {
+                    p.id.eq_ignore_ascii_case(sel)
+                        || p.session_id.as_deref() == Some(sel)
+                        || p.project_id.contains(sel)
+                }
+                _ => true,
+            }
+        })
+        .cloned();
+
+    let (prompt_id, conv_id, repo_path, prompt_text) = if let Some(p) = matched_active {
+        (p.id, p.session_id, p.repo_path, p.prompt_content)
+    } else {
+        let tree =
+            repo_db::get_project_conversation_tree_cached(Some(&resolved_inst), 2000, false, false);
+        let found = tree.iter().find_map(|proj| {
+            proj.conversations.iter().find_map(|c| {
+                let text = match c.full_prompt_text.as_deref() {
+                    Some(full) if !full.trim().is_empty() => full.to_string(),
+                    _ => c.prompt_preview_200w.clone(),
+                };
+                if text.trim().is_empty() {
+                    return None;
+                }
+                let matches = match selector.as_deref() {
+                    Some(sel) if !sel.is_empty() => {
+                        c.conversation_id.eq_ignore_ascii_case(sel)
+                            || c.short_id.eq_ignore_ascii_case(sel)
+                            || c.seq_code.eq_ignore_ascii_case(sel)
+                            || proj.seq_code.eq_ignore_ascii_case(sel)
+                    }
+                    _ => true,
+                };
+                if matches {
+                    Some((
+                        c.seq_code.clone(),
+                        Some(c.conversation_id.clone()),
+                        proj.repo_path.clone(),
+                        text,
+                    ))
+                } else {
+                    None
+                }
+            })
+        });
+        match found {
+            Some(tuple) => tuple,
+            None => {
+                if ctx.json_output {
+                    CliEnvelope::<()>::err(
+                        "prompts copy",
+                        Some(target_instance),
+                        "PROMPT_NOT_FOUND",
+                        "No prompt found to copy for target instance",
+                    )
+                    .print_and_exit();
+                }
+                eprintln!(
+                    "[ERROR] No prompt found to copy for instance '{}'.",
+                    target_instance
+                );
+                std::process::exit(1);
+            }
+        }
+    };
+
+    let copied_to_clipboard = copy_text_to_system_clipboard(&prompt_text);
+    let data = serde_json::json!({
+        "id": prompt_id,
+        "instance_id": resolved_inst,
+        "conversation_id": conv_id,
+        "repo_path": repo_path,
+        "copied_to_clipboard": copied_to_clipboard,
+        "char_count": prompt_text.chars().count(),
+        "prompt_content": prompt_text,
+    });
+
+    if ctx.json_output {
+        CliEnvelope::ok("prompts copy", Some(target_instance), data).print_and_exit();
+    }
+
+    println!(
+        "[SUCCESS] Copied prompt '{}' ({} chars, clipboard={}) for instance '{}':\n{}",
+        prompt_id,
+        prompt_text.chars().count(),
+        copied_to_clipboard,
+        target_instance,
+        prompt_text
+    );
+}
+
+fn copy_text_to_system_clipboard(text: &str) -> bool {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(mut child) = Command::new("clip")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+        {
+            if let Some(mut stdin) = child.stdin.take() {
+                let _ = stdin.write_all(text.as_bytes());
+            }
+            return child.wait().map(|s| s.success()).unwrap_or(false);
+        }
+        false
+    }
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(mut child) = Command::new("pbcopy")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+        {
+            if let Some(mut stdin) = child.stdin.take() {
+                let _ = stdin.write_all(text.as_bytes());
+            }
+            return child.wait().map(|s| s.success()).unwrap_or(false);
+        }
+        false
+    }
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    {
+        for (bin, bin_args) in [
+            ("wl-copy", &[][..]),
+            ("xclip", &["-selection", "clipboard"][..]),
+            ("xsel", &["--clipboard", "--input"][..]),
+        ] {
+            if let Ok(mut child) = Command::new(bin)
+                .args(bin_args)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+            {
+                if let Some(mut stdin) = child.stdin.take() {
+                    let _ = stdin.write_all(text.as_bytes());
+                }
+                if child.wait().map(|s| s.success()).unwrap_or(false) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
 }

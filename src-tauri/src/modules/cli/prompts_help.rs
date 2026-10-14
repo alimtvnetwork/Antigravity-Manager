@@ -17,7 +17,9 @@ pub(crate) fn print_prompts_cli_help() {
     println!("Subcommands:");
     println!("  ls, list [--all] [-i <inst>] [--json]      List active & queued prompts");
     println!("  tree [--running] [-i <inst>] [--json]      Output hierarchical conversation tree");
-    println!("  reset-tree, reset-db [-i <inst>] [--json] Clear the prompt tree cache and keep prompts");
+    println!(
+        "  reset-tree, reset-db [-i <inst>] [--json] Clear the prompt tree cache and keep prompts"
+    );
     println!("  send, run <prompt> [-i <inst>] [-r <repo>] Dispatch prompt immediately via Smart Process Cache");
     println!("  enqueue, queue <prompt> [-i <inst>] [-r <repo>] Enqueue prompt into FIFO execution queue");
     println!(

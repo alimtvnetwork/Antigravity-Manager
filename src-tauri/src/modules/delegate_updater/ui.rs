@@ -14,7 +14,36 @@ pub fn open_ui(args: &[String]) {
     let resolved_target_exe =
         resolve_default_target_exe(opts.target_exe.clone(), &resolved_install_dir);
 
-    let exe_to_launch = if resolved_target_exe.exists() {
+    let sibling_gui = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+        .map(|dir| {
+            dir.join(if cfg!(target_os = "windows") {
+                "agm-alim.exe"
+            } else {
+                "agm-alim"
+            })
+        })
+        .filter(|p| p.exists());
+
+    let exe_to_launch = if opts.target_exe.is_none() {
+        if let Some(sibling) = sibling_gui {
+            sibling
+        } else if resolved_target_exe.exists() {
+            resolved_target_exe
+        } else {
+            let alt = resolved_install_dir.join(if cfg!(target_os = "windows") {
+                "agm-alim.exe"
+            } else {
+                "agm-alim"
+            });
+            if alt.exists() {
+                alt
+            } else {
+                resolved_target_exe
+            }
+        }
+    } else if resolved_target_exe.exists() {
         resolved_target_exe
     } else {
         let alt = resolved_install_dir.join(if cfg!(target_os = "windows") {

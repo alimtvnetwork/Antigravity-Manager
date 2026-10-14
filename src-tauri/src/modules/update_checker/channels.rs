@@ -101,6 +101,90 @@ pub(crate) struct UpdaterJson {
     pub(crate) version: String,
     pub(crate) notes: Option<String>,
     pub_date: Option<String>,
+    #[serde(default)]
+    pub(crate) platforms: Option<serde_json::Value>,
+}
+
+pub(crate) fn has_platform_asset_in_release(assets: &[GitHubReleaseAsset]) -> bool {
+    assets.iter().any(|asset| {
+        let name = asset.name.to_ascii_lowercase();
+        let url_ok = !asset.browser_download_url.trim().is_empty();
+        if !url_ok {
+            return false;
+        }
+        #[cfg(target_os = "windows")]
+        {
+            name.ends_with(".exe") || name.ends_with(".msi")
+        }
+        #[cfg(target_os = "macos")]
+        {
+            name.ends_with(".dmg") || name.ends_with(".app.tar.gz") || name.ends_with(".pkg")
+        }
+        #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+        {
+            name.ends_with(".appimage") || name.ends_with(".deb") || name.ends_with(".rpm")
+        }
+    })
+}
+
+fn has_platform_asset_in_updater_json(platforms: &Option<serde_json::Value>) -> bool {
+    let Some(serde_json::Value::Object(map)) = platforms else {
+        return false;
+    };
+    map.iter().any(|(key, val)| {
+        let k = key.to_ascii_lowercase();
+        let os_match = if cfg!(target_os = "windows") {
+            k.contains("windows") || k.contains("win")
+        } else if cfg!(target_os = "macos") {
+            k.contains("darwin") || k.contains("macos") || k.contains("osx")
+        } else {
+            k.contains("linux")
+        };
+        if !os_match {
+            return false;
+        }
+        val.get("url")
+            .and_then(|u| u.as_str())
+            .map(|s| {
+                let lower = s.trim().to_ascii_lowercase();
+                if cfg!(target_os = "windows") {
+                    lower.ends_with(".exe")
+                        || lower.ends_with(".msi")
+                        || lower.ends_with(".nsis.zip")
+                } else if cfg!(target_os = "macos") {
+                    lower.ends_with(".dmg")
+                        || lower.ends_with(".app.tar.gz")
+                        || lower.ends_with(".pkg")
+                } else {
+                    lower.ends_with(".appimage")
+                        || lower.ends_with(".appimage.tar.gz")
+                        || lower.ends_with(".deb")
+                        || lower.ends_with(".rpm")
+                }
+            })
+            .unwrap_or(false)
+    })
+}
+
+pub(crate) async fn verify_tag_has_platform_asset(version: &str) -> bool {
+    let Ok(client) = create_client().await else {
+        return false;
+    };
+    let clean = version.trim().trim_start_matches('v');
+    let tag_url = format!(
+        "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases/tags/v{}",
+        clean
+    );
+    let Ok(resp) = client.get(&tag_url).send().await else {
+        return false;
+    };
+    if !resp.status().is_success() {
+        return false;
+    }
+    let Ok(release) = resp.json::<GitHubRelease>().await else {
+        return false;
+    };
+    has_platform_asset_in_release(&release.assets)
 }
 
 async fn create_client() -> Result<reqwest::Client, String> {
@@ -184,12 +268,24 @@ async fn check_updater_json_channel(channel: UpdateChannel) -> Result<UpdateInfo
 
     let latest_version = updater_info.version.trim_start_matches('v').to_string();
     let current_version = CURRENT_VERSION.to_string();
-    let has_update = compare_versions(&latest_version, &current_version);
+    let is_newer = compare_versions(&latest_version, &current_version);
+    let has_asset = if is_newer {
+        has_platform_asset_in_updater_json(&updater_info.platforms)
+            || verify_tag_has_platform_asset(&latest_version).await
+    } else {
+        false
+    };
+    let has_update = is_newer && has_asset;
 
     if has_update {
         logger::log_info(&format!(
-            "New version found ({:?} updater.json): {} (Current: {})",
+            "New version found ({:?} updater.json, platform asset verified): {} (Current: {})",
             channel, latest_version, current_version
+        ));
+    } else if is_newer {
+        logger::log_warn(&format!(
+            "Skipping version {} ({:?} updater.json): no installer asset found for this OS yet",
+            latest_version, channel
         ));
     } else {
         logger::log_info(&format!(
@@ -307,12 +403,19 @@ async fn check_github_api_channel(channel: UpdateChannel) -> Result<UpdateInfo, 
 
     let latest_version = release.tag_name.trim_start_matches('v').to_string();
     let current_version = CURRENT_VERSION.to_string();
-    let has_update = compare_versions(&latest_version, &current_version);
+    let is_newer = compare_versions(&latest_version, &current_version);
+    let has_asset = has_platform_asset_in_release(&release.assets);
+    let has_update = is_newer && has_asset;
 
     if has_update {
         logger::log_info(&format!(
-            "New version found (API {:?}): {} (Current: {})",
+            "New version found (API {:?}, platform asset verified): {} (Current: {})",
             channel, latest_version, current_version
+        ));
+    } else if is_newer {
+        logger::log_warn(&format!(
+            "Skipping release {} (API {:?}): no installer asset found for this OS yet",
+            latest_version, channel
         ));
     } else {
         logger::log_info(&format!(
@@ -371,12 +474,23 @@ async fn check_static_url(url: &str, source_name: &str) -> Result<UpdateInfo, St
 
     let latest_version = package_json.version;
     let current_version = CURRENT_VERSION.to_string();
-    let has_update = compare_versions(&latest_version, &current_version);
+    let is_newer = compare_versions(&latest_version, &current_version);
+    let has_asset = if is_newer {
+        verify_tag_has_platform_asset(&latest_version).await
+    } else {
+        false
+    };
+    let has_update = is_newer && has_asset;
 
     if has_update {
         logger::log_info(&format!(
-            "New version found ({}): {} (Current: {})",
+            "New version found ({}, platform asset verified): {} (Current: {})",
             source_name, latest_version, current_version
+        ));
+    } else if is_newer {
+        logger::log_warn(&format!(
+            "Skipping version {} ({}): no release asset found for this OS yet",
+            latest_version, source_name
         ));
     } else {
         logger::log_info(&format!(

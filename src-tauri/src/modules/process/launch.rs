@@ -41,9 +41,15 @@ pub fn clean_appimage_env(cmd: &mut Command) {
 /// passing `CREATE_BREAKAWAY_FROM_JOB` (0x01000000) results in `ERROR_ACCESS_DENIED` (os error 5).
 /// This helper first tries with `CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB`, and if
 /// Access Denied occurs, automatically retries with `CREATE_NEW_PROCESS_GROUP` only, and then default flags.
+///
+/// The child is a detached GUI app, so stdio is nulled: an inherited stdout pipe would keep a
+/// piped CLI caller (`agm ... | jq`, CI, scripts) blocked until the IDE exits.
 pub fn spawn_with_job_breakaway_fallback(
     cmd: &mut Command,
 ) -> std::io::Result<std::process::Child> {
+    cmd.stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
     #[cfg(target_os = "windows")]
     {
         cmd.creation_flags(0x00000200 | 0x01000000);

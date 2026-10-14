@@ -16,6 +16,18 @@ pub(crate) fn attach_parent_console() {
     }
 }
 
+/// Stored repo paths are later used from other working directories (the IDE launches with
+/// its install dir as cwd), so a relative `-r .` must be made absolute against the caller's cwd.
+fn resolve_repo_arg(raw: &str) -> String {
+    match std::path::absolute(raw) {
+        Ok(p) => p.to_string_lossy().into_owned(),
+        Err(e) => {
+            tracing::warn!(target: "cli", repo = raw, error = %e, "could not resolve repo path; using it as given");
+            raw.to_string()
+        }
+    }
+}
+
 /// Unified argument extractor for AGM CLI commands
 #[derive(Debug, Clone, Default)]
 pub struct CliContext {
@@ -46,7 +58,7 @@ impl CliContext {
                 }
                 "-r" | "--repo" | "--workspace" => {
                     if i + 1 < args.len() {
-                        ctx.repo_path = Some(args[i + 1].clone());
+                        ctx.repo_path = Some(resolve_repo_arg(&args[i + 1]));
                         i += 1;
                     }
                 }

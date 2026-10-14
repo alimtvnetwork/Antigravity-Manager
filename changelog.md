@@ -1,5 +1,24 @@
 # Changelog
 
+## [v4.198.0] - 2026-10-14
+
+### Fixed
+- **Prompt Tree WebView2 OOM Crash (`0xe0000008`) & Thread Storm Elimination**: Resolved an infinite React `useEffect` render loop in `src/components/instances/PromptTreeView/usePromptTreeData.ts` where `loadTree` depended on `archivedProjectIds` and `pinnedProjectIds` state arrays while the modal-open effect re-allocated both arrays on every run. Moved both arrays to `useRef`s inside `loadTree` and serialized uncached workspace scans behind a process-wide mutex in `src-tauri/src/modules/repo_db/tree.rs`, keeping process thread count flat (`~52` threads instead of spiking to `565` threads) and warm Prompt Tree loads under `200 ms`. (Thanks to @aukgit)
+- **Detached IDE Launch Pipe Hang & Relative Repo Resolution**: Redirected `stdin`, `stdout`, and `stderr` to `Stdio::null()` in `src-tauri/src/modules/process/launch.rs` (`spawn_with_job_breakaway_fallback`) so detached `Antigravity` launches never inherit the caller's stdout pipe handle or hang CLI commands (`agm prompts restore`, `agm auto-switch test`). Canonicalized relative `-r .` paths in `src-tauri/src/modules/cli/types.rs` and guarded `DELETE FROM running_projects` against active-prompt foreign keys in `src-tauri/src/modules/repo_db/detection.rs`. (Thanks to @aukgit)
+- **Update Available Platform Asset Gate & UI Contrast**: Updated `src-tauri/src/modules/update_checker/channels.rs`, `src-tauri/src/modules/update_checker/platform.rs`, and `src/stores/use-update-store.ts` so **Update Available** only appears when the target release tag is strictly newer than `CURRENT_VERSION` and carries a downloadable binary asset for the active OS (`.exe`/`.msi` on Windows, `.dmg`/`.app.tar.gz`/`.pkg` on macOS, `.AppImage`/`.deb`/`.rpm` on Linux). Restyled `src/components/UpdateNotification.tsx` with high-contrast dark-glass surfaces and Progress Green `#1af18d` action buttons. (Thanks to @aukgit)
+
+### Added
+- **CLI Prompt Copy, Resend, UI Launch & Pure JSON Stdout**: Added `agm prompts copy` (and `agm copy-prompt`) to copy running, queued, or recent prompts to the system clipboard with `--json` output, wired `agm prompts resend` to `cmd_resend_running_commands`, added `agm instances open-ui`, and routed console tracing logs to `stderr` when `--json` / `-j` is passed in `src-tauri/src/modules/logger.rs`. (Thanks to @aukgit)
+
+---
+
+## [v4.197.1] - 2026-10-14
+
+### Fixed
+- **Prompt Tree Cache Persistence & Panic Backtrace**: Preserved `prompt_tree_cache` across startup purges with a 120-second TTL, enabled cached tree reads in `agm prompts tree`, caught panics with backtraces during tree construction, and added the Prompt Tree header **Reset** control plus `agm prompts reset-tree`. (Thanks to @aukgit)
+
+---
+
 ## [v4.195.0] - 2026-10-13
 
 ### Fixed
@@ -223,6 +242,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.198.0 (2026-10-14)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.197.1 (2026-10-14)**:
         -   **[Instances] Prompt tree cache and crash log (Thanks to @aukgit)**:
             -   **Description**: Startup no longer deletes `prompt_tree_cache`. The cache lives 120 seconds, and `agm prompts tree` reads it. A panic while building the tree returns a backtrace instead of closing the window. The tree header has Reset, and the CLI command is `agm prompts reset-tree`. CLI checks on the previous binary listed both instances, backed up and restored prompts, sent a review prompt, and enqueued a second prompt. `agm auto-switch threshold 98` read back 98 percent and was restored to 15 percent.

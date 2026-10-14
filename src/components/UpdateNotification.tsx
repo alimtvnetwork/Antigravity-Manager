@@ -125,7 +125,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
     setTimeout(onClose, 400);
   };
 
-  if (updateState === 'none') {
+  if (updateState === 'none' || (updateState === 'checking' && !updateInfo?.has_update)) {
     return null;
   }
 
@@ -139,12 +139,12 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
     >
       <div className="
         relative overflow-hidden
-        w-64 p-2.5
+        w-72 p-3
         rounded-xl
-        border border-white/30 dark:border-white/10
-        shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)]
+        border border-emerald-500/35 dark:border-[#1af18d]/35
+        shadow-[0_10px_32px_rgb(0,0,0,0.16)] dark:shadow-[0_12px_36px_rgb(0,0,0,0.55)]
         backdrop-blur-xl
-        bg-white/90 dark:bg-[var(--ui-surface-1)]/95
+        bg-white/95 dark:bg-[#141824]/95
         group
       ">
         <div className="absolute -top-8 -right-8 w-20 h-20 bg-[#1af18d]/20 rounded-full blur-xl pointer-events-none transition-colors duration-500" />
@@ -304,9 +304,10 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                   onClick={handleClose}
                   disabled={isInstalling}
                   className="
-                    px-2 py-1 rounded-lg
-                    text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200
-                    hover:bg-black/5 dark:hover:bg-white/10
+                    px-2.5 py-1 rounded-lg
+                    bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-700/90
+                    border border-slate-200/80 dark:border-white/10
+                    text-slate-700 hover:text-slate-900 dark:text-slate-200 dark:hover:text-white
                     transition-all duration-200
                     text-xs font-medium cursor-pointer
                   "
@@ -327,7 +328,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                   }
                 }}
                 disabled={isInstalling}
-                className="text-[10px] text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400 text-center transition-colors py-0.5 cursor-pointer"
+                className="text-[10px] font-medium text-emerald-700 hover:text-emerald-600 dark:text-[#1af18d]/90 dark:hover:text-[#1af18d] text-center transition-colors py-0.5 cursor-pointer"
               >
                 {t('update_notification.btn_view_github', 'View on GitHub')}
               </button>

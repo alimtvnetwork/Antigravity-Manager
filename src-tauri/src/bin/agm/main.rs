@@ -198,6 +198,9 @@ fn main() {
         "resend-running-commands" | "rrc" | "resend-running" | "resend" => {
             crate::prompt_resend::cmd_resend_running_commands(&cmd_args);
         }
+        "copy-prompt" | "cp-prompt" | "prompt-copy" => {
+            crate::prompt_cmds::dispatch_prompt_domain("copy", &cmd_args);
+        }
         "backup-running-prompts" | "brp" | "backup-prompts" | "backup" | "backpack" => {
             crate::prompt_cmds::dispatch_prompt_domain("backup", &cmd_args);
         }

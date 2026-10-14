@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { getArchivedProjectsForInstance } from '../../../services/instanceService';
 import type { AgmConversationNode, AgmProjectTreeNode } from './types';
@@ -93,6 +93,11 @@ export function usePromptTreeData({
         activePromptTextRef,
         syncInterval,
     } = state;
+
+    const archivedProjectIdsRef = useRef(archivedProjectIds);
+    archivedProjectIdsRef.current = archivedProjectIds;
+    const pinnedProjectIdsRef = useRef(pinnedProjectIds);
+    pinnedProjectIdsRef.current = pinnedProjectIds;
 
     // Select conversation directly (2-tier leaf)
     const selectConversation = useCallback(
@@ -277,13 +282,16 @@ export function usePromptTreeData({
 
                 // Cache in memory for immediate SWR retrieval on subsequent opens
                 const cacheKey = instanceId || 'default';
+                if (isForce) {
+                    promptTreeSwrCache.delete(cacheKey);
+                }
                 promptTreeSwrCache.set(cacheKey, { data: finalData, timestamp: Date.now() });
 
                 setTreeData(finalData);
 
                 if (isInitialLoad) {
-                    const targetArchived = overrideArchivedIds || archivedProjectIds;
-                    const targetPinned = overridePinnedIds || pinnedProjectIds;
+                    const targetArchived = overrideArchivedIds || archivedProjectIdsRef.current;
+                    const targetPinned = overridePinnedIds || pinnedProjectIdsRef.current;
                     performAutoSelection(finalData, targetArchived, targetPinned);
                 } else {
                     // Background sync: match existing selected conversation in place
@@ -326,8 +334,6 @@ export function usePromptTreeData({
         },
         [
             instanceId,
-            archivedProjectIds,
-            pinnedProjectIds,
             performAutoSelection,
             selectedConversationRef,
             selectedProjectRef,

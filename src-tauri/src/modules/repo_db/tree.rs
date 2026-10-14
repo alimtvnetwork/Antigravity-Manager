@@ -4,6 +4,25 @@ use super::models::AgmProjectTreeNode;
 use super::schema::connect_db;
 use chrono::Utc;
 use rusqlite::params;
+use std::sync::{Mutex, OnceLock};
+
+static TREE_COMPUTE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+fn read_cached_tree(cache_key: &str, inst_key: &str, now: i64) -> Option<Vec<AgmProjectTreeNode>> {
+    let conn = connect_db().ok()?;
+    let (tree_json, updated_at, ttl_seconds): (String, i64, i64) = conn
+        .query_row(
+            "SELECT tree_json, updated_at, ttl_seconds FROM prompt_tree_cache WHERE cache_key = ?1 AND instance_id = ?2",
+            params![cache_key, inst_key],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .ok()?;
+    if now - updated_at < ttl_seconds {
+        serde_json::from_str::<Vec<AgmProjectTreeNode>>(&tree_json).ok()
+    } else {
+        None
+    }
+}
 
 /// Build the AGM Project -> Conversation -> 200-Word Prompt Tree across ALL registered instances
 /// and persist Dual AGM (`P001`/`C001`) + GitMap (`GM:#1`/`GM:<short_id>`) Sequence IDs in `repo_prompts.db`.
@@ -27,23 +46,25 @@ pub fn get_project_conversation_tree_cached(
     let now = Utc::now().timestamp();
 
     if !force {
-        if let Ok(conn) = connect_db() {
-            let cached: Result<(String, i64, i64), _> = conn.query_row(
-                "SELECT tree_json, updated_at, ttl_seconds FROM prompt_tree_cache WHERE cache_key = ?1 AND instance_id = ?2",
-                params![&cache_key, inst_key],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-            );
-            if let Ok((tree_json, updated_at, ttl_seconds)) = cached {
-                if now - updated_at < ttl_seconds {
-                    if let Ok(nodes) = serde_json::from_str::<Vec<AgmProjectTreeNode>>(&tree_json) {
-                        return nodes;
-                    }
-                }
-            }
+        if let Some(nodes) = read_cached_tree(&cache_key, inst_key, now) {
+            return nodes;
+        }
+    }
+
+    // Serialize uncached scans so concurrent callers share one workspace pass instead of
+    // fanning out across the blocking thread pool.
+    let lock = TREE_COMPUTE_LOCK.get_or_init(|| Mutex::new(()));
+    let _guard = lock.lock().unwrap_or_else(|e| e.into_inner());
+
+    if !force {
+        let now_after_wait = Utc::now().timestamp();
+        if let Some(nodes) = read_cached_tree(&cache_key, inst_key, now_after_wait) {
+            return nodes;
         }
     }
 
     let tree_nodes = compute_project_conversation_tree(instance_id, max_words, only_running);
+    let now = Utc::now().timestamp();
 
     let project_count = tree_nodes.len();
     let conversation_count: usize = tree_nodes.iter().map(|p| p.conversations.len()).sum();

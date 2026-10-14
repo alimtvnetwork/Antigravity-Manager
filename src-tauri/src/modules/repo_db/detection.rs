@@ -130,7 +130,8 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
         // Justification: persistence of discovery scan results is best-effort; the scan results are returned regardless
         crate::error::record_ignored(
             conn.execute(
-                "DELETE FROM running_projects WHERE last_detected_at < (?1 - 120)",
+                "DELETE FROM running_projects WHERE last_detected_at < (?1 - 120)
+                 AND id NOT IN (SELECT project_id FROM active_prompts)",
                 params![now],
             ),
             "prune stale running projects",
@@ -141,8 +142,9 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
         crate::error::record_ignored(
             conn.execute(
                 "DELETE FROM running_projects
-             WHERE instr(id, '__') = 0
-                OR (workspace_storage_path IS NULL AND (repo_path IS NULL OR repo_path = ''))",
+             WHERE (instr(id, '__') = 0
+                OR (workspace_storage_path IS NULL AND (repo_path IS NULL OR repo_path = '')))
+               AND id NOT IN (SELECT project_id FROM active_prompts)",
                 [],
             ),
             "delete corrupted running projects",
@@ -168,7 +170,8 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
                     // Justification: persistence of discovery scan results is best-effort; the scan results are returned regardless
                     crate::error::record_ignored(
                         conn.execute(
-                        "DELETE FROM running_projects WHERE id = ?1",
+                        "DELETE FROM running_projects WHERE id = ?1
+                         AND id NOT IN (SELECT project_id FROM active_prompts)",
                         params![&old_id],
                     ),
                         "delete undiscovered running project",
