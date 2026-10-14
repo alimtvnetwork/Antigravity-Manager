@@ -210,7 +210,9 @@ detect_current_version() {
     if [[ "$PLATFORM" == "linux" ]]; then
         case "${PKG_MANAGER:-}" in
             apt)
-                if dpkg -s "$APP_ID" &>/dev/null; then
+                if dpkg -s "antigravity-manager-tools" &>/dev/null; then
+                    CURRENT_VERSION=$(dpkg -s "antigravity-manager-tools" 2>/dev/null | grep -i '^Version:' | head -n1 | awk '{print $2}' | tr -d '[:space:]\r\n')
+                elif dpkg -s "$APP_ID" &>/dev/null; then
                     CURRENT_VERSION=$(dpkg -s "$APP_ID" 2>/dev/null | grep -i '^Version:' | head -n1 | awk '{print $2}' | tr -d '[:space:]\r\n')
                 elif dpkg -s antigravity-tools &>/dev/null; then
                     CURRENT_VERSION=$(dpkg -s antigravity-tools 2>/dev/null | grep -i '^Version:' | head -n1 | awk '{print $2}' | tr -d '[:space:]\r\n')
@@ -219,7 +221,9 @@ detect_current_version() {
                 fi
                 ;;
             dnf|yum)
-                if rpm -q "$APP_ID" &>/dev/null; then
+                if rpm -q "antigravity-manager-tools" &>/dev/null; then
+                    CURRENT_VERSION=$(rpm -q --queryformat '%{VERSION}' "antigravity-manager-tools" 2>/dev/null | tr -d '[:space:]\r\n')
+                elif rpm -q "$APP_ID" &>/dev/null; then
                     CURRENT_VERSION=$(rpm -q --queryformat '%{VERSION}' "$APP_ID" 2>/dev/null | tr -d '[:space:]\r\n')
                 elif rpm -q antigravity-tools &>/dev/null; then
                     CURRENT_VERSION=$(rpm -q --queryformat '%{VERSION}' antigravity-tools 2>/dev/null | tr -d '[:space:]\r\n')
@@ -1119,12 +1123,12 @@ remove_previous_installation() {
 
     case "$PKG_MANAGER" in
         apt)
-            if dpkg -s "$APP_ID" &>/dev/null || dpkg -s antigravity-tools &>/dev/null; then
+            if dpkg -s "antigravity-manager-tools" &>/dev/null || dpkg -s "$APP_ID" &>/dev/null || dpkg -s antigravity-tools &>/dev/null; then
                 has_legacy=1
             fi
             ;;
         dnf|yum)
-            if rpm -q "$APP_ID" &>/dev/null || rpm -q antigravity-tools &>/dev/null; then
+            if rpm -q "antigravity-manager-tools" &>/dev/null || rpm -q "$APP_ID" &>/dev/null || rpm -q antigravity-tools &>/dev/null; then
                 has_legacy=1
             fi
             ;;
@@ -1154,6 +1158,9 @@ remove_previous_installation() {
 
         case "$PKG_MANAGER" in
             apt)
+                if dpkg -s "antigravity-manager-tools" &>/dev/null; then
+                    run_indented $sudo_cmd apt-get remove -y "antigravity-manager-tools" 2>/dev/null || run_indented $sudo_cmd dpkg -r "antigravity-manager-tools" 2>/dev/null || true
+                fi
                 if dpkg -s "$APP_ID" &>/dev/null; then
                     run_indented $sudo_cmd apt-get remove -y "$APP_ID" 2>/dev/null || run_indented $sudo_cmd dpkg -r "$APP_ID" 2>/dev/null || true
                 fi
@@ -1162,6 +1169,9 @@ remove_previous_installation() {
                 fi
                 ;;
             dnf|yum)
+                if rpm -q "antigravity-manager-tools" &>/dev/null; then
+                    run_indented $sudo_cmd "${PKG_MANAGER}" remove -y "antigravity-manager-tools" 2>/dev/null || true
+                fi
                 if rpm -q "$APP_ID" &>/dev/null; then
                     run_indented $sudo_cmd "${PKG_MANAGER}" remove -y "$APP_ID" 2>/dev/null || true
                 fi
