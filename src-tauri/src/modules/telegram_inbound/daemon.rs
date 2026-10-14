@@ -8,6 +8,51 @@ use std::path::PathBuf;
 
 use super::*;
 
+async fn deliver_ui_or_command(
+    token: &str,
+    chat_id: i64,
+    text_raw: &str,
+    saved_media_opt: &Option<(PathBuf, Option<String>)>,
+) -> Option<String> {
+    if let Some(action) = super::ui_remote::prepare_local_ui_action(text_raw).await {
+        if let Some(png) = action.png.as_deref() {
+            if let Err(err) = send_telegram_photo(token, chat_id, png, &action.caption, None).await
+            {
+                let photo_err = format!(
+                    "❌ <b>Screenshot was captured but Telegram rejected the photo:</b> <code>{}</code>",
+                    crate::modules::notification_hub::escape_telegram_html(&err.to_string())
+                );
+                // Justification: the photo error is already included in the follow-up message; a second send failure is logged.
+                crate::error::record_ignored(
+                    send_telegram_message_with_markup(token, chat_id, &photo_err, None, false)
+                        .await,
+                    "send screenshot upload error",
+                );
+            }
+        }
+        // Justification: the command result is already computed; a Telegram send failure is logged and does not change the local action.
+        crate::error::record_ignored(
+            send_telegram_message_with_markup(token, chat_id, &action.reply, action.markup, false)
+                .await,
+            "send agm ui command reply",
+        );
+        return Some(action.reply);
+    }
+
+    let (reply_opt, reply_markup_opt) =
+        resolve_telegram_command_reply_and_markup(text_raw, saved_media_opt).await;
+    if let Some(reply) = reply_opt {
+        // Justification: command text is already built; a Telegram send failure is logged and the caller still records the reply.
+        crate::error::record_ignored(
+            send_telegram_message_with_markup(token, chat_id, &reply, reply_markup_opt, false)
+                .await,
+            "send_telegram_message_with_markup",
+        );
+        return Some(reply);
+    }
+    None
+}
+
 /// Resolve unified command response and interactive inline reply markup (copy buttons, navigation buttons)
 pub(crate) async fn resolve_telegram_command_reply_and_markup(
     text_raw: &str,
@@ -106,18 +151,7 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
                 ]
             ]
         })),
-        "help" | "start" => Some(json!({
-            "inline_keyboard": [
-                [
-                    { "text": "🌐 Fleet Identity", "callback_data": "cmd:fleet" },
-                    { "text": "📊 Live Observe", "callback_data": "cmd:observe" }
-                ],
-                [
-                    { "text": "🏷️ Instances", "callback_data": "cmd:instances" },
-                    { "text": "👤 Accounts", "callback_data": "cmd:accounts" }
-                ]
-            ]
-        })),
+        "help" | "start" => Some(super::ui_remote::help_copy_markup()),
         "ping" => Some(json!({
             "inline_keyboard": [
                 [
@@ -302,22 +336,9 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
                 }
             }
 
-            let (reply_opt, reply_markup_opt) =
-                resolve_telegram_command_reply_and_markup(text_raw, &saved_media_opt).await;
-
-            if let Some(reply) = reply_opt {
-                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-                crate::error::record_ignored(
-                    send_telegram_message_with_markup(
-                        &clean_token,
-                        chat_id,
-                        &reply,
-                        reply_markup_opt,
-                        false,
-                    )
-                    .await,
-                    "send_telegram_message_with_markup",
-                );
+            let reply =
+                deliver_ui_or_command(&clean_token, chat_id, text_raw, &saved_media_opt).await;
+            if let Some(reply) = reply {
                 processed.push((chat_id, text_raw.to_string(), reply));
             }
         }
@@ -533,27 +554,13 @@ pub fn start_telegram_daemon() {
                                         st.last_update_id = last_update_id;
                                     }
 
-                                    let (reply_opt, reply_markup_opt) =
-                                        resolve_telegram_command_reply_and_markup(
-                                            text_raw,
-                                            &saved_media_opt,
-                                        )
-                                        .await;
-
-                                    if let Some(reply) = reply_opt {
-                                        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-                                        crate::error::record_ignored(
-                                            send_telegram_message_with_markup(
-                                                &config.bot_token,
-                                                chat_id,
-                                                &reply,
-                                                reply_markup_opt,
-                                                false,
-                                            )
-                                            .await,
-                                            "send_telegram_message_with_markup",
-                                        );
-                                    }
+                                    let _ = deliver_ui_or_command(
+                                        &config.bot_token,
+                                        chat_id,
+                                        text_raw,
+                                        &saved_media_opt,
+                                    )
+                                    .await;
                                 }
                             }
                         }

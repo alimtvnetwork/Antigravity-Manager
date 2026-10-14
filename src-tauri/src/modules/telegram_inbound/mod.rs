@@ -18,6 +18,7 @@ pub mod reports_cluster_a;
 pub mod reports_cluster_b;
 pub mod tests;
 pub mod types;
+pub mod ui_remote;
 
 pub use cluster::*;
 pub use commands::*;

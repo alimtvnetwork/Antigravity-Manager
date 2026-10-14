@@ -84,23 +84,35 @@ impl SupabaseClient {
     /// Classify a reqwest transport error into an actionable user-facing message
     /// so users see likely causes and next steps instead of a raw error string.
     pub(crate) fn classify_transport_error(&self, e: &reqwest::Error) -> String {
-        self.log_transport_error("test_connection_probe", &self.base_url, e);
+        self.explain_transport_error("test_connection_probe", &self.base_url, e)
+    }
+
+    /// User-facing transport text for status, Test, and table calls.
+    /// A connect failure on a paused free-tier project is DNS NXDOMAIN, not a bad API key.
+    pub(crate) fn explain_transport_error(
+        &self,
+        operation: &str,
+        url: &str,
+        e: &reqwest::Error,
+    ) -> String {
+        self.log_transport_error(operation, url, e);
         if e.is_timeout() {
             format!(
-                "Connection timed out reaching {}. The Supabase project may be paused (free-tier projects pause after inactivity) or the network may be blocking it. Verify the project is active in the Supabase dashboard, then press Test again.",
-                self.base_url
+                "Connection timed out reaching {url}. The Supabase project may be paused (free-tier projects pause after inactivity) or the network may be blocking it. Unpause the project in the Supabase or Lovable dashboard, then press Test again."
             )
         } else if e.is_connect() {
             format!(
-                "Cannot connect to {} (DNS NXDOMAIN / connection refused). In Supabase Cloud, free-tier projects unpublish their <project_ref>.supabase.co DNS record when paused for inactivity. Unpause/restore the project in the Supabase or Lovable dashboard, or verify the project URL.",
-                self.base_url
+                "Cannot connect to {url}. DNS for this project ref does not exist (NXDOMAIN) or the connection was refused. Free-tier Supabase projects unpublish <project_ref>.supabase.co when they pause. The API key was not the thing that failed. Unpause the project in the Supabase or Lovable dashboard."
             )
         } else {
             format!(
-                "Network request to {} failed: {}. Check the URL, API key, and that no firewall/proxy blocks the connection.",
-                self.base_url, e
+                "Network request to {url} failed: {e}. Check the URL and that no firewall blocks the connection."
             )
         }
+    }
+
+    fn network_error(&self, operation: &str, url: &str, e: reqwest::Error) -> AppError {
+        AppError::Network(self.explain_transport_error(operation, url, &e), None)
     }
 
     /// Test the connection to the Supabase endpoint using a resilient multi-stage probe ladder:
@@ -368,15 +380,17 @@ impl SupabaseClient {
             url.push_str(query);
         }
 
-        let resp = self.client.get(&url).send().await.map_err(|e| {
-            self.log_transport_error("select", &url, &e);
-            AppError::Network(e.to_string(), None)
-        })?;
+        let resp = self
+            .client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| self.network_error("select", &url, e))?;
 
-        let parsed: Value = resp.json().await.map_err(|e| {
-            self.log_transport_error("select_parse_json", &url, &e);
-            AppError::Network(e.to_string(), None)
-        })?;
+        let parsed: Value = resp
+            .json()
+            .await
+            .map_err(|e| self.network_error("select_parse_json", &url, e))?;
         Ok(parsed)
     }
 
@@ -390,15 +404,12 @@ impl SupabaseClient {
             .json(&payload)
             .send()
             .await
-            .map_err(|e| {
-                self.log_transport_error("insert", &url, &e);
-                AppError::Network(e.to_string(), None)
-            })?;
+            .map_err(|e| self.network_error("insert", &url, e))?;
 
-        let parsed: Value = resp.json().await.map_err(|e| {
-            self.log_transport_error("insert_parse_json", &url, &e);
-            AppError::Network(e.to_string(), None)
-        })?;
+        let parsed: Value = resp
+            .json()
+            .await
+            .map_err(|e| self.network_error("insert_parse_json", &url, e))?;
         Ok(parsed)
     }
 
@@ -424,15 +435,12 @@ impl SupabaseClient {
             .json(&payload)
             .send()
             .await
-            .map_err(|e| {
-                self.log_transport_error("upsert", &url, &e);
-                AppError::Network(e.to_string(), None)
-            })?;
+            .map_err(|e| self.network_error("upsert", &url, e))?;
 
-        let parsed: Value = resp.json().await.map_err(|e| {
-            self.log_transport_error("upsert_parse_json", &url, &e);
-            AppError::Network(e.to_string(), None)
-        })?;
+        let parsed: Value = resp
+            .json()
+            .await
+            .map_err(|e| self.network_error("upsert_parse_json", &url, e))?;
         Ok(parsed)
     }
 
@@ -456,15 +464,12 @@ impl SupabaseClient {
             .json(&payload)
             .send()
             .await
-            .map_err(|e| {
-                self.log_transport_error("update", &url, &e);
-                AppError::Network(e.to_string(), None)
-            })?;
+            .map_err(|e| self.network_error("update", &url, e))?;
 
-        let parsed: Value = resp.json().await.map_err(|e| {
-            self.log_transport_error("update_parse_json", &url, &e);
-            AppError::Network(e.to_string(), None)
-        })?;
+        let parsed: Value = resp
+            .json()
+            .await
+            .map_err(|e| self.network_error("update_parse_json", &url, e))?;
         Ok(parsed)
     }
 
@@ -482,15 +487,12 @@ impl SupabaseClient {
             .header("Prefer", "return=representation")
             .send()
             .await
-            .map_err(|e| {
-                self.log_transport_error("delete", &url, &e);
-                AppError::Network(e.to_string(), None)
-            })?;
+            .map_err(|e| self.network_error("delete", &url, e))?;
 
-        let parsed: Value = resp.json().await.map_err(|e| {
-            self.log_transport_error("delete_parse_json", &url, &e);
-            AppError::Network(e.to_string(), None)
-        })?;
+        let parsed: Value = resp
+            .json()
+            .await
+            .map_err(|e| self.network_error("delete_parse_json", &url, e))?;
         Ok(parsed)
     }
 
@@ -503,15 +505,12 @@ impl SupabaseClient {
             .json(&payload)
             .send()
             .await
-            .map_err(|e| {
-                self.log_transport_error("rpc", &url, &e);
-                AppError::Network(e.to_string(), None)
-            })?;
+            .map_err(|e| self.network_error("rpc", &url, e))?;
 
-        let parsed: Value = resp.json().await.map_err(|e| {
-            self.log_transport_error("rpc_parse_json", &url, &e);
-            AppError::Network(e.to_string(), None)
-        })?;
+        let parsed: Value = resp
+            .json()
+            .await
+            .map_err(|e| self.network_error("rpc_parse_json", &url, e))?;
         Ok(parsed)
     }
 }

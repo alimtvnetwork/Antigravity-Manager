@@ -226,7 +226,8 @@ pub fn format_help_manual() -> String {
 
     format!(
         "🤖 <b>AGM v{} Telegram Remote Manual</b>\n\
-        <code>v{} | commit {} | branch {} | release {}</code>\n\n\
+        <code>v{} | commit {} | branch {} | release {}</code>\n\
+        {}\n\
         📌 <b>Core Telemetry &amp; Dual-Sequence Tree View (AGM + GitMap):</b>\n\
         • <code>/help</code> or <code>/start</code> — Display this full interactive command manual\n\
         • <code>/fleet</code> or <code>/whoami</code> — Standalone Machine, Instance &amp; Bound Account identity card (No Supabase required)\n\
@@ -298,6 +299,7 @@ pub fn format_help_manual() -> String {
         clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&hash, 24),
         clean_for_telegram_html(&branch, 24),
-        clean_for_telegram_html(&last_rel, 24)
+        clean_for_telegram_html(&last_rel, 24),
+        super::ui_remote::window_command_section()
     )
 }

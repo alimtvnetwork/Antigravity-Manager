@@ -1,5 +1,11 @@
 # AI Memory Plans Index (`.ai-memory/plans/`)
 
+## Active
+
+| Plan | Status | Summary |
+| :--- | :--- | :--- |
+| [telegram-and-superbase-improvement-plan.md](./telegram-and-superbase-improvement-plan.md) | `COMPLETED` | Telegram open, screenshot, and aimed prompt. Supabase Test fails because both project hosts are NXDOMAIN. |
+
 ## Completed Plans (`completed/`)
 | # | Plan File | Status | Summary |
 | :--- | :--- | :--- | :--- |

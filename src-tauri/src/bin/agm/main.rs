@@ -359,6 +359,25 @@ fn main() {
         "open-ui" | "ui" | "launch-ui" | "start-ui" => {
             antigravity_tools_lib::modules::delegate_updater::open_ui(&cmd_args);
         }
+        "shot" | "screenshot" => {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap_or_else(|err| {
+                    eprintln!("[ERROR] Telegram runtime failed: {err}");
+                    std::process::exit(1);
+                });
+            match rt.block_on(antigravity_tools_lib::modules::telegram_inbound::ui_remote::send_window_shot_to_saved_chat())
+            {
+                Ok(bytes) => println!(
+                    "[OK] AGM window screenshot captured ({bytes} bytes) and sent to the saved Telegram chat."
+                ),
+                Err(err) => {
+                    eprintln!("[ERROR] AGM window screenshot failed: {err}");
+                    std::process::exit(1);
+                }
+            }
+        }
         "ssh" | "sj" | "se" => {
             let mut f = if subcommand == "se" {
                 vec!["exec".to_string()]

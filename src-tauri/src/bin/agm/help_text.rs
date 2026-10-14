@@ -136,6 +136,11 @@ pub(crate) fn print_help() {
     println!("  └────────────────────────────────────────────────────────────────────────────┘");
     println!("  Syntax:");
     println!("    agm <command> [arguments] [flags]");
+    println!(
+        "    agm ui                         Open Antigravity Manager when you want the window"
+    );
+    println!("    agm shot                       Photograph the manager window on this machine");
+    println!("    Telegram /ui  /shot  /target <instance> <C001>   then send the prompt as the next message");
     println!();
     println!("  ────────────────────────────────────────────────────────────────────────────");
     println!("  ACCOUNT ROTATION & QUOTA GOVERNANCE");
