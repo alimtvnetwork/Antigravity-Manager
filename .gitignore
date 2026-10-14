@@ -102,3 +102,4 @@ antigravity_resume_task.json
 # Scratch dumps
 scratch/*.txt
 scratch/*.dump
+.antigravity_resume_task.default.json
