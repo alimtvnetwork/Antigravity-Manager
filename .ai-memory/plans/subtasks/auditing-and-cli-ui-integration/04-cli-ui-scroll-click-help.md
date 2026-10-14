@@ -1,7 +1,7 @@
 # Task-04: CLI-UI bridge — scroll / click / help
 
 ## Status
-PENDING
+DONE — verified by lead (dispatch wired, backend scroll/click endpoints added, tsc+fmt clean)
 
 ## Objective
 Complete `src-tauri/src/bin/agm/ui_cmds.rs` with scroll, click, and the

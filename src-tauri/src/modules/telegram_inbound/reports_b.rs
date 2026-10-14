@@ -244,7 +244,9 @@ pub fn format_help_manual() -> String {
         • <code>/open W3</code> — Open AGM on fleet machine <code>W3</code> (SSH, Supabase queue fallback)\n\
         • <code>/screenshot</code> — Photograph every known machine's screen\n\
         • <code>/screenshot W3</code> — Photograph one machine (<code>local</code> = this machine)\n\
-        • <code>/ui</code> — Open the manager window here · <code>/shot</code> · <code>/screen</code> — Screenshot this machine\n\n\
+        • <code>/ui</code> — Open the manager window here · <code>/shot</code> · <code>/screen</code> — Screenshot this machine\n\
+        • <code>/ui goto &lt;route&gt;</code> — Navigate the UI (<code>/ui goto instances</code>; unknown routes list the valid ones)\n\
+        • <code>/ui ls</code> — List UI routes (<code>/ui ls &lt;filter&gt;</code> narrows) · <code>/ui scroll &lt;id&gt;</code> — Scroll an element into view &amp; focus it\n\n\
         🟣 <b>Fleet telemetry</b>\n\
         • <code>/fleet</code> · <code>/whoami</code> — Machine, instance &amp; bound account identity card\n\
         • <code>/ping</code> — Node connectivity, IP, Git build &amp; uptime\n\
@@ -296,4 +298,37 @@ pub fn format_help_manual() -> String {
         clean_for_telegram_html(&last_rel, 24),
         super::ui_remote::window_command_section()
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::format_help_manual;
+    use crate::modules::telegram_inbound::ui_remote::window_command_section;
+
+    #[test]
+    fn help_manual_substitutes_all_format_args() {
+        let help = format_help_manual();
+        // Every `{}` placeholder must be substituted: the header carries the
+        // version twice plus hash/branch/release, and the window section is
+        // appended at the end. Any placeholder/argument mismatch is a compile
+        // error, but this locks the rendered contract against regressions.
+        assert!(
+            !help.contains("{}"),
+            "unsubstituted format placeholder in /help output"
+        );
+        assert!(help.contains("🤖 <b>AGM v"));
+        assert!(help.contains("| commit "));
+        assert!(help.contains("| branch "));
+        assert!(help.contains("| release "));
+        assert!(help.contains(window_command_section().trim()));
+    }
+
+    #[test]
+    fn help_manual_documents_ui_subcommands() {
+        let help = format_help_manual();
+        assert!(help.contains("/ui goto"));
+        assert!(help.contains("/ui ls"));
+        assert!(help.contains("/ui scroll"));
+        assert!(help.contains("Drive the UI remotely"));
+    }
 }

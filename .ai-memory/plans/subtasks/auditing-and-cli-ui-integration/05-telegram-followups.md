@@ -1,7 +1,7 @@
 # Task-05: Telegram follow-ups
 
 ## Status
-PENDING
+DONE — verified by lead (15 tests added, fmt clean; unified with lead backend via HTTP POST)
 
 ## Objective
 Harden and extend the Telegram bot from the previous program

@@ -19,6 +19,7 @@ mod admin_sync_external;
 mod admin_sync_opencode;
 mod admin_system;
 mod admin_tokens;
+mod admin_ui;
 mod app_state;
 mod audit;
 mod axum_server;

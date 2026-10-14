@@ -11,6 +11,7 @@ import { NavMenu } from './NavMenu';
 import { NavSettings } from './NavSettings';
 import { InstanceSelector } from './InstanceSelector';
 import { ErrorQueueBadge } from '../errors/error-queue-badge';
+import { RecordingIndicator } from '../audit';
 import type { NavItem } from './constants';
 
 /**
@@ -234,6 +235,7 @@ function Navbar() {
                         onDoubleClick={(e) => e.stopPropagation()}
                     >
                         <InstanceSelector />
+                        <RecordingIndicator />
                         <NavSettings
                             theme={(config?.theme as 'light' | 'dark') || 'light'}
                             currentLanguage={config?.language || 'en'}

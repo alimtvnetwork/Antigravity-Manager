@@ -1,7 +1,7 @@
 # Task-01: Interaction audit recorder — backend
 
 ## Status
-PENDING
+DONE — verified by lead (fmt clean, tsc clean, wired into mod.rs/run.rs/Layout/Navbar)
 
 ## Objective
 Build the Rust backend for UI interaction audit recording in a new module

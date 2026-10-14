@@ -3,6 +3,7 @@
 | # | Specification File | Summary |
 | :--- | :--- | :--- |
 | `root-cause-analysis-and-telegram-staff-improvement` | [root-cause-analysis-and-telegram-staff-improvement/01-spec.md](./root-cause-analysis-and-telegram-staff-improvement/01-spec.md) | Durable RCA memory (10 incidents), executable E2E testing playbook (auto-switch, instance open, prompt preview, prompt send, checklist), Telegram `/open` `/screenshot` `/send` + colorful copy-paste `/help`, Supabase paused-project root cause, voice-command feasibility note. |
+| `auditing-and-cli-ui-integration` | [auditing-and-cli-ui-integration/01-spec.md](./auditing-and-cli-ui-integration/01-spec.md) | UI interaction audit recorder (method + target + trigger + timestamp, SQLite, export), `agm ui` CLI bridge (open/goto/ls/scroll/click with actionable help), Telegram `/ui` commands, backend `/api/ui/*` endpoints driving the UI via Tauri events. |
 | `telegram-and-superbase` | [telegram-and-superbase-improvement-plan/01-architecture-spec.md](./telegram-and-superbase-improvement-plan/01-architecture-spec.md) | Telegram `/ui`, `/shot`, and `/target`, plus the live Supabase DNS pause. |
 | `ui-session-recorder` | [ui-session-recorder/01-guideline.md](./ui-session-recorder/01-guideline.md) | Developer-mode UI session recorder. Function names always. File and line only while developer mode is on. |
 | `local-cli-e2e` | [local-cli-e2e/01-retest-cases.md](./local-cli-e2e/01-retest-cases.md) | Rerunnable CLI cases for prompt send, copy-instance switch, shared login, email vault, and the 15% auto-switch restore. |

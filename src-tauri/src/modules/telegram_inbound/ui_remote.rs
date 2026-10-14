@@ -1,8 +1,20 @@
 //! Telegram commands that open the Antigravity Manager window, photograph it,
 //! and remember where the next plain-text prompt should go.
+//!
+//! This module also hosts the shared UI-action service surface
+//! (`ui_service_goto` / `ui_service_ls` / `ui_service_scroll` plus the
+//! canonical route registry): the `agm ui goto|ls|scroll` CLI subcommands
+//! (Task-03/04, `src-tauri/src/bin/agm/ui_cmds.rs`) call the SAME functions,
+//! so GUI, CLI, and Telegram drive the UI through identical routes.
 
+use crate::error::AppError;
+use crate::modules::audit::{
+    record_ui_interaction, InteractionActor, InteractionTrigger, RecordInteractionInput,
+};
 use serde_json::{json, Value};
+use std::fs::OpenOptions;
 use std::io::Write;
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -32,6 +44,408 @@ enum UiVerb {
     AimedPrompt {
         text: String,
     },
+    Goto {
+        route: String,
+    },
+    Ls {
+        filter: Option<String>,
+    },
+    Scroll {
+        element_id: String,
+    },
+    UiUsage,
+}
+
+// ---------------------------------------------------------------------------
+// Shared UI-action service surface (GUI / CLI / Telegram parity)
+//
+// The `agm ui goto|ls|scroll` CLI subcommands call the SAME `ui_service_*`
+// functions as these Telegram handlers, so every entry point drives the UI
+// through identical routes and the audit recorder sees the caller's actor.
+// Navigation/scroll intents are appended to a pending-intent JSONL file that
+// the GUI frontend's UI-command poller consumes and acknowledges:
+//
+//   {"v":1,"ts":<millis>,"actor":"telegram|cli|user","action":"goto|scroll",
+//    "route":"/instances"|null,"element_id":"settings-supabase"|null}
+// ---------------------------------------------------------------------------
+
+/// One canonical UI route, mirroring the router table in `src/App.tsx`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UiRouteInfo {
+    pub route: &'static str,
+    pub label: &'static str,
+    pub blurb: &'static str,
+}
+
+/// Canonical route registry — single source of truth shared by GUI, CLI, and bot.
+pub fn known_ui_routes() -> Vec<UiRouteInfo> {
+    vec![
+        UiRouteInfo {
+            route: "dashboard",
+            label: "Dashboard",
+            blurb: "Overview cards and quick actions",
+        },
+        UiRouteInfo {
+            route: "accounts",
+            label: "Accounts",
+            blurb: "Bound accounts, tiers and quota headroom (default landing page)",
+        },
+        UiRouteInfo {
+            route: "instances",
+            label: "Instances",
+            blurb: "Instance profiles and live process states",
+        },
+        UiRouteInfo {
+            route: "api-proxy",
+            label: "API Proxy",
+            blurb: "Local API gateway status (port 8045)",
+        },
+        UiRouteInfo {
+            route: "monitor",
+            label: "Monitor",
+            blurb: "Live monitoring views",
+        },
+        UiRouteInfo {
+            route: "token-stats",
+            label: "Token Stats",
+            blurb: "Token usage statistics",
+        },
+        UiRouteInfo {
+            route: "user-token",
+            label: "User Token",
+            blurb: "User token management",
+        },
+        UiRouteInfo {
+            route: "apikey-fun",
+            label: "API Key Fun",
+            blurb: "API key utilities",
+        },
+        UiRouteInfo {
+            route: "security",
+            label: "Security",
+            blurb: "Security settings",
+        },
+        UiRouteInfo {
+            route: "email",
+            label: "Email",
+            blurb: "Email vault and watcher settings",
+        },
+        UiRouteInfo {
+            route: "supabase",
+            label: "Supabase",
+            blurb: "Supabase sync endpoints and node config",
+        },
+        UiRouteInfo {
+            route: "audit",
+            label: "Audit",
+            blurb: "UI interaction audit recorder (start/stop, entries, export)",
+        },
+        UiRouteInfo {
+            route: "settings",
+            label: "Settings",
+            blurb: "Application settings and subpages (e.g. settings/supabase)",
+        },
+        UiRouteInfo {
+            route: "toolchain",
+            label: "Toolchain",
+            blurb: "Toolchain management",
+        },
+    ]
+}
+
+/// Canonicalize a user-supplied route (`instances`, `/Instances`,
+/// `settings/supabase`) to `/instances`-style form. Returns `None` for
+/// unknown top-level routes.
+pub fn resolve_ui_route(input: &str) -> Option<String> {
+    let trimmed = input.trim().trim_matches('/');
+    if trimmed.is_empty() {
+        return None;
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    let head = lower.split('/').next().unwrap_or("");
+    if known_ui_routes().iter().any(|r| r.route == head) {
+        Some(format!("/{lower}"))
+    } else {
+        None
+    }
+}
+
+/// Pending-intent file consumed by the GUI frontend's UI-command poller.
+/// Overridable via `AGM_UI_INTENTS_FILE` (CLI debugging, integration tests).
+pub fn ui_intent_file_path() -> Result<PathBuf, AppError> {
+    if let Ok(raw) = std::env::var("AGM_UI_INTENTS_FILE") {
+        let raw = raw.trim();
+        if !raw.is_empty() {
+            return Ok(PathBuf::from(raw));
+        }
+    }
+    let dir = crate::modules::account::get_data_dir()
+        .map_err(|e| AppError::Config(format!("resolve app data dir for ui intents: {e}")))?;
+    Ok(dir.join("ui_nav_intents.jsonl"))
+}
+
+/// Append one UI intent as a JSON line to `path`. Extracted so unit tests
+/// can target a temp file without touching the real data dir or env vars.
+pub fn queue_ui_intent_to(
+    actor: InteractionActor,
+    action: &str,
+    route: Option<&str>,
+    element_id: Option<&str>,
+    path: &PathBuf,
+) -> Result<(), AppError> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                AppError::Unknown(format!("create ui intent dir {}: {e}", parent.display()))
+            })?;
+        }
+    }
+    let intent = json!({
+        "v": 1,
+        "ts": SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0),
+        "actor": actor.as_str(),
+        "action": action,
+        "route": route,
+        "element_id": element_id,
+    });
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .map_err(|e| AppError::Unknown(format!("open ui intent file {}: {e}", path.display())))?;
+    writeln!(file, "{intent}")
+        .map_err(|e| AppError::Unknown(format!("append ui intent to {}: {e}", path.display())))?;
+    Ok(())
+}
+
+/// Best-effort audit entry for a bot/CLI-driven UI action. Failures are routed
+/// into the error module (never silent); the caller's primary result is
+/// unaffected because the UI intent is already queued.
+fn audit_ui_action(
+    actor: InteractionActor,
+    method_name: &str,
+    route: &str,
+    element_id: Option<&str>,
+    trigger: InteractionTrigger,
+    params: Value,
+    result: &str,
+    message: Option<String>,
+) {
+    let input = RecordInteractionInput {
+        actor,
+        method_name: method_name.to_string(),
+        route: route.to_string(),
+        component: None,
+        element_id: element_id.map(str::to_string),
+        trigger,
+        params: Some(params),
+        result: result.to_string(),
+        message,
+    };
+    // Justification: audit recording is observability, not the action itself —
+    // the UI intent is already queued, and a recorder failure must not flip the
+    // user-visible outcome; the error module keeps the failure visible.
+    crate::error::record_ignored(
+        record_ui_interaction(input).map(|_| ()),
+        "record ui audit entry",
+    );
+}
+
+fn unknown_route_reply(requested: &str) -> String {
+    let mut out = format!(
+        "⚠️ <b>Unknown UI route:</b> <code>{}</code>\n\n🧭 <b>Valid routes:</b>\n",
+        super::clean_for_telegram_html(requested.trim(), 48)
+    );
+    for r in known_ui_routes() {
+        out.push_str(&format!(
+            "• <code>/ui goto {}</code> — {}\n",
+            r.route, r.label
+        ));
+    }
+    out
+}
+
+/// Shared service: queue a UI navigation intent. Same function the
+/// `agm ui goto <route>` CLI calls. Unknown routes list the valid routes
+/// (never fail silently); only IO/config failures are `Err`.
+pub fn ui_service_goto(actor: InteractionActor, route_raw: &str) -> Result<String, AppError> {
+    let path = ui_intent_file_path()?;
+    ui_service_goto_to(actor, route_raw, &path)
+}
+
+/// POST to the local admin API for immediate UI navigation.
+///
+/// The JSONL intent queue (written by `ui_service_goto`) is the durable
+/// record; this POST triggers the live Tauri-event navigation so the UI
+/// responds immediately instead of waiting for a poll. Best-effort: any
+/// failure is tracked and the queued intent remains.
+async fn post_ui_navigate_event(route: &str) {
+    let token: String = crate::modules::config::load_app_config()
+        .ok()
+        .and_then(|c| {
+            c.proxy
+                .admin_password
+                .filter(|p| !p.is_empty())
+                .or(Some(c.proxy.api_key))
+        })
+        .unwrap_or_default();
+    // Justification: best-effort live navigation; the JSONL intent queue
+    // is the durable fallback and the audit entry is already recorded.
+    crate::error::record_ignored(
+        async {
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(5))
+                .build()
+                .map_err(|e| e.to_string())?;
+            let mut req = client
+                .post("http://127.0.0.1:8045/api/ui/navigate")
+                .json(&serde_json::json!({"route": route, "actor": "telegram"}));
+            if !token.is_empty() {
+                req = req
+                    .header("Authorization", format!("Bearer {token}"))
+                    .header("x-api-key", &token);
+            }
+            let resp = req.send().await.map_err(|e| e.to_string())?;
+            if !resp.status().is_success() {
+                return Err(format!("navigate endpoint returned {}", resp.status()));
+            }
+            Ok::<(), String>(())
+        }
+        .await,
+        "post /api/ui/navigate from telegram /ui goto",
+    );
+}
+
+/// `ui_service_goto` against an explicit intent file (unit-test seam).
+pub fn ui_service_goto_to(
+    actor: InteractionActor,
+    route_raw: &str,
+    intent_path: &PathBuf,
+) -> Result<String, AppError> {
+    match resolve_ui_route(route_raw) {
+        Some(route) => {
+            queue_ui_intent_to(actor, "goto", Some(&route), None, intent_path)?;
+            audit_ui_action(
+                actor,
+                "ui_goto",
+                &route,
+                None,
+                InteractionTrigger::Navigation,
+                json!({ "route": route }),
+                "ok",
+                None,
+            );
+            Ok(format!(
+                "🧭 <b>UI navigation sent</b>\n• <b>Route:</b> <code>{}</code>\nThe manager window navigates there now (intent also queued).",
+                escape_html(&route)
+            ))
+        }
+        None => {
+            audit_ui_action(
+                actor,
+                "ui_goto",
+                "/ui",
+                None,
+                InteractionTrigger::Navigation,
+                json!({ "requested": route_raw.trim() }),
+                "error",
+                Some(format!("unknown ui route: {}", route_raw.trim())),
+            );
+            Ok(unknown_route_reply(route_raw))
+        }
+    }
+}
+
+/// Shared service: queue a scroll-to-element intent. Same function the
+/// `agm ui scroll <element-id>` CLI calls.
+pub fn ui_service_scroll(
+    actor: InteractionActor,
+    element_id_raw: &str,
+) -> Result<String, AppError> {
+    let path = ui_intent_file_path()?;
+    ui_service_scroll_to(actor, element_id_raw, &path)
+}
+
+/// `ui_service_scroll` against an explicit intent file (unit-test seam).
+pub fn ui_service_scroll_to(
+    actor: InteractionActor,
+    element_id_raw: &str,
+    intent_path: &PathBuf,
+) -> Result<String, AppError> {
+    let element_id = element_id_raw.trim();
+    if element_id.is_empty() || element_id.len() > 128 || element_id.chars().any(|c| c.is_control())
+    {
+        audit_ui_action(
+            actor,
+            "ui_scroll",
+            "/ui",
+            None,
+            InteractionTrigger::Scroll,
+            json!({ "requested": element_id_raw }),
+            "error",
+            Some("invalid element id".to_string()),
+        );
+        return Ok("⚠️ <b>Invalid element id.</b> Send <code>/ui scroll &lt;element-id&gt;</code> with a plain element id (max 128 chars).".to_string());
+    }
+    queue_ui_intent_to(actor, "scroll", None, Some(element_id), intent_path)?;
+    audit_ui_action(
+        actor,
+        "ui_scroll",
+        "/ui",
+        Some(element_id),
+        InteractionTrigger::Scroll,
+        json!({ "element_id": element_id }),
+        "ok",
+        None,
+    );
+    Ok(format!(
+        "🖱️ <b>UI scroll queued</b>\n• <b>Element:</b> <code>{}</code>\nThe manager window scrolls it into view and focuses it on its next poll.",
+        escape_html(element_id)
+    ))
+}
+
+/// Shared service: render the UI route listing ("ls on the UI") as Telegram
+/// HTML. Pure — no side effects, no audit (read-only query).
+pub fn ui_service_ls(filter_raw: Option<&str>) -> String {
+    let filter = filter_raw
+        .map(|f| f.trim().to_ascii_lowercase())
+        .filter(|f| !f.is_empty());
+    let routes: Vec<UiRouteInfo> = known_ui_routes()
+        .into_iter()
+        .filter(|r| match &filter {
+            Some(f) => r.route.contains(f) || r.label.to_ascii_lowercase().contains(f),
+            None => true,
+        })
+        .collect();
+    let mut out = String::from("🧭 <b>UI routes</b>\n");
+    if routes.is_empty() {
+        out.push_str(&format!(
+            "No routes match <code>{}</code>. Send <code>/ui ls</code> for the full list.",
+            super::clean_for_telegram_html(filter.as_deref().unwrap_or(""), 32)
+        ));
+        return out;
+    }
+    for r in &routes {
+        out.push_str(&format!(
+            "• <code>{}</code> — <b>{}</b>\n  <i>{}</i>\n",
+            r.route, r.label, r.blurb
+        ));
+    }
+    out.push_str(
+        "\n💡 <code>/ui goto &lt;route&gt;</code> navigates · <code>/ui scroll &lt;id&gt;</code> focuses an element.",
+    );
+    out
+}
+
+/// Usage text for `/ui` subcommands.
+pub fn ui_usage_text() -> String {
+    "🖥️ <b>UI remote control</b>\n\
+    • <code>/ui</code> — Open the manager window here\n\
+    • <code>/ui goto &lt;route&gt;</code> — Navigate the UI (e.g. <code>/ui goto instances</code>)\n\
+    • <code>/ui ls</code> — List UI routes (<code>/ui ls &lt;filter&gt;</code> narrows)\n\
+    • <code>/ui scroll &lt;element-id&gt;</code> — Scroll an element into view and focus it\n\n\
+    Unknown routes list the valid ones — nothing fails silently."
+        .to_string()
 }
 
 pub struct LocalUiAction {
@@ -82,7 +496,8 @@ pub fn window_command_section() -> &'static str {
     <pre>/ui\n/shot\n/target default C001</pre>\n\
     <blockquote>🟢 Send <code>/target &lt;instance&gt; &lt;C001&gt;</code> first — the next plain message is the prompt and goes to that conversation. <code>/target clear</code> forgets the aim. For a guided machine → instance → conversation picker with screenshot proof of delivery, use <code>/send</code>.</blockquote>\n\
     <blockquote>🟡 <code>/open &lt;machine&gt;</code> opens AGM on a fleet machine; <code>/screenshot &lt;machine&gt;</code> photographs it. Bare <code>/open</code> / <code>/screenshot</code> stay local.</blockquote>\n\
-    <blockquote>🟣 Voice notes stay audio. Telegram does not turn them into text. Type the prompt after <code>/target</code> or <code>/send</code>.</blockquote>\n"
+    <blockquote>🟣 Voice notes stay audio. Telegram does not turn them into text. Type the prompt after <code>/target</code> or <code>/send</code>.</blockquote>\n\
+    <blockquote>🟠 <b>Drive the UI remotely.</b> <code>/ui goto &lt;route&gt;</code> navigates the manager window (e.g. <code>/ui goto instances</code>); <code>/ui ls</code> lists every route; <code>/ui scroll &lt;element-id&gt;</code> scrolls an element into view and focuses it. Unknown routes list the valid ones — nothing fails silently.</blockquote>\n"
 }
 
 /// Handle `/ui`, `/shot`, `/target`, and a follow-up prompt. Other text returns None.
@@ -110,7 +525,7 @@ fn classify_ui_verb(text: &str) -> Option<UiVerb> {
         .unwrap_or("")
         .to_ascii_lowercase();
     match cmd.as_str() {
-        "ui" => Some(UiVerb::Open),
+        "ui" => Some(parse_ui_subcommand(rest)),
         "open" | "open-ui" | "launch-ui" => open_target_verb(rest),
         "shot" => Some(UiVerb::Shot),
         "screenshot" | "screen" => shot_target_verb(rest),
@@ -118,19 +533,65 @@ fn classify_ui_verb(text: &str) -> Option<UiVerb> {
         "target" => Some(parse_target_rest(rest)),
         "agm" => match rest.split_once(char::is_whitespace) {
             Some((head, tail)) => match head.to_ascii_lowercase().as_str() {
-                "ui" | "open" | "open-ui" => Some(UiVerb::Open),
+                "ui" => Some(parse_ui_subcommand(tail.trim())),
+                "open" | "open-ui" => Some(UiVerb::Open),
                 "shot" | "screenshot" | "screen" => Some(UiVerb::Shot),
                 "target" | "where" | "aim" => Some(parse_target_rest(tail.trim())),
                 _ => None,
             },
             None => match rest.to_ascii_lowercase().as_str() {
-                "ui" | "open" | "open-ui" => Some(UiVerb::Open),
+                "ui" => Some(UiVerb::Open),
+                "open" | "open-ui" => Some(UiVerb::Open),
                 "shot" | "screenshot" | "screen" => Some(UiVerb::Shot),
                 "target" | "where" | "aim" => Some(UiVerb::ShowAim),
                 _ => None,
             },
         },
         _ => None,
+    }
+}
+
+/// Parse the `/ui` subcommand line. Bare `/ui` keeps the historical behavior
+/// (open the manager window); anything unrecognized prints usage — never
+/// fails silently.
+fn parse_ui_subcommand(rest: &str) -> UiVerb {
+    let rest = rest.trim();
+    if rest.is_empty() {
+        return UiVerb::Open;
+    }
+    let (sub, args) = match rest.split_once(char::is_whitespace) {
+        Some((s, a)) => (s.to_ascii_lowercase(), a.trim()),
+        None => (rest.to_ascii_lowercase(), ""),
+    };
+    match sub.as_str() {
+        "open" => UiVerb::Open,
+        "goto" | "go" | "nav" | "navigate" => {
+            if args.is_empty() {
+                UiVerb::UiUsage
+            } else {
+                UiVerb::Goto {
+                    route: args.to_string(),
+                }
+            }
+        }
+        "ls" | "list" | "routes" => UiVerb::Ls {
+            filter: if args.is_empty() {
+                None
+            } else {
+                Some(args.to_string())
+            },
+        },
+        "scroll" | "focus" => {
+            if args.is_empty() {
+                UiVerb::UiUsage
+            } else {
+                UiVerb::Scroll {
+                    element_id: args.to_string(),
+                }
+            }
+        }
+        "help" | "-h" | "--help" => UiVerb::UiUsage,
+        _ => UiVerb::UiUsage,
     }
 }
 
@@ -301,6 +762,57 @@ async fn run_ui_verb(verb: UiVerb) -> LocalUiAction {
                 png,
             }
         }
+        UiVerb::Goto { route } => {
+            let note = ensure_manager_window();
+            let body = match ui_service_goto(InteractionActor::Telegram, &route) {
+                Ok(text) => {
+                    // Trigger immediate navigation via the local admin API
+                    // (the queued intent is the durable fallback).
+                    if let Some(resolved) = resolve_ui_route(&route) {
+                        post_ui_navigate_event(&resolved).await;
+                    }
+                    text
+                }
+                Err(err) => format!(
+                    "❌ <b>UI navigation failed:</b> <code>{}</code>",
+                    escape_html(&err.to_string())
+                ),
+            };
+            LocalUiAction {
+                reply: format!("{body}\n{note}"),
+                markup: Some(help_copy_markup()),
+                png: None,
+                caption: String::new(),
+            }
+        }
+        UiVerb::Ls { filter } => LocalUiAction {
+            reply: ui_service_ls(filter.as_deref()),
+            markup: Some(help_copy_markup()),
+            png: None,
+            caption: String::new(),
+        },
+        UiVerb::Scroll { element_id } => {
+            let note = ensure_manager_window();
+            let body = match ui_service_scroll(InteractionActor::Telegram, &element_id) {
+                Ok(text) => text,
+                Err(err) => format!(
+                    "❌ <b>UI scroll failed:</b> <code>{}</code>",
+                    escape_html(&err.to_string())
+                ),
+            };
+            LocalUiAction {
+                reply: format!("{body}\n{note}"),
+                markup: Some(help_copy_markup()),
+                png: None,
+                caption: String::new(),
+            }
+        }
+        UiVerb::UiUsage => LocalUiAction {
+            reply: ui_usage_text(),
+            markup: Some(help_copy_markup()),
+            png: None,
+            caption: String::new(),
+        },
     }
 }
 
@@ -506,7 +1018,25 @@ Write-Output "OK ${w}x${ht}"
 #[cfg(test)]
 mod tests {
     use super::classify_ui_verb;
+    use super::parse_ui_subcommand;
+    use super::queue_ui_intent_to;
+    use super::resolve_ui_route;
+    use super::ui_service_goto_to;
+    use super::ui_service_ls;
+    use super::ui_service_scroll_to;
     use super::UiVerb;
+    use crate::modules::audit::InteractionActor;
+
+    fn temp_intent_path(tag: &str) -> std::path::PathBuf {
+        let mut p = std::env::temp_dir();
+        p.push(format!(
+            "agm-ui-intent-test-{}-{}.jsonl",
+            std::process::id(),
+            tag
+        ));
+        let _ = std::fs::remove_file(&p);
+        p
+    }
 
     #[test]
     fn classifies_window_commands_and_aim() {
@@ -535,5 +1065,140 @@ mod tests {
         assert_eq!(classify_ui_verb("/help"), None);
         assert_eq!(classify_ui_verb("/send"), None);
         assert_eq!(classify_ui_verb("just a sentence"), None);
+    }
+
+    #[test]
+    fn classifies_ui_subcommands() {
+        // Bare `/ui` keeps the historical open-window behavior.
+        assert_eq!(classify_ui_verb("/ui"), Some(UiVerb::Open));
+        assert_eq!(classify_ui_verb("/ui open"), Some(UiVerb::Open));
+        assert_eq!(
+            classify_ui_verb("/ui goto instances"),
+            Some(UiVerb::Goto {
+                route: "instances".to_string()
+            })
+        );
+        assert_eq!(
+            classify_ui_verb("/ui ls"),
+            Some(UiVerb::Ls { filter: None })
+        );
+        assert_eq!(
+            classify_ui_verb("/ui ls inst"),
+            Some(UiVerb::Ls {
+                filter: Some("inst".to_string())
+            })
+        );
+        assert_eq!(
+            classify_ui_verb("/ui scroll settings-supabase"),
+            Some(UiVerb::Scroll {
+                element_id: "settings-supabase".to_string()
+            })
+        );
+        // Missing args and unknown subcommands print usage, never fail silently.
+        assert_eq!(classify_ui_verb("/ui goto"), Some(UiVerb::UiUsage));
+        assert_eq!(classify_ui_verb("/ui scroll"), Some(UiVerb::UiUsage));
+        assert_eq!(classify_ui_verb("/ui frobnicate"), Some(UiVerb::UiUsage));
+        assert_eq!(classify_ui_verb("/ui --help"), Some(UiVerb::UiUsage));
+        // `/agm ui ...` aliases share the same subcommands.
+        assert_eq!(classify_ui_verb("/agm ui"), Some(UiVerb::Open));
+        assert_eq!(
+            classify_ui_verb("/agm ui goto accounts"),
+            Some(UiVerb::Goto {
+                route: "accounts".to_string()
+            })
+        );
+        assert_eq!(parse_ui_subcommand(""), UiVerb::Open);
+    }
+
+    #[test]
+    fn resolves_ui_routes() {
+        assert_eq!(
+            resolve_ui_route("instances"),
+            Some("/instances".to_string())
+        );
+        assert_eq!(
+            resolve_ui_route("/Instances"),
+            Some("/instances".to_string())
+        );
+        assert_eq!(
+            resolve_ui_route("settings/supabase"),
+            Some("/settings/supabase".to_string())
+        );
+        assert_eq!(resolve_ui_route("audit"), Some("/audit".to_string()));
+        assert_eq!(resolve_ui_route("nope"), None);
+        assert_eq!(resolve_ui_route(""), None);
+        assert_eq!(resolve_ui_route("/"), None);
+    }
+
+    #[test]
+    fn ui_ls_lists_routes_and_filters() {
+        let all = ui_service_ls(None);
+        assert!(all.contains("<code>instances</code>"));
+        assert!(all.contains("<code>audit</code>"));
+        assert!(all.contains("/ui goto"));
+        let filtered = ui_service_ls(Some("token"));
+        assert!(filtered.contains("<code>token-stats</code>"));
+        assert!(!filtered.contains("<code>instances</code>"));
+        let empty = ui_service_ls(Some("zzz-no-such-route"));
+        assert!(empty.contains("No routes match"));
+        assert!(empty.contains("/ui ls"));
+    }
+
+    #[test]
+    fn goto_queues_intent_jsonl() {
+        let path = temp_intent_path("goto");
+        let reply = ui_service_goto_to(InteractionActor::Telegram, "instances", &path).unwrap();
+        assert!(reply.contains("/instances"));
+        let raw = std::fs::read_to_string(&path).unwrap();
+        let intent: serde_json::Value = serde_json::from_str(raw.trim()).unwrap();
+        assert_eq!(intent["v"], 1);
+        assert_eq!(intent["actor"], "telegram");
+        assert_eq!(intent["action"], "goto");
+        assert_eq!(intent["route"], "/instances");
+        assert!(intent["element_id"].is_null());
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn goto_unknown_route_lists_valid_and_queues_nothing() {
+        let path = temp_intent_path("goto-unknown");
+        let reply = ui_service_goto_to(InteractionActor::Telegram, "nope", &path).unwrap();
+        assert!(reply.contains("Unknown UI route"));
+        assert!(reply.contains("/ui goto instances"));
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn scroll_queues_intent_and_validates_element_id() {
+        let path = temp_intent_path("scroll");
+        let reply =
+            ui_service_scroll_to(InteractionActor::Telegram, "settings-supabase", &path).unwrap();
+        assert!(reply.contains("settings-supabase"));
+        let raw = std::fs::read_to_string(&path).unwrap();
+        let intent: serde_json::Value = serde_json::from_str(raw.trim()).unwrap();
+        assert_eq!(intent["actor"], "telegram");
+        assert_eq!(intent["action"], "scroll");
+        assert_eq!(intent["element_id"], "settings-supabase");
+        assert!(intent["route"].is_null());
+
+        // Invalid element ids are rejected with guidance, never queued.
+        let bad_path = temp_intent_path("scroll-bad");
+        let bad = ui_service_scroll_to(InteractionActor::Telegram, "   ", &bad_path).unwrap();
+        assert!(bad.contains("Invalid element id"));
+        assert!(!bad_path.exists());
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn queue_ui_intent_appends_jsonl() {
+        let path = temp_intent_path("queue");
+        queue_ui_intent_to(InteractionActor::Cli, "goto", Some("/audit"), None, &path).unwrap();
+        queue_ui_intent_to(InteractionActor::Cli, "scroll", None, Some("x"), &path).unwrap();
+        let raw = std::fs::read_to_string(&path).unwrap();
+        let lines: Vec<&str> = raw.lines().collect();
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].contains("\"actor\":\"cli\""));
+        assert!(lines[1].contains("\"element_id\":\"x\""));
+        let _ = std::fs::remove_file(&path);
     }
 }

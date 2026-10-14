@@ -62,6 +62,7 @@ mod test_cmds;
 mod test_flow;
 mod test_flow_steps;
 mod test_flow_steps2;
+mod ui_cmds;
 mod update_cmds;
 mod update_helpers;
 
@@ -356,8 +357,11 @@ fn main() {
         "delegate-update" | "update-ui" | "ui-update-runner" => {
             crate::update_cmds::cmd_delegate_update(&cmd_args);
         }
-        "open-ui" | "ui" | "launch-ui" | "start-ui" => {
+        "open-ui" | "launch-ui" | "start-ui" => {
             antigravity_tools_lib::modules::delegate_updater::open_ui(&cmd_args);
+        }
+        "ui" => {
+            crate::ui_cmds::dispatch_ui_domain_from_args(&cmd_args);
         }
         "shot" | "screenshot" => {
             let rt = tokio::runtime::Builder::new_current_thread()

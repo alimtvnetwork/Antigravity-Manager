@@ -1,7 +1,7 @@
 # Task-02: Interaction audit recorder — frontend
 
 ## Status
-PENDING
+DONE — verified by lead (fmt clean, tsc clean, wired into mod.rs/run.rs/Layout/Navbar)
 
 ## Objective
 Wire the recorder into the React frontend: capture interactions, show

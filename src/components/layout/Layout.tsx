@@ -11,11 +11,16 @@ import { ensureFullViewState } from '../../utils/windowManager';
 import { useAccountStore } from '../../stores/useAccountStore';
 import { useInstanceStore } from '../../stores/useInstanceStore';
 import { useFastForwardShortcut } from '../../hooks/useFastForwardShortcut';
+import { useAuditRecorder } from '../../hooks/useAuditRecorder';
+import { useUiRemoteControl } from '../../hooks/useUiRemoteControl';
 import { useErrorStore } from '../../stores/error-store';
+import { AuditPanel } from '../audit';
 
 function Layout() {
     const { isMiniView } = useViewStore();
     useFastForwardShortcut();
+    useAuditRecorder();
+    useUiRemoteControl();
 
     // Ensure correct window state when in Full View (not Mini View)
     // This handles the case where the app was closed in Mini View (small size, no decorations)
@@ -91,6 +96,7 @@ function Layout() {
         <div className="h-screen flex flex-col bg-[#f5faf9] dark:bg-base-100">
             <BackgroundTaskRunner />
             <ToastContainer />
+            <AuditPanel />
             <Navbar />
             <main className="flex-1 min-h-0 overflow-hidden flex flex-col relative">
                 <Outlet />

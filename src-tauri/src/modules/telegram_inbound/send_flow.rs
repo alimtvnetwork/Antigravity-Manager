@@ -657,6 +657,110 @@ mod tests {
         assert!(reply.contains("Destination locked"));
     }
 
+    fn seed_flow(chat_id: i64, stage: SendStage) {
+        let mut flows = SEND_FLOWS.lock().unwrap();
+        flows.insert(
+            chat_id,
+            SendFlow {
+                machine: "W3".to_string(),
+                instance: Some("default".to_string()),
+                conversation: None,
+                stage,
+                updated_at: now_secs(),
+            },
+        );
+    }
+
+    fn drop_flow(chat_id: i64) {
+        if let Ok(mut flows) = SEND_FLOWS.lock() {
+            flows.remove(&chat_id);
+        }
+    }
+
+    #[test]
+    fn send_stage_transition_pick_conversation_locks_destination() {
+        let chat_id: i64 = -9_001_337;
+        seed_flow(chat_id, SendStage::PickConversation);
+
+        let (reply, markup) = on_conversation_picked(chat_id, "W3", "default", "C001");
+        assert!(reply.contains("Destination locked"));
+        assert!(reply.contains("C001"));
+        assert!(markup.is_some());
+
+        {
+            let flows = SEND_FLOWS.lock().unwrap();
+            let flow = flows
+                .get(&chat_id)
+                .expect("flow must survive the transition");
+            assert_eq!(flow.stage, SendStage::AwaitPrompt);
+            assert_eq!(flow.conversation.as_deref(), Some("C001"));
+        }
+
+        // Picking again at AwaitPrompt is rejected, never silently re-locked.
+        let (retry, _) = on_conversation_picked(chat_id, "W3", "default", "C002");
+        assert!(retry.contains("Unknown send action"));
+        drop_flow(chat_id);
+    }
+
+    #[test]
+    fn send_stage_transition_manual_conversation() {
+        let chat_id: i64 = -9_001_338;
+        seed_flow(chat_id, SendStage::PickConversation);
+
+        let (reply, markup) = on_manual_conversation(chat_id, "W3", "default");
+        assert!(reply.contains("Type the conversation"));
+        assert!(markup.is_some());
+        {
+            let flows = SEND_FLOWS.lock().unwrap();
+            assert_eq!(
+                flows.get(&chat_id).expect("flow must survive").stage,
+                SendStage::TypeConversation
+            );
+        }
+
+        // No flow for this chat: rejected, no state created.
+        let (unknown, none) = on_manual_conversation(-9_001_339, "W3", "default");
+        assert!(unknown.contains("Unknown send action"));
+        assert!(none.is_none());
+        drop_flow(chat_id);
+    }
+
+    #[test]
+    fn send_cancel_clears_pending_flows() {
+        let chat_id: i64 = -9_001_340;
+        seed_flow(chat_id, SendStage::PickInstance);
+
+        let reply = start_send_flow("cancel");
+        assert!(reply.contains("cancelled"));
+        assert!(reply.contains("Nothing was dispatched"));
+        assert!(SEND_FLOWS.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn send_start_lists_machines_destination_first() {
+        let reply = start_send_flow("");
+        assert!(reply.contains("step 1 of 3"));
+        assert!(reply.contains("destination locks"));
+    }
+
+    #[tokio::test]
+    async fn send_callback_cancel_clears_flow() {
+        let chat_id: i64 = -9_001_341;
+        seed_flow(chat_id, SendStage::PickInstance);
+
+        let (reply, markup) = handle_send_callback(chat_id, "send:cancel").await;
+        assert!(reply.contains("cancelled"));
+        assert!(markup.is_none());
+        assert!(SEND_FLOWS.lock().unwrap().get(&chat_id).is_none());
+    }
+
+    #[tokio::test]
+    async fn send_callback_unknown_payload_is_rejected() {
+        let (reply, markup) = handle_send_callback(-9_001_342, "send:bogus").await;
+        assert!(reply.contains("Unknown send action"));
+        assert!(markup.is_none());
+    }
+
     #[test]
     fn send_callback_routing_parses_prefixes() {
         // Pure prefix contract shared with the inline keyboards built above.

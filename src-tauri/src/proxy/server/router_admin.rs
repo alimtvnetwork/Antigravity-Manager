@@ -1,5 +1,6 @@
 //! Authenticated admin REST API route table.
 
+use super::admin_ui::ui_route_table;
 use super::app_state::AppState;
 use super::router_admin_a::admin_route_table_a;
 use super::router_admin_b::admin_route_table_b;
@@ -10,6 +11,7 @@ pub(crate) fn build_admin_routes(state: &AppState) -> Router<AppState> {
     Router::new()
         .merge(admin_route_table_a())
         .merge(admin_route_table_b())
+        .merge(ui_route_table())
         // Apply admin-specific auth layer (mandatory verification)
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),

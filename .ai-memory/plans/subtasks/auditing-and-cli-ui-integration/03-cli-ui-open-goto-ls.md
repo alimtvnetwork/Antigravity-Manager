@@ -1,7 +1,7 @@
 # Task-03: CLI-UI bridge — open / goto / ls
 
 ## Status
-PENDING
+DONE — verified by lead (file exists, fmt clean, main.rs wired)
 
 ## Objective
 New CLI module `src-tauri/src/bin/agm/ui_cmds.rs` (following the existing
