@@ -3,6 +3,14 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.199.0 (2026-10-14)**:
+        -   **[Prompt Tree] Send, Backup, and Restore report a real agy result (Thanks to @aukgit)**:
+            -   **Description**: Send passes `--conversation` and returns stderr when `agy` exits. Backup and Restore use a native dialog, and Restore dispatches the imported prompts.
+        -   **[Accounts] A live IDE window counts as a switch, and a copy switch keeps the Default login (Thanks to @aukgit)**:
+            -   **Description**: A dead saved process id is ignored. The stock Antigravity window counts for Default. Switching a copy does not rewrite the shared keyring or `~/.gemini`.
+        -   **[Telegram] Open the manager, screenshot it, and aim the next prompt (Thanks to @aukgit)**:
+            -   **Description**: `/ui`, `/shot`, and `/target` are in the help text. A paused Supabase project is described as DNS `NXDOMAIN`.
+
     *   **v4.198.0 (2026-10-14)**:
         -   **[Instances & Prompt Tree] WebView2 OOM Crash Fix (`0xe0000008`) & Fast Cached Tree Loads (Thanks to @aukgit)**:
             -   **Description**: Fixed an infinite React `useEffect` loop in `src/components/instances/PromptTreeView/usePromptTreeData.ts` where `loadTree` depended on `archivedProjectIds` and `pinnedProjectIds` state arrays while the modal-open effect recreated both arrays on every render, spawning hundreds of concurrent `get_project_conversation_tree` IPC calls and exhausting the Windows commit limit. Moved both reads to `useRef`s, serialized uncached workspace scans behind a mutex in `src-tauri/src/modules/repo_db/tree.rs`, and unified CLI/GUI `max_words` (`2000`) so Prompt Tree opens in `<200 ms` on warm cache with flat thread counts (`~52` threads).

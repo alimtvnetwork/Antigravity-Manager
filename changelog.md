@@ -1,5 +1,19 @@
 # Changelog
 
+## [v4.199.0] - 2026-10-14
+
+### Fixed
+- **Prompt Tree Send, Backup, and Restore**: `agy` is started with `--conversation` and `-p`. `--resume` and `--user-data-dir` are not passed. A process that exits immediately returns that error instead of a success toast. Backup and Restore use the native save and open dialogs with `write_prompt_backup_file` and `read_prompt_backup_file`, and Restore dispatches the imported rows. (Thanks to @aukgit)
+- **Account Switch Window Check and Shared Login**: A live stock Antigravity window counts as a successful relaunch even when its command line omits the saved data directory. A saved process id that has already exited does not count as running. Switching a copy instance no longer replaces the Default account in the shared OS keyring or `~/.gemini`. (Thanks to @aukgit)
+- **Supabase Pause Message and Email Import**: A paused free-tier project is reported as DNS `NXDOMAIN` instead of a bad API key. `agm email import` accepts a JSON file that has no password and prompts for the password separately. (Thanks to @aukgit)
+- **Clipboard While the WebView Is Unfocused**: Copy uses the OS helper when the webview does not have focus. (Thanks to @aukgit)
+
+### Added
+- **Telegram Window Commands**: `/ui` opens the manager, `/shot` sends a PNG of the current screen, and `/target` aims the next plain message at one instance and conversation. (Thanks to @aukgit)
+- **Retest Notes**: The UI session recorder guideline and the local CLI retest cases are written. The recorder itself is not implemented. (Thanks to @aukgit)
+
+---
+
 ## [v4.198.0] - 2026-10-14
 
 ### Fixed
@@ -242,6 +256,15 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.199.0 (2026-10-14)**:
+        -   **[Prompt Tree] Send, Backup, and Restore report a real agy result (Thanks to @aukgit)**:
+            -   **Description**: Send passes `--conversation` and returns stderr when `agy` exits. Backup and Restore use a native dialog, and Restore dispatches the imported prompts.
+        -   **[Accounts] A live IDE window counts as a switch, and a copy switch keeps the Default login (Thanks to @aukgit)**:
+            -   **Description**: A dead saved process id is ignored. The stock Antigravity window counts for Default. Switching a copy does not rewrite the shared keyring or `~/.gemini`.
+        -   **[Telegram] Open the manager, screenshot it, and aim the next prompt (Thanks to @aukgit)**:
+            -   **Description**: `/ui`, `/shot`, and `/target` are in the help text. A paused Supabase project is described as DNS `NXDOMAIN`.
+
+
     *   **v4.198.0 (2026-10-14)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
