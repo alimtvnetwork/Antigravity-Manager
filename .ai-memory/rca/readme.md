@@ -23,6 +23,8 @@ function signature, or re-running a failed pipeline.
 | [08-gitmap-workflow-poisoned-cache.md](./08-gitmap-workflow-poisoned-cache.md) | re-running CI on a failed SHA short-circuits everything green via the `ci-passed-<sha>` cache | `test-summary` job's `if: success()` mark step checks only its own job's steps (not the pipeline), so failed pipelines still write the "passed" cache entry |
 | [09-gitmap-workflow-e2e-shortcircuit.md](./09-gitmap-workflow-e2e-shortcircuit.md) | E2E jobs fail on re-run at step "Already validated": bash cannot start in `.../cli` | E2E job's `defaults.run.working-directory: cli` still applies to the no-op step, but the checkout is skipped when `already-built == 'true'`, so `cli/` does not exist |
 | [10-supabase-sync-failure.md](./10-supabase-sync-failure.md) | Supabase health check shows "Unreachable" / DNS failure for both configured endpoints | free-tier Supabase/Lovable projects are paused cloud-side, so `<project_ref>.supabase.co` is unpublished from DNS — not a code defect |
+| [11-telegram-sendflow-e0015.md](./11-telegram-sendflow-e0015.md) | CI failed on the Telegram program commit: `error[E0015]` at `send_flow.rs:41` | `HashMap::new()` is not const — cannot initialize a `static` with it; wrapped in the repo's `once_cell::sync::Lazy` pattern |
+| [12-telegram-sendflow-not-send.md](./12-telegram-sendflow-not-send.md) | CI failed on the E0015 fix commit: `future cannot be sent between threads safely` | `std::sync::MutexGuard` held across `.await` in `consume_send_prompt`; restructured to scope the lock in a block returning owned data |
 
 ## Standing notes
 
