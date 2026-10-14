@@ -559,39 +559,62 @@ pub async fn consume_send_prompt(_token: &str, chat_id: i64, text: &str) -> Opti
     if trimmed.is_empty() || trimmed.starts_with('/') {
         return None;
     }
-    let mut flows = SEND_FLOWS.lock().ok()?;
-    let flow = flows.get_mut(&chat_id)?;
-    if flow_expired(flow) {
-        flows.remove(&chat_id);
-        return None;
+    // Scope the lock: extract what the await needs, then drop the guard
+    // BEFORE any `.await` (std MutexGuard is not Send).
+    enum Next {
+        LockedReply(SendDispatch),
+        Dispatch {
+            machine: String,
+            instance: String,
+            conversation: String,
+        },
     }
-    match flow.stage {
-        SendStage::TypeConversation => {
-            flow.conversation = Some(trimmed.to_string());
-            flow.stage = SendStage::AwaitPrompt;
-            flow.updated_at = now_secs();
-            let reply = destination_locked_reply(
-                &flow.machine.clone(),
-                flow.instance.as_deref().unwrap_or("default"),
-                trimmed,
-            );
-            Some(SendDispatch {
-                reply,
-                markup: Some(cancel_markup()),
-            })
-        }
-        SendStage::AwaitPrompt => {
-            let machine = flow.machine.clone();
-            let instance = flow
-                .instance
-                .clone()
-                .unwrap_or_else(|| "default".to_string());
-            let conversation = flow.conversation.clone().unwrap_or_default();
+    let next = {
+        let mut flows = SEND_FLOWS.lock().ok()?;
+        let flow = flows.get_mut(&chat_id)?;
+        if flow_expired(flow) {
             flows.remove(&chat_id);
-            drop(flows);
-            Some(dispatch_send_prompt(&machine, &instance, &conversation, trimmed).await)
+            return None;
         }
-        _ => None,
+        match flow.stage {
+            SendStage::TypeConversation => {
+                flow.conversation = Some(trimmed.to_string());
+                flow.stage = SendStage::AwaitPrompt;
+                flow.updated_at = now_secs();
+                let reply = destination_locked_reply(
+                    &flow.machine.clone(),
+                    flow.instance.as_deref().unwrap_or("default"),
+                    trimmed,
+                );
+                Next::LockedReply(SendDispatch {
+                    reply,
+                    markup: Some(cancel_markup()),
+                })
+            }
+            SendStage::AwaitPrompt => {
+                let machine = flow.machine.clone();
+                let instance = flow
+                    .instance
+                    .clone()
+                    .unwrap_or_else(|| "default".to_string());
+                let conversation = flow.conversation.clone().unwrap_or_default();
+                flows.remove(&chat_id);
+                Next::Dispatch {
+                    machine,
+                    instance,
+                    conversation,
+                }
+            }
+            _ => return None,
+        }
+    };
+    match next {
+        Next::LockedReply(dispatch) => Some(dispatch),
+        Next::Dispatch {
+            machine,
+            instance,
+            conversation,
+        } => Some(dispatch_send_prompt(&machine, &instance, &conversation, trimmed).await),
     }
 }
 
