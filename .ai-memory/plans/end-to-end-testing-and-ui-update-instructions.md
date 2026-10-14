@@ -3,6 +3,8 @@
 - **Slug**: `end-to-end-testing-and-ui-update-instructions`
 - **Status**: `COMPLETED`
 - **Spec**: `02-spec/21-app/end-to-end-testing-and-ui-update-instructions/01-architecture-spec.md`
+- **Playbook (read this when asked to test again)**: `.ai-memory/memory/learned/27-e2e-instance-autoswitch-prompt-playbook.md`
+- **RCA**: `.ai-memory/issues/63-e2e-prompt-tree-supabase-email-and-autoswitch-rca.md`
 
 ## Subtasks
 
