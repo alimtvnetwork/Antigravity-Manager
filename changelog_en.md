@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.200.1 (2026-10-14)**:
+        -   **[Fix] Missing `tauri::Emitter` trait import broke the v4.200.0 build (Thanks to @aukgit)**:
+            -   **Description**: `src-tauri/src/proxy/server/admin_ui.rs` called `AppHandle::emit` without the trait in scope (E0599). One-line import fix; v4.200.0 tag pointed at the broken commit, so this patch release carries the fix.
+
     *   **v4.200.0 (2026-10-14)**:
         -   **[Audit] UI interaction audit recorder (Thanks to @aukgit)**:
             -   **Description**: New recorder captures every UI interaction (click, navigation, input, scroll) with method name, UI target (route + component + element id), trigger, actor (user/cli/telegram/system), and timestamp. SQLite-backed, with start/stop/clear/export, a recording indicator in the navbar, and a filterable audit panel with JSON/JSONL export for bug reports.
