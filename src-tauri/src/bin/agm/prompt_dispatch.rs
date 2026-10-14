@@ -268,8 +268,17 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
         "suffix_template": suffix_cat,
         "dispatched_at": now,
     });
-    if let Ok(js) = serde_json::to_string_pretty(&payload) {
-        let _ = fs::write(&task_file, js);
+    match serde_json::to_string_pretty(&payload) {
+        Ok(js) => {
+            if let Err(write_err) = fs::write(&task_file, js) {
+                eprintln!("[ERROR] Could not write the resume task file: {write_err}");
+                std::process::exit(1);
+            }
+        }
+        Err(json_err) => {
+            eprintln!("[ERROR] Could not encode the resume task: {json_err}");
+            std::process::exit(1);
+        }
     }
 
     let active_p = repo_db::ActivePrompt {
@@ -287,7 +296,7 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
     };
     if let Err(spawn_err) = repo_db::spawn_prompt_via_agy(&active_p) {
         eprintln!("[ERROR] agy did not accept the prompt: {spawn_err}");
-        return;
+        std::process::exit(1);
     }
 
     if let Some(seq_code) = seq_label {

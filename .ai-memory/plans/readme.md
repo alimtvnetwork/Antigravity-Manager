@@ -6,6 +6,7 @@
 | :--- | :--- | :--- |
 | [telegram-and-superbase-improvement-plan.md](./telegram-and-superbase-improvement-plan.md) | `COMPLETED` | Telegram open, screenshot, and aimed prompt. Supabase Test fails because both project hosts are NXDOMAIN. |
 | [ui-session-recorder.md](./ui-session-recorder.md) | `PENDING` | Guideline for a developer-mode UI session recorder. Spec is written. The recorder is not implemented. |
+| [local-prompt-switch-e2e.md](./local-prompt-switch-e2e.md) | `COMPLETED` | CLI retest for prompt send, copy-instance switch, shared login, email vault, and auto-switch 15%. |
 
 ## Completed Plans (`completed/`)
 | # | Plan File | Status | Summary |

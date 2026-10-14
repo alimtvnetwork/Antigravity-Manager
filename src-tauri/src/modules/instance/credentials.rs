@@ -63,9 +63,9 @@ pub(crate) fn inject_account_credentials(
     );
     purge_volatile_instance_sessions(&target_data_path);
 
-    if options.launch_mode {
-        // Launch path only: unconditionally sync credentials to system keyring
-        // and credential file so the active Antigravity instance reads the bound account.
+    if options.launch_mode && is_default {
+        // The shared keyring and ~/.gemini belong to the default instance.
+        // A copy launch must not replace that login with the copy's account.
         // Justification: keyring seeding is best-effort; the file-credentials fallback covers failures
         crate::error::record_ignored(
             crate::modules::integration::write_to_system_keyring(account),
@@ -76,13 +76,11 @@ pub(crate) fn inject_account_credentials(
             crate::modules::integration::write_to_file_credentials(account),
             "write file credentials",
         );
-        if is_default {
-            // Justification: account-state bookkeeping; in-memory state is already applied and re-persisted on next change
-            crate::error::record_ignored(
-                crate::modules::account::set_current_account_id(&account.id),
-                "set current account id",
-            );
-        }
+        // Justification: account-state bookkeeping; in-memory state is already applied and re-persisted on next change
+        crate::error::record_ignored(
+            crate::modules::account::set_current_account_id(&account.id),
+            "set current account id",
+        );
     }
 
     let inst_home_opt = get_instance_home_dir(instance_id).ok();
@@ -213,6 +211,10 @@ pub(crate) fn inject_account_credentials(
         }
     }
 
+    if !is_default {
+        reseed_shared_login_from_default_instance();
+    }
+
     // Wipe stale Local Storage / Session Storage to prevent old cached sessions from persisting
     for storage_name in ["Local Storage", "Session Storage"] {
         let storage_dir = target_data_path.join(storage_name);
@@ -223,6 +225,51 @@ pub(crate) fn inject_account_credentials(
     }
 
     Ok(())
+}
+
+/// A copy keeps its own home directory. The OS keyring and `~/.gemini` stay
+/// with the default instance, so a copy inject cannot become the machine login.
+fn reseed_shared_login_from_default_instance() {
+    let registry = match load_registry() {
+        Ok(registry) => registry,
+        Err(err) => {
+            crate::modules::logger::log_warn(&format!(
+                "[CREDENTIALS] Could not reload registry to restore the default login: {err}"
+            ));
+            return;
+        }
+    };
+    let Some(default_inst) = registry.instances.iter().find(|inst| inst.id == "default") else {
+        crate::modules::logger::log_warn(
+            "[CREDENTIALS] No default instance while restoring the shared login",
+        );
+        return;
+    };
+    let Some(account_id) = default_inst.bound_account_id.as_deref() else {
+        crate::modules::logger::log_warn(
+            "[CREDENTIALS] Default instance has no bound account; shared login left unchanged",
+        );
+        return;
+    };
+    let account = match crate::modules::account::load_account(account_id) {
+        Ok(account) => account,
+        Err(err) => {
+            crate::modules::logger::log_warn(&format!(
+                "[CREDENTIALS] Could not load the default account to restore the shared login: {err}"
+            ));
+            return;
+        }
+    };
+    // Justification: keyring restore is best-effort; the default instance state.vscdb still holds its own token
+    crate::error::record_ignored(
+        crate::modules::integration::write_to_system_keyring(&account),
+        "restore default system keyring after copy inject",
+    );
+    // Justification: file-credential restore is best-effort; the default instance state.vscdb still holds its own token
+    crate::error::record_ignored(
+        crate::modules::integration::write_to_file_credentials(&account),
+        "restore default file credentials after copy inject",
+    );
 }
 
 /// Single attempt at injecting the OAuth token into one `state.vscdb`.

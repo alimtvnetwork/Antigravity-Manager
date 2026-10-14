@@ -318,7 +318,20 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
             .map(|arg| arg.to_string_lossy().to_lowercase().replace('\\', "/"))
             .collect::<Vec<_>>()
             .join(" ");
-        if should_spare_pid(pid, &args_str, &exe, &name, &protected_pids, &markers) {
+        let inst_id_lower = instance_id.to_lowercase();
+        let owned_by_this_instance = if inst_id_lower == "default" {
+            !clean_data.is_empty() && args_str.contains(clean_data)
+        } else {
+            let exe_marker = format!("antigravity-{inst_id_lower}");
+            let home_marker = format!("/instances/{inst_id_lower}");
+            exe.contains(&exe_marker)
+                || name.contains(&exe_marker)
+                || args_str.contains(&home_marker)
+                || (!clean_data.is_empty() && args_str.contains(clean_data))
+        };
+        if !owned_by_this_instance
+            && should_spare_pid(pid, &args_str, &exe, &name, &protected_pids, &markers)
+        {
             crate::modules::logger::log_warn(&format!(
                 "[Instance] Leaving PID {} running; it belongs to another instance",
                 pid
