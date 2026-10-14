@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.197.1 (2026-10-14)**:
+        -   **[Instances] Prompt tree cache and crash log (Thanks to @aukgit)**:
+            -   **Description**: Startup no longer deletes `prompt_tree_cache`. The cache lives 120 seconds, and `agm prompts tree` reads it. A panic while building the tree returns a backtrace instead of closing the window. The tree header has Reset, and the CLI command is `agm prompts reset-tree`. CLI checks on the previous binary listed both instances, backed up and restored prompts, sent a review prompt, and enqueued a second prompt. `agm auto-switch threshold 98` read back 98 percent and was restored to 15 percent.
+
     *   **v4.197.0 (2026-10-14)**:
         -   **[CI/CD] Formatting Gate Fix & Dispatch Hardening**:
             -   **Description**: Restored green CI/CD pipeline checks by resolving the `cargo fmt` signature-formatting discrepancy in `src-tauri/src/commands/instance.rs` across all OS matrix runners; includes instance error-modal deduplication with poisoned prompt-lock prevention and pending AI end-to-end test cases for prompt dispatch. (Thanks to @aukgit).

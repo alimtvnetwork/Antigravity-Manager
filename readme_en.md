@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.197.0)
+> Professional AI Account Management & Protocol Proxy System (v4.197.1)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.197.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.197.1-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,6 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
+> Latest version **v4.197.1**: Prompt tree cache and crash log — startup keeps `prompt_tree_cache` for 120 seconds, the CLI tree reads that cache, a tree panic returns a backtrace, and the tree header plus `agm prompts reset-tree` clear only the cache. (Thanks to @aukgit)
 > Latest version **v4.197.0**: CI/CD Formatting Gate Fix & Dispatch Hardening — Resolved the `cargo fmt` signature-formatting discrepancy in `src-tauri/src/commands/instance.rs`, restoring green pipeline checks across all OS matrix runners; includes instance error-modal deduplication with poisoned prompt-lock prevention and pending AI end-to-end test cases for prompt dispatch. (Thanks to @aukgit)
 > Latest version **v4.196.0**: Accounts Quota Column Layout Fix — Fixed the Accounts table quota layout so the 4H Model Quota and Weekly Quota bars expand to fill their columns instead of floating as narrow right-aligned bars with dead space; 5-slot checkpoints, `#1af18d` progress green, full-width spatial gradient with mask reveal, and compact bar heights preserved — layout-width change only. (Thanks to @aukgit)
 > Latest version **v4.195.0**: CI/CD Quality Gates & Macro Syntax Remediation, Window Manager Error Tracking & Complete Supabase/UI Verification — Resolved duplicate variable declaration and expected assertion syntax in json envelope test suite, restoring green Clippy and test compilation across all OS matrix runners; enforced 'No Silent Errors' error tracking in `windowManager.ts`; verified 100% compliance across all 56 automated tests for Progress Green `#1af18d`, 5-slot quintile progress bars, right-compacted layouts, high-contrast theme typography, email privacy masking, prompt tree action capsules, and secure repo-secrets dynamic endpoint discovery. (Thanks to @aukgit)

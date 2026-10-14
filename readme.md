@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.197.0-3B82F6?style=flat-square" alt="Version v4.197.0">
+    <img src="https://img.shields.io/badge/Version-v4.197.1-3B82F6?style=flat-square" alt="Version v4.197.1">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -115,7 +115,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.197.0)**
+**Bar 2: Version-Based Installation (v4.197.1)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -559,6 +559,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
+> Latest version **v4.197.1**: Prompt tree cache and crash log — startup keeps `prompt_tree_cache` for 120 seconds, the CLI tree reads that cache, a tree panic returns a backtrace, and the tree header plus `agm prompts reset-tree` clear only the cache. (Thanks to @aukgit)
 > Latest version **v4.197.0**: CI/CD Formatting Gate Fix & Dispatch Hardening — Resolved the `cargo fmt` signature-formatting discrepancy in `src-tauri/src/commands/instance.rs`, restoring green pipeline checks across all OS matrix runners; includes instance error-modal deduplication with poisoned prompt-lock prevention and pending AI end-to-end test cases for prompt dispatch. (Thanks to @aukgit)
 > Latest version **v4.196.0**: Accounts Quota Column Layout Fix — Fixed the Accounts table quota layout so the 4H Model Quota and Weekly Quota bars expand to fill their columns instead of floating as narrow right-aligned bars with dead space; 5-slot checkpoints, `#1af18d` progress green, full-width spatial gradient with mask reveal, and compact bar heights preserved — layout-width change only. (Thanks to @aukgit)
 > Latest version **v4.195.0**: CI/CD Quality Gates & Macro Syntax Remediation, Window Manager Error Tracking & Complete Supabase/UI Verification — Resolved duplicate variable declaration and expected assertion syntax in json envelope test suite, restoring green Clippy and test compilation across all OS matrix runners; enforced 'No Silent Errors' error tracking in `windowManager.ts`; verified 100% compliance across all 56 automated tests for Progress Green `#1af18d`, 5-slot quintile progress bars, right-compacted layouts, high-contrast theme typography, email privacy masking, prompt tree action capsules, and secure repo-secrets dynamic endpoint discovery. (Thanks to @aukgit)
