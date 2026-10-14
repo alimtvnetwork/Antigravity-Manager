@@ -10,11 +10,11 @@ use std::os::windows::process::CommandExt;
 
 #[derive(Clone)]
 pub(crate) struct CachedProcessInfo {
-    pid: u32,
-    parent: Option<u32>,
-    name: String,
-    exe: String,
-    args_str: String,
+    pub(crate) pid: u32,
+    pub(crate) parent: Option<u32>,
+    pub(crate) name: String,
+    pub(crate) exe: String,
+    pub(crate) args_str: String,
 }
 
 pub(crate) static PROCESS_SCAN_CACHE: Lazy<
