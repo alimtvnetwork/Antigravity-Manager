@@ -288,7 +288,7 @@ pub fn format_help_manual() -> String {
         • <code>/email status</code> · <code>/email ping</code> · <code>/email help</code> — Vault status, test ping, full guide by email (<code>/mail</code> alias)\n\n\
         ⚡ <b>Fast tools</b>\n\
         • <code>/ff</code> · <code>/rotate</code> — Fast-forward to the freshest highest-quota account (prompts preserved)\n\n\
-        <blockquote>🛡️ Prompts are never guessed: <code>/send</code> locks machine → instance → conversation first; <code>/target</code> aims the next plain message at one conversation.</blockquote>",
+        <blockquote>🛡️ Prompts are never guessed: <code>/send</code> locks machine → instance → conversation first; <code>/target</code> aims the next plain message at one conversation.</blockquote>{}",
         clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&hash, 24),
