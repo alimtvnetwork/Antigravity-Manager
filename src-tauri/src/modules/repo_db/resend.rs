@@ -200,10 +200,9 @@ pub fn resend_running_commands_for_instance(
             );
         }
 
-        let sent = spawn_prompt_via_agy(&prompt);
-        if !sent {
+        if let Err(spawn_err) = spawn_prompt_via_agy(&prompt) {
             crate::modules::logger::log_error(&format!(
-                "[RepoDB] Prompt '{}' was not re-pushed; left {}",
+                "[RepoDB] Prompt '{}' was not re-pushed ({spawn_err}); left {}",
                 prompt.id, prompt.status
             ));
             continue;

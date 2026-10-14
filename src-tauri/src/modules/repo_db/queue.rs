@@ -189,8 +189,14 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
 
         // Spawn prompt via agy with task file fallback
         let sent = spawn_prompt_via_agy(&prompt);
+        if let Err(ref spawn_err) = sent {
+            crate::modules::logger::log_warn(&format!(
+                "[PromptQueueScheduler] agy dispatch failed for prompt '{}': {spawn_err}",
+                prompt.id
+            ));
+        }
         let task_file_written = task_file.exists();
-        if !sent && !task_file_written {
+        if sent.is_err() && !task_file_written {
             crate::modules::logger::log_warn(&format!(
                 "[PromptQueueScheduler] Prompt '{}' could not be dispatched (agy failed, task file write failed); keeping in queue",
                 prompt.id
@@ -198,11 +204,16 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
             continue;
         }
 
-        if !sent {
-            let _ = crate::modules::instance::ensure_instance_running_for_dispatch(
+        if sent.is_err() {
+            if let Err(focus_err) = crate::modules::instance::ensure_instance_running_for_dispatch(
                 &inst_id,
                 Some(&repo_path),
-            );
+            ) {
+                crate::modules::logger::log_warn(&format!(
+                    "[PromptQueueScheduler] IDE focus failed for '{}': {focus_err}",
+                    prompt.id
+                ));
+            }
         }
 
         // Update active_prompts status to 'dispatched'
@@ -229,7 +240,7 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
             prompt.prompt_content.clone()
         };
 
-        let action_taken = if sent {
+        let action_taken = if sent.is_ok() {
             "dispatched"
         } else {
             "resume_task_written"

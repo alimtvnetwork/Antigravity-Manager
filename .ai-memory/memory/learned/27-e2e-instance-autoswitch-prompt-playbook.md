@@ -44,6 +44,8 @@ Follow every line. Each line is a mistake that already happened.
 10. **Do not print tokens, passwords, or prompt bodies** in the result block. Print ids, counts, timings, and status words.
 11. **`--json` stdout must be JSON.** Tracing logs go to stderr when `--json` or `-j` is passed (`src-tauri/src/modules/logger.rs`). A log line on stdout is a fail.
 12. **One prompt send is enough.** Use a short instruction such as `Review the latest change in this repo.` Do not invent a repository path. Use a path already bound to `default` or `default-copy-5597`.
+13. **CLI backup/restore is not the Prompt Tree Backup and Restore buttons.** `agm prompts backup` writes a SQLite snapshot. The window buttons must open a native save/open dialog, write or read a `.json` file, and Restore must call `dispatch_backed_up_prompts`. A blob `<a download>` click and a hidden `<input type="file">` click both report success in WebView2 while doing nothing. `save_text_file` rejects paths under the user profile; prompt backups use `write_prompt_backup_file` / `read_prompt_backup_file`.
+14. **The Send button is not passed because `agm prompts send` exited 0.** The button calls `send_prompt_now` with the selected conversation id. `agy` accepts `--conversation` and `-p`. It rejects `--resume` and `--user-data-dir` (`flags provided but not defined`). A spawn that exits immediately must return that stderr to the UI. Do not treat an already-running worker, or a resume file write, as a successful send. Confirm the live `agy.exe` command line contains `--conversation` and does not contain `--resume`.
 
 ## 3. How the failures showed up, and the fix that stopped them
 
@@ -157,6 +159,22 @@ Follow every line. Each line is a mistake that already happened.
 
 **Pass.** `agm email ls` shows one account `ai-agm-tool-v1@hire-seoexperts.com` and one recipient `devorg.bd@gmail.com`. `agm email status` dispatches a status mail and prints `[SUCCESS]`.
 
+### 3.9 Prompt Tree Send, Backup, and Restore looked successful and did nothing
+
+**What you saw.** In v4.198.0 the Send button on a selected conversation showed a success line and the prompt never appeared in the IDE. Backup said the projects were backed up and no file was written. Restore did not open a file picker.
+
+**Why.** `spawn_prompt_via_agy` passed `--resume <conversation id>`. Current `agy` has `--conversation` and rejects `--resume` (`flags provided but not defined: -resume`). It also rejects `--user-data-dir`, which was appended after `-p` for non-default instances. `spawn()` still returned success, and `send_prompt_now_for_instance` returned `Ok` even when the child had already exited or a worker was already running. Backup built a blob URL and called `a.click()` without attaching the link, which WebView2 ignores. Restore clicked a `display:none` file input, which does not open a picker, so `resume_recent_project_prompts` never ran. A JSON import that did land only inserted `status = 'backed_up'` and never called `dispatch_running_prompts`. `agm prompts backup` / `agm prompts restore` are the SQLite snapshot path. Passing those CLI cases does not exercise the window buttons. The v4.198.0 notes marked Backup and Restore passed from that CLI path, and the window Reset button was not clicked.
+
+**The fix.**
+
+- Pass `--conversation` only for a real conversation id. Skip empty ids, synthetic `conv-` ids, and project keys that contain `__` or a path separator.
+- Do not pass `--user-data-dir`. Non-default instances stay isolated with `HOME` / `USERPROFILE`.
+- After spawn, wait briefly. If `agy` has already exited with a non-zero status, return that stderr. A missing binary or an already-running worker is an error on the Send path, not a success.
+- Backup and Restore use the native save/open dialog. The file is written and read with `write_prompt_backup_file` / `read_prompt_backup_file`, which still block `C:\Windows` and `C:\Program Files` and allow a `.json` the user picked under their profile. Cancel does not show success.
+- Restore imports the JSON and then calls `dispatch_backed_up_prompts`. A dispatch failure stays on screen.
+
+**Pass.** A send whose session is a real conversation id starts `agy.exe` with `--conversation` and without `--resume`. If `agy` exits immediately, the CLI prints `[ERROR]` or `DISPATCH_FAILED` and the window shows `Send failed`. A cancelled Backup dialog leaves the status line empty.
+
 ## 4. Section 0 — prepare, every time
 
 1. Read this file.
@@ -201,9 +219,9 @@ Do not run a real account rotation against the user's live Default instance as p
 | C4 | Open Prompt Tree in the window on Default (Prompts and History). | Tree paints. Header can show Backup, Restore, Reset, Refresh. Project count is in the header (the fixed run showed All Projects (48)). Thread count stays near 50, not hundreds. | Window closes, WebView `0xe0000008`, or threads climb past 200. |
 | C5 | Click Reset once in that tree. | Tree paints again. Window stays open. | Window closes. |
 | C6 | `agm prompts copy -i default --json` | Exit 0 and a JSON envelope. | Clipboard command hangs. |
-| C7 | Enter a prompt. Pick a repo path already bound to the instance. `agm prompts send -i default -r "<that path>" "Review the latest change in this repo."` | Exit 0. `agm prompts running -i default --json` shows the new id as running or dispatched. | Command closes the manager, stores repo path `.`, or never returns. |
+| C7 | Enter a prompt. Pick a repo path already bound to the instance. `agm prompts send -i default -r "<that path>" "Review the latest change in this repo."` Then click Send on the selected conversation in the Prompt Tree. | CLI exit 0 only if `agy` stays up. The process command line uses `--conversation` when a real conversation id is passed, and never `--resume`. The window Send shows an error when `agy` exits, and a success line only when the process is still running. | Exit 0 while `agy` printed `flags provided but not defined`, command line contains `--resume`, or the window says dispatched when nothing was sent. |
 | C8 | `agm prompts queue -i default -r "<that path>" "Queue a second review."` | Exit 0, status `queued`, `fifo_ordered true`. | The queued row is marked running immediately, or the window closes. |
-| C9 | `agm prompts backup -i default --json` then `agm prompts restore -i default --json` | Backup returns a path or a count. Restore returns within a few seconds (the fixed run was 162 ms) and does not delete a project that still has an active prompt. | 78-second hang, or `FOREIGN KEY constraint failed`. |
+| C9 | `agm prompts backup -i default --json` then `agm prompts restore -i default --json`. Separately, click Backup in the Prompt Tree, save the JSON, then click Restore and pick that file. | CLI backup returns a path or a count within a few seconds and does not delete a project that still has an active prompt. The window Backup writes the chosen `.json` (cancel shows no success). Restore reads that file, reports the restored count and the dispatched count, and a dispatch error is visible. | 78-second hang, `FOREIGN KEY constraint failed`, success toast with no file, or a restore that only inserts `backed_up` rows and never sends them. |
 | C10 | `agm prompts resend -i default --json` only if C3 showed a running prompt. | Exit 0 or one clear error. | Hang, or a second IDE spawned for an instance you did not name. |
 | C11 | Screenshot the Prompt Tree after C4. | File shows the tree, not only the desktop. | Missing file. |
 

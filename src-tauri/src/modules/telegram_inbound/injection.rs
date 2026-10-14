@@ -197,7 +197,15 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
             );
         }
 
-        let spawned = repo_db::spawn_prompt_via_agy(&active_prompt);
+        let spawned = match repo_db::spawn_prompt_via_agy(&active_prompt) {
+            Ok(()) => true,
+            Err(spawn_err) => {
+                crate::modules::logger::log_warn(&format!(
+                    "[Telegram] agy spawn failed for inbound prompt: {spawn_err}"
+                ));
+                false
+            }
+        };
         let exec_badge = if spawned {
             "🟢 Executing via agy"
         } else {

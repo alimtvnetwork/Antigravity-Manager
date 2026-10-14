@@ -25,25 +25,34 @@ fn truncate_utf8(value: &str, max_bytes: usize) -> &str {
     &value[..end]
 }
 
+/// `agy` resumes a conversation with `--conversation`. A synthetic `conv-` id means
+/// "start a new turn", and a project key (`name__instance`) is not a conversation id.
+fn agy_conversation_id(session: &str) -> Option<&str> {
+    let trimmed = session.trim();
+    if trimmed.is_empty() || trimmed.starts_with("conv-") {
+        return None;
+    }
+    if trimmed.contains("__") || trimmed.contains('\\') || trimmed.contains('/') {
+        return None;
+    }
+    Some(trimmed)
+}
+
 /// Helper to spawn `agy` CLI to execute a prompt in a workspace.
-/// Strips prompt envelope wrappers and executes cleanly via -p without failing on GUI trajectory IDs.
-pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
+/// Uses `--conversation` (not `--resume`, which agy rejects) and `-p`.
+pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> Result<(), String> {
     let ws_dir = PathBuf::from(&prompt.repo_path);
     if !ws_dir.exists() {
-        crate::modules::logger::log_warn(&format!(
-            "[RepoDB] Workspace directory does not exist: '{}', skipping agy spawn",
-            prompt.repo_path
-        ));
-        return false;
+        let message = format!("workspace directory does not exist: '{}'", prompt.repo_path);
+        crate::modules::logger::log_warn(&format!("[RepoDB] {message}"));
+        return Err(message);
     }
 
     let clean_prompt = extract_clean_user_prompt(&prompt.prompt_content);
     if clean_prompt.trim().is_empty() {
-        crate::modules::logger::log_warn(&format!(
-            "[RepoDB] Prompt content for '{}' is empty, skipping agy spawn",
-            prompt.id
-        ));
-        return false;
+        let message = format!("prompt content for '{}' is empty", prompt.id);
+        crate::modules::logger::log_warn(&format!("[RepoDB] {message}"));
+        return Err(message);
     }
 
     let ws_key = format!("{}:{}", prompt.instance_id, prompt.repo_path);
@@ -60,11 +69,12 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
                 sysinfo::ProcessRefreshKind::new().with_exe(sysinfo::UpdateKind::OnlyIfNotSet),
             );
             if sys.process(target_pid).is_some() {
-                crate::modules::logger::log_info(&format!(
-                    "[RepoDB] An agy worker (PID: {}) is already active for workspace '{}'. Prompt '{}' was not sent again.",
-                    existing_pid, ws_key, prompt.id
-                ));
-                return false;
+                let message = format!(
+                    "agy is already running for this workspace (pid {existing_pid}); prompt '{}' was not sent again",
+                    prompt.id
+                );
+                crate::modules::logger::log_info(&format!("[RepoDB] {message}"));
+                return Err(message);
             } else {
                 workers.remove(&ws_key);
             }
@@ -77,9 +87,8 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
         cmd.arg("--dangerously-skip-permissions");
 
         if let Some(ref sess) = prompt.session_id {
-            let s = sess.trim();
-            if !s.is_empty() && !s.starts_with("conv-") {
-                cmd.arg("--resume").arg(s);
+            if let Some(conversation_id) = agy_conversation_id(sess) {
+                cmd.arg("--conversation").arg(conversation_id);
             }
         }
 
@@ -98,9 +107,6 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
                     .iter()
                     .find(|i| i.id == prompt.instance_id || i.name == prompt.instance_id)
                 {
-                    if !inst.data_dir.trim().is_empty() {
-                        cmd.arg("--user-data-dir").arg(&inst.data_dir);
-                    }
                     if let Some(ref acc_id) = inst.bound_account_id {
                         if let Ok(acc) = crate::modules::account::load_account(acc_id) {
                             cmd.env("JETSKI_OAUTH_TOKEN", &acc.token.access_token);
@@ -132,6 +138,37 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
 
         match cmd.spawn() {
             Ok(mut child) => {
+                std::thread::sleep(std::time::Duration::from_millis(400));
+                match child.try_wait() {
+                    Ok(Some(status)) => {
+                        let mut err_msg = String::new();
+                        if let Some(mut reader) = child.stderr.take() {
+                            use std::io::Read;
+                            if let Err(read_err) = reader.read_to_string(&mut err_msg) {
+                                err_msg.push_str(&format!(" (stderr read failed: {read_err})"));
+                            }
+                        }
+                        if status.success() {
+                            return Ok(());
+                        }
+                        let detail = err_msg.trim();
+                        let message = if detail.is_empty() {
+                            format!("agy exited {status}")
+                        } else {
+                            format!("agy exited {status}: {detail}")
+                        };
+                        crate::modules::logger::log_error(&format!(
+                            "[RepoDB] {message} for prompt '{}'",
+                            prompt.id
+                        ));
+                        return Err(message);
+                    }
+                    Ok(None) => {}
+                    Err(wait_err) => {
+                        return Err(format!("agy wait failed: {wait_err}"));
+                    }
+                }
+
                 let child_pid = child.id();
                 {
                     let mut workers = match get_active_agy_workers().lock() {
@@ -164,7 +201,11 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
                                     let mut err_msg = String::new();
                                     if let Some(mut reader) = stderr_reader {
                                         use std::io::Read;
-                                        let _ = reader.read_to_string(&mut err_msg);
+                                        if let Err(read_err) = reader.read_to_string(&mut err_msg) {
+                                            err_msg.push_str(&format!(
+                                                " (stderr read failed: {read_err})"
+                                            ));
+                                        }
                                     }
                                     let err_str = err_msg.trim();
                                     tracing::warn!(
@@ -208,7 +249,7 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
                     tracing::warn!(target: "repo_db", error = %e, "Failed to spawn agy monitor thread");
                 }
 
-                true
+                Ok(())
             }
             Err(e) => {
                 tracing::warn!(
@@ -217,18 +258,15 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> bool {
                     error = %e,
                     "Failed to spawn agy execution"
                 );
-                crate::modules::logger::log_error(&format!(
-                    "[RepoDB] Failed to spawn agy execution for prompt '{}': {}",
-                    prompt.id, e
-                ));
-                false
+                let message = format!("failed to start agy for prompt '{}': {e}", prompt.id);
+                crate::modules::logger::log_error(&format!("[RepoDB] {message}"));
+                Err(message)
             }
         }
     } else {
-        crate::modules::logger::log_warn(
-            "[RepoDB] agy executable not found, cannot resume prompt via CLI",
-        );
-        false
+        let message = "agy executable was not found".to_string();
+        crate::modules::logger::log_warn(&format!("[RepoDB] {message}"));
+        Err(message)
     }
 }
 
@@ -537,25 +575,25 @@ pub fn send_prompt_now_for_instance(
     // 4. Dispatch via agy CLI execution with Tier 2 graceful degradation.
     // If agy CLI executable is absent or another worker is active, the prompt
     // has already been safely persisted to SQLite, copied to system clipboard,
-    // and written to .antigravity_resume_task.json. We ensure the IDE instance
-    // is running/focused and complete the dispatch successfully.
-    let spawned = spawn_prompt_via_agy(&active_prompt);
-    if !spawned {
+    // and written to .antigravity_resume_task.json. A failed agy spawn is
+    // returned so the UI can show it instead of a false success.
+    if let Err(spawn_err) = spawn_prompt_via_agy(&active_prompt) {
         tracing::warn!(
             target: "repo_db",
             prompt_id = %active_prompt.id,
             instance_id = %canonical_inst,
             repo_path = %repo_path,
-            "agy CLI dispatch failed or inactive; degraded to workspace resume task & clipboard fallback"
+            error = %spawn_err,
+            "agy CLI dispatch failed"
         );
-        let _ = crate::modules::instance::ensure_instance_running_for_dispatch(
+        let focus_note = match crate::modules::instance::ensure_instance_running_for_dispatch(
             &canonical_inst,
             Some(repo_path),
-        );
-        crate::modules::logger::log_warn(&format!(
-            "[RepoDB] agy CLI bridge inactive or busy for prompt '{}'; saved to .antigravity_resume_task.json & clipboard, instance '{}' focused",
-            active_prompt.id, canonical_inst
-        ));
+        ) {
+            Ok(pid) => format!("IDE focused (pid {pid})"),
+            Err(focus_err) => format!("IDE focus failed: {focus_err}"),
+        };
+        return Err(format!("{spawn_err}; {focus_note}"));
     } else {
         crate::modules::logger::log_info(&format!(
             "[RepoDB] send_prompt_now_for_instance dispatched prompt '{}' for instance '{}' in '{}'",
@@ -655,4 +693,19 @@ pub fn enqueue_prompt_for_instance(
     ));
 
     Ok(active_prompt)
+}
+
+#[cfg(test)]
+mod agy_flag_tests {
+    use super::agy_conversation_id;
+
+    #[test]
+    fn conversation_flag_keeps_real_ids_and_skips_synthetic_keys() {
+        assert_eq!(agy_conversation_id("cid-e2e-probe"), Some("cid-e2e-probe"));
+        assert_eq!(agy_conversation_id("  abc  "), Some("abc"));
+        assert_eq!(agy_conversation_id("conv-11111111"), None);
+        assert_eq!(agy_conversation_id("repo__default"), None);
+        assert_eq!(agy_conversation_id("C:/repo"), None);
+        assert_eq!(agy_conversation_id(""), None);
+    }
 }

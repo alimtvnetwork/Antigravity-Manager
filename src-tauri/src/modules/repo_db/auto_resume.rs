@@ -236,7 +236,12 @@ pub fn auto_resume_recent_prompts(
             updated_at: now,
             image_payload: image_payload.clone(),
         };
-        spawn_prompt_via_agy(&prompt_obj);
+        if let Err(spawn_err) = spawn_prompt_via_agy(&prompt_obj) {
+            crate::modules::logger::log_warn(&format!(
+                "[RepoDB] auto-resume agy spawn failed for '{}': {spawn_err}",
+                prompt_id
+            ));
+        }
 
         let preview = if prompt_text.len() > 80 {
             format!("{}...", &prompt_text[..77])

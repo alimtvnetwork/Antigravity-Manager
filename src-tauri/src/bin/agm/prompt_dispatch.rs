@@ -285,7 +285,10 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
         updated_at: now,
         image_payload: None,
     };
-    let _ = repo_db::spawn_prompt_via_agy(&active_p);
+    if let Err(spawn_err) = repo_db::spawn_prompt_via_agy(&active_p) {
+        eprintln!("[ERROR] agy did not accept the prompt: {spawn_err}");
+        return;
+    }
 
     if let Some(seq_code) = seq_label {
         println!(

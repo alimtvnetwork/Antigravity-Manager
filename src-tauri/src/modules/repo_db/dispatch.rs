@@ -141,12 +141,18 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
         };
 
         let sent = spawn_prompt_via_agy(&prompt);
+        if let Err(ref spawn_err) = sent {
+            crate::modules::logger::log_warn(&format!(
+                "[RepoDB] agy dispatch failed for prompt '{}': {spawn_err}",
+                prompt.id
+            ));
+        }
         let same_conversation = prompt
             .session_id
             .as_deref()
             .map(|id| !id.trim().is_empty())
             .unwrap_or(false);
-        if !sent && !(file_written && same_conversation) {
+        if sent.is_err() && !(file_written && same_conversation) {
             crate::modules::logger::log_error(&format!(
                 "[RepoDB] Prompt '{}' was not re-pushed for instance '{}'; left backed_up",
                 prompt.id, instance_id

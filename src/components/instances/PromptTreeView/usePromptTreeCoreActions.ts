@@ -4,6 +4,7 @@ import {
     setArchivedProjectsForInstance,
 } from '../../../services/instanceService';
 import { useErrorStore } from '../../../stores/error-store';
+import { isTauri } from '../../../utils/env';
 import type { AgmProjectTreeNode } from './types';
 import type { PromptTreeState } from './usePromptTreeState';
 
@@ -151,7 +152,6 @@ export function usePromptTreeCoreActions({
             try {
                 backedUpDb = await invoke<Record<string, unknown>[]>('list_backed_up_prompts');
             } catch (err: unknown) {
-                // Best-effort: backup proceeds with tree data even if DB read fails. Tracked.
                 useErrorStore.getState().trackWarning(err, {
                     source: 'PromptTreeViewModal.handleBackup',
                     triggerAction: 'list_backed_up_prompts',
@@ -170,19 +170,72 @@ export function usePromptTreeCoreActions({
             };
 
             const jsonStr = JSON.stringify(fullBackupPayload, null, 2);
-            const blob = new Blob([jsonStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `prompts-backup-${instanceId || 'all'}-${Date.now()}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            setActionMsg(`Backed up ${fullBackupPayload.totalProjects} project(s) and ${fullBackupPayload.totalConversations} conversation(s)!`);
-            setTimeout(() => setActionMsg(null), 3000);
+            const fileName = `prompts-backup-${instanceId || 'all'}-${Date.now()}.json`;
+
+            if (!isTauri()) {
+                const blob = new Blob([jsonStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                setActionMsg(`Backed up ${fullBackupPayload.totalProjects} project(s).`);
+                setTimeout(() => setActionMsg(null), 3000);
+                return;
+            }
+
+            const { save } = await import('@tauri-apps/plugin-dialog');
+            const selected = await save({
+                defaultPath: fileName,
+                filters: [{ name: 'JSON Backup', extensions: ['json'] }],
+            });
+            if (!selected) {
+                setActionMsg(null);
+                return;
+            }
+            await invoke('write_prompt_backup_file', { path: selected, content: jsonStr });
+            setActionMsg(`Backed up ${fullBackupPayload.totalProjects} project(s) to ${selected}`);
+            setTimeout(() => setActionMsg(null), 4000);
         } catch (err: unknown) {
+            useErrorStore.getState().captureError(err, {
+                source: 'PromptTreeViewModal.handleBackup',
+                triggerAction: 'write_prompt_backup_file',
+            });
             setError(err instanceof Error ? err.message : String(err) || 'Failed to backup prompts');
+            setActionMsg(null);
         }
     }, [instanceId, instanceName, treeData, setActionMsg, setError]);
+
+    const persistRestoredBackup = useCallback(
+        async (content: string) => {
+            JSON.parse(content);
+            setActionMsg('Importing prompts backup...');
+            const restoredCount = await invoke<number>('restore_prompts_backup', { backupJson: content });
+            let dispatched = 0;
+            let dispatchError = '';
+            try {
+                dispatched = await invoke<number>('dispatch_backed_up_prompts', {
+                    instanceId: instanceId || 'default',
+                });
+            } catch (err: unknown) {
+                dispatchError = err instanceof Error ? err.message : String(err);
+                useErrorStore.getState().captureError(err, {
+                    source: 'PromptTreeViewModal.handleRestore',
+                    triggerAction: 'dispatch_backed_up_prompts',
+                });
+            }
+            const dispatchNote = dispatchError
+                ? ` Import saved ${restoredCount} prompt(s), but sending them failed: ${dispatchError}`
+                : ` Restored ${restoredCount} prompt(s) and sent ${dispatched} to the instance.`;
+            setActionMsg(dispatchNote.trim());
+            await loadTree(true, true);
+            setTimeout(() => setActionMsg(null), 5000);
+        },
+        [instanceId, loadTree, setActionMsg]
+    );
 
     const handleFileRestore = useCallback(
         (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -191,46 +244,63 @@ export function usePromptTreeCoreActions({
             const reader = new FileReader();
             reader.onload = async (event) => {
                 try {
-                    setActionMsg('Importing and persisting prompts backup into SQLite...');
-                    const content = event.target?.result as string;
-                    JSON.parse(content);
-                    const restoredCount = await invoke<number>('restore_prompts_backup', { backupJson: content });
-                    setActionMsg(`Successfully restored and persisted ${restoredCount} prompts in strict FIFO order!`);
-                    await loadTree(true, true);
-                    setTimeout(() => {
-                        setActionMsg(null);
-                    }, 3500);
+                    const content = event.target?.result;
+                    if (typeof content !== 'string') {
+                        throw new Error('backup file was empty');
+                    }
+                    await persistRestoredBackup(content);
                 } catch (err: unknown) {
                     const msg = err instanceof Error ? err.message : String(err);
+                    useErrorStore.getState().captureError(err, {
+                        source: 'PromptTreeViewModal.handleFileRestore',
+                        triggerAction: 'restore_prompts_backup',
+                    });
                     setError(`Restore failed: ${msg || 'Invalid backup format'}`);
+                    setActionMsg(null);
                 }
+            };
+            reader.onerror = () => {
+                const readErr = reader.error ?? new Error('failed to read backup file');
+                useErrorStore.getState().captureError(readErr, {
+                    source: 'PromptTreeViewModal.handleFileRestore',
+                    triggerAction: 'read_backup_file',
+                });
+                setError(`Restore failed: ${readErr.message}`);
+                setActionMsg(null);
             };
             reader.readAsText(file);
             e.target.value = '';
         },
-        [loadTree, setActionMsg, setError]
+        [persistRestoredBackup, setActionMsg, setError]
     );
 
     const handleRestore = useCallback(async () => {
-        if (restoreFileInputRef.current) {
-            restoreFileInputRef.current.click();
-        } else {
-            try {
-                setActionMsg('Restoring prompts with 7s channel stabilization...');
-                await invoke('resume_recent_project_prompts', {
-                    instanceId: instanceId || 'default',
-                    maxAgeSeconds: 3600,
-                });
-                setActionMsg('Prompts restoration dispatched!');
-                setTimeout(() => {
-                    setActionMsg(null);
-                    loadTree(true, true);
-                }, 3000);
-            } catch (err: unknown) {
-                setError(err instanceof Error ? err.message : String(err) || 'Failed to restore prompts');
+        try {
+            if (!isTauri()) {
+                restoreFileInputRef.current?.click();
+                return;
             }
+            const { open } = await import('@tauri-apps/plugin-dialog');
+            const selected = await open({
+                multiple: false,
+                filters: [{ name: 'JSON Backup', extensions: ['json'] }],
+            });
+            if (!selected || typeof selected !== 'string') {
+                setActionMsg(null);
+                return;
+            }
+            setActionMsg('Reading backup...');
+            const content = await invoke<string>('read_prompt_backup_file', { path: selected });
+            await persistRestoredBackup(content);
+        } catch (err: unknown) {
+            useErrorStore.getState().captureError(err, {
+                source: 'PromptTreeViewModal.handleRestore',
+                triggerAction: 'read_prompt_backup_file',
+            });
+            setError(err instanceof Error ? err.message : String(err) || 'Failed to restore prompts');
+            setActionMsg(null);
         }
-    }, [restoreFileInputRef, instanceId, loadTree, setActionMsg, setError]);
+    }, [restoreFileInputRef, persistRestoredBackup, setActionMsg, setError]);
 
     return {
         togglePinProject,

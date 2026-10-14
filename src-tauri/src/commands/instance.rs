@@ -383,6 +383,12 @@ pub fn restore_prompts_backup(backup_json: String) -> Result<usize, String> {
 }
 
 #[tauri::command]
+pub fn dispatch_backed_up_prompts(instance_id: Option<String>) -> Result<usize, String> {
+    let id = instance_id.unwrap_or_else(|| "default".to_string());
+    crate::modules::repo_db::dispatch_running_prompts(&id)
+}
+
+#[tauri::command]
 pub fn assign_project_to_instance(
     instance_id: String,
     repo_paths: Vec<String>,

@@ -384,6 +384,12 @@ pub fn prompt_target_by_sequence_scoped(
         "save prompt before agy spawn",
     );
     let spawned = spawn_prompt_via_agy(&active_prompt);
+    if let Err(ref spawn_err) = spawned {
+        crate::modules::logger::log_warn(&format!(
+            "[RepoDB] tree format agy spawn failed: {spawn_err}"
+        ));
+    }
+    let spawned = spawned.is_ok();
 
     let conv_label = resolved
         .conversation_id
