@@ -3,6 +3,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.206.0 (2026-10-15)**:
+        -   **[Prompt Tree & Telegram] Send Dropdown Enqueue, Tree Import/Export (SQLite+JSON), Telegram Button Fixes (Thanks to @aukgit)**:
+            -   **Description**: Send button dropdown now contains an "Enqueue to FIFO Queue" entry wired to the same dispatch path as the standalone Enqueue button; prompt tree gains copy-all-tree-prompts plus a unified Import/Export section (single-file SQLite DB export/import and JSON export/import); Telegram `cmd:` callback double-slash dispatch bug fixed (send-prompt, find-instance, credits-check buttons now work), 64-byte callback cap guarded, and unknown button taps show a visible notice instead of failing silently. RCAs 14-16 document each root cause.
+
+
     *   **v4.205.0 (2026-10-16)**:
         -   **[UI & UX Responsive Layout] Table Minimum Width Floor, Sticky Column Opaque Shield, Dual-Axis Viewport Scroll, Navbar Responsive Compaction & Window Minima (Thanks to @aukgit)**:
             -   **Description**: Enforced `min-w-[1060px]` on `<table className="w-full min-w-[1060px]">` in `src/components/accounts/AccountTable.tsx` and updated `src/pages/accounts/AccountsContent.tsx` to `overflow-auto`, preventing Column 5 (Weekly Quota) from squishing into `ACTIONS` (`WEEKLY QUOCACTIONS`) and surfacing immediate horizontal scrolling; rendered sticky `ACTIONS` column header and cells with 100% solid opaque backgrounds (`bg-slate-50 dark:bg-[#061220]`, `dark:bg-[#171025]`, `dark:bg-[#081826]`) to prevent scrolled text bleed-through; protected `src/components/instances/InstanceTable.tsx` with `min-w-[780px]`; made `NavLogo.tsx` switch to "AGM" below `lg` (1024px), saving ~95px and lowering Navbar minimum width to 670px so window controls (`btn-window-minimize`, `btn-window-maximize`, `btn-window-close`) are never pushed off-screen; added `"minWidth": 800` and `"minHeight": 520` in `src-tauri/tauri.conf.json`; and implemented a 4-tier responsive simulator toolbar (`100% Fluid`, `1280px`, `1024px`, `800px`) in `scripts/ui-builder.html`.
