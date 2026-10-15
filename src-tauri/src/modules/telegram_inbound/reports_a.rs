@@ -566,5 +566,834 @@ pub fn format_accounts_report() -> String {
         ));
     }
 
+    out.push_str(
+        "\n💡 Export CSV: <code>/accounts --csv</code> or <code>/export accounts csv</code>",
+    );
     out
+}
+
+/// Format dedicated Account & Instance Credit Balance dashboard (/balance, /credits, /quota)
+pub fn format_balance_report(filter_arg: &str) -> String {
+    let local_config = supabase_sync::load_config().unwrap_or_default();
+    let machine_name = std::env::var("COMPUTERNAME")
+        .or_else(|_| std::env::var("HOSTNAME"))
+        .unwrap_or_else(|_| email_watcher::detect_machine_name());
+    let local_ip = email_watcher::detect_local_ip();
+    let raw_alias = if !local_config.node_alias.trim().is_empty() {
+        local_config.node_alias.trim().to_string()
+    } else if let Ok(settings) = email_vault_db::get_notification_settings() {
+        settings.local_machine_name.trim().to_string()
+    } else {
+        machine_name.clone()
+    };
+    let display_alias = if raw_alias.is_empty() {
+        machine_name.clone()
+    } else {
+        raw_alias
+    };
+
+    let app_cfg = crate::modules::config::load_app_config().unwrap_or_default();
+    let switch_threshold = app_cfg.quota_protection.threshold_percentage;
+    let target_model = app_cfg.auto_profile_switcher.target_model.clone();
+
+    let reg = crate::modules::instance::load_registry().unwrap_or_default();
+    let accounts = crate::modules::account::list_accounts().unwrap_or_default();
+    let curr_acc_id = crate::modules::account::get_current_account_id().unwrap_or_default();
+
+    let filter_clean = filter_arg
+        .trim()
+        .replace("--csv", "")
+        .replace("--json", "")
+        .trim()
+        .to_lowercase();
+
+    let mut out = format!(
+        "💰 <b>Account &amp; Instance Credit Balance Dashboard</b>\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        🖥️ <b>Machine:</b> <code>{}</code> (<code>{}</code>) | 🏷️ <b>Node:</b> <code>{}</code>\n\
+        🛡️ <b>Switch Threshold:</b> <code>{}%</code> | 🎯 <b>Model:</b> <code>{}</code>\n\
+        👥 <b>Total Accounts:</b> <code>{}</code> | 💻 <b>Instances:</b> <code>{}</code>\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        <b>🏷️ INSTANCE BOUND ACCOUNTS &amp; BALANCES</b>\n",
+        clean_for_telegram_html(&machine_name, 48),
+        clean_for_telegram_html(&local_ip, 48),
+        clean_for_telegram_html(&display_alias, 48),
+        switch_threshold,
+        clean_for_telegram_html(&target_model, 40),
+        accounts.len(),
+        reg.instances.len()
+    );
+
+    let mut bound_emails_set = std::collections::HashSet::new();
+
+    if reg.instances.is_empty() {
+        let default_acc = accounts
+            .iter()
+            .find(|a| curr_acc_id.as_deref() == Some(&a.id))
+            .or_else(|| accounts.first());
+        if let Some(acc) = default_acc {
+            bound_emails_set.insert(acc.email.to_lowercase());
+            let tier = acc
+                .quota
+                .as_ref()
+                .and_then(|q| q.subscription_tier.as_deref())
+                .unwrap_or("PRO");
+            let (q_4h, q_weekly) =
+                crate::modules::auto_switcher::extract_dual_window_quotas(acc, &target_model);
+            let h_str = q_4h
+                .map(|v| format!("{:.1}%", v))
+                .unwrap_or_else(|| "100.0%".to_string());
+            let w_str = q_weekly
+                .map(|v| format!("{:.1}%", v))
+                .unwrap_or_else(|| "100.0%".to_string());
+            out.push_str(&format!(
+                "• 🟢 <b>default</b> (<code>{}</code>)\n  \u{2007}\u{2007}└ 👤 <code>{}</code> [<code>{}</code>]\n  \u{2007}\u{2007}└ 📊 <b>4h:</b> <code>{}</code> | <b>Weekly:</b> <code>{}</code>\n",
+                clean_for_telegram_html(&display_alias, 24),
+                clean_for_telegram_html(&acc.email, 48),
+                clean_for_telegram_html(tier, 16),
+                h_str,
+                w_str
+            ));
+        } else {
+            out.push_str("• ⚪ <b>default</b> — <i>No active account bound</i>\n");
+        }
+    } else {
+        for inst in &reg.instances {
+            if !filter_clean.is_empty()
+                && filter_clean != "all"
+                && !inst.name.to_lowercase().contains(&filter_clean)
+                && !inst.id.to_lowercase().contains(&filter_clean)
+            {
+                continue;
+            }
+            let pids =
+                crate::modules::instance::find_pids_for_data_dir(&inst.data_dir, inst.is_default);
+            let is_running = !pids.is_empty()
+                || crate::modules::instance::is_instance_running(
+                    &inst.id,
+                    &inst.data_dir,
+                    inst.pid,
+                );
+            let state_icon = if is_running { "🟢" } else { "⚪" };
+            let bound_email = inst
+                .bound_email
+                .clone()
+                .or_else(|| {
+                    if inst.is_default || inst.id == "default" {
+                        accounts
+                            .iter()
+                            .find(|a| curr_acc_id.as_deref() == Some(&a.id))
+                            .map(|a| a.email.clone())
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| "(unbound)".to_string());
+
+            bound_emails_set.insert(bound_email.to_lowercase());
+
+            let matched_acc = accounts
+                .iter()
+                .find(|a| a.email.eq_ignore_ascii_case(&bound_email))
+                .or_else(|| {
+                    inst.bound_account_id
+                        .as_ref()
+                        .and_then(|bid| accounts.iter().find(|a| &a.id == bid))
+                });
+
+            let (tier_str, h_str, w_str) = if let Some(acc) = matched_acc {
+                let t = acc
+                    .quota
+                    .as_ref()
+                    .and_then(|q| q.subscription_tier.as_deref())
+                    .unwrap_or("PRO");
+                let (q_4h, q_weekly) =
+                    crate::modules::auto_switcher::extract_dual_window_quotas(acc, &target_model);
+                (
+                    t.to_string(),
+                    q_4h.map(|v| format!("{:.1}%", v))
+                        .unwrap_or_else(|| "100.0%".to_string()),
+                    q_weekly
+                        .map(|v| format!("{:.1}%", v))
+                        .unwrap_or_else(|| "100.0%".to_string()),
+                )
+            } else {
+                ("N/A".to_string(), "-".to_string(), "-".to_string())
+            };
+
+            out.push_str(&format!(
+                "• {} <b>{}</b> (<code>{}</code> | <code>{}</code>)\n  \u{2007}\u{2007}└ 👤 <code>{}</code> [<code>{}</code>]\n  \u{2007}\u{2007}└ 📊 <b>4h:</b> <code>{}</code> | <b>Weekly:</b> <code>{}</code>\n",
+                state_icon,
+                clean_for_telegram_html(&inst.name, 32),
+                clean_for_telegram_html(&inst.id, 24),
+                clean_for_telegram_html(&display_alias, 24),
+                clean_for_telegram_html(&bound_email, 48),
+                clean_for_telegram_html(&tier_str, 16),
+                h_str,
+                w_str
+            ));
+        }
+    }
+
+    // Top Standby Accounts Pool
+    let mut standby: Vec<(String, String, f64, f64)> = accounts
+        .iter()
+        .filter(|a| !bound_emails_set.contains(&a.email.to_lowercase()))
+        .map(|a| {
+            let tier = a
+                .quota
+                .as_ref()
+                .and_then(|q| q.subscription_tier.as_deref())
+                .unwrap_or("PRO")
+                .to_string();
+            let (q_4h, q_weekly) =
+                crate::modules::auto_switcher::extract_dual_window_quotas(a, &target_model);
+            (
+                a.email.clone(),
+                tier,
+                q_4h.unwrap_or(100.0),
+                q_weekly.unwrap_or(100.0),
+            )
+        })
+        .collect();
+
+    standby.sort_by(|a, b| {
+        b.2.partial_cmp(&a.2)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| b.3.partial_cmp(&a.3).unwrap_or(std::cmp::Ordering::Equal))
+    });
+
+    out.push_str("\n<b>🔋 STANDBY ACCOUNT POOL (TOP READY)</b>\n");
+    if standby.is_empty() {
+        out.push_str("• <i>All registered accounts are currently bound to instances.</i>\n");
+    } else {
+        for (idx, (email, tier, h, w)) in standby.iter().take(6).enumerate() {
+            out.push_str(&format!(
+                "{}. <code>{}</code> [<code>{}</code>] — <b>4h:</b> <code>{:.1}%</code> | <b>Wk:</b> <code>{:.1}%</code>\n",
+                idx + 1,
+                clean_for_telegram_html(email, 48),
+                clean_for_telegram_html(tier, 16),
+                h,
+                w
+            ));
+        }
+    }
+
+    let ssh_nodes = crate::modules::ssh_manager::load_ssh_connections().unwrap_or_default();
+    if !ssh_nodes.is_empty() {
+        out.push_str(&format!(
+            "\n🌐 <b>SSH Fleet Nodes Configured:</b> <code>{}</code> (Send <code>/ssh balance</code> or <code>/nodes</code>)\n",
+            ssh_nodes.len()
+        ));
+    }
+
+    out.push_str(
+        "\n💡 <b>Quick Commands:</b> <code>/balance --csv</code> · <code>/export balance csv</code> · <code>/ff</code>",
+    );
+    out
+}
+
+/// Inline keyboard markup for `/balance` (`/credits`, `/quota`)
+pub fn resolve_balance_markup() -> serde_json::Value {
+    serde_json::json!({
+        "inline_keyboard": [
+            [
+                { "text": "📥 Export Balance CSV", "callback_data": "cmd:/export balance csv" },
+                { "text": "🔄 Refresh Balance", "callback_data": "cmd:/balance" }
+            ],
+            [
+                { "text": "⚡ Fast-Forward (/ff)", "callback_data": "cmd:/ff" },
+                { "text": "🚀 Send Prompt", "callback_data": "cmd:/send" }
+            ],
+            [
+                { "text": "📥 Accounts CSV", "callback_data": "cmd:/export accounts csv" },
+                { "text": "📥 Instances CSV", "callback_data": "cmd:/export instances csv" }
+            ]
+        ]
+    })
+}
+
+/// RFC 4180 compliant CSV field escaping
+pub fn escape_csv_field(val: &str) -> String {
+    if val.contains(',') || val.contains('"') || val.contains('\n') || val.contains('\r') {
+        format!("\"{}\"", val.replace('"', "\"\""))
+    } else {
+        val.to_string()
+    }
+}
+
+/// Export document container for Telegram sendDocument upload
+#[derive(Debug, Clone)]
+pub struct TelegramExportDocument {
+    pub file_name: String,
+    pub mime_type: String,
+    pub bytes: Vec<u8>,
+    pub caption: String,
+    pub markup: Option<serde_json::Value>,
+}
+
+/// Generate export dataset returning `(filename, mime_or_ext, file_content_string)`
+/// Supports targets: `accounts`, `instances`, `balance` (`credits`/`quota`), `nodes` (`ssh`), `prompts`, `status`, `all`
+/// Supports formats: `csv`, `json`
+pub fn generate_export_dataset(
+    target: &str,
+    format: &str,
+) -> Result<(String, String, String), String> {
+    let clean_target = target.trim().to_lowercase();
+    let clean_fmt = if format.trim().eq_ignore_ascii_case("json") {
+        "json"
+    } else {
+        "csv"
+    };
+    let mime = if clean_fmt == "json" {
+        "application/json".to_string()
+    } else {
+        "text/csv".to_string()
+    };
+
+    let machine_name = email_watcher::detect_machine_name();
+    let local_ip = email_watcher::detect_local_ip();
+    let app_cfg = crate::modules::config::load_app_config().unwrap_or_default();
+    let threshold_pct = app_cfg.quota_protection.threshold_percentage;
+    let target_model = app_cfg.auto_profile_switcher.target_model.clone();
+
+    match clean_target.as_str() {
+        "accounts" | "account" | "acc" => {
+            let accounts = crate::modules::account::list_accounts().unwrap_or_default();
+            let curr_id = crate::modules::account::get_current_account_id().unwrap_or_default();
+            let reg = crate::modules::instance::load_registry().unwrap_or_default();
+
+            if clean_fmt == "json" {
+                let items: Vec<serde_json::Value> = accounts
+                    .iter()
+                    .map(|acc| {
+                        let is_active = curr_id.as_deref() == Some(&acc.id);
+                        let tier = acc
+                            .quota
+                            .as_ref()
+                            .and_then(|q| q.subscription_tier.as_deref())
+                            .unwrap_or("PRO");
+                        let (q_4h, q_weekly) =
+                            crate::modules::auto_switcher::extract_dual_window_quotas(
+                                acc,
+                                &target_model,
+                            );
+                        let min_pct = acc
+                            .quota
+                            .as_ref()
+                            .and_then(|q| q.models.iter().map(|m| m.percentage).min())
+                            .unwrap_or(100);
+                        let bound_insts: Vec<String> = reg
+                            .instances
+                            .iter()
+                            .filter(|i| {
+                                i.bound_email
+                                    .as_deref()
+                                    .map(|e| e.eq_ignore_ascii_case(&acc.email))
+                                    .unwrap_or(false)
+                            })
+                            .map(|i| i.name.clone())
+                            .collect();
+                        serde_json::json!({
+                            "id": acc.id,
+                            "email": acc.email,
+                            "tier": tier,
+                            "is_active": is_active,
+                            "bound_instances": bound_insts,
+                            "quota_4h_pct": q_4h.unwrap_or(100.0),
+                            "quota_weekly_pct": q_weekly.unwrap_or(100.0),
+                            "min_model_pct": min_pct,
+                            "machine": machine_name,
+                            "ip": local_ip,
+                        })
+                    })
+                    .collect();
+                let content = serde_json::to_string_pretty(&items)
+                    .map_err(|e| format!("Failed to serialize accounts JSON: {}", e))?;
+                Ok(("agm-accounts.json".to_string(), mime, content))
+            } else {
+                let mut csv = String::from(
+                    "id,email,tier,is_active,bound_instances,quota_4h_pct,quota_weekly_pct,min_model_pct,machine,ip\n",
+                );
+                for acc in &accounts {
+                    let is_active = curr_id.as_deref() == Some(&acc.id);
+                    let tier = acc
+                        .quota
+                        .as_ref()
+                        .and_then(|q| q.subscription_tier.as_deref())
+                        .unwrap_or("PRO");
+                    let (q_4h, q_weekly) =
+                        crate::modules::auto_switcher::extract_dual_window_quotas(
+                            acc,
+                            &target_model,
+                        );
+                    let min_pct = acc
+                        .quota
+                        .as_ref()
+                        .and_then(|q| q.models.iter().map(|m| m.percentage).min())
+                        .unwrap_or(100);
+                    let bound_insts: Vec<String> = reg
+                        .instances
+                        .iter()
+                        .filter(|i| {
+                            i.bound_email
+                                .as_deref()
+                                .map(|e| e.eq_ignore_ascii_case(&acc.email))
+                                .unwrap_or(false)
+                        })
+                        .map(|i| i.name.clone())
+                        .collect();
+                    csv.push_str(&format!(
+                        "{},{},{},{},{},{:.1},{:.1},{},{},{}\n",
+                        escape_csv_field(&acc.id),
+                        escape_csv_field(&acc.email),
+                        escape_csv_field(tier),
+                        is_active,
+                        escape_csv_field(&bound_insts.join(";")),
+                        q_4h.unwrap_or(100.0),
+                        q_weekly.unwrap_or(100.0),
+                        min_pct,
+                        escape_csv_field(&machine_name),
+                        escape_csv_field(&local_ip),
+                    ));
+                }
+                Ok(("agm-accounts.csv".to_string(), mime, csv))
+            }
+        }
+        "instances" | "instance" | "inst" => {
+            let reg = crate::modules::instance::load_registry().unwrap_or_default();
+            let accounts = crate::modules::account::list_accounts().unwrap_or_default();
+            let curr_id = crate::modules::account::get_current_account_id().unwrap_or_default();
+
+            if clean_fmt == "json" {
+                let items: Vec<serde_json::Value> = reg
+                    .instances
+                    .iter()
+                    .map(|inst| {
+                        let pids = crate::modules::instance::find_pids_for_data_dir(
+                            &inst.data_dir,
+                            inst.is_default,
+                        );
+                        let running = !pids.is_empty()
+                            || crate::modules::instance::is_instance_running(
+                                &inst.id,
+                                &inst.data_dir,
+                                inst.pid,
+                            );
+                        let bound_email = inst
+                            .bound_email
+                            .clone()
+                            .or_else(|| {
+                                if inst.is_default || inst.id == "default" {
+                                    accounts
+                                        .iter()
+                                        .find(|a| curr_id.as_deref() == Some(&a.id))
+                                        .map(|a| a.email.clone())
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap_or_default();
+                        serde_json::json!({
+                            "id": inst.id,
+                            "name": inst.name,
+                            "is_default": inst.is_default,
+                            "running": running,
+                            "pid": pids.first().copied().or(inst.pid),
+                            "bound_email": bound_email,
+                            "data_dir": inst.data_dir,
+                            "machine": machine_name,
+                            "ip": local_ip,
+                        })
+                    })
+                    .collect();
+                let content = serde_json::to_string_pretty(&items)
+                    .map_err(|e| format!("Failed to serialize instances JSON: {}", e))?;
+                Ok(("agm-instances.json".to_string(), mime, content))
+            } else {
+                let mut csv = String::from(
+                    "id,name,is_default,running,pid,bound_email,data_dir,machine,ip\n",
+                );
+                for inst in &reg.instances {
+                    let pids = crate::modules::instance::find_pids_for_data_dir(
+                        &inst.data_dir,
+                        inst.is_default,
+                    );
+                    let running = !pids.is_empty()
+                        || crate::modules::instance::is_instance_running(
+                            &inst.id,
+                            &inst.data_dir,
+                            inst.pid,
+                        );
+                    let pid_str = pids
+                        .first()
+                        .copied()
+                        .or(inst.pid)
+                        .map(|p| p.to_string())
+                        .unwrap_or_default();
+                    let bound_email = inst
+                        .bound_email
+                        .clone()
+                        .or_else(|| {
+                            if inst.is_default || inst.id == "default" {
+                                accounts
+                                    .iter()
+                                    .find(|a| curr_id.as_deref() == Some(&a.id))
+                                    .map(|a| a.email.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or_default();
+                    csv.push_str(&format!(
+                        "{},{},{},{},{},{},{},{},{}\n",
+                        escape_csv_field(&inst.id),
+                        escape_csv_field(&inst.name),
+                        inst.is_default,
+                        running,
+                        escape_csv_field(&pid_str),
+                        escape_csv_field(&bound_email),
+                        escape_csv_field(&inst.data_dir),
+                        escape_csv_field(&machine_name),
+                        escape_csv_field(&local_ip),
+                    ));
+                }
+                Ok(("agm-instances.csv".to_string(), mime, csv))
+            }
+        }
+        "balance" | "credits" | "quota" | "bal" | "all" | "cluster" => {
+            let reg = crate::modules::instance::load_registry().unwrap_or_default();
+            let accounts = crate::modules::account::list_accounts().unwrap_or_default();
+            let curr_id = crate::modules::account::get_current_account_id().unwrap_or_default();
+
+            let mut rows_json = Vec::new();
+            let mut csv = String::from(
+                "machine,ip,instance_id,instance_name,running,account_email,tier,quota_4h_pct,quota_weekly_pct,min_model_pct,threshold_pct\n",
+            );
+
+            if reg.instances.is_empty() {
+                for acc in &accounts {
+                    let is_curr = curr_id.as_deref() == Some(&acc.id);
+                    let inst_id = if is_curr { "default" } else { "standby" };
+                    let tier = acc
+                        .quota
+                        .as_ref()
+                        .and_then(|q| q.subscription_tier.as_deref())
+                        .unwrap_or("PRO");
+                    let (q_4h, q_weekly) =
+                        crate::modules::auto_switcher::extract_dual_window_quotas(
+                            acc,
+                            &target_model,
+                        );
+                    let min_pct = acc
+                        .quota
+                        .as_ref()
+                        .and_then(|q| q.models.iter().map(|m| m.percentage).min())
+                        .unwrap_or(100);
+                    rows_json.push(serde_json::json!({
+                        "machine": machine_name,
+                        "ip": local_ip,
+                        "instance_id": inst_id,
+                        "instance_name": inst_id,
+                        "running": is_curr,
+                        "account_email": acc.email,
+                        "tier": tier,
+                        "quota_4h_pct": q_4h.unwrap_or(100.0),
+                        "quota_weekly_pct": q_weekly.unwrap_or(100.0),
+                        "min_model_pct": min_pct,
+                        "threshold_pct": threshold_pct,
+                    }));
+                    csv.push_str(&format!(
+                        "{},{},{},{},{},{},{},{:.1},{:.1},{},{}\n",
+                        escape_csv_field(&machine_name),
+                        escape_csv_field(&local_ip),
+                        escape_csv_field(inst_id),
+                        escape_csv_field(inst_id),
+                        is_curr,
+                        escape_csv_field(&acc.email),
+                        escape_csv_field(tier),
+                        q_4h.unwrap_or(100.0),
+                        q_weekly.unwrap_or(100.0),
+                        min_pct,
+                        threshold_pct
+                    ));
+                }
+            } else {
+                for inst in &reg.instances {
+                    let pids = crate::modules::instance::find_pids_for_data_dir(
+                        &inst.data_dir,
+                        inst.is_default,
+                    );
+                    let running = !pids.is_empty()
+                        || crate::modules::instance::is_instance_running(
+                            &inst.id,
+                            &inst.data_dir,
+                            inst.pid,
+                        );
+                    let bound_email = inst
+                        .bound_email
+                        .clone()
+                        .or_else(|| {
+                            if inst.is_default || inst.id == "default" {
+                                accounts
+                                    .iter()
+                                    .find(|a| curr_id.as_deref() == Some(&a.id))
+                                    .map(|a| a.email.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or_default();
+                    let matched_acc = accounts
+                        .iter()
+                        .find(|a| a.email.eq_ignore_ascii_case(&bound_email));
+                    let tier = matched_acc
+                        .and_then(|a| a.quota.as_ref())
+                        .and_then(|q| q.subscription_tier.as_deref())
+                        .unwrap_or("PRO");
+                    let (q_4h, q_weekly) = matched_acc
+                        .map(|a| {
+                            crate::modules::auto_switcher::extract_dual_window_quotas(
+                                a,
+                                &target_model,
+                            )
+                        })
+                        .unwrap_or((Some(100.0), Some(100.0)));
+                    let min_pct = matched_acc
+                        .and_then(|a| a.quota.as_ref())
+                        .and_then(|q| q.models.iter().map(|m| m.percentage).min())
+                        .unwrap_or(100);
+
+                    rows_json.push(serde_json::json!({
+                        "machine": machine_name,
+                        "ip": local_ip,
+                        "instance_id": inst.id,
+                        "instance_name": inst.name,
+                        "running": running,
+                        "account_email": bound_email,
+                        "tier": tier,
+                        "quota_4h_pct": q_4h.unwrap_or(100.0),
+                        "quota_weekly_pct": q_weekly.unwrap_or(100.0),
+                        "min_model_pct": min_pct,
+                        "threshold_pct": threshold_pct,
+                    }));
+                    csv.push_str(&format!(
+                        "{},{},{},{},{},{},{},{:.1},{:.1},{},{}\n",
+                        escape_csv_field(&machine_name),
+                        escape_csv_field(&local_ip),
+                        escape_csv_field(&inst.id),
+                        escape_csv_field(&inst.name),
+                        running,
+                        escape_csv_field(&bound_email),
+                        escape_csv_field(tier),
+                        q_4h.unwrap_or(100.0),
+                        q_weekly.unwrap_or(100.0),
+                        min_pct,
+                        threshold_pct
+                    ));
+                }
+            }
+
+            if clean_fmt == "json" {
+                let content = serde_json::to_string_pretty(&rows_json)
+                    .map_err(|e| format!("Failed to serialize balance JSON: {}", e))?;
+                Ok(("agm-balance.json".to_string(), mime, content))
+            } else {
+                Ok(("agm-balance.csv".to_string(), mime, csv))
+            }
+        }
+        "nodes" | "node" | "ssh" => {
+            let conns = crate::modules::ssh_manager::load_ssh_connections().unwrap_or_default();
+            if clean_fmt == "json" {
+                let items: Vec<serde_json::Value> = conns
+                    .iter()
+                    .map(|c| {
+                        let port = if c.port == 0 { 22 } else { c.port };
+                        serde_json::json!({
+                            "alias": c.alias,
+                            "ip_address": c.ip_address,
+                            "username": c.username,
+                            "port": port,
+                            "os": c.os,
+                            "auth_method": if !c.key_path.is_empty() { "key" } else { "rsa-password" },
+                            "encryption_algo": if c.encryption_algo.is_empty() { "RSA-2048" } else { &c.encryption_algo },
+                            "has_encrypted_password": !c.encrypted_password.is_empty(),
+                        })
+                    })
+                    .collect();
+                let content = serde_json::to_string_pretty(&items)
+                    .map_err(|e| format!("Failed to serialize nodes JSON: {}", e))?;
+                Ok(("agm-nodes.json".to_string(), mime, content))
+            } else {
+                let mut csv = String::from(
+                    "alias,ip_address,username,port,os,auth_method,encryption_algo,has_encrypted_password\n",
+                );
+                for c in &conns {
+                    let port = if c.port == 0 { 22 } else { c.port };
+                    let auth = if !c.key_path.is_empty() {
+                        "key"
+                    } else {
+                        "rsa-password"
+                    };
+                    let algo = if c.encryption_algo.is_empty() {
+                        "RSA-2048"
+                    } else {
+                        &c.encryption_algo
+                    };
+                    csv.push_str(&format!(
+                        "{},{},{},{},{},{},{},{}\n",
+                        escape_csv_field(&c.alias),
+                        escape_csv_field(&c.ip_address),
+                        escape_csv_field(&c.username),
+                        port,
+                        escape_csv_field(&c.os),
+                        auth,
+                        escape_csv_field(algo),
+                        !c.encrypted_password.is_empty()
+                    ));
+                }
+                Ok(("agm-nodes.csv".to_string(), mime, csv))
+            }
+        }
+        "prompts" | "prompt" => {
+            let prompts = repo_db::list_all_prompts().unwrap_or_default();
+            if clean_fmt == "json" {
+                let items: Vec<serde_json::Value> = prompts
+                    .iter()
+                    .map(|p| {
+                        let (preview, wc) =
+                            repo_db::extract_prompt_words_preview(&p.prompt_content, 50);
+                        serde_json::json!({
+                            "id": p.id,
+                            "instance_id": p.instance_id,
+                            "project_id": p.project_id,
+                            "status": p.status,
+                            "word_count": wc,
+                            "created_at": p.created_at,
+                            "preview": preview,
+                        })
+                    })
+                    .collect();
+                let content = serde_json::to_string_pretty(&items)
+                    .map_err(|e| format!("Failed to serialize prompts JSON: {}", e))?;
+                Ok(("agm-prompts.json".to_string(), mime, content))
+            } else {
+                let mut csv =
+                    String::from("id,instance_id,project_id,status,word_count,created_at,preview\n");
+                for p in &prompts {
+                    let (preview, wc) =
+                        repo_db::extract_prompt_words_preview(&p.prompt_content, 40);
+                    csv.push_str(&format!(
+                        "{},{},{},{},{},{},{}\n",
+                        escape_csv_field(&p.id),
+                        escape_csv_field(&p.instance_id),
+                        escape_csv_field(&p.project_id),
+                        escape_csv_field(&p.status),
+                        wc,
+                        p.created_at,
+                        escape_csv_field(&preview),
+                    ));
+                }
+                Ok(("agm-prompts.csv".to_string(), mime, csv))
+            }
+        }
+        "status" | "observe" => {
+            let ver = git_info::get_app_version();
+            let hash = git_info::get_git_hash();
+            let reg = crate::modules::instance::load_registry().unwrap_or_default();
+            let accounts = crate::modules::account::list_accounts().unwrap_or_default();
+            let prompts = repo_db::list_all_prompts().unwrap_or_default();
+            let running_prompts = prompts
+                .iter()
+                .filter(|p| p.status == "running" || p.status == "dispatched")
+                .count();
+            if clean_fmt == "json" {
+                let obj = serde_json::json!({
+                    "version": ver,
+                    "git_hash": hash,
+                    "machine": machine_name,
+                    "ip": local_ip,
+                    "accounts_total": accounts.len(),
+                    "instances_total": reg.instances.len(),
+                    "running_prompts": running_prompts,
+                    "threshold_pct": threshold_pct,
+                });
+                let content = serde_json::to_string_pretty(&obj)
+                    .map_err(|e| format!("Failed to serialize status JSON: {}", e))?;
+                Ok(("agm-status.json".to_string(), mime, content))
+            } else {
+                let csv = format!(
+                    "version,git_hash,machine,ip,accounts_total,instances_total,running_prompts,threshold_pct\n{},{},{},{},{},{},{},{}\n",
+                    escape_csv_field(&ver),
+                    escape_csv_field(&hash),
+                    escape_csv_field(&machine_name),
+                    escape_csv_field(&local_ip),
+                    accounts.len(),
+                    reg.instances.len(),
+                    running_prompts,
+                    threshold_pct
+                );
+                Ok(("agm-status.csv".to_string(), mime, csv))
+            }
+        }
+        _ => Err(format!(
+            "Unsupported export target '{}'. Valid targets: accounts, instances, balance, nodes, prompts, status",
+            target
+        )),
+    }
+}
+
+/// Build full `TelegramExportDocument` with caption and inline keyboard for `/export`
+pub fn generate_export_document(
+    kind: &str,
+    format: &str,
+) -> Result<TelegramExportDocument, String> {
+    let (file_name, mime_type, content) = generate_export_dataset(kind, format)?;
+    let line_count = content.lines().count();
+    let machine_name = email_watcher::detect_machine_name();
+    let local_ip = email_watcher::detect_local_ip();
+    let clean_kind = if kind.trim().is_empty() {
+        "accounts"
+    } else {
+        kind.trim()
+    };
+    let clean_fmt = if format.trim().eq_ignore_ascii_case("json") {
+        "JSON"
+    } else {
+        "CSV"
+    };
+
+    let caption = format!(
+        "📥 <b>AGM {} {} Export</b>\n\
+        🖥️ <b>Machine:</b> <code>{}</code> (<code>{}</code>)\n\
+        📄 <b>File:</b> <code>{}</code> ({} lines / {} bytes)",
+        clean_for_telegram_html(&clean_kind.to_uppercase(), 24),
+        clean_fmt,
+        clean_for_telegram_html(&machine_name, 48),
+        clean_for_telegram_html(&local_ip, 48),
+        clean_for_telegram_html(&file_name, 48),
+        line_count,
+        content.len()
+    );
+
+    let markup = serde_json::json!({
+        "inline_keyboard": [
+            [
+                { "text": "💰 Check Balance", "callback_data": "cmd:/balance" },
+                { "text": "📥 Accounts CSV", "callback_data": "cmd:/export accounts csv" }
+            ],
+            [
+                { "text": "📥 Instances CSV", "callback_data": "cmd:/export instances csv" },
+                { "text": "🔄 Refresh Status", "callback_data": "cmd:/status" }
+            ]
+        ]
+    });
+
+    Ok(TelegramExportDocument {
+        file_name,
+        mime_type,
+        bytes: content.into_bytes(),
+        caption,
+        markup: Some(markup),
+    })
 }

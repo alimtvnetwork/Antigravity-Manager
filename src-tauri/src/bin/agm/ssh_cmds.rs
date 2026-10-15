@@ -11,6 +11,36 @@ use std::io::{self, BufRead, Write};
 use std::process::{Command, Stdio};
 
 pub(crate) fn handle_ssh_nodes(args: &[String]) {
+    let is_csv = args.iter().any(|a| a.eq_ignore_ascii_case("--csv"))
+        || args
+            .windows(2)
+            .any(|w| w[0].eq_ignore_ascii_case("--format") && w[1].eq_ignore_ascii_case("csv"));
+    if is_csv {
+        match telegram_inbound::generate_export_dataset("nodes", "csv") {
+            Ok((_name, _mime, csv)) => {
+                print!("{}", csv);
+                return;
+            }
+            Err(e) => {
+                eprintln!("[ERROR] Failed to export SSH nodes CSV: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+    let is_json_flag = args.iter().any(|a| a == "--json" || a == "-j");
+    if is_json_flag {
+        match telegram_inbound::generate_export_dataset("nodes", "json") {
+            Ok((_name, _mime, j)) => {
+                println!("{}", j);
+                return;
+            }
+            Err(e) => {
+                eprintln!("[ERROR] Failed to export SSH nodes JSON: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+
     let mut gitmap_args = Vec::new();
     let first = args.first().map(|s| s.to_lowercase()).unwrap_or_default();
     if first == "nodes" {
@@ -209,7 +239,151 @@ pub(crate) fn cmd_ssh(args: &[String]) {
         return;
     }
 
+    if args
+        .iter()
+        .any(|a| a.eq_ignore_ascii_case("--install-gitmap"))
+    {
+        match ssh_manager::install_gitmap_via_powershell(true) {
+            Ok(msg) => println!("[SUCCESS] {}", msg),
+            Err(e) => eprintln!("[ERROR] {}", e),
+        }
+        return;
+    }
+
+    let gm_status = ssh_manager::check_gitmap_installed_status();
+    if !gm_status.gitmap_installed {
+        eprintln!(
+            "  💡 Tip: GitMap CLI is not installed on this machine. Run `agm ssh install-gitmap` or `{}`",
+            gm_status.suggested_install_cmd
+        );
+    }
+
     let first = args[0].to_lowercase();
+    if first == "install-gitmap" || first == "install_gitmap" {
+        match ssh_manager::install_gitmap_via_powershell(true) {
+            Ok(msg) => println!("[SUCCESS] {}", msg),
+            Err(e) => eprintln!("[ERROR] {}", e),
+        }
+        return;
+    }
+
+    if first == "import-gitmap" || first == "import_gitmap" {
+        match ssh_manager::import_ssh_from_gitmap() {
+            Ok((source, stats)) => println!(
+                "[SUCCESS] Imported SSH nodes from {}. Total: {}, Inserted: {}, Updated: {}, Unchanged: {} (RSA-2048 encrypted)",
+                source, stats.total, stats.inserted, stats.updated, stats.unchanged
+            ),
+            Err(e) => eprintln!("[ERROR] Failed to import SSH nodes from GitMap: {}", e),
+        }
+        return;
+    }
+
+    if first == "balance" || first == "balances" || first == "quota" {
+        crate::quota_cmds::cmd_quota_show(&args[1..]);
+        return;
+    }
+
+    if first == "status" {
+        let gm = ssh_manager::check_gitmap_installed_status();
+        println!("\n  [*] SSH & GitMap Fleet Status:");
+        println!(
+            "      GitMap Installed:  {} ({})",
+            if gm.gitmap_installed { "YES" } else { "NO" },
+            gm.gitmap_version
+                .unwrap_or_else(|| "not detected".to_string())
+        );
+        println!(
+            "      RSA Vault Status:  {}",
+            if gm.rsa_vault_initialized {
+                "RSA-2048 Initialized"
+            } else {
+                "Pending First KeyGen"
+            }
+        );
+        if let Some(fp) = gm.rsa_public_fingerprint {
+            println!("      RSA Public Key:    {}", fp);
+        }
+        handle_ssh_nodes(&args[1..]);
+        return;
+    }
+
+    if first == "prompt" {
+        if args.len() < 4 {
+            eprintln!("Usage: agm ssh prompt <node> <instance> <prompt_text...>");
+            std::process::exit(1);
+        }
+        let node = args[1].clone();
+        let inst = args[2].clone();
+        let text = args[3..].join(" ");
+        let payload = ssh_manager::RemotePromptDispatchPayload {
+            node_alias: node,
+            instance_name: inst,
+            prompt_text: text,
+            conversation_id: None,
+        };
+        if let Ok(rt) = tokio::runtime::Runtime::new() {
+            match rt.block_on(ssh_manager::send_remote_ssh_prompt(&payload)) {
+                Ok(res) => println!("[SUCCESS] [{}] {}", res.dispatch_route, res.message),
+                Err(e) => eprintln!("[ERROR] {}", e),
+            }
+        }
+        return;
+    }
+
+    if first == "add" || first == "save" {
+        let mut positional = Vec::new();
+        let mut port: u16 = 22;
+        let mut raw_password: Option<String> = None;
+        let mut key_path: Option<String> = None;
+        let mut idx = 1;
+        while idx < args.len() {
+            let a = &args[idx];
+            if (a == "--port" || a == "-p") && idx + 1 < args.len() {
+                port = args[idx + 1].parse().unwrap_or(22);
+                idx += 2;
+            } else if a == "--password" && idx + 1 < args.len() {
+                raw_password = Some(args[idx + 1].clone());
+                idx += 2;
+            } else if (a == "--key" || a == "-i") && idx + 1 < args.len() {
+                key_path = Some(args[idx + 1].clone());
+                idx += 2;
+            } else if !a.starts_with('-') {
+                positional.push(a.clone());
+                idx += 1;
+            } else {
+                idx += 1;
+            }
+        }
+        if positional.len() < 2 {
+            eprintln!("Usage: agm ssh add <alias> <ip> [user] [--port 22] [--password <pw>]");
+            std::process::exit(1);
+        }
+        let alias = positional[0].clone();
+        let host = positional[1].clone();
+        let username = positional
+            .get(2)
+            .cloned()
+            .unwrap_or_else(|| "Administrator".to_string());
+        let payload = ssh_manager::SaveSshNodeRsaPayload {
+            id: None,
+            alias,
+            host,
+            port,
+            username,
+            raw_password,
+            key_path,
+            os: Some("windows".to_string()),
+        };
+        match ssh_manager::upsert_ssh_node_rsa(&payload) {
+            Ok(rec) => println!(
+                "[SUCCESS] Saved SSH node '{}' ({}@{}:{}) with {} encryption.",
+                rec.alias, rec.username, rec.host, rec.port, rec.encryption_algo
+            ),
+            Err(e) => eprintln!("[ERROR] {}", e),
+        }
+        return;
+    }
+
     if first == "exec" || first == "se" {
         handle_ssh_exec(&args[1..]);
         return;

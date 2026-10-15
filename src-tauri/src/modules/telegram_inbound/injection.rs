@@ -63,8 +63,47 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
         idx += 1;
     }
 
+    if filtered_tokens.is_empty() {
+        return "⚠️ <b>Missing Prompt Content:</b> Please specify both the target (e.g. <code>default</code>, <code>W3:default</code>, or Seq ID <code>C001</code>) and the prompt text.\nExample: <code>/prompt default Write unit tests</code>".to_string();
+    }
+
+    // If `--node` or `--instance` was explicitly provided and the first token is NOT a C001/P001 sequence ID
+    // or if only 1 token is left when both `--node` and `--instance` were provided, allow direct prompt text!
+    let first_tok = filtered_tokens[0];
+    let is_seq_like = first_tok.to_uppercase().starts_with("C0")
+        || first_tok.to_uppercase().starts_with("P0")
+        || first_tok.to_uppercase().starts_with("GM:")
+        || first_tok.to_uppercase().starts_with("AGM:");
+
+    // Support `<machine>:<instance>` colon syntax in first token (e.g. `/prompt W3:default Fix build`)
+    if !is_seq_like && first_tok.contains(':') && filtered_tokens.len() >= 2 {
+        if let Some((m_part, i_part)) = first_tok.split_once(':') {
+            if !m_part.trim().is_empty() && !i_part.trim().is_empty() {
+                explicit_node = Some(m_part.trim().to_string());
+                explicit_instance = Some(
+                    crate::modules::instance::resolve_instance_id(i_part.trim())
+                        .unwrap_or_else(|_| i_part.trim().to_string()),
+                );
+                filtered_tokens[0] = "default";
+            }
+        }
+    } else if !is_seq_like && explicit_instance.is_none() && filtered_tokens.len() >= 2 {
+        // Support `/prompt default Write unit tests` where first token is an instance name/id
+        if first_tok.eq_ignore_ascii_case("default")
+            || crate::modules::instance::resolve_instance_id(first_tok).is_ok()
+        {
+            let resolved_id = crate::modules::instance::resolve_instance_id(first_tok)
+                .unwrap_or_else(|_| first_tok.to_string());
+            explicit_instance = Some(resolved_id);
+            filtered_tokens[0] = "default";
+        }
+    } else if !is_seq_like && (explicit_node.is_some() || explicit_instance.is_some()) {
+        // Support `/prompt --node vm-1 --instance work Audit code` without requiring a dummy project token
+        filtered_tokens.insert(0, "default");
+    }
+
     if filtered_tokens.len() < 2 {
-        return "⚠️ <b>Missing Prompt Content:</b> Please specify both the target (Seq ID <code>C001</code> / <code>P001</code> / <code>GM:#1</code>, project, or node) and the prompt text.\nExample: <code>/prompt C001 Is it done?</code>".to_string();
+        return "⚠️ <b>Missing Prompt Content:</b> Please specify both the target (Seq ID <code>C001</code> / <code>P001</code> / <code>GM:#1</code>, instance, or <code>machine:instance</code>) and the prompt text.\nExample: <code>/prompt default Write unit tests</code>".to_string();
     }
 
     let local_config = supabase_sync::load_config().unwrap_or_default();
@@ -74,12 +113,16 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
         local_config.node_alias.clone()
     };
     let gitmap_nodes = query_gitmap_cluster_nodes();
+    let ssh_nodes = crate::modules::ssh_manager::load_ssh_connections().unwrap_or_default();
 
     let is_first_token_remote_node = explicit_node.is_none()
-        && gitmap_nodes.iter().any(|n| {
+        && (gitmap_nodes.iter().any(|n| {
             n.alias.eq_ignore_ascii_case(filtered_tokens[0])
                 && !n.alias.eq_ignore_ascii_case(&local_alias)
-        });
+        }) || ssh_nodes.iter().any(|n| {
+            n.alias.eq_ignore_ascii_case(filtered_tokens[0])
+                && !n.alias.eq_ignore_ascii_case(&local_alias)
+        }));
 
     let (target_node, target_project, prompt_text) = if let Some(exp_node) = explicit_node {
         let proj = filtered_tokens[0];
@@ -267,6 +310,19 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
         if let Ok(out) = gm_out {
             if out.status.success() {
                 dispatched_gitmap = true;
+            }
+        }
+        if !dispatched_gitmap {
+            if let Ok(results) = crate::modules::ssh_manager::exec_ssh_command(
+                &target_node,
+                std::slice::from_ref(&remote_cmd),
+                None,
+                None,
+                None,
+            ) {
+                if results.iter().any(|r| r.success) {
+                    dispatched_gitmap = true;
+                }
             }
         }
 

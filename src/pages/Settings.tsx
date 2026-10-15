@@ -9,6 +9,7 @@ import { ProxyTab } from './Settings/tabs/ProxyTab';
 import { AboutTab } from './Settings/tabs/AboutTab';
 import { SettingsModals } from './Settings/SettingsModals';
 import EmailNotificationSettings from '../components/settings/EmailNotificationSettings';
+import { SshGitmapSection } from '../components/settings/EmailNotifications/SshGitmapSection';
 import ThemePicker from '../components/settings/ThemePicker';
 import SupabaseSyncSettings from '../components/settings/SupabaseSyncSettings';
 
@@ -58,6 +59,15 @@ function Settings() {
                                 onClick={() => setActiveTab('email')}
                             >
                                 {t('settings.tabs.email', 'Email-Alerts')}
+                            </button>
+                            <button
+                                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'ssh'
+                                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
+                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                    }`}
+                                onClick={() => setActiveTab('ssh')}
+                            >
+                                {t('settings.tabs.ssh', 'SSH & GitMap')}
                             </button>
                             <button
                                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'themes'
@@ -208,6 +218,7 @@ function Settings() {
                     {activeTab === 'debug' && <DebugTab {...page} />}
                     {activeTab === 'proxy' && <ProxyTab {...page} />}
                     {activeTab === 'email' && <EmailNotificationSettings />}
+                    {activeTab === 'ssh' && <SshGitmapSection />}
                     {activeTab === 'themes' && <ThemePicker />}
                     {activeTab === 'supabase' && <SupabaseSyncSettings />}
                     {activeTab === 'about' && <AboutTab {...page} />}

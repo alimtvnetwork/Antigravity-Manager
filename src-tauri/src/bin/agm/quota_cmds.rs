@@ -40,10 +40,58 @@ pub(crate) fn dispatch_quota_domain(subcommand: &str, args: &[String]) {
 }
 
 pub(crate) fn cmd_quota_show(args: &[String]) {
+    let is_csv = args.iter().any(|a| a.eq_ignore_ascii_case("--csv"))
+        || args
+            .windows(2)
+            .any(|w| w[0].eq_ignore_ascii_case("--format") && w[1].eq_ignore_ascii_case("csv"));
+    if is_csv {
+        match telegram_inbound::generate_export_dataset("balance", "csv") {
+            Ok((_name, _mime, csv)) => {
+                print!("{}", csv);
+                return;
+            }
+            Err(e) => {
+                eprintln!("[ERROR] Failed to export balance CSV: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+
     let ctx = CliContext::parse(args);
     if ctx.json_output {
+        let cluster_balances =
+            ssh_manager::get_cluster_instances_and_balances().unwrap_or_default();
         let accounts = account::list_accounts().unwrap_or_default();
-        CliEnvelope::ok("quota show", None, accounts).print_and_exit();
+        CliEnvelope::ok(
+            "quota show",
+            None,
+            serde_json::json!({
+                "instances_and_balances": cluster_balances,
+                "accounts": accounts,
+            }),
+        )
+        .print_and_exit();
+    }
+    if let Ok(items) = ssh_manager::get_cluster_instances_and_balances() {
+        println!("\n[*] Multi-Machine Instance & Account Credit Balances:");
+        println!(
+            "    {:<14} {:<16} {:<14} {:<28} {:<8} {:<10} {:<10}",
+            "MACHINE", "IP", "INSTANCE", "BOUND ACCOUNT", "TIER", "4H QUOTA", "WEEKLY"
+        );
+        println!("    --------------------------------------------------------------------------------------------------------");
+        for item in &items {
+            println!(
+                "    {:<14} {:<16} {:<14} {:<28} {:<8} {:>7.1}%   {:>7.1}%",
+                item.machine_alias,
+                item.machine_ip,
+                item.instance_name,
+                item.bound_email,
+                item.tier,
+                item.quota_4h_pct,
+                item.quota_weekly_pct
+            );
+        }
+        println!();
     }
     crate::status_cmds::cmd_status(args);
 }

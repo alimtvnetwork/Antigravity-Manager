@@ -178,6 +178,91 @@ pub async fn send_telegram_photo(
     Ok(file_id.to_string())
 }
 
+/// Send a document (.csv, .json, .txt) to Telegram chat via multipart POST /sendDocument
+pub async fn send_telegram_document(
+    bot_token: &str,
+    chat_id: i64,
+    filename: &str,
+    content_bytes: &[u8],
+    caption_html: &str,
+    reply_markup: Option<serde_json::Value>,
+) -> Result<(), String> {
+    let clean_token = bot_token.trim();
+    if clean_token.is_empty() {
+        return Err("Telegram bot token is empty".to_string());
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("HTTP client init failed: {}", e))?;
+
+    let safe_name = if filename.trim().is_empty() {
+        "agm-export.csv"
+    } else {
+        filename.trim()
+    };
+    let lower = safe_name.to_lowercase();
+    let mime = if lower.ends_with(".csv") {
+        "text/csv"
+    } else if lower.ends_with(".json") {
+        "application/json"
+    } else {
+        "text/plain"
+    };
+
+    let part = reqwest::multipart::Part::bytes(content_bytes.to_vec())
+        .file_name(safe_name.to_string())
+        .mime_str(mime)
+        .map_err(|e| format!("Invalid multipart document part: {}", e))?;
+
+    let mut form = reqwest::multipart::Form::new()
+        .text("chat_id", chat_id.to_string())
+        .part("document", part);
+
+    if !caption_html.trim().is_empty() {
+        let sanitized_caption =
+            super::formatting::sanitize_telegram_html_entities(caption_html.trim());
+        let clamped_caption = super::formatting::clamp_telegram_copy_text(&sanitized_caption, 950);
+        form = form
+            .text("caption", clamped_caption)
+            .text("parse_mode", "HTML");
+    }
+
+    if let Some(markup) = reply_markup {
+        let markup_str = serde_json::to_string(&markup)
+            .map_err(|e| format!("Failed to serialize reply_markup: {}", e))?;
+        form = form.text("reply_markup", markup_str);
+    }
+
+    let send_doc_url = format!("https://api.telegram.org/bot{}/sendDocument", clean_token);
+    let resp = client
+        .post(&send_doc_url)
+        .multipart(form)
+        .send()
+        .await
+        .map_err(|e| format!("Telegram sendDocument request failed: {}", e))?;
+
+    let status = resp.status();
+    if !status.is_success() {
+        let err_text = resp.text().await.unwrap_or_default();
+        return Err(format!(
+            "Telegram sendDocument returned HTTP {}: {}",
+            status, err_text
+        ));
+    }
+
+    if let Ok(body) = resp.json::<Value>().await {
+        if let Some(file_id) = body["result"]["document"]["file_id"].as_str() {
+            let sha = compute_sha256(content_bytes);
+            let id = format!("doc-{}", &sha[..sha.len().min(12)]);
+            record_media_vault(&id, &sha, Some(safe_name), None, Some(file_id), Some(mime));
+        }
+    }
+
+    Ok(())
+}
+
 /// Upload an image to Catbox for free, permanent public hosting
 pub async fn upload_image_to_catbox(img_bytes: &[u8], filename: &str) -> Result<String, String> {
     let client = reqwest::Client::builder()

@@ -461,29 +461,26 @@ pub fn help_copy_markup() -> Value {
     json!({
         "inline_keyboard": [
             [
-                { "text": "📋 /send", "copy_text": { "text": "/send" } },
-                { "text": "📋 /prompt", "copy_text": { "text": "/prompt C001 " } },
-                { "text": "📋 /open", "copy_text": { "text": "/open " } }
+                { "text": "💰 Account Balances", "callback_data": "cmd:/balance" },
+                { "text": "🚀 Prompt Wizard (/send)", "callback_data": "cmd:/send" }
+            ],
+            [
+                { "text": "📥 Accounts CSV", "callback_data": "cmd:/export accounts csv" },
+                { "text": "📥 Instances CSV", "callback_data": "cmd:/export instances csv" }
+            ],
+            [
+                { "text": "🖥️ SSH Nodes", "callback_data": "cmd:/nodes" },
+                { "text": "🔄 Live Status", "callback_data": "cmd:/status" }
+            ],
+            [
+                { "text": "📋 /prompt", "copy_text": { "text": "/prompt default Write unit tests" } },
+                { "text": "📋 /target", "copy_text": { "text": "/target W3 default" } },
+                { "text": "📋 /balance", "copy_text": { "text": "/balance" } }
             ],
             [
                 { "text": "📋 /screenshot", "copy_text": { "text": "/screenshot " } },
                 { "text": "📋 /shot", "copy_text": { "text": "/shot" } },
                 { "text": "📋 /ui", "copy_text": { "text": "/ui" } }
-            ],
-            [
-                { "text": "📋 /target", "copy_text": { "text": "/target default C001" } },
-                { "text": "📋 /tree", "copy_text": { "text": "/tree" } },
-                { "text": "📋 /fleet", "copy_text": { "text": "/fleet" } }
-            ],
-            [
-                { "text": "📋 /status", "copy_text": { "text": "/status" } },
-                { "text": "📋 /active", "copy_text": { "text": "/active" } },
-                { "text": "📋 /nodes", "copy_text": { "text": "/nodes" } }
-            ],
-            [
-                { "text": "📋 /backup", "copy_text": { "text": "/backup" } },
-                { "text": "📋 /update", "copy_text": { "text": "/update" } },
-                { "text": "📋 /help", "copy_text": { "text": "/help" } }
             ]
         ]
     })
@@ -622,11 +619,19 @@ fn parse_target_rest(rest: &str) -> UiVerb {
     if rest.eq_ignore_ascii_case("clear") || rest.eq_ignore_ascii_case("reset") {
         return UiVerb::ClearAim;
     }
-    let mut parts = rest.split_whitespace();
-    match (parts.next(), parts.next()) {
-        (Some(instance), Some(conversation)) => UiVerb::SetAim {
-            instance: instance.to_string(),
-            conversation: conversation.to_string(),
+    let parts: Vec<&str> = rest.split_whitespace().collect();
+    match parts.as_slice() {
+        [single] => UiVerb::SetAim {
+            instance: (*single).to_string(),
+            conversation: "C001".to_string(),
+        },
+        [first, second] => UiVerb::SetAim {
+            instance: (*first).to_string(),
+            conversation: (*second).to_string(),
+        },
+        [machine, instance, conversation, ..] => UiVerb::SetAim {
+            instance: format!("{}:{}", machine, instance),
+            conversation: (*conversation).to_string(),
         },
         _ => UiVerb::ShowAim,
     }
@@ -729,10 +734,20 @@ async fn run_ui_verb(verb: UiVerb) -> LocalUiAction {
                         .map(|aim| (aim.instance.clone(), aim.conversation.clone()))
                 })
                 .unwrap_or_else(|| ("default".to_string(), "C001".to_string()));
-            let injected = execute_prompt_injection(&format!(
-                "{conversation} --instance {instance} {text}"
-            ))
-            .await;
+            let inject_cmd = if instance.contains(':') {
+                let (m_part, i_part) = instance.split_once(':').unwrap_or(("local", "default"));
+                format!("{conversation} --node {m_part} --instance {i_part} {text}")
+            } else if !(conversation.to_uppercase().starts_with('C')
+                || conversation.to_uppercase().starts_with('P')
+                || conversation.to_uppercase().starts_with("GM:"))
+                && crate::modules::instance::resolve_instance_id(&conversation).is_ok()
+            {
+                // `/target <machine> <instance>` where `instance` held machine and `conversation` held instance name
+                format!("default --node {instance} --instance {conversation} {text}")
+            } else {
+                format!("{conversation} --instance {instance} {text}")
+            };
+            let injected = execute_prompt_injection(&inject_cmd).await;
             let (png, note) = match capture_manager_png() {
                 Ok(bytes) => (
                     Some(bytes),

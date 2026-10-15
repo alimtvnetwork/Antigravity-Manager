@@ -278,3 +278,35 @@ pub fn copy_ssh_public_key(name: Option<&str>) -> Result<SshKeyRecord, String> {
 
     Ok(target_key)
 }
+
+/// Ensure AGM's RSA-2048 password encryption vault keypair is initialized in `~/.agm/ssh/rsa_vault_key.json`
+/// and return a short SHA-256 fingerprint of the RSA-2048 modulus.
+pub fn ensure_agm_rsa_vault_key() -> Result<String, String> {
+    let vault_dir = get_agm_ssh_vault_dir()?;
+    let (n, e, _d) = crate::utils::crypto::load_or_init_rsa_2048_keypair();
+    let n_hex = n.to_hex();
+    let e_hex = e.to_hex();
+
+    let pub_pem_path = vault_dir.join("rsa_vault_key.pub");
+    if !pub_pem_path.exists() {
+        let pub_record = format!(
+            "agm-rsa-2048 n={} e={}\n",
+            &n_hex[..64],
+            e_hex.trim_start_matches('0')
+        );
+        // Justification: best-effort write of human-readable RSA-2048 public key summary
+        crate::error::record_ignored(
+            fs::write(&pub_pem_path, pub_record),
+            "write rsa_vault_key.pub",
+        );
+    }
+
+    use sha2::Digest;
+    let digest = sha2::Sha256::digest(n_hex.as_bytes());
+    let fp_hex: String = digest
+        .iter()
+        .take(8)
+        .map(|b| format!("{:02x}", b))
+        .collect();
+    Ok(format!("RSA-2048:SHA256:{}", fp_hex))
+}

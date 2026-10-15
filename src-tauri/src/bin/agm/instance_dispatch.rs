@@ -209,6 +209,22 @@ pub(crate) fn cmd_instances(args: &[String]) {
     }
 
     let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+    let is_csv = args.iter().any(|a| a.eq_ignore_ascii_case("--csv"))
+        || args
+            .windows(2)
+            .any(|w| w[0].eq_ignore_ascii_case("--format") && w[1].eq_ignore_ascii_case("csv"));
+    if is_csv {
+        match telegram_inbound::generate_export_dataset("instances", "csv") {
+            Ok((_name, _mime, csv)) => {
+                print!("{}", csv);
+                return;
+            }
+            Err(e) => {
+                eprintln!("[ERROR] Failed to export instances CSV: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
 
     if crate::instance_routes_a::route_instances_duplicate(args, &non_flag_args, is_json) {
         return;

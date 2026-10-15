@@ -93,8 +93,24 @@ fn main() {
 
     match subcommand.as_str() {
         "status" => crate::status_cmds::cmd_status(&cmd_args),
-        "credits" | "credit" | "status/credits" | "quota" => {
+        "balance" | "bal" | "credits" | "credit" | "status/credits" | "quota" => {
             crate::quota_cmds::dispatch_quota_domain_from_args(&cmd_args);
+        }
+        "export" => {
+            let target = cmd_args.first().map(|s| s.as_str()).unwrap_or("accounts");
+            let fmt = cmd_args
+                .get(1)
+                .map(|s| s.trim_start_matches('-'))
+                .unwrap_or("csv");
+            match antigravity_tools_lib::modules::telegram_inbound::generate_export_dataset(
+                target, fmt,
+            ) {
+                Ok((_name, _mime, content)) => print!("{}", content),
+                Err(e) => {
+                    eprintln!("[ERROR] {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
         "instances" | "instance" | "intrance" | "intrances" | "profile" | "profiles" => {
             crate::instance_cmds::dispatch_instance_domain_from_args(&cmd_args);
@@ -390,6 +406,38 @@ fn main() {
             };
             f.extend(cmd_args);
             crate::ssh_cmds::cmd_ssh(&f);
+        }
+        "gitmap" | "gm" => {
+            if cmd_args.iter().any(|a| {
+                a.eq_ignore_ascii_case("--install-gitmap") || a.eq_ignore_ascii_case("install")
+            }) {
+                match antigravity_tools_lib::modules::ssh_manager::install_gitmap_via_powershell(
+                    true,
+                ) {
+                    Ok(msg) => println!("[SUCCESS] {}", msg),
+                    Err(e) => eprintln!("[ERROR] {}", e),
+                }
+                return;
+            }
+            if let Some(gitmap_bin) = crate::update_helpers::resolve_gitmap_bin() {
+                let mut cmd = std::process::Command::new(gitmap_bin);
+                cmd.args(&cmd_args);
+                cmd.stdin(std::process::Stdio::inherit())
+                    .stdout(std::process::Stdio::inherit())
+                    .stderr(std::process::Stdio::inherit());
+                if let Ok(st) = cmd.status() {
+                    if !st.success() {
+                        std::process::exit(st.code().unwrap_or(1));
+                    }
+                    return;
+                }
+            }
+            let status =
+                antigravity_tools_lib::modules::ssh_manager::check_gitmap_installed_status();
+            eprintln!("[WARN] GitMap CLI is not installed on this machine.");
+            eprintln!("  💡 Install via AGM:   agm ssh install-gitmap");
+            eprintln!("  💡 Or via Cargo CLI:  {}", status.suggested_install_cmd);
+            std::process::exit(1);
         }
         "version" | "--version" | "-v" => {
             let git_hash = antigravity_tools_lib::modules::git_info::get_git_hash();

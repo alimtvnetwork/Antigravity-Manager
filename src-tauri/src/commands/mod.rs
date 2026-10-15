@@ -37,6 +37,9 @@ pub use toolchain::*;
 // 导出 fleet 命令 (GitMap Fleet Sync)
 pub mod fleet;
 pub use fleet::*;
+// 导出 ssh 命令 (GitMap Multi-Machine & RSA SSH Vault)
+pub mod ssh;
+pub use ssh::*;
 
 // Command groups extracted from the former monolithic mod.rs (each ≤500 lines)
 mod cmd_accounts;

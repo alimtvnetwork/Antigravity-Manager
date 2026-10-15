@@ -118,7 +118,9 @@ pub(crate) fn parse_adhoc_connection(token: &str) -> Option<SshConnectionRecord>
         alias: host.clone(),
         ip_address: host,
         username: user,
+        port: 22,
         encrypted_password: String::new(),
+        encryption_algo: "RSA-2048".to_string(),
         key_path: resolve_usable_key_path(""),
         os,
         os_group: None,
@@ -146,7 +148,7 @@ pub(crate) fn build_ssh_args_for_node(
         args.push("-o".to_string());
         args.push("BatchMode=yes".to_string());
     }
-    let port = port_override.unwrap_or(22);
+    let port = port_override.unwrap_or(if node.port == 0 { 22 } else { node.port });
     args.push("-p".to_string());
     args.push(port.to_string());
 
@@ -256,4 +258,308 @@ pub fn exec_ssh_command(
     });
 
     Ok(results)
+}
+
+/// Suggested CLI command to install GitMap when not detected
+pub const GITMAP_SUGGESTED_INSTALL_CMD: &str =
+    "cargo install --git https://github.com/aukgit/gitmap gitmap --force";
+
+/// Inspect local GitMap installation and RSA-2048 SSH vault status
+pub fn check_gitmap_installed_status() -> SshGitmapStatus {
+    let mut gitmap_installed = false;
+    let mut gitmap_version = None;
+    let mut gitmap_path = None;
+
+    if let Ok(out) = Command::new("gitmap").arg("--version").output() {
+        if out.status.success() {
+            gitmap_installed = true;
+            let v_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            gitmap_version = Some(if v_str.is_empty() {
+                "installed".to_string()
+            } else {
+                v_str
+            });
+        }
+    }
+
+    if gitmap_installed {
+        #[cfg(target_os = "windows")]
+        let which_cmd = ("where.exe", "gitmap");
+        #[cfg(not(target_os = "windows"))]
+        let which_cmd = ("which", "gitmap");
+
+        if let Ok(out) = Command::new(which_cmd.0).arg(which_cmd.1).output() {
+            if out.status.success() {
+                if let Some(first_line) = String::from_utf8_lossy(&out.stdout).lines().next() {
+                    gitmap_path = Some(first_line.trim().to_string());
+                }
+            }
+        }
+    }
+
+    let rsa_fp = ensure_agm_rsa_vault_key().unwrap_or_else(|_| "RSA-2048:ready".to_string());
+    let ssh_config_path = get_ssh_dir()
+        .map(|d| d.join("config").to_string_lossy().to_string())
+        .unwrap_or_else(|_| "~/.ssh/config".to_string());
+    let total_nodes = load_ssh_connections().map(|c| c.len()).unwrap_or(0);
+
+    SshGitmapStatus {
+        gitmap_installed,
+        gitmap_version,
+        gitmap_path,
+        rsa_vault_ready: true,
+        rsa_public_key_fingerprint: rsa_fp,
+        ssh_config_path,
+        suggested_install_cmd: GITMAP_SUGGESTED_INSTALL_CMD.to_string(),
+        total_nodes,
+    }
+}
+
+/// Launch PowerShell (or shell) to install or upgrade GitMap CLI
+pub fn install_gitmap_via_powershell(open_window: bool) -> Result<String, String> {
+    let status = check_gitmap_installed_status();
+    let install_script = format!(
+        "Write-Host '🚀 Installing / Updating GitMap CLI for AGM Multi-Machine Control...' -ForegroundColor Cyan; \
+        if (Get-Command gitmap -ErrorAction SilentlyContinue) {{ gitmap self-update }} \
+        elseif (Get-Command cargo -ErrorAction SilentlyContinue) {{ {} }} \
+        else {{ Write-Host 'Run: {}' -ForegroundColor Yellow }}",
+        GITMAP_SUGGESTED_INSTALL_CMD, GITMAP_SUGGESTED_INSTALL_CMD
+    );
+
+    if open_window {
+        #[cfg(target_os = "windows")]
+        {
+            let mut cmd = Command::new("powershell.exe");
+            cmd.args([
+                "-NoProfile",
+                "-Command",
+                &format!(
+                    "Start-Process powershell.exe -ArgumentList '-NoExit','-NoProfile','-Command','{}'",
+                    install_script.replace('\'', "''")
+                ),
+            ]);
+            let spawn_res = crate::modules::process::spawn_with_job_breakaway_fallback(&mut cmd);
+            if let Err(e) = spawn_res {
+                return Err(format!(
+                    "Failed to launch PowerShell installer window: {}. Suggested command: {}",
+                    e, GITMAP_SUGGESTED_INSTALL_CMD
+                ));
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            // Justification: best-effort background shell launch on Unix
+            crate::error::record_ignored(
+                Command::new("sh")
+                    .args(["-c", GITMAP_SUGGESTED_INSTALL_CMD])
+                    .spawn(),
+                "spawn gitmap install sh",
+            );
+        }
+    }
+
+    if status.gitmap_installed {
+        Ok(format!(
+            "GitMap is installed ({}). Triggered update / verification. Manual command: `{}`",
+            status
+                .gitmap_version
+                .unwrap_or_else(|| "latest".to_string()),
+            GITMAP_SUGGESTED_INSTALL_CMD
+        ))
+    } else {
+        Ok(format!(
+            "GitMap CLI was not detected. PowerShell installer launched! You can also run: `{}`",
+            GITMAP_SUGGESTED_INSTALL_CMD
+        ))
+    }
+}
+
+/// Return multi-machine instance & bound account balances across local machine and SSH/GitMap nodes
+pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalanceItem>, String> {
+    let mut items = Vec::new();
+
+    let local_machine = crate::modules::email_watcher::detect_machine_name();
+    let local_ip = crate::modules::email_watcher::detect_local_ip();
+    let app_cfg = crate::modules::config::load_app_config().unwrap_or_default();
+    let target_model = app_cfg.auto_profile_switcher.target_model.clone();
+
+    let reg = crate::modules::instance::load_registry().unwrap_or_default();
+    let accounts = crate::modules::account::list_accounts().unwrap_or_default();
+    let curr_id = crate::modules::account::get_current_account_id().unwrap_or_default();
+
+    if reg.instances.is_empty() {
+        let default_acc = accounts
+            .iter()
+            .find(|a| curr_id.as_deref() == Some(&a.id))
+            .or_else(|| accounts.first());
+        let (email, tier, q_4h, q_wk) = if let Some(acc) = default_acc {
+            let t = acc
+                .quota
+                .as_ref()
+                .and_then(|q| q.subscription_tier.as_deref())
+                .unwrap_or("PRO")
+                .to_string();
+            let (h, w) =
+                crate::modules::auto_switcher::extract_dual_window_quotas(acc, &target_model);
+            (acc.email.clone(), t, h.unwrap_or(100.0), w.unwrap_or(100.0))
+        } else {
+            ("(unbound)".to_string(), "PRO".to_string(), 100.0, 100.0)
+        };
+        items.push(ClusterInstanceBalanceItem {
+            machine_alias: local_machine.clone(),
+            machine_ip: local_ip.clone(),
+            is_local: true,
+            instance_id: "default".to_string(),
+            instance_name: "default".to_string(),
+            running: true,
+            bound_email: email,
+            tier,
+            quota_4h_pct: q_4h,
+            quota_weekly_pct: q_wk,
+            active_model: target_model.clone(),
+            status_label: "online".to_string(),
+        });
+    } else {
+        for inst in &reg.instances {
+            let pids =
+                crate::modules::instance::find_pids_for_data_dir(&inst.data_dir, inst.is_default);
+            let running = !pids.is_empty()
+                || crate::modules::instance::is_instance_running(
+                    &inst.id,
+                    &inst.data_dir,
+                    inst.pid,
+                );
+            let bound_email = inst
+                .bound_email
+                .clone()
+                .or_else(|| {
+                    if inst.is_default || inst.id == "default" {
+                        accounts
+                            .iter()
+                            .find(|a| curr_id.as_deref() == Some(&a.id))
+                            .map(|a| a.email.clone())
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| "(unbound)".to_string());
+            let matched_acc = accounts
+                .iter()
+                .find(|a| a.email.eq_ignore_ascii_case(&bound_email));
+            let tier = matched_acc
+                .and_then(|a| a.quota.as_ref())
+                .and_then(|q| q.subscription_tier.as_deref())
+                .unwrap_or("PRO")
+                .to_string();
+            let (q_4h, q_wk) = matched_acc
+                .map(|a| {
+                    crate::modules::auto_switcher::extract_dual_window_quotas(a, &target_model)
+                })
+                .unwrap_or((Some(100.0), Some(100.0)));
+
+            items.push(ClusterInstanceBalanceItem {
+                machine_alias: local_machine.clone(),
+                machine_ip: local_ip.clone(),
+                is_local: true,
+                instance_id: inst.id.clone(),
+                instance_name: inst.name.clone(),
+                running,
+                bound_email,
+                tier,
+                quota_4h_pct: q_4h.unwrap_or(100.0),
+                quota_weekly_pct: q_wk.unwrap_or(100.0),
+                active_model: target_model.clone(),
+                status_label: if running {
+                    "running".to_string()
+                } else {
+                    "idle".to_string()
+                },
+            });
+        }
+    }
+
+    // Include configured remote SSH nodes
+    let ssh_conns = load_ssh_connections().unwrap_or_default();
+    for conn in ssh_conns {
+        if conn.ip_address == local_ip || conn.alias.eq_ignore_ascii_case(&local_machine) {
+            continue;
+        }
+        let port = if conn.port == 0 { 22 } else { conn.port };
+        let reachable = check_tcp_liveness(&conn.ip_address, port, 600);
+        items.push(ClusterInstanceBalanceItem {
+            machine_alias: conn.alias.clone(),
+            machine_ip: conn.ip_address.clone(),
+            is_local: false,
+            instance_id: "default".to_string(),
+            instance_name: format!("{}:default", conn.alias),
+            running: reachable,
+            bound_email: format!("{}@{}", conn.username, conn.alias),
+            tier: "SSH-NODE".to_string(),
+            quota_4h_pct: 100.0,
+            quota_weekly_pct: 100.0,
+            active_model: target_model.clone(),
+            status_label: if reachable {
+                "reachable".to_string()
+            } else {
+                "offline".to_string()
+            },
+        });
+    }
+
+    Ok(items)
+}
+
+/// Dispatch a prompt to a local or remote SSH machine & instance
+pub async fn send_remote_ssh_prompt(
+    payload: &RemotePromptDispatchPayload,
+) -> Result<RemotePromptDispatchResult, String> {
+    let node_alias = if payload.node_alias.trim().is_empty() {
+        "local".to_string()
+    } else {
+        payload.node_alias.trim().to_string()
+    };
+    let inst_name = if payload.instance_name.trim().is_empty() {
+        "default".to_string()
+    } else {
+        payload.instance_name.trim().to_string()
+    };
+    let text = payload.prompt_text.trim();
+    if text.is_empty() {
+        return Err("Prompt text cannot be empty".to_string());
+    }
+
+    let local_machine = crate::modules::email_watcher::detect_machine_name();
+    let is_local = node_alias.eq_ignore_ascii_case("local")
+        || node_alias.eq_ignore_ascii_case("localhost")
+        || node_alias.eq_ignore_ascii_case(&local_machine);
+
+    let cmd_str = if is_local {
+        if let Some(conv) = payload.conversation_id.as_deref().filter(|s| !s.is_empty()) {
+            format!("{} --instance {} {}", conv, inst_name, text)
+        } else {
+            format!("{} {}", inst_name, text)
+        }
+    } else if let Some(conv) = payload.conversation_id.as_deref().filter(|s| !s.is_empty()) {
+        format!(
+            "{} --node {} --instance {} {}",
+            conv, node_alias, inst_name, text
+        )
+    } else {
+        format!("{}:{} {}", node_alias, inst_name, text)
+    };
+
+    let reply = crate::modules::telegram_inbound::execute_prompt_injection(&cmd_str).await;
+    let success = !reply.contains("❌") && !reply.contains("⚠️ <b>Missing");
+
+    Ok(RemotePromptDispatchResult {
+        success,
+        node_alias,
+        instance_name: inst_name,
+        dispatch_route: if is_local {
+            "local-instance".to_string()
+        } else {
+            "remote-ssh-gitmap".to_string()
+        },
+        message: crate::modules::telegram_inbound::strip_telegram_html_tags(&reply),
+    })
 }

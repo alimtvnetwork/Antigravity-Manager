@@ -1,0 +1,22 @@
+{
+  "subtaskId": 4,
+  "slug": "enhancing-telegram-ui-and-gitmap-integration",
+  "worker": "worker-02",
+  "status": "COMPLETED",
+  "ownedFilesModified": [
+    "src/services/sshService.ts",
+    "src/components/settings/EmailNotifications/SshGitmapSection.tsx",
+    "src/components/settings/EmailNotifications/TelegramSection.tsx",
+    "src/components/settings/SupabaseSync/TelegramSection.tsx",
+    "src/components/settings/EmailNotificationSettings.tsx",
+    "src/components/settings/SupabaseSyncSettings.tsx",
+    "src/pages/Settings/useSettingsState.ts",
+    "src/pages/Settings.tsx"
+  ],
+  "verification": {
+    "frontendBuild": "npm run build — PASSED (tsc && vite build succeeded with 0 errors)",
+    "noSilentErrors": "All catch blocks routed through useErrorStore.getState().trackWarning or captureError",
+    "relativePathsOnly": true
+  },
+  "summary": "Enhanced TelegramSection.tsx (in both EmailNotifications and SupabaseSync) with categorized click-to-copy power commands, Quick Prompt Dispatcher (Machine -> Instance -> Prompt), CSV/JSON Export bar, and live Account Balance Quick Check; created sshService.ts and SshGitmapSection.tsx with GitMap detection, one-click PowerShell installer, RSA-2048 zero-plaintext SSH node vault form, GitMap SSH node import, encrypted fleet credential deployment, and Multi-Machine Instance & Account Credit Matrix; mounted SshGitmapSection in EmailNotificationSettings, SupabaseSyncSettings, and /settings/ssh."
+}

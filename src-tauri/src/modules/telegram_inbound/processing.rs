@@ -39,6 +39,32 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
         "fleet" | "whoami" => Some(format_fleet_identity_report()),
         "instances" | "inst" => Some(format_instances_report()),
         "accounts" | "acc" => Some(format_accounts_report()),
+        "balance" | "credits" | "quota" | "bal" => Some(format_balance_report(rest)),
+        "export" => {
+            let mut parts = rest.split_whitespace();
+            let target = parts.next().unwrap_or("accounts");
+            let fmt = parts
+                .next()
+                .map(|s| s.trim_start_matches('-'))
+                .unwrap_or("csv");
+            match generate_export_document(target, fmt) {
+                Ok(doc) => {
+                    let preview_str = String::from_utf8_lossy(&doc.bytes);
+                    let preview_lines: Vec<&str> = preview_str.lines().take(12).collect();
+                    Some(format!(
+                        "{}\n\n<pre>{}</pre>",
+                        doc.caption,
+                        crate::modules::notification_hub::escape_telegram_html(
+                            &preview_lines.join("\n")
+                        )
+                    ))
+                }
+                Err(e) => Some(format!(
+                    "❌ <b>Export Failed:</b> <code>{}</code>",
+                    crate::modules::notification_hub::escape_telegram_html(&e)
+                )),
+            }
+        }
         "status" | "observe" => Some(format_observe_report()),
         "tree" => {
             let only_running = !rest.eq_ignore_ascii_case("all");
@@ -63,6 +89,32 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                 || sub.eq_ignore_ascii_case("list")
             {
                 Some(execute_gitmap_subcommand("ssh nodes"))
+            } else if sub.eq_ignore_ascii_case("import-gitmap")
+                || sub.eq_ignore_ascii_case("import")
+            {
+                match crate::modules::ssh_manager::import_ssh_from_gitmap() {
+                    Ok((source, stats)) => Some(format!(
+                        "✅ <b>GitMap SSH Nodes Imported</b>\n\
+                        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+                        • <b>Source:</b> <code>{}</code>\n\
+                        • <b>Total Nodes:</b> <code>{}</code> (Inserted: <code>{}</code>, Updated: <code>{}</code>)\n\
+                        • <b>Encryption:</b> <code>RSA-2048 (ag_rsa_v1_)</code>",
+                        clean_for_telegram_html(&source, 64),
+                        stats.total,
+                        stats.inserted,
+                        stats.updated
+                    )),
+                    Err(e) => Some(format!(
+                        "⚠️ <b>GitMap SSH Import Notice:</b> <code>{}</code>\n\
+                        💡 Install GitMap via <code>agm ssh install-gitmap</code>",
+                        clean_for_telegram_html(&e, 160)
+                    )),
+                }
+            } else if sub.eq_ignore_ascii_case("balance")
+                || sub.eq_ignore_ascii_case("balances")
+                || sub.eq_ignore_ascii_case("quota")
+            {
+                Some(format_balance_report("all"))
             } else if sub.starts_with("check ")
                 || sub.starts_with("exec ")
                 || sub.starts_with("update ")
@@ -76,11 +128,37 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
             {
                 Some(execute_gitmap_subcommand(&format!("ssh {}", sub)))
             } else if let Some((node, cmd)) = sub.split_once(char::is_whitespace) {
-                Some(execute_gitmap_subcommand(&format!(
+                let gm_res = execute_gitmap_subcommand(&format!(
                     "cluster exec {} {}",
                     node.trim(),
                     cmd.trim()
-                )))
+                ));
+                if gm_res.contains("Failed") || gm_res.contains("not found") {
+                    if let Ok(results) = crate::modules::ssh_manager::exec_ssh_command(
+                        node.trim(),
+                        &[cmd.trim().to_string()],
+                        None,
+                        None,
+                        None,
+                    ) {
+                        if let Some(first) = results.first() {
+                            return Some(format!(
+                                "🖥️ <b>SSH Exec [{} ({})]:</b>\n<pre>{}</pre>",
+                                clean_for_telegram_html(&first.alias, 32),
+                                clean_for_telegram_html(&first.ip_address, 32),
+                                clean_for_telegram_html(
+                                    if !first.stdout.trim().is_empty() {
+                                        &first.stdout
+                                    } else {
+                                        &first.stderr
+                                    },
+                                    1800
+                                )
+                            ));
+                        }
+                    }
+                }
+                Some(gm_res)
             } else {
                 Some(execute_gitmap_subcommand(&format!("ssh {}", sub)))
             }

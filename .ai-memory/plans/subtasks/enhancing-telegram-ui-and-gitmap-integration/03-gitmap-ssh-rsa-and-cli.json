@@ -1,0 +1,35 @@
+{
+  "subtask_id": 3,
+  "task": "03-enhancing-telegram-ui-and-gitmap-integration",
+  "plan": "03-gitmap-ssh-rsa-and-cli",
+  "agent": "worker-01",
+  "status": "completed",
+  "owned_files_modified": [
+    "src-tauri/src/utils/crypto.rs",
+    "src-tauri/src/modules/ssh_manager/paths.rs",
+    "src-tauri/src/modules/ssh_manager/types.rs",
+    "src-tauri/src/modules/ssh_manager/keys.rs",
+    "src-tauri/src/modules/ssh_manager/connections.rs",
+    "src-tauri/src/modules/ssh_manager/sync.rs",
+    "src-tauri/src/modules/ssh_manager/bundles.rs",
+    "src-tauri/src/modules/ssh_manager/exec.rs",
+    "src-tauri/src/modules/ssh_manager/tests.rs",
+    "src-tauri/src/commands/ssh.rs",
+    "src-tauri/src/commands/mod.rs",
+    "src-tauri/src/lib/run.rs",
+    "src-tauri/src/bin/agm/main.rs",
+    "src-tauri/src/bin/agm/quota_cmds.rs",
+    "src-tauri/src/bin/agm/account_cmds.rs",
+    "src-tauri/src/bin/agm/account_mgmt.rs",
+    "src-tauri/src/bin/agm/instance_cmds.rs",
+    "src-tauri/src/bin/agm/instance_dispatch.rs",
+    "src-tauri/src/bin/agm/status_cmds.rs",
+    "src-tauri/src/bin/agm/ssh_cmds.rs"
+  ],
+  "verification": {
+    "cargo_fmt_check": "passed",
+    "cargo_clippy": "passed",
+    "unit_tests": "passed (7 tests in utils::crypto::tests, 4 tests in modules::ssh_manager::tests)"
+  },
+  "summary": "Implemented pure-Rust RSA-2048 modular exponentiation + AES-256-GCM hybrid password encryption (encrypt_password_rsa / decrypt_password_rsa with ag_rsa_v1_ prefix); enforced zero plaintext password persistence in ssh_manager; added GitMap detection, PowerShell auto-install helper, GitMap/OpenSSH node import, and multi-machine instance/balance inspection; registered 11 Tauri commands in commands/ssh.rs and lib/run.rs; upgraded AGM CLI with agm balance, --csv/--json flags, and agm ssh subcommands."
+}

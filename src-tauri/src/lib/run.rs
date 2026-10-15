@@ -403,6 +403,18 @@ pub fn run() {
             commands::check_gitmap_available,
             commands::check_gitmap_installed,
             commands::deploy_accounts_to_fleet,
+            // GitMap Multi-Machine & RSA-2048 SSH Vault commands
+            commands::get_ssh_gitmap_status,
+            commands::install_gitmap_powershell,
+            commands::list_ssh_nodes,
+            commands::save_ssh_node_rsa,
+            commands::delete_ssh_node,
+            commands::test_ssh_node_connection,
+            commands::import_ssh_nodes_from_gitmap,
+            commands::deploy_encrypted_ssh_bundle,
+            commands::get_cluster_instances_and_balances,
+            commands::send_remote_ssh_prompt,
+            commands::export_system_data_csv,
             // Toolchain Installer commands
             commands::toolchain_list_items,
             commands::toolchain_check,

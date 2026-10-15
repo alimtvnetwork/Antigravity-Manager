@@ -4,6 +4,7 @@ import { RecipientsSection } from './EmailNotifications/RecipientsSection';
 import { WatcherSection } from './EmailNotifications/WatcherSection';
 import { RemoteCommandSection } from './EmailNotifications/RemoteCommandSection';
 import { TelegramSection } from './EmailNotifications/TelegramSection';
+import { SshGitmapSection } from './EmailNotifications/SshGitmapSection';
 import { AccountModal } from './EmailNotifications/AccountModal';
 import { EmailDialogs } from './EmailNotifications/EmailDialogs';
 
@@ -17,6 +18,7 @@ export default function EmailNotificationSettings() {
             <WatcherSection {...api} />
             <RemoteCommandSection {...api} />
             <TelegramSection {...api} />
+            <SshGitmapSection />
             <AccountModal {...api} />
             <EmailDialogs {...api} />
         </div>

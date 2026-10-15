@@ -5,6 +5,7 @@ import { GlobalSyncSection } from './SupabaseSync/GlobalSyncSection';
 import { EndpointsSection } from './SupabaseSync/EndpointsSection';
 import { LeasesSection } from './SupabaseSync/LeasesSection';
 import { TelegramSection } from './SupabaseSync/TelegramSection';
+import { SshGitmapSection } from './EmailNotifications/SshGitmapSection';
 import { SyncModalsA } from './SupabaseSync/SyncModalsA';
 import { SyncModalsB } from './SupabaseSync/SyncModalsB';
 
@@ -30,6 +31,7 @@ export default function SupabaseSyncSettings() {
             <EndpointsSection {...api} />
             <LeasesSection {...api} />
             <TelegramSection {...api} />
+            <SshGitmapSection />
             <SyncModalsA {...api} />
             <SyncModalsB {...api} />
         </div>

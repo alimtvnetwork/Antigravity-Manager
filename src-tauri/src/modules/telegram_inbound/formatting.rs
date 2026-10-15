@@ -177,6 +177,157 @@ pub fn clamp_telegram_copy_text(text: &str, max_chars: usize) -> String {
     }
 }
 
+/// Sanitize unsupported HTML named entities (&nbsp;, &bull;) for Telegram HTML parse_mode.
+/// Telegram HTML mode only supports &lt;, &gt;, &amp;, &quot; and numeric character references.
+pub fn sanitize_telegram_html_entities(text: &str) -> String {
+    text.replace("&nbsp;", "\u{2007}").replace("&bull;", "•")
+}
+
+/// Build rich inline keyboard markup for Account Rotation (Switch) Alerts
+pub fn build_switch_alert_reply_markup(
+    instance_name: &str,
+    _selected_email: &str,
+    target_4h: &str,
+    target_weekly: &str,
+    prompt_text: &str,
+    asset_urls: &[String],
+) -> serde_json::Value {
+    let mut keyboard_rows: Vec<Vec<serde_json::Value>> = Vec::new();
+    let inst_label = if instance_name.trim().is_empty() {
+        "default"
+    } else {
+        instance_name.trim()
+    };
+
+    keyboard_rows.push(vec![json!({
+        "text": format!("🟢 {} | 4h: {} | Wk: {}", inst_label, target_4h, target_weekly),
+        "callback_data": "cmd:/balance"
+    })]);
+
+    keyboard_rows.push(vec![
+        json!({
+            "text": "💰 Check Balance",
+            "callback_data": "cmd:/balance"
+        }),
+        json!({
+            "text": "📥 Export CSV",
+            "callback_data": "cmd:/export accounts csv"
+        }),
+    ]);
+
+    keyboard_rows.push(vec![
+        json!({
+            "text": "🚀 Prompt Instance",
+            "callback_data": "cmd:/send"
+        }),
+        json!({
+            "text": "🔄 Refresh Status",
+            "callback_data": "cmd:/status"
+        }),
+    ]);
+
+    let clamped_text = clamp_telegram_copy_text(prompt_text, 3900);
+    if !clamped_text.trim().is_empty() {
+        keyboard_rows.push(vec![json!({
+            "text": "📋 Copy Prompt",
+            "copy_text": {
+                "text": clamped_text
+            }
+        })]);
+
+        if !asset_urls.is_empty() {
+            let mut composite = clamped_text;
+            composite.push_str("\n\n---\n### Attached Images:\n");
+            for url in asset_urls {
+                composite.push_str(&format!("![image]({})\n", url));
+            }
+            let clamped_composite = clamp_telegram_copy_text(&composite, 3900);
+            keyboard_rows.push(vec![json!({
+                "text": "🖼️ Copy Prompt + Images",
+                "copy_text": {
+                    "text": clamped_composite
+                }
+            })]);
+        }
+    }
+
+    json!({
+        "inline_keyboard": keyboard_rows
+    })
+}
+
+/// Build rich inline keyboard markup for Post-Switch Liveness & Emergency Alerts
+pub fn build_liveness_alert_reply_markup(
+    instance_id: &str,
+    verified_running: usize,
+    backed_up_count: usize,
+    prompt_text: &str,
+    asset_urls: &[String],
+) -> serde_json::Value {
+    let mut keyboard_rows: Vec<Vec<serde_json::Value>> = Vec::new();
+    let inst_label = if instance_id.trim().is_empty() {
+        "default"
+    } else {
+        instance_id.trim()
+    };
+
+    keyboard_rows.push(vec![json!({
+        "text": format!("🟢 {} | Running: {}/{}", inst_label, verified_running, backed_up_count),
+        "callback_data": "cmd:/active"
+    })]);
+
+    keyboard_rows.push(vec![
+        json!({
+            "text": "💰 Check Balance",
+            "callback_data": "cmd:/balance"
+        }),
+        json!({
+            "text": "📥 Export CSV",
+            "callback_data": "cmd:/export accounts csv"
+        }),
+    ]);
+
+    keyboard_rows.push(vec![
+        json!({
+            "text": "🚀 Prompt Instance",
+            "callback_data": "cmd:/send"
+        }),
+        json!({
+            "text": "🔄 Refresh Status",
+            "callback_data": "cmd:/status"
+        }),
+    ]);
+
+    let clamped_text = clamp_telegram_copy_text(prompt_text, 3900);
+    if !clamped_text.trim().is_empty() {
+        keyboard_rows.push(vec![json!({
+            "text": "📋 Copy Prompt",
+            "copy_text": {
+                "text": clamped_text
+            }
+        })]);
+
+        if !asset_urls.is_empty() {
+            let mut composite = clamped_text;
+            composite.push_str("\n\n---\n### Attached Images:\n");
+            for url in asset_urls {
+                composite.push_str(&format!("![image]({})\n", url));
+            }
+            let clamped_composite = clamp_telegram_copy_text(&composite, 3900);
+            keyboard_rows.push(vec![json!({
+                "text": "🖼️ Copy Prompt + Images",
+                "copy_text": {
+                    "text": clamped_composite
+                }
+            })]);
+        }
+    }
+
+    json!({
+        "inline_keyboard": keyboard_rows
+    })
+}
+
 /// Build Telegram Bot API 7.8+ inline keyboard markup with native copy_text button
 pub fn build_copy_prompt_reply_markup(
     prompt_text: &str,
@@ -244,7 +395,8 @@ pub async fn send_telegram_message_with_markup(
         return Err(AppError::Config("Telegram bot token is empty".to_string()));
     }
 
-    let chunks = chunk_telegram_text(text, 3800);
+    let sanitized_text = sanitize_telegram_html_entities(text);
+    let chunks = chunk_telegram_text(&sanitized_text, 3800);
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .build()
@@ -402,7 +554,9 @@ pub fn strip_telegram_html_tags(input: &str) -> String {
             out.push(c);
         }
     }
-    out.replace("&amp;", "&")
+    out.replace("&nbsp;", " ")
+        .replace("&bull;", "•")
+        .replace("&amp;", "&")
         .replace("&lt;", "<")
         .replace("&gt;", ">")
         .replace("&quot;", "\"")

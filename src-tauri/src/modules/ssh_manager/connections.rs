@@ -40,11 +40,36 @@ pub fn load_ssh_connections() -> Result<Vec<SshConnectionRecord>, String> {
     Ok(Vec::new())
 }
 
-/// Save SSH connections to local store as an SshNodesExportEnvelope
+/// Normalize a list of SSH connections so that any non-empty password is encrypted with `encrypt_password_rsa` (`ag_rsa_v1_`)
+pub fn ensure_connections_rsa_encrypted(conns: &[SshConnectionRecord]) -> Vec<SshConnectionRecord> {
+    conns
+        .iter()
+        .map(|c| {
+            let mut item = c.clone();
+            if item.port == 0 {
+                item.port = 22;
+            }
+            if item.encryption_algo.trim().is_empty() {
+                item.encryption_algo = "RSA-2048".to_string();
+            }
+            let pw = item.encrypted_password.trim();
+            if !pw.is_empty() && !pw.starts_with(crate::utils::crypto::ENCRYPTED_RSA_V1_PREFIX) {
+                if let Ok(enc) = crate::utils::crypto::encrypt_password_rsa(pw) {
+                    item.encrypted_password = enc;
+                    item.encryption_algo = "RSA-2048".to_string();
+                }
+            }
+            item
+        })
+        .collect()
+}
+
+/// Save SSH connections to local store as an SshNodesExportEnvelope (with RSA-2048 password encryption enforced)
 pub fn save_ssh_connections(
     conns: &[SshConnectionRecord],
 ) -> Result<SshNodesExportEnvelope, String> {
-    let envelope = build_envelope_from_connections(conns);
+    let safe_conns = ensure_connections_rsa_encrypted(conns);
+    let envelope = build_envelope_from_connections(&safe_conns);
     let store_path = get_ssh_nodes_store_path()?;
     if let Some(parent) = store_path.parent() {
         // Justification: best-effort directory creation; later file ops fail loudly if the directory is actually needed
@@ -59,7 +84,8 @@ pub fn save_ssh_connections(
 
 /// Build a GitMap-compatible SshNodesExportEnvelope from connections
 pub fn build_envelope_from_connections(conns: &[SshConnectionRecord]) -> SshNodesExportEnvelope {
-    let nodes: Vec<SshNodeExportItem> = conns
+    let safe_conns = ensure_connections_rsa_encrypted(conns);
+    let nodes: Vec<SshNodeExportItem> = safe_conns
         .iter()
         .enumerate()
         .map(|(idx, c)| {
@@ -67,7 +93,7 @@ pub fn build_envelope_from_connections(conns: &[SshConnectionRecord]) -> SshNode
             let auth_method = if !key_path.is_empty() {
                 "key".to_string()
             } else {
-                "password".to_string()
+                "rsa-password".to_string()
             };
             SshNodeExportItem {
                 worker_id: format!("worker-{}", idx + 1),
@@ -79,7 +105,7 @@ pub fn build_envelope_from_connections(conns: &[SshConnectionRecord]) -> SshNode
                 } else {
                     c.username.clone()
                 },
-                port: 22,
+                port: if c.port == 0 { 22 } else { c.port },
                 os: if c.os.is_empty() {
                     "linux".to_string()
                 } else {
@@ -87,6 +113,8 @@ pub fn build_envelope_from_connections(conns: &[SshConnectionRecord]) -> SshNode
                 },
                 auth_method,
                 key_path,
+                encrypted_password: c.encrypted_password.clone(),
+                encryption_algo: "RSA-2048".to_string(),
             }
         })
         .collect();
@@ -94,9 +122,9 @@ pub fn build_envelope_from_connections(conns: &[SshConnectionRecord]) -> SshNode
     SshNodesExportEnvelope {
         schema_version: "1.0".to_string(),
         exported_at: Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-        total_nodes: conns.len(),
+        total_nodes: safe_conns.len(),
         nodes,
-        connections: conns.to_vec(),
+        connections: safe_conns,
     }
 }
 
@@ -176,7 +204,7 @@ pub fn decode_connections_from_json(raw: &str) -> Result<Vec<SshConnectionRecord
 
 pub(crate) fn nodes_to_connections(nodes: &[SshNodeExportItem]) -> Vec<SshConnectionRecord> {
     let now = Utc::now().to_rfc3339();
-    nodes
+    let mapped: Vec<SshConnectionRecord> = nodes
         .iter()
         .map(|n| SshConnectionRecord {
             alias: n.alias.clone(),
@@ -186,7 +214,9 @@ pub(crate) fn nodes_to_connections(nodes: &[SshNodeExportItem]) -> Vec<SshConnec
             } else {
                 n.username.clone()
             },
-            encrypted_password: String::new(),
+            port: if n.port == 0 { 22 } else { n.port },
+            encrypted_password: n.encrypted_password.clone(),
+            encryption_algo: "RSA-2048".to_string(),
             key_path: resolve_usable_key_path(&n.key_path),
             os: if n.os.is_empty() {
                 "linux".to_string()
@@ -199,7 +229,8 @@ pub(crate) fn nodes_to_connections(nodes: &[SshNodeExportItem]) -> Vec<SshConnec
             first_run_at: Some(now.clone()),
             created_at: Some(now.clone()),
         })
-        .collect()
+        .collect();
+    ensure_connections_rsa_encrypted(&mapped)
 }
 
 /// Smart match-and-update synchronization of incoming SSH connections
@@ -213,12 +244,16 @@ pub fn sync_ssh_connections_locally(
     };
     let now = Utc::now().to_rfc3339();
 
-    for inc in incoming_list {
+    for inc in &ensure_connections_rsa_encrypted(incoming_list) {
         let mut normalized_inc = inc.clone();
         normalized_inc.key_path = resolve_usable_key_path(&normalized_inc.key_path);
         if normalized_inc.username.is_empty() {
             normalized_inc.username = "root".to_string();
         }
+        if normalized_inc.port == 0 {
+            normalized_inc.port = 22;
+        }
+        normalized_inc.encryption_algo = "RSA-2048".to_string();
         if normalized_inc.os.is_empty() {
             normalized_inc.os = "linux".to_string();
         }
@@ -255,6 +290,11 @@ pub fn sync_ssh_connections_locally(
                 curr.encrypted_password = normalized_inc.encrypted_password.clone();
                 changed = true;
             }
+            if normalized_inc.port != 0 && curr.port != normalized_inc.port {
+                curr.port = normalized_inc.port;
+                changed = true;
+            }
+            curr.encryption_algo = "RSA-2048".to_string();
             if !normalized_inc.key_path.is_empty() && curr.key_path != normalized_inc.key_path {
                 curr.key_path = normalized_inc.key_path.clone();
                 changed = true;
@@ -285,4 +325,113 @@ pub fn sync_ssh_connections_locally(
     // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
     crate::error::record_ignored(update_ssh_config(false), "update_ssh_config");
     Ok(stats)
+}
+
+/// Convert `SshConnectionRecord` into UI/CLI `SshNodeRecord`
+pub fn to_ssh_node_record(conn: &SshConnectionRecord) -> SshNodeRecord {
+    let has_pw = !conn.encrypted_password.trim().is_empty();
+    let auth_method = if !conn.key_path.trim().is_empty() && has_pw {
+        "rsa-key+password".to_string()
+    } else if !conn.key_path.trim().is_empty() {
+        "key".to_string()
+    } else if has_pw {
+        "rsa-password".to_string()
+    } else {
+        "agent".to_string()
+    };
+    SshNodeRecord {
+        id: conn.alias.to_lowercase(),
+        alias: conn.alias.clone(),
+        host: conn.ip_address.clone(),
+        port: if conn.port == 0 { 22 } else { conn.port },
+        username: conn.username.clone(),
+        auth_method,
+        key_path: if conn.key_path.trim().is_empty() {
+            None
+        } else {
+            Some(conn.key_path.clone())
+        },
+        encrypted_password: if has_pw {
+            Some(conn.encrypted_password.clone())
+        } else {
+            None
+        },
+        has_password: has_pw,
+        encryption_algo: if conn.encryption_algo.trim().is_empty() {
+            "RSA-2048".to_string()
+        } else {
+            conn.encryption_algo.clone()
+        },
+        os: conn.os.clone(),
+        source: "agm-ssh-vault".to_string(),
+        last_status: "ready".to_string(),
+    }
+}
+
+/// Save or update an SSH node, encrypting any raw password immediately with RSA-2048 (`ag_rsa_v1_`)
+pub fn upsert_ssh_node_rsa(payload: &SaveSshNodeRsaPayload) -> Result<SshNodeRecord, String> {
+    let alias = payload.alias.trim();
+    let host = payload.host.trim();
+    if alias.is_empty() || host.is_empty() {
+        return Err("SSH node alias and host/IP cannot be empty".to_string());
+    }
+    let username = if payload.username.trim().is_empty() {
+        "Administrator".to_string()
+    } else {
+        payload.username.trim().to_string()
+    };
+    let port = if payload.port == 0 { 22 } else { payload.port };
+
+    let encrypted_password = if let Some(raw_pw) = payload.raw_password.as_deref() {
+        let trimmed_pw = raw_pw.trim();
+        if trimmed_pw.is_empty() {
+            String::new()
+        } else {
+            crate::utils::crypto::encrypt_password_rsa(trimmed_pw)?
+        }
+    } else {
+        String::new()
+    };
+
+    let record = SshConnectionRecord {
+        alias: alias.to_string(),
+        ip_address: host.to_string(),
+        username,
+        port,
+        encrypted_password,
+        encryption_algo: "RSA-2048".to_string(),
+        key_path: payload.key_path.clone().unwrap_or_default(),
+        os: payload.os.clone().unwrap_or_else(|| "windows".to_string()),
+        os_group: None,
+        os_version: None,
+        build_version: None,
+        first_run_at: None,
+        created_at: Some(Utc::now().to_rfc3339()),
+    };
+
+    sync_ssh_connections_locally(std::slice::from_ref(&record))?;
+    let all = load_ssh_connections()?;
+    let saved = all
+        .into_iter()
+        .find(|c| c.alias.eq_ignore_ascii_case(alias))
+        .unwrap_or(record);
+    Ok(to_ssh_node_record(&saved))
+}
+
+/// Delete an SSH connection by alias or IP
+pub fn delete_ssh_connection(id_or_alias: &str) -> Result<bool, String> {
+    let target = id_or_alias.trim();
+    if target.is_empty() {
+        return Err("Node alias/id is empty".to_string());
+    }
+    let mut conns = load_ssh_connections()?;
+    let before = conns.len();
+    conns.retain(|c| {
+        !c.alias.eq_ignore_ascii_case(target) && !c.ip_address.eq_ignore_ascii_case(target)
+    });
+    let removed = conns.len() < before;
+    if removed {
+        save_ssh_connections(&conns)?;
+    }
+    Ok(removed)
 }

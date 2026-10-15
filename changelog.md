@@ -1,5 +1,17 @@
 # Changelog
 
+## [v4.203.0] - 2026-10-15
+
+### Fixed
+- **Telegram HTML Entity Rendering Fix (`&nbsp;` / `&bull;`)**: Replaced unsupported `&nbsp;&nbsp;` and `&bull;` HTML entities in `src-tauri/src/modules/notification_hub/telegram_alerts.rs`, `src-tauri/src/modules/notification_hub/telemetry.rs`, and `src-tauri/src/modules/telegram_inbound/formatting.rs` with Unicode figure spaces (`\u{2007}\u{2007}`) and bullet glyphs (`•`) so Telegram HTML cards render cleanly without raw entity text. (Thanks to @aukgit)
+
+### Added
+- **Enhanced Telegram Bot UI, Inline Action Keyboards, `/balance` & CSV/JSON File Exports**: Upgraded `/help` (`src-tauri/src/modules/telegram_inbound/reports_b.rs`) with categorized click-to-copy (`<code>...</code>`) command examples, attached interactive inline action buttons to switch and liveness alerts, added `/balance` (`/credits`, `/quota`) for per-instance 4h and weekly account credit inspection, implemented `send_telegram_document` in `src-tauri/src/modules/telegram_inbound/media.rs` to deliver downloadable `.csv` and `.json` files on `/export <accounts|instances|balance|nodes|prompts|status> [csv|json]` and `--csv`/`--json` flags, and simplified machine/instance prompting via `/prompt <machine:instance> <text>` and `/target <machine> <instance>`. (Thanks to @aukgit)
+- **GitMap Multi-Machine Control, SSH Node Import, Auto-Install & RSA-2048 Password Encryption**: Implemented RSA-2048 hybrid envelope password encryption (`ag_rsa_v1_`) in `src-tauri/src/utils/crypto.rs` and `src-tauri/src/modules/ssh_manager/` so SSH passwords are encrypted on first login and never stored in plain text on disk; added cross-machine encrypted bundle deployment (`deploy_encrypted_ssh_to_nodes`), GitMap SSH node import (`agm ssh import-gitmap`), PowerShell auto-install helper (`agm ssh install-gitmap`), multi-machine instance and credit balance inspection (`agm balance`, `agm ssh balance`, `--csv`, `--json`), and remote prompt delegation (`agm ssh prompt`). (Thanks to @aukgit)
+- **Telegram Power Commands Hub & SSH / GitMap Fleet Settings UI**: Upgraded `src/components/settings/EmailNotifications/TelegramSection.tsx` and `src/components/settings/SupabaseSync/TelegramSection.tsx` with categorized click-to-copy command chips, an inline `Machine -> Instance -> Prompt` dispatcher, CSV/JSON export bar, and live balance inspector; and added `src/components/settings/EmailNotifications/SshGitmapSection.tsx` (`/settings/ssh`) with GitMap detection and one-click PowerShell installer, RSA-2048 encrypted SSH node configuration, and the multi-machine instance/account credit matrix. (Thanks to @aukgit)
+
+---
+
 ## [v4.202.0] - 2026-10-15
 
 ### Fixed
@@ -279,6 +291,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.203.0 (2026-10-15)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.202.0 (2026-10-15)**:
         -   **[Onboarding & Privacy] Automatic CDP dismissal of Antigravity "Security Notice & Data Use" dialog with telemetry unchecked (Thanks to @aukgit)**:
             -   **Description**: Added `src-tauri/src/modules/instance/cdp_onboarding.rs` and enabled `--remote-debugging-port=0` on instance launches so account switches and instance starts automatically connect to `DevToolsActivePort`, uncheck the Interactions data-sharing checkbox, click **"Accept and continue"**, and persist `hasAcceptedTermsOfService = true` and `shareDataToImproveAntigravity = false` in `app_storage.json` and `state.vscdb`.

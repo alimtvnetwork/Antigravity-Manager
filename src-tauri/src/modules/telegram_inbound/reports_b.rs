@@ -71,7 +71,7 @@ pub fn format_expand_prompt_report(query_str: &str) -> String {
                 format!(
                     "\n🖼️ <b>Attached Media ({}):</b> {}\n",
                     detected_images.len(),
-                    links.join(" &bull; ")
+                    links.join(" • ")
                 )
             } else {
                 String::new()
@@ -231,66 +231,50 @@ pub fn format_help_manual() -> String {
         <code>v{} | commit {} | branch {} | release {}</code>\n\
         ━━━━━━━━━━━━━━━━━━━━━━━━\n\
         💡 Every <code>command</code> below is tap-to-copy. Copy buttons for the essentials sit under this message.\n\n\
-        🟢 <b>Send prompts</b>\n\
-        • <code>/send</code> — Guided send: pick machine → instance → conversation, then type the prompt. The destination is always explicit, never guessed\n\
-        • <code>/prompt C001 Is it done?</code> — Inject into a conversation (<code>C001</code>, <code>P001</code>, <code>GM:#1</code>, <code>GM:&lt;cid&gt;</code>)\n\
-        • <code>/prompt C001 --instance #2 --node W3 Fix it</code> — Target remote machine + instance + conversation\n\
+        🚀 <b>Easy Machine &amp; Instance Prompting</b>\n\
+        • <code>/prompt default Write unit tests</code> — Prompt local <code>default</code> instance directly\n\
+        • <code>/prompt W3:default Fix build</code> — Prompt remote machine <code>W3</code> instance <code>default</code>\n\
+        • <code>/prompt --node vm-1 --instance work Audit code</code> — Explicit machine + instance prompt\n\
+        • <code>/target W3 default</code> — Aim subsequent plain messages at machine <code>W3</code> instance <code>default</code>\n\
+        • <code>/target default C001</code> — Aim next plain message at a conversation (<code>/target clear</code> forgets, <code>/where</code> shows aim)\n\
+        • <code>/send</code> — Guided 3-step picker: machine → instance → conversation, then type the prompt\n\
+        • <code>/prompt C001 Is it done?</code> — Inject into conversation (<code>C001</code>, <code>P001</code>, <code>GM:#1</code>)\n\
         • <code>C001 your prompt here</code> — Shorthand: Seq ID + text injects directly\n\
-        • <code>/inject …</code> · <code>/p …</code> · <code>/pt …</code> — Aliases of <code>/prompt</code>\n\
-        • <code>/prompts</code> · <code>/prompt_queue</code> · <code>/templates</code> — Reusable prompt templates (<code>read-all</code>, <code>is-done</code>, <code>ci-cd-fix</code>)\n\
-        • <code>/target default C001</code> — Aim the next plain message at a conversation (<code>/target clear</code> forgets, <code>/where</code> shows the aim)\n\n\
+        • <code>/prompts</code> · <code>/prompt_queue</code> · <code>/templates</code> — Reusable prompt templates\n\n\
+        💰 <b>Account Balance &amp; Credit Inspection</b>\n\
+        • <code>/balance</code> — Dedicated per-instance &amp; standby account 4h / weekly balance dashboard\n\
+        • <code>/credits</code> · <code>/quota</code> — Aliases for <code>/balance</code> credit &amp; quota overview\n\
+        • <code>/balance --csv</code> — Export live instance &amp; account balances as downloadable CSV file\n\
+        • <code>/ff</code> · <code>/rotate</code> — Fast-forward to freshest highest-quota account (prompts preserved)\n\n\
+        📥 <b>CSV &amp; File Format Exports</b>\n\
+        • <code>/export accounts csv</code> — Download all accounts &amp; dual-window quotas as CSV\n\
+        • <code>/export instances csv</code> — Download all instance profiles &amp; bound accounts as CSV\n\
+        • <code>/export balance csv</code> — Download instance + account balance report as CSV\n\
+        • <code>/export nodes csv</code> — Download registered SSH fleet nodes as CSV\n\
+        • <code>/export prompts json</code> — Download active &amp; queued prompts as JSON\n\
+        • <code>/accounts --csv</code> · <code>/instances --csv</code> · <code>/status --json</code> — Inline flag exports\n\n\
+        🌐 <b>GitMap Multi-Machine &amp; SSH Control</b>\n\
+        • <code>/nodes</code> — Inspect SSH / GitMap cluster VM nodes\n\
+        • <code>/ssh nodes</code> — List configured SSH fleet nodes &amp; status\n\
+        • <code>/ssh import-gitmap</code> — Import SSH nodes from GitMap &amp; <code>~/.ssh/config</code>\n\
+        • <code>/ssh balance</code> — Poll multi-machine instances &amp; account balances across SSH fleet\n\
+        • <code>/ssh exec vm-1 agm status</code> — Run command on remote SSH node <code>vm-1</code>\n\
+        • <code>/gitmap cluster status</code> — Query GitMap cluster topology &amp; health\n\
+        • <code>/ssh check &lt;node&gt;</code> · <code>/gitmap …</code> · <code>/agm …</code> · <code>/agy active</code>\n\n\
         🔵 <b>Window &amp; screen</b>\n\
-        • <code>/open</code> — Open AGM on this machine (already running → brought to the foreground)\n\
-        • <code>/open W3</code> — Open AGM on fleet machine <code>W3</code> (SSH, Supabase queue fallback)\n\
-        • <code>/screenshot</code> — Photograph every known machine's screen\n\
-        • <code>/screenshot W3</code> — Photograph one machine (<code>local</code> = this machine)\n\
-        • <code>/ui</code> — Open the manager window here · <code>/shot</code> · <code>/screen</code> — Screenshot this machine\n\
-        • <code>/ui goto &lt;route&gt;</code> — Navigate the UI (<code>/ui goto instances</code>; unknown routes list the valid ones)\n\
-        • <code>/ui ls</code> — List UI routes (<code>/ui ls &lt;filter&gt;</code> narrows) · <code>/ui scroll &lt;id&gt;</code> — Scroll an element into view &amp; focus it\n\n\
+        • <code>/open</code> — Open AGM on this machine (or <code>/open W3</code> on fleet machine <code>W3</code>)\n\
+        • <code>/screenshot</code> — Photograph every known machine's screen (or <code>/screenshot W3</code>)\n\
+        • <code>/ui</code> — Open manager window · <code>/shot</code> · <code>/screen</code> — Screenshot this machine\n\
+        • <code>/ui goto &lt;route&gt;</code> — Navigate UI (<code>/ui goto instances</code>) · <code>/ui ls</code> · <code>/ui scroll &lt;id&gt;</code>\n\n\
         🟣 <b>Fleet telemetry</b>\n\
-        • <code>/fleet</code> · <code>/whoami</code> — Machine, instance &amp; bound account identity card\n\
-        • <code>/ping</code> — Node connectivity, IP, Git build &amp; uptime\n\
-        • <code>/instances</code> · <code>/inst</code> — Instance profiles &amp; live process states\n\
-        • <code>/accounts</code> · <code>/acc</code> — Registered accounts, tiers &amp; quota headroom\n\
-        • <code>/status</code> · <code>/observe</code> — Live workspaces, active account quota &amp; prompts\n\
-        • <code>/tree</code> — Project → conversation → prompt tree (<code>/tree all</code> for everything)\n\
-        • <code>/active</code> · <code>/running</code> — Running prompts + dual-sequence tree view\n\
-        • <code>/queues</code> · <code>/queue</code> — Pending workspace prompt queues\n\
-        • <code>/query &lt;term&gt;</code> · <code>/search &lt;term&gt;</code> — Search cached prompts (200-word preview)\n\
-        • <code>/expand &lt;id&gt;</code> · <code>/exp &lt;id&gt;</code> — Full untruncated prompt instructions\n\
-        • <code>/projects</code> · <code>/workspaces</code> — Registered workspaces, AGM/GitMap Seq IDs &amp; syntax\n\
-        • <code>/snapshot</code> · <code>/cluster</code> — Multi-node cluster status snapshot\n\
-        • <code>/nodes</code> · <code>/node</code> — SSH / cluster VM nodes (<code>/nodes &lt;alias&gt; prompts</code> inspects a node)\n\n\
-        🟠 <b>Fleet execution</b>\n\
-        • <code>/ssh &lt;node&gt; &lt;cmd&gt;</code> — Run a command on one machine (e.g. <code>/ssh vm-01 agm status</code>)\n\
-        • <code>/ssh check &lt;node&gt;</code> — Probe connectivity &amp; health · <code>/ssh nodes</code> — Node inventory\n\
-        • <code>/ssh exec \"&lt;cmd&gt;\"</code> — Run across all remote SSH fleet nodes\n\
-        • <code>CMD:&lt;node&gt;:&lt;command&gt;</code> — Direct node routing · <code>W3: agm status</code> — Shorthand\n\
-        • <code>/gitmap …</code> · <code>/gm …</code> — Any GitMap CLI (<code>/gitmap pe</code> = pipeline status)\n\
-        • <code>/agm …</code> — Any AGM CLI (<code>/agm tree</code>, <code>/agm wpr</code>, <code>/agm accounts</code>)\n\
-        • <code>/agy active</code> — Antigravity active prompts via GitMap\n\
-        • <code>/agy prompt -n read-all -t \"…\"</code> — Dispatch a prompt template\n\
-        • <code>/agy prompt-project P001 -n is-done -t \"Check build\"</code> — Template at a specific project\n\
-        • <code>/agy prompt-txt \"Quick hotfix\"</code> — Dispatch raw prompt text\n\
-        • <code>/agy prompt ls</code> — List templates · <code>/agy fpug</code> — Loop until queues clear &amp; CI green\n\
-        • <code>/agy sug</code> — Watch &amp; shut down when green · <code>/agy rerun 1</code> — Restart IDE &amp; replay\n\
-        • <code>/api</code> · <code>/proxy</code> — Local API proxy (port 8045) &amp; account bindings\n\n\
-        🟡 <b>Backup &amp; cleanup</b>\n\
-        • <code>/backup</code> · <code>/backpack</code> — Snapshot running prompts (<code>/backup ls</code> lists batches)\n\
-        • <code>/restore</code> — Restore &amp; resume backed-up prompts\n\
-        • <code>/prune [N]</code> · <code>/pr [N]</code> — Prune conversations, keep N (default 10; guards active prompts)\n\
-        • <code>/clean</code> — Clean runtime &amp; build caches\n\
-        • <code>/agy ccko</code> — Keep 1 conversation · <code>/agy cckf</code> — Keep top 5 · <code>/agy cc --keep 10</code> — Prune history\n\
-        • <code>/agy running-prompts ls</code> · <code>backup</code> · <code>restore</code> — AGY storage via GitMap\n\n\
-        🔴 <b>Updates</b>\n\
-        • <code>/update</code> · <code>/update agm</code> · <code>/upgrade</code> — Self-update Antigravity-Manager\n\
-        • <code>/update gitmap</code> — Update GitMap CLI · <code>/update all</code> — Update both\n\
-        • <code>/gitmap ssh update agm</code> — Update AGM across all SSH nodes\n\n\
-        📧 <b>Email</b>\n\
-        • <code>/email status</code> · <code>/email ping</code> · <code>/email help</code> — Vault status, test ping, full guide by email (<code>/mail</code> alias)\n\n\
-        ⚡ <b>Fast tools</b>\n\
-        • <code>/ff</code> · <code>/rotate</code> — Fast-forward to the freshest highest-quota account (prompts preserved)\n\n\
-        <blockquote>🛡️ Prompts are never guessed: <code>/send</code> locks machine → instance → conversation first; <code>/target</code> aims the next plain message at one conversation.</blockquote>{}",
+        • <code>/fleet</code> · <code>/whoami</code> · <code>/ping</code> — Machine, instance &amp; bound account identity\n\
+        • <code>/instances</code> · <code>/accounts</code> · <code>/status</code> · <code>/observe</code> · <code>/tree</code> · <code>/active</code>\n\
+        • <code>/queues</code> · <code>/query &lt;term&gt;</code> · <code>/expand &lt;id&gt;</code> · <code>/projects</code> · <code>/snapshot</code>\n\n\
+        🟡 <b>Backup, Cleanup, Updates &amp; Email</b>\n\
+        • <code>/backup</code> · <code>/restore</code> · <code>/prune [N]</code> · <code>/clean</code>\n\
+        • <code>/update</code> · <code>/update gitmap</code> · <code>/update all</code> · <code>/gitmap ssh update agm</code>\n\
+        • <code>/email status</code> · <code>/email ping</code> · <code>/email help</code>\n\n\
+        <blockquote>🛡️ Prompts are never guessed: <code>/send</code> locks machine → instance → conversation first; <code>/target</code> aims the next plain message at one machine/instance/conversation.</blockquote>{}",
         clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&hash, 24),

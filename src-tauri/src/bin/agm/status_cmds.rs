@@ -34,6 +34,23 @@ pub(crate) fn cmd_status(args: &[String]) {
         return;
     }
 
+    let is_csv = args.iter().any(|a| a.eq_ignore_ascii_case("--csv"))
+        || args
+            .windows(2)
+            .any(|w| w[0].eq_ignore_ascii_case("--format") && w[1].eq_ignore_ascii_case("csv"));
+    if is_csv {
+        match telegram_inbound::generate_export_dataset("status", "csv") {
+            Ok((_name, _mime, csv)) => {
+                print!("{}", csv);
+                return;
+            }
+            Err(e) => {
+                eprintln!("[ERROR] Failed to export status CSV: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+
     let is_json = args.iter().any(|a| a == "--json");
     let machine_name = email_watcher::detect_machine_name();
     let node_alias = supabase_sync::load_config()

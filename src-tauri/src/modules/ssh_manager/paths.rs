@@ -29,17 +29,27 @@ pub fn get_ssh_nodes_store_path() -> Result<PathBuf, String> {
     Ok(data_dir.join("ssh_nodes.json"))
 }
 
+/// Return `~/.agm/ssh` directory for AGM RSA vault keypair and SSH metadata
+pub fn get_agm_ssh_vault_dir() -> Result<PathBuf, String> {
+    let home = dirs::home_dir().ok_or_else(|| "Could not determine home directory".to_string())?;
+    let dir = home.join(".agm").join("ssh");
+    if !dir.exists() {
+        fs::create_dir_all(&dir).map_err(|e| format!("Failed to create ~/.agm/ssh: {}", e))?;
+    }
+    Ok(dir)
+}
+
 /// Candidate paths for auto-seeding SSH nodes from GitMap / repo-secrets
 pub(crate) fn candidate_seed_node_paths() -> Vec<PathBuf> {
     let mut paths = vec![
         PathBuf::from("gitmap-ssh-nodes.json"),
-        PathBuf::from("D:/work/repo-secrets/gitmap-ssh-nodes.json"),
-        PathBuf::from("D:/work/repo-secrets/01-gitmap/gitmap-ssh-nodes.json"),
         PathBuf::from("../repo-secrets/gitmap-ssh-nodes.json"),
+        PathBuf::from("../repo-secrets/01-gitmap/gitmap-ssh-nodes.json"),
         PathBuf::from("../../repo-secrets/gitmap-ssh-nodes.json"),
     ];
     if let Some(home) = dirs::home_dir() {
         paths.push(home.join(".gitmap").join("gitmap-ssh-nodes.json"));
+        paths.push(home.join(".gitmap").join("ssh-nodes.json"));
         paths.push(home.join("gitmap-ssh-nodes.json"));
     }
     paths

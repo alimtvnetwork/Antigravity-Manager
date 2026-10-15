@@ -6,6 +6,7 @@ import { AppConfig } from '../../types/config';
 import { useDebugConsole } from '../../stores/useDebugConsole';
 import { useTranslation } from 'react-i18next';
 import { isTauri } from '../../utils/env';
+import { useErrorStore } from '../../stores/error-store';
 import versionData from '../../../version.json';
 
 export function normalizeDataDirDisplay(path: string): string {
@@ -30,7 +31,7 @@ export function useSettingsState() {
     const { tab: routeTab } = useParams<{ tab?: string }>();
     const { config, loadConfig, saveConfig, updateLanguage, updateTheme } = useConfigStore();
     const { enable, disable, isEnabled, open: openDebugModal } = useDebugConsole();
-    const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'email' | 'themes' | 'supabase' | 'advanced' | 'debug' | 'about'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'email' | 'ssh' | 'themes' | 'supabase' | 'advanced' | 'debug' | 'about'>('general');
 
     useEffect(() => {
         if (!routeTab) return;
@@ -39,7 +40,7 @@ export function useSettingsState() {
             setActiveTab('account');
             return;
         }
-        const validTabs = ['general', 'account', 'proxy', 'email', 'themes', 'supabase', 'advanced', 'debug', 'about'] as const;
+        const validTabs = ['general', 'account', 'proxy', 'email', 'ssh', 'themes', 'supabase', 'advanced', 'debug', 'about'] as const;
         if ((validTabs as readonly string[]).includes(normalized)) {
             setActiveTab(normalized as typeof validTabs[number]);
         }
@@ -163,7 +164,12 @@ export function useSettingsState() {
         // Get actual data directory path
         invoke<string>('get_data_dir_path')
             .then(path => setDataDirPath(normalizeDataDirDisplay(path)))
-            .catch(err => console.error('Failed to get data dir:', err));
+            .catch(err => {
+                useErrorStore.getState().trackWarning(err, {
+                    source: 'useSettingsState.getDataDirPath',
+                    triggerAction: 'get_data_dir_path',
+                });
+            });
 
         // Load update settings
         invoke<{
@@ -186,19 +192,36 @@ export function useSettingsState() {
                     update_channel: settings.update_channel || (appVersion.includes('-') ? 'beta' : 'stable'),
                 }));
             })
-            .catch(err => console.error('Failed to load update settings:', err));
+            .catch(err => {
+                useErrorStore.getState().trackWarning(err, {
+                    source: 'useSettingsState.getUpdateSettings',
+                    triggerAction: 'get_update_settings',
+                });
+            });
 
         // Get actual auto launch status
         invoke<boolean>('is_auto_launch_enabled')
             .then(enabled => {
                 setFormData(prev => ({ ...prev, auto_launch: enabled }));
             })
-            .catch(err => console.error('Failed to get auto launch status:', err));
+            .catch(err => {
+                useErrorStore.getState().trackWarning(err, {
+                    source: 'useSettingsState.isAutoLaunchEnabled',
+                    triggerAction: 'is_auto_launch_enabled',
+                });
+            });
 
         // Get actual app version
         if (isTauri()) {
             import('@tauri-apps/api/app').then(({ getVersion }) => {
-                getVersion().then(v => setAppVersion(v)).catch(() => {});
+                getVersion()
+                    .then(v => setAppVersion(v))
+                    .catch(err => {
+                        useErrorStore.getState().trackWarning(err, {
+                            source: 'useSettingsState.getVersion',
+                            triggerAction: 'getVersion',
+                        });
+                    });
             });
         }
 
@@ -206,7 +229,12 @@ export function useSettingsState() {
         if (isTauri()) {
             invoke<boolean>('check_homebrew_installation')
                 .then(installed => setIsBrewInstalled(installed))
-                .catch(err => console.error('Failed to check Homebrew installation:', err));
+                .catch(err => {
+                    useErrorStore.getState().trackWarning(err, {
+                        source: 'useSettingsState.checkHomebrewInstallation',
+                        triggerAction: 'check_homebrew_installation',
+                    });
+                });
         }
 
     }, [loadConfig]);

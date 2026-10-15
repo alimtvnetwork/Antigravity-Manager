@@ -101,7 +101,7 @@ async fn dispatch_post_switch_prompt_telemetry(
                     format!(
                         "\n🖼️ <b>Attached Media ({}):</b> {}\n",
                         detected_images.len(),
-                        links.join(" &bull; ")
+                        links.join(" • ")
                     )
                 } else {
                     String::new()
@@ -164,16 +164,13 @@ async fn dispatch_post_switch_prompt_telemetry(
                     )
                 };
 
-                let reply_markup =
-                    if !full_prompt_content.trim().is_empty() || !detected_images.is_empty() {
-                        Some(telegram_inbound::build_copy_prompt_reply_markup(
-                            &full_prompt_content,
-                            &detected_images,
-                            None,
-                        ))
-                    } else {
-                        None
-                    };
+                let reply_markup = Some(telegram_inbound::build_liveness_alert_reply_markup(
+                    instance_id,
+                    verified_running,
+                    backed_up_count,
+                    &full_prompt_content,
+                    &detected_images,
+                ));
 
                 // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
                 crate::error::record_ignored(

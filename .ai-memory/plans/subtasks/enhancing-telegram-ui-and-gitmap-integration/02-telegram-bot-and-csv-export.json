@@ -1,0 +1,26 @@
+{
+  "subtask_id": 2,
+  "task": "03-enhancing-telegram-ui-and-gitmap-integration",
+  "plan": "02-telegram-bot-and-csv-export",
+  "agent": "worker-01",
+  "status": "completed",
+  "owned_files_modified": [
+    "src-tauri/src/modules/notification_hub/telegram_alerts.rs",
+    "src-tauri/src/modules/notification_hub/telemetry.rs",
+    "src-tauri/src/modules/telegram_inbound/formatting.rs",
+    "src-tauri/src/modules/telegram_inbound/media.rs",
+    "src-tauri/src/modules/telegram_inbound/reports_a.rs",
+    "src-tauri/src/modules/telegram_inbound/reports_b.rs",
+    "src-tauri/src/modules/telegram_inbound/injection.rs",
+    "src-tauri/src/modules/telegram_inbound/ui_remote.rs",
+    "src-tauri/src/modules/telegram_inbound/processing.rs",
+    "src-tauri/src/modules/telegram_inbound/daemon.rs",
+    "src-tauri/src/modules/telegram_inbound/tests.rs"
+  ],
+  "verification": {
+    "cargo_fmt_check": "passed",
+    "cargo_clippy": "passed",
+    "unit_tests": "passed (27 tests in modules::telegram_inbound)"
+  },
+  "summary": "Fixed literal &nbsp; and &bull; Telegram HTML entity bug via sanitize_telegram_html_entities and Unicode figure spaces; attached rich inline action buttons to switch and liveness alerts; added multipart send_telegram_document (.csv/.json); implemented /balance (/credits, /quota), /export <target> [csv|json], and --csv/--json flags; upgraded /help with click-to-copy command blocks; added easy /prompt <instance_or_machine:instance> <text> and /target <machine> <instance> routing."
+}

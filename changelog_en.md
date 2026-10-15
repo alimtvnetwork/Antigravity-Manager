@@ -3,6 +3,12 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.203.0 (2026-10-15)**:
+        -   **[Telegram UI & Bot] HTML entity fix, click-to-copy command hub, inline action buttons, `/balance` credit view, and CSV/JSON file exports (Thanks to @aukgit)**:
+            -   **Description**: Replaced unsupported `&nbsp;&nbsp;` and `&bull;` HTML entities in `src-tauri/src/modules/notification_hub/telegram_alerts.rs` and `src-tauri/src/modules/telegram_inbound/formatting.rs` with Unicode figure spaces and bullet glyphs; attached interactive inline buttons to switch and liveness cards; expanded `/help` with categorized click-to-copy `<code>` examples; added `/balance` (`/credits`, `/quota`) and `send_telegram_document` in `src-tauri/src/modules/telegram_inbound/media.rs` for downloadable `.csv` and `.json` attachments via `/export` and `--csv`/`--json`; and added `/prompt <machine:instance> <text>` and `/target <machine> <instance>` routing.
+        -   **[GitMap & SSH Fleet] Multi-machine instance/account credit matrix, GitMap SSH import, PowerShell auto-installer, and RSA-2048 password encryption (Thanks to @aukgit)**:
+            -   **Description**: Added `encrypt_password_rsa` / `decrypt_password_rsa` (`ag_rsa_v1_`) in `src-tauri/src/utils/crypto.rs` and `src-tauri/src/modules/ssh_manager/` so SSH passwords are encrypted with RSA-2048 on first login and never stored in plaintext on disk, with encrypted bundle deployment across machines; added `agm ssh import-gitmap`, `agm ssh install-gitmap` (plus one-click PowerShell installer when `gitmap` is not installed), `agm balance [--csv|--json]`, `agm ssh balance`, `agm ssh prompt`, and the new `src/components/settings/EmailNotifications/SshGitmapSection.tsx` (`/settings/ssh`) UI.
+
     *   **v4.202.0 (2026-10-15)**:
         -   **[Onboarding & Privacy] Automatic CDP dismissal of Antigravity "Security Notice & Data Use" dialog with telemetry unchecked (Thanks to @aukgit)**:
             -   **Description**: Added `src-tauri/src/modules/instance/cdp_onboarding.rs` and enabled `--remote-debugging-port=0` on instance launches so account switches and instance starts automatically connect to `DevToolsActivePort`, uncheck the Interactions data-sharing checkbox, click **"Accept and continue"**, and persist `hasAcceptedTermsOfService = true` and `shareDataToImproveAntigravity = false` in `app_storage.json` and `state.vscdb`.

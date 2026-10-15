@@ -49,6 +49,22 @@ pub(crate) fn dispatch_instance_domain(subcommand: &str, args: &[String]) {
 }
 
 pub(crate) fn cmd_instances_list(args: &[String]) {
+    let is_csv = args.iter().any(|a| a.eq_ignore_ascii_case("--csv"))
+        || args
+            .windows(2)
+            .any(|w| w[0].eq_ignore_ascii_case("--format") && w[1].eq_ignore_ascii_case("csv"));
+    if is_csv {
+        match telegram_inbound::generate_export_dataset("instances", "csv") {
+            Ok((_name, _mime, csv)) => {
+                print!("{}", csv);
+                return;
+            }
+            Err(e) => {
+                eprintln!("[ERROR] Failed to export instances CSV: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
     let ctx = CliContext::parse(args);
     if ctx.json_output {
         if is_daemon_running() {

@@ -42,6 +42,74 @@ async fn deliver_send_flow_callback(
     true
 }
 
+/// Detect if a Telegram command requests a CSV or JSON file attachment export
+/// (e.g. `/export accounts csv`, `/accounts --csv`, `/instances --csv`, `/balance --csv`, `/status --json`)
+pub(crate) fn detect_telegram_export_request(text_raw: &str) -> Option<(String, String)> {
+    let trimmed = text_raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let (cmd_raw, rest) = match trimmed.split_once(char::is_whitespace) {
+        Some((c, r)) => (c, r.trim()),
+        None => (trimmed, ""),
+    };
+    let cmd_no_slash = cmd_raw.strip_prefix('/').unwrap_or(cmd_raw);
+    let cmd_base = cmd_no_slash
+        .split('@')
+        .next()
+        .unwrap_or(cmd_no_slash)
+        .to_lowercase();
+
+    if cmd_base == "export" {
+        let mut parts = rest.split_whitespace();
+        let target = parts.next().unwrap_or("accounts").to_lowercase();
+        let fmt = parts
+            .next()
+            .map(|s| s.trim_start_matches('-').to_lowercase())
+            .unwrap_or_else(|| "csv".to_string());
+        let normalized_fmt = if fmt == "json" { "json" } else { "csv" };
+        return Some((target, normalized_fmt.to_string()));
+    }
+
+    let tokens: Vec<&str> = rest.split_whitespace().collect();
+    let mut detected_fmt: Option<&str> = None;
+    for (idx, tok) in tokens.iter().enumerate() {
+        if tok.eq_ignore_ascii_case("--csv") || tok.eq_ignore_ascii_case("-csv") {
+            detected_fmt = Some("csv");
+            break;
+        } else if tok.eq_ignore_ascii_case("--json") || tok.eq_ignore_ascii_case("-json") {
+            detected_fmt = Some("json");
+            break;
+        } else if tok.eq_ignore_ascii_case("--format") {
+            if let Some(next_tok) = tokens.get(idx + 1) {
+                if next_tok.eq_ignore_ascii_case("json") {
+                    detected_fmt = Some("json");
+                } else {
+                    detected_fmt = Some("csv");
+                }
+                break;
+            }
+        }
+    }
+
+    if let Some(fmt) = detected_fmt {
+        let target = match cmd_base.as_str() {
+            "accounts" | "acc" => Some("accounts"),
+            "instances" | "inst" => Some("instances"),
+            "balance" | "credits" | "quota" | "bal" => Some("balance"),
+            "nodes" | "node" | "ssh" => Some("nodes"),
+            "prompts" | "prompt_queue" => Some("prompts"),
+            "status" | "observe" => Some("status"),
+            _ => None,
+        };
+        if let Some(t) = target {
+            return Some((t.to_string(), fmt.to_string()));
+        }
+    }
+
+    None
+}
+
 async fn deliver_ui_or_command(
     token: &str,
     chat_id: i64,
@@ -59,6 +127,51 @@ async fn deliver_ui_or_command(
             "send /send flow reply",
         );
         return Some(send.reply);
+    }
+
+    // Check if command requests CSV/JSON document attachment upload
+    if let Some((export_target, export_fmt)) = detect_telegram_export_request(text_raw) {
+        match reports_a::generate_export_document(&export_target, &export_fmt) {
+            Ok(doc) => {
+                if let Err(err) = send_telegram_document(
+                    token,
+                    chat_id,
+                    &doc.file_name,
+                    &doc.bytes,
+                    &doc.caption,
+                    doc.markup.clone(),
+                )
+                .await
+                {
+                    let fallback = format!(
+                        "{}\n⚠️ <i>Document upload fallback:</i> <code>{}</code>",
+                        doc.caption,
+                        crate::modules::notification_hub::escape_telegram_html(&err)
+                    );
+                    // Justification: fallback message when document upload fails; logged via record_ignored
+                    crate::error::record_ignored(
+                        send_telegram_message_with_markup(
+                            token, chat_id, &fallback, doc.markup, false,
+                        )
+                        .await,
+                        "send export fallback message",
+                    );
+                }
+                return Some(doc.caption);
+            }
+            Err(err) => {
+                let err_msg = format!(
+                    "❌ <b>Export Error:</b> <code>{}</code>",
+                    crate::modules::notification_hub::escape_telegram_html(&err)
+                );
+                // Justification: best-effort error notification to Telegram chat
+                crate::error::record_ignored(
+                    send_telegram_message_with_markup(token, chat_id, &err_msg, None, false).await,
+                    "send export error message",
+                );
+                return Some(err_msg);
+            }
+        }
     }
 
     if let Some(action) = super::ui_remote::prepare_local_ui_action(text_raw).await {
@@ -174,27 +287,66 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
         "fleet" | "whoami" => Some(json!({
             "inline_keyboard": [
                 [
-                    { "text": "🔄 Refresh Fleet", "callback_data": "cmd:fleet" },
-                    { "text": "🏷️ Instances", "callback_data": "cmd:instances" },
-                    { "text": "👤 Accounts", "callback_data": "cmd:accounts" }
+                    { "text": "🔄 Refresh Fleet", "callback_data": "cmd:/fleet" },
+                    { "text": "💰 Account Balances", "callback_data": "cmd:/balance" }
+                ],
+                [
+                    { "text": "🏷️ Instances", "callback_data": "cmd:/instances" },
+                    { "text": "👤 Accounts", "callback_data": "cmd:/accounts" },
+                    { "text": "🚀 Prompt Wizard (/send)", "callback_data": "cmd:/send" }
                 ]
             ]
         })),
         "instances" | "inst" => Some(json!({
             "inline_keyboard": [
                 [
-                    { "text": "🔄 Refresh", "callback_data": "cmd:instances" },
-                    { "text": "🌐 Fleet Identity", "callback_data": "cmd:fleet" },
-                    { "text": "👤 Accounts", "callback_data": "cmd:accounts" }
+                    { "text": "📥 Instances CSV", "callback_data": "cmd:/export instances csv" },
+                    { "text": "💰 Account Balances", "callback_data": "cmd:/balance" }
+                ],
+                [
+                    { "text": "🔄 Refresh", "callback_data": "cmd:/instances" },
+                    { "text": "🚀 Prompt Wizard (/send)", "callback_data": "cmd:/send" }
                 ]
             ]
         })),
         "accounts" | "acc" => Some(json!({
             "inline_keyboard": [
                 [
-                    { "text": "🔄 Refresh", "callback_data": "cmd:accounts" },
-                    { "text": "🌐 Fleet Identity", "callback_data": "cmd:fleet" },
-                    { "text": "🏷️ Instances", "callback_data": "cmd:instances" }
+                    { "text": "📥 Accounts CSV", "callback_data": "cmd:/export accounts csv" },
+                    { "text": "💰 Account Balances", "callback_data": "cmd:/balance" }
+                ],
+                [
+                    { "text": "🔄 Refresh", "callback_data": "cmd:/accounts" },
+                    { "text": "🏷️ Instances", "callback_data": "cmd:/instances" }
+                ]
+            ]
+        })),
+        "balance" | "credits" | "quota" | "bal" => Some(reports_a::resolve_balance_markup()),
+        "status" | "observe" => Some(json!({
+            "inline_keyboard": [
+                [
+                    { "text": "💰 Account Balances", "callback_data": "cmd:/balance" },
+                    { "text": "🚀 Prompt Wizard (/send)", "callback_data": "cmd:/send" }
+                ],
+                [
+                    { "text": "📥 Accounts CSV", "callback_data": "cmd:/export accounts csv" },
+                    { "text": "📥 Instances CSV", "callback_data": "cmd:/export instances csv" }
+                ],
+                [
+                    { "text": "🖥️ SSH Nodes", "callback_data": "cmd:/nodes" },
+                    { "text": "🔄 Refresh Status", "callback_data": "cmd:/status" }
+                ]
+            ]
+        })),
+        "nodes" | "node" | "ssh" => Some(json!({
+            "inline_keyboard": [
+                [
+                    { "text": "📥 Nodes CSV", "callback_data": "cmd:/export nodes csv" },
+                    { "text": "🔄 Import GitMap SSH", "callback_data": "cmd:/ssh import-gitmap" }
+                ],
+                [
+                    { "text": "💰 Account Balances", "callback_data": "cmd:/balance" },
+                    { "text": "🚀 Prompt Wizard (/send)", "callback_data": "cmd:/send" }
                 ]
             ]
         })),
@@ -322,26 +474,14 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
                     if let Some(allowed) = config.allowed_chat_id {
                         if chat_id == allowed {
                             let cmd_str = if let Some(stripped) = data.strip_prefix("cmd:") {
-                                format!("/{}", stripped)
+                                format!("/{}", stripped.trim_start_matches('/'))
                             } else {
                                 data.to_string()
                             };
 
-                            let (reply_opt, markup_opt) =
-                                resolve_telegram_command_reply_and_markup(&cmd_str, &None).await;
-                            if let Some(reply) = reply_opt {
-                                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-                                crate::error::record_ignored(
-                                    send_telegram_message_with_markup(
-                                        &clean_token,
-                                        chat_id,
-                                        &reply,
-                                        markup_opt,
-                                        false,
-                                    )
-                                    .await,
-                                    "send callback query reply with markup",
-                                );
+                            if let Some(reply) =
+                                deliver_ui_or_command(&clean_token, chat_id, &cmd_str, &None).await
+                            {
                                 processed.push((chat_id, cmd_str, reply));
                             }
 

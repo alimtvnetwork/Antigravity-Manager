@@ -72,3 +72,53 @@ pub fn import_all_bundle(dir_opt: Option<&str>) -> Result<(usize, NodeSyncStats)
 
     Ok((installed_keys, stats))
 }
+
+/// Deploy RSA-2048 encrypted SSH node bundle (`gitmap-ssh-nodes.json` + public keys) to remote machines
+pub fn deploy_encrypted_ssh_to_nodes(
+    target_aliases: Option<Vec<String>>,
+) -> Result<MeshDeploySummary, String> {
+    let target_filter = match target_aliases {
+        Some(ref list) if !list.is_empty() => list.join(","),
+        _ => "all".to_string(),
+    };
+
+    let conns = load_ssh_connections()?;
+    let envelope = build_envelope_from_connections(&conns);
+    let envelope_json = serde_json::to_string_pretty(&envelope)
+        .map_err(|e| format!("Failed to serialize encrypted SSH envelope: {}", e))?;
+    let b64_env = BASE64.encode(envelope_json.as_bytes());
+
+    let mut summary = deploy_mesh_keys(&target_filter, None, false)?;
+
+    // Also push the RSA-encrypted `ssh_nodes.json` / `gitmap-ssh-nodes.json` to online remote nodes
+    let nodes = resolve_target_nodes(&target_filter, None).unwrap_or_default();
+    for node in nodes {
+        let port = if node.port == 0 { 22 } else { node.port };
+        if !check_tcp_liveness(&node.ip_address, port, 2000) {
+            continue;
+        }
+        let is_win = node.os.eq_ignore_ascii_case("windows")
+            || node.username.eq_ignore_ascii_case("administrator");
+        let sync_cmd = if is_win {
+            format!(
+                "powershell -NoProfile -NonInteractive -Command \"$raw = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{}')); \
+                $gmDir = Join-Path $HOME '.gitmap'; if (!(Test-Path $gmDir)) {{ New-Item -ItemType Directory -Force -Path $gmDir | Out-Null }}; \
+                Set-Content -Path (Join-Path $gmDir 'gitmap-ssh-nodes.json') -Value $raw -Encoding UTF8\"",
+                b64_env
+            )
+        } else {
+            format!(
+                "mkdir -p ~/.gitmap && echo '{}' | base64 -d > ~/.gitmap/gitmap-ssh-nodes.json",
+                b64_env
+            )
+        };
+        // Justification: best-effort remote encrypted bundle distribution after key mesh deploy
+        crate::error::record_ignored(
+            exec_ssh_command(&node.alias, &[sync_cmd], Some(port), None, None),
+            "deploy encrypted ssh bundle to node",
+        );
+    }
+
+    summary.local_files_updated += 1;
+    Ok(summary)
+}

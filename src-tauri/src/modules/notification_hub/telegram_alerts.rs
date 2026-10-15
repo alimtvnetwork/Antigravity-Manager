@@ -156,7 +156,7 @@ pub(crate) async fn dispatch_telegram_switch_alert(
         format!(
             "\n🖼️ <b>Attached Media ({}):</b> {}\n",
             resolved_image_urls.len(),
-            links.join(" &bull; ")
+            links.join(" • ")
         )
     } else {
         String::new()
@@ -188,9 +188,9 @@ pub(crate) async fn dispatch_telegram_switch_alert(
         <b>📊 QUOTA DELTA &amp; ROTATION STATUS</b>\n\
         <blockquote>\
         • <b>Previous Account:</b> <code>{}</code>\n\
-        &nbsp;&nbsp;└ <i>Balances:</i> <code>4h: {} | Weekly: {}</code>\n\
+        \u{2007}\u{2007}└ <i>Balances:</i> <code>4h: {} | Weekly: {}</code>\n\
         • <b>Selected Account:</b> <code>{}</code>\n\
-        &nbsp;&nbsp;└ <i>Balances:</i> <code>4h: {} | Weekly: {}</code>\n\
+        \u{2007}\u{2007}└ <i>Balances:</i> <code>4h: {} | Weekly: {}</code>\n\
         • <b>Threshold Guard:</b> <code>{}</code> (Trigger: <i>{}</i>)\
         </blockquote>\n\n\
         <b>📁 WORKSPACE &amp; SYSTEM CONTEXT</b>\n\
@@ -218,16 +218,14 @@ pub(crate) async fn dispatch_telegram_switch_alert(
         prompt_section
     );
 
-    let reply_markup = if !full_prompt_content.trim().is_empty() || !resolved_image_urls.is_empty()
-    {
-        Some(telegram_inbound::build_copy_prompt_reply_markup(
-            &full_prompt_content,
-            &resolved_image_urls,
-            None,
-        ))
-    } else {
-        None
-    };
+    let reply_markup = Some(telegram_inbound::build_switch_alert_reply_markup(
+        &details.instance_name,
+        &details.selected_email,
+        &target_4h_str,
+        &target_weekly_str,
+        &full_prompt_content,
+        &resolved_image_urls,
+    ));
 
     match telegram_inbound::send_telegram_message_with_markup(
         &config.bot_token,
