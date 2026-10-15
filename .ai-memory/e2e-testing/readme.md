@@ -14,6 +14,7 @@ These files are checklists of tests this session actually created or executed. T
 | 3 | [03-cdp-onboarding-and-prompt.md](./03-cdp-onboarding-and-prompt.md) | v4.202.0 (`e8b0fb49`) | Security Notice dialog, CDP send, backup restore, settings route |
 | 4 | [04-telegram-balance-ssh.md](./04-telegram-balance-ssh.md) | v4.203.0 (`876dc50b`) | Balance table, CSV, SSH status, RSA round-trip |
 | 5 | [05-master-checklist.md](./05-master-checklist.md) | all | One page to tick |
+| 6 | [06-recorder-ui-screenshot-telegram.md](./06-recorder-ui-screenshot-telegram.md) | v4.200.0 through v4.203.0 | Recorder, `agm ui` open/goto/click, `agm shot`, and the two Telegram spec images |
 
 ## Rules for the next AI
 

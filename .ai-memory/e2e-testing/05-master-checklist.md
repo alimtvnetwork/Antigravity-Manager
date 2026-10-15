@@ -45,6 +45,16 @@ Decisions
 [ ] RSA test round-trip, or NOT RUN
 [ ] Telegram cards have no literal nbsp, or bot NOT RUN
 
+06 Recorder, UI, screenshots, Telegram images
+[ ] agm ui record start, one action, list shows that action, then stop
+[ ] agm ui open, then agm ui goto settings/ssh, no 404
+[ ] agm ui ls settings/ssh before any scroll or click
+[ ] agm shot sent the open window to the saved Telegram chat, or NOT RUN
+[ ] Compared the new switch card to assets/screenshots/enhancing-telegram-ui-and-gitmap-integration-01.png
+[ ] No literal &nbsp; on the new card
+[ ] Buttons Check Balance, Export CSV, Prompt Instance, Refresh Status are under the card
+[ ] Export CSV arrived as a file
+
 Verdict
 [ ] PASS or FAIL written per section
 ```
