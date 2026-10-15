@@ -95,15 +95,21 @@ pub fn restore_and_inject_prompts_for_instance(
     instance_id: &str,
     _workspace_roots: &[String],
 ) -> Result<usize, String> {
-    // Justification: background restore; prompts are re-restored on the next launch
-    crate::error::record_ignored(
-        crate::modules::backup_prompts_db::restore_running_prompts(Some(instance_id), false, None),
-        "restore running prompts",
-    );
     let resent =
         crate::modules::repo_db::resend_running_commands_for_instance(Some(instance_id), 20)
             .unwrap_or_default();
     let dispatched = crate::modules::repo_db::dispatch_running_prompts(instance_id).unwrap_or(0);
+    // Justification: background restore; marks prompt_backups rows as restored without resetting active_prompts back to backed_up
+    if let Ok(conn) = crate::modules::backup_prompts_db::connect_db() {
+        let now = chrono::Utc::now().timestamp();
+        crate::error::record_ignored(
+            conn.execute(
+                "UPDATE prompt_backups SET is_restored = 1, restored_at = ?1 WHERE instance_id = ?2 AND is_restored = 0",
+                rusqlite::params![now, instance_id],
+            ),
+            "mark prompt_backups restored",
+        );
+    }
     // Justification: intentionally discards the ensured-goals count; the function is infallible and the scheduler re-verifies on its next tick
     let _ = crate::modules::repo_db::ensure_prompt_goals_running_for_instance(instance_id);
     Ok(resent.len() + dispatched)

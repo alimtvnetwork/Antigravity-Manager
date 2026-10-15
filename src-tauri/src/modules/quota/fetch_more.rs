@@ -36,6 +36,33 @@ pub(crate) async fn fetch_quota_summary(
             Ok(response) => {
                 let status = response.status();
                 if !status.is_success() {
+                    if status == rquest::StatusCode::FORBIDDEN {
+                        let body_text = response.text().await.unwrap_or_default();
+                        let lower = body_text.to_lowercase();
+                        if lower.contains("validation_required")
+                            || lower.contains("verify your account")
+                            || lower.contains("further action is required")
+                            || lower.contains("validation_url")
+                            || lower.contains("appeal_url")
+                        {
+                            crate::modules::logger::log_warn(&format!(
+                                "[{}] QuotaSummary API returned 403 VALIDATION_REQUIRED; marking account validation_blocked",
+                                email
+                            ));
+                            if let Some(acc_id) = account_id {
+                                if let Ok(mut acc) = crate::modules::account::load_account(acc_id) {
+                                    crate::modules::account::mark_validation_blocked(
+                                        &mut acc,
+                                        &format!(
+                                            "QuotaSummary 403 VALIDATION_REQUIRED: {}",
+                                            body_text.trim()
+                                        ),
+                                    );
+                                }
+                            }
+                            return None;
+                        }
+                    }
                     crate::modules::logger::log_warn(&format!(
                         "QuotaSummary API {} returned {}, trying next endpoint",
                         ep_url, status

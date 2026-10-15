@@ -149,28 +149,30 @@ pub async fn execute_profile_rotation_with_context(
         .collect();
     let backup_count_opt = backup_res.as_ref().ok().copied();
 
-    let _notify = crate::modules::notification_hub::notify_account_switched_details(
-        crate::modules::notification_hub::SwitchNotificationDetails {
-            previous_email: prev_email,
-            previous_quota_4h: prev_q_4h,
-            previous_quota_weekly: prev_q_weekly,
-            predicted_next_email: predicted_opt,
-            selected_email: target.email.clone(),
-            target_quota_4h: target_q_4h,
-            target_quota_weekly: target_q_weekly,
-            credit_before_switch: credit_before,
-            threshold_activated: thresh,
-            instance_id: inst_id.clone(),
-            instance_name: inst_id.clone(),
-            instance_mode: String::new(),
-            reason: reason.clone(),
-            is_auto: true,
-            backed_up_projects: proj_names.clone(),
-            backed_up_prompts_count: backup_count_opt,
-            restored_prompts_count: None,
-        },
-    )
-    .await;
+    let notify_details = crate::modules::notification_hub::SwitchNotificationDetails {
+        previous_email: prev_email,
+        previous_quota_4h: prev_q_4h,
+        previous_quota_weekly: prev_q_weekly,
+        predicted_next_email: predicted_opt,
+        selected_email: target.email.clone(),
+        target_quota_4h: target_q_4h,
+        target_quota_weekly: target_q_weekly,
+        credit_before_switch: credit_before,
+        threshold_activated: thresh,
+        instance_id: inst_id.clone(),
+        instance_name: inst_id.clone(),
+        instance_mode: String::new(),
+        reason: reason.clone(),
+        is_auto: true,
+        backed_up_projects: proj_names.clone(),
+        backed_up_prompts_count: backup_count_opt,
+        restored_prompts_count: None,
+    };
+    tauri::async_runtime::spawn(async move {
+        // Justification: notify_account_switched_details returns a formatted String summary and logs its own per-channel results
+        let _ =
+            crate::modules::notification_hub::notify_account_switched_details(notify_details).await;
+    });
 
     // Delegate directly to the exact account switch pipeline (the exact ⇄ button handler)
     let app_handle_opt = crate::modules::log_bridge::get_app_handle();
@@ -367,52 +369,23 @@ pub async fn execute_profile_rotation_with_context(
         );
     });
 
-    // Step 3: Asynchronous 5-second post-launch prompt re-injection and status notification
+    // Step 3: Post-switch prompt verification and status notification
+    // Note: switch_account_to_instance already synchronously restores and dispatches backed-up prompts.
     let target_inst_id_clone = inst_id.clone();
     let proj_names_clone = proj_names.clone();
     let backed_up_count_val = backed_up_count;
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-        let resent_count = match crate::modules::repo_db::resend_running_commands_for_instance(
-            if target_inst_id_clone == "default" {
-                None
-            } else {
-                Some(&target_inst_id_clone)
-            },
-            20,
-        ) {
-            Ok(resent) => {
-                logger::log_info(&format!(
-                    "[AutoSwitcher] Post-switch re-injected {} backed-up running prompts across workspaces",
-                    resent.len()
-                ));
-                resent.len()
-            }
-            Err(e) => {
-                logger::log_warn(&format!(
-                    "[AutoSwitcher] Failed to resend backed-up running commands after switch: {}",
-                    e
-                ));
-                0
-            }
-        };
-
-        let dispatched_count =
-            crate::modules::repo_db::dispatch_running_prompts(&target_inst_id_clone).unwrap_or(0);
-        let verified_running = crate::modules::repo_db::verify_prompts_running();
-        logger::log_info(&format!(
-            "[AutoSwitcher] Prompt restoration complete: {} resent, {} dispatched, {} verified active running for instance '{}'",
-            resent_count, dispatched_count, verified_running, target_inst_id_clone
-        ));
-
-        crate::modules::notification_hub::notify_post_switch_prompt_status(
-            &target_inst_id_clone,
-            backed_up_count_val,
-            resent_count + dispatched_count,
-            verified_running,
-            proj_names_clone,
-        );
-    });
+    let verified_running = crate::modules::repo_db::verify_prompts_running();
+    logger::log_info(&format!(
+        "[AutoSwitcher] Post-switch prompt verification: {} backed-up, {} verified active running for instance '{}'",
+        backed_up_count_val, verified_running, target_inst_id_clone
+    ));
+    crate::modules::notification_hub::notify_post_switch_prompt_status(
+        &target_inst_id_clone,
+        backed_up_count_val,
+        backed_up_count_val,
+        verified_running,
+        proj_names_clone,
+    );
 
     // Auto-resume recent active prompts (<1h) if configured
     let app_config = config::load_app_config().unwrap_or_default();

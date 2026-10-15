@@ -1,6 +1,6 @@
 //! Repo DB: dispatch
 
-use super::agy::spawn_prompt_via_agy;
+use super::agy::spawn_or_replace_prompt_via_agy;
 use super::detection::resume_task_document;
 use super::models::ActivePrompt;
 use super::schema::{connect_db, init_tables};
@@ -140,7 +140,7 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
             false
         };
 
-        let sent = spawn_prompt_via_agy(&prompt);
+        let sent = spawn_or_replace_prompt_via_agy(&prompt, true);
         if let Err(ref spawn_err) = sent {
             crate::modules::logger::log_warn(&format!(
                 "[RepoDB] agy dispatch failed for prompt '{}': {spawn_err}",

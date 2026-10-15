@@ -132,14 +132,18 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
             continue;
         }
 
-        // Project is IDLE! Pick the first enqueued prompt (FIFO: earliest created_at)
+        // Pick the first enqueued prompt (FIFO: earliest created_at).
+        // NOTE: Do NOT include 'backed_up' here! 'backed_up' rows belong to an in-progress
+        // account switch (between Stage 1 snapshot and Stage 5 post-launch restore).
+        // If the background PromptQueueScheduler steals a 'backed_up' row while the instance
+        // is being terminated, it gets dispatched against the dead/dying old account.
         let prompt_opt: Option<ActivePrompt> = conn
             .query_row(
                 "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload
                  FROM active_prompts
                  WHERE (project_id = ?1 OR repo_path = ?2)
                    AND (instance_id = ?3 OR (?3 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))
-                   AND status IN ('backed_up', 'queued', 'pending')
+                   AND status IN ('queued', 'pending')
                  ORDER BY created_at ASC, id ASC
                  LIMIT 1",
                 params![&project_id, &repo_path, &inst_id],
@@ -166,6 +170,21 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
             continue;
         };
 
+        if super::text_utils::extract_clean_user_prompt(&prompt.prompt_content)
+            .trim()
+            .is_empty()
+        {
+            // Justification: purge corrupt empty queued prompt row so it cannot block the FIFO queue
+            crate::error::record_ignored(
+                conn.execute(
+                    "DELETE FROM active_prompts WHERE id = ?1",
+                    params![&prompt.id],
+                ),
+                "delete empty queued prompt row",
+            );
+            continue;
+        }
+
         crate::modules::logger::log_info(&format!(
             "[PromptQueueScheduler] Project '{}' verified idle. Dispatching enqueued prompt '{}' (conv: {:?})",
             clean_project_name, prompt.id, prompt.session_id
@@ -187,33 +206,14 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
             );
         }
 
-        // Spawn prompt via agy with task file fallback
+        // Spawn prompt via agy
         let sent = spawn_prompt_via_agy(&prompt);
         if let Err(ref spawn_err) = sent {
             crate::modules::logger::log_warn(&format!(
-                "[PromptQueueScheduler] agy dispatch failed for prompt '{}': {spawn_err}",
-                prompt.id
-            ));
-        }
-        let task_file_written = task_file.exists();
-        if sent.is_err() && !task_file_written {
-            crate::modules::logger::log_warn(&format!(
-                "[PromptQueueScheduler] Prompt '{}' could not be dispatched (agy failed, task file write failed); keeping in queue",
+                "[PromptQueueScheduler] agy dispatch failed for prompt '{}': {spawn_err}; keeping in queue",
                 prompt.id
             ));
             continue;
-        }
-
-        if sent.is_err() {
-            if let Err(focus_err) = crate::modules::instance::ensure_instance_running_for_dispatch(
-                &inst_id,
-                Some(&repo_path),
-            ) {
-                crate::modules::logger::log_warn(&format!(
-                    "[PromptQueueScheduler] IDE focus failed for '{}': {focus_err}",
-                    prompt.id
-                ));
-            }
         }
 
         // Update active_prompts status to 'dispatched'

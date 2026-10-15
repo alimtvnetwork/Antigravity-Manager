@@ -1,6 +1,6 @@
 //! Repo DB: auto resume
 
-use super::agy::spawn_prompt_via_agy;
+use super::agy::spawn_or_replace_prompt_via_agy;
 use super::detection::resume_task_document;
 use super::models::{ActivePrompt, AutoResumePromptInfo, AutoResumeResult, RunningProject};
 use super::schema::{connect_db, init_tables};
@@ -236,7 +236,7 @@ pub fn auto_resume_recent_prompts(
             updated_at: now,
             image_payload: image_payload.clone(),
         };
-        if let Err(spawn_err) = spawn_prompt_via_agy(&prompt_obj) {
+        if let Err(spawn_err) = spawn_or_replace_prompt_via_agy(&prompt_obj, true) {
             crate::modules::logger::log_warn(&format!(
                 "[RepoDB] auto-resume agy spawn failed for '{}': {spawn_err}",
                 prompt_id

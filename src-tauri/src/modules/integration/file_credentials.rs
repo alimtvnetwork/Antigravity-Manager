@@ -140,23 +140,31 @@ pub fn write_to_file_credentials_at(
         "token": token_obj,
         "auth_method": "consumer"
     });
-    let jetski_path = gemini_dir.join("jetski-standalone-oauth-token");
-    if let Ok(jetski_json) = serde_json::to_string(&jetski_payload) {
-        // Justification: jetski token file is a fallback for the Go language_server worker; best-effort
-        crate::error::record_ignored(
-            std::fs::write(&jetski_path, jetski_json),
-            "write jetski standalone oauth token",
-        );
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            // Justification: permission hardening on a best-effort mirror file
+    for token_name in &[
+        "jetski-standalone-oauth-token",
+        "antigravity-oauth-token",
+        "antigravity-cli-oauth-token",
+        "antigravity-ide-oauth-token",
+    ] {
+        let token_path = gemini_dir.join(token_name);
+        if let Ok(ref jetski_json) = serde_json::to_string(&jetski_payload) {
+            // Justification: jetski/antigravity token files are fallbacks for the Go language_server and agy CLI workers; best-effort
             crate::error::record_ignored(
-                std::fs::set_permissions(&jetski_path, std::fs::Permissions::from_mode(0o600)),
-                "set 0600 permissions on jetski token file",
+                std::fs::write(&token_path, jetski_json),
+                "write oauth token file",
             );
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                // Justification: permission hardening on a best-effort mirror file
+                crate::error::record_ignored(
+                    std::fs::set_permissions(&token_path, std::fs::Permissions::from_mode(0o600)),
+                    "set 0600 permissions on oauth token file",
+                );
+            }
         }
     }
+    let jetski_path = gemini_dir.join("jetski-standalone-oauth-token");
 
     // Also mirror to .gemini subdirectories for language_server, agy CLI, and background workers
     for sub in &["antigravity", "antigravity-ide", "antigravity-cli", "cache"] {
@@ -172,14 +180,18 @@ pub fn write_to_file_credentials_at(
                 std::fs::copy(&accounts_path, target_sub.join("google_accounts.json")),
                 "mirror google_accounts.json to IDE subdir",
             );
-            // Justification: credential mirror to IDE subdirectories is best-effort; the primary .gemini files are authoritative
-            crate::error::record_ignored(
-                std::fs::copy(
-                    &jetski_path,
-                    target_sub.join("jetski-standalone-oauth-token"),
-                ),
-                "mirror jetski token to IDE subdir",
-            );
+            for token_name in &[
+                "jetski-standalone-oauth-token",
+                "antigravity-oauth-token",
+                "antigravity-cli-oauth-token",
+                "antigravity-ide-oauth-token",
+            ] {
+                // Justification: credential mirror to IDE subdirectories is best-effort; the primary .gemini files are authoritative
+                crate::error::record_ignored(
+                    std::fs::copy(&jetski_path, target_sub.join(token_name)),
+                    "mirror oauth token to IDE subdir",
+                );
+            }
         }
     }
 
@@ -194,14 +206,18 @@ pub fn write_to_file_credentials_at(
             std::fs::copy(&accounts_path, base_home.join("google_accounts.json")),
             "mirror google_accounts.json to base home",
         );
-        // Justification: credential mirror to the base home is best-effort; the primary .gemini files are authoritative
-        crate::error::record_ignored(
-            std::fs::copy(
-                &jetski_path,
-                base_home.join("jetski-standalone-oauth-token"),
-            ),
-            "mirror jetski token to base home",
-        );
+        for token_name in &[
+            "jetski-standalone-oauth-token",
+            "antigravity-oauth-token",
+            "antigravity-cli-oauth-token",
+            "antigravity-ide-oauth-token",
+        ] {
+            // Justification: credential mirror to the base home is best-effort; the primary .gemini files are authoritative
+            crate::error::record_ignored(
+                std::fs::copy(&jetski_path, base_home.join(token_name)),
+                "mirror oauth token to base home",
+            );
+        }
     }
 
     for marker_name in &[

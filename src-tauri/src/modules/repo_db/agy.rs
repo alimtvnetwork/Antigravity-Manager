@@ -29,13 +29,80 @@ fn truncate_utf8(value: &str, max_bytes: usize) -> &str {
 /// "start a new turn", and a project key (`name__instance`) is not a conversation id.
 fn agy_conversation_id(session: &str) -> Option<&str> {
     let trimmed = session.trim();
-    if trimmed.is_empty() || trimmed.starts_with("conv-") {
+    if trimmed.is_empty()
+        || trimmed == "-"
+        || trimmed.starts_with("conv-")
+        || trimmed.starts_with("proj-")
+        || trimmed.starts_with("p-")
+        || trimmed.starts_with("queued-")
+    {
         return None;
     }
     if trimmed.contains("__") || trimmed.contains('\\') || trimmed.contains('/') {
         return None;
     }
     Some(trimmed)
+}
+
+/// Terminate any active `agy` background worker processes scoped to `instance_id`
+/// before switching or closing an instance so stale workers cannot block post-switch dispatch.
+pub fn terminate_agy_workers_for_instance(instance_id: &str) -> usize {
+    let clean_inst = if instance_id.trim().is_empty() || instance_id == "__default__" {
+        "default".to_string()
+    } else {
+        crate::modules::instance::resolve_instance_id(instance_id.trim())
+            .unwrap_or_else(|_| instance_id.trim().to_string())
+    };
+    let is_default = clean_inst == "default";
+
+    let mut workers = match get_active_agy_workers().lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+
+    let matching_keys: Vec<(String, u32)> = workers
+        .iter()
+        .filter_map(|(ws_key, &pid)| {
+            let prefix = ws_key.split(':').next().unwrap_or("");
+            let matches = prefix == clean_inst
+                || (is_default
+                    && (prefix == "default" || prefix == "__default__" || prefix.is_empty()));
+            if matches {
+                Some((ws_key.clone(), pid))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if matching_keys.is_empty() {
+        return 0;
+    }
+
+    let pids: Vec<sysinfo::Pid> = matching_keys
+        .iter()
+        .map(|(_, pid)| sysinfo::Pid::from_u32(*pid))
+        .collect();
+    let mut sys = sysinfo::System::new();
+    sys.refresh_processes_specifics(
+        sysinfo::ProcessesToUpdate::Some(&pids),
+        sysinfo::ProcessRefreshKind::new().with_exe(sysinfo::UpdateKind::OnlyIfNotSet),
+    );
+
+    let mut terminated = 0;
+    for (ws_key, pid) in matching_keys {
+        if let Some(proc) = sys.process(sysinfo::Pid::from_u32(pid)) {
+            crate::modules::logger::log_info(&format!(
+                "[RepoDB] Terminating active agy worker (pid {pid}) for instance '{}' ({ws_key}) before switch/close",
+                clean_inst
+            ));
+            proc.kill();
+            terminated += 1;
+        }
+        workers.remove(&ws_key);
+    }
+
+    terminated
 }
 
 /// Helper to spawn `agy` CLI to execute a prompt in a workspace.
@@ -246,6 +313,23 @@ pub fn spawn_or_replace_prompt_via_agy(
                                         prompt_id = %prompt_id,
                                         "agy CLI process exited successfully"
                                     );
+                                    if let Ok(conn) = super::schema::connect_db() {
+                                        let now = Utc::now().timestamp();
+                                        // Justification: best-effort completion status update; prevents finished prompts from being re-backed-up
+                                        crate::error::record_ignored(
+                                            conn.execute(
+                                                "UPDATE active_prompts SET status = 'completed', updated_at = ?1 WHERE id = ?2 AND status IN ('running', 'dispatched', 'in_flight')",
+                                                rusqlite::params![now, &prompt_id],
+                                            ),
+                                            "mark prompt completed on agy exit",
+                                        );
+                                    }
+                                    if let Ok(mut map) = super::state::get_memory_prompts_map().lock() {
+                                        if let Some(p) = map.get_mut(&prompt_id) {
+                                            p.status = "completed".to_string();
+                                            p.updated_at = Utc::now().timestamp();
+                                        }
+                                    }
                                 }
                                 drain_next_queued_prompt_for_workspace(&inst_id_clone, &repo_path_clone);
                             }
@@ -632,6 +716,9 @@ pub fn enqueue_prompt_for_instance(
     prompt_content: &str,
     conversation_id: Option<&str>,
 ) -> Result<ActivePrompt, String> {
+    if extract_clean_user_prompt(prompt_content).trim().is_empty() {
+        return Err("prompt content is empty".to_string());
+    }
     crate::modules::instance::scan_and_cache_all_running_instances();
     copy_to_system_clipboard(prompt_content);
 
@@ -764,6 +851,21 @@ pub fn drain_next_queued_prompt_for_workspace(instance_id: &str, repo_path: &str
         return;
     };
 
+    if extract_clean_user_prompt(&prompt.prompt_content)
+        .trim()
+        .is_empty()
+    {
+        // Justification: purge corrupt empty queued prompt row so it cannot block the FIFO queue
+        crate::error::record_ignored(
+            conn.execute(
+                "DELETE FROM active_prompts WHERE id = ?1",
+                rusqlite::params![&prompt.id],
+            ),
+            "delete empty queued prompt row",
+        );
+        return;
+    }
+
     let now = Utc::now().timestamp();
     prompt.status = "running".to_string();
     prompt.updated_at = now;
@@ -808,6 +910,9 @@ mod agy_flag_tests {
         assert_eq!(agy_conversation_id("cid-e2e-probe"), Some("cid-e2e-probe"));
         assert_eq!(agy_conversation_id("  abc  "), Some("abc"));
         assert_eq!(agy_conversation_id("conv-11111111"), None);
+        assert_eq!(agy_conversation_id("-"), None);
+        assert_eq!(agy_conversation_id("p-12345678"), None);
+        assert_eq!(agy_conversation_id("queued-12345678"), None);
         assert_eq!(agy_conversation_id("repo__default"), None);
         assert_eq!(agy_conversation_id("C:/repo"), None);
         assert_eq!(agy_conversation_id(""), None);

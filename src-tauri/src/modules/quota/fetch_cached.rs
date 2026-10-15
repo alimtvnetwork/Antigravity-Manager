@@ -192,10 +192,21 @@ pub async fn fetch_quota_with_cache(
                     }
 
                     // Best-effort: fetch grouped quota summary (weekly + 5h windows).
-                    // Failure here must not block the primary quota result.
+                    // Failure here must not block the primary quota result, unless it returned
+                    // 403 VALIDATION_REQUIRED (which marks the account validation_blocked).
                     let quota_groups =
                         fetch_quota_summary(access_token, email, project_id.as_deref(), account_id)
                             .await;
+
+                    if quota_groups.is_none() {
+                        if let Some(acc_id) = account_id {
+                            if let Ok(acc) = crate::modules::account::load_account(acc_id) {
+                                if acc.validation_blocked {
+                                    quota_data.is_forbidden = true;
+                                }
+                            }
+                        }
+                    }
 
                     // [FIX #3426] Fuse real bucket quotas into models so UI doesn't show fake 100%
                     if let Some(ref groups) = quota_groups {

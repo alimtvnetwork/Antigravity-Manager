@@ -307,7 +307,9 @@ pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppR
 
         match retry_result {
             Ok((q, _)) => {
-                clear_validation_blocked(account);
+                if !q.is_forbidden {
+                    clear_validation_blocked(account);
+                }
                 store_l1_quota_cache(&account.id, &q, now_sec);
                 return Ok(q);
             }
@@ -332,7 +334,9 @@ pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppR
     // fetch_quota already handles 403, with additional local fallback/validation handling.
     match result {
         Ok((q, _)) => {
-            clear_validation_blocked(account);
+            if !q.is_forbidden {
+                clear_validation_blocked(account);
+            }
             store_l1_quota_cache(&account.id, &q, now_sec);
             Ok(q)
         }

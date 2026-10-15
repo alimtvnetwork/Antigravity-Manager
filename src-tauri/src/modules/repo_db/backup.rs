@@ -60,24 +60,26 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
 
     let is_all_or_default =
         instance_id == "all" || instance_id == "__default__" || instance_id == "default";
+    let recent_dispatched_cutoff = now - 120;
 
-    // Transition in-flight and active prompts in active_prompts to 'backed_up' before switch (scoped to target instance)
+    // Transition in-flight and active prompts in active_prompts to 'backed_up' before switch (scoped to target instance).
+    // Only recently dispatched prompts (within 120s) are treated as in-flight so old finished rows are not resurrected.
     let transitioned = if instance_id == "all" {
         conn.execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched')",
-            params![now],
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE (status IN ('running', 'in_flight') OR (status = 'dispatched' AND updated_at >= ?2))",
+            params![now, recent_dispatched_cutoff],
         )
         .unwrap_or(0)
     } else if is_all_or_default {
         conn.execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched') AND instance_id IN ('default', '__default__')",
-            params![now],
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE (status IN ('running', 'in_flight') OR (status = 'dispatched' AND updated_at >= ?2)) AND instance_id IN ('default', '__default__')",
+            params![now, recent_dispatched_cutoff],
         )
         .unwrap_or(0)
     } else {
         conn.execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched') AND instance_id = ?2",
-            params![now, instance_id],
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE (status IN ('running', 'in_flight') OR (status = 'dispatched' AND updated_at >= ?2)) AND instance_id = ?3",
+            params![now, recent_dispatched_cutoff, instance_id],
         )
         .unwrap_or(0)
     };
@@ -89,9 +91,10 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                     || (is_all_or_default
                         && (p.instance_id == "default" || p.instance_id == "__default__"))
                     || p.instance_id == instance_id;
-                if (p.status == "running" || p.status == "in_flight" || p.status == "dispatched")
-                    && matches_inst
-                {
+                let is_inflight_status = p.status == "running"
+                    || p.status == "in_flight"
+                    || (p.status == "dispatched" && p.updated_at >= recent_dispatched_cutoff);
+                if is_inflight_status && matches_inst {
                     p.status = "backed_up".to_string();
                     p.updated_at = now;
                 }
@@ -218,15 +221,44 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                             if task_file.exists() {
                                 if let Ok(c) = fs::read_to_string(&task_file) {
                                     if let Ok(v) = serde_json::from_str::<serde_json::Value>(&c) {
-                                        if let Some(txt) =
-                                            v.get("prompt_content").and_then(|t| t.as_str())
-                                        {
-                                            if !txt.trim().is_empty() {
-                                                let img = v
-                                                    .get("image_payload")
-                                                    .and_then(|i| i.as_str())
-                                                    .map(|s| s.to_string());
-                                                extracted.push((txt.to_string(), img));
+                                        let file_status = v
+                                            .get("status")
+                                            .and_then(|s| s.as_str())
+                                            .unwrap_or("");
+                                        let file_inst = v
+                                            .get("instance_id")
+                                            .and_then(|s| s.as_str())
+                                            .unwrap_or("");
+                                        let file_ts = v
+                                            .get("updated_at")
+                                            .or_else(|| v.get("resumed_at"))
+                                            .or_else(|| v.get("created_at"))
+                                            .and_then(|t| t.as_i64())
+                                            .unwrap_or(0);
+                                        let inst_matches = instance_id == "all"
+                                            || file_inst.is_empty()
+                                            || file_inst == instance_id
+                                            || ((instance_id == "default"
+                                                || instance_id == "__default__")
+                                                && (file_inst == "default"
+                                                    || file_inst == "__default__"));
+                                        let is_active_task = (file_status == "running"
+                                            || file_status == "in_flight"
+                                            || file_status == "backed_up"
+                                            || (file_status == "dispatched"
+                                                && file_ts >= recent_dispatched_cutoff))
+                                            && (file_ts == 0 || file_ts >= now - 600);
+                                        if inst_matches && is_active_task {
+                                            if let Some(txt) =
+                                                v.get("prompt_content").and_then(|t| t.as_str())
+                                            {
+                                                if !txt.trim().is_empty() {
+                                                    let img = v
+                                                        .get("image_payload")
+                                                        .and_then(|i| i.as_str())
+                                                        .map(|s| s.to_string());
+                                                    extracted.push((txt.to_string(), img));
+                                                }
                                             }
                                         }
                                     }
@@ -243,19 +275,21 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
         });
 
     for (project, mut extracted_prompts) in extracted_results {
-        // Check if SQLite active_prompts already has an existing prompt for this repo_path or project
+        // Check if SQLite active_prompts already has an active running/in_flight prompt for this repo_path and instance
         if extracted_prompts.is_empty() {
             let proj_like = format!("%{}%", project.repo_name.to_lowercase());
             let mut check_stmt = conn
                 .prepare(
                     "SELECT prompt_content, image_payload FROM active_prompts \
-                     WHERE repo_path = ?1 OR project_id = ?2 OR project_id LIKE ?3 \
+                     WHERE (repo_path = ?1 OR project_id = ?2 OR project_id LIKE ?3) \
+                       AND status IN ('running', 'in_flight') \
+                       AND (?4 = 'all' OR instance_id = ?4 OR (?4 IN ('default', '__default__') AND instance_id IN ('default', '__default__'))) \
                      ORDER BY updated_at DESC LIMIT 1",
                 )
                 .ok();
             if let Some(ref mut c_stmt) = check_stmt {
                 if let Ok((txt, img)) = c_stmt.query_row(
-                    rusqlite::params![&project.repo_path, &project.id, &proj_like],
+                    rusqlite::params![&project.repo_path, &project.id, &proj_like, instance_id],
                     |r| Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?)),
                 ) {
                     if !txt.trim().is_empty() {
@@ -266,13 +300,22 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
         }
 
         for (prompt_text, image_payload) in extracted_prompts {
-            let existing_id: Option<String> = conn
-                .query_row(
-                    "SELECT id FROM active_prompts WHERE repo_path = ?1 AND prompt_content = ?2 LIMIT 1",
+            let existing_id: Option<String> = if instance_id == "default" || instance_id.is_empty()
+            {
+                conn.query_row(
+                    "SELECT id FROM active_prompts WHERE repo_path = ?1 AND prompt_content = ?2 AND (instance_id = 'default' OR instance_id = '') LIMIT 1",
                     rusqlite::params![&project.repo_path, &prompt_text],
                     |r| r.get(0),
                 )
-                .ok();
+                .ok()
+            } else {
+                conn.query_row(
+                    "SELECT id FROM active_prompts WHERE repo_path = ?1 AND prompt_content = ?2 AND instance_id = ?3 LIMIT 1",
+                    rusqlite::params![&project.repo_path, &prompt_text, instance_id],
+                    |r| r.get(0),
+                )
+                .ok()
+            };
 
             let (prompt_id, is_existing) = match existing_id {
                 Some(eid) => (eid, true),
@@ -282,8 +325,8 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
             let prompt_model = Some("gemini-pro".to_string());
             let result = if is_existing {
                 conn.execute(
-                    "UPDATE active_prompts SET status = 'backed_up', updated_at = ?, image_payload = COALESCE(?, image_payload) WHERE id = ?",
-                    params![now, &image_payload, &prompt_id],
+                    "UPDATE active_prompts SET status = 'backed_up', instance_id = ?1, updated_at = ?2, image_payload = COALESCE(?3, image_payload) WHERE id = ?4",
+                    params![instance_id, now, &image_payload, &prompt_id],
                 )
             } else {
                 conn.execute(

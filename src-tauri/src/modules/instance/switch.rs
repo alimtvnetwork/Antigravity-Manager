@@ -151,7 +151,8 @@ pub async fn switch_account_to_instance(
     };
 
     // 1.5. [Step 1/5] Snapshot and re-enqueue running prompts scoped to THIS target instance BEFORE closing IDE
-    let backed_up_count = match crate::modules::repo_db::backup_running_prompts(&instance.id) {
+    let existing_backed_up = crate::modules::repo_db::count_backed_up_prompts(&instance.id);
+    let newly_backed_up = match crate::modules::repo_db::backup_running_prompts(&instance.id) {
         Ok(count) => count,
         Err(e) => {
             crate::modules::logger::log_warn(&format!(
@@ -161,6 +162,7 @@ pub async fn switch_account_to_instance(
             0
         }
     };
+    let backed_up_count = newly_backed_up.max(existing_backed_up);
     // Justification: opportunistic prompt backup; re-attempted on the next switch
     crate::error::record_ignored(
         crate::modules::backup_prompts_db::backup_active_running_prompts(Some(&instance.id), None),
@@ -203,9 +205,12 @@ pub async fn switch_account_to_instance(
     //    produce a warning — the switch must not brick over them.
     //    Snapshot the pre-kill PID set for the audit trail first.
     let pids_to_kill = find_pids_for_data_dir(&instance.data_dir, is_default_inst);
+    let killed_agy_workers =
+        crate::modules::repo_db::terminate_agy_workers_for_instance(&instance.id);
     crate::modules::logger::log_info(&format!(
-        "[INSTANCE_SWITCH:STAGE_2_TERMINATE] Terminating {} PIDs for instance '{}': {:?}",
+        "[INSTANCE_SWITCH:STAGE_2_TERMINATE] Terminating {} PIDs (and {} agy workers) for instance '{}': {:?}",
         pids_to_kill.len(),
+        killed_agy_workers,
         instance.id,
         pids_to_kill
     ));
@@ -360,47 +365,21 @@ pub async fn switch_account_to_instance(
     }
 
     let target_inst_id = instance.id.clone();
-    let target_inst_data_dir = instance.data_dir.clone();
+    let workspace_roots = crate::modules::instance::get_instance_workspace_paths(&target_inst_id);
+    let dispatched_now = crate::modules::instance::restore_and_inject_prompts_for_instance(
+        &target_inst_id,
+        &workspace_roots,
+    )
+    .unwrap_or(0);
     crate::modules::logger::log_info(&format!(
-        "[INSTANCE_SWITCH:STAGE_5_RESTORE] Scheduled 5s async prompt restoration for instance '{}'",
-        target_inst_id
+        "[INSTANCE_SWITCH:STAGE_5_RESTORE] Restored and dispatched {} prompts for instance '{}'",
+        dispatched_now, target_inst_id
     ));
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-        crate::modules::logger::log_info(&format!(
-            "[PromptRestore] 5s post-launch delay elapsed. Restoring prompts for instance {}",
-            target_inst_id
-        ));
-        let workspace_roots =
-            crate::modules::instance::get_instance_workspace_paths(&target_inst_id);
-        // Justification: background restore; prompts are re-restored on the next launch
-        crate::error::record_ignored(
-            crate::modules::instance::restore_and_inject_prompts_for_instance(
-                &target_inst_id,
-                &workspace_roots,
-            ),
-            "restore and inject prompts",
-        );
-        // Justification: background restore; prompts are re-restored on the next launch
-        crate::error::record_ignored(
-            crate::modules::backup_prompts_db::restore_running_prompts_for_instance(
-                Some(&target_inst_id),
-                false,
-                None,
-            ),
-            "restore running prompts",
-        );
-        // Justification: background dispatch; the scheduler re-attempts on its next tick
-        crate::error::record_ignored(
-            crate::modules::repo_db::dispatch_running_prompts(&target_inst_id),
-            "dispatch running prompts",
-        );
-    });
 
     let restore_step = crate::modules::task_history_db::SwitchRestoreStep {
-        method: "resume_task_json + async_5s_prompt_restore".to_string(),
+        method: "resume_task_json + sync_agy_prompt_restore".to_string(),
         restored_count: backed_up_count,
-        dispatched_count: 0,
+        dispatched_count: dispatched_now,
         prompt_channel_waited: false,
         success: true,
     };
@@ -516,7 +495,7 @@ pub async fn switch_account_to_instance(
             prompt_id: snap.prompt_id,
             prompt_text: snap.prompt_text,
             conversation_id: snap.conversation_id,
-            prompt_reinjected: backed_up_count > 0,
+            prompt_reinjected: backed_up_count > 0 || dispatched_now > 0,
             switch_ok: true,
             instance_id: instance.id.clone(),
             ide_type: "antigravity".to_string(),

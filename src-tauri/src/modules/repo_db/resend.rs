@@ -1,6 +1,6 @@
 //! Repo DB: resend
 
-use super::agy::spawn_prompt_via_agy;
+use super::agy::spawn_or_replace_prompt_via_agy;
 use super::detection::extract_image_payload_or_path;
 use super::models::ActivePrompt;
 use super::schema::{connect_db, init_tables};
@@ -200,7 +200,7 @@ pub fn resend_running_commands_for_instance(
             );
         }
 
-        if let Err(spawn_err) = spawn_prompt_via_agy(&prompt) {
+        if let Err(spawn_err) = spawn_or_replace_prompt_via_agy(&prompt, true) {
             crate::modules::logger::log_error(&format!(
                 "[RepoDB] Prompt '{}' was not re-pushed ({spawn_err}); left {}",
                 prompt.id, prompt.status
