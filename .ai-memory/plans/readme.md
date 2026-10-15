@@ -8,6 +8,7 @@
 | [auditing-and-cli-ui-integration.md](./auditing-and-cli-ui-integration.md) | `COMPLETED` | UI interaction audit recorder (Rust backend + React hooks/panel), `agm ui` CLI bridge (open/goto/ls/scroll/click), Telegram `/ui` commands, backend `/api/ui/*` endpoints with Tauri-event navigation. |
 | [ui-session-recorder.md](./ui-session-recorder.md) | `PENDING` | Guideline for a developer-mode UI session recorder. Spec is written. The recorder is not implemented. |
 | [local-prompt-switch-e2e.md](./local-prompt-switch-e2e.md) | `COMPLETED` | CLI retest for prompt send, copy-instance switch, shared login, email vault, and auto-switch 15%. |
+| [fixing-auto-switching-and-progress-bar-issues.md](./fixing-auto-switching-and-progress-bar-issues.md) | `COMPLETED` | Fix prompt Send/Rerun when `agy` worker is active, Accounts row switch instance targeting, `agm ui record` CLI session recorder, progress bar inner-dot-only glow (`#1af18d`), and GitMap credential/SSH auto-fix + Windows Defender `VirTool:MSIL/Subti.C` elimination. |
 
 ## Completed Plans (`completed/`)
 | # | Plan File | Status | Summary |
