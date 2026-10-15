@@ -1,5 +1,20 @@
 # Changelog
 
+## [v4.204.1] - 2026-10-16
+
+### Fixed
+- **TitleBar Window Control Cut-Off Remediation**: Added safe-area right inset padding (`pr-2.5 sm:pr-3`) in `src/components/layout/TitleBar.tsx` and `src/components/navbar/NavSettings.tsx`, with centered viewBox coordinates and `overflow-visible`, eliminating window close button clipping against window edges and DWM rounded borders. (Thanks to @aukgit)
+- **Modal Stacking Context & Sticky Header Collision Fix**: Removed `isolation: 'isolate'` from `src/components/navbar/Navbar.tsx` and elevated modal z-index to `z-[99999]` (drag region `z-[100000]`) in `src/components/common/ModalDialog.tsx` and `src/components/instances/PromptTreeView/PromptTreeViewModal.tsx`, ensuring modals and prompt inspectors always float strictly above top sticky navigation headers. (Thanks to @aukgit)
+- **Non-Silent Update Verification Feedback**: Hardened `handleCheckUpdates` in `src/components/navbar/NavMenu.tsx` to provide immediate tactile toast feedback ("Checking for updates...") followed by clear status reporting ("No updates available (latest version installed)") so manual update checks never fail silently. (Thanks to @aukgit)
+
+### Added
+- **Navbar Segmented Capsule Modernization (Icon-Only Settings & Triangle Chevron Trigger)**: Refined the navigation toolbar capsule in `src/components/navbar/NavMenu.tsx` by converting Settings to an icon-only item (`<Settings className="w-3.5 h-3.5 shrink-0" />`) with tooltip parity, and replacing the trailing round hamburger button with an integrated micro-triangle chevron trigger (`<ChevronDown />` rotating 180° when expanded) featuring seamless `rounded-r-full rounded-l-none` capsule rounding. (Thanks to @aukgit)
+- **Quota Progress Bar Overhaul**: Re-architected `src/components/accounts/QuotaProgressBar.tsx` with a 10px track (`h-2.5`), 20px protruding circular milestone nodes (`w-5 h-5`), crisp symmetrical rounded downward chevrons (`v`), strictly zero boundary dots at 0% and 100%, 5 internal milestone splits (`[20, 40, 60, 80, 90]`), a 6-stop spatial gradient from dark red `#7f1d1d` (0%) to Progress Green `#1af18d` (100%), resting opacity at 85%, and dynamic row hover neon glow. (Thanks to @aukgit)
+- **Browser-Based UI Builder Workbench**: Added `scripts/ui-builder.html` and package script `npm run ui:builder`, allowing developers and designers to interactively adjust colors, progress bar metrics, and capsule styles directly in the browser with bi-directional JSON state import/export. (Thanks to @aukgit)
+- **Desktop UI Binary Target Alignment (`Antigravity Manager (AGM)-ui.exe` / `agm-ui`)**: Aligned the desktop UI executable target to `agm-ui` in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, and test harnesses (`scripts/test-instance-e2e.ps1`), while preserving the standalone terminal CLI binary `agm`. (Thanks to @aukgit)
+
+---
+
 ## [v4.204.0] - 2026-10-15
 
 ### Fixed
@@ -304,6 +319,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.204.1 (2026-10-16)**:
+        -   **[UI & UX Enhancements] TitleBar Close Button Padding, Icon-Only Settings, Triangle Capsule Trigger, QuotaProgressBar Overhaul, Modal z-index Fix, Browser UI Builder & Binary Target Alignment (Thanks to @aukgit)**:
+            -   **Description**: Added safe-area right inset padding (`pr-2.5 sm:pr-3`) and centered `overflow-visible` cross in `src/components/layout/TitleBar.tsx` and `src/components/navbar/NavSettings.tsx` to eliminate window close button clipping against window edges; converted Settings in `src/components/navbar/NavMenu.tsx` to an icon-only button and replaced the trailing round hamburger trigger with an integrated rotating micro-triangle chevron (`rounded-r-full`); hardened `handleCheckUpdates` with non-silent toast feedback ("Checking for updates..." -> "No updates available (latest version installed)"); overhauled `src/components/accounts/QuotaProgressBar.tsx` with a 10px track, 20px protruding milestone nodes with symmetrical `v` chevrons, strictly zero boundary dots at 0% and 100%, 5 internal splits (`[20, 40, 60, 80, 90]`), 6-stop spatial gradient (`#7f1d1d` to `#1af18d`), 85% resting opacity, and table row hover neon glow; removed `isolation: 'isolate'` from `src/components/navbar/Navbar.tsx` and standardized modal stacking context to `z-[99999]`; implemented browser-based UI builder workbench (`scripts/ui-builder.html` / `npm run ui:builder`) with bi-directional JSON state export/import; and aligned desktop UI binary target to `agm-ui` / `Antigravity Manager (AGM)-ui.exe` across `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` while preserving standalone CLI `agm`.
+
+
     *   **v4.204.0 (2026-10-15)**:
         -   **[Prompt Tree UI & Action Toolbar] 3-capsule segmented dark-glass toolbar, send vs enqueue decoupling, and transparent select styling (Thanks to @aukgit)**:
             -   **Description**: Redesigned `src/components/instances/PromptTreeView/DetailHeader.tsx` into 3 contiguous segmented capsules (`[ Copy All | v ]`, `[ Send N | v ]`, and `[ Enqueue | v ]`), separating immediate direct prompt execution from background FIFO queueing; styled `<select>` elements with transparent borderless styling (`bg-transparent border-0 focus:ring-0 focus:outline-none`) to eradicate nested white pill defects; wired independent menu toggles (`isSendMenuOpen`, `isEnqueueMenuOpen`, `isCopyMenuOpen`) in `usePromptTreeState.ts` and refined handlers in `usePromptTreePromptActions.ts`.
