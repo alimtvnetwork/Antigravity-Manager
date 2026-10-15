@@ -151,7 +151,16 @@ pub fn start_antigravity_with_fallback_path(
     let raw_args = config
         .and_then(|c| c.antigravity_args.clone())
         .or_else(|| preferred_args.map(|a| a.to_vec()));
-    let args = raw_args.map(|a| sanitize_restart_args(&a));
+    let mut cleaned_args = raw_args
+        .map(|a| sanitize_restart_args(&a))
+        .unwrap_or_default();
+    if !cleaned_args
+        .iter()
+        .any(|a| a.starts_with("--remote-debugging-port"))
+    {
+        cleaned_args.push("--remote-debugging-port=0".to_string());
+    }
+    let args = Some(cleaned_args);
 
     if let Some(mut path_str) = manual_path {
         let mut path = std::path::PathBuf::from(&path_str);

@@ -132,12 +132,11 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
 
         let is_app_bundle = exe_str.ends_with(".app") || Path::new(&exe_str).is_dir();
 
-        let mut app_args = Vec::new();
+        let mut app_args = vec!["--remote-debugging-port=0".to_string()];
         let has_custom_data = !is_default;
         let inst_home_opt = if has_custom_data {
             app_args.push(format!("--user-data-dir={}", data_dir));
             app_args.push("--password-store=basic".to_string());
-            app_args.push("--remote-debugging-port=0".to_string());
             let home_opt = get_instance_home_dir(instance_id).ok();
             write_keyring_bypass_markers(&target_data_path, home_opt.as_deref());
             if let Some(ref inst_home) = home_opt {
@@ -354,6 +353,11 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
             let _ = crate::modules::repo_db::ensure_prompt_goals_running_for_instance(instance_id);
         }
         crate::modules::repo_db::invalidate_prompt_tree_cache(Some(instance_id));
+        spawn_security_notice_dismisser(
+            target_data_path.clone(),
+            bound_email.clone(),
+            std::time::Duration::from_secs(25),
+        );
         return Ok(());
     }
 
@@ -361,6 +365,7 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
     {
         let mut cmd = Command::new(&exe_str);
         cmd.env("RUST_BACKTRACE", "1");
+        cmd.arg("--remote-debugging-port=0");
 
         let has_custom_data = !is_default;
         let inst_home_opt = if has_custom_data {
@@ -371,8 +376,10 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
         if has_custom_data {
             cmd.arg(format!("--user-data-dir={}", data_dir));
             cmd.arg("--password-store=basic");
-            cmd.arg("--remote-debugging-port=0");
             write_keyring_bypass_markers(&target_data_path, inst_home_opt.as_deref());
+            cmd.env("SSH_CONNECTION", "127.0.0.1 50000 127.0.0.1 22");
+            cmd.env("SSH_CLIENT", "127.0.0.1 50000 22");
+            cmd.env("SSH_TTY", "pty/0");
 
             if let Some(ref inst_home) = inst_home_opt {
                 // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
@@ -470,10 +477,13 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
                         ));
                         let mut fallback_cmd = Command::new(&base_str);
                         fallback_cmd.env("RUST_BACKTRACE", "1");
+                        fallback_cmd.arg("--remote-debugging-port=0");
                         if has_custom_data {
                             fallback_cmd.arg(format!("--user-data-dir={}", data_dir));
                             fallback_cmd.arg("--password-store=basic");
-                            fallback_cmd.arg("--remote-debugging-port=0");
+                            fallback_cmd.env("SSH_CONNECTION", "127.0.0.1 50000 127.0.0.1 22");
+                            fallback_cmd.env("SSH_CLIENT", "127.0.0.1 50000 22");
+                            fallback_cmd.env("SSH_TTY", "pty/0");
                             if let Some(ref inst_home) = inst_home_opt {
                                 #[cfg(target_os = "windows")]
                                 {
@@ -551,11 +561,10 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
                                 exe_str.clone()
                             };
 
-                            let mut shell_args = Vec::new();
+                            let mut shell_args = vec!["--remote-debugging-port=0".to_string()];
                             if has_custom_data {
                                 shell_args.push(format!("--user-data-dir={}", data_dir));
                                 shell_args.push("--password-store=basic".to_string());
-                                shell_args.push("--remote-debugging-port=0".to_string());
                             }
                             if let Some(ref ext_dir) = extensions_dir {
                                 shell_args.push(format!("--extensions-dir={}", ext_dir));
@@ -581,6 +590,9 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
                                 shell_cmd.arg(a);
                             }
                             if has_custom_data {
+                                shell_cmd.env("SSH_CONNECTION", "127.0.0.1 50000 127.0.0.1 22");
+                                shell_cmd.env("SSH_CLIENT", "127.0.0.1 50000 22");
+                                shell_cmd.env("SSH_TTY", "pty/0");
                                 if let Some(ref inst_home) = inst_home_opt {
                                     shell_cmd.env("USERPROFILE", inst_home);
                                     shell_cmd
@@ -649,6 +661,11 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
                                     reinject_prompts,
                                     detected_pid,
                                 )?;
+                                spawn_security_notice_dismisser(
+                                    target_data_path.clone(),
+                                    bound_email.clone(),
+                                    std::time::Duration::from_secs(25),
+                                );
                                 return Ok(());
                             }
                         }
@@ -664,6 +681,11 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
 
         // Justification: PID cache bookkeeping; staleness is tolerated via the OS-level re-detect fallback
         record_spawned_instance_process(instance_id, &data_dir, reinject_prompts, child.id())?;
+        spawn_security_notice_dismisser(
+            target_data_path.clone(),
+            bound_email.clone(),
+            std::time::Duration::from_secs(25),
+        );
         Ok(())
     }
 }

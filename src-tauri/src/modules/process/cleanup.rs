@@ -100,7 +100,8 @@ pub fn clean_antigravity_lockfiles(target_ide: Option<&str>) {
                 let is_lock = fname == "lockfile"
                     || fname.starts_with("singleton")
                     || fname.ends_with(".lock")
-                    || fname == "code.lock";
+                    || fname == "code.lock"
+                    || fname == "devtoolsactiveport";
                 if is_lock {
                     // Justification: best-effort cleanup; a leftover file is harmless
                     crate::error::record_ignored(std::fs::remove_file(entry.path()), "remove_file");

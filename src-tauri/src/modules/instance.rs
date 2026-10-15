@@ -6,6 +6,8 @@
 
 #[path = "instance/active.rs"]
 pub mod active;
+#[path = "instance/cdp_onboarding.rs"]
+pub mod cdp_onboarding;
 #[path = "instance/clone.rs"]
 pub mod clone;
 #[path = "instance/clone_helpers.rs"]
@@ -97,6 +99,9 @@ pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStat
 pub use active::{
     bind_account_to_instance, get_active_instance_id, set_active_instance_id, set_default_instance,
 };
+pub use cdp_onboarding::{
+    dismiss_security_notice_dialog_for_data_dir, spawn_security_notice_dismisser,
+};
 pub use clone::copy_instance_with_options;
 pub(crate) use clone_helpers::{
     copy_gemini_trees, copy_required_ide_files, pick_best_settings_path, source_profile_home,
@@ -174,7 +179,8 @@ pub use smart_run::{
 };
 pub(crate) use spawn::record_spawned_instance_process;
 pub use storage::{
-    get_default_antigravity_data_dir, purge_volatile_instance_sessions,
+    clear_instance_onboarding_acceptance, get_default_antigravity_data_dir,
+    purge_volatile_instance_sessions, record_onboarding_acceptance_fallback,
     update_instance_app_storage, write_keyring_bypass_markers,
 };
 pub use switch::switch_account_to_instance;

@@ -224,6 +224,19 @@ pub(crate) fn inject_account_credentials(
         }
     }
 
+    // When switching accounts (non-launch mode), clear the onboarding acceptance keys so the
+    // "Security Notice & Data Use" dialog opens on relaunch and our CDP dismisser can uncheck the
+    // telemetry/Interactions data-sharing checkbox and click "Accept and continue".
+    if !options.launch_mode {
+        clear_instance_onboarding_acceptance(&target_data_path);
+        if is_default {
+            let default_dir = get_default_antigravity_data_dir();
+            if default_dir != target_data_path {
+                clear_instance_onboarding_acceptance(&default_dir);
+            }
+        }
+    }
+
     Ok(())
 }
 

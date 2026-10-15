@@ -158,6 +158,7 @@ impl SystemIntegration for DesktopIntegration {
             }
         }
         for dir in &target_data_dirs {
+            crate::modules::instance::clear_instance_onboarding_acceptance(dir);
             for lock in &["lockfile", "code.lock", "DevToolsActivePort"] {
                 let lock_file = dir.join(lock);
                 if lock_file.exists() {
@@ -191,9 +192,8 @@ impl SystemIntegration for DesktopIntegration {
         // check a stillborn relaunch reports success while the user sees
         // nothing reopen.
         {
-            let default_data_dir = crate::modules::instance::get_default_antigravity_data_dir()
-                .to_string_lossy()
-                .to_string();
+            let default_data_path = crate::modules::instance::get_default_antigravity_data_dir();
+            let default_data_dir = default_data_path.to_string_lossy().to_string();
             if !crate::modules::instance::verify_instance_relaunched(
                 "default",
                 &default_data_dir,
@@ -205,6 +205,30 @@ impl SystemIntegration for DesktopIntegration {
                 );
                 crate::modules::logger::log_error(&format!("[Desktop][ERROR] {}", err_msg));
                 return Err(err_msg);
+            }
+
+            // STEP 4c: Automatically uncheck the Interactions data-sharing checkbox
+            // and click "Accept and continue" on the "Security Notice & Data Use" modal.
+            let cdp_email = account.email.clone();
+            let dismissed = tokio::task::spawn_blocking({
+                let data_dir = default_data_path.clone();
+                let email = cdp_email.clone();
+                move || {
+                    crate::modules::instance::dismiss_security_notice_dialog_for_data_dir(
+                        &data_dir,
+                        Some(email.as_str()),
+                        std::time::Duration::from_secs(15),
+                    )
+                }
+            })
+            .await
+            .unwrap_or(false);
+            if !dismissed {
+                crate::modules::instance::spawn_security_notice_dismisser(
+                    default_data_path,
+                    Some(cdp_email),
+                    std::time::Duration::from_secs(20),
+                );
             }
         }
 

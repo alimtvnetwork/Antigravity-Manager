@@ -364,6 +364,33 @@ pub async fn switch_account_to_instance(
         return Err(err_msg);
     }
 
+    // 4c. Automatically uncheck the Interactions data-sharing checkbox and click
+    // "Accept and continue" on the "Security Notice & Data Use" modal if shown.
+    {
+        let cdp_data_dir = std::path::PathBuf::from(&instance.data_dir);
+        let cdp_email = account.email.clone();
+        let dismissed = tokio::task::spawn_blocking({
+            let data_dir = cdp_data_dir.clone();
+            let email = cdp_email.clone();
+            move || {
+                crate::modules::instance::dismiss_security_notice_dialog_for_data_dir(
+                    &data_dir,
+                    Some(email.as_str()),
+                    std::time::Duration::from_secs(15),
+                )
+            }
+        })
+        .await
+        .unwrap_or(false);
+        if !dismissed {
+            crate::modules::instance::spawn_security_notice_dismisser(
+                cdp_data_dir,
+                Some(cdp_email),
+                std::time::Duration::from_secs(20),
+            );
+        }
+    }
+
     let target_inst_id = instance.id.clone();
     let workspace_roots = crate::modules::instance::get_instance_workspace_paths(&target_inst_id);
     let dispatched_now = crate::modules::instance::restore_and_inject_prompts_for_instance(

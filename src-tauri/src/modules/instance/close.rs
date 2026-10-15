@@ -53,6 +53,11 @@ pub(crate) fn clear_stale_instance_lockfiles(target_data_path: &Path) {
         // Justification: cleanup of an optional file; absence is the normal case
         crate::error::record_ignored(fs::remove_file(&code_lock), "remove file");
     }
+    let dt_port = target_data_path.join("DevToolsActivePort");
+    if dt_port.exists() {
+        // Justification: cleanup of an optional file; absence is the normal case
+        crate::error::record_ignored(fs::remove_file(&dt_port), "remove file");
+    }
     if let Ok(entries) = fs::read_dir(target_data_path) {
         for entry in entries.flatten() {
             let fname = entry.file_name().to_string_lossy().to_lowercase();
