@@ -240,20 +240,20 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
     let now = chrono::Utc::now().timestamp();
     let prompt_id = uuid::Uuid::new_v4().to_string();
 
-    if let Ok(conn) = repo_db::connect_db() {
-        let _ = conn.execute(
-            "INSERT OR REPLACE INTO running_projects \
-             (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at) \
-             VALUES (?1, ?2, ?3, ?4, '', 1, ?5, ?5)",
-            rusqlite::params![&slug, &inst_id, &slug, &cwd_str, now],
-        );
-        let _ = conn.execute(
-            "INSERT INTO active_prompts \
-             (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, 'gemini-3.8-flash-high', ?6, 'dispatched', ?7, ?7)",
-            rusqlite::params![&prompt_id, &slug, &inst_id, &cwd_str, &final_prompt, &session_id, now],
-        );
-    }
+    let active_p = repo_db::ActivePrompt {
+        id: prompt_id.clone(),
+        project_id: slug.clone(),
+        instance_id: inst_id.clone(),
+        repo_path: cwd_str.clone(),
+        prompt_content: final_prompt.clone(),
+        model: Some("gemini-3.8-flash-high".to_string()),
+        session_id: Some(session_id.clone()),
+        status: "running".to_string(),
+        created_at: now,
+        updated_at: now,
+        image_payload: None,
+    };
+    let _ = repo_db::save_or_requeue_prompt(&active_p);
 
     let task_file = PathBuf::from(&cwd_str).join(".antigravity_resume_task.json");
     let payload = serde_json::json!({
@@ -281,19 +281,6 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
         }
     }
 
-    let active_p = repo_db::ActivePrompt {
-        id: prompt_id,
-        project_id: slug.clone(),
-        instance_id: inst_id.clone(),
-        repo_path: cwd_str.clone(),
-        prompt_content: final_prompt.clone(),
-        model: Some("gemini-3.8-flash-high".to_string()),
-        session_id: Some(session_id.clone()),
-        status: "running".to_string(),
-        created_at: now,
-        updated_at: now,
-        image_payload: None,
-    };
     if let Err(spawn_err) = repo_db::spawn_or_replace_prompt_via_agy(&active_p, true) {
         antigravity_tools_lib::modules::audit::record_if_active(
             "cli",

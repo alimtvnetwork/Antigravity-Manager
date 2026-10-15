@@ -391,3 +391,182 @@ pub fn spawn_security_notice_dismisser(
         dismiss_security_notice_dialog_for_data_dir(&data_dir, bound_email.as_deref(), timeout);
     });
 }
+
+fn cdp_send_and_recv(
+    stream: &mut TcpStream,
+    id: i64,
+    method: &str,
+    params: serde_json::Value,
+) -> Option<serde_json::Value> {
+    let cmd = serde_json::json!({
+        "id": id,
+        "method": method,
+        "params": params
+    });
+    let payload = serde_json::to_vec(&cmd).ok()?;
+    write_masked_ws_text_frame(stream, &payload).ok()?;
+
+    for _ in 0..24 {
+        let (opcode, data) = read_ws_frame(stream).ok()?;
+        if opcode == 0x8 {
+            return None;
+        }
+        if opcode != 0x1 {
+            continue;
+        }
+        if let Ok(msg) = serde_json::from_slice::<serde_json::Value>(&data) {
+            if msg.get("id").and_then(|v| v.as_i64()) == Some(id) {
+                return Some(msg);
+            }
+        }
+    }
+    None
+}
+
+fn submit_prompt_on_ws(ws_url: &str, prompt_text: &str) -> bool {
+    let Some((port, path)) = parse_ws_url(ws_url) else {
+        return false;
+    };
+    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port);
+    let Ok(mut stream) = TcpStream::connect_timeout(&addr, Duration::from_millis(800)) else {
+        return false;
+    };
+    // Justification: best-effort socket timeout configuration on loopback CDP WebSocket
+    crate::error::record_ignored(
+        stream.set_read_timeout(Some(Duration::from_millis(2500))),
+        "set CDP WS read timeout for prompt submit",
+    );
+    // Justification: best-effort socket timeout configuration on loopback CDP WebSocket
+    crate::error::record_ignored(
+        stream.set_write_timeout(Some(Duration::from_millis(1000))),
+        "set CDP WS write timeout for prompt submit",
+    );
+
+    let handshake = format!(
+        "GET {} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n",
+        path, port
+    );
+    if stream.write_all(handshake.as_bytes()).is_err() {
+        return false;
+    }
+
+    let mut header_bytes = Vec::with_capacity(256);
+    let mut byte = [0u8; 1];
+    while !header_bytes.ends_with(b"\r\n\r\n") {
+        let Ok(n) = stream.read(&mut byte) else {
+            return false;
+        };
+        if n == 0 {
+            return false;
+        }
+        header_bytes.push(byte[0]);
+        if header_bytes.len() > 8192 {
+            return false;
+        }
+    }
+    if !String::from_utf8_lossy(&header_bytes).contains("101") {
+        return false;
+    }
+
+    // 1. Focus the message input and clear any draft text
+    let focus_js = r#"(() => {
+        const el = document.querySelector('[aria-label="Message input"], [role="combobox"][contenteditable="true"]');
+        if (!el) return 'no_input';
+        el.focus();
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        return 'focused';
+    })()"#;
+    let Some(focus_res) = cdp_send_and_recv(
+        &mut stream,
+        1,
+        "Runtime.evaluate",
+        serde_json::json!({ "expression": focus_js, "returnByValue": true }),
+    ) else {
+        return false;
+    };
+    let focus_val = focus_res
+        .get("result")
+        .and_then(|r| r.get("result"))
+        .and_then(|r| r.get("value"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if focus_val != "focused" {
+        return false;
+    }
+
+    // 2. Insert text via CDP Input.insertText so Lexical/React state updates properly
+    if cdp_send_and_recv(
+        &mut stream,
+        2,
+        "Input.insertText",
+        serde_json::json!({ "text": prompt_text }),
+    )
+    .is_none()
+    {
+        return false;
+    }
+
+    std::thread::sleep(Duration::from_millis(120));
+
+    // 3. Click the Send message button
+    let send_js = r#"(() => {
+        const btn = document.querySelector('button[aria-label="Send message"]');
+        if (!btn || btn.disabled) return 'not_ready';
+        btn.click();
+        return 'sent';
+    })()"#;
+    let Some(send_res) = cdp_send_and_recv(
+        &mut stream,
+        3,
+        "Runtime.evaluate",
+        serde_json::json!({ "expression": send_js, "returnByValue": true }),
+    ) else {
+        return false;
+    };
+    let send_val = send_res
+        .get("result")
+        .and_then(|r| r.get("result"))
+        .and_then(|r| r.get("value"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    send_val == "sent"
+}
+
+/// Submit a prompt directly into the running Antigravity IDE's conversation composer
+/// via CDP (`Input.insertText` + clicking `button[aria-label="Send message"]`).
+pub fn submit_prompt_via_cdp_for_instance(instance_id: &str, prompt_text: &str) -> bool {
+    let trimmed = prompt_text.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    let data_dir =
+        if instance_id.is_empty() || instance_id == "default" || instance_id == "__default__" {
+            super::storage::get_default_antigravity_data_dir()
+        } else if let Ok(reg) = super::load_registry() {
+            reg.instances
+                .iter()
+                .find(|i| i.id == instance_id || i.name == instance_id)
+                .map(|i| PathBuf::from(&i.data_dir))
+                .unwrap_or_else(super::storage::get_default_antigravity_data_dir)
+        } else {
+            super::storage::get_default_antigravity_data_dir()
+        };
+
+    for port in read_active_ports(&data_dir) {
+        for ws_url in fetch_page_ws_urls(port) {
+            if submit_prompt_on_ws(&ws_url, trimmed) {
+                crate::modules::logger::log_info(&format!(
+                    "[Instance] Submitted prompt ({} chars) into live Antigravity conversation via CDP for instance '{}'",
+                    trimmed.len(),
+                    instance_id
+                ));
+                return true;
+            }
+        }
+    }
+    false
+}

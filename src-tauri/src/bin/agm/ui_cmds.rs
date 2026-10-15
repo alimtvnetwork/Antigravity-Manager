@@ -94,7 +94,12 @@ static ROUTE_REGISTRY: Lazy<Vec<UiRoute>> = Lazy::new(|| {
                 "SwitchAccountDialog",
                 "InstancesStates",
             ],
-            known_ids: &["launch-immediately-check"],
+            known_ids: &[
+                "launch-immediately-check",
+                "instances-open-backup-btn",
+                "prompt-tree-btn-default",
+                "prompt-tree-btn-default-copy-5597",
+            ],
             focusable: &["buttons", "links", "inputs", "checkboxes", "dialogs"],
         },
         UiRoute {

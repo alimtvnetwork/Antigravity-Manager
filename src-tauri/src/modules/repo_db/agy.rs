@@ -235,6 +235,10 @@ pub fn spawn_or_replace_prompt_via_agy(
                             }
                         }
                         if status.success() {
+                            let _ = crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
+                                &prompt.instance_id,
+                                &clean_prompt,
+                            );
                             return Ok(());
                         }
                         let detail = err_msg.trim();
@@ -263,6 +267,11 @@ pub fn spawn_or_replace_prompt_via_agy(
                     };
                     workers.insert(ws_key.clone(), child_pid);
                 }
+                let _ =
+                    crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
+                        &prompt.instance_id,
+                        &clean_prompt,
+                    );
                 crate::modules::logger::log_info(&format!(
                     "[RepoDB] Dispatched agy execution for prompt '{}' (PID: {:?}, inst: '{}') in '{}': {:.60}...",
                     prompt.id, child_pid, prompt.instance_id, prompt.repo_path, clean_prompt

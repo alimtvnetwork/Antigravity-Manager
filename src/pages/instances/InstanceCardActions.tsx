@@ -142,6 +142,7 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                                                 <div className="flex items-center rounded-[5px] overflow-hidden bg-slate-100 dark:bg-[#090611] border border-slate-200/80 dark:border-[#40285e] p-0.5 divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs w-full relative">
                                                     {/* Slot 1: Prompts Tree */}
                                                     <button
+                                                        id={`prompt-tree-btn-${inst.config.id}`}
                                                         type="button"
                                                         disabled={isBusy}
                                                         onClick={() => openPromptTree(inst.config.id)}

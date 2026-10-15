@@ -43,13 +43,17 @@ pub(crate) const UI_ROUTES: &[&str] = &[
     "audit",
     "settings",
     "settings/general",
+    "settings/account",
     "settings/supabase",
     "settings/telegram",
     "settings/proxy",
     "settings/auto-switcher",
     "settings/email",
+    "settings/themes",
     "settings/advanced",
+    "settings/debug",
     "settings/about",
+    "toolchain",
 ];
 
 pub(crate) fn ui_route_table() -> Router<AppState> {

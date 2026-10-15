@@ -251,26 +251,20 @@ pub(crate) fn recreate_single_workspace(target_spec: &str) {
             "DELETE FROM running_projects WHERE LOWER(repo_path) = LOWER(?1) OR LOWER(repo_name) = LOWER(?2)",
             rusqlite::params![&clean_str, &repo_name],
         );
-        let _ = conn.execute(
-            "INSERT OR REPLACE INTO running_projects \
-             (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at) \
-             VALUES (?1, ?2, ?3, ?4, NULL, 1, ?5, ?5)",
-            rusqlite::params![&proj_id, &inst_id, &repo_name, &clean_str, now],
-        );
-        let _ = conn.execute(
-            "INSERT INTO active_prompts \
-             (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, 'gemini-3.8-flash-high', ?6, 'dispatched', ?7, ?7)",
-            rusqlite::params![
-                &prompt_id,
-                &proj_id,
-                &inst_id,
-                &clean_str,
-                initial_prompt,
-                &session_id,
-                now
-            ],
-        );
+        let seed_prompt = repo_db::ActivePrompt {
+            id: prompt_id.clone(),
+            project_id: proj_id.clone(),
+            instance_id: inst_id.clone(),
+            repo_path: clean_str.clone(),
+            prompt_content: initial_prompt.to_string(),
+            model: Some("gemini-3.8-flash-high".to_string()),
+            session_id: Some(session_id.clone()),
+            status: "running".to_string(),
+            created_at: now,
+            updated_at: now,
+            image_payload: None,
+        };
+        let _ = repo_db::save_or_requeue_prompt(&seed_prompt);
         println!(
             "    [✓] Cleared old state and seeded initial prompt '{}' in repo_prompts.db",
             initial_prompt

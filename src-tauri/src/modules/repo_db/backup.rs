@@ -109,44 +109,10 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
 
     // Layer 1: Core Antigravity Live Conversations Discovery (~/.gemini/antigravity)
     let ag_prompts = discover_running_prompts_from_antigravity(instance_id);
-    for p in ag_prompts {
-        let clean_repo_name = Path::new(&p.repo_path)
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| p.project_id.clone());
-        // Justification: project-row scaffolding is auxiliary; the prompt upsert result is checked separately
-        crate::error::record_ignored(
-            conn.execute(
-            "INSERT OR REPLACE INTO running_projects
-             (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
-             VALUES (?, ?, ?, ?, NULL, 0, ?, ?)",
-            params![&p.project_id, &p.instance_id, &clean_repo_name, &p.repo_path, now, now],
-        ),
-            "upsert running project for backed-up prompt",
-        );
-
-        let res = conn.execute(
-            "INSERT INTO active_prompts 
-             (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'backed_up', ?8, ?9, ?10)
-             ON CONFLICT(id) DO UPDATE SET 
-                 status = 'backed_up',
-                 updated_at = excluded.updated_at,
-                 prompt_content = excluded.prompt_content,
-                 image_payload = excluded.image_payload",
-            params![
-                &p.id,
-                &p.project_id,
-                &p.instance_id,
-                &p.repo_path,
-                &p.prompt_content,
-                &p.model,
-                &p.session_id,
-                p.created_at,
-                now,
-                &p.image_payload,
-            ],
-        );
+    for mut p in ag_prompts {
+        p.status = "backed_up".to_string();
+        p.updated_at = now;
+        let res = super::prompts_crud::save_or_requeue_prompt(&p);
 
         if res.is_ok() {
             backed_up_count += 1;

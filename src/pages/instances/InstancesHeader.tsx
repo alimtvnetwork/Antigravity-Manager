@@ -100,6 +100,7 @@ export function InstancesHeader({ api }: { api: InstancePageApi }) {
                         <span>Sync All</span>
                     </button>
                     <button
+                        id="instances-open-backup-btn"
                         type="button"
                         onClick={handleOpenBackup}
                         className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-100/50 dark:hover:bg-purple-950/40 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"

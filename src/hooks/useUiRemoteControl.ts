@@ -62,7 +62,10 @@ export function useUiRemoteControl() {
                     await listen<UiElementActionPayload>('agm://ui-click', (event) => {
                         const id = event.payload?.element_id?.trim();
                         if (!id) return;
-                        const el = document.getElementById(id);
+                        const el =
+                            document.getElementById(id) ||
+                            (document.querySelector(`[title="${id.replace(/"/g, '\\"')}"]`) as HTMLElement | null) ||
+                            (document.querySelector(`[data-testid="${id.replace(/"/g, '\\"')}"]`) as HTMLElement | null);
                         if (!el) {
                             useErrorStore.getState().trackWarning(
                                 new Error(`agm://ui-click target #${id} not found in the live DOM`),

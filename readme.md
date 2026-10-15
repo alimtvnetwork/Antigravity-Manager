@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.201.0-3B82F6?style=flat-square" alt="Version v4.201.0">
+    <img src="https://img.shields.io/badge/Version-v4.202.0-3B82F6?style=flat-square" alt="Version v4.202.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -115,7 +115,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.201.0)**
+**Bar 2: Version-Based Installation (v4.202.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -559,6 +559,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
+> Latest version **v4.202.0**: Automatic CDP Dismissal of Antigravity "Security Notice & Data Use" Modal, Live CDP Conversation Prompt Submission & Startup Purge Persistence Fix — added `src-tauri/src/modules/instance/cdp_onboarding.rs` and `--remote-debugging-port=0` on instance launches to automatically uncheck the Interactions data-sharing checkbox and click **"Accept and continue"** via CDP when switching accounts or launching instances while persisting `hasAcceptedTermsOfService = true` and `shareDataToImproveAntigravity = false` in `app_storage.json` and `state.vscdb`; routed `agm prompt` (`prompt_dispatch.rs`), `project_cmds.rs`, and `repo_db/backup.rs` through `save_or_requeue_prompt` so active and queued prompts are never wiped by `purge_corrupted_running_projects` across CLI calls; added `submit_prompt_via_cdp_for_instance` so dispatched, queued, and restored prompts are submitted directly into the live Antigravity IDE conversation composer; and wired `/settings/:tab` routing for `agm ui goto`. (Thanks to @aukgit)
 > Latest version **v4.201.0**: Post-Switch `agy` Silent Auth (`antigravity-oauth-token`), Quota Summary 403 `VALIDATION_REQUIRED` Detection, Synchronous Prompt Restoration & `agm ui record` CLI Audit Recorder — provisioned `antigravity-oauth-token`, `antigravity-cli-oauth-token`, and `antigravity-ide-oauth-token` across isolated instance `.gemini` subdirectories (`antigravity-cli`, `antigravity`, `antigravity-ide`, `cache`) so `agy -p` print mode authenticates silently without hanging on OAuth; detected HTTP 403 `VALIDATION_REQUIRED` on `retrieveUserQuotaSummary` and persisted `validation_blocked = true` so `auto-switch` and `ff` skip verification-blocked accounts; prevented the background `PromptQueueScheduler` from stealing `'backed_up'` prompts mid-switch and synchronously re-dispatched backed-up prompts upon IDE relaunch verification; enabled live `agy` worker replacement on explicit `Send`/`Rerun` with automatic FIFO queue drain on worker completion; added `agm ui record start/stop/status/list/clear/export`; targeted `activeInstanceId` from the Accounts table switch button; and refined progress bar checkpoint glow. (Thanks to @aukgit)
 > Latest version **v4.200.1**: Build fix — added the missing `tauri::Emitter` trait import in `src-tauri/src/proxy/server/admin_ui.rs` (E0599 broke the v4.200.0 build). (Thanks to @aukgit)
 > Latest version **v4.200.0**: UI interaction audit recorder, `agm ui` CLI bridge, and Telegram `/ui` commands — the recorder captures every UI interaction (click, navigation, input, scroll) with method name, target, trigger, and timestamp in SQLite, with a navbar indicator and filterable audit panel; `agm ui open/goto/ls/scroll/click` drives any UI surface from the CLI with actionable help; backend `/api/ui/*` endpoints navigate the live UI via Tauri events; Telegram `/ui goto/ls/scroll` mirrors the CLI. (Thanks to @aukgit)

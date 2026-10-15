@@ -1,5 +1,14 @@
 # Changelog
 
+## [v4.202.0] - 2026-10-15
+
+### Fixed
+- **Automatic CDP Dismissal of Antigravity "Security Notice & Data Use" Modal**: Added `src-tauri/src/modules/instance/cdp_onboarding.rs` and wired `--remote-debugging-port=0` on instance launches so switching accounts or launching instances automatically connects to `DevToolsActivePort`, unchecks the *"Yes, I agree to help improve Antigravity by allowing Google to collect and use my Interactions data..."* checkbox, clicks **"Accept and continue"**, and persists `hasAcceptedTermsOfService = true` and `shareDataToImproveAntigravity = false` across `app_storage.json` and `state.vscdb`. (Thanks to @aukgit)
+- **Live CDP Conversation Prompt Submission & Startup Purge Persistence Fix**: Fixed `agm prompt` (`src-tauri/src/bin/agm/prompt_dispatch.rs`), `src-tauri/src/bin/agm/project_cmds.rs`, and `src-tauri/src/modules/repo_db/backup.rs` to persist `running_projects` and `active_prompts` via `save_or_requeue_prompt` (populating composite `<project>__<instance>` IDs and `workspace_storage_path`) so subsequent CLI invocations do not purge active prompts during `purge_corrupted_running_projects`; and added `submit_prompt_via_cdp_for_instance` in `src-tauri/src/modules/instance/cdp_onboarding.rs` so `spawn_or_replace_prompt_via_agy` also injects and sends prompts directly into the open Antigravity IDE conversation composer via CDP. (Thanks to @aukgit)
+- **CLI UI Sub-Route Navigation (`/settings/:tab`)**: Added the `settings/:tab` route in `src/App.tsx`, synchronized tab selection from URL parameters in `src/pages/Settings/useSettingsState.ts`, and expanded `UI_ROUTES` in `src-tauri/src/proxy/server/admin_ui.rs` so `agm ui goto settings/<tab>` navigates directly without triggering a React Router 404 screen. (Thanks to @aukgit)
+
+---
+
 ## [v4.201.0] - 2026-10-15
 
 ### Fixed
@@ -270,6 +279,15 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.202.0 (2026-10-15)**:
+        -   **[Onboarding & Privacy] Automatic CDP dismissal of Antigravity "Security Notice & Data Use" dialog with telemetry unchecked (Thanks to @aukgit)**:
+            -   **Description**: Added `src-tauri/src/modules/instance/cdp_onboarding.rs` and enabled `--remote-debugging-port=0` on instance launches so account switches and instance starts automatically connect to `DevToolsActivePort`, uncheck the Interactions data-sharing checkbox, click **"Accept and continue"**, and persist `hasAcceptedTermsOfService = true` and `shareDataToImproveAntigravity = false` in `app_storage.json` and `state.vscdb`.
+        -   **[Prompt Engine & Backup] Live CDP conversation prompt submission and startup-purge persistence fix (Thanks to @aukgit)**:
+            -   **Description**: Routed `agm prompt` (`prompt_dispatch.rs`), `project_cmds.rs`, and `repo_db/backup.rs` through `save_or_requeue_prompt` so `running_projects` rows always carry composite `<project>__<instance>` IDs and valid `workspace_storage_path` values (preventing `purge_corrupted_running_projects` from deleting active/queued prompts on subsequent CLI runs), and added `submit_prompt_via_cdp_for_instance` so prompts dispatched via CLI or restored from backup are typed and submitted directly inside the live Antigravity IDE conversation window.
+        -   **[CLI & UI] `/settings/:tab` sub-route navigation and remote click selectors (Thanks to @aukgit)**:
+            -   **Description**: Registered `settings/:tab` in `src/App.tsx` and `src/pages/Settings/useSettingsState.ts` and synchronized `UI_ROUTES` in `admin_ui.rs` so `agm ui goto settings/<tab>` opens the target settings tab cleanly.
+
+
     *   **v4.201.0 (2026-10-15)**:
         -   **[Auto-Switch & Prompt Engine] Post-switch `agy` silent auth, 403 `VALIDATION_REQUIRED` detection, and synchronous prompt restoration (Thanks to @aukgit)**:
             -   **Description**: Provisioned `antigravity-oauth-token`, `antigravity-cli-oauth-token`, and `antigravity-ide-oauth-token` across isolated instance `.gemini` subdirectories (`antigravity-cli`, `antigravity`, `antigravity-ide`, `cache`) so `agy -p` print mode authenticates silently without timing out; detected HTTP 403 `VALIDATION_REQUIRED` on `retrieveUserQuotaSummary` and persisted `validation_blocked = true` so `auto-switch` and `ff` skip verification-blocked accounts; prevented the background `PromptQueueScheduler` from stealing `'backed_up'` prompts mid-switch; and made `switch_account_to_instance` terminate stale `agy` workers and synchronously re-dispatch backed-up prompts upon IDE relaunch verification.

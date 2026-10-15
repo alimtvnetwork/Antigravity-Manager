@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { request as invoke } from '../../utils/request';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { AppConfig } from '../../types/config';
@@ -26,9 +27,23 @@ export function normalizeDataDirDisplay(path: string): string {
 
 export function useSettingsState() {
     const { t, i18n } = useTranslation();
+    const { tab: routeTab } = useParams<{ tab?: string }>();
     const { config, loadConfig, saveConfig, updateLanguage, updateTheme } = useConfigStore();
     const { enable, disable, isEnabled, open: openDebugModal } = useDebugConsole();
     const [activeTab, setActiveTab] = useState<'general' | 'account' | 'proxy' | 'email' | 'themes' | 'supabase' | 'advanced' | 'debug' | 'about'>('general');
+
+    useEffect(() => {
+        if (!routeTab) return;
+        const normalized = routeTab.toLowerCase();
+        if (normalized === 'auto-switcher') {
+            setActiveTab('account');
+            return;
+        }
+        const validTabs = ['general', 'account', 'proxy', 'email', 'themes', 'supabase', 'advanced', 'debug', 'about'] as const;
+        if ((validTabs as readonly string[]).includes(normalized)) {
+            setActiveTab(normalized as typeof validTabs[number]);
+        }
+    }, [routeTab]);
     const [appVersion, setAppVersion] = useState<string>(versionData.version || versionData.Version || '4.183.0');
     const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
     const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
