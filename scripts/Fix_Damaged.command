@@ -4,7 +4,7 @@ set -E
 # Resolve script directory and app configuration
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 APP_NAME="Antigravity Manager Tools"
-BUNDLE_ID="com.lbjlaq.antigravity-tools"
+BUNDLE_ID="com.alimtvnetwork.antigravity-tools"
 
 # Formatting colors
 RED='\033[0;31m'
@@ -105,7 +105,7 @@ dump_diagnostic_state() {
     if [ -n "$LSREGISTER" ] && [ -x "$LSREGISTER" ]; then
         "$LSREGISTER" -dump 2>/dev/null | awk '
             BEGIN { RS = "--------------------------------------------------------------------------------"; FS = "\n" }
-            /com\.lbjlaq\.antigravity-tools|[Aa]ntigravity|[Aa]gm/ {
+            /com\.(lbjlaq|alimtvnetwork)\.antigravity-tools|[Aa]ntigravity|[Aa]gm/ {
                 for (i = 1; i <= NF; i++) {
                     if ($i ~ /^[[:space:]]*(path|identifier|name|version|flags):/) print "    " $i
                 }
@@ -346,7 +346,7 @@ if [ -n "$LSREGISTER" ] && [ -x "$LSREGISTER" ]; then
         fi
     done < <("$LSREGISTER" -dump 2>/dev/null | awk '
         BEGIN { RS = "--------------------------------------------------------------------------------"; FS = "\n" }
-        /com\.lbjlaq\.antigravity-tools|[Aa]ntigravity|[Aa]gm/ {
+        /com\.(lbjlaq|alimtvnetwork)\.antigravity-tools|[Aa]ntigravity|[Aa]gm/ {
             for (i = 1; i <= NF; i++) {
                 if ($i ~ /^[[:space:]]*path:[[:space:]]*/) {
                     p = $i

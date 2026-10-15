@@ -3,7 +3,7 @@ set -E
 
 # Configurations
 APP_NAME="Antigravity Manager Tools"
-BUNDLE_ID="com.lbjlaq.antigravity-tools"
+BUNDLE_ID="com.alimtvnetwork.antigravity-tools"
 TARGET_APP="/Applications/${APP_NAME}.app"
 
 # Persistent diagnostic logging

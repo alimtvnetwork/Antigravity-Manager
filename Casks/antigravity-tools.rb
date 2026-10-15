@@ -20,10 +20,10 @@ cask "antigravity-tools" do
     end
 
     zap trash: [
-      "~/Library/Application Support/com.lbjlaq.antigravity-tools",
-      "~/Library/Caches/com.lbjlaq.antigravity-tools",
-      "~/Library/Preferences/com.lbjlaq.antigravity-tools.plist",
-      "~/Library/Saved Application State/com.lbjlaq.antigravity-tools.savedState",
+      "~/Library/Application Support/com.alimtvnetwork.antigravity-tools",
+      "~/Library/Caches/com.alimtvnetwork.antigravity-tools",
+      "~/Library/Preferences/com.alimtvnetwork.antigravity-tools.plist",
+      "~/Library/Saved Application State/com.alimtvnetwork.antigravity-tools.savedState",
     ]
   end
 

@@ -3,7 +3,7 @@
   "productName": "Antigravity Manager Tools",
   "mainBinaryName": "agm-alim",
   "version": "4.200.1",
-  "identifier": "com.lbjlaq.antigravity-tools",
+  "identifier": "com.alimtvnetwork.antigravity-tools",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",

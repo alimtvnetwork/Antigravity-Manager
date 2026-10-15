@@ -2,7 +2,7 @@
 set -E
 
 APP_NAME="Antigravity Manager Tools"
-BUNDLE_ID="com.lbjlaq.antigravity-tools"
+BUNDLE_ID="com.alimtvnetwork.antigravity-tools"
 
 # Persistent diagnostic logging
 LOG_DIR="$HOME/Library/Logs/AntigravityManager"
@@ -90,7 +90,7 @@ if [ -n "$LSREGISTER" ] && [ -x "$LSREGISTER" ]; then
         fi
     done < <("$LSREGISTER" -dump 2>/dev/null | awk '
         BEGIN { RS = "--------------------------------------------------------------------------------"; FS = "\n" }
-        /com\.lbjlaq\.antigravity-tools|[Aa]ntigravity|[Aa]gm/ {
+        /com\.(lbjlaq|alimtvnetwork)\.antigravity-tools|[Aa]ntigravity|[Aa]gm/ {
             for (i = 1; i <= NF; i++) {
                 if ($i ~ /^[[:space:]]*path:[[:space:]]*/) {
                     p = $i
