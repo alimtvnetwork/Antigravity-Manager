@@ -1,5 +1,19 @@
 # Changelog
 
+## [v4.201.0] - 2026-10-15
+
+### Fixed
+- **Post-Switch `agy` Silent Auth & Token Provisioning**: Wrote `antigravity-oauth-token`, `antigravity-cli-oauth-token`, and `antigravity-ide-oauth-token` alongside `jetski-standalone-oauth-token` across all `.gemini` subdirectories (`antigravity`, `antigravity-cli`, `antigravity-ide`, `cache`) in `src-tauri/src/modules/integration/file_credentials.rs` so `agy -p` print mode authenticates silently on isolated instances instead of hanging on interactive OAuth. (Thanks to @aukgit)
+- **Quota Summary 403 `VALIDATION_REQUIRED` Detection**: Updated `fetch_quota_summary` in `src-tauri/src/modules/quota/fetch_more.rs` and `src-tauri/src/modules/quota/fetch_cached.rs` to inspect HTTP 403 responses for `VALIDATION_REQUIRED` / `Verify your account`, marking affected accounts `validation_blocked = true` and `quota.is_forbidden = true` so `auto-switch` and `ff` never rotate into verification-blocked accounts. (Thanks to @aukgit)
+- **Synchronous Post-Switch Prompt Restoration & Queue Race Prevention**: Removed `'backed_up'` from background `check_and_dispatch_enqueued_prompts` in `src-tauri/src/modules/repo_db/queue.rs` so in-flight switch backups cannot be stolen while an instance is restarting; made `switch_account_to_instance` in `src-tauri/src/modules/instance/switch.rs` terminate stale `agy` workers and synchronously restore/dispatch backed-up prompts upon relaunch verification; and updated `send_prompt_now_for_instance`, `resend_running_commands_for_instance`, and `dispatch_running_prompts` to replace existing `agy` workers cleanly and automatically drain the FIFO queue when a worker exits. (Thanks to @aukgit)
+- **Account Switch Active Instance Target & Progress Bar Inner Glow**: Updated `useAccountRowState.ts` and `AccountRow.tsx` so the row Switch button targets `activeInstanceId` rather than hardcoding `'default'`, and tuned the inner checkpoint dot glow in `QuotaProgressBar.tsx` and `WaterDrainProgressBar.tsx` for subtle contrast. (Thanks to @aukgit)
+
+### Added
+- **CLI UI Audit Recorder (`agm ui record`)**: Added `agm ui record start/stop/status/list/clear/export` in `src-tauri/src/bin/agm/ui_cmd.rs` and instrumented CLI account switches, fast-forward rotations, and prompt send/rerun/enqueue commands to persist structured audit entries in `ui_audit.db`. (Thanks to @aukgit)
+- **Rebrand to `com.alimtvnetwork`, Uninstaller & Homebrew Cask Automation**: Updated bundle identifiers, installer/uninstaller scripts, and `.deb`/`.rpm`/macOS cask package detection across platforms. (Thanks to @aukgit)
+
+---
+
 ## [v4.199.0] - 2026-10-14
 
 ### Fixed
@@ -256,6 +270,17 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.201.0 (2026-10-15)**:
+        -   **[Auto-Switch & Prompt Engine] Post-switch `agy` silent auth, 403 `VALIDATION_REQUIRED` detection, and synchronous prompt restoration (Thanks to @aukgit)**:
+            -   **Description**: Provisioned `antigravity-oauth-token`, `antigravity-cli-oauth-token`, and `antigravity-ide-oauth-token` across isolated instance `.gemini` subdirectories (`antigravity-cli`, `antigravity`, `antigravity-ide`, `cache`) so `agy -p` print mode authenticates silently without timing out; detected HTTP 403 `VALIDATION_REQUIRED` on `retrieveUserQuotaSummary` and persisted `validation_blocked = true` so `auto-switch` and `ff` skip verification-blocked accounts; prevented the background `PromptQueueScheduler` from stealing `'backed_up'` prompts mid-switch; and made `switch_account_to_instance` terminate stale `agy` workers and synchronously re-dispatch backed-up prompts upon IDE relaunch verification.
+        -   **[Prompt Tree & Queue] Live `agy` worker replacement and automatic FIFO queue drain (Thanks to @aukgit)**:
+            -   **Description**: Explicit `Send` and `Rerun` now replace an already-running `agy` worker in the same workspace, and the `agy-monitor` thread marks finished prompts `'completed'` and automatically drains the next `'queued'` prompt in FIFO order (`ORDER BY created_at ASC, id ASC`).
+        -   **[CLI & UI] `agm ui record` CLI audit commands, active-instance account switch target, and progress bar glow refinement (Thanks to @aukgit)**:
+            -   **Description**: Added `agm ui record start/stop/status/list/clear/export` and recorded CLI switch/send/enqueue/rerun/ff events into `ui_audit.db`; fixed the Accounts table row switch action to target `activeInstanceId`; and refined checkpoint dot glow in `QuotaProgressBar.tsx` and `WaterDrainProgressBar.tsx`.
+        -   **[Installers] Rebrand to `com.alimtvnetwork`, uninstaller, and cask automation (Thanks to @aukgit)**:
+            -   **Description**: Standardized bundle identifiers, Linux `.deb`/`.rpm` package detection, and Homebrew cask URLs across macOS, Linux, and Windows.
+
+
     *   **v4.200.1 (2026-10-14)**:
         -   **[Fix] Missing `tauri::Emitter` trait import broke the v4.200.0 build (Thanks to @aukgit)**:
             -   **Description**: `src-tauri/src/proxy/server/admin_ui.rs` called `AppHandle::emit` without the trait in scope (E0599). One-line import fix; v4.200.0 tag pointed at the broken commit, so this patch release carries the fix.
