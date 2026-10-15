@@ -23,6 +23,7 @@ Subtask files live in
 | Task-04 | New conversation + copy-with-images verify | Worker 02 | prompt actions, `clipboard.ts` |
 | Task-05 | Tree import/export — SQLite + JSON | Worker 01 | tree view, backend import/export |
 | Task-06 | E2E validation of fixed flows | Worker 02 | `.ai-memory/e2e-testing/` (docs only) |
+| Task-07 | Telegram buttons — send/find/credits E2E + fix | Worker 01 | `src-tauri/src/modules/telegram_inbound/` |
 | Task-07 | Release — minor bump, CI green | Lead | version files, changelog, tag |
 
 Task-01 runs first (research, read-only). Tasks 02–06 run in waves after the
@@ -49,4 +50,5 @@ The lead owns shared indexes (`.ai-memory/plans/readme.md`,
 - [ ] Semantics fixes done
 - [ ] Import/export done
 - [ ] E2E done
+- [ ] Telegram buttons fixed
 - [ ] Released, CI green
