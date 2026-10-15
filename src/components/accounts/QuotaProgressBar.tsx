@@ -26,15 +26,16 @@ export interface QuotaProgressBarProps {
  * corresponds to its position on the scale.
  */
 const CHECKPOINT_SCALE_COLORS: Record<number, string> = {
+    90: '#1af18d',
+    80: '#10b981',
+    60: '#eab308',
+    40: '#f97316',
+    20: '#ef4444',
     100: '#1af18d',
-    80: '#6fd8b8',
-    60: '#a8dcb0',
-    40: '#f5bf58',
-    20: '#ef6a8a',
-    75: '#70ddb0',
-    50: '#e7d36a',
-    25: '#f49a45',
-    0: '#ef6a8a',
+    75: '#10b981',
+    50: '#eab308',
+    25: '#f97316',
+    0: '#7f1d1d',
 };
 
 export function QuotaProgressBar({
@@ -46,8 +47,8 @@ export function QuotaProgressBar({
     isWeeklyConstrained = false,
     className,
     compact = false,
-    heightClassName = compact ? "h-4" : "h-[18px]",
-    checkpoints = [100, 80, 60, 40, 20],
+    heightClassName = compact ? "h-2" : "h-2.5",
+    checkpoints = [20, 40, 60, 80, 90],
     showCheckpoints = true,
     Icon,
 }: QuotaProgressBarProps) {
@@ -69,11 +70,20 @@ export function QuotaProgressBar({
         }
     };
 
-    const activeCheckpoints = (checkpoints && checkpoints.length > 0 ? checkpoints : [100, 80, 60, 40, 20]).slice(0, 5);
-    const sortedCheckpoints = [...activeCheckpoints].sort((a, b) => b - a);
+    const internalCheckpoints = (checkpoints && checkpoints.length > 0 ? checkpoints : [20, 40, 60, 80, 90])
+        .filter((cp) => cp > 0 && cp < 100)
+        .slice(0, 5);
+    const sortedCheckpoints = [...internalCheckpoints].sort((a, b) => a - b);
 
     return (
-        <div className={cn("w-full flex items-center", compact ? "gap-1" : "gap-2", className)}>
+        <div
+            id="agm-progress-container"
+            className={cn(
+                "w-full flex items-center opacity-85 hover:opacity-100 group-hover:opacity-100 transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(26,241,141,0.5)] group-hover:drop-shadow-[0_0_8px_rgba(26,241,141,0.5)]",
+                compact ? "gap-1" : "gap-2",
+                className
+            )}
+        >
             {/* Optional Icon / Label on Left */}
             {(Icon || label) && (
                 <div className="flex items-center gap-1 shrink-0 max-w-[18%] min-w-0 text-slate-700 dark:text-slate-300">
@@ -86,11 +96,12 @@ export function QuotaProgressBar({
                 </div>
             )}
 
-            {/* Progress Bar Track — the 8-stop scale gradient spans the FULL track
+            {/* Progress Bar Track — the spatial scale gradient spans the FULL track
                 width; a mask reveals only the filled percentage. The gradient is
                 never stretched into a partial fill. */}
             <div className="relative flex-1 min-w-[140px] flex items-center">
                 <div
+                    id="agm-progress-track"
                     className={cn(
                         "relative w-full rounded-full overflow-hidden bg-slate-200 dark:bg-[var(--ui-quota-track)] border border-slate-300 dark:border-[var(--ui-quota-track-border)] shadow-none",
                         heightClassName
@@ -103,6 +114,7 @@ export function QuotaProgressBar({
                 >
                     {/* Full-width spatial scale */}
                     <div
+                        id="agm-progress-fill"
                         className="absolute inset-0"
                         style={{ background: 'var(--ui-quota-gradient)' }}
                         aria-hidden="true"
@@ -115,43 +127,48 @@ export function QuotaProgressBar({
                     />
                 </div>
 
-                {/* Milestone Checkpoint Nodes */}
-                {showCheckpoints && sortedCheckpoints.map((cp) => {
+                {/* Ambient neon glow element */}
+                <div
+                    id="agm-progress-glow"
+                    className="absolute inset-0 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity duration-200 shadow-[0_0_12px_rgba(26,241,141,0.6)]"
+                />
+
+                {/* Milestone Checkpoint Nodes (20px protruding nodes, centered vertically) */}
+                {showCheckpoints && sortedCheckpoints.map((cp, idx) => {
                     const isFilled = clamped >= cp;
-                    const leftPos = cp >= 100 ? '100%' : cp <= 0 ? '0%' : `${cp}%`;
-                    const transform = cp >= 100 ? 'translate(-100%, -50%)' : cp <= 0 ? 'translate(0, -50%)' : 'translate(-50%, -50%)';
-                    const isCritical = clamped < 25;
-                    const scaleColor = CHECKPOINT_SCALE_COLORS[cp] ?? '#1af18d';
+                    const scaleColor = CHECKPOINT_SCALE_COLORS[cp] ?? (cp >= 75 ? '#1af18d' : cp >= 50 ? '#eab308' : '#ef4444');
 
                     return (
                         <div
                             key={cp}
+                            id={`agm-progress-node-${idx + 1}`}
                             className={cn(
-                                "absolute top-1/2 rounded-full flex items-center justify-center transition-all duration-300 z-10 pointer-events-none border-[1.5px]",
-                                compact ? "w-3 h-3" : "w-3.5 h-3.5",
+                                "agm-progress-node absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full flex items-center justify-center transition-all duration-300 z-10 pointer-events-none border-[1.5px]",
+                                compact ? "w-4 h-4" : "w-5 h-5",
                                 isFilled
-                                    ? (cp >= 50
-                                        ? 'shadow-[inset_0_0_6px_rgba(26,241,141,0.9),0_0_6px_rgba(26,241,141,0.75)]'
-                                        : 'shadow-[inset_0_0_4px_rgba(255,255,255,0.65)]')
-                                    : 'bg-slate-200/50 dark:bg-[var(--ui-surface-2)] border-slate-300 dark:border-[var(--ui-border-subtle)] shadow-none'
+                                    ? "border-white shadow-[0_0_8px_rgba(0,0,0,0.4),inset_0_1px_2px_rgba(255,255,255,0.5)] group-hover:shadow-[0_0_10px_rgba(26,241,141,0.8),0_0_4px_#ffffff]"
+                                    : "bg-slate-200/90 dark:bg-[#171025]/90 border-slate-300 dark:border-[#40285e] shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)]"
                             )}
                             style={{
-                                left: leftPos,
-                                transform,
-                                ...(isFilled ? { backgroundColor: scaleColor, borderColor: scaleColor } : {}),
+                                left: `${cp}%`,
+                                ...(isFilled ? { backgroundColor: scaleColor, borderColor: '#ffffff' } : {}),
                             }}
-                            title={`Checkpoint ${cp}%`}
+                            title={`Milestone ${cp}%`}
                         >
                             {isFilled ? (
-                                isCritical && cp <= 20 ? (
-                                    <span className={cn("font-black font-mono text-white leading-none tracking-tighter select-none", compact ? "text-[6px]" : "text-[7.5px]")}>
-                                        {Math.round(clamped)}%
-                                    </span>
-                                ) : (
-                                    <span className={cn("rounded-full bg-white shadow-[0_0_4px_rgba(255,255,255,0.8)]", compact ? "w-1 h-1" : "w-1.5 h-1.5")} />
-                                )
+                                <svg
+                                    className={cn("text-white pointer-events-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]", compact ? "w-2.5 h-2.5" : "w-3 h-3")}
+                                    viewBox="0 0 16 16"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                >
+                                    <path d="M3.5 8.5L6.5 11.5L12.5 4.5" />
+                                </svg>
                             ) : (
-                                <span className="w-1 h-1 rounded-full bg-slate-400/40 dark:bg-white/20" />
+                                <span className={cn("rounded-full bg-slate-400/40 dark:bg-white/20", compact ? "w-1 h-1" : "w-1.5 h-1.5")} />
                             )}
                         </div>
                     );

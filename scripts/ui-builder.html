@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Antigravity-Manager — UI Components & Builder Prototyping Tool</title>
+  <style>
+    /* -------------------------------------------------------------
+       Antigravity-Manager — Semantic UI Tokens & Theme Palettes
+       ------------------------------------------------------------- */
+    :root {
+      --bg-canvas: #090611;
+      --bg-surface: #171025;
+      --bg-surface-hover: #211631;
+      --border-subtle: #40285e;
+      --text-primary: #f5f0ff;
+      --text-secondary: #b8accb;
+      --text-muted: #8f7fa8;
+      --primary: #7c3aed;
+      --neon-green: #1af18d;
+      --dark-red: #7f1d1d;
+      --crimson-red: #dc2626;
+      --warning-orange: #ea580c;
+      --golden-yellow: #eab308;
+      --mint-emerald: #10b981;
+
+      /* Spatial Quota Gradient (0% Dark Red -> 100% Neon Green) */
+      --ui-quota-gradient: linear-gradient(
+        90deg,
+        #7f1d1d 0%,
+        #dc2626 15%,
+        #ea580c 35%,
+        #eab308 55%,
+        #10b981 75%,
+        #1af18d 100%
+      );
+    }
+
+    body.light-theme {
+      --bg-canvas: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-surface-hover: #f1f5f9;
+      --border-subtle: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Top Banner Header */
+    header.builder-header {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #f59e0b, #fbbf24);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 14px;
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(245, 158, 11, 0.4);
+    }
+
+    .brand-title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .brand-badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      background: rgba(26, 241, 141, 0.15);
+      color: var(--neon-green);
+      border: 1px solid rgba(26, 241, 141, 0.3);
+      font-weight: 600;
+    }
+
+    /* Main Workbench Layout */
+    .builder-layout {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      flex: 1;
+      min-height: calc(100vh - 57px);
+    }
+
+    @media (max-width: 900px) {
+      .builder-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Left Control Sidebar */
+    .control-panel {
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border-subtle);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      overflow-y: auto;
+    }
+
+    .panel-section {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .form-label span.value-pill {
+      font-family: monospace;
+      color: var(--neon-green);
+      background: rgba(26, 241, 141, 0.1);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      outline: none;
+      -webkit-appearance: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--neon-green);
+      box-shadow: 0 0 6px rgba(26, 241, 141, 0.8);
+      cursor: pointer;
+    }
+
+    /* Swatches */
+    .swatch-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .swatch-btn {
+      height: 32px;
+      border-radius: 6px;
+      border: 1.5px solid transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 150ms ease;
+    }
+
+    .swatch-btn:hover {
+      transform: scale(1.05);
+    }
+
+    .swatch-btn.active {
+      border-color: #ffffff;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+    }
+
+    /* Toggle Switch */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 38px;
+      height: 20px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(255, 255, 255, 0.15);
+      transition: .2s;
+      border-radius: 20px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .2s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--neon-green);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(18px);
+    }
+
+    /* Action Buttons */
+    .btn-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      border: 1px solid var(--border-subtle);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+      transition: all 150ms ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #ffffff;
+    }
+
+    .btn-primary:hover {
+      background: #6d28d9;
+      border-color: #6d28d9;
+    }
+
+    textarea.json-box {
+      width: 100%;
+      height: 90px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      color: #38bdf8;
+      font-family: monospace;
+      font-size: 10px;
+      padding: 8px;
+      resize: vertical;
+      outline: none;
+    }
+
+    /* Right Canvas Area */
+    .preview-canvas {
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 36px;
+      overflow-y: auto;
+    }
+
+    .preview-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+
+    .preview-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-muted);
+      border: 1px solid var(--border-subtle);
+      font-family: monospace;
+    }
+
+    /* =============================================================
+       COMPONENT 1: TitleBar Windows/Linux Caption Controls
+       ============================================================= */
+    .titlebar-preview-container {
+      width: 100%;
+      height: 36px;
+      background: #090611;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 0 0 12px;
+      overflow: hidden;
+    }
+
+    .titlebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #94a3b8;
+    }
+
+    .titlebar-right-wrapper {
+      display: flex;
+      align-items: center;
+      height: 100%;
+      padding-right: 10px; /* pr-2.5 safe-area inset */
+    }
+
+    .segmented-caption-capsule {
+      display: flex;
+      align-items: center;
+      border-radius: 9999px;
+      background: rgba(23, 16, 37, 0.9);
+      border: 1px solid #40285e;
+      padding: 2px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+
+    .caption-btn {
+      width: 32px;
+      height: 24px;
+      background: transparent;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #94a3b8;
+      transition: all 150ms ease;
+    }
+
+    .caption-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+    }
+
+    .caption-btn.btn-min {
+      border-radius: 9999px 0 0 9999px;
+    }
+
+    .caption-btn.btn-max {
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .caption-btn.btn-close {
+      border-radius: 0 9999px 9999px 0;
+      overflow: visible;
+    }
+
+    .caption-btn.btn-close:hover {
+      background: #e81123;
+      color: #ffffff;
+    }
+
+    /* =============================================================
+       COMPONENT 2: NavMenu Segmented Capsule
+       ============================================================= */
+    .navmenu-preview-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 12px;
+    }
+
+    .nav-segmented-capsule {
+      display: flex;
+      align-items: center;
+      border-radius: 9999px;
+      background: #171025;
+      border: 1px solid #40285e;
+      padding: 2px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .nav-slot-btn {
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #cbd5e1;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 150ms ease;
+    }
+
+    .nav-slot-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+    }
+
+    .nav-slot-btn.active {
+      background: #2563eb;
+      color: #ffffff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+
+    .nav-slot-btn.slot-accounts {
+      border-radius: 9999px 0 0 9999px;
+    }
+
+    .nav-slot-btn.slot-instances {
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0;
+    }
+
+    .nav-slot-btn.slot-settings {
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0;
+    }
+
+    .nav-slot-btn.slot-more {
+      border-radius: 0 9999px 9999px 0;
+      padding: 4px 8px;
+    }
+
+    /* =============================================================
+       COMPONENT 3: QuotaProgressBar (Overhauled)
+       ============================================================= */
+    .quota-demo-row {
+      padding: 20px 16px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-subtle);
+      transition: all 200ms ease;
+      cursor: pointer;
+    }
+
+    .quota-demo-row:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    #agm-progress-container {
+      position: relative;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      opacity: 0.85;
+      transition: opacity 200ms ease, filter 200ms ease;
+    }
+
+    .quota-demo-row:hover #agm-progress-container,
+    #agm-progress-container.hover-glow-active {
+      opacity: 1.0;
+      filter: drop-shadow(0 0 8px rgba(26, 241, 141, 0.5));
+    }
+
+    .quota-meta-left {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-primary);
+      width: 90px;
+      flex-shrink: 0;
+    }
+
+    .quota-track-wrapper {
+      position: relative;
+      flex: 1;
+      display: flex;
+      align-items: center;
+    }
+
+    #agm-progress-track {
+      position: relative;
+      width: 100%;
+      height: 10px; /* Slim 10px height */
+      background: #171025;
+      border: 1px solid #40285e;
+      border-radius: 9999px;
+      overflow: hidden;
+    }
+
+    #agm-progress-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      right: 0;
+      background: var(--ui-quota-gradient);
+    }
+
+    .agm-progress-mask {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: 0;
+      background: #171025;
+      transition: width 240ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    #agm-progress-glow {
+      position: absolute;
+      inset: 0;
+      border-radius: 9999px;
+      pointer-events-none;
+      opacity: 0;
+      transition: opacity 200ms ease;
+      box-shadow: 0 0 12px rgba(26, 241, 141, 0.6);
+    }
+
+    .quota-demo-row:hover #agm-progress-glow,
+    #agm-progress-container.hover-glow-active #agm-progress-glow {
+      opacity: 1;
+    }
+
+    /* 20px Diameter Protruding Milestone Nodes */
+    .agm-progress-node {
+      position: absolute;
+      top: 50%;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      pointer-events: none;
+      border: 1.5px solid #ffffff;
+      box-sizing: border-box;
+      transition: all 250ms ease;
+    }
+
+    .agm-progress-node.filled {
+      border-color: #ffffff;
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+    }
+
+    .quota-demo-row:hover .agm-progress-node.filled,
+    #agm-progress-container.hover-glow-active .agm-progress-node.filled {
+      box-shadow: 0 0 10px rgba(26, 241, 141, 0.8), 0 0 4px #ffffff;
+    }
+
+    .agm-progress-node.unfilled {
+      background: rgba(23, 16, 37, 0.9);
+      border-color: #40285e;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+    }
+
+    .node-pip {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .quota-meta-right {
+      font-size: 11px;
+      font-weight: 800;
+      font-family: monospace;
+      color: var(--neon-green);
+      width: 50px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* =============================================================
+       COMPONENT 4: Modal Z-Index Stacking Simulator
+       ============================================================= */
+    .modal-simulator-container {
+      position: relative;
+      height: 180px;
+      border: 1px dashed var(--border-subtle);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sim-navbar {
+      background: rgba(23, 16, 37, 0.95);
+      border-bottom: 1px solid #40285e;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 700;
+      position: sticky;
+      top: 0;
+      z-index: 100; /* z-sticky: 100 */
+    }
+
+    .sim-modal-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(3px);
+      z-index: 99999; /* z-modal: 99999 */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 200ms ease;
+    }
+
+    .sim-modal-box {
+      background: #171025;
+      border: 1px solid #40285e;
+      border-radius: 12px;
+      padding: 16px;
+      width: 260px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.6);
+      position: relative;
+      z-index: 10;
+    }
+
+    .sim-drag-region {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 24px;
+      z-index: 100000;
+      pointer-events: none;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Brand Navigation Header -->
+  <header class="builder-header">
+    <div class="brand-group">
+      <div class="brand-logo">A</div>
+      <div class="brand-title">Antigravity-Manager UI Builder</div>
+      <span class="brand-badge">PROTOTYPE WORKBENCH</span>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn" id="btn-theme-toggle">🌓 Toggle Light/Dark</button>
+      <button class="btn btn-primary" id="btn-export-json">💾 Export JSON</button>
+      <button class="btn" id="btn-import-json">📂 Import JSON</button>
+    </div>
+  </header>
+
+  <!-- Main Grid Layout -->
+  <main class="builder-layout">
+
+    <!-- Left Control Panel -->
+    <aside class="control-panel">
+      <!-- 1. Quota Progress Controls -->
+      <section class="panel-section">
+        <div class="section-title">
+          <span>Quota Progress Bar</span>
+          <span class="card-badge">h-2.5 / 10px</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            <span>Quota Percentage</span>
+            <span class="value-pill" id="val-quota">78%</span>
+          </label>
+          <input type="range" id="input-quota" min="0" max="100" value="78">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            <span>Track Height</span>
+            <span class="value-pill" id="val-track-height">10px</span>
+          </label>
+          <input type="range" id="input-track-height" min="6" max="20" value="10">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            <span>Milestone Node Diameter</span>
+            <span class="value-pill" id="val-node-size">20px</span>
+          </label>
+          <input type="range" id="input-node-size" min="14" max="28" value="20">
+        </div>
+
+        <div class="toggle-row">
+          <span>Ambient Hover Glow</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggle-hover-glow" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </section>
+
+      <!-- 2. Color Themes & Swatches -->
+      <section class="panel-section">
+        <div class="section-title">Theme Palette Swatches</div>
+        <div class="swatch-grid">
+          <button class="swatch-btn active" data-theme="royal-violet" style="background: linear-gradient(135deg, #171025 50%, #7c3aed 50%);" title="Royal Violet"></button>
+          <button class="swatch-btn" data-theme="obsidian-dark" style="background: linear-gradient(135deg, #0f172a 50%, #38bdf8 50%);" title="Obsidian Dark"></button>
+          <button class="swatch-btn" data-theme="emerald-terminal" style="background: linear-gradient(135deg, #064e3b 50%, #1af18d 50%);" title="Emerald Terminal"></button>
+          <button class="swatch-btn" data-theme="amber-sun" style="background: linear-gradient(135deg, #451a03 50%, #f59e0b 50%);" title="Amber Sun"></button>
+        </div>
+      </section>
+
+      <!-- 3. JSON State Import / Export -->
+      <section class="panel-section">
+        <div class="section-title">JSON Configuration State</div>
+        <textarea class="json-box" id="json-io-area" spellcheck="false"></textarea>
+        <div class="btn-row">
+          <button class="btn" id="btn-apply-json">⚡ Apply JSON</button>
+          <button class="btn" id="btn-copy-json">📋 Copy JSON</button>
+        </div>
+      </section>
+    </aside>
+
+    <!-- Right Live Previews -->
+    <section class="preview-canvas">
+
+      <!-- PREVIEW 1: Quota Progress Bar Overhaul -->
+      <div class="preview-card">
+        <div class="preview-card-header">
+          <div class="card-title">
+            <span>QuotaProgressBar Overhaul</span>
+          </div>
+          <span class="card-badge">Protruding Nodes & Checkmarks</span>
+        </div>
+
+        <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+          Slim 10px track height with 20px protruding milestone nodes (5px protrusion above and below). Filled milestone nodes render crisp white checkmarks. Strictly zero boundary dots at 0% and 100%.
+        </p>
+
+        <div class="quota-demo-row" id="quota-row-container">
+          <div id="agm-progress-container">
+            <span class="quota-meta-left">Claude 3.5 Sonnet</span>
+
+            <div class="quota-track-wrapper">
+              <!-- 10px Track with spatial gradient and mask -->
+              <div id="agm-progress-track">
+                <div id="agm-progress-fill"></div>
+                <div class="agm-progress-mask" id="agm-progress-mask" style="width: 22%;"></div>
+              </div>
+
+              <!-- Ambient Glow layer -->
+              <div id="agm-progress-glow"></div>
+
+              <!-- 5 Internal Milestone Checkpoints (20%, 40%, 60%, 80%, 90%) -->
+              <div id="agm-progress-node-1" class="agm-progress-node filled" style="left: 20%; background-color: #ef4444;">
+                <svg class="check-svg" style="width: 12px; height: 12px;" viewBox="0 0 16 16" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3.5 8.5L6.5 11.5L12.5 4.5" />
+                </svg>
+              </div>
+
+              <div id="agm-progress-node-2" class="agm-progress-node filled" style="left: 40%; background-color: #ea580c;">
+                <svg class="check-svg" style="width: 12px; height: 12px;" viewBox="0 0 16 16" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3.5 8.5L6.5 11.5L12.5 4.5" />
+                </svg>
+              </div>
+
+              <div id="agm-progress-node-3" class="agm-progress-node filled" style="left: 60%; background-color: #eab308;">
+                <svg class="check-svg" style="width: 12px; height: 12px;" viewBox="0 0 16 16" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3.5 8.5L6.5 11.5L12.5 4.5" />
+                </svg>
+              </div>
+
+              <div id="agm-progress-node-4" class="agm-progress-node unfilled" style="left: 80%;">
+                <span class="node-pip"></span>
+              </div>
+
+              <div id="agm-progress-node-5" class="agm-progress-node unfilled" style="left: 90%;">
+                <span class="node-pip"></span>
+              </div>
+            </div>
+
+            <span class="quota-meta-right" id="label-percentage">78%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- PREVIEW 2: TitleBar Window Controls Segmented Capsule -->
+      <div class="preview-card">
+        <div class="preview-card-header">
+          <div class="card-title">
+            <span>TitleBar Window Controls Remediation</span>
+          </div>
+          <span class="card-badge">Safe-Area Inset pr-2.5</span>
+        </div>
+
+        <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+          Titlebar caption controls wrapped into a contiguous dark-glass capsule with an explicit 10px safe-area right inset (<code>pr-2.5</code>). The SVG cross is centered with <code>overflow-visible</code> to eliminate corner clipping.
+        </p>
+
+        <div class="titlebar-preview-container">
+          <div class="titlebar-brand">
+            <span style="font-weight: 700; color: #f8fafc;">Agm Tool By Alim</span>
+            <span style="background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 4px; font-family: monospace; font-size: 9px;">v4.200.0</span>
+          </div>
+
+          <div class="titlebar-right-wrapper">
+            <div class="segmented-caption-capsule">
+              <!-- Minimize Button -->
+              <button class="caption-btn btn-min" title="Minimize">
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M2 8h12v1.5H2z" />
+                </svg>
+              </button>
+              <!-- Maximize Button -->
+              <button class="caption-btn btn-max" title="Maximize">
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="2" y="2" width="12" height="12" rx="1.5" />
+                </svg>
+              </button>
+              <!-- Close Button with safe padding and overflow-visible -->
+              <button class="caption-btn btn-close" id="titlebar-btn-close" title="Close">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="overflow: visible;">
+                  <path d="M3 3l10 10M13 3L3 13" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PREVIEW 3: NavMenu Segmented Capsule -->
+      <div class="preview-card">
+        <div class="preview-card-header">
+          <div class="card-title">
+            <span>NavMenu Segmented Capsule</span>
+          </div>
+          <span class="card-badge">Icon-Only Settings & Triangle Indicator</span>
+        </div>
+
+        <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+          Settings item is modernized to icon-only (matching Accounts and Instances) with <code>rounded-none</code>, and the trailing hamburger is replaced with an integrated rotating micro-triangle chevron.
+        </p>
+
+        <div class="navmenu-preview-container">
+          <div class="nav-segmented-capsule">
+            <button class="nav-slot-btn slot-accounts active" title="Accounts">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+              </svg>
+            </button>
+            <button class="nav-slot-btn slot-instances" title="Instances">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="18" height="12" x="3" y="4" rx="2"/><line x1="2" x2="22" y1="20" y2="20"/>
+              </svg>
+            </button>
+            <button class="nav-slot-btn slot-settings" title="Settings">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+            <button class="nav-slot-btn slot-more" id="btn-toggle-more" title="More Views">
+              <svg id="chevron-more" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 200ms ease;">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PREVIEW 4: Modal Stacking Context Simulator -->
+      <div class="preview-card">
+        <div class="preview-card-header">
+          <div class="card-title">
+            <span>Modal Stacking & Z-Index Resolution</span>
+          </div>
+          <span class="card-badge">z-[99999] vs z-[100]</span>
+        </div>
+
+        <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+          Removal of <code>isolation: isolate</code> from the sticky navbar prevents local context trapping. Standard modals mount at <code>z-[99999]</code> with full viewport backdrops, ensuring modal headers never slip under the top navbar.
+        </p>
+
+        <div class="modal-simulator-container">
+          <div class="sim-navbar">
+            <span>Sticky Application Navbar (z-index: 100)</span>
+            <button class="btn" style="padding: 2px 8px; font-size: 10px;" id="btn-trigger-modal">Trigger Modal</button>
+          </div>
+
+          <!-- Portaled Modal Preview -->
+          <div class="sim-modal-overlay" id="sim-modal" style="display: none;">
+            <div class="sim-drag-region"></div>
+            <div class="sim-modal-box">
+              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700;">
+                <span>Dialog (z-[99999])</span>
+                <span style="cursor: pointer; color: #94a3b8;" id="btn-close-sim-modal">✕</span>
+              </div>
+              <p style="font-size: 11px; color: #94a3b8;">
+                Backdrop covers entire viewport above navbar. Modal header is 100% accessible.
+              </p>
+              <button class="btn btn-primary" style="padding: 6px; font-size: 11px;" id="btn-confirm-sim-modal">Acknowledge</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- Interactive Workbench Engine -->
+  <script>
+    // State Model
+    const state = {
+      quota: 78,
+      trackHeight: 10,
+      nodeSize: 20,
+      hoverGlow: true,
+      theme: 'royal-violet',
+      isLight: false,
+      checkpoints: [20, 40, 60, 80, 90]
+    };
+
+    // Color stop interpolation for milestone nodes
+    const NODE_COLORS = {
+      20: '#ef4444',
+      40: '#ea580c',
+      60: '#eab308',
+      80: '#10b981',
+      90: '#1af18d'
+    };
+
+    // DOM Elements
+    const inputQuota = document.getElementById('input-quota');
+    const valQuota = document.getElementById('val-quota');
+    const inputTrackHeight = document.getElementById('input-track-height');
+    const valTrackHeight = document.getElementById('val-track-height');
+    const inputNodeSize = document.getElementById('input-node-size');
+    const valNodeSize = document.getElementById('val-node-size');
+    const toggleHoverGlow = document.getElementById('toggle-hover-glow');
+    const labelPercentage = document.getElementById('label-percentage');
+    const progressMask = document.getElementById('agm-progress-mask');
+    const progressTrack = document.getElementById('agm-progress-track');
+    const progressContainer = document.getElementById('agm-progress-container');
+    const jsonIoArea = document.getElementById('json-io-area');
+
+    function updateProgressDOM() {
+      // 1. Quota & Mask
+      valQuota.textContent = `${state.quota}%`;
+      labelPercentage.textContent = `${state.quota}%`;
+      progressMask.style.width = `${100 - state.quota}%`;
+
+      // 2. Track & Node Dimensions
+      valTrackHeight.textContent = `${state.trackHeight}px`;
+      progressTrack.style.height = `${state.trackHeight}px`;
+
+      valNodeSize.textContent = `${state.nodeSize}px`;
+
+      // 3. Update 5 Milestone Nodes
+      state.checkpoints.forEach((cp, idx) => {
+        const node = document.getElementById(`agm-progress-node-${idx + 1}`);
+        if (!node) return;
+
+        node.style.width = `${state.nodeSize}px`;
+        node.style.height = `${state.nodeSize}px`;
+
+        const isFilled = state.quota >= cp;
+        if (isFilled) {
+          node.className = 'agm-progress-node filled';
+          node.style.backgroundColor = NODE_COLORS[cp] || '#1af18d';
+          node.style.borderColor = '#ffffff';
+          node.innerHTML = `
+            <svg class="check-svg" style="width: ${Math.round(state.nodeSize * 0.6)}px; height: ${Math.round(state.nodeSize * 0.6)}px;" viewBox="0 0 16 16" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3.5 8.5L6.5 11.5L12.5 4.5" />
+            </svg>
+          `;
+        } else {
+          node.className = 'agm-progress-node unfilled';
+          node.style.backgroundColor = 'rgba(23, 16, 37, 0.9)';
+          node.style.borderColor = '#40285e';
+          node.innerHTML = '<span class="node-pip"></span>';
+        }
+      });
+
+      // 4. Hover Glow Simulation
+      if (state.hoverGlow) {
+        progressContainer.classList.add('hover-glow-active');
+      } else {
+        progressContainer.classList.remove('hover-glow-active');
+      }
+
+      // 5. Update JSON representation
+      jsonIoArea.value = JSON.stringify(state, null, 2);
+    }
+
+    // Event Listeners
+    inputQuota.addEventListener('input', (e) => {
+      state.quota = parseInt(e.target.value, 10);
+      updateProgressDOM();
+    });
+
+    inputTrackHeight.addEventListener('input', (e) => {
+      state.trackHeight = parseInt(e.target.value, 10);
+      updateProgressDOM();
+    });
+
+    inputNodeSize.addEventListener('input', (e) => {
+      state.nodeSize = parseInt(e.target.value, 10);
+      updateProgressDOM();
+    });
+
+    toggleHoverGlow.addEventListener('change', (e) => {
+      state.hoverGlow = e.target.checked;
+      updateProgressDOM();
+    });
+
+    // Theme Swatches
+    document.querySelectorAll('.swatch-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.swatch-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.theme = btn.dataset.theme;
+        updateProgressDOM();
+      });
+    });
+
+    // Light/Dark Toggle
+    document.getElementById('btn-theme-toggle').addEventListener('click', () => {
+      state.isLight = !state.isLight;
+      document.body.classList.toggle('light-theme', state.isLight);
+      updateProgressDOM();
+    });
+
+    // NavMenu Chevron Toggle
+    const btnToggleMore = document.getElementById('btn-toggle-more');
+    const chevronMore = document.getElementById('chevron-more');
+    let isMoreOpen = false;
+    btnToggleMore.addEventListener('click', () => {
+      isMoreOpen = !isMoreOpen;
+      chevronMore.style.transform = isMoreOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+      btnToggleMore.classList.toggle('active', isMoreOpen);
+    });
+
+    // Modal Simulation Toggle
+    const btnTriggerModal = document.getElementById('btn-trigger-modal');
+    const simModal = document.getElementById('sim-modal');
+    const btnCloseSimModal = document.getElementById('btn-close-sim-modal');
+    const btnConfirmSimModal = document.getElementById('btn-confirm-sim-modal');
+
+    btnTriggerModal.addEventListener('click', () => {
+      simModal.style.display = 'flex';
+    });
+
+    const hideModal = () => {
+      simModal.style.display = 'none';
+    };
+    btnCloseSimModal.addEventListener('click', hideModal);
+    btnConfirmSimModal.addEventListener('click', hideModal);
+
+    // JSON Export / Import
+    document.getElementById('btn-export-json').addEventListener('click', () => {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `agm-ui-builder-state.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    });
+
+    document.getElementById('btn-apply-json').addEventListener('click', () => {
+      try {
+        const parsed = JSON.parse(jsonIoArea.value);
+        Object.assign(state, parsed);
+        inputQuota.value = state.quota;
+        inputTrackHeight.value = state.trackHeight;
+        inputNodeSize.value = state.nodeSize;
+        toggleHoverGlow.checked = state.hoverGlow;
+        updateProgressDOM();
+        alert('Configuration successfully applied!');
+      } catch (err) {
+        alert('Invalid JSON: ' + err.message);
+      }
+    });
+
+    document.getElementById('btn-copy-json').addEventListener('click', () => {
+      navigator.clipboard.writeText(jsonIoArea.value).then(() => {
+        alert('JSON configuration copied to clipboard!');
+      });
+    });
+
+    // Initial render
+    updateProgressDOM();
+  </script>
+</body>
+</html>

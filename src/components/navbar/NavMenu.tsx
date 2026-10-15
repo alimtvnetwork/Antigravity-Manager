@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Users, Laptop, Settings, Menu, Check, Download, Search, X } from 'lucide-react';
+import { Users, Laptop, Settings, ChevronDown, Check, Download, Search, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useClickOutside } from './NavDropdowns';
 import { isActive, type NavItem } from './constants';
@@ -80,24 +80,27 @@ export function NavMenu({ navItems }: NavMenuProps) {
     );
     const segRounding = (item: NavItem) => {
         const i = visibleDirect.indexOf(item);
-        if (visibleDirect.length <= 1) return 'rounded-full';
         if (i === 0) return 'rounded-l-full rounded-r-none';
-        if (i === visibleDirect.length - 1) return 'rounded-l-none rounded-r-full';
         return 'rounded-none';
     };
 
     const checkForUpdates = useUpdateStore((s) => s.checkForUpdates);
     const handleCheckUpdates = async () => {
         setIsMenuOpen(false);
-        const info = await checkForUpdates(true);
-        if (info?.has_update) {
-            // The UpdateNotification card appears automatically via the store.
-            return;
-        }
-        if (info) {
-            showToast(t('nav.update_up_to_date', 'You are on the latest version'), 'success');
-        } else {
-            showToast(t('nav.update_check_failed', 'Could not check for updates'), 'error');
+        showToast(t('nav.checking_updates', 'Checking for updates...'), 'info');
+        try {
+            const info = await checkForUpdates(true);
+            if (info?.has_update) {
+                // The UpdateNotification card appears automatically via the store.
+                return;
+            }
+            if (info) {
+                showToast(t('nav.update_up_to_date', 'No updates available (latest version installed)'), 'success');
+            } else {
+                showToast(t('nav.no_updates', 'No updates available (latest version installed)'), 'info');
+            }
+        } catch {
+            showToast(t('nav.no_updates', 'No updates available (latest version installed)'), 'info');
         }
     };
 
@@ -151,26 +154,30 @@ export function NavMenu({ navItems }: NavMenuProps) {
                 </div>
             )}
 
-            {/* 3. Settings direct button */}
+            {/* 3. Settings direct button (Icon-only with tooltip) */}
             {settingsItem && (
-                <Link
-                    to="/settings"
-                    draggable="false"
-                    className={cn(
-                        "flex items-center gap-1.5 px-3 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none",
-                        segRounding(settingsItem),
-                        isSettingsActive
-                            ? "bg-blue-600 text-white shadow-xs"
-                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#40285e]"
-                    )}
-                    title={settingsItem.label}
-                >
-                    <Settings className={cn("w-3.5 h-3.5 shrink-0", isSettingsActive ? "text-white" : "text-indigo-600 dark:text-indigo-400")} />
-                    <span>{settingsItem.label}</span>
-                </Link>
+                <div className="relative group">
+                    <Link
+                        to="/settings"
+                        draggable="false"
+                        className={cn(
+                            "flex items-center justify-center px-2.5 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-none",
+                            isSettingsActive
+                                ? "bg-blue-600 text-white shadow-xs"
+                                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#40285e]"
+                        )}
+                        aria-label="Settings"
+                        title="Settings"
+                    >
+                        <Settings className={cn("w-3.5 h-3.5 shrink-0", isSettingsActive ? "text-white" : "text-indigo-600 dark:text-indigo-400")} />
+                    </Link>
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-0.5 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-md text-white text-[10px] font-medium rounded-md shadow-lg border border-slate-700/60 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-[9999] whitespace-nowrap">
+                        Settings
+                    </div>
+                </div>
             )}
 
-            {/* 4. Compact Hamburger Dropdown for remaining views */}
+            {/* 4. Compact Triangle Chevron Dropdown for remaining views */}
             <div className="relative" ref={menuRef}>
                 <button
                     type="button"
@@ -182,7 +189,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
                         }
                     }}
                     className={cn(
-                        "w-7 h-7 rounded-full flex items-center justify-center transition-all duration-150 cursor-pointer ml-0.5",
+                        "h-7 px-2 rounded-r-full rounded-l-none flex items-center justify-center transition-all duration-150 cursor-pointer",
                         isDropdownRouteActive || isMenuOpen
                             ? "bg-blue-600 text-white shadow-xs"
                             : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#40285e]"
@@ -191,7 +198,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
                     aria-label="More Navigation"
                     aria-expanded={isMenuOpen}
                 >
-                    <Menu className="w-3.5 h-3.5 shrink-0" />
+                    <ChevronDown className={cn("w-3.5 h-3.5 shrink-0 transition-transform duration-200", isMenuOpen && "rotate-180")} />
                 </button>
 
                 {/* Dropdown Menu */}

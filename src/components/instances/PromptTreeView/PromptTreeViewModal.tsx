@@ -468,10 +468,13 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
 
     const modalContent = (
         <div
-            className={`fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 ${isFullscreen ? "p-0" : "p-4 sm:p-6"}`}
+            className={`fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 ${isFullscreen ? "p-0" : "p-4 sm:p-6"}`}
         >
+            {/* Draggable Top Region */}
+            <div data-tauri-drag-region className="fixed top-0 left-0 right-0 h-8 z-[100000] pointer-events-none" />
+
             <div
-                className={`flex flex-col overflow-hidden bg-white dark:bg-[#171025] shadow-2xl transition-all ${isFullscreen
+                className={`flex flex-col overflow-hidden bg-white dark:bg-[#171025] shadow-2xl transition-all relative z-10 ${isFullscreen
                     ? "h-full w-full rounded-none border-0"
                     : "h-[88vh] w-full max-w-6xl rounded-2xl border border-slate-200 dark:border-[#40285e]"
                     }`}

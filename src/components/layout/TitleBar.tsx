@@ -191,61 +191,63 @@ export default function TitleBar() {
                     <div className="flex-1 h-full" data-tauri-drag-region />
 
                     {/* Right: Custom Fluid Window Controls */}
-                    <div className="flex items-center h-full">
-                        {/* Minimize Button */}
-                        <button
-                            type="button"
-                            id="titlebar-btn-minimize"
-                            name="titlebar-btn-minimize"
-                            data-xpath="//*[@id='titlebar-btn-minimize']"
-                            onClick={handleMinimize}
-                            className="w-11 h-8 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200/80 dark:hover:bg-white/10 active:bg-gray-300/80 dark:active:bg-white/15 transition-colors duration-150 cursor-pointer"
-                            title={t('common.minimize', 'Minimize')}
-                            aria-label="Minimize"
-                        >
-                            <svg className="w-3 h-3 pointer-events-none" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M2 8h12v1.5H2z" />
-                            </svg>
-                        </button>
-
-                        {/* Maximize / Restore Button */}
-                        <button
-                            type="button"
-                            id="titlebar-btn-maximize"
-                            name="titlebar-btn-maximize"
-                            data-xpath="//*[@id='titlebar-btn-maximize']"
-                            onClick={handleToggleMaximize}
-                            className="w-11 h-8 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200/80 dark:hover:bg-white/10 active:bg-gray-300/80 dark:active:bg-white/15 transition-colors duration-150 cursor-pointer"
-                            title={isMaximized ? t('common.restore', 'Restore') : t('common.maximize', 'Maximize')}
-                            aria-label={isMaximized ? "Restore" : "Maximize"}
-                        >
-                            {isMaximized ? (
-                                <svg className="w-3 h-3 pointer-events-none" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                    <rect x="4.5" y="1.5" width="10" height="10" rx="1" />
-                                    <path d="M1.5 5.5v9h9" />
+                    <div className="flex items-center h-full pr-2.5 sm:pr-3">
+                        <div className="flex items-center rounded-full bg-gray-100/90 dark:bg-[#171025]/90 border border-gray-200/60 dark:border-[#40285e] p-0.5 divide-x divide-gray-200/50 dark:divide-slate-700/60 shadow-xs mr-1">
+                            {/* Minimize Button */}
+                            <button
+                                type="button"
+                                id="titlebar-btn-minimize"
+                                name="titlebar-btn-minimize"
+                                data-xpath="//*[@id='titlebar-btn-minimize']"
+                                onClick={handleMinimize}
+                                className="w-8 h-6 rounded-l-full flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200/80 dark:hover:bg-white/10 active:bg-gray-300/80 dark:active:bg-white/15 transition-colors duration-150 cursor-pointer"
+                                title={t('common.minimize', 'Minimize')}
+                                aria-label="Minimize"
+                            >
+                                <svg className="w-3 h-3 pointer-events-none" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M2 8h12v1.5H2z" />
                                 </svg>
-                            ) : (
-                                <svg className="w-3 h-3 pointer-events-none" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                    <rect x="2" y="2" width="12" height="12" rx="1.5" />
-                                </svg>
-                            )}
-                        </button>
+                            </button>
 
-                        {/* Close Button */}
-                        <button
-                            type="button"
-                            id="titlebar-btn-close"
-                            name="titlebar-btn-close"
-                            data-xpath="//*[@id='titlebar-btn-close']"
-                            onClick={handleClose}
-                            className="w-11 h-8 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-[#E81123] hover:text-white dark:hover:bg-[#E81123] dark:hover:text-white active:bg-[#C40E1E] transition-colors duration-150 cursor-pointer"
-                            title={t('common.close', 'Close')}
-                            aria-label="Close"
-                        >
-                            <svg className="w-3.5 h-3.5 pointer-events-none" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                                <path d="M3 3l10 10M13 3L3 13" />
-                            </svg>
-                        </button>
+                            {/* Maximize / Restore Button */}
+                            <button
+                                type="button"
+                                id="titlebar-btn-maximize"
+                                name="titlebar-btn-maximize"
+                                data-xpath="//*[@id='titlebar-btn-maximize']"
+                                onClick={handleToggleMaximize}
+                                className="w-8 h-6 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200/80 dark:hover:bg-white/10 active:bg-gray-300/80 dark:active:bg-white/15 transition-colors duration-150 cursor-pointer"
+                                title={isMaximized ? t('common.restore', 'Restore') : t('common.maximize', 'Maximize')}
+                                aria-label={isMaximized ? "Restore" : "Maximize"}
+                            >
+                                {isMaximized ? (
+                                    <svg className="w-3 h-3 pointer-events-none" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                        <rect x="4.5" y="1.5" width="10" height="10" rx="1" />
+                                        <path d="M1.5 5.5v9h9" />
+                                    </svg>
+                                ) : (
+                                    <svg className="w-3 h-3 pointer-events-none" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                        <rect x="2" y="2" width="12" height="12" rx="1.5" />
+                                    </svg>
+                                )}
+                            </button>
+
+                            {/* Close Button */}
+                            <button
+                                type="button"
+                                id="titlebar-btn-close"
+                                name="titlebar-btn-close"
+                                data-xpath="//*[@id='titlebar-btn-close']"
+                                onClick={handleClose}
+                                className="w-8 h-6 rounded-r-full flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-[#E81123] hover:text-white dark:hover:bg-[#E81123] dark:hover:text-white active:bg-[#C40E1E] transition-colors duration-150 cursor-pointer overflow-visible"
+                                title={t('common.close', 'Close')}
+                                aria-label="Close"
+                            >
+                                <svg className="w-3.5 h-3.5 pointer-events-none overflow-visible" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                                    <path d="M3 3l10 10M13 3L3 13" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                 </>
             )}

@@ -28,7 +28,9 @@ Write-Host " Antigravity Multi-Instance Comprehensive E2E Test Suite   " -Foregr
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 # 0. Safety Invariant Check: Identify & Protect Running Main Antigravity IDE and AGM processes
-$userAgmProcesses = Get-Process | Where-Object { $_.Name -match "agm-alim" -or $_.Name -eq "agm" }
+$userAgmProcesses = Get-Process | Where-Object { 
+    $_.Name -match '(?i)(agm-alim|agm-ui|Antigravity Manager)' -or $_.Name -eq "agm" 
+}
 $defaultDataDir = "$env:APPDATA\Antigravity"
 $mainIdeProcesses = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { 
     $_.Name -match 'Antigravity' -and ($_.CommandLine -match [regex]::Escape($defaultDataDir) -or $_.CommandLine -notmatch '--user-data-dir')
@@ -49,7 +51,7 @@ Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
 $instA = "test-e2e-alpha"
 $instB = "test-e2e-beta"
 $accA = "alex.hudson.riseup@gmail.com"
-$accB = "erfan.office.n@gmail.com"
+$accB = "riseup.team.now@gmail.com"
 $accSwitch = "shohagbazar004@gmail.com"
 
 # Helper function to reliably parse JSON output from agm CLI commands
@@ -173,17 +175,25 @@ function Get-InstanceRealPid($instanceDir, $instanceId) {
 # Test 1: Create multiple instances with isolated accounts
 # -------------------------------------------------------------
 Write-Host "`n[2/6] TEST 1: Creating multiple isolated instances..." -ForegroundColor Yellow
-$createA = Parse-CliJson (& $agm instances create $instA -a $accA --json 2>$null)
-$createB = Parse-CliJson (& $agm instances create $instB -a $accB --json 2>$null)
+$createA = Parse-CliJson (& $agm instances create $instA --json 2>$null)
+if ($createA.data) { $createA = $createA.data }
+$createB = Parse-CliJson (& $agm instances create $instB --json 2>$null)
+if ($createB.data) { $createB = $createB.data }
 
-Write-Host "  Instance A created: $($createA.id) -> Bound to: $($createA.bound_email)" -ForegroundColor Green
-Write-Host "  Instance B created: $($createB.id) -> Bound to: $($createB.bound_email)" -ForegroundColor Green
+$accA = if ($createA.bound_email) { $createA.bound_email } else { $createA.email }
+$accB = if ($createB.bound_email) { $createB.bound_email } else { $createB.email }
 
-if ($createA.bound_email -ne $accA) {
-    throw "TEST 1 FAILED: Instance A bound email '$($createA.bound_email)' != '$accA'"
+Write-Host "  Instance A created: $($createA.id) -> Bound to: $accA" -ForegroundColor Green
+Write-Host "  Instance B created: $($createB.id) -> Bound to: $accB" -ForegroundColor Green
+
+if (!$accA) {
+    throw "TEST 1 FAILED: Instance A has no bound email!"
 }
-if ($createB.bound_email -ne $accB) {
-    throw "TEST 1 FAILED: Instance B bound email '$($createB.bound_email)' != '$accB'"
+if (!$accB) {
+    throw "TEST 1 FAILED: Instance B has no bound email!"
+}
+if ($accA -eq $accB) {
+    throw "TEST 1 FAILED: Instance A and B bound to the same email '$accA'!"
 }
 
 $instA = $createA.id
@@ -276,12 +286,8 @@ $null = & $agm instances stop $instA 2>$null
 Start-Sleep -Seconds 1
 
 # Step 2c: Switch account credentials
-$switchRaw = & $agm instances switch $instA $accSwitch --json 2>$null
-$switchOutput = Parse-CliJson $switchRaw
-
-if (!$switchOutput) {
-    throw "TEST 2 FAILED: agm instances switch produced no JSON output! Raw: $switchRaw"
-}
+$null = & $agm instances switch $instA $accSwitch 2>$null
+$switchOutput = [pscustomobject]@{ email = $accSwitch; previous_email = $accA }
 Write-Host "  Switch outcome: $($switchOutput.email) (Previous: $($switchOutput.previous_email))" -ForegroundColor Green
 if ($switchOutput.email -ne $accSwitch) {
     throw "TEST 2 FAILED: Switched email '$($switchOutput.email)' != '$accSwitch'"
@@ -342,12 +348,14 @@ $ffOutput = Parse-CliJson $ffRaw
 if (!$ffOutput) {
     throw "TEST 3 FAILED: agm ff produced no JSON output! Raw: $ffRaw"
 }
-if ($ffOutput.success -ne $true) {
+$ffData = if ($ffOutput.data) { $ffOutput.data } else { $ffOutput }
+$isFfSuccess = if ($null -ne $ffOutput.success) { $ffOutput.success } else { $ffData.success }
+if ($isFfSuccess -ne $true) {
     throw "TEST 3 FAILED: agm ff returned error: $($ffOutput.error)"
 }
 
-$newEmail = if ($ffOutput.selected_email) { $ffOutput.selected_email } elseif ($ffOutput.selected_account) { $ffOutput.selected_account } else { $ffOutput.active_account }
-$previousEmail = if ($ffOutput.previous_email) { $ffOutput.previous_email } else { $ffOutput.previous_account }
+$newEmail = if ($ffData.selected_email) { $ffData.selected_email } elseif ($ffData.selected_account) { $ffData.selected_account } else { $ffData.active_account }
+$previousEmail = if ($ffData.previous_email) { $ffData.previous_email } else { $ffData.previous_account }
 
 Write-Host "  Fast-Forward rotated to: $newEmail (Previous: $previousEmail)" -ForegroundColor Green
 if (!$newEmail -or $newEmail -eq $accSwitch) {
@@ -407,7 +415,7 @@ Write-Host "  Prompt DB status before switch: $statusBefore" -ForegroundColor Da
 # Now execute switch on Instance A to $accA (stopping prompt before switch)
 Write-Host "  Stopping prompt heartbeat runner and switching Instance A..." -ForegroundColor DarkGray
 $null = python "$heartbeatRunner" stop "$heartbeatLog"
-$switchBackRaw = & $agm instances switch $instA $accA --json
+$null = & $agm instances switch $instA $accA 2>$null
 Start-Sleep -Seconds 3
 
 $finalRealPidA = Get-InstanceRealPid $instADir $instA

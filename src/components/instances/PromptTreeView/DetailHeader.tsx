@@ -157,17 +157,21 @@ export function DetailHeader(props: DetailHeaderProps) {
                         <button
                             type="button"
                             onClick={() => {
-                                if (onCopyAllWithRichImages) {
-                                    onCopyAllWithRichImages();
-                                } else {
-                                    onCopyWithImages();
+                                try {
+                                    if (onCopyAllWithRichImages) {
+                                        onCopyAllWithRichImages();
+                                    } else {
+                                        onCopyWithImages();
+                                    }
+                                    setLocalCopiedAll(true);
+                                    setIsCopiedAll?.(true);
+                                    setTimeout(() => {
+                                        setLocalCopiedAll(false);
+                                        setIsCopiedAll?.(false);
+                                    }, 2000);
+                                } catch (err) {
+                                    reportPromptActionError(err, 'DetailHeader.copyAllWithRichImages');
                                 }
-                                setLocalCopiedAll(true);
-                                setIsCopiedAll?.(true);
-                                setTimeout(() => {
-                                    setLocalCopiedAll(false);
-                                    setIsCopiedAll?.(false);
-                                }, 2000);
                             }}
                             className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             title="Copy full prompt text and all embedded images in one shot"
@@ -200,17 +204,23 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        if (onCopyCleanText) {
-                                            onCopyCleanText();
-                                        } else {
-                                            const cleanText = stripImagesFromPrompt(activePromptText);
-                                            copyToClipboard(cleanText);
-                                            setLocalCopiedText(true);
-                                            setIsCopiedText(true);
-                                            setTimeout(() => {
-                                                setLocalCopiedText(false);
-                                                setIsCopiedText(false);
-                                            }, 2000);
+                                        try {
+                                            if (onCopyCleanText) {
+                                                onCopyCleanText();
+                                            } else {
+                                                const cleanText = stripImagesFromPrompt(activePromptText);
+                                                void copyToClipboard(cleanText).catch((err) => {
+                                                    reportPromptActionError(err, 'DetailHeader.copyCleanText');
+                                                });
+                                                setLocalCopiedText(true);
+                                                setIsCopiedText(true);
+                                                setTimeout(() => {
+                                                    setLocalCopiedText(false);
+                                                    setIsCopiedText(false);
+                                                }, 2000);
+                                            }
+                                        } catch (err) {
+                                            reportPromptActionError(err, 'DetailHeader.onCopyCleanText');
                                         }
                                         setIsCopyMenuOpen(false);
                                     }}
@@ -223,12 +233,48 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     <span className="text-[10px] text-slate-400 font-mono">No Images</span>
                                 </button>
 
-                                {/* Sub-item 2: Save Images to Disk */}
+                                {/* Sub-item 2: Copy with Images */}
                                 {hasImages && (
                                     <button
                                         type="button"
                                         onClick={() => {
-                                            onSaveImages();
+                                            try {
+                                                if (onCopyAllWithRichImages) {
+                                                    onCopyAllWithRichImages();
+                                                } else {
+                                                    onCopyWithImages();
+                                                }
+                                                setLocalCopiedAll(true);
+                                                setIsCopiedAll?.(true);
+                                                setTimeout(() => {
+                                                    setLocalCopiedAll(false);
+                                                    setIsCopiedAll?.(false);
+                                                }, 2000);
+                                            } catch (err) {
+                                                reportPromptActionError(err, 'DetailHeader.onCopyWithImages');
+                                            }
+                                            setIsCopyMenuOpen(false);
+                                        }}
+                                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            {isCopiedAllActive ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-purple-500" />}
+                                            <span>{isCopiedAllActive ? 'Copied with Images!' : 'Copy with Images'}</span>
+                                        </div>
+                                        <span className="text-[10px] text-slate-400 font-mono">Rich HTML</span>
+                                    </button>
+                                )}
+
+                                {/* Sub-item 3: Save Images to Disk */}
+                                {hasImages && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            try {
+                                                onSaveImages();
+                                            } catch (err) {
+                                                reportPromptActionError(err, 'DetailHeader.onSaveImages');
+                                            }
                                             setIsCopyMenuOpen(false);
                                         }}
                                         className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"

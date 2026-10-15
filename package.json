@@ -1,6 +1,6 @@
 {
   "version": "4.204.0",
-  "name": "agm-alim",
+  "name": "agm-ui",
   "description": "Antigravity Manager Tools - Maintained by Alim, Sponsored by RISEUP ASIA LLC",
   "author": "Alim (Sponsored by RISEUP ASIA LLC)",
   "type": "module",
@@ -9,6 +9,7 @@
     "dev": "vite",
     "build": "tsc && node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build",
     "preview": "vite preview",
+    "ui:builder": "node -e \"const cp = require('child_process'); const p = process.platform === 'win32' ? 'start' : process.platform === 'darwin' ? 'open' : 'xdg-open'; cp.exec(p + ' scripts/ui-builder.html');\"",
     "test": "node scripts/run-frontend-tests.mjs",
     "prepare": "node scripts/install-git-hooks.mjs",
     "hooks:install": "node scripts/install-git-hooks.mjs",

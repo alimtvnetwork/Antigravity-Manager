@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Sun, Moon, LogOut, Minus, X, RotateCcw, Globe, ChevronDown, Check, Palette, Sparkles } from 'lucide-react';
+import { Sun, Moon, LogOut, Minus, X, RotateCcw, Globe, Check, Palette, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
@@ -29,6 +29,8 @@ export function NavSettings({
     const [isCleanModalOpen, setIsCleanModalOpen] = useState(false);
     const [isPrefsOpen, setIsPrefsOpen] = useState(false);
     const [isThemeOpen, setIsThemeOpen] = useState(false);
+    const [selectedThemeFeedback, setSelectedThemeFeedback] = useState<string | null>(null);
+    const [selectedLangFeedback, setSelectedLangFeedback] = useState<string | null>(null);
     const prefsRef = useRef<HTMLDivElement>(null);
     const themeRef = useRef<HTMLDivElement>(null);
     const { config, updateTheme } = useConfigStore();
@@ -164,7 +166,7 @@ export function NavSettings({
     const currentPalette = findPalette(currentThemeId);
 
     return (
-        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 pr-2.5">
             {/* 1. Quick Clean + Theme Switcher + Language Preferences Segmented Pill Capsule */}
             <div className="flex items-center rounded-full bg-gray-100 dark:bg-[#171025]/90 border border-gray-200/60 dark:border-[#40285e] p-0.5 shadow-xs">
                 {/* Antigravity Quick Clean (Recycle) Icon Button */}
@@ -206,7 +208,13 @@ export function NavSettings({
                             }}
                         />
                         <Palette className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                        <ChevronDown className={`w-2.5 h-2.5 text-gray-400 transition-transform duration-150 ${isThemeOpen ? 'rotate-180' : ''}`} />
+                        <svg 
+                            className={`w-2 h-2 text-gray-400 group-hover:text-gray-200 transition-transform duration-150 shrink-0 ${isThemeOpen ? 'rotate-180' : ''}`} 
+                            viewBox="0 0 8 6" 
+                            fill="currentColor"
+                        >
+                            <path d="M0 1.5L4 5.5L8 1.5H0Z" />
+                        </svg>
                     </button>
 
                     {/* Theme Catalogue Dropdown Popover */}
@@ -228,17 +236,25 @@ export function NavSettings({
 
                             <div className="grid grid-cols-2 gap-1.5 max-h-64 overflow-y-auto pr-1">
                                 {THEME_PALETTES.map((palette) => {
-                                    const isActive = currentThemeId === palette.id;
+                                    const isCurrent = currentThemeId === palette.id;
+                                    const isFeedback = selectedThemeFeedback === palette.id;
+                                    const isActive = isCurrent || isFeedback;
                                     return (
                                         <button
                                             key={palette.id}
                                             type="button"
                                             onClick={() => {
+                                                setSelectedThemeFeedback(palette.id);
                                                 updateTheme(palette.id);
-                                                setIsThemeOpen(false);
+                                                setTimeout(() => {
+                                                    setSelectedThemeFeedback(null);
+                                                    setIsThemeOpen(false);
+                                                }, 180);
                                             }}
                                             className={`w-full p-1.5 text-left flex items-center justify-between gap-1.5 rounded-[5px] border transition-all duration-150 cursor-pointer text-xs ${
-                                                isActive
+                                                isFeedback
+                                                    ? 'border-emerald-500/50 ring-1 ring-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold'
+                                                    : isActive
                                                     ? 'border-[var(--primary)] ring-1 ring-[var(--primary)] bg-blue-50/60 dark:bg-blue-900/20 font-semibold'
                                                     : 'border-gray-200/70 dark:border-slate-800 hover:border-gray-300 dark:hover:border-slate-700 hover:bg-gray-50/80 dark:hover:bg-slate-800/60'
                                             }`}
@@ -261,7 +277,7 @@ export function NavSettings({
                                                 </div>
                                             </div>
                                             {isActive && (
-                                                <Check className="w-3 h-3 text-blue-600 dark:text-blue-400 shrink-0" />
+                                                <Check className={`w-3 h-3 shrink-0 ${isFeedback ? 'text-emerald-500 animate-in zoom-in-75 duration-100' : 'text-blue-600 dark:text-blue-400'}`} />
                                             )}
                                         </button>
                                     );
@@ -292,7 +308,13 @@ export function NavSettings({
                             <Moon className="w-3 h-3 text-blue-400 shrink-0" />
                         )}
                         <span className="uppercase">{currentLangItem.short}</span>
-                        <ChevronDown className={`w-2.5 h-2.5 text-gray-400 transition-transform duration-150 ${isPrefsOpen ? 'rotate-180' : ''}`} />
+                        <svg 
+                            className={`w-2 h-2 text-gray-400 group-hover:text-gray-200 transition-transform duration-150 shrink-0 ${isPrefsOpen ? 'rotate-180' : ''}`} 
+                            viewBox="0 0 8 6" 
+                            fill="currentColor"
+                        >
+                            <path d="M0 1.5L4 5.5L8 1.5H0Z" />
+                        </svg>
                     </button>
 
                     {isPrefsOpen && (
@@ -335,20 +357,32 @@ export function NavSettings({
                             <div className="max-h-56 overflow-y-auto">
                                 {LANGUAGES.map((lang) => {
                                     const isCurrent = lang.code === currentLanguage;
+                                    const isFeedback = selectedLangFeedback === lang.code;
+                                    const isRowActive = isCurrent || isFeedback;
                                     return (
                                         <button
                                             key={lang.code}
                                             type="button"
                                             onClick={() => {
+                                                setSelectedLangFeedback(lang.code);
                                                 onLanguageChange(lang.code);
-                                                setIsPrefsOpen(false);
+                                                setTimeout(() => {
+                                                    setSelectedLangFeedback(null);
+                                                    setIsPrefsOpen(false);
+                                                }, 180);
                                             }}
                                             className={`w-full px-3 py-1.5 text-left flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors cursor-pointer ${
-                                                isCurrent ? 'text-blue-600 dark:text-blue-400 font-semibold bg-blue-50/50 dark:bg-blue-900/20' : 'text-gray-700 dark:text-gray-300'
+                                                isFeedback
+                                                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold'
+                                                    : isCurrent
+                                                    ? 'text-blue-600 dark:text-blue-400 font-semibold bg-blue-50/50 dark:bg-blue-900/20'
+                                                    : 'text-gray-700 dark:text-gray-300'
                                             }`}
                                         >
                                             <span>{lang.label}</span>
-                                            {isCurrent && <Check className="w-3.5 h-3.5 shrink-0" />}
+                                            {isRowActive && (
+                                                <Check className={`w-3.5 h-3.5 shrink-0 ${isFeedback ? 'text-emerald-500 animate-in zoom-in-75 duration-100' : ''}`} />
+                                            )}
                                         </button>
                                     );
                                 })}
@@ -360,7 +394,7 @@ export function NavSettings({
 
             {/* Window controls (Minimize, Maximize/Restore, Close) - Tauri only: Permanently visible, never collapsed */}
             {isTauri() && (
-                <div className="flex items-center rounded-full bg-gray-100 dark:bg-[#171025]/90 border border-gray-200/60 dark:border-[#40285e] p-0.5 divide-x divide-gray-200/50 dark:divide-slate-700/60 shadow-xs z-50 shrink-0">
+                <div className="flex items-center rounded-full bg-gray-100 dark:bg-[#171025]/90 border border-gray-200/60 dark:border-[#40285e] p-0.5 divide-x divide-gray-200/50 dark:divide-slate-700/60 shadow-xs z-50 shrink-0 mr-1">
                     <button
                         type="button"
                         id="btn-window-minimize"
@@ -402,11 +436,11 @@ export function NavSettings({
                         name="window-close"
                         data-xpath="//*[@id='btn-window-close']"
                         onClick={handleClose}
-                        className="w-7 h-7 rounded-r-full hover:bg-red-500 hover:text-white dark:hover:bg-red-500 dark:hover:text-white flex items-center justify-center transition-all duration-150 ease-out cursor-pointer group"
+                        className="w-7 h-7 rounded-r-full hover:bg-red-500 hover:text-white dark:hover:bg-red-500 dark:hover:text-white flex items-center justify-center transition-all duration-150 ease-out cursor-pointer group overflow-visible"
                         title={t('common.close', 'Close')}
                         aria-label="Close"
                     >
-                        <X className="w-3.5 h-3.5 text-gray-700 dark:text-gray-300 group-hover:text-white transition-colors duration-150 pointer-events-none" />
+                        <X className="w-3.5 h-3.5 text-gray-700 dark:text-gray-300 group-hover:text-white transition-colors duration-150 pointer-events-none overflow-visible" />
                     </button>
                 </div>
             )}

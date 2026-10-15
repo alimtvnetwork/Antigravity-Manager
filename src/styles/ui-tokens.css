@@ -43,17 +43,22 @@
   /* ---- Quota / progress scale ---- */
   --ui-quota-track: #171025;         /* Bar track background */
   --ui-quota-track-border: #40285e; /* Bar track border */
-  /* Continuous 8-stop spatial scale. Rendered full-width on the track and
+  --ui-quota-stop-0:   #7f1d1d; /* 0%   - Deep Crimson Dark Red */
+  --ui-quota-stop-15:  #dc2626; /* 15%  - Crimson Red */
+  --ui-quota-stop-35:  #ea580c; /* 35%  - Warm Orange */
+  --ui-quota-stop-55:  #eab308; /* 55%  - Warm Golden Yellow */
+  --ui-quota-stop-75:  #10b981; /* 75%  - Mint Emerald */
+  --ui-quota-stop-100: #1af18d; /* 100% - Vibrant Terminal Neon Green */
+
+  /* Continuous 6-stop spatial scale. Rendered full-width on the track and
      revealed by the current percentage — NEVER stretched into a partial fill. */
   --ui-quota-gradient: linear-gradient(
     90deg,
-    #ef6a8a 0%,
-    #f07f8f 14%,
-    #f2a06a 28%,
-    #f5bf58 40%,
-    #e8d67e 52%,
-    #a8dcb0 64%,
-    #6fd8b8 78%,
+    #7f1d1d 0%,
+    #dc2626 15%,
+    #ea580c 35%,
+    #eab308 55%,
+    #10b981 75%,
     #1af18d 100%
   );
 }

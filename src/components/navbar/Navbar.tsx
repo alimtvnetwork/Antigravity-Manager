@@ -178,7 +178,7 @@ function Navbar() {
         <nav
             onMouseDown={handleMouseDown}
             onDoubleClick={handleDoubleClick}
-            style={{ position: 'sticky', top: 0, zIndex: 100, isolation: 'isolate' }}
+            style={{ position: 'sticky', top: 0, zIndex: 100 }}
             className="py-1.5 transition-colors duration-200 bg-[#f5faf9] dark:bg-[#090611] border-b border-gray-200/50 dark:border-[#40285e] select-none"
         >
             <div className="w-full px-3 sm:px-4 md:px-6 relative" style={{ zIndex: 10 }}>
