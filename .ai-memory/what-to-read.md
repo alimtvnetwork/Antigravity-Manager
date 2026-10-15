@@ -1,10 +1,11 @@
 # What to Read
 
 > Canonical map of what the AI must read before working on this project.
-> Last updated: 2026-10-06T06:50:00Z
+> Last updated: 2026-10-15T23:10:00Z
 
 ## Changelog
 
+- 2026-10-15T23:10:00Z, Executed E2E checklists: when the user asks to repeat end-to-end tests, read `.ai-memory/e2e-testing/readme.md` first, then `00-decisions.md` and `05-master-checklist.md`, then the numbered case that matches the release (01 prompt tree, 02 live switch and resend, 03 CDP onboarding and IDE prompt, 04 telegram balance and SSH). Do not score an older installed `agm`. Restore auto-switch to 15%. The generic button flows stay in `.ai-memory/e2e-playbook/`.
 - 2026-10-14T21:35:00Z, Local CLI retest: read `02-spec/21-app/local-cli-e2e/01-retest-cases.md` before scoring prompt send or account switch. Send with `agm prompt <C-seq> --instance <id>`. `agm prompts tree` is running-only. Switch the idle copy, not Default. A copy switch must leave `~/.gemini/google_accounts.json` `active` on the Default account. Put auto-switch back to 15%.
 - 2026-10-14T21:10:00Z, Telegram `/ui`, `/shot`, `/target` and Supabase pause: read `02-spec/21-app/telegram-and-superbase-improvement-plan/03-supabase-e2e-rca.md` before treating a Supabase test failure as a bad key. Both project hosts are NXDOMAIN while `supabase.co` resolves. Voice notes are not transcribed.
 - 2026-10-14T20:40:00Z, Prompt Tree Send, Backup, and Restore: `agy` rejects `--resume` and `--user-data-dir`. Send must pass `--conversation` and return the process stderr when `agy` exits. Window Backup/Restore use a native dialog plus `write_prompt_backup_file` / `read_prompt_backup_file`, and Restore dispatches backed-up prompts. CLI `agm prompts backup` is a different path. Playbook rule 13 and 14 in `.ai-memory/memory/learned/27-e2e-instance-autoswitch-prompt-playbook.md`.
@@ -65,6 +66,7 @@
 
 - `git log -n 10 --stat`, why: inspect the last 10 commits to understand recent file changes, what code/docs were touched, and the latest repository state before starting any task
 - `.ai-memory/what-to-read.md`, why: authoritative prioritized reading sequence that must be read and followed before touching any files
+- `.ai-memory/e2e-testing/readme.md`, why: checklists of the end-to-end tests the AI already executed (prompt tree, live switch and resend, CDP onboarding, telegram balance and SSH) and the decisions that made a case pass or fail
 - `version.json`, why: single source of truth for the repository version, backend/frontend sections, and sub-package version tracks. All codebases must import this file for version information.
 - `.ai-memory/memory/readme.md`, why: master memory index (learned 01 to 25) that points to the full historical `01-index.md`
 - `.ai-memory/plans/readme.md`, why: plan index and the "Recent Completed Tasks Register" (last 20 tasks, newest first)

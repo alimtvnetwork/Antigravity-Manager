@@ -1,5 +1,7 @@
 # E2E Testing Playbook (`.ai-memory/e2e-playbook/`)
 
+Recent executed runs and the decisions behind them are in [`.ai-memory/e2e-testing/readme.md`](../e2e-testing/readme.md). Start there when the user asks to repeat what the AI already ran. This folder stays the generic auto-switch, instance, preview, and send procedure.
+
 Step-by-step, checklist-driven procedures for end-to-end testing of
 Antigravity Manager. Written for an AI with **zero prior context**: every
 step names the exact button, label, command, or log path — nothing is
