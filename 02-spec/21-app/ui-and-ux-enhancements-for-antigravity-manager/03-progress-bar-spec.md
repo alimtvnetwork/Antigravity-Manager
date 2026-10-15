@@ -160,21 +160,22 @@ Each milestone node is a 20px circular component structured with three visual la
    - **Center Pip:** Faint hollow dot or dim checkmark outline with `opacity: 0.25`.
    - **Box Shadow:** Subtle inset shadow (`box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4)`).
 
-### 4.2 SVG Checkmark (`v`) Specification
+### 4.2 SVG Downward Chevron (`v`) Specification
 
 ```svg
 <svg 
-    class="w-3 h-3 text-white pointer-events-none" 
+    class="w-3 h-3 text-white pointer-events-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]" 
     viewBox="0 0 16 16" 
     fill="none" 
     stroke="currentColor" 
-    stroke-width="2.2" 
+    stroke-width="2.6" 
     stroke-linecap="round" 
     stroke-linejoin="round"
 >
-    <path d="M3.5 8.5L6.5 11.5L12.5 4.5" />
+    <path d="M4 6.5L8 10.5L12 6.5" />
 </svg>
 ```
+*Note: In unfilled nodes, the identical downward chevron is rendered with muted opacity (`stroke="rgba(255,255,255,0.35)"` or `text-slate-400 dark:text-white/35`) inside a translucent glass circle, matching the reference blueprint.*
 
 ---
 
@@ -331,42 +332,42 @@ Below is the complete, self-contained, standalone reference implementation. It i
 
     /* Filled Node State */
     .agm-progress-node.filled {
-      border: 1.5px solid #ffffff;
-      box-shadow: 0 0 8px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+      border: 1.5px solid transparent;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
     }
 
     #agm-progress-container:hover .agm-progress-node.filled {
-      box-shadow: 0 0 10px rgba(26, 241, 141, 0.8), 0 0 4px #ffffff;
+      box-shadow: 0 0 12px rgba(26, 241, 141, 0.85);
     }
 
     /* Unfilled Node State */
     .agm-progress-node.unfilled {
-      background-color: var(--agm-surface-dark);
-      border: 1.5px solid var(--agm-border-dark);
-      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+      background-color: rgba(255, 255, 255, 0.12);
+      border: 1.5px solid transparent;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
     }
 
-    /* Checkmark SVG styling */
+    /* Downward Chevron SVG styling */
     .agm-progress-node svg {
       width: 11px;
       height: 11px;
       stroke: #ffffff;
-      stroke-width: 2.2;
+      stroke-width: 2.6;
       stroke-linecap: round;
       stroke-linejoin: round;
       fill: none;
     }
 
     .agm-progress-node.unfilled svg {
-      stroke: rgba(255, 255, 255, 0.2);
+      stroke: rgba(255, 255, 255, 0.35);
     }
 
     /* Explicit Milestone Node Positioning */
     #agm-progress-node-1 { left: 20%; background-color: #ef4444; }
     #agm-progress-node-2 { left: 40%; background-color: #f97316; }
     #agm-progress-node-3 { left: 60%; background-color: #eab308; }
-    #agm-progress-node-4 { left: 80%; background-color: var(--agm-surface-dark); } /* Unfilled at 78% */
-    #agm-progress-node-5 { left: 90%; background-color: var(--agm-surface-dark); } /* Unfilled at 78% */
+    #agm-progress-node-4 { left: 80%; } /* Unfilled at 78% */
+    #agm-progress-node-5 { left: 90%; } /* Unfilled at 78% */
   </style>
 </head>
 <body>
@@ -384,27 +385,27 @@ Below is the complete, self-contained, standalone reference implementation. It i
     <!-- 5 Internal Milestone Nodes (20px Diameter, Protruding 5px Top & Bottom) -->
     <!-- Node 1: 20% (Filled) -->
     <div id="agm-progress-node-1" class="agm-progress-node filled" title="Milestone 20%">
-      <svg viewBox="0 0 16 16"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" /></svg>
+      <svg viewBox="0 0 16 16"><path d="M4 6.5L8 10.5L12 6.5" /></svg>
     </div>
 
     <!-- Node 2: 40% (Filled) -->
     <div id="agm-progress-node-2" class="agm-progress-node filled" title="Milestone 40%">
-      <svg viewBox="0 0 16 16"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" /></svg>
+      <svg viewBox="0 0 16 16"><path d="M4 6.5L8 10.5L12 6.5" /></svg>
     </div>
 
     <!-- Node 3: 60% (Filled) -->
     <div id="agm-progress-node-3" class="agm-progress-node filled" title="Milestone 60%">
-      <svg viewBox="0 0 16 16"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" /></svg>
+      <svg viewBox="0 0 16 16"><path d="M4 6.5L8 10.5L12 6.5" /></svg>
     </div>
 
     <!-- Node 4: 80% (Unfilled at 78%) -->
     <div id="agm-progress-node-4" class="agm-progress-node unfilled" title="Milestone 80%">
-      <svg viewBox="0 0 16 16"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" /></svg>
+      <svg viewBox="0 0 16 16"><path d="M4 6.5L8 10.5L12 6.5" /></svg>
     </div>
 
     <!-- Node 5: 90% (Unfilled at 78%) -->
     <div id="agm-progress-node-5" class="agm-progress-node unfilled" title="Milestone 90%">
-      <svg viewBox="0 0 16 16"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" /></svg>
+      <svg viewBox="0 0 16 16"><path d="M4 6.5L8 10.5L12 6.5" /></svg>
     </div>
   </div>
 

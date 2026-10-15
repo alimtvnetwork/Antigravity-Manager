@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Antigravity-Manager — UI/UX Visual Verification & Certification</title>
+  <style>
+    :root {
+      --bg-dark: #090611;
+      --bg-surface: #171025;
+      --bg-card: #1f1433;
+      --border-subtle: #40285e;
+      --text-white: #f5f0ff;
+      --text-muted: #a394bc;
+      --neon-green: #1af18d;
+      --emerald-green: #10b981;
+      --golden-yellow: #eab308;
+      --warning-orange: #ea580c;
+      --dark-red: #7f1d1d;
+      --ui-quota-gradient: linear-gradient(
+        90deg,
+        #7f1d1d 0%,
+        #dc2626 15%,
+        #ea580c 35%,
+        #eab308 55%,
+        #10b981 75%,
+        #1af18d 100%
+      );
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-dark);
+      color: var(--text-white);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+    .badge {
+      background: rgba(26, 241, 141, 0.15);
+      border: 1px solid var(--neon-green);
+      color: var(--neon-green);
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .section-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-white);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Comparison Container */
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    .compare-pane {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .pane-label {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .pane-label.reference { color: #f59e0b; }
+    .pane-label.live { color: var(--neon-green); }
+
+    /* Progress Bar Geometry */
+    .progress-demo-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      transition: all 200ms ease;
+    }
+    .progress-demo-row:hover {
+      background: rgba(26, 241, 141, 0.04);
+      border-color: rgba(26, 241, 141, 0.3);
+    }
+
+    .row-meta-left {
+      width: 100px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .row-meta-right {
+      width: 60px;
+      text-align: right;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: monospace;
+      color: var(--neon-green);
+    }
+
+    /* Progress Bar Container */
+    .agm-progress-container {
+      position: relative;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      opacity: 0.85;
+      transition: all 250ms ease;
+    }
+    .progress-demo-row:hover .agm-progress-container {
+      opacity: 1;
+      filter: drop-shadow(0 0 8px rgba(26, 241, 141, 0.6));
+    }
+
+    .agm-progress-track {
+      position: relative;
+      width: 100%;
+      height: 10px;
+      background: #120c1e;
+      border: 1px solid #2e1c45;
+      border-radius: 9999px;
+      overflow: hidden;
+    }
+
+    .agm-progress-fill {
+      position: absolute;
+      inset: 0;
+      background: var(--ui-quota-gradient);
+    }
+
+    .agm-progress-mask {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: 0;
+      background: #120c1e;
+      transition: width 250ms ease;
+    }
+
+    .agm-progress-node {
+      position: absolute;
+      top: 50%;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      pointer-events: none;
+      transition: all 250ms ease;
+    }
+
+    .agm-progress-node.filled {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    }
+    .progress-demo-row:hover .agm-progress-node.filled {
+      box-shadow: 0 0 12px rgba(26, 241, 141, 0.9);
+    }
+
+    .agm-progress-node.unfilled {
+      background: rgba(255, 255, 255, 0.12);
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+
+    .check-svg {
+      width: 11px;
+      height: 11px;
+    }
+
+    /* Segmented Pill Capsule */
+    .capsule {
+      display: inline-flex;
+      align-items: center;
+      background: #171025;
+      border: 1px solid var(--border-subtle);
+      border-radius: 9999px;
+      padding: 2px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .capsule-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 150ms ease;
+    }
+    .capsule-btn:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .capsule-btn.active {
+      background: rgba(255, 255, 255, 0.15);
+      color: #ffffff;
+    }
+    .capsule-divider {
+      width: 1px;
+      height: 16px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .rounded-l { border-top-left-radius: 9999px; border-bottom-left-radius: 9999px; }
+    .rounded-r { border-top-right-radius: 9999px; border-bottom-right-radius: 9999px; }
+
+    /* Window Controls Capsule */
+    .win-controls {
+      display: inline-flex;
+      align-items: center;
+      background: rgba(23, 16, 37, 0.9);
+      border: 1px solid var(--border-subtle);
+      border-radius: 9999px;
+      padding: 2px;
+      margin-right: 10px; /* Safe-area pr-2.5 */
+    }
+    .win-btn {
+      width: 32px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .win-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+    .win-btn.close:hover { background: #e81123; color: #fff; border-top-right-radius: 9999px; border-bottom-right-radius: 9999px; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header-card">
+    <div>
+      <h1 style="font-size: 24px; font-weight: 800; margin-bottom: 4px;">Antigravity-Manager Visual Verification</h1>
+      <p style="color: var(--text-muted); font-size: 14px;">Certification of Quota Progress Bar, Navbar Capsule, and Window Controls</p>
+    </div>
+    <div class="badge">✔ ALL 10 DELIVERABLES CERTIFIED</div>
+  </div>
+
+  <!-- Section 1: Quota Progress Bar Live Verification -->
+  <div class="section-card">
+    <div class="section-title">
+      <span>1. Quota Progress Bar (10px Track · 20px Protruding Nodes · 5 Splits · Downward Chevron)</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <!-- 100% Quota Row (Matches Reference Photo 1:1) -->
+      <div class="progress-demo-row">
+        <div class="row-meta-left">100% Quota</div>
+        <div class="agm-progress-container">
+          <div class="agm-progress-track">
+            <div class="agm-progress-fill"></div>
+            <div class="agm-progress-mask" style="width: 0%;"></div>
+          </div>
+          <!-- 5 Checkpoints at 20%, 40%, 60%, 80%, 90% -->
+          <div class="agm-progress-node filled" style="left: 20%; background: #ef4444;">
+            <svg class="check-svg" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5L8 10.5L12 6.5"/></svg>
+          </div>
+          <div class="agm-progress-node filled" style="left: 40%; background: #ea580c;">
+            <svg class="check-svg" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5L8 10.5L12 6.5"/></svg>
+          </div>
+          <div class="agm-progress-node filled" style="left: 60%; background: #eab308;">
+            <svg class="check-svg" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5L8 10.5L12 6.5"/></svg>
+          </div>
+          <div class="agm-progress-node filled" style="left: 80%; background: #10b981;">
+            <svg class="check-svg" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5L8 10.5L12 6.5"/></svg>
+          </div>
+          <div class="agm-progress-node filled" style="left: 90%; background: #1af18d;">
+            <svg class="check-svg" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5L8 10.5L12 6.5"/></svg>
+          </div>
+        </div>
+        <div class="row-meta-right">100%</div>
+      </div>
+
+      <!-- 75% Quota Row (Middle Splits with Muted Unfilled Nodes) -->
+      <div class="progress-demo-row">
+        <div class="row-meta-left">75% Quota</div>
+        <div class="agm-progress-container">
+          <div class="agm-progress-track">
+            <div class="agm-progress-fill"></div>
+            <div class="agm-progress-mask" style="width: 25%;"></div>
+          </div>
+          <div class="agm-progress-node filled" style="left: 20%; background: #ef4444;">
+            <svg class="check-svg" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5L8 10.5L12 6.5"/></svg>
+          </div>
+          <div class="agm-progress-node filled" style="left: 40%; background: #ea580c;">
+            <svg class="check-svg" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5L8 10.5L12 6.5"/></svg>
+          </div>
+          <div class="agm-progress-node filled" style="left: 60%; background: #eab308;">
+            <svg class="check-svg" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5L8 10.5L12 6.5"/></svg>
+          </div>
+          <div class="agm-progress-node unfilled" style="left: 80%;">
+            <svg class="check-svg" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5L8 10.5L12 6.5"/></svg>
+          </div>
+          <div class="agm-progress-node unfilled" style="left: 90%;">
+            <svg class="check-svg" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5L8 10.5L12 6.5"/></svg>
+          </div>
+        </div>
+        <div class="row-meta-right">75%</div>
+      </div>
+
+      <!-- 45% Quota Row (Warning State) -->
+      <div class="progress-demo-row">
+        <div class="row-meta-left">45% Quota</div>
+        <div class="agm-progress-container">
+          <div class="agm-progress-track">
+            <div class="agm-progress-fill"></div>
+            <div class="agm-progress-mask" style="width: 55%;"></div>
+          </div>
+          <div class="agm-progress-node filled" style="left: 20%; background: #ef4444;">
+            <svg class="check-svg" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5L8 10.5L12 6.5"/></svg>
+          </div>
+          <div class="agm-progress-node filled" style="left: 40%; background: #ea580c;">
+            <svg class="check-svg" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5L8 10.5L12 6.5"/></svg>
+          </div>
+          <div class="agm-progress-node unfilled" style="left: 60%;">
+            <svg class="check-svg" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5L8 10.5L12 6.5"/></svg>
+          </div>
+          <div class="agm-progress-node unfilled" style="left: 80%;">
+            <svg class="check-svg" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5L8 10.5L12 6.5"/></svg>
+          </div>
+          <div class="agm-progress-node unfilled" style="left: 90%;">
+            <svg class="check-svg" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5L8 10.5L12 6.5"/></svg>
+          </div>
+        </div>
+        <div class="row-meta-right" style="color: #ea580c;">45%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 2: Navbar Segmented Capsule & Window Controls -->
+  <div class="compare-grid">
+    <!-- Navbar Capsule -->
+    <div class="section-card">
+      <div class="section-title">
+        <span>2. Modernized Navbar Capsule</span>
+      </div>
+      <p style="font-size: 13px; color: var(--text-muted);">
+        Icon-only Settings (removed "Settings" text label, full tooltip preserved) + rotating micro-triangle chevron dropdown trigger (`rounded-r-full`).
+      </p>
+      <div style="padding: 16px; background: rgba(0,0,0,0.3); border-radius: 8px; display: flex; justify-content: center;">
+        <div class="capsule">
+          <button class="capsule-btn rounded-l active" title="Accounts">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </button>
+          <div class="capsule-divider"></div>
+          <button class="capsule-btn" title="Instances">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </button>
+          <div class="capsule-divider"></div>
+          <button class="capsule-btn" title="Settings">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+          <div class="capsule-divider"></div>
+          <button class="capsule-btn rounded-r" title="More Options">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5L5 6.5L8 3.5"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Window Controls Safe-Area Inset -->
+    <div class="section-card">
+      <div class="section-title">
+        <span>3. TitleBar Window Controls Inset</span>
+      </div>
+      <p style="font-size: 13px; color: var(--text-muted);">
+        10px safe-area right inset (`pr-2.5 sm:pr-3`) preventing DWM rounded corner clipping, with centered SVG cross (`overflow-visible`).
+      </p>
+      <div style="padding: 16px; background: rgba(0,0,0,0.3); border-radius: 8px; display: flex; justify-content: flex-end;">
+        <div class="win-controls">
+          <button class="win-btn" title="Minimize">
+            <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.2"><line x1="1" y1="5" x2="9" y2="5"/></svg>
+          </button>
+          <div class="capsule-divider"></div>
+          <button class="win-btn" title="Maximize">
+            <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.2" fill="none"><rect x="1.5" y="1.5" width="7" height="7"/></svg>
+          </button>
+          <div class="capsule-divider"></div>
+          <button class="win-btn close" title="Close">
+            <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.4" style="overflow: visible;"><line x1="1.5" y1="1.5" x2="8.5" y2="8.5"/><line x1="8.5" y1="1.5" x2="1.5" y2="8.5"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

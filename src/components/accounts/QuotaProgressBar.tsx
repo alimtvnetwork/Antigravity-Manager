@@ -146,30 +146,30 @@ export function QuotaProgressBar({
                                 "agm-progress-node absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full flex items-center justify-center transition-all duration-300 z-10 pointer-events-none border-[1.5px]",
                                 compact ? "w-4 h-4" : "w-5 h-5",
                                 isFilled
-                                    ? "border-white shadow-[0_0_8px_rgba(0,0,0,0.4),inset_0_1px_2px_rgba(255,255,255,0.5)] group-hover:shadow-[0_0_10px_rgba(26,241,141,0.8),0_0_4px_#ffffff]"
-                                    : "bg-slate-200/90 dark:bg-[#171025]/90 border-slate-300 dark:border-[#40285e] shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)]"
+                                    ? "border-transparent shadow-[0_2px_8px_rgba(0,0,0,0.35)] group-hover:shadow-[0_0_12px_rgba(26,241,141,0.85)]"
+                                    : "bg-slate-300/50 dark:bg-white/10 border-transparent shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)]"
                             )}
                             style={{
                                 left: `${cp}%`,
-                                ...(isFilled ? { backgroundColor: scaleColor, borderColor: '#ffffff' } : {}),
+                                ...(isFilled ? { backgroundColor: scaleColor } : {}),
                             }}
                             title={`Milestone ${cp}%`}
                         >
-                            {isFilled ? (
-                                <svg
-                                    className={cn("text-white pointer-events-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]", compact ? "w-2.5 h-2.5" : "w-3 h-3")}
-                                    viewBox="0 0 16 16"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2.2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                >
-                                    <path d="M3.5 8.5L6.5 11.5L12.5 4.5" />
-                                </svg>
-                            ) : (
-                                <span className={cn("rounded-full bg-slate-400/40 dark:bg-white/20", compact ? "w-1 h-1" : "w-1.5 h-1.5")} />
-                            )}
+                            <svg
+                                className={cn(
+                                    "pointer-events-none transition-colors duration-200",
+                                    compact ? "w-2.5 h-2.5" : "w-3 h-3",
+                                    isFilled ? "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]" : "text-slate-400 dark:text-white/35"
+                                )}
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.6"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <path d="M4 6.5L8 10.5L12 6.5" />
+                            </svg>
                         </div>
                     );
                 })}
