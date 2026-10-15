@@ -95,9 +95,7 @@ docs/CODEBASE_ALIGNMENT_ANALYSIS.md
 testJson/
 .antigravity_resume_task.json
 gitmap*.json
-antigravity-resume_task.json
-antigravity_resume_task.json
-.antigravity-resume_task.json
+
 
 # Scratch dumps
 scratch/*.txt
@@ -107,3 +105,4 @@ scratch/*.dump
 
 # GitMap & Task Persistence
 .gitmap/backup/
+.antigravity_*.json
