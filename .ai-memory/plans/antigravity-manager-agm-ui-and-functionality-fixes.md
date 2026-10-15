@@ -1,7 +1,7 @@
 # Plan: antigravity-manager-agm-ui-and-functionality-fixes
 
 ## Status
-ACTIVE
+COMPLETE
 
 ## Spec
 `02-spec/21-app/antigravity-manager-agm-ui-and-functionality-fixes/01-spec.md`
@@ -45,10 +45,13 @@ The lead owns shared indexes (`.ai-memory/plans/readme.md`,
 ## Progress
 - [x] Spec written
 - [x] Plan enqueued
-- [ ] Gap analysis done
-- [ ] UI fixes done
-- [ ] Semantics fixes done
-- [ ] Import/export done
-- [ ] E2E done
-- [ ] Telegram buttons fixed
-- [ ] Released, CI green
+- [x] Gap analysis done
+- [x] UI fixes done
+- [x] Semantics fixes done
+- [x] Import/export done
+- [x] E2E done
+- [x] Telegram buttons fixed
+- [x] Released, CI green
+
+## Release
+- v4.206.0 tagged and released: https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v4.206.0

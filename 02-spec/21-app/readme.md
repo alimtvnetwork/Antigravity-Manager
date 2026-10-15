@@ -2,6 +2,7 @@
 
 | # | Specification File | Summary |
 | :--- | :--- | :--- |
+| `antigravity-manager-agm-ui-and-functionality-fixes` | [antigravity-manager-agm-ui-and-functionality-fixes/01-spec.md](./antigravity-manager-agm-ui-and-functionality-fixes/01-spec.md) | Send dropdown Enqueue entry, tree copy-all + unified Import/Export (SQLite DB + JSON), Telegram `cmd:` button fixes (RCAs 14-16), E2E validation; released v4.206.0. |
 | `root-cause-analysis-and-telegram-staff-improvement` | [root-cause-analysis-and-telegram-staff-improvement/01-spec.md](./root-cause-analysis-and-telegram-staff-improvement/01-spec.md) | Durable RCA memory (10 incidents), executable E2E testing playbook (auto-switch, instance open, prompt preview, prompt send, checklist), Telegram `/open` `/screenshot` `/send` + colorful copy-paste `/help`, Supabase paused-project root cause, voice-command feasibility note. |
 | `auditing-and-cli-ui-integration` | [auditing-and-cli-ui-integration/01-spec.md](./auditing-and-cli-ui-integration/01-spec.md) | UI interaction audit recorder (method + target + trigger + timestamp, SQLite, export), `agm ui` CLI bridge (open/goto/ls/scroll/click with actionable help), Telegram `/ui` commands, backend `/api/ui/*` endpoints driving the UI via Tauri events. |
 | `telegram-and-superbase` | [telegram-and-superbase-improvement-plan/01-architecture-spec.md](./telegram-and-superbase-improvement-plan/01-architecture-spec.md) | Telegram `/ui`, `/shot`, and `/target`, plus the live Supabase DNS pause. |

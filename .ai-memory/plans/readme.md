@@ -4,6 +4,7 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
+| [antigravity-manager-agm-ui-and-functionality-fixes.md](./antigravity-manager-agm-ui-and-functionality-fixes.md) | `COMPLETED` | Send dropdown Enqueue entry, tree copy-all + unified Import/Export (SQLite+JSON), Telegram `cmd:` double-slash fix + 64-byte cap guards + unknown-action fallback (RCAs 14-16), E2E validation docs; released v4.206.0. |
 | [telegram-and-superbase-improvement-plan.md](./telegram-and-superbase-improvement-plan.md) | `COMPLETED` | Telegram open, screenshot, and aimed prompt. Supabase Test fails because both project hosts are NXDOMAIN. |
 | [auditing-and-cli-ui-integration.md](./auditing-and-cli-ui-integration.md) | `COMPLETED` | UI interaction audit recorder (Rust backend + React hooks/panel), `agm ui` CLI bridge (open/goto/ls/scroll/click), Telegram `/ui` commands, backend `/api/ui/*` endpoints with Tauri-event navigation. |
 | [ui-session-recorder.md](./ui-session-recorder.md) | `PENDING` | Guideline for a developer-mode UI session recorder. Spec is written. The recorder is not implemented. |
