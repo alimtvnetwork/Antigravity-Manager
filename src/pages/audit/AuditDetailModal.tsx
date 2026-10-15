@@ -27,11 +27,11 @@ export function AuditDetailModal({
     if (!openId) return null;
     return (
         <div
-            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"
+            className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 p-4 overflow-y-auto"
             onClick={onClose}
         >
             <div
-                className="flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025] text-slate-950 dark:text-gray-100 shadow-xl"
+                className="flex max-h-[85vh] w-full max-w-3xl flex-col my-auto rounded-xl border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025] text-slate-950 dark:text-gray-100 shadow-xl"
                 onClick={(event) => event.stopPropagation()}
                 role="dialog"
                 aria-label="Audit detail"

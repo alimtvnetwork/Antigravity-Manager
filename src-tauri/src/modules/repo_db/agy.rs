@@ -688,7 +688,7 @@ pub fn send_prompt_now_for_instance(
         }
     }
 
-    // 4. Dispatch via agy CLI execution with Tier 2 graceful degradation.
+    // 4. Dispatch via agy CLI execution with direct CDP graceful degradation fallback.
     // Explicit user Send/Rerun replaces any lingering agy worker for this workspace.
     if let Err(spawn_err) = spawn_or_replace_prompt_via_agy(&active_prompt, true) {
         tracing::warn!(
@@ -697,16 +697,47 @@ pub fn send_prompt_now_for_instance(
             instance_id = %canonical_inst,
             repo_path = %repo_path,
             error = %spawn_err,
-            "agy CLI dispatch failed"
+            "agy CLI dispatch failed; attempting direct CDP insertion fallback"
         );
-        let focus_note = match crate::modules::instance::ensure_instance_running_for_dispatch(
+
+        // Fallback: Direct DevTools insertion into running Antigravity IDE
+        let clean_prompt = extract_clean_user_prompt(prompt_content);
+        let cdp_ok = crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
             &canonical_inst,
-            Some(repo_path),
-        ) {
-            Ok(pid) => format!("IDE focused (pid {pid})"),
-            Err(focus_err) => format!("IDE focus failed: {focus_err}"),
-        };
-        return Err(format!("{spawn_err}; {focus_note}"));
+            &clean_prompt,
+        );
+
+        if cdp_ok {
+            crate::modules::logger::log_info(&format!(
+                "[RepoDB] Direct CDP fallback succeeded for prompt '{}' on instance '{}'",
+                active_prompt.id, canonical_inst
+            ));
+            crate::modules::audit::record_if_active(
+                "backend",
+                "repo_db",
+                "cdp_dispatch_fallback",
+                &format!("instance:{canonical_inst}"),
+                serde_json::json!({
+                    "promptId": active_prompt.id,
+                    "instanceId": canonical_inst,
+                    "repoPath": repo_path,
+                    "fallback": "cdp_direct",
+                }),
+                "ok",
+                "Prompt dispatched via live DevTools CDP fallback",
+            );
+        } else {
+            let focus_note = match crate::modules::instance::ensure_instance_running_for_dispatch(
+                &canonical_inst,
+                Some(repo_path),
+            ) {
+                Ok(pid) => format!("IDE focused (pid {pid})"),
+                Err(focus_err) => format!("IDE focus failed: {focus_err}"),
+            };
+            return Err(format!(
+                "{spawn_err}; direct CDP fallback failed; {focus_note}"
+            ));
+        }
     } else {
         crate::modules::logger::log_info(&format!(
             "[RepoDB] send_prompt_now_for_instance dispatched prompt '{}' for instance '{}' in '{}'",

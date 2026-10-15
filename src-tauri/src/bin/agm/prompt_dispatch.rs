@@ -74,6 +74,7 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
         }
     }
 
+    let mut is_queue_mode = false;
     let mut prefix_cat: Option<String> = None;
     let mut suffix_cat: Option<String> = None;
     let mut explicit_instance: Option<String> = None;
@@ -84,7 +85,11 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
     let mut i = 0;
     while i < args.len() {
         let arg = &args[i];
-        if arg == "--prefix" || arg == "-prefix" {
+        if arg == "--queue" || arg == "-q" || arg == "--enqueue" {
+            is_queue_mode = true;
+            i += 1;
+            continue;
+        } else if arg == "--prefix" || arg == "-prefix" {
             if i + 1 < args.len() {
                 prefix_cat = Some(args[i + 1].clone());
                 i += 2;
@@ -127,11 +132,11 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
         i += 1;
     }
 
-    // Check if the first positional token is an AGM or GitMap Sequence ID (e.g. C001, P001, AGM:C001, GM:#1, GM:<cid>) when >= 2 tokens exist
+    // Check if the first positional token is an AGM or GitMap Sequence ID (e.g. C001, P001, AGM:C001, GM:#1, GM:<cid>)
     let mut resolved_seq: Option<repo_db::AgmSequenceResolution> = None;
     if let Some(ref seq_tok) = explicit_seq_or_target {
         resolved_seq = repo_db::resolve_agm_sequence_target(seq_tok);
-    } else if text_parts.len() >= 2 {
+    } else if !text_parts.is_empty() {
         let first_tok = text_parts[0].trim();
         let upper = first_tok.trim_start_matches('#').to_uppercase();
         let looks_like_seq = upper.starts_with("AGM:")
@@ -237,6 +242,50 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
         (s, c, i, sess, None)
     };
 
+    if is_queue_mode {
+        match repo_db::enqueue_prompt_for_instance(
+            &inst_id,
+            &cwd_str,
+            &final_prompt,
+            Some(&session_id),
+        ) {
+            Ok(queued) => {
+                let queue_pos = repo_db::count_enqueued_prompts(Some(&inst_id));
+                antigravity_tools_lib::modules::audit::record_if_active(
+                    "cli",
+                    "cli",
+                    "enqueue_prompt",
+                    &format!("instance:{inst_id}"),
+                    serde_json::json!({
+                        "instanceId": inst_id,
+                        "repoPath": cwd_str,
+                        "conversationId": session_id,
+                        "promptLen": final_prompt.len(),
+                        "queuePosition": queue_pos,
+                    }),
+                    "ok",
+                    &format!("Enqueued prompt {} to {slug}", queued.id),
+                );
+                if let Some(seq_code) = seq_label {
+                    println!(
+                        "[SUCCESS] Prompt queued for AGM Seq [{}] -> instance '{}' at position #{} (id: {}, conv: {}).",
+                        seq_code, inst_id, queue_pos, queued.id, session_id
+                    );
+                } else {
+                    println!(
+                        "[SUCCESS] Prompt queued for instance '{}' at position #{} (conv: {}).",
+                        inst_id, queue_pos, session_id
+                    );
+                }
+                return;
+            }
+            Err(e) => {
+                eprintln!("[ERROR] Failed to queue prompt: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+
     let now = chrono::Utc::now().timestamp();
     let prompt_id = uuid::Uuid::new_v4().to_string();
 
@@ -256,6 +305,8 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
     let _ = repo_db::save_or_requeue_prompt(&active_p);
 
     let task_file = PathBuf::from(&cwd_str).join(".antigravity_resume_task.json");
+    let inst_task_file =
+        PathBuf::from(&cwd_str).join(format!(".antigravity_resume_task.{}.json", inst_id));
     let payload = serde_json::json!({
         "prompt_id": prompt_id,
         "agm_seq_id": seq_label,
@@ -270,10 +321,12 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
     });
     match serde_json::to_string_pretty(&payload) {
         Ok(js) => {
-            if let Err(write_err) = fs::write(&task_file, js) {
+            if let Err(write_err) = fs::write(&task_file, &js) {
                 eprintln!("[ERROR] Could not write the resume task file: {write_err}");
                 std::process::exit(1);
             }
+            // Justification: per-instance resume snapshot is a convenience file alongside the primary task_file
+            let _ = fs::write(&inst_task_file, &js);
         }
         Err(json_err) => {
             eprintln!("[ERROR] Could not encode the resume task: {json_err}");
@@ -282,22 +335,49 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
     }
 
     if let Err(spawn_err) = repo_db::spawn_or_replace_prompt_via_agy(&active_p, true) {
-        antigravity_tools_lib::modules::audit::record_if_active(
-            "cli",
-            "cli",
-            "send_prompt_now",
-            &format!("instance:{inst_id}"),
-            serde_json::json!({
-                "instanceId": inst_id,
-                "repoPath": cwd_str,
-                "conversationId": session_id,
-                "promptLen": final_prompt.len(),
-            }),
-            "error",
-            &spawn_err,
-        );
-        eprintln!("[ERROR] agy did not accept the prompt: {spawn_err}");
-        std::process::exit(1);
+        let clean_prompt = repo_db::extract_clean_user_prompt(&final_prompt);
+        let cdp_ok =
+            antigravity_tools_lib::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
+                &inst_id,
+                &clean_prompt,
+            );
+        if cdp_ok {
+            antigravity_tools_lib::modules::audit::record_if_active(
+                "cli",
+                "cli",
+                "cdp_dispatch_fallback",
+                &format!("instance:{inst_id}"),
+                serde_json::json!({
+                    "promptId": active_p.id,
+                    "instanceId": inst_id,
+                    "repoPath": cwd_str,
+                    "fallback": "cdp_direct",
+                }),
+                "ok",
+                "Prompt dispatched via live DevTools CDP fallback",
+            );
+            println!(
+                "[SUCCESS] Direct CDP fallback succeeded for prompt '{}' on instance '{}'.",
+                active_p.id, inst_id
+            );
+        } else {
+            antigravity_tools_lib::modules::audit::record_if_active(
+                "cli",
+                "cli",
+                "send_prompt_now",
+                &format!("instance:{inst_id}"),
+                serde_json::json!({
+                    "instanceId": inst_id,
+                    "repoPath": cwd_str,
+                    "conversationId": session_id,
+                    "promptLen": final_prompt.len(),
+                }),
+                "error",
+                &spawn_err,
+            );
+            eprintln!("[ERROR] agy did not accept the prompt and CDP fallback failed: {spawn_err}");
+            std::process::exit(1);
+        }
     }
 
     antigravity_tools_lib::modules::audit::record_if_active(

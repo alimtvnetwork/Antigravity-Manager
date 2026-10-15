@@ -79,8 +79,8 @@ export const LogDetailPanel: React.FC<LogDetailPanelProps> = ({
     ) : undefined;
 
     return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-2 sm:p-3 md:p-4" onClick={onClose}>
-                <div className="bg-white dark:bg-base-100 rounded-2xl shadow-2xl w-full max-w-[98vw] xl:max-w-[1720px] h-[94vh] max-h-[94vh] flex flex-col overflow-hidden border border-gray-200 dark:border-base-200" onClick={e => e.stopPropagation()}>
+            <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-2 sm:p-3 md:p-4 overflow-y-auto" onClick={onClose}>
+                <div className="bg-white dark:bg-base-100 rounded-2xl shadow-2xl w-full max-w-[98vw] xl:max-w-[1720px] h-[94vh] max-h-[94vh] flex flex-col my-auto overflow-hidden border border-gray-200 dark:border-base-200" onClick={e => e.stopPropagation()}>
                     {/* Modal Header */}
                     <div className="px-4 py-2.5 border-b border-gray-200 dark:border-base-300 flex items-center justify-between bg-gray-50 dark:bg-base-200 shrink-0">
                         <div className="flex items-center gap-3 min-w-0">

@@ -83,9 +83,9 @@ export default function ModalDialog({
     const showCancel = isConfirmType && hasCancelHandler;
 
     return createPortal(
-        <div className="modal modal-open z-[100] items-center justify-center p-4">
+        <div className="modal modal-open z-[99999] items-center justify-center p-4 overflow-y-auto">
             {/* Draggable Top Region */}
-            <div data-tauri-drag-region className="fixed top-0 left-0 right-0 h-8 z-[110]" />
+            <div data-tauri-drag-region className="fixed top-0 left-0 right-0 h-8 z-[100000]" />
 
             <div className={`modal-box relative ${maxWidth} w-full max-h-[90vh] flex flex-col bg-white dark:bg-base-100 shadow-2xl rounded-2xl p-0 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200`}>
                 {handleCancel && (

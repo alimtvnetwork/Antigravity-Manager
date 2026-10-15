@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ShieldCheck, Download, Upload, Mail, Loader2, X } from 'lucide-react';
 import { useBackupExport } from './unified-backup/useBackupExport';
@@ -14,13 +14,58 @@ export function UnifiedBackupModal({ isOpen, onClose, initialTab = 'export' }: U
     const backupExport = useBackupExport({ isOpen, onClose });
     const backupImport = useBackupImport({ onClose });
 
+    useEffect(() => {
+        if (isOpen) {
+            setActiveTab(initialTab);
+        }
+    }, [isOpen, initialTab]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+
+        window.dispatchEvent(
+            new CustomEvent('agm:dropdown-open', { detail: { source: 'backup-modal' } })
+        );
+
+        const handleDropdownOpen = (e: Event) => {
+            const customEvent = e as CustomEvent<{ source?: string }>;
+            if (customEvent.detail?.source && customEvent.detail.source !== 'backup-modal') {
+                onClose();
+            }
+        };
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
+
+        window.addEventListener('agm:dropdown-open', handleDropdownOpen);
+        window.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('agm:dropdown-open', handleDropdownOpen);
+        };
+    }, [isOpen, onClose]);
+
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-            <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-800 overflow-hidden">
+        <div
+            className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 overflow-y-auto bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+            onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                    onClose();
+                }
+            }}
+        >
+            <div
+                className="relative w-full max-w-xl max-h-[85vh] flex flex-col my-auto bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Modal Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400">
                             <ShieldCheck className="w-5 h-5" />
@@ -37,7 +82,7 @@ export function UnifiedBackupModal({ isOpen, onClose, initialTab = 'export' }: U
                     <button
                         type="button"
                         onClick={onClose}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                         title={t('common.close', 'Close')}
                     >
                         <X className="w-5 h-5" />
@@ -45,7 +90,7 @@ export function UnifiedBackupModal({ isOpen, onClose, initialTab = 'export' }: U
                 </div>
 
                 {/* Tab Switcher */}
-                <div className="flex border-b border-gray-100 dark:border-slate-800 px-6 pt-3 bg-gray-50/30 dark:bg-slate-800/30">
+                <div className="flex border-b border-gray-100 dark:border-slate-800 px-6 pt-3 bg-gray-50/30 dark:bg-slate-800/30 shrink-0">
                     <button
                         type="button"
                         onClick={() => setActiveTab('export')}
@@ -73,7 +118,7 @@ export function UnifiedBackupModal({ isOpen, onClose, initialTab = 'export' }: U
                 </div>
 
                 {/* Modal Body */}
-                <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+                <div className="p-6 space-y-5 flex-1 min-h-0 overflow-y-auto">
                     {activeTab === 'export' ? (
                         <ExportTab
                             exportScope={backupExport.exportScope}
@@ -112,7 +157,7 @@ export function UnifiedBackupModal({ isOpen, onClose, initialTab = 'export' }: U
                 </div>
 
                 {/* Modal Footer */}
-                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50">
+                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 shrink-0">
                     <button
                         type="button"
                         onClick={onClose}

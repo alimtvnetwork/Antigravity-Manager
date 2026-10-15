@@ -179,16 +179,19 @@ export function AgyCleanModal({ isOpen, onClose }: AgyCleanModalProps) {
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+            className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 overflow-y-auto bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
             onClick={(e) => {
                 if (e.target === e.currentTarget) {
                     onClose();
                 }
             }}
         >
-            <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-800 overflow-hidden">
+            <div
+                className="relative w-full max-w-xl max-h-[85vh] flex flex-col my-auto bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Modal Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
                             <RotateCcw className="w-5 h-5" />
@@ -213,7 +216,7 @@ export function AgyCleanModal({ isOpen, onClose }: AgyCleanModalProps) {
                 </div>
 
                 {/* Modal Body */}
-                <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+                <div className="p-6 space-y-5 flex-1 min-h-0 overflow-y-auto">
                     {/* Retention Presets */}
                     <div>
                         <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-2">
@@ -382,7 +385,7 @@ export function AgyCleanModal({ isOpen, onClose }: AgyCleanModalProps) {
                 </div>
 
                 {/* Modal Footer */}
-                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50">
+                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 shrink-0">
                     <button
                         type="button"
                         onClick={handleUndoLast}

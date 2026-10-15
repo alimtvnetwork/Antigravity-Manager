@@ -53,7 +53,7 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
     const isSwitching = actionState[switchTargetInstance.config.id] === 'switch';
 
     return (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[99999] p-4 overflow-y-auto">
             <div className="bg-white dark:bg-base-200 rounded-2xl p-6 w-full max-w-lg shadow-2xl border border-gray-100 dark:border-base-100 max-h-[85vh] flex flex-col">
                 <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-base-100">
                     <div className="flex items-center gap-2.5">

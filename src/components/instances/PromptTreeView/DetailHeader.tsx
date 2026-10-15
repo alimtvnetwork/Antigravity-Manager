@@ -30,11 +30,19 @@ export interface DetailHeaderProps {
     isCopiedRaw: boolean;
     isCopied: boolean;
     setIsCopied: (v: boolean) => void;
+    isCopiedAll?: boolean;
+    setIsCopiedAll?: (v: boolean) => void;
     isEnqueueing: boolean;
     isResending: boolean;
     isFocusing: boolean;
-    isExportMenuOpen: boolean;
-    setIsExportMenuOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
+    isCopyMenuOpen?: boolean;
+    setIsCopyMenuOpen?: (v: boolean | ((prev: boolean) => boolean)) => void;
+    isSendMenuOpen?: boolean;
+    setIsSendMenuOpen?: (v: boolean | ((prev: boolean) => boolean)) => void;
+    isEnqueueMenuOpen?: boolean;
+    setIsEnqueueMenuOpen?: (v: boolean | ((prev: boolean) => boolean)) => void;
+    isExportMenuOpen?: boolean;
+    setIsExportMenuOpen?: (v: boolean | ((prev: boolean) => boolean)) => void;
     hasImages: boolean;
     instancePid?: number;
     instanceSeqNum: number;
@@ -42,6 +50,8 @@ export interface DetailHeaderProps {
     instanceNameDisplay: string;
     formatDuration: (secs: number) => string;
     elapsedSeconds: number;
+    onCopyAllWithRichImages?: () => void;
+    onCopyCleanText?: () => void;
     onCopyWithImages: () => void;
     onSaveImages: () => void;
     onExport: (format: 'md' | 'json') => void;
@@ -57,16 +67,35 @@ export function DetailHeader(props: DetailHeaderProps) {
         confirmationSuffix, setConfirmationSuffix,
         conversationTargetMode = 'current', setConversationTargetMode,
         isCopiedText, setIsCopiedText,
+        isCopiedAll = false, setIsCopiedAll,
         isEnqueueing, isResending, isFocusing,
+        isCopyMenuOpen: propIsCopyMenuOpen, setIsCopyMenuOpen: propSetIsCopyMenuOpen,
+        isSendMenuOpen: propIsSendMenuOpen, setIsSendMenuOpen: propSetIsSendMenuOpen,
+        isEnqueueMenuOpen: propIsEnqueueMenuOpen, setIsEnqueueMenuOpen: propSetIsEnqueueMenuOpen,
         isExportMenuOpen, setIsExportMenuOpen,
         hasImages, instancePid, instanceSeqNum, instanceExeName, instanceNameDisplay,
         formatDuration, elapsedSeconds,
+        onCopyAllWithRichImages, onCopyCleanText,
         onCopyWithImages, onSaveImages, onExport, onFocusIde, onResend, onEnqueue, onOpenInspector,
     } = props;
 
     const [localCopiedText, setLocalCopiedText] = useState(false);
     const isCopiedTextActive = isCopiedText || localCopiedText;
-    const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
+    const [localCopiedAll, setLocalCopiedAll] = useState(false);
+    const isCopiedAllActive = isCopiedAll || localCopiedAll;
+
+    const [localIsCopyMenuOpen, setLocalIsCopyMenuOpen] = useState(false);
+    const [localIsSendMenuOpen, setLocalIsSendMenuOpen] = useState(false);
+    const [localIsEnqueueMenuOpen, setLocalIsEnqueueMenuOpen] = useState(false);
+
+    const isCopyMenuOpen = propIsCopyMenuOpen ?? isExportMenuOpen ?? localIsCopyMenuOpen;
+    const setIsCopyMenuOpen = propSetIsCopyMenuOpen ?? setIsExportMenuOpen ?? setLocalIsCopyMenuOpen;
+
+    const isSendMenuOpen = propIsSendMenuOpen ?? localIsSendMenuOpen;
+    const setIsSendMenuOpen = propSetIsSendMenuOpen ?? setLocalIsSendMenuOpen;
+
+    const isEnqueueMenuOpen = propIsEnqueueMenuOpen ?? localIsEnqueueMenuOpen;
+    const setIsEnqueueMenuOpen = propSetIsEnqueueMenuOpen ?? setLocalIsEnqueueMenuOpen;
 
     return (
         <div className="space-y-2 pb-2.5 border-b border-slate-200 dark:border-[#40285e] shrink-0">
@@ -120,102 +149,137 @@ export function DetailHeader(props: DetailHeaderProps) {
                     </span>
                 </div>
 
-                {/* Right: The 2 Canonical Segmented Dark-Glass Action Capsules */}
+                {/* Right: The 3 Canonical Segmented Dark-Glass Action Capsules */}
                 <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-                    {/* Capsule 1: Consolidated Content & Export Split Button */}
-                    <div className="relative flex items-center rounded-full bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200 dark:border-[#40285e] p-0.5 divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs shrink-0">
-                        {/* Primary Click: Copy Clean Text */}
+                    {/* Capsule 1: Content & Media Copy Split Button [ Copy All | v ] */}
+                    <div className="relative flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
+                        {/* Primary Click: One-Shot Copy All (Content + Images) */}
                         <button
                             type="button"
                             onClick={() => {
-                                const cleanText = stripImagesFromPrompt(activePromptText);
-                                copyToClipboard(cleanText);
-                                setLocalCopiedText(true);
-                                setIsCopiedText(true);
+                                if (onCopyAllWithRichImages) {
+                                    onCopyAllWithRichImages();
+                                } else {
+                                    onCopyWithImages();
+                                }
+                                setLocalCopiedAll(true);
+                                setIsCopiedAll?.(true);
                                 setTimeout(() => {
-                                    setLocalCopiedText(false);
-                                    setIsCopiedText(false);
+                                    setLocalCopiedAll(false);
+                                    setIsCopiedAll?.(false);
                                 }, 2000);
                             }}
-                            className="flex items-center gap-1 px-2.5 py-0.5 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                            title="Copy clean prompt text (excluding embedded images)"
+                            className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            title="Copy full prompt text and all embedded images in one shot"
                         >
-                            {isCopiedTextActive ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-slate-500 dark:text-slate-400" />}
-                            <span>{isCopiedTextActive ? 'Copied!' : 'Copy'}</span>
+                            {isCopiedAllActive ? (
+                                <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                            ) : (
+                                <Copy className="w-3 h-3 text-slate-500 dark:text-slate-400 shrink-0" />
+                            )}
+                            <span>{isCopiedAllActive ? 'Copied All!' : 'Copy All'}</span>
                         </button>
 
-                        {/* Dropdown Chevron for Rich Copy & Export Options */}
+                        {/* Dropdown Chevron for Clean Text, Image Saving, and Exports */}
                         <button
                             type="button"
-                            onClick={() => setIsExportMenuOpen((prev) => !prev)}
-                            className="flex items-center px-1.5 py-0.5 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            onClick={() => setIsCopyMenuOpen((prev) => !prev)}
+                            className="flex items-center justify-center px-1.5 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             title="More copy and export options"
                         >
-                            <ChevronDown className="w-3 h-3 text-slate-400" />
+                            <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isCopyMenuOpen && "rotate-180")} />
                         </button>
 
                         {/* Flyout Menu */}
-                        {isExportMenuOpen && (
+                        {isCopyMenuOpen && (
                             <div
-                                className="absolute right-0 top-full mt-1.5 z-50 w-52 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl py-1 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md"
-                                onMouseLeave={() => setIsExportMenuOpen(false)}
+                                className="absolute right-0 top-full mt-1.5 z-50 w-56 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-1"
+                                onMouseLeave={() => setIsCopyMenuOpen(false)}
                             >
+                                {/* Sub-item 1: Copy Clean Text Only */}
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        onCopyWithImages();
-                                        setIsExportMenuOpen(false);
+                                        if (onCopyCleanText) {
+                                            onCopyCleanText();
+                                        } else {
+                                            const cleanText = stripImagesFromPrompt(activePromptText);
+                                            copyToClipboard(cleanText);
+                                            setLocalCopiedText(true);
+                                            setIsCopiedText(true);
+                                            setTimeout(() => {
+                                                setLocalCopiedText(false);
+                                                setIsCopiedText(false);
+                                            }, 2000);
+                                        }
+                                        setIsCopyMenuOpen(false);
                                     }}
-                                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] text-left cursor-pointer transition-colors"
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
                                 >
-                                    <Copy className="w-3.5 h-3.5 text-indigo-500" />
-                                    <span>Copy with Rich Images</span>
+                                    <div className="flex items-center gap-2">
+                                        {isCopiedTextActive ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                                        <span>{isCopiedTextActive ? 'Copied Clean Text!' : 'Copy Clean Text'}</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-mono">No Images</span>
                                 </button>
 
+                                {/* Sub-item 2: Save Images to Disk */}
                                 {hasImages && (
                                     <button
                                         type="button"
                                         onClick={() => {
                                             onSaveImages();
-                                            setIsExportMenuOpen(false);
+                                            setIsCopyMenuOpen(false);
                                         }}
-                                        className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] text-left cursor-pointer transition-colors"
+                                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
                                     >
-                                        <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
-                                        <span>Save Images to Disk</span>
+                                        <div className="flex items-center gap-2">
+                                            <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
+                                            <span>Save Images to Disk</span>
+                                        </div>
+                                        <span className="text-[10px] text-slate-400 font-mono">Assets</span>
                                     </button>
                                 )}
 
-                                <div className="border-t border-slate-100 dark:border-slate-800 my-1" />
+                                <div className="border-t border-slate-100 dark:border-[#40285e]/60 my-1" />
 
+                                {/* Sub-item 3: Export as Markdown */}
                                 <button
                                     type="button"
                                     onClick={() => {
                                         onExport('md');
-                                        setIsExportMenuOpen(false);
+                                        setIsCopyMenuOpen(false);
                                     }}
-                                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] text-left cursor-pointer transition-colors"
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
                                 >
-                                    <FileText className="w-3.5 h-3.5 text-cyan-500" />
-                                    <span>Export as Markdown (.md)</span>
+                                    <div className="flex items-center gap-2">
+                                        <FileText className="w-3.5 h-3.5 text-cyan-500" />
+                                        <span>Export as Markdown</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-mono">.md</span>
                                 </button>
+
+                                {/* Sub-item 4: Export as JSON */}
                                 <button
                                     type="button"
                                     onClick={() => {
                                         onExport('json');
-                                        setIsExportMenuOpen(false);
+                                        setIsCopyMenuOpen(false);
                                     }}
-                                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] text-left cursor-pointer transition-colors"
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
                                 >
-                                    <Code className="w-3.5 h-3.5 text-amber-500" />
-                                    <span>Export as JSON (.json)</span>
+                                    <div className="flex items-center gap-2">
+                                        <Code className="w-3.5 h-3.5 text-amber-500" />
+                                        <span>Export as JSON</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-mono">.json</span>
                                 </button>
                             </div>
                         )}
                     </div>
 
-                    {/* Capsule 2: Segmented Dark-Glass Split-Dropdown Capsule */}
-                    <div className="relative ml-auto flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
+                    {/* Capsule 2: Direct Send Split Button [ Send N | v ] */}
+                    <div className="relative flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
                         {/* Primary Send Button with <kbd>N</kbd> */}
                         <button
                             type="button"
@@ -233,76 +297,22 @@ export function DetailHeader(props: DetailHeaderProps) {
                             <kbd className="ml-0.5 px-1 py-0.2 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded text-[8.5px] font-mono font-bold">N</kbd>
                         </button>
 
-                        {/* Split ChevronDown Dropdown Toggle */}
+                        {/* Split ChevronDown Dropdown Toggle for Send Options */}
                         <button
                             type="button"
-                            onClick={() => setIsActionMenuOpen((prev) => !prev)}
+                            onClick={() => setIsSendMenuOpen((prev) => !prev)}
                             className="flex items-center justify-center px-1.5 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                            title="More execution, queue, and dispatch options"
+                            title="Send and dispatch configuration options"
                         >
-                            <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isActionMenuOpen && "rotate-180")} />
+                            <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isSendMenuOpen && "rotate-180")} />
                         </button>
 
-                        {/* Dropdown Menu for Enqueue, Focus IDE, Full Inspector, Destination Mode, and Confirmation Suffix */}
-                        {isActionMenuOpen && (
+                        {/* Dropdown Menu for Send Options (Destination, Suffix, Focus IDE) */}
+                        {isSendMenuOpen && (
                             <div
                                 className="absolute right-0 top-full mt-1.5 z-50 w-64 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-1"
-                                onMouseLeave={() => setIsActionMenuOpen(false)}
+                                onMouseLeave={() => setIsSendMenuOpen(false)}
                             >
-                                {/* Enqueue Action */}
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        void Promise.resolve(onEnqueue()).catch((err) => {
-                                            reportPromptActionError(err, 'DetailHeader.onEnqueue');
-                                        });
-                                        setIsActionMenuOpen(false);
-                                    }}
-                                    disabled={isEnqueueing}
-                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-amber-800 dark:text-amber-200 hover:bg-amber-50 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors disabled:opacity-50"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <ListPlus className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300 shrink-0" />
-                                        <span className="font-medium">Enqueue Prompt</span>
-                                    </div>
-                                    <span className="text-[10px] text-slate-400 font-mono">FIFO Queue</span>
-                                </button>
-
-                                {/* Focus IDE Action */}
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        onFocusIde();
-                                        setIsActionMenuOpen(false);
-                                    }}
-                                    disabled={isFocusing}
-                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors disabled:opacity-50"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <ExternalLink className={cn('w-3.5 h-3.5 text-sky-500 shrink-0', isFocusing && 'animate-spin')} />
-                                        <span className="font-medium">Focus IDE Window</span>
-                                    </div>
-                                    <span className="text-[10px] text-slate-400 font-mono">Launch/Focus</span>
-                                </button>
-
-                                {/* Full Inspector Action */}
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        onOpenInspector(selectedConversation);
-                                        setIsActionMenuOpen(false);
-                                    }}
-                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-blue-700 dark:text-cyan-300 hover:bg-blue-50 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <Maximize2 className="w-3.5 h-3.5 text-blue-500 dark:text-cyan-400 shrink-0" />
-                                        <span className="font-medium">Full Inspector</span>
-                                    </div>
-                                    <span className="text-[10px] text-slate-400 font-mono">Full-Screen</span>
-                                </button>
-
-                                <div className="border-t border-slate-100 dark:border-[#40285e]/60 my-1" />
-
                                 {/* Destination Conversation Mode */}
                                 <div className="flex items-center justify-between px-2.5 py-1 text-xs">
                                     <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
@@ -312,7 +322,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         value={conversationTargetMode}
                                         onChange={(e) => setConversationTargetMode?.(e.target.value as 'current' | 'new')}
                                         className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:ring-0 focus:outline-none cursor-pointer py-0.5 text-right"
-                                        title="Destination conversation mode for Send and Queue"
+                                        title="Destination conversation mode for Send"
                                     >
                                         <option value="current" className="bg-white dark:bg-[#171025]">Current Conv</option>
                                         <option value="new" className="bg-white dark:bg-[#171025]">New Conv</option>
@@ -337,6 +347,101 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         <option value="Double check all edge cases" className="bg-white dark:bg-[#171025]">Edge cases</option>
                                         <option value="Verify build and tests" className="bg-white dark:bg-[#171025]">Verify tests</option>
                                     </select>
+                                </div>
+
+                                <div className="border-t border-slate-100 dark:border-[#40285e]/60 my-1" />
+
+                                {/* Focus IDE Action */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onFocusIde();
+                                        setIsSendMenuOpen(false);
+                                    }}
+                                    disabled={isFocusing}
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors disabled:opacity-50"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <ExternalLink className={cn('w-3.5 h-3.5 text-sky-500 shrink-0', isFocusing && 'animate-spin')} />
+                                        <span className="font-medium">Focus IDE Window</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-mono">Launch/Focus</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Capsule 3: Background FIFO Enqueue Split Button [ Enqueue | v ] */}
+                    <div className="relative flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
+                        {/* Primary Enqueue Button */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                void Promise.resolve(onEnqueue()).catch((err) => {
+                                    reportPromptActionError(err, 'DetailHeader.onEnqueue');
+                                });
+                            }}
+                            disabled={isEnqueueing}
+                            className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-amber-800 dark:text-amber-300 hover:bg-amber-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                            title="Enqueue prompt into FIFO background scheduler queue"
+                        >
+                            <ListPlus className={cn('w-3 h-3 text-amber-500 dark:text-amber-400', isEnqueueing && 'animate-pulse')} />
+                            <span>Enqueue</span>
+                        </button>
+
+                        {/* Split ChevronDown Dropdown Toggle for Queue Options */}
+                        <button
+                            type="button"
+                            onClick={() => setIsEnqueueMenuOpen((prev) => !prev)}
+                            className="flex items-center justify-center px-1.5 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            title="Queue options and full inspector"
+                        >
+                            <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isEnqueueMenuOpen && "rotate-180")} />
+                        </button>
+
+                        {/* Dropdown Menu for Queue Options */}
+                        {isEnqueueMenuOpen && (
+                            <div
+                                className="absolute right-0 top-full mt-1.5 z-50 w-64 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-1"
+                                onMouseLeave={() => setIsEnqueueMenuOpen(false)}
+                            >
+                                {/* Destination Conversation Mode for Queue */}
+                                <div className="flex items-center justify-between px-2.5 py-1 text-xs">
+                                    <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
+                                        Destination:
+                                    </span>
+                                    <select
+                                        value={conversationTargetMode}
+                                        onChange={(e) => setConversationTargetMode?.(e.target.value as 'current' | 'new')}
+                                        className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:ring-0 focus:outline-none cursor-pointer py-0.5 text-right"
+                                        title="Destination conversation mode for Queue"
+                                    >
+                                        <option value="current" className="bg-white dark:bg-[#171025]">Current Conv</option>
+                                        <option value="new" className="bg-white dark:bg-[#171025]">New Conv</option>
+                                    </select>
+                                </div>
+
+                                <div className="border-t border-slate-100 dark:border-[#40285e]/60 my-1" />
+
+                                {/* Full Inspector Action */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onOpenInspector(selectedConversation);
+                                        setIsEnqueueMenuOpen(false);
+                                    }}
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-blue-700 dark:text-cyan-300 hover:bg-blue-50 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Maximize2 className="w-3.5 h-3.5 text-blue-500 dark:text-cyan-400 shrink-0" />
+                                        <span className="font-medium">Full Inspector</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-mono">Full-Screen</span>
+                                </button>
+
+                                {/* Queue Information / FIFO Notice */}
+                                <div className="px-2.5 py-1.5 text-[10px] text-slate-400 font-mono border-t border-slate-100 dark:border-[#40285e]/60 mt-1">
+                                    FIFO Scheduler: Background execution without focus interruption
                                 </div>
                             </div>
                         )}

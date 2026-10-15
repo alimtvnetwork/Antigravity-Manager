@@ -1,5 +1,18 @@
 # Changelog
 
+## [v4.204.0] - 2026-10-15
+
+### Fixed
+- **Prompt Tree Direct Send & FIFO Enqueue Decoupling**: Replaced the combined action dropdown in `src/components/instances/PromptTreeView/DetailHeader.tsx` with dedicated segmented capsules (`[ Send N | v ]` and `[ Enqueue | v ]`) and separate menus; "Send" now dispatches directly to the active IDE conversation composer instead of silently acting as an enqueue operation, while "Enqueue" preserves strict FIFO background queueing. All inline `<select>` elements use transparent borderless styling (`bg-transparent border-0 focus:ring-0 focus:outline-none`) to eliminate nested white pill visual defects. (Thanks to @aukgit)
+- **Direct Prompt Dispatch CDP DOM Insertion Fallback**: In `src-tauri/src/modules/repo_db/agy.rs` and `src-tauri/src/bin/agm/prompt_dispatch.rs`, direct prompt dispatch automatically falls back to loopback CDP DOM insertion (`submit_prompt_via_cdp_for_instance`) when the standalone `agy` executable is absent or fails to launch, writing both `.antigravity_resume_task.json` and instance-scoped resumption files and recording audit trail telemetry. (Thanks to @aukgit)
+- **SSH Vault Status Field Alignment**: Aligned field access in `src-tauri/src/bin/agm/ssh_cmds.rs` with `SshGitmapStatus` (`rsa_vault_ready`, `rsa_public_key_fingerprint`). (Thanks to @aukgit)
+
+### Added
+- **Standalone One-Shot Rich Copy (Content + Images)**: Implemented `copyPromptWithRichImages` in `src/components/instances/PromptTreeView/clipboard.ts` and added a standalone "Copy All (Content + Images)" button in `src/components/instances/PromptTreeView/PromptInstructionView.tsx` and `DetailHeader.tsx` that copies dual-MIME `ClipboardItem` (`text/html` with embedded `<img>` tags and markdown `text/plain` fallback) with 2-second visual checkmark confirmation and structured error tracking. (Thanks to @aukgit)
+- **CLI Methods & Sections Parity (`agm prompt send` / `agm prompt queue` / `agm queue`)**: Added top-level shortcuts `agm queue`, `agm enqueue`, and `agm qe`, along with `--queue` / `-q` flag support for `agm prompt [text]`, sequence target resolution (`C001`, `P001`, `GM:#1`) via `repo_db::resolve_agm_sequence_target`, and empty prompt validation with actionable CLI help. (Thanks to @aukgit)
+
+---
+
 ## [v4.203.0] - 2026-10-15
 
 ### Fixed
@@ -291,6 +304,15 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.204.0 (2026-10-15)**:
+        -   **[Prompt Tree UI & Action Toolbar] 3-capsule segmented dark-glass toolbar, send vs enqueue decoupling, and transparent select styling (Thanks to @aukgit)**:
+            -   **Description**: Redesigned `src/components/instances/PromptTreeView/DetailHeader.tsx` into 3 contiguous segmented capsules (`[ Copy All | v ]`, `[ Send N | v ]`, and `[ Enqueue | v ]`), separating immediate direct prompt execution from background FIFO queueing; styled `<select>` elements with transparent borderless styling (`bg-transparent border-0 focus:ring-0 focus:outline-none`) to eradicate nested white pill defects; wired independent menu toggles (`isSendMenuOpen`, `isEnqueueMenuOpen`, `isCopyMenuOpen`) in `usePromptTreeState.ts` and refined handlers in `usePromptTreePromptActions.ts`.
+        -   **[Standalone Rich Copy & Dual-MIME Clipboard] One-shot copying of prompt content and embedded media with error tracking (Thanks to @aukgit)**:
+            -   **Description**: Implemented `copyPromptWithRichImages` in `src/components/instances/PromptTreeView/clipboard.ts` copying dual-MIME `ClipboardItem` (`text/html` with embedded `<img>` tags for rich text editors and Telegram, and `text/plain` markdown fallback); added a standalone "Copy All (Content + Images)" button with 2-second visual confirmation in `PromptInstructionView.tsx`; and routed clipboard failures through `useErrorStore.getState().trackWarning`.
+        -   **[CLI Methods & Backend Dispatch] CLI parity for `agm prompt send`, `agm prompt queue`, `agm queue`, `agm enqueue`, and CDP injection fallback (Thanks to @aukgit)**:
+            -   **Description**: Added `agm queue`, `agm enqueue`, and `agm qe` top-level aliases, `--queue` / `-q` flags for `agm prompt [text]`, and sequence token resolution (`C001`, `P001`, `GM:#1`) in `src-tauri/src/bin/agm/main.rs`, `prompt_cmds.rs`, and `common.rs`; added empty prompt validation; hardened `src-tauri/src/modules/repo_db/agy.rs` and `prompt_dispatch.rs` with automatic fallback to loopback CDP DOM injection (`submit_prompt_via_cdp_for_instance`) when the `agy` CLI binary is absent or failing; and aligned `ssh_cmds.rs` with `SshGitmapStatus`.
+
+
     *   **v4.203.0 (2026-10-15)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

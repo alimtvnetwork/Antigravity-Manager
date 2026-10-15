@@ -81,8 +81,18 @@ export default function InstanceAuditTrailModal({
     const totalSwitches = history?.total_switches ?? (history?.recent_switches?.length || 0);
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 sm:p-6 animate-in fade-in duration-200">
-            <div className="flex h-[90vh] max-h-[860px] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025] shadow-2xl">
+        <div
+            className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 sm:p-6 overflow-y-auto animate-in fade-in duration-200"
+            onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                    onClose();
+                }
+            }}
+        >
+            <div
+                className="flex h-[90vh] max-h-[860px] w-full max-w-4xl flex-col my-auto overflow-hidden rounded-2xl border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025] shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-[#40285e] px-6 py-4 bg-slate-50/80 dark:bg-[#090611]">
                     <div className="flex items-center gap-3">

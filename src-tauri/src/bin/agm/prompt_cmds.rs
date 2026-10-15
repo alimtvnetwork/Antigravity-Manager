@@ -39,7 +39,7 @@ pub(crate) fn dispatch_prompt_domain(subcommand: &str, args: &[String]) {
         "inspect" | "observe" => cmd_prompts_inspect(args),
         "send" | "dispatch" => cmd_prompts_send(args),
         "running" | "wpr" => cmd_prompts_running(args),
-        "queue" | "qe" => cmd_prompts_queue(args),
+        "queue" | "enqueue" | "qe" => cmd_prompts_queue(args),
         "history" => cmd_prompts_history(args),
         "export" => crate::prompt_import_export::cmd_prompts_export(args),
         "export-compact" | "compact-export" => crate::compact_cmds::cmd_export_compact(args),
@@ -51,8 +51,24 @@ pub(crate) fn dispatch_prompt_domain(subcommand: &str, args: &[String]) {
         }
         "copy" | "cp" => cmd_prompts_copy(args),
         "purge" | "clean" => cmd_prompts_purge(args),
+        "help" | "--help" | "-h" => cmd_prompts_help(args),
         _ => crate::common::handle_unknown_domain_command("prompts", subcommand, args),
     }
+}
+
+pub(crate) fn cmd_prompts_help(_args: &[String]) {
+    println!("AGM Prompts Domain Commands:");
+    println!("  agm prompt send [target] \"<text>\"     Immediately dispatch prompt (bypasses FIFO queue)");
+    println!("  agm prompt queue [target] \"<text>\"    Enqueue prompt into SQLite FIFO queue");
+    println!("  agm queue [target] \"<text>\"           Top-level shortcut to enqueue prompt");
+    println!("  agm enqueue [target] \"<text>\"         Top-level alias to enqueue prompt");
+    println!("  agm prompt [target] \"<text>\" [--queue] Dispatch prompt immediately (or queue if --queue)");
+    println!("  agm prompt list                       List active prompts");
+    println!("  agm prompt tree                       Render project/conversation tree");
+    println!("  agm prompt running                    Show currently running prompts");
+    println!("  agm prompt backup                     Snapshot active prompts");
+    println!("  agm prompt restore                    Restore and re-enqueue in-flight prompts");
+    println!("  agm prompt inspect                    Observe prompt goals and liveness");
 }
 
 pub(crate) fn cmd_prompts_list(args: &[String]) {
@@ -180,32 +196,58 @@ fn resolve_destination_session(args: &[String], repo_path: &str) -> Option<Strin
 
 pub(crate) fn cmd_prompts_send(args: &[String]) {
     let ctx = CliContext::parse(args);
-    let target_instance = ctx
-        .resolve_target_instance()
-        .unwrap_or_else(|_| "default".to_string());
-    let resolved_inst =
-        instance::resolve_instance_id(&target_instance).unwrap_or_else(|_| target_instance.clone());
-    let repo_path = ctx.repo_path.clone().unwrap_or_else(|| {
-        std::env::current_dir()
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_else(|_| "scratch/test-repo".to_string())
-    });
+    let mut resolved_seq: Option<repo_db::AgmSequenceResolution> = None;
+    let mut prompt_tokens = ctx.positional_args.clone();
 
-    let raw_prompt = if ctx.instance_id.is_none() && ctx.positional_args.len() >= 2 {
-        let first = &ctx.positional_args[0];
-        if first.starts_with('#')
-            || first.starts_with("inst-")
-            || first == "default"
-            || instance::resolve_instance_id(first).is_ok()
+    if !prompt_tokens.is_empty() {
+        let first = prompt_tokens[0].trim();
+        let upper = first.trim_start_matches('#').to_uppercase();
+        let looks_like_seq = upper.starts_with("AGM:")
+            || upper.starts_with("GM:")
+            || ((upper.starts_with('C') || upper.starts_with('P'))
+                && upper[1..].chars().all(|c| c.is_ascii_digit())
+                && !upper[1..].is_empty());
+
+        if looks_like_seq {
+            if let Some(res) = repo_db::resolve_agm_sequence_target(first) {
+                resolved_seq = Some(res);
+                prompt_tokens.remove(0);
+            }
+        } else if ctx.instance_id.is_none()
+            && prompt_tokens.len() >= 2
+            && (first.starts_with('#')
+                || first.starts_with("inst-")
+                || first == "default"
+                || instance::resolve_instance_id(first).is_ok())
         {
-            ctx.positional_args[1..].join(" ")
-        } else {
-            ctx.positional_args.join(" ")
+            prompt_tokens.remove(0);
         }
+    }
+
+    let (target_instance, repo_path, session_id) = if let Some(seq) = resolved_seq {
+        let inst = ctx.instance_id.clone().unwrap_or(seq.instance_id);
+        let repo = ctx.repo_path.clone().unwrap_or(seq.repo_path);
+        let sess = seq
+            .conversation_id
+            .or_else(|| resolve_destination_session(args, &repo));
+        (inst, repo, sess)
     } else {
-        ctx.positional_args.join(" ")
+        let inst = ctx
+            .resolve_target_instance()
+            .unwrap_or_else(|_| "default".to_string());
+        let repo = ctx.repo_path.clone().unwrap_or_else(|| {
+            std::env::current_dir()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|_| "scratch/test-repo".to_string())
+        });
+        let sess = resolve_destination_session(args, &repo);
+        (inst, repo, sess)
     };
 
+    let resolved_inst =
+        instance::resolve_instance_id(&target_instance).unwrap_or_else(|_| target_instance.clone());
+
+    let raw_prompt = prompt_tokens.join(" ");
     let mut final_prompt = raw_prompt;
     if let Some(ref pref) = ctx.prefix {
         final_prompt = format!("{} {}", pref, final_prompt);
@@ -214,8 +256,21 @@ pub(crate) fn cmd_prompts_send(args: &[String]) {
         final_prompt = format!("{} {}", final_prompt, suff);
     }
 
-    let session_id = resolve_destination_session(args, &repo_path)
-        .or_else(|| Some(format!("conv-{}", uuid::Uuid::new_v4())));
+    if final_prompt.trim().is_empty() {
+        if ctx.json_output {
+            CliEnvelope::<()>::err(
+                "prompt send",
+                Some(target_instance),
+                "EMPTY_PROMPT",
+                "Prompt content cannot be empty.",
+            )
+            .print_and_exit();
+        }
+        eprintln!("[ERROR] Prompt content cannot be empty.");
+        std::process::exit(1);
+    }
+
+    let session_id = session_id.or_else(|| Some(format!("conv-{}", uuid::Uuid::new_v4())));
 
     // Query smart process cache / OS process table
     let cached_proc = instance::get_or_detect_instance_process(&resolved_inst);
@@ -355,32 +410,58 @@ pub(crate) fn cmd_prompts_running(args: &[String]) {
 
 pub(crate) fn cmd_prompts_queue(args: &[String]) {
     let ctx = CliContext::parse(args);
-    let target_instance = ctx
-        .resolve_target_instance()
-        .unwrap_or_else(|_| "default".to_string());
-    let resolved_inst =
-        instance::resolve_instance_id(&target_instance).unwrap_or_else(|_| target_instance.clone());
-    let repo_path = ctx.repo_path.clone().unwrap_or_else(|| {
-        std::env::current_dir()
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_else(|_| "scratch/test-repo".to_string())
-    });
+    let mut resolved_seq: Option<repo_db::AgmSequenceResolution> = None;
+    let mut prompt_tokens = ctx.positional_args.clone();
 
-    let raw_prompt = if ctx.instance_id.is_none() && ctx.positional_args.len() >= 2 {
-        let first = &ctx.positional_args[0];
-        if first.starts_with('#')
-            || first.starts_with("inst-")
-            || first == "default"
-            || instance::resolve_instance_id(first).is_ok()
+    if !prompt_tokens.is_empty() {
+        let first = prompt_tokens[0].trim();
+        let upper = first.trim_start_matches('#').to_uppercase();
+        let looks_like_seq = upper.starts_with("AGM:")
+            || upper.starts_with("GM:")
+            || ((upper.starts_with('C') || upper.starts_with('P'))
+                && upper[1..].chars().all(|c| c.is_ascii_digit())
+                && !upper[1..].is_empty());
+
+        if looks_like_seq {
+            if let Some(res) = repo_db::resolve_agm_sequence_target(first) {
+                resolved_seq = Some(res);
+                prompt_tokens.remove(0);
+            }
+        } else if ctx.instance_id.is_none()
+            && prompt_tokens.len() >= 2
+            && (first.starts_with('#')
+                || first.starts_with("inst-")
+                || first == "default"
+                || instance::resolve_instance_id(first).is_ok())
         {
-            ctx.positional_args[1..].join(" ")
-        } else {
-            ctx.positional_args.join(" ")
+            prompt_tokens.remove(0);
         }
+    }
+
+    let (target_instance, repo_path, session_id) = if let Some(seq) = resolved_seq {
+        let inst = ctx.instance_id.clone().unwrap_or(seq.instance_id);
+        let repo = ctx.repo_path.clone().unwrap_or(seq.repo_path);
+        let sess = seq
+            .conversation_id
+            .or_else(|| resolve_destination_session(args, &repo));
+        (inst, repo, sess)
     } else {
-        ctx.positional_args.join(" ")
+        let inst = ctx
+            .resolve_target_instance()
+            .unwrap_or_else(|_| "default".to_string());
+        let repo = ctx.repo_path.clone().unwrap_or_else(|| {
+            std::env::current_dir()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|_| "scratch/test-repo".to_string())
+        });
+        let sess = resolve_destination_session(args, &repo);
+        (inst, repo, sess)
     };
 
+    let resolved_inst =
+        instance::resolve_instance_id(&target_instance).unwrap_or_else(|_| target_instance.clone());
+
+    let raw_prompt = prompt_tokens.join(" ");
     let mut final_prompt = raw_prompt;
     if let Some(ref pref) = ctx.prefix {
         final_prompt = format!("{} {}", pref, final_prompt);
@@ -389,7 +470,19 @@ pub(crate) fn cmd_prompts_queue(args: &[String]) {
         final_prompt = format!("{} {}", final_prompt, suff);
     }
 
-    let session_id = resolve_destination_session(args, &repo_path);
+    if final_prompt.trim().is_empty() {
+        if ctx.json_output {
+            CliEnvelope::<()>::err(
+                "prompt queue",
+                Some(target_instance),
+                "EMPTY_PROMPT",
+                "Prompt content cannot be empty.",
+            )
+            .print_and_exit();
+        }
+        eprintln!("[ERROR] Prompt content cannot be empty.");
+        std::process::exit(1);
+    }
 
     match repo_db::enqueue_prompt_for_instance(
         &resolved_inst,

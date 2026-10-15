@@ -20,6 +20,8 @@ export interface PromptInstructionViewProps {
     formatByteSize: (bytes: number) => string;
     isCopied: boolean;
     setIsCopied: (v: boolean) => void;
+    isCopiedAll?: boolean;
+    onCopyAllWithRichImages?: () => void;
     openInspector: (conv: AgmConversationNode, repoPath: string) => void;
     selectedProject: AgmProjectTreeNode | null;
     activeByteCount: number;
@@ -34,6 +36,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         displayedMarkdown, showAllWords, setShowAllWords,
         isTruncated, totalWords, activeWordCount, formatByteSize,
         isCopied, setIsCopied,
+        isCopiedAll = false, onCopyAllWithRichImages,
         openInspector, selectedProject, activeByteCount,
         setActivePromptText, setActionMsg,
     } = props;
@@ -100,6 +103,27 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                     </button>
                 )}
 
+                {onCopyAllWithRichImages && (
+                    <button
+                        type="button"
+                        onClick={onCopyAllWithRichImages}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-xs font-semibold bg-indigo-50 dark:bg-[#171025] text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-[#40285e] hover:bg-indigo-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
+                        title="Copy full prompt text and all embedded rich images in one shot"
+                    >
+                        {isCopiedAll ? (
+                            <>
+                                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                <span>Copied All!</span>
+                            </>
+                        ) : (
+                            <>
+                                <Copy className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+                                <span>Copy All (Content + Images)</span>
+                            </>
+                        )}
+                    </button>
+                )}
+
                 <button
                     type="button"
                     onClick={() => {
@@ -142,7 +166,27 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                 'No prompt content recorded.'
             )}
         </div>
-        <div className="flex items-center justify-end pt-1">
+        <div className="flex items-center justify-end gap-2 pt-1">
+            {onCopyAllWithRichImages && (
+                <button
+                    type="button"
+                    onClick={onCopyAllWithRichImages}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-xs font-semibold bg-indigo-50 dark:bg-[#171025] text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-[#40285e] hover:bg-indigo-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
+                    title="Copy full prompt text and all embedded rich images in one shot"
+                >
+                    {isCopiedAll ? (
+                        <>
+                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            <span>Copied All!</span>
+                        </>
+                    ) : (
+                        <>
+                            <Copy className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+                            <span>Copy All (Content + Images)</span>
+                        </>
+                    )}
+                </button>
+            )}
             <button
                 type="button"
                 onClick={() => {

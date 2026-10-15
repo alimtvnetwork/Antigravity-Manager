@@ -13,7 +13,52 @@ import { isGhostConversation } from './conversationGuards';
 import { detectPromptCategory } from './tierClassification';
 import type { PromptTreeState } from './usePromptTreeState';
 
+export async function copyPromptWithRichImages(
+    promptText: string,
+    onSuccess: (message: string) => void,
+    onError: (err: unknown) => void
+): Promise<boolean> {
+    if (!promptText || !promptText.trim()) {
+        return false;
+    }
+
+    try {
+        // 1. Synthesize rich HTML payload converting Markdown images to styled HTML <img> tags
+        const htmlContent = promptText
+            .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" style="max-width:100%; border-radius: 8px; margin: 8px 0;" /><br />')
+            .replace(/\n/g, '<br />');
+
+        const blobHtml = new Blob([htmlContent], { type: 'text/html' });
+        const blobText = new Blob([promptText], { type: 'text/plain' });
+
+        const item = new ClipboardItem({
+            'text/html': blobHtml,
+            'text/plain': blobText,
+        });
+
+        await navigator.clipboard.write([item]);
+        onSuccess('Copied full prompt with embedded rich images to clipboard!');
+        return true;
+    } catch (err) {
+        // Fallback ladder adhering to "No Silent Errors" rule
+        useErrorStore.getState().trackWarning(err, {
+            source: 'clipboard.copyPromptWithRichImages',
+            triggerAction: 'navigator.clipboard.write',
+        });
+
+        const fallbackOk = await copyToClipboard(promptText);
+        if (fallbackOk) {
+            onSuccess('Copied clean prompt text to clipboard (rich media unsupported in current context)');
+            return true;
+        }
+
+        onError(err);
+        return false;
+    }
+}
+
 export interface PromptTreePromptActions {
+    handleCopyAllWithRichImages: () => Promise<void>;
     handleCopyWithImagesRich: () => Promise<void>;
     handleSaveImages: () => void;
     handleResendPrompt: () => Promise<void>;
@@ -47,7 +92,7 @@ export function usePromptTreePromptActions({
         selectedConversation,
         activePromptText,
         editedPromptText,
-        setIsCopiedRaw,
+        setIsCopiedAll,
         setIsResending,
         setIsEnqueueing,
         setIsFocusing,
@@ -100,37 +145,44 @@ export function usePromptTreePromptActions({
         [activePromptText, extractAssets, setShowAllWords, setInspectorPrompt]
     );
 
-    const handleCopyWithImagesRich = useCallback(async () => {
-        try {
-            const htmlContent = activePromptText
-                .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" style="max-width:100%;" /><br />')
-                .replace(/\n/g, '<br />');
-            const blobHtml = new Blob([htmlContent], { type: 'text/html' });
-            const blobText = new Blob([activePromptText], { type: 'text/plain' });
-            const item = new ClipboardItem({
-                'text/html': blobHtml,
-                'text/plain': blobText,
-            });
-            await navigator.clipboard.write([item]);
-            setIsCopiedRaw(true);
-            setActionMsg('Copied rich prompt with embedded images to clipboard!');
-            setTimeout(() => {
-                setIsCopiedRaw(false);
-                setActionMsg(null);
-            }, 2500);
-        } catch (err) {
-            useErrorStore.getState().trackWarning(err, {
-                source: 'usePromptTreePromptActions.copyRichPrompt',
-                triggerAction: 'clipboard.write',
-            });
-            const copied = await copyToClipboard(activePromptText);
-            if (!copied) {
-                return;
-            }
-            setIsCopiedRaw(true);
-            setTimeout(() => setIsCopiedRaw(false), 2000);
+    const handleCopyAllWithRichImages = useCallback(async () => {
+        const text = editedPromptText.trim() || activePromptTextRef.current || activePromptText || selectedConversation?.prompt_preview_200w || '';
+        if (!text) {
+            setActionMsg('No prompt content to copy');
+            setTimeout(() => setActionMsg(null), 2000);
+            return;
         }
-    }, [activePromptText, setIsCopiedRaw, setActionMsg]);
+
+        const ok = await copyPromptWithRichImages(
+            text,
+            (msg) => {
+                setIsCopiedAll(true);
+                setActionMsg(msg);
+                setTimeout(() => {
+                    setIsCopiedAll(false);
+                    setActionMsg(null);
+                }, 2000);
+            },
+            (err) => {
+                useErrorStore.getState().captureException(
+                    err instanceof Error ? err : new Error(String(err)),
+                    {
+                        source: 'usePromptTreePromptActions.handleCopyAllWithRichImages',
+                        triggerAction: 'copyPromptWithRichImages',
+                    }
+                );
+                setError('Failed to copy prompt to clipboard');
+            }
+        );
+        if (ok) {
+            setIsCopiedAll(true);
+            setTimeout(() => setIsCopiedAll(false), 2000);
+        }
+    }, [editedPromptText, activePromptText, selectedConversation, activePromptTextRef, setIsCopiedAll, setActionMsg, setError]);
+
+    const handleCopyWithImagesRich = useCallback(async () => {
+        await handleCopyAllWithRichImages();
+    }, [handleCopyAllWithRichImages]);
 
     const handleSaveImages = useCallback(() => {
         const text = activePromptText || selectedConversation?.prompt_preview_200w || '';
@@ -377,6 +429,10 @@ ${activePromptText}
         } catch (err: unknown) {
             const errorObj = err instanceof Error ? err : new Error(String(err) || 'Failed to enqueue prompt');
             persistClientCrash(errorObj, 'PromptTreeViewModal.handleEnqueuePrompt');
+            useErrorStore.getState().captureException(errorObj, {
+                source: 'PromptTreeViewModal.handleEnqueuePrompt',
+                triggerAction: 'enqueue_prompt',
+            });
             setError(`Queue failed: ${errorObj.message}`);
         } finally {
             setIsEnqueueing(false);
@@ -409,6 +465,7 @@ ${activePromptText}
     }, [selectedProject, instanceId, setIsFocusing, setActionMsg, setError]);
 
     return {
+        handleCopyAllWithRichImages,
         handleCopyWithImagesRich,
         handleSaveImages,
         handleResendPrompt,

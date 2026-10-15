@@ -10,6 +10,7 @@
 | [local-prompt-switch-e2e.md](./local-prompt-switch-e2e.md) | `COMPLETED` | CLI retest for prompt send, copy-instance switch, shared login, email vault, and auto-switch 15%. |
 | [fixing-auto-switching-and-progress-bar-issues.md](./fixing-auto-switching-and-progress-bar-issues.md) | `COMPLETED` | Fix prompt Send/Rerun when `agy` worker is active, Accounts row switch instance targeting, `agm ui record` CLI session recorder, progress bar inner-dot-only glow (`#1af18d`), and GitMap credential/SSH auto-fix + Windows Defender `VirTool:MSIL/Subti.C` elimination. |
 | [enhancing-telegram-ui-and-gitmap-integration.md](./enhancing-telegram-ui-and-gitmap-integration.md) | `COMPLETED` | Enhanced Telegram UI & Bot (`&nbsp;` fix, click-to-copy commands, inline buttons, `/balance`, CSV/JSON file exports, machine/instance prompting), GitMap multi-machine SSH node import & control, `gitmap` auto-install suggestion, RSA-2048 encrypted SSH password management, and v4.203.0 release. |
+| [ui-and-cli-enhancement-and-testing.md](./ui-and-cli-enhancement-and-testing.md) | `IN_PROGRESS` | Decouple direct Send from Enqueue, 3-capsule segmented dark-glass action toolbar, dedicated dropdown menus with borderless transparent selects, standalone "Copy All (Content + Images)" dual-MIME clipboard button, CLI sequence resolution (C001, P001), --queue flag support, direct CDP fallback, and minor release ceremony. |
 
 ## Completed Plans (`completed/`)
 | # | Plan File | Status | Summary |

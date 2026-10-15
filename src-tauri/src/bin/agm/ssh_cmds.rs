@@ -294,14 +294,14 @@ pub(crate) fn cmd_ssh(args: &[String]) {
         );
         println!(
             "      RSA Vault Status:  {}",
-            if gm.rsa_vault_initialized {
+            if gm.rsa_vault_ready {
                 "RSA-2048 Initialized"
             } else {
                 "Pending First KeyGen"
             }
         );
-        if let Some(fp) = gm.rsa_public_fingerprint {
-            println!("      RSA Public Key:    {}", fp);
+        if !gm.rsa_public_key_fingerprint.is_empty() {
+            println!("      RSA Public Key:    {}", gm.rsa_public_key_fingerprint);
         }
         handle_ssh_nodes(&args[1..]);
         return;

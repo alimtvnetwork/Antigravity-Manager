@@ -30,7 +30,7 @@ export function CreateInstanceDialog({ api }: { api: InstancePageApi }) {
     };
 
     return (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4" onClick={close}>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[99999] p-4 overflow-y-auto" onClick={close}>
             <div
                 className="bg-white dark:bg-base-200 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 dark:border-base-100"
                 onClick={(e) => e.stopPropagation()}
@@ -139,7 +139,7 @@ export function EditInstanceDialog({ api }: { api: InstancePageApi }) {
     };
 
     return (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4" onClick={close}>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[99999] p-4 overflow-y-auto" onClick={close}>
             <div
                 className="bg-white dark:bg-base-200 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 dark:border-base-100"
                 onClick={(e) => e.stopPropagation()}

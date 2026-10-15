@@ -38,6 +38,8 @@ pub(crate) fn is_prompt_subcommand(sub: &str) -> bool {
             | "running"
             | "wpr"
             | "queue"
+            | "enqueue"
+            | "qe"
             | "history"
             | "export"
             | "backup"
@@ -46,6 +48,7 @@ pub(crate) fn is_prompt_subcommand(sub: &str) -> bool {
             | "rrp"
             | "purge"
             | "clean"
+            | "help"
     )
 }
 

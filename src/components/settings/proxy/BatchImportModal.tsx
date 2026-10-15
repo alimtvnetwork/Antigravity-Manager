@@ -124,8 +124,8 @@ export default function BatchImportModal({ isOpen, onClose, onImport }: BatchImp
     };
 
     return createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-base-100 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col border border-gray-100 dark:border-base-300">
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-base-100 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col my-auto border border-gray-100 dark:border-base-300">
                 <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-base-200">
                     <h3 className="text-xl font-semibold text-gray-900 dark:text-base-content flex items-center gap-2">
                         <Upload size={20} className="text-blue-500" />

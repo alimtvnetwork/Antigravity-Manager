@@ -84,7 +84,9 @@ pub(crate) fn print_help_json() {
                     { "name": "import-compact", "aliases": ["compact-import", "ic"], "flags": ["<file>", "-w <work-dir>", "-y"], "description": "Import portable workspace compaction snapshot into local SQLite databases" },
                     { "name": "which-prompts-running", "aliases": ["wpr"], "flags": ["--json"], "description": "List running projects, conv IDs, and prompt queues" },
                     { "name": "prompts ls", "aliases": ["running-prompts ls"], "flags": ["[N]", "--json", "--words <W>"], "description": "Show N running prompts in ASC stack order (with friendly project names)" },
-                    { "name": "prompt", "aliases": [], "flags": ["\"<text>\"", "--prefix <cat>", "--suffix <cat>"], "description": "Dispatch prompt with git pull & 01-prompts templates" },
+                    { "name": "prompt send", "aliases": ["send"], "flags": ["[target]", "\"<text>\"", "--json"], "description": "Dispatch prompt immediately into instance workspace (bypasses FIFO queue)" },
+                    { "name": "prompt queue", "aliases": ["queue", "enqueue", "qe"], "flags": ["[target]", "\"<text>\"", "--json"], "description": "Enqueue prompt into SQLite FIFO active_prompts queue" },
+                    { "name": "prompt", "aliases": [], "flags": ["[target]", "\"<text>\"", "--queue", "--prefix <cat>", "--suffix <cat>"], "description": "Dispatch prompt immediately (or enqueue if --queue) with git pull & 01-prompts templates" },
                     { "name": "query", "aliases": ["search", "find", "prompts query"], "flags": ["[term]", "--words <W>", "--limit <N>", "--status <S>", "--json"], "description": "Query cached SQLite prompts with ≥200-word preview" },
                     { "name": "prune", "aliases": ["pr", "clear-cache"], "flags": ["--keep <N>", "--preflight", "--undo", "--json"], "description": "Safely prune older conversations (guards active prompts & ≥5 sessions)" },
                     { "name": "resend-running-commands", "aliases": ["rrc"], "flags": ["[N]", "--json", "-f [path]"], "description": "Resend commands before close/switch & sync image paths" },
@@ -236,9 +238,17 @@ pub(crate) fn print_help() {
     println!("        Query cached prompts in SQLite with ≥200-word preview, filtering by status or term");
     println!("    prompts show <id|seq> [--json]");
     println!("        Show full prompt instructions and metadata for specific ID or sequence");
-    println!("    prompt [C001|P001|GM:#1|proj] \"<text>\" [--instance <id|#seq>] [--node <alias>] [--prefix C] [--suffix C]");
-    println!("        Dispatch prompt by Dual AGM/GitMap Sequence ID, project, instance, or remote SSH node");
+    println!("    prompt send, send [target] \"<text>\" [--instance <id|#seq>] [--json]");
+    println!("        Immediately dispatch prompt into active conversation or workspace (bypasses FIFO queue)");
+    println!(
+        "    prompt queue, queue, enqueue, qe [target] \"<text>\" [--instance <id|#seq>] [--json]"
+    );
+    println!("        Append prompt to SQLite FIFO active_prompts queue");
+    println!("    prompt [C001|P001|GM:#1|proj] \"<text>\" [--queue] [--instance <id|#seq>] [--node <alias>] [--prefix C] [--suffix C]");
+    println!("        Dispatch prompt immediately (or enqueue if --queue) by Dual AGM/GitMap Sequence ID, project, instance, or node");
     println!("        Examples:");
+    println!("          agm prompt send C001 \"continue task\"          # Immediately inject prompt into C001");
+    println!("          agm queue P001 \"run build\"                   # FIFO enqueue prompt for project P001");
     println!("          agm prompt C001 \"continue task\"               # Inject prompt locally into C001");
     println!("          agm prompt P001 \"check build\" --node vm-01    # Select machine and dispatch via SSH");
     println!("          gitmap ssh exec vm-01 \"agm status\"            # Query remote machine via GitMap SSH");
@@ -427,6 +437,18 @@ pub(crate) fn print_commands_table() {
         "Send Prompt to Project",
         format!("sub: {} | proj-<project_name>", node_alias),
         "agm prompt -p \"<name>\" \"<text>\""
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Direct Send Prompt",
+        format!("cmd: {} | agm prompt send", node_alias),
+        "agm prompt send [target] \"<text>\""
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "FIFO Enqueue Prompt",
+        format!("cmd: {} | agm queue", node_alias),
+        "agm queue [target] \"<text>\""
     );
     println!(
         "  {:<26} {:<36} {:<32}",

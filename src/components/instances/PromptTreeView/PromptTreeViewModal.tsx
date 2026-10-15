@@ -4,7 +4,8 @@ import { createPortal } from 'react-dom';
 import { AlertTriangle } from 'lucide-react';
 import { useErrorStore } from '../../../stores/error-store';
 import { useInstanceStore } from '../../../stores/useInstanceStore';
-import { getTruncatedText, countWords } from './formatters';
+import { copyToClipboard } from '../../../utils/clipboard';
+import { getTruncatedText, countWords, stripImagesFromPrompt } from './formatters';
 import type { PromptTreeViewModalProps } from './types';
 import { usePromptTreeState } from './usePromptTreeState';
 import { usePromptTreeData } from './usePromptTreeData';
@@ -134,8 +135,12 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         previewTab, setPreviewTab,
         isCopiedResults, setIsCopiedResults,
         isCopied, setIsCopied,
+        isCopiedAll, setIsCopiedAll,
         isResending,
         isEnqueueing,
+        isCopyMenuOpen, setIsCopyMenuOpen,
+        isSendMenuOpen, setIsSendMenuOpen,
+        isEnqueueMenuOpen, setIsEnqueueMenuOpen,
         isExportMenuOpen, setIsExportMenuOpen,
         actionMsg, setActionMsg,
         elapsedSeconds, setElapsedSeconds,
@@ -576,9 +581,17 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                         isCopiedRaw={false}
                                         isCopied={isCopied}
                                         setIsCopied={setIsCopied}
+                                        isCopiedAll={isCopiedAll}
+                                        setIsCopiedAll={setIsCopiedAll}
                                         isEnqueueing={isEnqueueing}
                                         isResending={isResending}
                                         isFocusing={false}
+                                        isCopyMenuOpen={isCopyMenuOpen}
+                                        setIsCopyMenuOpen={setIsCopyMenuOpen}
+                                        isSendMenuOpen={isSendMenuOpen}
+                                        setIsSendMenuOpen={setIsSendMenuOpen}
+                                        isEnqueueMenuOpen={isEnqueueMenuOpen}
+                                        setIsEnqueueMenuOpen={setIsEnqueueMenuOpen}
                                         isExportMenuOpen={isExportMenuOpen}
                                         setIsExportMenuOpen={setIsExportMenuOpen}
                                         hasImages={hasImages}
@@ -588,6 +601,11 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                         instanceNameDisplay={instanceNameDisplay}
                                         formatDuration={formatDuration}
                                         elapsedSeconds={elapsedSeconds}
+                                        onCopyAllWithRichImages={promptActions.handleCopyAllWithRichImages}
+                                        onCopyCleanText={() => {
+                                            const cleanText = stripImagesFromPrompt(activePromptText);
+                                            copyToClipboard(cleanText);
+                                        }}
                                         onCopyWithImages={promptActions.handleCopyWithImagesRich}
                                         onSaveImages={promptActions.handleSaveImages}
                                         onExport={promptActions.handleExport}
@@ -630,6 +648,8 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                             formatByteSize={formatByteSize}
                                             isCopied={isCopied}
                                             setIsCopied={setIsCopied}
+                                            isCopiedAll={isCopiedAll}
+                                            onCopyAllWithRichImages={promptActions.handleCopyAllWithRichImages}
                                             openInspector={promptActions.openInspector}
                                             selectedProject={selectedProject}
                                             activeByteCount={activeByteCount}

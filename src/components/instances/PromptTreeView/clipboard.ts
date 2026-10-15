@@ -1,6 +1,10 @@
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 
+/**
+ * Copies markdown prompt content and embedded images into system clipboard
+ * simultaneously using dual MIME types ('text/html' and 'text/plain').
+ */
 export async function copyPromptWithRichImages(markdownText: string): Promise<boolean> {
     if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
         return copyToClipboard(markdownText);

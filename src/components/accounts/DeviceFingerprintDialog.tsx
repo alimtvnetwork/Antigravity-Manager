@@ -305,7 +305,7 @@ function ConfirmDialog({ profile, type, onConfirm, onCancel, loading }: { profil
             ? t('accounts.device_fingerprint_dialog.confirm_generate_desc')
             : t('accounts.device_fingerprint_dialog.confirm_restore_desc');
     return createPortal(
-        <div className="modal modal-open z-[140]">
+        <div className="modal modal-open z-[99999]">
             <div className="modal-box max-w-sm bg-white dark:bg-base-100 rounded-2xl shadow-2xl p-6 text-center">
                 <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-300">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

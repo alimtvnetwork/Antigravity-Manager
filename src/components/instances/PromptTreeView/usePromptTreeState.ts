@@ -83,6 +83,14 @@ export interface PromptTreeState {
     setIsResending: React.Dispatch<React.SetStateAction<boolean>>;
     isEnqueueing: boolean;
     setIsEnqueueing: React.Dispatch<React.SetStateAction<boolean>>;
+    isCopyMenuOpen: boolean;
+    setIsCopyMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    isSendMenuOpen: boolean;
+    setIsSendMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    isEnqueueMenuOpen: boolean;
+    setIsEnqueueMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    isCopiedAll: boolean;
+    setIsCopiedAll: React.Dispatch<React.SetStateAction<boolean>>;
     isExportMenuOpen: boolean;
     setIsExportMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
     actionMsg: string | null;
@@ -149,10 +157,47 @@ export function usePromptTreeState(instanceId: string): PromptTreeState {
     const [isCopiedResults, setIsCopiedResults] = useState(false);
 
     const [isCopied, setIsCopied] = useState(false);
+    const [isCopiedAll, setIsCopiedAll] = useState(false);
     const [isResending, setIsResending] = useState(false);
     const [isEnqueueing, setIsEnqueueing] = useState(false);
-    const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+    const [isCopyMenuOpen, _setIsCopyMenuOpen] = useState(false);
+    const [isSendMenuOpen, _setIsSendMenuOpen] = useState(false);
+    const [isEnqueueMenuOpen, _setIsEnqueueMenuOpen] = useState(false);
     const [actionMsg, setActionMsg] = useState<string | null>(null);
+
+    // Single-active menu invariant: opening one menu closes the other two
+    const setIsCopyMenuOpen: React.Dispatch<React.SetStateAction<boolean>> = (val) => {
+        _setIsCopyMenuOpen((prev) => {
+            const next = typeof val === 'function' ? val(prev) : val;
+            if (next) {
+                _setIsSendMenuOpen(false);
+                _setIsEnqueueMenuOpen(false);
+            }
+            return next;
+        });
+    };
+
+    const setIsSendMenuOpen: React.Dispatch<React.SetStateAction<boolean>> = (val) => {
+        _setIsSendMenuOpen((prev) => {
+            const next = typeof val === 'function' ? val(prev) : val;
+            if (next) {
+                _setIsCopyMenuOpen(false);
+                _setIsEnqueueMenuOpen(false);
+            }
+            return next;
+        });
+    };
+
+    const setIsEnqueueMenuOpen: React.Dispatch<React.SetStateAction<boolean>> = (val) => {
+        _setIsEnqueueMenuOpen((prev) => {
+            const next = typeof val === 'function' ? val(prev) : val;
+            if (next) {
+                _setIsCopyMenuOpen(false);
+                _setIsSendMenuOpen(false);
+            }
+            return next;
+        });
+    };
 
     // Live refs to prevent closure staleness in background auto-sync timer
     const selectedConversationRef = useRef(selectedConversation);
@@ -201,9 +246,13 @@ export function usePromptTreeState(instanceId: string): PromptTreeState {
         previewTab, setPreviewTab,
         isCopiedResults, setIsCopiedResults,
         isCopied, setIsCopied,
+        isCopiedAll, setIsCopiedAll,
         isResending, setIsResending,
         isEnqueueing, setIsEnqueueing,
-        isExportMenuOpen, setIsExportMenuOpen,
+        isCopyMenuOpen, setIsCopyMenuOpen,
+        isSendMenuOpen, setIsSendMenuOpen,
+        isEnqueueMenuOpen, setIsEnqueueMenuOpen,
+        isExportMenuOpen: isCopyMenuOpen, setIsExportMenuOpen: setIsCopyMenuOpen,
         actionMsg, setActionMsg,
         selectedConversationRef,
         selectedProjectRef,

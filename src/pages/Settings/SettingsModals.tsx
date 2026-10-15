@@ -149,8 +149,8 @@ export function SettingsModals(props: SettingsPageApi) {
 
 
             {/* Support Modal */}
-            <div className={`modal ${isSupportModalOpen ? 'modal-open' : ''} z-[100]`}>
-                <div data-tauri-drag-region className="fixed top-0 left-0 right-0 h-8 z-[110]" />
+            <div className={`modal ${isSupportModalOpen ? 'modal-open' : ''} z-[99999]`}>
+                <div data-tauri-drag-region className="fixed top-0 left-0 right-0 h-8 z-[100000]" />
                 <div className="modal-box relative max-w-2xl bg-white dark:bg-base-100 shadow-2xl rounded-3xl p-0 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-300">
                     <div className="flex flex-col items-center p-8">
                         <div className="w-16 h-16 bg-pink-50 dark:bg-pink-900/20 rounded-2xl flex items-center justify-center mb-6 shadow-sm">
