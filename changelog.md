@@ -1,5 +1,17 @@
 # Changelog
 
+## [v4.205.0] - 2026-10-16
+
+### Fixed
+- **Table Column Squishing & Text Collision Resolution (`WEEKLY QUOCACTIONS`)**: Enforced a `min-w-[1060px]` floor on `<table className="w-full min-w-[1060px]">` in `src/components/accounts/AccountTable.tsx` and changed `overflow-y-auto` to `overflow-auto` in `src/pages/accounts/AccountsContent.tsx`, guaranteeing 4H Model Quota (min 220px) and Weekly Quota (min 210px) columns never collapse or overlap into sticky `ACTIONS` when the desktop window is resized; made `sticky right-0` header and row cell backgrounds 100% solid and opaque (`bg-slate-50 dark:bg-[#061220]`, `dark:bg-[#171025]`, `dark:bg-[#081826]`) in `AccountTable.tsx` and `ActionsCell.tsx` to eliminate horizontal scroll text bleed-through; and enforced `min-w-[780px]` on `src/components/instances/InstanceTable.tsx`. (Thanks to @aukgit)
+- **Top Navbar Window Controls Protection & Responsive Compaction**: Switched `NavLogo.tsx` text from "Antigravity Tools" to compact "AGM" below the `lg` breakpoint (`1024px`), reclaiming ~95px of horizontal navbar space; refined active profile label truncation in `InstanceSelector.tsx` (`max-w-[70px] sm:max-w-[90px] md:max-w-[125px]`); optimized button padding in `NavSettings.tsx` (`px-1.5 sm:px-2`) and navbar flex gaps in `Navbar.tsx`; and lowered total navbar minimum width from 880px to 670px, completely preventing window controls (`btn-window-minimize`, `btn-window-maximize`, `btn-window-close`) and Fast-Forward from being pushed off-screen on narrow window widths. (Thanks to @aukgit)
+
+### Added
+- **Native Desktop Window Size Floor Constraints**: Added `"minWidth": 800` and `"minHeight": 520` to the `"main"` window configuration in `src-tauri/tauri.conf.json`, preventing operating system window managers (Windows DWM, macOS, Linux) from resizing the application below viable layout dimensions. (Thanks to @aukgit)
+- **UI Builder Responsive Viewport Simulation Toolbar**: Added an interactive 4-tier viewport simulator toolbar (`100% Fluid`, `1280px`, `1024px`, `800px Min Desktop`) to `scripts/ui-builder.html` and wired `window.setSimWidth`, allowing designers and developers to test and verify component responsiveness live in the browser. (Thanks to @aukgit)
+
+---
+
 ## [v4.204.1] - 2026-10-16
 
 ### Fixed
@@ -319,6 +331,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.205.0 (2026-10-16)**:
+        -   **[UI & UX Responsive Layout] Table Minimum Width Floor, Sticky Column Opaque Shield, Dual-Axis Viewport Scroll, Navbar Responsive Compaction & Window Minima (Thanks to @aukgit)**:
+            -   **Description**: Enforced `min-w-[1060px]` on `<table className="w-full min-w-[1060px]">` in `src/components/accounts/AccountTable.tsx` and updated `src/pages/accounts/AccountsContent.tsx` to `overflow-auto`, preventing Column 5 (Weekly Quota) from squishing into `ACTIONS` (`WEEKLY QUOCACTIONS`) and surfacing immediate horizontal scrolling; rendered sticky `ACTIONS` column header and cells with 100% solid opaque backgrounds (`bg-slate-50 dark:bg-[#061220]`, `dark:bg-[#171025]`, `dark:bg-[#081826]`) to prevent scrolled text bleed-through; protected `src/components/instances/InstanceTable.tsx` with `min-w-[780px]`; made `NavLogo.tsx` switch to "AGM" below `lg` (1024px), saving ~95px and lowering Navbar minimum width to 670px so window controls (`btn-window-minimize`, `btn-window-maximize`, `btn-window-close`) are never pushed off-screen; added `"minWidth": 800` and `"minHeight": 520` in `src-tauri/tauri.conf.json`; and implemented a 4-tier responsive simulator toolbar (`100% Fluid`, `1280px`, `1024px`, `800px`) in `scripts/ui-builder.html`.
+
+
     *   **v4.204.1 (2026-10-16)**:
         -   **[UI & UX Enhancements] TitleBar Close Button Padding, Icon-Only Settings, Triangle Capsule Trigger, QuotaProgressBar Overhaul, Modal z-index Fix, Browser UI Builder & Binary Target Alignment (Thanks to @aukgit)**:
             -   **Description**: Added safe-area right inset padding (`pr-2.5 sm:pr-3`) and centered `overflow-visible` cross in `src/components/layout/TitleBar.tsx` and `src/components/navbar/NavSettings.tsx` to eliminate window close button clipping against window edges; converted Settings in `src/components/navbar/NavMenu.tsx` to an icon-only button and replaced the trailing round hamburger trigger with an integrated rotating micro-triangle chevron (`rounded-r-full`); hardened `handleCheckUpdates` with non-silent toast feedback ("Checking for updates..." -> "No updates available (latest version installed)"); overhauled `src/components/accounts/QuotaProgressBar.tsx` with a 10px track, 20px protruding milestone nodes with symmetrical `v` chevrons, strictly zero boundary dots at 0% and 100%, 5 internal splits (`[20, 40, 60, 80, 90]`), 6-stop spatial gradient (`#7f1d1d` to `#1af18d`), 85% resting opacity, and table row hover neon glow; removed `isolation: 'isolate'` from `src/components/navbar/Navbar.tsx` and standardized modal stacking context to `z-[99999]`; implemented browser-based UI builder workbench (`scripts/ui-builder.html` / `npm run ui:builder`) with bi-directional JSON state export/import; and aligned desktop UI binary target to `agm-ui` / `Antigravity Manager (AGM)-ui.exe` across `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` while preserving standalone CLI `agm`.
