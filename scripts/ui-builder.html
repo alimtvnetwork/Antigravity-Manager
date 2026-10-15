@@ -822,6 +822,20 @@
     <!-- Right Live Previews -->
     <section class="preview-canvas">
 
+      <!-- Responsive Viewport Simulator Bar -->
+      <div class="viewport-tester-bar" style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-surface); padding: 10px 16px; border-radius: 12px; border: 1px solid var(--border-subtle); flex-wrap: wrap; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600;">
+          <span>📐 Responsive Viewport Simulation:</span>
+          <span id="current-viewport-label" style="color: var(--neon-green); font-family: monospace;">100% Fluid</span>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button type="button" class="btn-tool" style="padding: 4px 10px; font-size: 11px;" onclick="setSimWidth('100%')">100% Fluid</button>
+          <button type="button" class="btn-tool" style="padding: 4px 10px; font-size: 11px;" onclick="setSimWidth('1280px')">1280px</button>
+          <button type="button" class="btn-tool" style="padding: 4px 10px; font-size: 11px;" onclick="setSimWidth('1024px')">1024px</button>
+          <button type="button" class="btn-tool" style="padding: 4px 10px; font-size: 11px;" onclick="setSimWidth('800px')">800px (Min Desktop)</button>
+        </div>
+      </div>
+
       <!-- PREVIEW 1: Quota Progress Bar Overhaul -->
       <div class="preview-card">
         <div class="preview-card-header">
@@ -1190,6 +1204,18 @@
         alert('JSON configuration copied to clipboard!');
       });
     });
+
+    window.setSimWidth = function(width) {
+      const canvas = document.querySelector('.preview-canvas');
+      if (width === '100%') {
+        canvas.style.maxWidth = 'none';
+        canvas.style.margin = '0';
+      } else {
+        canvas.style.maxWidth = width;
+        canvas.style.margin = '0 auto';
+      }
+      document.getElementById('current-viewport-label').innerText = width;
+    };
 
     // Initial render
     updateProgressDOM();

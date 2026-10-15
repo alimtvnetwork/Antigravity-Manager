@@ -86,7 +86,7 @@ export default function InstanceTable({
     return (
         <div className="w-full overflow-hidden rounded-[5px] border border-slate-200/90 dark:border-slate-800/90 bg-white dark:bg-[#171025] shadow-xs">
             <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-[#40285e]">
-                <table className="w-full text-left text-xs">
+                <table className="w-full min-w-[780px] text-left text-xs">
                     <thead>
                         <tr className="border-b border-slate-200/90 dark:border-slate-800/90 bg-slate-50/80 dark:bg-[#090611] text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                             <th className="px-2 py-1.5 min-w-[150px] max-w-[190px]">Profile & Account</th>

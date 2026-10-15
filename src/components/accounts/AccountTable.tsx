@@ -178,7 +178,7 @@ export function AccountTable({
             onDragEnd={handleDragEnd}
         >
             <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#071724] shadow-xs">
-                <table className="w-full">
+                <table className="w-full min-w-[1060px]">
                     <thead>
                         <tr className="border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/90 dark:bg-[#061220]">
                             <th className="pl-2 py-0.5 text-left w-7">
@@ -273,7 +273,7 @@ export function AccountTable({
                                     )}
                                 </button>
                             </th>
-                            <th className="px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap sticky right-0 w-[220px] xl:w-[280px] bg-slate-50/90 dark:bg-slate-900/90 z-20 shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center">{t('accounts.table.actions')}</th>
+                            <th className="px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap sticky right-0 w-[220px] xl:w-[280px] bg-slate-50 dark:bg-[#061220] z-20 shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center">{t('accounts.table.actions')}</th>
                         </tr>
                     </thead>
                     <SortableContext items={accountIds} strategy={verticalListSortingStrategy}>

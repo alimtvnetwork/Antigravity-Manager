@@ -49,15 +49,15 @@ export function ActionsCell(props: ActionsCellProps) {
     return (
 <td className={cn(
     "px-2 py-0.5 sticky right-0 z-10 w-[220px] xl:w-[280px] shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center align-middle transition-colors border-b border-slate-200/90 dark:border-slate-800/90",
-    // 动态高对比高亮处理
+    // 动态高对比高亮处理 (100% 不透明，防止横向滚动文字透底重叠)
     isFocused
-        ? "bg-teal-50/90 dark:bg-[#171025]"
+        ? "bg-teal-50 dark:bg-[#171025]"
         : selected
-        ? "bg-blue-50/90 dark:bg-[#171025]"
+        ? "bg-blue-50 dark:bg-[#171025]"
         : isCurrent
-        ? "bg-blue-50/70 dark:bg-[#091b2c]"
+        ? "bg-blue-50 dark:bg-[#091b2c]"
         : "bg-white dark:bg-[#081826]",
-    !isCurrent && !selected && !isFocused ? "group-hover:bg-slate-50/80 dark:group-hover:bg-[#171025]/60" : ""
+    !isCurrent && !selected && !isFocused ? "group-hover:bg-slate-50 dark:group-hover:bg-[#171025]" : ""
 )}>
     <div className="flex items-center justify-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
         <button

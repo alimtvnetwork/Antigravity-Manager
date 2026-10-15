@@ -19,6 +19,8 @@
         "title": "Antigravity Manager Tools v4.204.1",
         "width": 1024,
         "height": 700,
+        "minWidth": 800,
+        "minHeight": 520,
         "decorations": false,
         "transparent": false,
         "visible": true,

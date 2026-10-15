@@ -55,7 +55,7 @@ export function InstanceSelector() {
                 <span
                     className={`w-2 h-2 rounded-full shrink-0 ${isActiveRunning ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`}
                 />
-                <span className="truncate max-w-[95px] md:max-w-[130px] text-gray-800 dark:text-gray-200 font-medium">
+                <span className="truncate max-w-[70px] sm:max-w-[90px] md:max-w-[125px] text-gray-800 dark:text-gray-200 font-medium">
                     {activeInstance
                         ? `#${instances.findIndex((i) => i.config.id === activeInstance.config.id) + 1} ${activeInstance.config.name}`
                         : 'Default'}

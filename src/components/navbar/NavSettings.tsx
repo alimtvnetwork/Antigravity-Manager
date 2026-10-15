@@ -197,7 +197,7 @@ export function NavSettings({
                                 window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'theme-switcher' } }));
                             }
                         }}
-                        className="h-7 px-2 hover:bg-gray-200 dark:hover:bg-[#40285e] flex items-center gap-1 transition-all duration-150 ease-out cursor-pointer text-[11px] font-semibold text-gray-700 dark:text-gray-300 border-r border-gray-200/50 dark:border-slate-700/60"
+                        className="h-7 px-1.5 sm:px-2 hover:bg-gray-200 dark:hover:bg-[#40285e] flex items-center gap-1 transition-all duration-150 ease-out cursor-pointer text-[11px] font-semibold text-gray-700 dark:text-gray-300 border-r border-gray-200/50 dark:border-slate-700/60"
                         title={`Active Theme: ${currentPalette.label}`}
                         aria-expanded={isThemeOpen}
                     >
@@ -299,7 +299,7 @@ export function NavSettings({
                                 window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'nav-settings' } }));
                             }
                         }}
-                        className="h-7 px-2 rounded-r-full hover:bg-gray-200 dark:hover:bg-[#40285e] flex items-center gap-1 transition-all duration-150 ease-out cursor-pointer text-[11px] font-semibold text-gray-700 dark:text-gray-300"
+                        className="h-7 px-1.5 sm:px-2 rounded-r-full hover:bg-gray-200 dark:hover:bg-[#40285e] flex items-center gap-1 transition-all duration-150 ease-out cursor-pointer text-[11px] font-semibold text-gray-700 dark:text-gray-300"
                         title="Theme & Language Preferences"
                     >
                         {theme === 'light' ? (
