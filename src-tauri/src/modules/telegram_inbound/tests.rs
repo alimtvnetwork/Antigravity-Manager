@@ -186,4 +186,39 @@ pub(crate) mod tests {
             Some(("balance".to_string(), "csv".to_string()))
         );
     }
+
+    #[test]
+    pub(crate) fn test_normalize_cmd_callback_payload() {
+        // Slash-form payloads (the report markups) must not produce `//cmd`.
+        assert_eq!(daemon::normalize_cmd_callback_payload("cmd:/send"), "/send");
+        assert_eq!(
+            daemon::normalize_cmd_callback_payload("cmd:/instances"),
+            "/instances"
+        );
+        assert_eq!(
+            daemon::normalize_cmd_callback_payload("cmd:/balance"),
+            "/balance"
+        );
+        // Non-slash form (the ping markup) keeps working.
+        assert_eq!(
+            daemon::normalize_cmd_callback_payload("cmd:fleet"),
+            "/fleet"
+        );
+        // Doubled slashes collapse to one.
+        assert_eq!(
+            daemon::normalize_cmd_callback_payload("cmd://send"),
+            "/send"
+        );
+        // Payloads with arguments survive intact.
+        assert_eq!(
+            daemon::normalize_cmd_callback_payload("cmd:/export instances csv"),
+            "/export instances csv"
+        );
+        // Non-cmd payloads pass through untouched.
+        assert_eq!(
+            daemon::normalize_cmd_callback_payload("send:m:W3"),
+            "send:m:W3"
+        );
+        assert_eq!(daemon::normalize_cmd_callback_payload("/send"), "/send");
+    }
 }

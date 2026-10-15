@@ -26,6 +26,7 @@ pub mod resend;
 pub mod restore;
 pub mod schema;
 pub mod sequences;
+pub mod sqlite_export;
 pub mod state;
 pub mod text_utils;
 pub mod transcript;
@@ -104,6 +105,11 @@ pub use resend::{resend_all_running_commands, resend_running_commands_for_instan
 pub use auto_resume::auto_resume_recent_prompts;
 // ---- sequences ----
 pub use sequences::{extract_prompt_tail_snippet, extract_prompt_words_preview};
+// ---- sqlite_export ----
+pub use sqlite_export::{
+    export_prompt_tree_db_bytes, import_prompt_tree_db, import_prompt_tree_db_bytes,
+    write_prompt_tree_db, TreeExportPayload, TreeExportStats,
+};
 // ---- transcript ----
 pub use transcript::resolve_transcript_path;
 // ---- tree ----

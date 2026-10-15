@@ -84,16 +84,30 @@ fn callback_fits(text: &str) -> bool {
     text.len() <= MAX_CALLBACK_BYTES
 }
 
+/// A machine label is picker-usable when it round-trips through a
+/// `send:m:<label>` callback payload: no separator characters and inside
+/// Telegram's 64-byte `callback_data` cap.
+fn machine_entry_usable(label: &str) -> bool {
+    picker_safe(label) && callback_fits(&format!("send:m:{label}"))
+}
+
 /// Fleet machines the picker can address: this machine plus GitMap cluster nodes.
 fn machine_entries() -> Vec<String> {
     let local = local_machine_label();
-    let mut entries = vec![local.clone()];
+    let mut entries = Vec::new();
+    // The local entry anchors the whole flow, but an unusable label must not
+    // silently poison the picker: it is held to the same guards as fleet
+    // nodes, and the empty state is reported to the user by `start_send_flow`.
+    if machine_entry_usable(&local) {
+        entries.push(local);
+    } else {
+        tracing::warn!(
+            "local machine label is not picker-safe; /send destination picker will be empty"
+        );
+    }
     for node in query_gitmap_cluster_nodes() {
         let alias = node.alias.trim();
-        if picker_safe(alias)
-            && !entries.iter().any(|e| e.eq_ignore_ascii_case(alias))
-            && callback_fits(&format!("send:m:{alias}"))
-        {
+        if machine_entry_usable(alias) && !entries.iter().any(|e| e.eq_ignore_ascii_case(alias)) {
             entries.push(alias.to_string());
         }
     }
@@ -234,7 +248,10 @@ fn conversation_picker_markup(machine: &str, instance: &str, convs: &[(String, S
         .collect();
     push_buttons(&mut rows, buttons, 2);
     rows.push(json!([
-        { "text": "✏️ Type it manually", "callback_data": format!("send:cman:{machine}|{instance}") },
+        // `send:cman` carries no params: machine/instance already live in the
+        // flow state (set when the instance was picked), so the payload stays
+        // far below Telegram's 64-byte callback_data cap by construction.
+        { "text": "✏️ Type it manually", "callback_data": "send:cman" },
         { "text": "🧹 Cancel", "callback_data": "send:cancel" }
     ]));
     json!({ "inline_keyboard": rows })
@@ -264,6 +281,12 @@ pub fn start_send_flow(rest: &str) -> String {
         return "🧹 <b>Send flow cancelled.</b> Nothing was dispatched.".to_string();
     }
     let entries = machine_entries();
+    if entries.is_empty() {
+        return "⚠️ <b>Send unavailable:</b> this machine's label cannot be shown \
+        in the destination picker (unsafe characters or too long for a button). \
+        Rename the node alias and try <code>/send</code> again."
+            .to_string();
+    }
     let mut out = String::from(
         "📮 <b>Send a prompt — step 1 of 3: pick the destination machine</b>\n\
         ━━━━━━━━━━━━━━━━━━━━━━━━\n",
@@ -490,6 +513,13 @@ pub async fn handle_send_callback(chat_id: i64, data: &str) -> (String, Option<V
             Some((machine, instance)) => on_instance_picked(chat_id, machine, instance),
             None => (send_unknown(), None),
         };
+    }
+    // `send:cman` carries no params: machine/instance already live in the
+    // flow state (set when the instance was picked). The `cman:<m>|<i>`
+    // spelling is still accepted for buttons delivered before the payload
+    // was shortened.
+    if payload == "cman" {
+        return on_manual_conversation(chat_id, "", "");
     }
     if let Some(rest) = payload.strip_prefix("cman:") {
         return match rest.split_once('|') {
@@ -777,6 +807,45 @@ mod tests {
             .strip_prefix("send:")
             .unwrap()
             .starts_with("cman:"));
+        assert_eq!("send:cman".strip_prefix("send:").unwrap(), "cman");
         assert_eq!("send:cancel".strip_prefix("send:").unwrap(), "cancel");
+    }
+
+    #[tokio::test]
+    async fn send_callback_cman_accepts_short_and_legacy_payloads() {
+        // New short form: params come from the flow state, payload stays tiny.
+        let chat_id: i64 = -9_001_343;
+        seed_flow(chat_id, SendStage::PickConversation);
+        let (reply, markup) = handle_send_callback(chat_id, "send:cman").await;
+        assert!(reply.contains("Type the conversation"));
+        assert!(markup.is_some());
+        {
+            let flows = SEND_FLOWS.lock().unwrap();
+            assert_eq!(
+                flows.get(&chat_id).expect("flow must survive").stage,
+                SendStage::TypeConversation
+            );
+        }
+        drop_flow(chat_id);
+
+        // Legacy long form from buttons delivered before the shortening.
+        let legacy_id: i64 = -9_001_344;
+        seed_flow(legacy_id, SendStage::PickConversation);
+        let (legacy_reply, _) = handle_send_callback(legacy_id, "send:cman:W3|default").await;
+        assert!(legacy_reply.contains("Type the conversation"));
+        drop_flow(legacy_id);
+    }
+
+    #[test]
+    fn machine_entry_usable_guards_picker_payloads() {
+        assert!(machine_entry_usable("W3"));
+        assert!(machine_entry_usable("antigravity-node"));
+        // Separator characters would corrupt `|`-split parsing.
+        assert!(!machine_entry_usable("node|evil"));
+        assert!(!machine_entry_usable("node:evil"));
+        assert!(!machine_entry_usable(""));
+        // `send:m:` is 7 bytes; the alias must leave room under the 64-byte cap.
+        assert!(!machine_entry_usable(&"n".repeat(60)));
+        assert!(machine_entry_usable(&"n".repeat(50)));
     }
 }

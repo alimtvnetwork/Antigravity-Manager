@@ -1,8 +1,6 @@
 import {
     X,
     Layers,
-    Download,
-    Upload,
     Maximize2,
     Minimize2,
     RefreshCw,
@@ -10,6 +8,7 @@ import {
 import { cn } from '../../../utils/cn';
 import type { SyncInterval } from '../../../services/instanceService';
 import { setPromptTreeSyncInterval } from '../../../services/instanceService';
+import { ImportExportMenu } from './ImportExportMenu';
 
 export interface ModalHeaderProps {
     instanceName: string;
@@ -24,6 +23,9 @@ export interface ModalHeaderProps {
     onClose: () => void;
     onBackup: () => void;
     onRestore: () => void;
+    onExportSqlite: () => void;
+    onImportSqlite: () => void;
+    onCopyAllTreePrompts: () => Promise<void> | void;
     onFileRestore: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onRefreshAll: () => void;
     onResetTree: () => void;
@@ -51,6 +53,9 @@ export function ModalHeader(props: ModalHeaderProps) {
         onClose,
         onBackup,
         onRestore,
+        onExportSqlite,
+        onImportSqlite,
+        onCopyAllTreePrompts,
         onFileRestore,
         onRefreshAll,
         onResetTree,
@@ -94,27 +99,17 @@ export function ModalHeader(props: ModalHeaderProps) {
             <div className="flex items-center gap-1.5 shrink-0">
                 {/* Capsule 1: Data Operations Capsule */}
                 <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#40285e]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#40285e]/80 shadow-2xs">
-                    {/* Backup Button */}
-                    <button
-                        type="button"
-                        onClick={onBackup}
-                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 rounded-l-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                        title="Backup Prompts to JSON"
-                    >
-                        <Download className="w-3.5 h-3.5 text-indigo-500" />
-                        <span>Backup</span>
-                    </button>
-
-                    {/* Restore Button */}
-                    <button
-                        type="button"
-                        onClick={onRestore}
-                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                        title="Restore Prompts from JSON backup file"
-                    >
-                        <Upload className="w-3.5 h-3.5 text-emerald-500" />
-                        <span>Restore</span>
-                    </button>
+                    {/* Unified Import / Export section: all tree-level data
+                        operations (Export SQLite, Export JSON, Import SQLite,
+                        Import JSON, Copy All Tree Prompts) in one entry point. */}
+                    <ImportExportMenu
+                        onExportSqlite={onExportSqlite}
+                        onExportJson={onBackup}
+                        onImportSqlite={onImportSqlite}
+                        onImportJson={onRestore}
+                        onCopyAllTree={onCopyAllTreePrompts}
+                        isLoading={isLoading}
+                    />
 
                     <button
                         type="button"
@@ -161,7 +156,7 @@ export function ModalHeader(props: ModalHeaderProps) {
                     <input
                         type="file"
                         ref={restoreFileInputRef}
-                        accept=".json"
+                        accept=".json,.db,.sqlite"
                         onChange={onFileRestore}
                         style={{ display: 'none' }}
                     />

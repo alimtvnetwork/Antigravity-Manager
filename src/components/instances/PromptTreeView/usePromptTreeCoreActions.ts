@@ -5,6 +5,7 @@ import {
 } from '../../../services/instanceService';
 import { useErrorStore } from '../../../stores/error-store';
 import { isTauri } from '../../../utils/env';
+import { copyPromptWithRichImages } from './clipboard';
 import type { AgmProjectTreeNode } from './types';
 import type { PromptTreeState } from './usePromptTreeState';
 
@@ -15,6 +16,22 @@ export interface PromptTreeCoreActions {
     handleBackup: () => Promise<void>;
     handleFileRestore: (e: React.ChangeEvent<HTMLInputElement>) => void;
     handleRestore: () => Promise<void>;
+    handleCopyAllTreePrompts: () => Promise<void>;
+    handleExportSqlite: () => Promise<void>;
+    handleImportSqlite: () => Promise<void>;
+}
+
+interface TreeExportStats {
+    path: string;
+    project_count: number;
+    prompt_count: number;
+    sequence_count: number;
+}
+
+interface TreeExportPayload {
+    data_b64: string;
+    file_name: string;
+    stats: TreeExportStats;
 }
 
 interface UsePromptTreeCoreActionsProps {
@@ -237,10 +254,63 @@ export function usePromptTreeCoreActions({
         [instanceId, loadTree, setActionMsg]
     );
 
+    const persistRestoredSqliteBytes = useCallback(
+        async (dataB64: string) => {
+            setActionMsg('Importing SQLite tree export...');
+            const restored = await invoke<number>('import_prompt_tree_sqlite_bytes', { dataB64 });
+            setActionMsg(`Imported ${restored} prompt(s) from SQLite export.`);
+            await loadTree(true, true);
+            setTimeout(() => setActionMsg(null), 5000);
+        },
+        [loadTree, setActionMsg]
+    );
+
     const handleFileRestore = useCallback(
         (e: React.ChangeEvent<HTMLInputElement>) => {
             const file = e.target.files?.[0];
             if (!file) return;
+
+            // SQLite tree exports arrive here in web (non-Tauri) mode: read the
+            // raw bytes, base64-encode them, and run the validated byte import.
+            if (/\.(db|sqlite)$/i.test(file.name)) {
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    try {
+                        const buf = event.target?.result;
+                        if (!(buf instanceof ArrayBuffer)) {
+                            throw new Error('database file could not be read');
+                        }
+                        const bytes = new Uint8Array(buf);
+                        let binary = '';
+                        const chunk = 0x8000;
+                        for (let i = 0; i < bytes.length; i += chunk) {
+                            binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
+                        }
+                        await persistRestoredSqliteBytes(btoa(binary));
+                    } catch (err: unknown) {
+                        const msg = err instanceof Error ? err.message : String(err);
+                        useErrorStore.getState().captureError(err, {
+                            source: 'PromptTreeViewModal.handleFileRestore',
+                            triggerAction: 'import_prompt_tree_sqlite_bytes',
+                        });
+                        setError(`SQLite import failed: ${msg || 'Invalid database file'}`);
+                        setActionMsg(null);
+                    }
+                };
+                reader.onerror = () => {
+                    const readErr = reader.error ?? new Error('failed to read database file');
+                    useErrorStore.getState().captureError(readErr, {
+                        source: 'PromptTreeViewModal.handleFileRestore',
+                        triggerAction: 'read_sqlite_file',
+                    });
+                    setError(`SQLite import failed: ${readErr.message}`);
+                    setActionMsg(null);
+                };
+                reader.readAsArrayBuffer(file);
+                e.target.value = '';
+                return;
+            }
+
             const reader = new FileReader();
             reader.onload = async (event) => {
                 try {
@@ -271,7 +341,7 @@ export function usePromptTreeCoreActions({
             reader.readAsText(file);
             e.target.value = '';
         },
-        [persistRestoredBackup, setActionMsg, setError]
+        [persistRestoredBackup, persistRestoredSqliteBytes, setActionMsg, setError]
     );
 
     const handleRestore = useCallback(async () => {
@@ -302,6 +372,159 @@ export function usePromptTreeCoreActions({
         }
     }, [restoreFileInputRef, persistRestoredBackup, setActionMsg, setError]);
 
+    /**
+     * Copy ALL prompts across every project in the tree in one shot.
+     * Reuses the existing rich-copy path (`copyPromptWithRichImages`) with
+     * per-project / per-conversation markdown separators.
+     */
+    const handleCopyAllTreePrompts = useCallback(async () => {
+        try {
+            const sections: string[] = [];
+            let convCount = 0;
+            let projectCount = 0;
+            for (const proj of treeData) {
+                const convs = (proj.conversations || []).filter((c) =>
+                    (c.full_prompt_text || c.prompt_preview_200w || '').trim().length > 0
+                );
+                if (convs.length === 0) continue;
+                projectCount++;
+                sections.push(`\n\n---\n\n# ${proj.repo_name || proj.project_id}\n`);
+                for (const conv of convs) {
+                    const text = (conv.full_prompt_text || conv.prompt_preview_200w || '').trim();
+                    const heading = conv.title || conv.short_id || conv.conversation_id;
+                    const seq = conv.seq_code ? ` (${conv.seq_code})` : '';
+                    sections.push(`## ${heading}${seq}\n\n${text}`);
+                    convCount++;
+                }
+            }
+            if (convCount === 0) {
+                setActionMsg('No prompts in the tree to copy.');
+                setTimeout(() => setActionMsg(null), 2500);
+                return;
+            }
+            const combined = sections.join('\n\n').trim();
+            const ok = await copyPromptWithRichImages(
+                combined,
+                (msg) => {
+                    setActionMsg(`Copied ${convCount} prompt(s) from ${projectCount} project(s) — ${msg}`);
+                    setTimeout(() => setActionMsg(null), 3000);
+                },
+                (err) => {
+                    useErrorStore.getState().captureException(
+                        err instanceof Error ? err : new Error(String(err)),
+                        {
+                            source: 'PromptTreeViewModal.handleCopyAllTreePrompts',
+                            triggerAction: 'copyPromptWithRichImages',
+                        }
+                    );
+                    setError('Failed to copy tree prompts to clipboard');
+                }
+            );
+            if (!ok) {
+                setError('Failed to copy tree prompts to clipboard');
+            }
+        } catch (err: unknown) {
+            useErrorStore.getState().captureError(err, {
+                source: 'PromptTreeViewModal.handleCopyAllTreePrompts',
+                triggerAction: 'copy_all_tree_prompts',
+            });
+            setError(err instanceof Error ? err.message : String(err) || 'Failed to copy tree prompts');
+        }
+    }, [treeData, setActionMsg, setError]);
+
+    /**
+     * Export the full prompt tree (prompts, structure, metadata) to a
+     * portable SQLite `.db` file. Tauri: native save dialog. Web: byte
+     * payload downloaded as a blob.
+     */
+    const handleExportSqlite = useCallback(async () => {
+        try {
+            setActionMsg('Exporting prompt tree to SQLite...');
+            const fileName = `prompt-tree-${instanceId || 'all'}-${Date.now()}.db`;
+
+            if (!isTauri()) {
+                const payload = await invoke<TreeExportPayload>('export_prompt_tree_sqlite_bytes');
+                const bytes = Uint8Array.from(atob(payload.data_b64), (c) => c.charCodeAt(0));
+                const blob = new Blob([bytes as BlobPart], { type: 'application/x-sqlite3' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = payload.file_name || fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                setActionMsg(
+                    `Exported ${payload.stats.project_count} project(s), ${payload.stats.prompt_count} prompt(s) to SQLite.`
+                );
+                setTimeout(() => setActionMsg(null), 4000);
+                return;
+            }
+
+            const { save } = await import('@tauri-apps/plugin-dialog');
+            const selected = await save({
+                defaultPath: fileName,
+                filters: [{ name: 'SQLite Database', extensions: ['db', 'sqlite'] }],
+            });
+            if (!selected) {
+                setActionMsg(null);
+                return;
+            }
+            const stats = await invoke<TreeExportStats>('export_prompt_tree_sqlite', {
+                path: selected,
+            });
+            setActionMsg(
+                `Exported ${stats.project_count} project(s), ${stats.prompt_count} prompt(s) to ${stats.path}`
+            );
+            setTimeout(() => setActionMsg(null), 4000);
+        } catch (err: unknown) {
+            useErrorStore.getState().captureError(err, {
+                source: 'PromptTreeViewModal.handleExportSqlite',
+                triggerAction: 'export_prompt_tree_sqlite',
+            });
+            setError(err instanceof Error ? err.message : String(err) || 'Failed to export prompt tree to SQLite');
+            setActionMsg(null);
+        }
+    }, [instanceId, setActionMsg, setError]);
+
+    /**
+     * Import a portable SQLite `.db` tree export into the live database.
+     * The backend validates the file (SQLite magic, required tables, export
+     * kind) and reports real errors. Tauri: native open dialog. Web: hidden
+     * file input (handled by handleFileRestore).
+     */
+    const handleImportSqlite = useCallback(async () => {
+        try {
+            if (!isTauri()) {
+                restoreFileInputRef.current?.click();
+                return;
+            }
+            const { open } = await import('@tauri-apps/plugin-dialog');
+            const selected = await open({
+                multiple: false,
+                filters: [{ name: 'SQLite Database', extensions: ['db', 'sqlite'] }],
+            });
+            if (!selected || typeof selected !== 'string') {
+                setActionMsg(null);
+                return;
+            }
+            setActionMsg('Importing prompt tree from SQLite...');
+            const restored = await invoke<number>('import_prompt_tree_sqlite', {
+                path: selected,
+            });
+            setActionMsg(`Imported ${restored} prompt(s) from SQLite export.`);
+            await loadTree(true, true);
+            setTimeout(() => setActionMsg(null), 5000);
+        } catch (err: unknown) {
+            useErrorStore.getState().captureError(err, {
+                source: 'PromptTreeViewModal.handleImportSqlite',
+                triggerAction: 'import_prompt_tree_sqlite',
+            });
+            setError(err instanceof Error ? err.message : String(err) || 'Failed to import prompt tree from SQLite');
+            setActionMsg(null);
+        }
+    }, [restoreFileInputRef, loadTree, setActionMsg, setError]);
+
     return {
         togglePinProject,
         toggleArchiveProject,
@@ -309,5 +532,8 @@ export function usePromptTreeCoreActions({
         handleBackup,
         handleFileRestore,
         handleRestore,
+        handleCopyAllTreePrompts,
+        handleExportSqlite,
+        handleImportSqlite,
     };
 }

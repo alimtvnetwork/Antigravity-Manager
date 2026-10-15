@@ -353,12 +353,16 @@ export function DetailHeader(props: DetailHeaderProps) {
                             <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isSendMenuOpen && "rotate-180")} />
                         </button>
 
-                        {/* Dropdown Menu for Send Options (Destination, Suffix, Focus IDE) */}
+                        {/* Dropdown Menu for Send Options (Destination, Suffix, Enqueue, Focus IDE) */}
                         {isSendMenuOpen && (
                             <div
                                 className="absolute right-0 top-full mt-1.5 z-50 w-64 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-1"
                                 onMouseLeave={() => setIsSendMenuOpen(false)}
                             >
+                                {/* Menu Header */}
+                                <div className="px-2.5 pt-1 pb-0.5 text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 select-none">
+                                    Send Options
+                                </div>
                                 {/* Destination Conversation Mode */}
                                 <div className="flex items-center justify-between px-2.5 py-1 text-xs">
                                     <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
@@ -396,6 +400,26 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 </div>
 
                                 <div className="border-t border-slate-100 dark:border-[#40285e]/60 my-1" />
+
+                                {/* Enqueue Action — same dispatch path as the standalone Enqueue button (Capsule 3) */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        void Promise.resolve(onEnqueue()).catch((err) => {
+                                            reportPromptActionError(err, 'DetailHeader.onEnqueue');
+                                        });
+                                        setIsSendMenuOpen(false);
+                                    }}
+                                    disabled={isEnqueueing}
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors disabled:opacity-50"
+                                    title="Enqueue prompt into FIFO background scheduler queue"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <ListPlus className={cn('w-3.5 h-3.5 text-amber-500 shrink-0', isEnqueueing && 'animate-pulse')} />
+                                        <span className="font-medium">Enqueue to FIFO Queue</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-mono">Background</span>
+                                </button>
 
                                 {/* Focus IDE Action */}
                                 <button

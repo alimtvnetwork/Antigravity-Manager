@@ -8,6 +8,19 @@ use std::path::PathBuf;
 
 use super::*;
 
+/// Normalize a `cmd:` inline-keyboard payload into the `/command …` text the
+/// command pipeline expects. Both spellings exist in the wild (`cmd:/send`
+/// from the report markups, `cmd:fleet` from the ping markup), so every
+/// leading slash after `cmd:` is stripped. Non-`cmd:` payloads pass through
+/// untouched.
+pub(crate) fn normalize_cmd_callback_payload(data: &str) -> String {
+    if let Some(stripped) = data.strip_prefix("cmd:") {
+        format!("/{}", stripped.trim_start_matches('/'))
+    } else {
+        data.to_string()
+    }
+}
+
 /// Handle `send:*` inline-keyboard callbacks for the `/send` two-step flow.
 /// Returns true when the callback belonged to the flow (caller should `continue`).
 async fn deliver_send_flow_callback(
@@ -473,11 +486,7 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
 
                     if let Some(allowed) = config.allowed_chat_id {
                         if chat_id == allowed {
-                            let cmd_str = if let Some(stripped) = data.strip_prefix("cmd:") {
-                                format!("/{}", stripped.trim_start_matches('/'))
-                            } else {
-                                data.to_string()
-                            };
+                            let cmd_str = normalize_cmd_callback_payload(data);
 
                             if let Some(reply) =
                                 deliver_ui_or_command(&clean_token, chat_id, &cmd_str, &None).await
@@ -672,32 +681,41 @@ pub fn start_telegram_daemon() {
 
                                             if let Some(allowed) = config.allowed_chat_id {
                                                 if chat_id == allowed {
-                                                    let cmd_str = if let Some(stripped) =
-                                                        data.strip_prefix("cmd:")
+                                                    // Same unified pipeline the one-shot poller
+                                                    // uses, so `cmd:` buttons behave identically on
+                                                    // both paths (exports, UI actions, and the
+                                                    // unknown-action fallback included).
+                                                    let cmd_str =
+                                                        normalize_cmd_callback_payload(data);
+                                                    let delivered = deliver_ui_or_command(
+                                                        &clean_token,
+                                                        chat_id,
+                                                        &cmd_str,
+                                                        &None,
+                                                    )
+                                                    .await;
+
+                                                    if delivered.is_none()
+                                                        && data.starts_with("cmd:")
                                                     {
-                                                        format!("/{}", stripped)
-                                                    } else {
-                                                        data.to_string()
-                                                    };
-
-                                                    let (reply_opt, markup_opt) =
-                                                        resolve_telegram_command_reply_and_markup(
-                                                            &cmd_str, &None,
-                                                        )
-                                                        .await;
-
-                                                    if let Some(reply) = reply_opt {
-                                                        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+                                                        // Justification: a tapped button must never
+                                                        // die silently; an unrecognized payload is
+                                                        // surfaced to the user and the failure is
+                                                        // logged without changing control flow.
                                                         crate::error::record_ignored(
                                                             send_telegram_message_with_markup(
                                                                 &clean_token,
                                                                 chat_id,
-                                                                &reply,
-                                                                markup_opt,
+                                                                &format!(
+                                                                    "⚠️ <b>Unknown button action:</b> <code>{}</code>\n\
+                                                                    The menu may be stale — send a fresh command to get new buttons.",
+                                                                    clean_for_telegram_html(data, 48)
+                                                                ),
+                                                                None,
                                                                 false,
                                                             )
                                                             .await,
-                                                            "send callback reply with markup",
+                                                            "send unknown callback action notice",
                                                         );
                                                     }
 

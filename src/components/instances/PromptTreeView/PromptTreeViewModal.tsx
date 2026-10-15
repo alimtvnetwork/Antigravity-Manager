@@ -492,6 +492,9 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                     onClose={onClose}
                     onBackup={coreActions.handleBackup}
                     onRestore={coreActions.handleRestore}
+                    onExportSqlite={coreActions.handleExportSqlite}
+                    onImportSqlite={coreActions.handleImportSqlite}
+                    onCopyAllTreePrompts={coreActions.handleCopyAllTreePrompts}
                     onFileRestore={coreActions.handleFileRestore}
                     onRefreshAll={() => loadTree(true, true)}
                     onResetTree={() => {

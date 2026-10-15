@@ -173,6 +173,75 @@ pub async fn read_prompt_backup_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| format!("failed to read prompt backup: {e}"))
 }
 
+/// Prompt-tree SQLite exports are user-picked `.db`/`.sqlite` files, including
+/// under their own profile. OS directories stay blocked.
+fn validate_prompt_tree_db_path(path: &str, must_exist: bool) -> Result<PathBuf, String> {
+    let requested = PathBuf::from(path);
+    if requested.as_os_str().is_empty() {
+        return Err("invalid_path: empty path".to_string());
+    }
+    if !requested.is_absolute() {
+        return Err("invalid_path: absolute path is required".to_string());
+    }
+    let resolved = resolve_existing_or_parent(&requested)?;
+    if is_os_protected_path(&resolved) {
+        return Err("security_denied: system path is not allowed".to_string());
+    }
+    let is_sqlite = resolved
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.eq_ignore_ascii_case("db") || ext.eq_ignore_ascii_case("sqlite"))
+        .unwrap_or(false);
+    if !is_sqlite {
+        return Err("invalid_path: prompt tree export must be a .db or .sqlite file".to_string());
+    }
+    if must_exist {
+        let metadata = std::fs::metadata(&resolved)
+            .map_err(|e| format!("failed_to_read_file_metadata: {e}"))?;
+        if !metadata.is_file() {
+            return Err("invalid_path: expected a regular file".to_string());
+        }
+        if metadata.len() > 512 * 1024 * 1024 {
+            return Err("invalid_path: tree export file is larger than 512MB".to_string());
+        }
+    }
+    Ok(resolved)
+}
+
+/// Export the full prompt tree (prompts, structure, metadata) to a portable
+/// SQLite `.db` file at the dialog-chosen path.
+#[tauri::command]
+pub async fn export_prompt_tree_sqlite(
+    path: String,
+) -> Result<crate::modules::repo_db::TreeExportStats, String> {
+    let path = validate_prompt_tree_db_path(&path, false)?;
+    crate::modules::repo_db::write_prompt_tree_db(&path).map_err(|e| e.to_string())
+}
+
+/// Web (non-Tauri) export path: returns base64-encoded `.db` bytes for a
+/// browser blob download.
+#[tauri::command]
+pub async fn export_prompt_tree_sqlite_bytes(
+) -> Result<crate::modules::repo_db::TreeExportPayload, String> {
+    crate::modules::repo_db::export_prompt_tree_db_bytes().map_err(|e| e.to_string())
+}
+
+/// Import a portable prompt-tree `.db` export into the live database.
+/// The file is validated (SQLite magic header, required tables, export kind)
+/// and real validation errors are reported — never silently swallowed.
+#[tauri::command]
+pub async fn import_prompt_tree_sqlite(path: String) -> Result<usize, String> {
+    let path = validate_prompt_tree_db_path(&path, true)?;
+    crate::modules::repo_db::import_prompt_tree_db(&path).map_err(|e| e.to_string())
+}
+
+/// Web (non-Tauri) import path: accepts base64-encoded `.db` bytes picked via
+/// the file input and runs the same validated import pipeline.
+#[tauri::command]
+pub async fn import_prompt_tree_sqlite_bytes(data_b64: String) -> Result<usize, String> {
+    crate::modules::repo_db::import_prompt_tree_db_bytes(&data_b64).map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod prompt_backup_path_tests {
     use super::validate_prompt_backup_path;

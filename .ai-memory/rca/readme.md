@@ -25,6 +25,10 @@ function signature, or re-running a failed pipeline.
 | [10-supabase-sync-failure.md](./10-supabase-sync-failure.md) | Supabase health check shows "Unreachable" / DNS failure for both configured endpoints | free-tier Supabase/Lovable projects are paused cloud-side, so `<project_ref>.supabase.co` is unpublished from DNS — not a code defect |
 | [11-telegram-sendflow-e0015.md](./11-telegram-sendflow-e0015.md) | CI failed on the Telegram program commit: `error[E0015]` at `send_flow.rs:41` | `HashMap::new()` is not const — cannot initialize a `static` with it; wrapped in the repo's `once_cell::sync::Lazy` pattern |
 | [12-telegram-sendflow-not-send.md](./12-telegram-sendflow-not-send.md) | CI failed on the E0015 fix commit: `future cannot be sent between threads safely` | `std::sync::MutexGuard` held across `.await` in `consume_send_prompt`; restructured to scope the lock in a block returning owned data |
+| [13-admin-ui-emitter-trait.md](./13-admin-ui-emitter-trait.md) | v4.200.0 tag shipped with `error[E0599]`: `tauri::Emitter` trait not in scope in `admin_ui.rs` | one-line trait import missing; fixed and released as v4.200.1 without rewriting the published tag |
+| [14-telegram-cmd-callback-double-slash.md](./14-telegram-cmd-callback-double-slash.md) | Telegram send/find/credits buttons silently did nothing | `cmd:/send` hit the daemon's second dispatch site which didn't strip `/` → `//send` → lookup `None` → silent no-op; unified both sites on `normalize_cmd_callback_payload()` |
+| [15-telegram-picker-callback-64byte-cap.md](./15-telegram-picker-callback-64byte-cap.md) | Send-flow picker callbacks could exceed Telegram's 64-byte callback limit | `send:cman:{m}|{i}` payload and unconditionally-pushed local machine label; shortened to bare `send:cman` + `machine_entry_usable()` guard |
+| [16-telegram-unknown-cmd-callback-silence.md](./16-telegram-unknown-cmd-callback-silence.md) | Unresolvable `cmd:` button taps failed silently | added user-visible "Unknown button action" fallback notice |
 
 ## Standing notes
 
