@@ -30,16 +30,16 @@ export function WaterDrainProgressBar({
             return "bg-slate-200/50 dark:bg-[#171025] border border-slate-300 dark:border-[#40285e]/60 shadow-none";
         }
         switch (idx) {
-            case 0: // 100% node — neon green glow
-                return 'bg-[#1af18d] border-[1.5px] border-emerald-300 shadow-[0_0_8px_rgba(26,241,141,0.85)]';
-            case 1: // 75% node — emerald with glow
-                return 'bg-emerald-400 border-[1.5px] border-emerald-300 shadow-[0_0_6px_rgba(26,241,141,0.6)]';
-            case 2: // 50% node — amber, no glow
-                return 'bg-amber-400 dark:bg-amber-500 border-[1.5px] border-amber-300 dark:border-amber-400 shadow-none';
-            case 3: // 25% node — orange, no glow
-                return 'bg-orange-500 border-[1.5px] border-orange-400 shadow-none';
+            case 0: // 100% node — neon green inner glow
+                return 'bg-[#1af18d] border-[1.5px] border-emerald-300 shadow-[inset_0_0_6px_rgba(26,241,141,0.9),0_0_6px_rgba(26,241,141,0.75)]';
+            case 1: // 75% node — emerald with inner glow
+                return 'bg-emerald-400 border-[1.5px] border-emerald-300 shadow-[inset_0_0_5px_rgba(26,241,141,0.8),0_0_5px_rgba(26,241,141,0.6)]';
+            case 2: // 50% node — amber, crisp inner highlight
+                return 'bg-amber-400 dark:bg-amber-500 border-[1.5px] border-amber-300 dark:border-amber-400 shadow-[inset_0_0_4px_rgba(255,255,255,0.65)]';
+            case 3: // 25% node — orange, crisp inner highlight
+                return 'bg-orange-500 border-[1.5px] border-orange-400 shadow-[inset_0_0_4px_rgba(255,255,255,0.65)]';
             default: // 0% node or critical
-                return 'bg-rose-600 border-[1.5px] border-rose-400 shadow-none';
+                return 'bg-rose-600 border-[1.5px] border-rose-400 shadow-[inset_0_0_4px_rgba(255,255,255,0.65)]';
         }
     };
 
@@ -58,8 +58,7 @@ export function WaterDrainProgressBar({
 
             {/* Base Progress Track */}
             <div className={cn(
-                "relative w-full h-2 rounded-full overflow-hidden bg-slate-200 dark:bg-[#090611] border border-slate-300 dark:border-[#40285e]",
-                clamped >= 50 ? 'shadow-[0_0_10px_rgba(26,241,141,0.75)]' : ''
+                "relative w-full h-2 rounded-full overflow-hidden bg-slate-200 dark:bg-[#090611] border border-slate-300 dark:border-[#40285e] shadow-none"
             )}>
                 {/* Active Water Fill with Gradient & Subtle Shimmer */}
                 <div

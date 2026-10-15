@@ -239,6 +239,20 @@ pub(crate) fn cmd_prompts_send(args: &[String]) {
         session_id.as_deref(),
     ) {
         Ok(dispatched) => {
+            antigravity_tools_lib::modules::audit::record_if_active(
+                "cli",
+                "cli",
+                "send_prompt_now",
+                &format!("instance:{resolved_inst}"),
+                serde_json::json!({
+                    "instanceId": resolved_inst,
+                    "repoPath": repo_path,
+                    "conversationId": dispatched.session_id,
+                    "promptLen": final_prompt.len(),
+                }),
+                "ok",
+                &format!("Dispatched prompt {}", dispatched.id),
+            );
             let res_data = serde_json::json!({
                 "id": dispatched.id,
                 "project_id": dispatched.project_id,
@@ -384,6 +398,20 @@ pub(crate) fn cmd_prompts_queue(args: &[String]) {
         session_id.as_deref(),
     ) {
         Ok(queued) => {
+            antigravity_tools_lib::modules::audit::record_if_active(
+                "cli",
+                "cli",
+                "enqueue_prompt",
+                &format!("instance:{resolved_inst}"),
+                serde_json::json!({
+                    "instanceId": resolved_inst,
+                    "repoPath": repo_path,
+                    "conversationId": queued.session_id,
+                    "promptLen": final_prompt.len(),
+                }),
+                "ok",
+                &format!("Enqueued prompt {}", queued.id),
+            );
             let queue_position = repo_db::count_enqueued_prompts(Some(&resolved_inst));
             let data = serde_json::json!({
                 "id": queued.id,

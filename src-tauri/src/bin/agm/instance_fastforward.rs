@@ -106,6 +106,19 @@ pub(crate) fn cmd_fast_forward(args: &[String]) {
 
     match result {
         Ok(res_msg) => {
+            antigravity_tools_lib::modules::audit::record_if_active(
+                "cli",
+                "cli",
+                "fast_forward_instance",
+                &format!("instance:{target_instance}"),
+                serde_json::json!({
+                    "instanceId": target_instance,
+                    "selectedEmail": status_after.active_account_email,
+                    "previousEmail": status_before.active_account_email,
+                }),
+                "ok",
+                &res_msg,
+            );
             let prompts_resent = running_prompts_count > 0;
             let mut prev_email = status_before.active_account_email.clone();
             let selected_email = status_after.active_account_email.clone();

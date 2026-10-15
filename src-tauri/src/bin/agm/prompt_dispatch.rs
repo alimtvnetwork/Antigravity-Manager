@@ -294,10 +294,39 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
         updated_at: now,
         image_payload: None,
     };
-    if let Err(spawn_err) = repo_db::spawn_prompt_via_agy(&active_p) {
+    if let Err(spawn_err) = repo_db::spawn_or_replace_prompt_via_agy(&active_p, true) {
+        antigravity_tools_lib::modules::audit::record_if_active(
+            "cli",
+            "cli",
+            "send_prompt_now",
+            &format!("instance:{inst_id}"),
+            serde_json::json!({
+                "instanceId": inst_id,
+                "repoPath": cwd_str,
+                "conversationId": session_id,
+                "promptLen": final_prompt.len(),
+            }),
+            "error",
+            &spawn_err,
+        );
         eprintln!("[ERROR] agy did not accept the prompt: {spawn_err}");
         std::process::exit(1);
     }
+
+    antigravity_tools_lib::modules::audit::record_if_active(
+        "cli",
+        "cli",
+        "send_prompt_now",
+        &format!("instance:{inst_id}"),
+        serde_json::json!({
+            "instanceId": inst_id,
+            "repoPath": cwd_str,
+            "conversationId": session_id,
+            "promptLen": final_prompt.len(),
+        }),
+        "ok",
+        &format!("Dispatched prompt {} to {slug}", active_p.id),
+    );
 
     if let Some(seq_code) = seq_label {
         println!(

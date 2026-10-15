@@ -222,13 +222,20 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                     <div className="relative inline-flex items-center" ref={menuRef}>
                         <button
                             className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
-                            onClick={(e) => { e.stopPropagation(); onSwitch(); }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                const targetInst = activeInstanceId || 'default';
+                                onSwitch(`instance:${targetInst}`);
+                            }}
                             onContextMenu={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
                                 setShowInstanceMenu(!showInstanceMenu);
                             }}
-                            title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : `${t('accounts.switch_to')} (Right-click to select instance)`)}
+                            title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : (() => {
+                                const activeInstName = instances.find((i) => i.config.id === activeInstanceId)?.config.name || activeInstanceId || 'Default';
+                                return `Switch account for instance "${activeInstName}" (Right-click to choose instance)`;
+                            })())}
                             disabled={isSwitching || isDisabled}
                         >
                             <ArrowRightLeft className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />

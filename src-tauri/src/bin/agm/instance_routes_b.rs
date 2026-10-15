@@ -330,6 +330,20 @@ pub(crate) fn route_instances_switch(
         )) {
             Ok(_) => {
                 let _ = instance::set_active_instance_id(&resolved_id);
+                antigravity_tools_lib::modules::audit::record_if_active(
+                    "cli",
+                    "cli",
+                    "switch_account_to_instance",
+                    &format!("instance:{resolved_id}"),
+                    serde_json::json!({
+                        "instanceId": resolved_id,
+                        "accountId": target_acc.id,
+                        "email": target_acc.email,
+                        "previousEmail": previous_email,
+                    }),
+                    "ok",
+                    &format!("Switched instance {resolved_id} to {}", target_acc.email),
+                );
                 if is_json {
                     let res = serde_json::json!({
                         "success": true,
@@ -410,12 +424,25 @@ pub(crate) fn route_instances_ff(args: &[String], non_flag_args: &[String], is_j
             ))) {
                 Ok(msg) => {
                     let _ = repo_db::resend_running_commands_for_instance(Some(&resolved_id), 20);
+                    let active_acc = instance::load_registry()
+                        .ok()
+                        .and_then(|r| r.instances.into_iter().find(|i| i.id == resolved_id))
+                        .and_then(|i| i.bound_email)
+                        .unwrap_or_default();
+                    antigravity_tools_lib::modules::audit::record_if_active(
+                        "cli",
+                        "cli",
+                        "fast_forward_instance",
+                        &format!("instance:{resolved_id}"),
+                        serde_json::json!({
+                            "instanceId": resolved_id,
+                            "selectedEmail": active_acc,
+                            "previousEmail": prev_email,
+                        }),
+                        "ok",
+                        &msg,
+                    );
                     if is_json {
-                        let active_acc = instance::load_registry()
-                            .ok()
-                            .and_then(|r| r.instances.into_iter().find(|i| i.id == resolved_id))
-                            .and_then(|i| i.bound_email)
-                            .unwrap_or_default();
                         let res = serde_json::json!({
                             "success": true,
                             "instance": resolved_id,

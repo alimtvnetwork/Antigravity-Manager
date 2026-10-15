@@ -214,6 +214,25 @@ pub async fn switch_account(
         "reload proxy accounts after account switch",
     );
 
+    // Justification: UI audit recording is observability; never block account switch on it.
+    crate::error::record_ignored(
+        crate::modules::audit::record_interaction(crate::modules::audit::RecordInteractionInput {
+            actor: crate::modules::audit::InteractionActor::User,
+            method_name: "switch_account".to_string(),
+            route: "/accounts".to_string(),
+            component: Some("AccountRow".to_string()),
+            element_id: Some(format!("switch-account-{account_id}")),
+            trigger: crate::modules::audit::InteractionTrigger::Click,
+            params: Some(serde_json::json!({
+                "account_id": account_id,
+                "target_ide": target_ide,
+            })),
+            result: "ok".to_string(),
+            message: None,
+        }),
+        "audit switch_account",
+    );
+
     Ok(())
 }
 

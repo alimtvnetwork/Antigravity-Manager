@@ -58,6 +58,12 @@ pub(crate) fn ui_route_table() -> Router<AppState> {
         .route("/ui/element-tree", get(element_tree))
         .route("/ui/scroll", post(scroll_ui))
         .route("/ui/click", post(click_ui))
+        .route("/ui/record/start", post(start_record_ui))
+        .route("/ui/record/stop", post(stop_record_ui))
+        .route("/ui/record/status", get(status_record_ui))
+        .route("/ui/record/list", get(list_record_ui))
+        .route("/ui/record/clear", post(clear_record_ui))
+        .route("/ui/record/export", post(export_record_ui))
 }
 
 #[derive(Deserialize)]
@@ -350,4 +356,105 @@ fn element_manifest(route: &str) -> RouteManifest {
             focusable_kinds: m.focusable_kinds.clone(),
         },
     )
+}
+
+#[derive(Deserialize)]
+pub(crate) struct RecordListQuery {
+    limit: Option<u32>,
+}
+
+/// POST /ui/record/start — enable UI interaction recording.
+pub(crate) async fn start_record_ui() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)>
+{
+    let was_recording = crate::modules::audit::start_recording().map_err(|err| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: err.to_string(),
+            }),
+        )
+    })?;
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "recording": true,
+        "was_recording": was_recording,
+    })))
+}
+
+/// POST /ui/record/stop — disable UI interaction recording.
+pub(crate) async fn stop_record_ui() -> impl IntoResponse {
+    let was_recording = crate::modules::audit::stop_recording();
+    Json(serde_json::json!({
+        "success": true,
+        "recording": false,
+        "was_recording": was_recording,
+    }))
+}
+
+/// GET /ui/record/status — return whether UI interaction recording is active.
+pub(crate) async fn status_record_ui() -> impl IntoResponse {
+    let recording = crate::modules::audit::is_recording();
+    let count = crate::modules::audit::list_recorded(5000)
+        .map(|v| v.len())
+        .unwrap_or(0);
+    Json(serde_json::json!({
+        "success": true,
+        "recording": recording,
+        "entries_count": count,
+    }))
+}
+
+/// GET /ui/record/list?limit=<N> — list recorded UI interactions.
+pub(crate) async fn list_record_ui(
+    Query(query): Query<RecordListQuery>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    let limit = query.limit.unwrap_or(50).clamp(1, 5000);
+    let entries = crate::modules::audit::list_recorded(limit).map_err(|err| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: err.to_string(),
+            }),
+        )
+    })?;
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "recording": crate::modules::audit::is_recording(),
+        "count": entries.len(),
+        "entries": entries,
+    })))
+}
+
+/// POST /ui/record/clear — delete all recorded UI interaction entries.
+pub(crate) async fn clear_record_ui() -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)>
+{
+    let deleted = crate::modules::audit::clear_recording().map_err(|err| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: err.to_string(),
+            }),
+        )
+    })?;
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "deleted": deleted,
+    })))
+}
+
+/// POST /ui/record/export — export recorded UI interactions to a timestamped JSON file.
+pub(crate) async fn export_record_ui(
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    let path = crate::modules::audit::export_recording().map_err(|err| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: err.to_string(),
+            }),
+        )
+    })?;
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "path": path.to_string_lossy().to_string(),
+    })))
 }

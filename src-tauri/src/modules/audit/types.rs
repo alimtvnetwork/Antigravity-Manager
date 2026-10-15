@@ -63,7 +63,7 @@ pub struct RecordInteractionInput {
 }
 
 /// One recorded UI interaction: the 8 audit fields plus the DB row id.
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct InteractionEntry {
     pub id: i64,
     pub timestamp: i64,

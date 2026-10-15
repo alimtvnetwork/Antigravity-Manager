@@ -93,7 +93,32 @@ pub async fn restart_instance(instance_id: String) -> Result<InstanceStatus, Str
 
 #[tauri::command]
 pub async fn fast_forward_instance(instance_id: String) -> Result<String, String> {
-    crate::modules::auto_switcher::trigger_manual_rotation_for_instance(Some(&instance_id)).await
+    let res =
+        crate::modules::auto_switcher::trigger_manual_rotation_for_instance(Some(&instance_id))
+            .await;
+    // Justification: UI audit recording is observability; never block fast-forward on it.
+    crate::error::record_ignored(
+        crate::modules::audit::record_interaction(crate::modules::audit::RecordInteractionInput {
+            actor: crate::modules::audit::InteractionActor::User,
+            method_name: "fast_forward_instance".to_string(),
+            route: "/instances".to_string(),
+            component: Some("InstanceCardActions".to_string()),
+            element_id: Some(format!("fast-forward-{instance_id}")),
+            trigger: crate::modules::audit::InteractionTrigger::Click,
+            params: Some(serde_json::json!({ "instance_id": instance_id })),
+            result: if res.is_ok() {
+                "ok".to_string()
+            } else {
+                "error".to_string()
+            },
+            message: Some(match &res {
+                Ok(msg) => msg.clone(),
+                Err(err) => err.clone(),
+            }),
+        }),
+        "audit fast_forward_instance",
+    );
+    res
 }
 
 #[tauri::command]
@@ -198,9 +223,32 @@ pub async fn switch_account_to_instance(
     account_id: String,
     instance_id: Option<String>,
 ) -> Result<(), crate::error::AppError> {
-    instance::switch_account_to_instance(&account_id, instance_id.as_deref())
+    let res = instance::switch_account_to_instance(&account_id, instance_id.as_deref())
         .await
-        .map_err(crate::error::AppError::Process)
+        .map_err(crate::error::AppError::Process);
+    // Justification: UI audit recording is observability; never block account switch on it.
+    crate::error::record_ignored(
+        crate::modules::audit::record_interaction(crate::modules::audit::RecordInteractionInput {
+            actor: crate::modules::audit::InteractionActor::User,
+            method_name: "switch_account_to_instance".to_string(),
+            route: "/accounts".to_string(),
+            component: Some("AccountRow".to_string()),
+            element_id: Some(format!("switch-account-{account_id}")),
+            trigger: crate::modules::audit::InteractionTrigger::Click,
+            params: Some(serde_json::json!({
+                "account_id": account_id,
+                "instance_id": instance_id,
+            })),
+            result: if res.is_ok() {
+                "ok".to_string()
+            } else {
+                "error".to_string()
+            },
+            message: res.as_ref().err().map(|e| e.to_string()),
+        }),
+        "audit switch_account_to_instance",
+    );
+    res
 }
 
 #[tauri::command]
@@ -335,7 +383,10 @@ pub async fn send_prompt_now(
     conversation_id: Option<String>,
 ) -> Result<crate::modules::repo_db::ActivePrompt, String> {
     let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
-    tokio::task::spawn_blocking(move || {
+    let audit_inst = resolved_id.clone();
+    let audit_repo = repo_path.clone();
+    let audit_conv = conversation_id.clone();
+    let res = tokio::task::spawn_blocking(move || {
         run_caught_prompt_task("send_prompt_now", move || {
             crate::modules::repo_db::send_prompt_now_for_instance(
                 &resolved_id,
@@ -346,7 +397,32 @@ pub async fn send_prompt_now(
         })
     })
     .await
-    .map_err(|e| format!("send_prompt_now task failed: {e}"))?
+    .map_err(|e| format!("send_prompt_now task failed: {e}"))?;
+    // Justification: UI audit recording is observability; never block prompt dispatch on it.
+    crate::error::record_ignored(
+        crate::modules::audit::record_interaction(crate::modules::audit::RecordInteractionInput {
+            actor: crate::modules::audit::InteractionActor::User,
+            method_name: "send_prompt_now".to_string(),
+            route: "/instances".to_string(),
+            component: Some("PromptTreeView".to_string()),
+            element_id: Some("send-prompt-btn".to_string()),
+            trigger: crate::modules::audit::InteractionTrigger::Click,
+            params: Some(serde_json::json!({
+                "instance_id": audit_inst,
+                "repo_path": audit_repo,
+                "conversation_id": audit_conv,
+                "prompt_id": res.as_ref().ok().map(|p| p.id.clone()),
+            })),
+            result: if res.is_ok() {
+                "ok".to_string()
+            } else {
+                "error".to_string()
+            },
+            message: res.as_ref().err().cloned(),
+        }),
+        "audit send_prompt_now",
+    );
+    res
 }
 
 #[tauri::command]
@@ -358,7 +434,10 @@ pub async fn enqueue_prompt(
     _project_id: Option<String>,
 ) -> Result<crate::modules::repo_db::ActivePrompt, String> {
     let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
-    tokio::task::spawn_blocking(move || {
+    let audit_inst = resolved_id.clone();
+    let audit_repo = repo_path.clone();
+    let audit_conv = conversation_id.clone();
+    let res = tokio::task::spawn_blocking(move || {
         run_caught_prompt_task("enqueue_prompt", move || {
             crate::modules::repo_db::enqueue_prompt_for_instance(
                 &resolved_id,
@@ -369,7 +448,32 @@ pub async fn enqueue_prompt(
         })
     })
     .await
-    .map_err(|e| format!("enqueue_prompt task failed: {e}"))?
+    .map_err(|e| format!("enqueue_prompt task failed: {e}"))?;
+    // Justification: UI audit recording is observability; never block prompt enqueue on it.
+    crate::error::record_ignored(
+        crate::modules::audit::record_interaction(crate::modules::audit::RecordInteractionInput {
+            actor: crate::modules::audit::InteractionActor::User,
+            method_name: "enqueue_prompt".to_string(),
+            route: "/instances".to_string(),
+            component: Some("PromptTreeView".to_string()),
+            element_id: Some("enqueue-prompt-btn".to_string()),
+            trigger: crate::modules::audit::InteractionTrigger::Click,
+            params: Some(serde_json::json!({
+                "instance_id": audit_inst,
+                "repo_path": audit_repo,
+                "conversation_id": audit_conv,
+                "prompt_id": res.as_ref().ok().map(|p| p.id.clone()),
+            })),
+            result: if res.is_ok() {
+                "ok".to_string()
+            } else {
+                "error".to_string()
+            },
+            message: res.as_ref().err().cloned(),
+        }),
+        "audit enqueue_prompt",
+    );
+    res
 }
 
 #[tauri::command]

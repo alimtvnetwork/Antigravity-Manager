@@ -319,13 +319,20 @@ pub(crate) fn cmd_instances_switch(args: &[String]) {
     }
     if account_query.is_none() {
         if let Some(pos) = ctx.positional_args.first() {
-            if pos != &target_instance {
+            if pos != &target_instance && instance::resolve_instance_id(pos).is_err() {
                 account_query = Some(pos.clone());
             } else if ctx.positional_args.len() > 1 {
                 account_query = Some(ctx.positional_args[1].clone());
             }
         }
     }
+
+    if account_query.is_none() {
+        let forward_args = vec!["switch".to_string(), target_instance];
+        crate::instance_dispatch::cmd_instances(&forward_args);
+        return;
+    }
+
     let acc = account_query.unwrap_or_else(|| "default".to_string());
 
     let test_repo = PathBuf::from("scratch/test-repo");

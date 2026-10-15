@@ -92,8 +92,7 @@ export function QuotaProgressBar({
             <div className="relative flex-1 min-w-[140px] flex items-center">
                 <div
                     className={cn(
-                        "relative w-full rounded-full overflow-hidden bg-slate-200 dark:bg-[var(--ui-quota-track)] border border-slate-300 dark:border-[var(--ui-quota-track-border)] transition-shadow duration-300",
-                        clamped >= 95 && "shadow-[0_0_12px_rgba(26,241,141,0.8)]",
+                        "relative w-full rounded-full overflow-hidden bg-slate-200 dark:bg-[var(--ui-quota-track)] border border-slate-300 dark:border-[var(--ui-quota-track-border)] shadow-none",
                         heightClassName
                     )}
                     role="progressbar"
@@ -131,11 +130,9 @@ export function QuotaProgressBar({
                                 "absolute top-1/2 rounded-full flex items-center justify-center transition-all duration-300 z-10 pointer-events-none border-[1.5px]",
                                 compact ? "w-3 h-3" : "w-3.5 h-3.5",
                                 isFilled
-                                    ? (cp === 100 || clamped >= 95
-                                        ? 'shadow-[0_0_10px_rgba(26,241,141,0.8)]'
-                                        : cp >= 50
-                                        ? 'shadow-[0_0_8px_rgba(26,241,141,0.35)]'
-                                        : 'shadow-none')
+                                    ? (cp >= 50
+                                        ? 'shadow-[inset_0_0_6px_rgba(26,241,141,0.9),0_0_6px_rgba(26,241,141,0.75)]'
+                                        : 'shadow-[inset_0_0_4px_rgba(255,255,255,0.65)]')
                                     : 'bg-slate-200/50 dark:bg-[var(--ui-surface-2)] border-slate-300 dark:border-[var(--ui-border-subtle)] shadow-none'
                             )}
                             style={{

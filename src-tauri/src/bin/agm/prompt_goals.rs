@@ -279,6 +279,7 @@ pub(crate) fn cmd_rerun(args: &[String]) {
     let mut count_n: usize = 1;
     let mut prefix_cat: Option<String> = None;
     let mut suffix_cat: Option<String> = None;
+    let mut explicit_instance: Option<String> = None;
 
     let mut i = 0;
     while i < args.len() {
@@ -286,6 +287,12 @@ pub(crate) fn cmd_rerun(args: &[String]) {
         if arg.eq_ignore_ascii_case("prompts") || arg.eq_ignore_ascii_case("prompt") {
             i += 1;
             continue;
+        } else if arg == "--instance" || arg == "-i" {
+            if i + 1 < args.len() {
+                explicit_instance = Some(args[i + 1].clone());
+                i += 2;
+                continue;
+            }
         } else if arg == "-prefix" || arg == "--prefix" {
             if i + 1 < args.len() {
                 prefix_cat = Some(args[i + 1].clone());
@@ -389,14 +396,41 @@ pub(crate) fn cmd_rerun(args: &[String]) {
     // Actually dispatch the re-queued prompts through the standard resend pipeline
     // so they are re-sent via agy. Marking them 'dispatched' without sending (the
     // old behavior) silently dropped them from every future resend queue.
-    let resent = match repo_db::resend_running_commands_for_instance(None, 20) {
-        Ok(v) => v.len(),
-        Err(e) => {
-            // Best-effort: prompts left backed_up/queued are retried by later resends.
-            eprintln!("[WARN] Failed to resend rerun prompts: {}", e);
-            0
-        }
-    };
+    let target_inst_resolved = explicit_instance.as_deref().and_then(|raw| {
+        instance::resolve_instance_id(raw)
+            .ok()
+            .or_else(|| Some(raw.to_string()))
+    });
+    let resent =
+        match repo_db::resend_running_commands_for_instance(target_inst_resolved.as_deref(), 20) {
+            Ok(v) => v.len(),
+            Err(e) => {
+                // Best-effort: prompts left backed_up/queued are retried by later resends.
+                eprintln!("[WARN] Failed to resend rerun prompts: {}", e);
+                0
+            }
+        };
+
+    antigravity_tools_lib::modules::audit::record_if_active(
+        "cli",
+        "cli",
+        "rerun_prompts",
+        &format!(
+            "instance:{}",
+            target_inst_resolved.as_deref().unwrap_or("all")
+        ),
+        serde_json::json!({
+            "instanceId": target_inst_resolved,
+            "requeuedCount": prompts.len(),
+            "resentCount": resent,
+        }),
+        "ok",
+        &format!(
+            "Reran {} prompt(s), {} resent via agy",
+            prompts.len(),
+            resent
+        ),
+    );
 
     println!(
         "[SUCCESS] Re-queued {} prompt(s) for rerun, {} re-sent via agy.",

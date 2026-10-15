@@ -41,6 +41,16 @@ fn agy_conversation_id(session: &str) -> Option<&str> {
 /// Helper to spawn `agy` CLI to execute a prompt in a workspace.
 /// Uses `--conversation` (not `--resume`, which agy rejects) and `-p`.
 pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> Result<(), String> {
+    spawn_or_replace_prompt_via_agy(prompt, false)
+}
+
+/// Spawn `agy` CLI to execute a prompt in a workspace. When `replace_existing`
+/// is true (explicit user Send/Rerun), any lingering headless `agy` worker for
+/// the same `(instance_id, repo_path)` is terminated before spawning the new worker.
+pub fn spawn_or_replace_prompt_via_agy(
+    prompt: &ActivePrompt,
+    replace_existing: bool,
+) -> Result<(), String> {
     let ws_dir = PathBuf::from(&prompt.repo_path);
     if !ws_dir.exists() {
         let message = format!("workspace directory does not exist: '{}'", prompt.repo_path);
@@ -68,13 +78,22 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> Result<(), String> {
                 sysinfo::ProcessesToUpdate::Some(&[target_pid]),
                 sysinfo::ProcessRefreshKind::new().with_exe(sysinfo::UpdateKind::OnlyIfNotSet),
             );
-            if sys.process(target_pid).is_some() {
-                let message = format!(
-                    "agy is already running for this workspace (pid {existing_pid}); prompt '{}' was not sent again",
-                    prompt.id
-                );
-                crate::modules::logger::log_info(&format!("[RepoDB] {message}"));
-                return Err(message);
+            if let Some(proc) = sys.process(target_pid) {
+                if replace_existing {
+                    crate::modules::logger::log_info(&format!(
+                        "[RepoDB] Replacing existing agy worker (pid {existing_pid}) in workspace '{}' for explicit Send of prompt '{}'",
+                        prompt.repo_path, prompt.id
+                    ));
+                    proc.kill();
+                    workers.remove(&ws_key);
+                } else {
+                    let message = format!(
+                        "agy is already running for this workspace (pid {existing_pid}); prompt '{}' was not sent again",
+                        prompt.id
+                    );
+                    crate::modules::logger::log_info(&format!("[RepoDB] {message}"));
+                    return Err(message);
+                }
             } else {
                 workers.remove(&ws_key);
             }
@@ -184,6 +203,8 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> Result<(), String> {
 
                 let prompt_id = prompt.id.clone();
                 let ws_key_clone = ws_key.clone();
+                let inst_id_clone = prompt.instance_id.clone();
+                let repo_path_clone = prompt.repo_path.clone();
                 let monitor_res = std::thread::Builder::new()
                     .name(format!("agy-monitor-{}", prompt_id))
                     .spawn(move || {
@@ -226,6 +247,7 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> Result<(), String> {
                                         "agy CLI process exited successfully"
                                     );
                                 }
+                                drain_next_queued_prompt_for_workspace(&inst_id_clone, &repo_path_clone);
                             }
                             Err(e) => {
                                 {
@@ -241,6 +263,7 @@ pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> Result<(), String> {
                                     error = %e,
                                     "Failed to wait on agy CLI child process"
                                 );
+                                drain_next_queued_prompt_for_workspace(&inst_id_clone, &repo_path_clone);
                             }
                         }
                     });
@@ -573,11 +596,8 @@ pub fn send_prompt_now_for_instance(
     }
 
     // 4. Dispatch via agy CLI execution with Tier 2 graceful degradation.
-    // If agy CLI executable is absent or another worker is active, the prompt
-    // has already been safely persisted to SQLite, copied to system clipboard,
-    // and written to .antigravity_resume_task.json. A failed agy spawn is
-    // returned so the UI can show it instead of a false success.
-    if let Err(spawn_err) = spawn_prompt_via_agy(&active_prompt) {
+    // Explicit user Send/Rerun replaces any lingering agy worker for this workspace.
+    if let Err(spawn_err) = spawn_or_replace_prompt_via_agy(&active_prompt, true) {
         tracing::warn!(
             target: "repo_db",
             prompt_id = %active_prompt.id,
@@ -693,6 +713,90 @@ pub fn enqueue_prompt_for_instance(
     ));
 
     Ok(active_prompt)
+}
+
+/// Drain the oldest FIFO `queued` prompt (`ORDER BY created_at ASC, id ASC`)
+/// for `(instance_id, repo_path)` when an `agy` worker finishes.
+pub fn drain_next_queued_prompt_for_workspace(instance_id: &str, repo_path: &str) {
+    let conn = match super::schema::connect_db() {
+        Ok(c) => c,
+        Err(err) => {
+            crate::modules::logger::log_warn(&format!(
+                "[RepoDB] drain_next_queued_prompt_for_workspace connect_db failed: {err}"
+            ));
+            return;
+        }
+    };
+    let mut stmt = match conn.prepare(
+        "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload
+         FROM active_prompts
+         WHERE instance_id = ?1 AND repo_path = ?2 AND status = 'queued'
+         ORDER BY created_at ASC, id ASC
+         LIMIT 1",
+    ) {
+        Ok(s) => s,
+        Err(err) => {
+            crate::modules::logger::log_warn(&format!(
+                "[RepoDB] drain_next_queued_prompt_for_workspace prepare failed: {err}"
+            ));
+            return;
+        }
+    };
+    let next_prompt: Option<ActivePrompt> = stmt
+        .query_row(rusqlite::params![instance_id, repo_path], |row| {
+            Ok(ActivePrompt {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                instance_id: row.get(2)?,
+                repo_path: row.get(3)?,
+                prompt_content: row.get(4)?,
+                model: row.get(5)?,
+                session_id: row.get(6)?,
+                status: row.get(7)?,
+                created_at: row.get(8)?,
+                updated_at: row.get(9)?,
+                image_payload: row.get(10).ok(),
+            })
+        })
+        .ok();
+
+    let Some(mut prompt) = next_prompt else {
+        return;
+    };
+
+    let now = Utc::now().timestamp();
+    prompt.status = "running".to_string();
+    prompt.updated_at = now;
+    if let Err(err) = conn.execute(
+        "UPDATE active_prompts SET status = 'running', updated_at = ?1 WHERE id = ?2",
+        rusqlite::params![now, &prompt.id],
+    ) {
+        crate::modules::logger::log_warn(&format!(
+            "[RepoDB] drain_next_queued_prompt_for_workspace update status failed for '{}': {err}",
+            prompt.id
+        ));
+        return;
+    }
+
+    if let Ok(mut map) = super::state::get_memory_prompts_map().lock() {
+        if let Some(p) = map.get_mut(&prompt.id) {
+            p.status = "running".to_string();
+            p.updated_at = now;
+        }
+    }
+
+    crate::modules::logger::log_info(&format!(
+        "[RepoDB] Auto-draining next FIFO queued prompt '{}' for instance '{}' in '{}'",
+        prompt.id, instance_id, repo_path
+    ));
+
+    if let Err(err) = spawn_or_replace_prompt_via_agy(&prompt, false) {
+        crate::modules::logger::log_warn(&format!(
+            "[RepoDB] Auto-drain spawn failed for queued prompt '{}': {err}",
+            prompt.id
+        ));
+    }
+    invalidate_prompt_tree_cache(Some(instance_id));
 }
 
 #[cfg(test)]

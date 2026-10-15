@@ -94,8 +94,9 @@ pub use text_utils::{
 };
 // ---- agy ----
 pub use agy::{
-    copy_text_to_clipboard_sync, copy_to_system_clipboard, enqueue_prompt_for_instance,
-    send_prompt_now_for_instance, spawn_prompt_via_agy,
+    copy_text_to_clipboard_sync, copy_to_system_clipboard, drain_next_queued_prompt_for_workspace,
+    enqueue_prompt_for_instance, send_prompt_now_for_instance, spawn_or_replace_prompt_via_agy,
+    spawn_prompt_via_agy,
 };
 // ---- resend ----
 pub use resend::{resend_all_running_commands, resend_running_commands_for_instance};

@@ -26,6 +26,10 @@ CREATE TABLE IF NOT EXISTS interactions (
     message TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_interactions_timestamp ON interactions(timestamp);
+CREATE TABLE IF NOT EXISTS recorder_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 ";
 
 /// Attach filesystem context to an IO error before routing it into `AppError`.
@@ -128,6 +132,31 @@ pub fn clear_entries() -> AppResult<u64> {
     let conn = open_db()?;
     let deleted = conn.execute("DELETE FROM interactions", [])?;
     Ok(deleted as u64)
+}
+
+/// Persist whether the UI interaction recorder is enabled across processes.
+pub fn set_persisted_recording(enabled: bool) -> AppResult<()> {
+    let conn = open_db()?;
+    let val = if enabled { "1" } else { "0" };
+    conn.execute(
+        "INSERT INTO recorder_state (key, value) VALUES ('recording', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![val],
+    )?;
+    Ok(())
+}
+
+/// Read persisted recording state from SQLite (`None` when never set).
+pub fn get_persisted_recording() -> AppResult<Option<bool>> {
+    let conn = open_db()?;
+    let mut stmt =
+        conn.prepare("SELECT value FROM recorder_state WHERE key = 'recording' LIMIT 1")?;
+    let mut rows = stmt.query([])?;
+    if let Some(row) = rows.next()? {
+        let val: String = row.get(0)?;
+        return Ok(Some(val == "1" || val.eq_ignore_ascii_case("true")));
+    }
+    Ok(None)
 }
 
 /// Dump all entries to a timestamped JSON file in the audit dir; returns its path.

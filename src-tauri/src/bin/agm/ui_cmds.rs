@@ -303,6 +303,7 @@ pub(crate) fn dispatch_ui_domain(subcommand: &str, args: &[String]) {
         "ls" => cmd_ui_ls(args),
         "scroll" => cmd_ui_scroll(args),
         "click" => cmd_ui_click(args),
+        "record" | "rec" | "audit" => cmd_ui_record(args),
         "help" | "h" => cmd_ui_help_full(args),
         _ => crate::common::handle_unknown_domain_command("ui", subcommand, args),
     }
@@ -1002,9 +1003,213 @@ fn print_ui_help_topic(topic: &str) {
             println!("  Output:   [OK] Clicked #launch-immediately-check on /instances (same handler as a GUI click).");
             println!("  Bridge:   same honest-bridge behavior as `scroll` (POST /api/ui/click).");
         }
+        "record" => {
+            println!("record — Control and inspect the UI interaction audit recorder.");
+            println!("  Purpose:  Start, stop, check status, list/tail, clear, or export recorded");
+            println!("            UI, CLI, and system interactions stored in ui_audit.db.");
+            println!("  Example:  agm ui record start");
+            println!("  Output:   [OK] UI audit recording started.");
+            println!("  Example:  agm ui record list --limit 20 --json");
+            println!("  Output:   (JSON envelope containing recorded interaction entries)");
+        }
         _ => {
             eprintln!(
-                "[ERROR] Unknown help topic '{topic}'. Topics: open, goto, ls, scroll, click."
+                "[ERROR] Unknown help topic '{topic}'. Topics: open, goto, ls, scroll, click, record."
+            );
+            std::process::exit(1);
+        }
+    }
+}
+
+/// `agm ui record <start|stop|status|list|tail|clear|export> [--limit N] [--json]`
+pub(crate) fn cmd_ui_record(args: &[String]) {
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        print_ui_help_topic("record");
+        return;
+    }
+    let ctx = CliContext::parse(args);
+    let action = ctx
+        .positional_args
+        .first()
+        .map(|s| s.to_lowercase())
+        .unwrap_or_else(|| "status".to_string());
+
+    match action.as_str() {
+        "start" | "on" => {
+            let was = match audit::start_recording() {
+                Ok(w) => w,
+                Err(err) => {
+                    eprintln!("[ERROR] Failed to start UI audit recording: {err}");
+                    std::process::exit(1);
+                }
+            };
+            if is_daemon_running() {
+                let _ = forward_to_local_rest::<serde_json::Value>(
+                    reqwest::Method::POST,
+                    "/ui/record/start",
+                    Some(serde_json::json!({})),
+                );
+            }
+            if ctx.json_output {
+                CliEnvelope::ok(
+                    "ui record start",
+                    None,
+                    serde_json::json!({ "recording": true, "was_recording": was }),
+                )
+                .print_and_exit();
+            }
+            println!("[OK] UI audit recording started (was_recording={was}).");
+        }
+        "stop" | "off" => {
+            let was = audit::stop_recording();
+            if is_daemon_running() {
+                let _ = forward_to_local_rest::<serde_json::Value>(
+                    reqwest::Method::POST,
+                    "/ui/record/stop",
+                    Some(serde_json::json!({})),
+                );
+            }
+            if ctx.json_output {
+                CliEnvelope::ok(
+                    "ui record stop",
+                    None,
+                    serde_json::json!({ "recording": false, "was_recording": was }),
+                )
+                .print_and_exit();
+            }
+            println!("[OK] UI audit recording stopped (was_recording={was}).");
+        }
+        "status" => {
+            let recording = audit::is_recording();
+            let count = audit::list_recorded(5000).map(|v| v.len()).unwrap_or(0);
+            if ctx.json_output {
+                CliEnvelope::ok(
+                    "ui record status",
+                    None,
+                    serde_json::json!({ "recording": recording, "entries_count": count }),
+                )
+                .print_and_exit();
+            }
+            println!(
+                "UI audit recording: {} ({} recorded entries)",
+                if recording { "ACTIVE" } else { "STOPPED" },
+                count
+            );
+        }
+        "list" | "ls" | "tail" => {
+            let mut flag_limit: Option<u32> = None;
+            let mut idx = 0;
+            while idx < args.len() {
+                match args[idx].as_str() {
+                    "--limit" | "-n" => {
+                        if let Some(val) = args.get(idx + 1) {
+                            flag_limit = val.parse::<u32>().ok();
+                        }
+                        idx += 1;
+                    }
+                    arg if arg.starts_with("--limit=") => {
+                        flag_limit = arg
+                            .strip_prefix("--limit=")
+                            .and_then(|v| v.parse::<u32>().ok());
+                    }
+                    _ => {}
+                }
+                idx += 1;
+            }
+            let limit = flag_limit
+                .or_else(|| {
+                    ctx.positional_args
+                        .get(1)
+                        .and_then(|v| v.parse::<u32>().ok())
+                })
+                .unwrap_or(50)
+                .clamp(1, 5000);
+            let entries = match audit::list_recorded(limit) {
+                Ok(e) => e,
+                Err(err) => {
+                    eprintln!("[ERROR] Failed to list UI audit entries: {err}");
+                    std::process::exit(1);
+                }
+            };
+            if ctx.json_output {
+                CliEnvelope::ok(
+                    "ui record list",
+                    None,
+                    serde_json::json!({
+                        "recording": audit::is_recording(),
+                        "count": entries.len(),
+                        "entries": entries,
+                    }),
+                )
+                .print_and_exit();
+            }
+            println!(
+                "UI Audit Entries ({} shown, recording={}):",
+                entries.len(),
+                audit::is_recording()
+            );
+            for e in &entries {
+                println!(
+                    "  #{} [{}] actor={} trigger={} method={} target={} result={} params={} msg={}",
+                    e.id,
+                    e.timestamp,
+                    e.actor,
+                    e.trigger,
+                    e.method_name,
+                    e.ui_target,
+                    e.result,
+                    e.params,
+                    e.message
+                );
+            }
+        }
+        "clear" | "reset" => {
+            let deleted = match audit::clear_recording() {
+                Ok(d) => d,
+                Err(err) => {
+                    eprintln!("[ERROR] Failed to clear UI audit entries: {err}");
+                    std::process::exit(1);
+                }
+            };
+            if is_daemon_running() {
+                let _ = forward_to_local_rest::<serde_json::Value>(
+                    reqwest::Method::POST,
+                    "/ui/record/clear",
+                    Some(serde_json::json!({})),
+                );
+            }
+            if ctx.json_output {
+                CliEnvelope::ok(
+                    "ui record clear",
+                    None,
+                    serde_json::json!({ "deleted": deleted }),
+                )
+                .print_and_exit();
+            }
+            println!("[OK] Cleared {deleted} UI audit record(s).");
+        }
+        "export" => {
+            let path = match audit::export_recording() {
+                Ok(p) => p,
+                Err(err) => {
+                    eprintln!("[ERROR] Failed to export UI audit entries: {err}");
+                    std::process::exit(1);
+                }
+            };
+            let path_str = path.to_string_lossy().to_string();
+            if ctx.json_output {
+                CliEnvelope::ok(
+                    "ui record export",
+                    None,
+                    serde_json::json!({ "path": path_str }),
+                )
+                .print_and_exit();
+            }
+            println!("[OK] Exported UI audit entries to {path_str}");
+        }
+        other => {
+            eprintln!(
+                "[ERROR] Unknown `agm ui record` action '{other}'. Expected: start, stop, status, list, tail, clear, export."
             );
             std::process::exit(1);
         }

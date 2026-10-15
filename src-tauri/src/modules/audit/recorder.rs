@@ -18,7 +18,9 @@ static RECORDING: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 /// Fails fast when the audit DB is unreachable so records cannot be silently dropped.
 pub fn start_recording() -> AppResult<bool> {
     storage::ensure_db()?;
-    let was = RECORDING.swap(true, Ordering::SeqCst);
+    let was = is_recording();
+    storage::set_persisted_recording(true)?;
+    RECORDING.store(true, Ordering::SeqCst);
     tracing::info!(
         target: "ui_audit",
         "UI audit recording started (was_recording={})",
@@ -29,7 +31,13 @@ pub fn start_recording() -> AppResult<bool> {
 
 /// Stop recording UI interactions; returns the previous recording state.
 pub fn stop_recording() -> bool {
-    let was = RECORDING.swap(false, Ordering::SeqCst);
+    let was = is_recording();
+    // Justification: best-effort persist of recording state on stop; in-memory flag is always updated.
+    crate::error::record_ignored(
+        storage::set_persisted_recording(false),
+        "persist ui audit recording=false",
+    );
+    RECORDING.store(false, Ordering::SeqCst);
     tracing::info!(
         target: "ui_audit",
         "UI audit recording stopped (was_recording={})",
@@ -39,7 +47,12 @@ pub fn stop_recording() -> bool {
 }
 
 /// Whether the recorder is currently capturing interactions.
+/// Checks both in-memory atomic flag and persisted SQLite state so CLI and GUI stay synchronized.
 pub fn is_recording() -> bool {
+    if let Ok(Some(persisted)) = storage::get_persisted_recording() {
+        RECORDING.store(persisted, Ordering::SeqCst);
+        return persisted;
+    }
     RECORDING.load(Ordering::SeqCst)
 }
 
@@ -128,4 +141,34 @@ pub fn export_recording() -> AppResult<PathBuf> {
 /// List the newest recorded entries, capped at `limit`.
 pub fn list_recorded(limit: u32) -> AppResult<Vec<InteractionEntry>> {
     storage::list_entries(limit)
+}
+
+/// Convenience helper for CLI / backend callers: appends an entry directly to `ui_audit.db`
+/// when the recorder is active.
+pub fn record_if_active(
+    actor: &str,
+    trigger: &str,
+    method_name: &str,
+    ui_target: &str,
+    params: serde_json::Value,
+    result: &str,
+    message: &str,
+) {
+    if !is_recording() {
+        return;
+    }
+    // Justification: best-effort audit recording from CLI/backend paths; must not abort primary operation.
+    crate::error::record_ignored(
+        storage::append_entry(
+            Utc::now().timestamp_millis(),
+            actor,
+            method_name,
+            ui_target,
+            trigger,
+            &params.to_string(),
+            result,
+            message,
+        ),
+        "record_if_active ui_audit",
+    );
 }
