@@ -123,14 +123,62 @@ fn machine_entries() -> Vec<String> {
     entries
 }
 
-/// (id, display name) pairs from the existing instance registry.
-fn instance_entries() -> Vec<(String, String)> {
-    let mut out: Vec<(String, String)> = match crate::modules::instance::load_registry() {
+struct PickerInstance {
+    id: String,
+    name: String,
+    exe_ending: String,
+    data_ending: String,
+}
+
+/// Last path section only. A Telegram instance line must not carry the full path.
+fn path_ending(path: &str) -> String {
+    path.trim()
+        .trim_end_matches(['/', '\\'])
+        .rsplit(['/', '\\'])
+        .find(|part| !part.trim().is_empty())
+        .unwrap_or("")
+        .trim()
+        .to_string()
+}
+
+fn format_instance_choice(index: usize, inst: &PickerInstance) -> String {
+    let mut line = format!(
+        "{}. 🏷️ <b>{}</b> (<code>{}</code>)\n",
+        index + 1,
+        clean_for_telegram_html(&inst.name, 48),
+        clean_for_telegram_html(&inst.id, 48)
+    );
+    if !inst.exe_ending.is_empty() {
+        line.push_str(&format!(
+            "    └ IDE exe: <code>{}</code>\n",
+            clean_for_telegram_html(&inst.exe_ending, 64)
+        ));
+    }
+    if !inst.data_ending.is_empty() {
+        line.push_str(&format!(
+            "    └ IDE data: <code>{}</code>\n",
+            clean_for_telegram_html(&inst.data_ending, 64)
+        ));
+    }
+    line
+}
+
+/// Instances from the registry, with only the ending of the IDE exe and data dir.
+fn instance_entries() -> Vec<PickerInstance> {
+    let mut out: Vec<PickerInstance> = match crate::modules::instance::load_registry() {
         Ok(reg) => reg
             .instances
             .iter()
             .filter(|i| picker_safe(&i.id))
-            .map(|i| (i.id.clone(), i.name.clone()))
+            .map(|i| PickerInstance {
+                id: i.id.clone(),
+                name: i.name.clone(),
+                exe_ending: crate::modules::instance::resolve_instance_exe_name(
+                    &i.id,
+                    i.executable_path.as_deref(),
+                ),
+                data_ending: path_ending(&i.data_dir),
+            })
             .collect(),
         // Justification: the picker must stay usable when the registry is
         // unreadable; "default" is the documented fallback instance id.
@@ -143,7 +191,12 @@ fn instance_entries() -> Vec<(String, String)> {
         }
     };
     if out.is_empty() {
-        out.push(("default".to_string(), "default".to_string()));
+        out.push(PickerInstance {
+            id: "default".to_string(),
+            name: "default".to_string(),
+            exe_ending: crate::modules::instance::resolve_instance_exe_name("default", None),
+            data_ending: String::new(),
+        });
     }
     out
 }
@@ -187,15 +240,15 @@ pub fn send_entry_markup() -> Value {
     machine_picker_markup()
 }
 
-fn instance_picker_markup(machine: &str, instances: &[(String, String)]) -> Value {
+fn instance_picker_markup(machine: &str, instances: &[PickerInstance]) -> Value {
     let mut rows: Vec<Value> = Vec::new();
     let buttons: Vec<Value> = instances
         .iter()
-        .filter(|(id, _)| callback_fits(&format!("send:i:{machine}|{id}")))
-        .map(|(id, name)| {
+        .filter(|inst| callback_fits(&format!("send:i:{machine}|{}", inst.id)))
+        .map(|inst| {
             json!({
-                "text": format!("🏷️ {}", name),
-                "callback_data": format!("send:i:{machine}|{id}"),
+                "text": format!("🏷️ {}", inst.name),
+                "callback_data": format!("send:i:{machine}|{}", inst.id),
             })
         })
         .collect();
@@ -409,13 +462,8 @@ fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
         ━━━━━━━━━━━━━━━━━━━━━━━━\n",
         super::node_label::machine_header_html(&canonical)
     );
-    for (idx, (id, name)) in instances.iter().enumerate() {
-        out.push_str(&format!(
-            "{}. 🏷️ <b>{}</b> (<code>{}</code>)\n",
-            idx + 1,
-            clean_for_telegram_html(name, 48),
-            clean_for_telegram_html(id, 48)
-        ));
+    for (idx, inst) in instances.iter().enumerate() {
+        out.push_str(&format_instance_choice(idx, inst));
     }
     out.push_str("\n👆 Tap an instance. Instance ids resolve on the target machine.");
     (out, Some(instance_picker_markup(&canonical, &instances)))
@@ -439,9 +487,9 @@ fn on_instance_picked(chat_id: i64, machine: &str, instance: &str) -> (String, O
     };
     let canonical_instance = match instance_entries()
         .into_iter()
-        .find(|(id, _)| id.eq_ignore_ascii_case(instance))
+        .find(|inst| inst.id.eq_ignore_ascii_case(instance))
     {
-        Some((id, _)) => id,
+        Some(inst) => inst.id,
         None => {
             return (
                 format!(
@@ -927,5 +975,37 @@ mod tests {
         // `send:m:` is 7 bytes; the alias must leave room under the 64-byte cap.
         assert!(!machine_entry_usable(&"n".repeat(60)));
         assert!(machine_entry_usable(&"n".repeat(50)));
+    }
+
+    #[test]
+    fn path_ending_keeps_only_the_last_section() {
+        assert_eq!(
+            path_ending(r"C:\Users\Administrator\AppData\Roaming\Antigravity"),
+            "Antigravity"
+        );
+        assert_eq!(path_ending(r"D:\apps\Antigravity.exe"), "Antigravity.exe");
+        assert_eq!(
+            path_ending("/home/me/.antigravity/instances/default-copy-5597/"),
+            "default-copy-5597"
+        );
+        assert_eq!(path_ending("Antigravity.exe"), "Antigravity.exe");
+        assert!(path_ending("").is_empty());
+    }
+
+    #[test]
+    fn instance_choice_lists_exe_and_data_endings_only() {
+        let inst = PickerInstance {
+            id: "default-copy-5597".to_string(),
+            name: "Default Copy".to_string(),
+            exe_ending: "Antigravity.exe".to_string(),
+            data_ending: "default-copy-5597".to_string(),
+        };
+        let text = format_instance_choice(1, &inst);
+        assert!(text.contains("IDE exe"));
+        assert!(text.contains("Antigravity.exe"));
+        assert!(text.contains("IDE data"));
+        assert!(text.contains("default-copy-5597"));
+        assert!(!text.contains(":\\"));
+        assert!(!text.contains("/home/"));
     }
 }
