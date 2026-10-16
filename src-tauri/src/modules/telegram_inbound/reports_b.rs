@@ -88,8 +88,7 @@ pub fn format_expand_prompt_report(query_str: &str) -> String {
                 Machine: {} · Instance: <code>{}</code>\n\
                 Status: {}\n\
                 {}\n\
-                {}{}\
-                {}",
+                {}{}",
                 palette.mark,
                 clean_for_telegram_html(id8, 16),
                 clean_for_telegram_html(&short_ws, 32),
