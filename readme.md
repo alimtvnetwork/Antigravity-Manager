@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.214.0-3B82F6?style=flat-square" alt="Version v4.214.0">
+    <img src="https://img.shields.io/badge/Version-v4.215.0-3B82F6?style=flat-square" alt="Version v4.215.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -115,7 +115,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.214.0)**
+**Bar 2: Version-Based Installation (v4.215.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -559,6 +559,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
+> Latest version **v4.215.0**: Telegram prompts now show the IDE exe name, `/history` lists sent prompts with one-tap `↻ Rerun`, and all 64 prompt bot messages were rewritten into professional human-readable text ("Destination confirmed", 8-char refs, no jargon). (Thanks to @aukgit)
 > Latest version **v4.214.0**: Telegram `/send` step 2 lists each instance with `IDE exe` and `IDE data` subpoints. Only the last path section is shown, not the full absolute path. (Thanks to @aukgit)
 > Latest version **v4.213.0**: The Send menu Destination hover stays inside the menu. A browser tooltip on that right-edge menu was clipped to `Destination conversation mo`. Do not put `title` back on those controls. The note is `.ai-memory/rca/20-dispatch-menu-hover-clipped.md`. (Thanks to @aukgit)
 > Latest version **v4.212.0**: The Telegram `/send` picker root cause, the file map, the mistakes that reorder FIFO or put the conversation id back in the button, and the do-not-break checklist are in `.ai-memory/rca/18-telegram-project-listing-and-node-cache.md`, indexed from `.ai-memory/what-to-read.md`. (Thanks to @aukgit)
