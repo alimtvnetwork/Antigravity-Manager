@@ -3,6 +3,16 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.216.0 (2026-10-17)**:
+        -   **[Auto-Switch] Post-switch prompt resume (Thanks to @aukgit)**:
+            -   **Description**: ~10 seconds after an auto-switch or account switch, the last running prompt resumes on the new account. Delay is configurable (default 10s), cancellable, and rides the existing RCA-15 restore pipeline (no duplicate reinjection).
+        -   **[Backup] Prompt backup + re-send (Thanks to @aukgit)**:
+            -   **Description**: Running and enqueued prompts are backed up durably and can be re-sent later via the new `agm prompts resend-queued` CLI command or the UI button, in FIFO order with deduplication.
+        -   **[Prompts] Rerun section in prompts tree (Thanks to @aukgit)**:
+            -   **Description**: The send area now has a rerun section with a count selector and message options ("is it done?", "is it published?", or randomized), dispatching through the canonical send path.
+        -   **[Audit] Stack traces (Thanks to @aukgit)**:
+            -   **Description**: Every audit entry now captures the recording code path (function + file + line, Rust and frontend), visible as a collapsible trace in the audit panel and included in exports.
+
     *   **v4.215.1 (2026-10-17)**:
         -   **[Telegram] Fix `/expand` format-string compile error (Thanks to @aukgit)**:
             -   **Description**: `format_expand_prompt_report` had 10 format placeholders but 9 arguments (leftover `{}` from the message rewrite); removed the stray placeholder. v4.215.0's tag pointed at the broken commit, so this patch carries the same Telegram enhancements on a green tree. (Thanks to @aukgit)

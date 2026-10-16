@@ -1,5 +1,15 @@
 # Changelog
 
+## [v4.216.0] - 2026-10-17
+
+### Added
+- **Post-switch prompt resume**: ~10 seconds after an auto-switch or account switch, the last running prompt resumes on the new account. Delay is configurable (`post_switch_resume_delay_seconds`, default 10s), cancellable, and rides the existing RCA-15 restore pipeline (no parallel restore logic, no duplicate reinjection). (Thanks to @aukgit)
+- **Prompt backup + re-send**: Running and enqueued prompts are backed up durably and can be re-sent later via the new `agm prompts resend-queued` CLI command or the UI "Re-send queued prompts" button, in FIFO order with deduplication. (Thanks to @aukgit)
+- **Rerun section in prompts tree**: The send area now has a rerun section with a count selector and message options ("is it done?", "is it published?", or randomized), dispatching through the canonical send path. (Thanks to @aukgit)
+- **Audit stack traces**: Every audit entry now captures the recording code path (function + file + line, Rust and frontend), visible as a collapsible trace in the audit panel and included in exports. (Thanks to @aukgit)
+
+---
+
 ## [v4.214.0] - 2026-10-17
 
 ### Added
@@ -424,6 +434,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.216.0 (2026-10-17)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.215.1 (2026-10-17)**:
         -   **[Telegram] Fix `/expand` format-string compile error (Thanks to @aukgit)**:
             -   **Description**: `format_expand_prompt_report` had 10 format placeholders but 9 arguments (leftover `{}` from the message rewrite); removed the stray placeholder. v4.215.0's tag pointed at the broken commit, so this patch carries the same Telegram enhancements on a green tree. (Thanks to @aukgit)
