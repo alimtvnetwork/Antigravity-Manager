@@ -234,6 +234,31 @@ pub type AppResult<T> = Result<T, AppError>;
 #[inline]
 pub fn record_ignored<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) {
     if let Err(e) = result {
-        tracing::warn!(target: "best_effort", "{context}: {e}");
+        let text = e.to_string();
+        if expected_best_effort(&text) {
+            tracing::debug!(target: "best_effort", "{context}: {text}");
+        } else {
+            tracing::warn!(target: "best_effort", "{context}: {text}");
+        }
+    }
+}
+
+/// Idempotent SQLite migrations report "duplicate column name" on every open
+/// after the column exists. That is success, so it stays out of the console.
+pub fn expected_best_effort(err: &str) -> bool {
+    err.contains("duplicate column name")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::expected_best_effort;
+
+    #[test]
+    fn duplicate_column_is_expected_and_other_errors_are_not() {
+        assert!(expected_best_effort("duplicate column name: image_payload"));
+        assert!(expected_best_effort(
+            "db execute: duplicate column name: instance_id"
+        ));
+        assert!(!expected_best_effort("database is locked"));
     }
 }

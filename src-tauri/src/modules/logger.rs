@@ -14,6 +14,15 @@ impl tracing_subscriber::fmt::time::FormatTime for LocalTimer {
     }
 }
 
+/// Short clock for the console so a line fits without splitting the message.
+struct ConsoleTimer;
+
+impl tracing_subscriber::fmt::time::FormatTime for ConsoleTimer {
+    fn format_time(&self, w: &mut tracing_subscriber::fmt::format::Writer<'_>) -> std::fmt::Result {
+        write!(w, "{}", chrono::Local::now().format("%H:%M:%S"))
+    }
+}
+
 pub fn get_log_dir() -> Result<PathBuf, String> {
     let data_dir = get_data_dir()?;
     let log_dir = data_dir.join("logs");
@@ -47,7 +56,11 @@ pub fn init_logger() {
 
     // 2. Console output layer (route to stderr when --json/-j is passed so stdout stays pure JSON)
     let is_json_cli = std::env::args().any(|a| a == "--json" || a == "-j");
+    // Colors only when stdout is a console. Otherwise the layer stays plain text.
+    let ansi = crate::modules::delegate_updater::enable_modern_console();
     let console_layer = fmt::Layer::new()
+        .compact()
+        .with_ansi(ansi)
         .with_writer(move || -> Box<dyn std::io::Write + Send> {
             if is_json_cli {
                 Box::new(std::io::stderr())
@@ -58,7 +71,7 @@ pub fn init_logger() {
         .with_target(false)
         .with_thread_ids(false)
         .with_level(true)
-        .with_timer(LocalTimer);
+        .with_timer(ConsoleTimer);
 
     // 3. File output layer (disable ANSI formatting, use local timezone)
     let file_layer = fmt::Layer::new()
