@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.213.0 (2026-10-17)**:
+        -   **[Prompt tree] Dispatch hover stays inside the menu (Thanks to @aukgit)**:
+            -   **Description**: Destination, Suffix, and the Copy AI rows use an in-menu hint anchored to the right edge. A browser `title` on that right-aligned menu is clipped by the window. See `.ai-memory/rca/20-dispatch-menu-hover-clipped.md`. (Thanks to @aukgit)
+
     *   **v4.212.0 (2026-10-17)**:
         -   **[Memory] Telegram picker root cause, checklist, and do-not-break rules (Thanks to @aukgit)**:
             -   **Description**: `.ai-memory/rca/18-telegram-project-listing-and-node-cache.md` explains the FIFO `session_id` label, the short `send:n:` callback, the This machine button, and the 24-hour `node_display_cache`. `.ai-memory/what-to-read.md` points at it. (Thanks to @aukgit)
