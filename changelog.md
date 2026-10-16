@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.216.1] - 2026-10-17
+
+### Fixed
+- **Build fix**: `post_switch_resume.rs` used `tokio::task::JoinHandle` for the timer registry but `tauri::async_runtime::spawn` returns `tauri::async_runtime::JoinHandle` — a distinct type. Switched the registry to the tauri handle type (E0308 broke the v4.216.0 build). (Thanks to @aukgit)
+
+---
+
 ## [v4.216.0] - 2026-10-17
 
 ### Added
@@ -434,6 +441,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.216.1 (2026-10-17)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.216.0 (2026-10-17)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

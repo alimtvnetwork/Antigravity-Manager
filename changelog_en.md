@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.216.1 (2026-10-17)**:
+        -   **[Build] Fix `JoinHandle` type mismatch (Thanks to @aukgit)**:
+            -   **Description**: `post_switch_resume.rs` stored `tokio::task::JoinHandle` in the timer registry but `tauri::async_runtime::spawn` returns `tauri::async_runtime::JoinHandle` (E0308 broke the v4.216.0 build); registry now uses the tauri handle type.
+
     *   **v4.216.0 (2026-10-17)**:
         -   **[Auto-Switch] Post-switch prompt resume (Thanks to @aukgit)**:
             -   **Description**: ~10 seconds after an auto-switch or account switch, the last running prompt resumes on the new account. Delay is configurable (default 10s), cancellable, and rides the existing RCA-15 restore pipeline (no duplicate reinjection).
