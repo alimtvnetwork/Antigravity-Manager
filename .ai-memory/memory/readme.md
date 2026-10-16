@@ -1,6 +1,6 @@
 # Memory Index (`.ai-memory/memory/`)
 
-- Updated: 2026-10-14T12:10:00Z
+- Updated: 2026-10-17T02:27:00Z
 - Full historical index: [01-index.md](./01-index.md). Every file listed here is also listed there.
 - Read order for the whole repo: [../what-to-read.md](../what-to-read.md). Task register: [../plans/readme.md](../plans/readme.md) "Recent Completed Tasks Register".
 
@@ -35,6 +35,7 @@
 | 25 | [learned/25-per-instance-prompt-attribution-and-e2e-testing.md](./learned/25-per-instance-prompt-attribution-and-e2e-testing.md) | Everything coded and learned on prompts and instances, per-instance identity root cause, feasibility, best practices, keep-code-from-breaking rules, every E2E test discussed; plan 140, spec 140, RCA 34 |
 | 26 | [learned/26-git-reconciliation-merge-conflicts-and-v4-190-priority.md](./learned/26-git-reconciliation-merge-conflicts-and-v4-190-priority.md) | Git reconciliation, mechanical package-lock.json conflict resolution, and strict preservation of v4.190.0 stable production baseline logic |
 | 27 | [learned/27-e2e-instance-autoswitch-prompt-playbook.md](./learned/27-e2e-instance-autoswitch-prompt-playbook.md) | Mandatory playbook when the user says end-to-end testing, instance testing, or auto-switch testing. Instance testing includes auto-switch, opening the instance, prompt preview, and entering a prompt. RCA of the OOM loop, CLI hang, update toast, 15% threshold, Supabase mocks, and email dedupe, plus the checklist. |
+| 28 | [learned/28-telegram-project-picker-and-node-cache.md](./learned/28-telegram-project-picker-and-node-cache.md) | Pointer to RCA 18. `/send` pages eight projects by newest conversation, title not id, This machine in green, node names cached 24 hours. Do not reorder `list_all_prompts`. |
 
 **Plan 140 execution (not learned memory):** implement via [../plans/subtasks/140-per-instance-prompt-attribution-backup-queue/06-blind-executor/00-start-here.md](../plans/subtasks/140-per-instance-prompt-attribution-backup-queue/06-blind-executor/00-start-here.md) and steps 01 to 22. Design background: [../plans/140-per-instance-prompt-attribution-backup-queue.md](../plans/140-per-instance-prompt-attribution-backup-queue.md).
 
