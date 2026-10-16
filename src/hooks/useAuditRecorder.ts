@@ -46,23 +46,31 @@ function findInteractiveTarget(el: Element | null): HTMLElement | null {
     return (interactive as HTMLElement) || (el as HTMLElement);
 }
 
-function extractStackTrace(): { callerInfo: string; stackTrace: string } {
+function extractStackTrace(): { callerInfo: string; stackTrace: string; stackFrames: { function: string; location: string }[] } {
     try {
         const stack = new Error().stack || '';
         const lines = stack.split('\n').map((l) => l.trim()).filter(Boolean);
-        // Skip first line (Error) and hook internal frames
         const filtered = lines.filter(
             (l) =>
                 !l.includes('useAuditRecorder') &&
                 !l.includes('extractStackTrace') &&
-                !l.includes('Error') &&
-                !l.includes('report')
+                l !== 'Error'
         );
-        const callerInfo = filtered[0] || 'anonymous';
+        const stackFrames = filtered.flatMap((line) => {
+            const matched = line.match(/^at\s+(.+?)\s+\((.+)\)$/) || line.match(/^at\s+(.+)$/);
+            if (!matched) return [];
+            const functionName = matched[2] ? matched[1] : 'anonymous';
+            const location = matched[2] || matched[1];
+            if (!location.includes('/') && !location.includes('\\')) return [];
+            return [{ function: functionName, location }];
+        }).slice(0, 2);
+        const callerInfo = stackFrames[0]
+            ? `${stackFrames[0].function} ${stackFrames[0].location}`
+            : filtered[0] || 'anonymous';
         const stackTrace = filtered.slice(0, 8).join('\n');
-        return { callerInfo, stackTrace };
+        return { callerInfo, stackTrace, stackFrames };
     } catch {
-        return { callerInfo: 'unknown', stackTrace: '' };
+        return { callerInfo: 'unknown', stackTrace: '', stackFrames: [] };
     }
 }
 
@@ -146,7 +154,7 @@ export function useAuditRecorder(): void {
                 if (!isRecordingActive()) return;
                 const targetEl = (event.target as HTMLElement)?.closest?.('button, a, input, select, textarea, [role="button"]') || (event.target as HTMLElement | null);
                 const explicitMethod = targetEl?.closest?.(`[${AUDIT_ATTR_METHOD}]`)?.getAttribute(AUDIT_ATTR_METHOD);
-                const { callerInfo, stackTrace } = extractStackTrace();
+                const { callerInfo, stackTrace, stackFrames } = extractStackTrace();
                 const methodName = explicitMethod || methodOf(targetEl, 'click');
 
                 report({
@@ -159,6 +167,7 @@ export function useAuditRecorder(): void {
                         callerInfo,
                         stack: stackTrace,
                         stackTrace,
+                        stack_frames: stackFrames,
                         metadata: {
                             callerInfo,
                             stackTrace,
@@ -182,7 +191,7 @@ export function useAuditRecorder(): void {
                 if (!isRecordingActive()) return;
                 const targetEl = (event.target as HTMLElement)?.closest?.('input, select, textarea') || (event.target as HTMLElement | null);
                 const isPassword = targetEl instanceof HTMLInputElement && targetEl.type === 'password';
-                const { callerInfo, stackTrace } = extractStackTrace();
+                const { callerInfo, stackTrace, stackFrames } = extractStackTrace();
                 const explicitMethod = targetEl?.closest?.(`[${AUDIT_ATTR_METHOD}]`)?.getAttribute(AUDIT_ATTR_METHOD);
                 const methodName = explicitMethod || methodOf(targetEl, 'input');
 
@@ -196,6 +205,7 @@ export function useAuditRecorder(): void {
                         callerInfo,
                         stack: stackTrace,
                         stackTrace,
+                        stack_frames: stackFrames,
                         metadata: {
                             callerInfo,
                             stackTrace,

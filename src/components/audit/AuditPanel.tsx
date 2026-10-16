@@ -45,6 +45,43 @@ function parseParams(params: AuditEntry['params']): Record<string, unknown> {
     }
 }
 
+type CallerFrame = { functionName: string; location: string };
+
+function frameFromUnknown(value: unknown): CallerFrame | null {
+    if (!value || typeof value !== 'object') return null;
+    const record = value as Record<string, unknown>;
+    const functionName = String(record.function || record.functionName || '').trim();
+    const location = String(record.location || record.file || '').trim();
+    if (!functionName && !location) return null;
+    return { functionName: functionName || 'unknown', location: location || 'unknown' };
+}
+
+function framesFromStackText(stackText: string): CallerFrame[] {
+    const frames: CallerFrame[] = [];
+    for (const line of stackText.split('\n')) {
+        const trimmed = line.trim();
+        const matched = trimmed.match(/^at\s+(.+?)\s+\((.+)\)$/) || trimmed.match(/^at\s+(.+)$/);
+        if (!matched) continue;
+        const functionName = matched[2] ? matched[1] : 'anonymous';
+        const location = matched[2] || matched[1];
+        if (!location.includes('/') && !location.includes('\\') && !location.includes('.ts')) continue;
+        frames.push({ functionName, location });
+        if (frames.length === 2) break;
+    }
+    return frames;
+}
+
+function lastTwoCallerFrames(
+    params: Record<string, unknown>,
+    stackTrace: unknown,
+): CallerFrame[] {
+    const stored = params.stack_frames ?? params.stackFrames;
+    if (Array.isArray(stored)) {
+        return stored.map(frameFromUnknown).filter((frame): frame is CallerFrame => frame !== null).slice(0, 2);
+    }
+    return framesFromStackText(String(stackTrace || ''));
+}
+
 function formatTimestamp(timestamp: AuditEntry['timestamp']): string {
     const ms = typeof timestamp === 'number' ? timestamp : Date.parse(timestamp);
     if (Number.isNaN(ms)) return String(timestamp);
@@ -67,14 +104,25 @@ function ActorBadge({ actor }: { actor: AuditActor }) {
     );
 }
 
+const METHOD_LABELS: Record<string, string> = {
+    send_prompt_now: 'Send prompt now',
+    enqueue_prompt: 'Enqueue prompt',
+};
+
+function humanMethodLabel(methodName: string): string {
+    return METHOD_LABELS[methodName] ?? methodName;
+}
+
 function EntryRow({ entry }: { entry: AuditEntry }) {
     const [expanded, setExpanded] = useState(false);
     const params = useMemo(() => parseParams(entry.params), [entry.params]);
     const methodName = entry.methodName || entry.method_name || 'CLICK';
+    const methodLabel = humanMethodLabel(methodName);
     const uiTarget = entry.uiTarget || entry.ui_target || '-';
 
     const stackTrace = params.stackTrace || params.stack || (params.metadata as Record<string, unknown> | undefined)?.stackTrace;
     const callerInfo = params.callerInfo || params.caller || (params.metadata as Record<string, unknown> | undefined)?.callerInfo;
+    const callerFrames = lastTwoCallerFrames(params, stackTrace);
 
     return (
         <>
@@ -91,8 +139,8 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
                         {entry.trigger}
                     </span>
                 </td>
-                <td className="px-2 py-1.5 font-mono text-[10px] text-slate-200 max-w-[220px] truncate" title={methodName}>
-                    {methodName}
+                <td className="px-2 py-1.5 text-[10px] text-slate-200 max-w-[220px] truncate" title={methodName}>
+                    {methodLabel}
                 </td>
                 <td className="px-2 py-1.5 font-mono text-[10px] text-slate-400 max-w-[260px] truncate" title={uiTarget}>
                     {uiTarget}
@@ -118,6 +166,25 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
                                 <span className="truncate">{String(callerInfo)}</span>
                             </div>
                         )}
+                        <div>
+                            <h5 className="text-[10px] font-semibold text-sky-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                                <Terminal className="w-3 h-3" />
+                                Last two methods
+                            </h5>
+                            {callerFrames.length === 0 ? (
+                                <p className="font-mono text-[10px] text-slate-500">No caller frames were stored for this entry.</p>
+                            ) : (
+                                <ol className="font-mono text-[10px] text-sky-200/90 bg-slate-950/80 p-2.5 rounded-lg border border-sky-500/20 space-y-1">
+                                    {callerFrames.map((frame) => (
+                                        <li key={`${frame.functionName}-${frame.location}`}>
+                                            <span className="text-sky-100">{frame.functionName}</span>
+                                            <span className="text-slate-500"> — </span>
+                                            <span className="text-emerald-300">{frame.location}</span>
+                                        </li>
+                                    ))}
+                                </ol>
+                            )}
+                        </div>
                         {Boolean(stackTrace) && (
                             <div>
                                 <h5 className="text-[10px] font-semibold text-sky-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
