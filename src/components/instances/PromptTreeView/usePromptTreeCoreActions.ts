@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
     setArchivedProjectsForInstance,
@@ -21,6 +21,20 @@ export interface PromptTreeCoreActions {
     handleImportSqlite: () => Promise<void>;
     handleExportRunningJson: () => Promise<void>;
     handleExportQueuedJson: () => Promise<void>;
+    handleResendQueued: () => Promise<void>;
+    isResendingQueued: boolean;
+}
+
+interface ResendQueuedOutcome {
+    instance_id: string;
+    backup_batch_id?: string | null;
+    backed_up_queued: number;
+    reinjected: number;
+    dispatched: number;
+    dispatched_from_backup: number;
+    skipped_duplicates: number;
+    failed: number;
+    failures: string[];
 }
 
 export type PromptTreeStatusExport = 'running' | 'queued';
@@ -654,6 +668,52 @@ export function usePromptTreeCoreActions({
         await downloadPromptTreeStatusJson('queued');
     }, []);
 
+    const [isResendingQueued, setIsResendingQueued] = useState(false);
+
+    /**
+     * Re-send all enqueued prompts in FIFO order (Task-03).
+     * GUI twin of `agm prompts resend-queued`: takes a durable FIFO snapshot
+     * of the queue first, then re-sends via a single dispatch pass.
+     * Real counts (dispatched / skipped / failed) — never silent success.
+     */
+    const handleResendQueued = useCallback(async () => {
+        if (!isTauri()) {
+            setActionMsg('Re-send queued prompts is available in the desktop app.');
+            setTimeout(() => setActionMsg(null), 3000);
+            return;
+        }
+        if (isResendingQueued) return;
+        setIsResendingQueued(true);
+        try {
+            setActionMsg('Re-sending queued prompts in FIFO order…');
+            const outcome = await invoke<ResendQueuedOutcome>('resend_queued_prompts', {
+                instanceId: instanceId || 'default',
+                limit: 20,
+            });
+            const summary =
+                `Re-sent queued prompts: ${outcome.dispatched} dispatched` +
+                ` (${outcome.dispatched_from_backup} from backup),` +
+                ` ${outcome.skipped_duplicates} skipped (already sent/queued),` +
+                ` ${outcome.failed} failed.`;
+            setActionMsg(
+                outcome.failed > 0 && outcome.failures.length > 0
+                    ? `${summary} First failure: ${outcome.failures[0]}`
+                    : summary
+            );
+            await loadTree(true, true);
+            setTimeout(() => setActionMsg(null), 6000);
+        } catch (err: unknown) {
+            useErrorStore.getState().captureError(err, {
+                source: 'PromptTreeViewModal.handleResendQueued',
+                triggerAction: 'resend_queued_prompts',
+            });
+            setError(err instanceof Error ? err.message : String(err) || 'Failed to re-send queued prompts');
+            setActionMsg(null);
+        } finally {
+            setIsResendingQueued(false);
+        }
+    }, [instanceId, isResendingQueued, loadTree, setActionMsg, setError]);
+
     return {
         togglePinProject,
         toggleArchiveProject,
@@ -666,5 +726,7 @@ export function usePromptTreeCoreActions({
         handleImportSqlite,
         handleExportRunningJson,
         handleExportQueuedJson,
+        handleResendQueued,
+        isResendingQueued,
     };
 }

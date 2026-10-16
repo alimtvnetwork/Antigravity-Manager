@@ -31,6 +31,12 @@ export type AuditTrigger =
 /** Outcome recorded for the interaction. */
 export type AuditResult = 'ok' | 'error';
 
+/** One frame of a captured stack trace: function name + source location. */
+export interface AuditStackFrame {
+    function: string;
+    location: string;
+}
+
 /**
  * One recorded UI interaction.
  * `uiTarget` follows the convention `route | component | element`.
@@ -49,6 +55,12 @@ export interface AuditEntry {
     result: AuditResult;
     /** Human-readable message when `result === 'error'`. */
     message?: string;
+    /**
+     * Dedicated stack-trace column: a JSON array of `AuditStackFrame`, or the
+     * raw JSON string when not yet decoded. Absent/null for entries recorded
+     * before the trace column existed.
+     */
+    stackTrace?: string | AuditStackFrame[] | null;
 }
 
 /** Payload sent to the `audit_record` command for one interaction. */
@@ -58,8 +70,21 @@ export interface AuditRecordPayload {
     method_name?: string;
     uiTarget: string;
     ui_target?: string;
+    /**
+     * Backend-required top-level route (the `RecordInteractionInput.route`
+     * field). Injected by `report()` in useAuditRecorder.ts when absent —
+     * without it the backend rejects the payload (missing-field error).
+     */
+    route?: string;
+    component?: string;
+    elementId?: string;
     trigger: AuditTrigger;
     params: Record<string, unknown>;
+    /**
+     * Caller-captured stack frames. The backend promotes these into the
+     * dedicated trace column; when absent it captures its own backtrace.
+     */
+    stackTrace?: AuditStackFrame[];
     result: AuditResult;
     message?: string;
 }

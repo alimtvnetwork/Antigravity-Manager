@@ -34,7 +34,7 @@ pub fn resend_running_commands_for_instance(
             "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
              FROM active_prompts 
              WHERE status IN ('backed_up', 'queued', 'pending', 'running')
-             ORDER BY created_at ASC LIMIT ?",
+             ORDER BY created_at ASC, id ASC LIMIT ?",
         )
         .map_err(|e| format!("Failed to prepare resend query: {}", e))?;
 

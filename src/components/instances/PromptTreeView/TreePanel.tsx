@@ -9,6 +9,7 @@ import {
     Bot,
     Terminal,
     Pin,
+    RotateCcw,
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import type { AgmConversationNode, AgmProjectTreeNode } from './types';
@@ -52,6 +53,9 @@ export interface TreePanelProps {
     onRefreshProject: (projectId: string, e: React.MouseEvent) => void;
     onTogglePin: (projectId: string, e: React.MouseEvent) => void;
     onToggleArchive: (projectId: string, e: React.MouseEvent) => void;
+    // Re-send queued prompts (Task-03): shown next to the Queued filter.
+    onResendQueued?: () => void;
+    isResendingQueued?: boolean;
 }
 
 export function TreePanel(props: TreePanelProps) {
@@ -88,6 +92,8 @@ export function TreePanel(props: TreePanelProps) {
         onRefreshProject,
         onTogglePin,
         onToggleArchive,
+        onResendQueued,
+        isResendingQueued,
     } = props;
 
     const [subLoading, setSubLoading] = useState(promptTreeLoadingEmitter.isLoading);
@@ -280,6 +286,28 @@ export function TreePanel(props: TreePanelProps) {
                         <option value="archived" className="dark:bg-[#171025]">Archived ({archivedCount})</option>
                     </select>
                 </div>
+
+                {/* Re-send queued prompts: visible in the queue view (Queued filter).
+                    GUI twin of `agm prompts resend-queued` — same backend, same
+                    FIFO single-dispatch pipeline, real sent/skipped/failed counts. */}
+                {activeFilter === 'queued' && onResendQueued && (
+                    <div className="flex items-center justify-end pt-1">
+                        <button
+                            type="button"
+                            onClick={onResendQueued}
+                            disabled={isResendingQueued}
+                            className={cn(
+                                "flex items-center gap-1.5 px-3 py-1 text-[10px] font-semibold rounded-full transition-colors cursor-pointer",
+                                "bg-amber-600/10 text-amber-700 dark:text-amber-300 border border-amber-500/40",
+                                "hover:bg-amber-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                            )}
+                            title="Re-send all queued prompts in FIFO order (durable backup first; already-sent prompts are skipped)"
+                        >
+                            <RotateCcw className={cn("w-2.5 h-2.5 shrink-0", isResendingQueued && "animate-spin")} />
+                            <span>{isResendingQueued ? 'Re-sending…' : 'Re-send queued prompts'}</span>
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Tree Items List */}

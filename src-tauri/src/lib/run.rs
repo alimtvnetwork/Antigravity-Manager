@@ -340,6 +340,8 @@ pub fn run() {
             commands::resume_recent_project_prompts,
             commands::send_prompt_now,
             commands::enqueue_prompt,
+            commands::resend_queued_prompts,
+            commands::backup_queued_prompts,
             commands::get_running_instances_process_count,
             commands::assign_project_to_instance,
             commands::get_instance_workspace_folders,

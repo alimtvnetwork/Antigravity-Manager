@@ -91,6 +91,13 @@ export function useInstancePage(): InstancePageApi {
     const [projectTreeNodes, setProjectTreeNodes] = useState<AgmProjectTreeNode[]>([]);
     const [daemonStatus, setDaemonStatus] = useState<AutoSwitcherDaemonStatus | null>(null);
     const [daemonCountdown, setDaemonCountdown] = useState<number>(0);
+    // Post-switch prompt resume indicator: set when the backend emits
+    // `prompts://restored`, auto-clears after a few seconds.
+    const [resumeIndicator, setResumeIndicator] = useState<{
+        instanceId: string;
+        restoredCount: number;
+        at: number;
+    } | null>(null);
 
     useEffect(() => {
         if (activeInstanceId) {
@@ -213,6 +220,17 @@ export function useInstancePage(): InstancePageApi {
                             setDaemonCountdown(Math.max(0, event.payload.next_check_in_seconds));
                         }
                     }
+                }),
+                // Post-switch resume indicator: backend emits `prompts://restored`
+                // when the delayed resume fires (see post_switch_resume.rs).
+                listen<{ instance_id: string; restored_count: number }>('prompts://restored', (event) => {
+                    setResumeIndicator({
+                        instanceId: event.payload.instance_id,
+                        restoredCount: event.payload.restored_count,
+                        at: Date.now(),
+                    });
+                    // Justification: transient indicator; auto-clears so a stale "resumed" pill never lingers
+                    window.setTimeout(() => setResumeIndicator(null), 6000);
                 }),
             ]).then((unsubscribers) => {
                 unlistenList = unsubscribers;
@@ -349,6 +367,7 @@ export function useInstancePage(): InstancePageApi {
         projectTreeNodes,
         daemonStatus,
         daemonCountdown,
+        resumeIndicator,
         actionError,
         setActionError,
         actionState,

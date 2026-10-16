@@ -568,6 +568,8 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                         onRefreshProject={coreActions.handleRefreshSingleProject}
                         onTogglePin={coreActions.togglePinProject}
                         onToggleArchive={coreActions.toggleArchiveProject}
+                        onResendQueued={coreActions.handleResendQueued}
+                        isResendingQueued={coreActions.isResendingQueued}
                     />
 
                     {/* Right Panel: Prompt Details */}
@@ -618,6 +620,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                         onFocusIde={promptActions.handleFocusIde}
                                         onResend={promptActions.handleResendPrompt}
                                         onEnqueue={promptActions.handleEnqueuePrompt}
+                                        rerunRepoPath={selectedProject?.repo_path || ''}
                                         onOpenInspector={(conv) => promptActions.openInspector(conv, selectedProject?.repo_path || '')}
                                     />
 

@@ -12,11 +12,338 @@ use super::tree::invalidate_prompt_tree_cache;
 use chrono::Utc;
 use rusqlite::params;
 use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use uuid::Uuid;
+
+/// Outcome of re-sending backed-up queued prompts via a single dispatch pass.
+/// Counts are real — nothing is reported as sent unless the dispatch pass
+/// actually dispatched it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResendQueuedOutcome {
+    pub instance_id: String,
+    pub backup_batch_id: Option<String>,
+    pub backed_up_queued: usize,
+    pub reinjected: usize,
+    pub dispatched: usize,
+    pub dispatched_from_backup: usize,
+    pub skipped_duplicates: usize,
+    pub failed: usize,
+    pub failures: Vec<String>,
+}
+
+fn norm_resend_sig_path(repo_path: &str) -> String {
+    repo_path.trim().to_lowercase().replace('\\', "/")
+}
+
+fn resend_queued_sig(repo_path: &str, prompt_text: &str) -> String {
+    format!(
+        "{}\u{1f}{}",
+        norm_resend_sig_path(repo_path),
+        prompt_text.trim()
+    )
+}
+
+/// Canonical instance match used by the queued re-send dedup (mirrors the
+/// dispatch-time matching in `resend_running_commands_for_instance`).
+fn resend_queued_instance_matches(scope: Option<&str>, prompt_instance: &str) -> bool {
+    match scope {
+        None | Some("all") => true,
+        Some(target) => {
+            let canon = |s: &str| {
+                crate::modules::instance::resolve_instance_id(s).unwrap_or_else(|_| s.to_string())
+            };
+            let p_inst = canon(prompt_instance);
+            if target == "default" || target == "__default__" {
+                p_inst == "default" || p_inst == "__default__" || p_inst.is_empty()
+            } else {
+                p_inst == canon(target)
+            }
+        }
+    }
+}
+
+/// Re-send all enqueued prompts in FIFO order from the durable prompt-backup
+/// store.
+///
+/// Pipeline (SINGLE dispatch — never layered on another dispatch path):
+/// 1. Take a durable FIFO snapshot of the live queue (`backup_queued_prompts_for_instance`).
+/// 2. Re-inject unrestored queued backup records into `active_prompts` as
+///    `queued`, skipping anything already queued/dispatched (RCA-15 dedup:
+///    checked against the live queue by prompt id AND by
+///    repo-path+text signature, plus in-run dedup).
+/// 3. Run `resend_running_commands_for_instance` exactly ONCE.
+///
+/// This deliberately does NOT go through
+/// `backup_prompts_db::restore_running_prompts_for_instance`, which dispatches
+/// internally — calling it here would double-dispatch.
+pub fn resend_queued_prompts_for_instance(
+    instance_id: Option<&str>,
+    limit: usize,
+) -> Result<ResendQueuedOutcome, String> {
+    let unscoped = instance_id.is_none();
+    let target_inst = instance_id.unwrap_or("default");
+    let now = Utc::now().timestamp();
+    let mut outcome = ResendQueuedOutcome {
+        instance_id: target_inst.to_string(),
+        backup_batch_id: None,
+        backed_up_queued: 0,
+        reinjected: 0,
+        dispatched: 0,
+        dispatched_from_backup: 0,
+        skipped_duplicates: 0,
+        failed: 0,
+        failures: Vec::new(),
+    };
+
+    // Step 1: durable FIFO snapshot of the live queue before re-sending.
+    match crate::modules::backup_prompts_db::backup_queued_prompts_for_instance(instance_id, None) {
+        Ok((batch, records)) => {
+            outcome.backup_batch_id = Some(batch.id);
+            outcome.backed_up_queued = records.len();
+        }
+        Err(e) => {
+            let msg = format!(
+                "queued backup snapshot failed (continuing with existing backup records): {}",
+                e
+            );
+            crate::modules::logger::log_warn(&format!("[RepoDB] {}", msg));
+            outcome.failures.push(msg);
+            outcome.failed += 1;
+        }
+    }
+
+    // Step 2: load unrestored queued backup records in FIFO order.
+    let bconn = crate::modules::backup_prompts_db::connect_backup_db(None)?;
+    let is_default_scope = target_inst == "default" || target_inst == "__default__";
+    let select_sql = if unscoped {
+        "SELECT id, backup_batch_id, prompt_id, project_name, project_path, project_id,
+                conversation_id, conversation_name, sequence_id, prompt_text, has_images,
+                images_payload, status, created_at, is_restored, restored_at, instance_id
+         FROM prompt_backups
+         WHERE is_restored = 0 AND status = 'queued'
+         ORDER BY created_at ASC, sequence_id ASC, id ASC"
+    } else if is_default_scope {
+        "SELECT id, backup_batch_id, prompt_id, project_name, project_path, project_id,
+                conversation_id, conversation_name, sequence_id, prompt_text, has_images,
+                images_payload, status, created_at, is_restored, restored_at, instance_id
+         FROM prompt_backups
+         WHERE is_restored = 0 AND status = 'queued'
+           AND (instance_id = 'default' OR instance_id IS NULL OR instance_id = '')
+         ORDER BY created_at ASC, sequence_id ASC, id ASC"
+    } else {
+        "SELECT id, backup_batch_id, prompt_id, project_name, project_path, project_id,
+                conversation_id, conversation_name, sequence_id, prompt_text, has_images,
+                images_payload, status, created_at, is_restored, restored_at, instance_id
+         FROM prompt_backups
+         WHERE is_restored = 0 AND status = 'queued' AND instance_id = ?1
+         ORDER BY created_at ASC, sequence_id ASC, id ASC"
+    };
+    let mut sel = bconn
+        .prepare(select_sql)
+        .map_err(|e| format!("Failed to prepare queued backup query: {}", e))?;
+    let parse_row = |row: &rusqlite::Row| {
+        Ok(crate::modules::backup_prompts_db::PromptBackupRecord {
+            id: row.get(0)?,
+            backup_batch_id: row.get(1)?,
+            prompt_id: row.get(2)?,
+            project_name: row.get(3)?,
+            project_path: row.get(4)?,
+            project_id: row.get(5)?,
+            conversation_id: row.get(6)?,
+            conversation_name: row.get(7)?,
+            sequence_id: row.get(8)?,
+            prompt_text: row.get(9)?,
+            has_images: row.get(10)?,
+            images_payload: row.get(11)?,
+            status: row.get(12)?,
+            created_at: row.get(13)?,
+            is_restored: row.get(14)?,
+            restored_at: row.get(15)?,
+            instance_id: row.get(16).ok(),
+        })
+    };
+    let records: Vec<crate::modules::backup_prompts_db::PromptBackupRecord> =
+        if unscoped || is_default_scope {
+            sel.query_map([], parse_row)
+                .map_err(|e| format!("Failed to query queued backups: {}", e))?
+                .flatten()
+                .collect()
+        } else {
+            sel.query_map(params![target_inst], parse_row)
+                .map_err(|e| format!("Failed to query queued backups: {}", e))?
+                .flatten()
+                .collect()
+        };
+
+    // Live-queue dedup maps: prompt id -> status, (repo_path, text) sig -> status.
+    let repo_conn = connect_db()?;
+    let mut live_by_id: HashMap<String, String> = HashMap::new();
+    let mut live_by_sig: HashMap<String, String> = HashMap::new();
+    {
+        let mut live_stmt = repo_conn
+            .prepare(
+                "SELECT id, instance_id, repo_path, prompt_content, status FROM active_prompts
+                 WHERE status IN ('queued', 'pending', 'running', 'backed_up', 'dispatched')",
+            )
+            .map_err(|e| format!("Failed to prepare live queue query: {}", e))?;
+        let live_rows = live_stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                ))
+            })
+            .map_err(|e| format!("Failed to query live queue: {}", e))?;
+        for row in live_rows.flatten() {
+            let (pid, pinst, ppath, ptext, pstatus) = row;
+            if !resend_queued_instance_matches(instance_id, &pinst) {
+                continue;
+            }
+            live_by_id.insert(pid, pstatus.clone());
+            live_by_sig.insert(resend_queued_sig(&ppath, &ptext), pstatus);
+        }
+    }
+
+    let mark_restored = |bconn: &Connection, rec_id: &str| {
+        // Justification: idempotent state update; a missed mark is retried on the
+        // next re-send and the live-queue dedup above prevents double dispatch.
+        crate::error::record_ignored(
+            bconn.execute(
+                "UPDATE prompt_backups SET is_restored = 1, restored_at = ?1 WHERE id = ?2",
+                params![now, rec_id],
+            ),
+            "mark queued backup restored",
+        );
+    };
+
+    // Step 3: re-inject in FIFO order with RCA-15 dedup.
+    let mut seen_sigs: HashSet<String> = HashSet::new();
+    let mut reinjected_ids: HashSet<String> = HashSet::new();
+    for rec in &records {
+        let sig = resend_queued_sig(&rec.project_path, &rec.prompt_text);
+        let eff_inst = rec
+            .instance_id
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or(target_inst);
+
+        let live_status = live_by_id
+            .get(&rec.prompt_id)
+            .or_else(|| live_by_sig.get(&sig));
+        let skip_reason: Option<&str> = match live_status.map(|s| s.as_str()) {
+            Some("running") | Some("dispatched") => Some("already dispatched"),
+            Some(_) => Some("already in queue"),
+            None => {
+                if seen_sigs.contains(&sig) {
+                    Some("duplicate backup row")
+                } else {
+                    None
+                }
+            }
+        };
+        if let Some(reason) = skip_reason {
+            crate::modules::logger::log_info(&format!(
+                "[RepoDB] Resend-queued: skipping '{}' ({})",
+                rec.prompt_id, reason
+            ));
+            mark_restored(&bconn, &rec.id);
+            outcome.skipped_duplicates += 1;
+            seen_sigs.insert(sig);
+            continue;
+        }
+
+        let active_p = ActivePrompt {
+            id: rec.prompt_id.clone(),
+            project_id: rec.project_id.clone(),
+            instance_id: eff_inst.to_string(),
+            repo_path: rec.project_path.clone(),
+            prompt_content: rec.prompt_text.clone(),
+            // Backup schema carries no model column; mirror the established
+            // restore.rs reinjection default.
+            model: Some("gemini-3.8-flash-high".to_string()),
+            session_id: Some(rec.conversation_id.clone()),
+            status: "queued".to_string(),
+            // Preserve the original enqueue time so the dispatch pass below
+            // reads FIFO order (ORDER BY created_at ASC, id ASC).
+            created_at: rec.created_at,
+            updated_at: now,
+            image_payload: rec.images_payload.clone(),
+        };
+        match super::prompts_crud::save_or_requeue_prompt(&active_p) {
+            Ok(()) => {
+                mark_restored(&bconn, &rec.id);
+                outcome.reinjected += 1;
+                seen_sigs.insert(sig.clone());
+                reinjected_ids.insert(rec.prompt_id.clone());
+                live_by_id.insert(rec.prompt_id.clone(), "queued".to_string());
+                live_by_sig.insert(sig, "queued".to_string());
+                crate::modules::logger::log_info(&format!(
+                    "[RepoDB] Resend-queued: re-injected '{}' as queued on '{}'",
+                    rec.prompt_id, eff_inst
+                ));
+            }
+            Err(e) => {
+                let msg = format!(
+                    "failed to re-inject queued backup '{}': {}",
+                    rec.prompt_id, e
+                );
+                crate::modules::logger::log_error(&format!("[RepoDB] {}", msg));
+                outcome.failures.push(msg);
+                outcome.failed += 1;
+                seen_sigs.insert(sig);
+            }
+        }
+    }
+
+    // Mark fully-restored batches (mirror restore.rs).
+    // Justification: best-effort DB statement (idempotent cleanup write); failure logged
+    crate::error::record_ignored(
+        bconn.execute(
+            "UPDATE backup_batches SET is_fully_restored = 1 WHERE id IN (
+                SELECT backup_batch_id FROM prompt_backups GROUP BY backup_batch_id HAVING min(is_restored) = 1
+             )",
+            [],
+        ),
+        "db execute",
+    );
+
+    // Step 4: SINGLE dispatch pass — never layered on another dispatch.
+    match super::resend::resend_running_commands_for_instance(instance_id, limit.max(1)) {
+        Ok(resent) => {
+            outcome.dispatched = resent.len();
+            outcome.dispatched_from_backup = resent
+                .iter()
+                .filter(|p| reinjected_ids.contains(&p.id))
+                .count();
+            crate::modules::logger::log_info(&format!(
+                "[RepoDB] Resend-queued: dispatched {} prompt(s) ({} from backup), skipped {}, failed {}",
+                outcome.dispatched,
+                outcome.dispatched_from_backup,
+                outcome.skipped_duplicates,
+                outcome.failed
+            ));
+        }
+        Err(e) => {
+            let msg = format!(
+                "dispatch pass failed (re-injected prompts remain queued for retry): {}",
+                e
+            );
+            crate::modules::logger::log_error(&format!("[RepoDB] {}", msg));
+            outcome.failures.push(msg);
+            outcome.failed += 1;
+        }
+    }
+
+    Ok(outcome)
+}
 
 /// Prompts that still need a re-push after this instance's IDE is back up.
 pub fn count_backed_up_prompts(instance_id: &str) -> usize {

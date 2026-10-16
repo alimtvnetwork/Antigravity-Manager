@@ -22,12 +22,15 @@ import {
     AUDIT_ATTR_COMPONENT,
     AUDIT_ATTR_METHOD,
     type AuditRecordPayload,
+    type AuditStackFrame,
     type AuditTrigger,
 } from '../components/audit/audit-types';
 
 const SOURCE = 'useAuditRecorder';
 const SCROLL_THROTTLE_MS = 2000;
 const MAX_DESC_LEN = 80;
+/** Frames kept per interaction: enough to name the UI call path, cheap to parse. */
+const STACK_FRAME_LIMIT = 8;
 
 function isRecordingActive(): boolean {
     return useAuditStore.getState().isRecording;
@@ -46,7 +49,7 @@ function findInteractiveTarget(el: Element | null): HTMLElement | null {
     return (interactive as HTMLElement) || (el as HTMLElement);
 }
 
-function extractStackTrace(): { callerInfo: string; stackTrace: string; stackFrames: { function: string; location: string }[] } {
+function extractStackTrace(): { callerInfo: string; stackTrace: string; stackFrames: AuditStackFrame[] } {
     try {
         const stack = new Error().stack || '';
         const lines = stack.split('\n').map((l) => l.trim()).filter(Boolean);
@@ -63,13 +66,14 @@ function extractStackTrace(): { callerInfo: string; stackTrace: string; stackFra
             const location = matched[2] || matched[1];
             if (!location.includes('/') && !location.includes('\\')) return [];
             return [{ function: functionName, location }];
-        }).slice(0, 2);
+        }).slice(0, STACK_FRAME_LIMIT);
         const callerInfo = stackFrames[0]
             ? `${stackFrames[0].function} ${stackFrames[0].location}`
             : filtered[0] || 'anonymous';
-        const stackTrace = filtered.slice(0, 8).join('\n');
+        const stackTrace = filtered.slice(0, STACK_FRAME_LIMIT).join('\n');
         return { callerInfo, stackTrace, stackFrames };
-    } catch {
+    } catch (error) {
+        trackHookError(error, 'extractStackTrace');
         return { callerInfo: 'unknown', stackTrace: '', stackFrames: [] };
     }
 }
@@ -125,9 +129,18 @@ function trackHookError(error: unknown, triggerAction: string, context?: Record<
 
 /** Fire-and-forget report; every failure is tracked, never swallowed. */
 function report(payload: AuditRecordPayload): void {
+    // The backend `RecordInteractionInput` requires top-level `route`
+    // (serde camelCase, no default). The recorder historically sent it only
+    // nested inside `params`, so every frontend-initiated record was rejected
+    // with a missing-field deserialization error. Inject it here so all
+    // call sites are fixed at once.
+    const backendPayload: AuditRecordPayload = {
+        ...payload,
+        route: payload.route ?? currentRoute(),
+    };
     // Intentionally not awaited: reporting must never block the interaction.
     // auditRecord routes its own failures into the error module.
-    void auditRecord(payload).catch((error) => {
+    void auditRecord(backendPayload).catch((error) => {
         trackHookError(error, 'report', { methodName: payload.methodName });
     });
 }
@@ -179,6 +192,8 @@ export function useAuditRecorder(): void {
                         href: targetEl instanceof HTMLAnchorElement ? targetEl.href : undefined,
                         route: currentRoute(),
                     },
+                    // Promoted by the backend into the dedicated stack_trace column.
+                    stackTrace: stackFrames,
                     result: 'ok',
                 });
             } catch (error) {
@@ -221,6 +236,8 @@ export function useAuditRecorder(): void {
                                 : undefined,
                         route: currentRoute(),
                     },
+                    // Promoted by the backend into the dedicated stack_trace column.
+                    stackTrace: stackFrames,
                     result: 'ok',
                 });
             } catch (error) {

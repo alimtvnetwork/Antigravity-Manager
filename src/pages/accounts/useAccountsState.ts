@@ -267,6 +267,14 @@ export function useAccountsState() {
     null,
   );
 
+  // Post-switch prompt resume indicator: set when the backend emits
+  // `prompts://restored` (delayed resume fired), auto-clears after a few seconds.
+  const [lastPromptRestore, setLastPromptRestore] = useState<{
+    instanceId: string;
+    restoredCount: number;
+    at: number;
+  } | null>(null);
+
   // Listen for auto-switch events from backend to animate the specific account row and refresh state
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -289,6 +297,28 @@ export function useAccountsState() {
       if (unlisten) unlisten();
     };
   }, [fetchAccounts, fetchCurrentAccount]);
+
+  // Listen for the delayed post-switch prompt resume so the accounts page can
+  // flash a "prompts resumed" indicator next to the switched account row.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    import('@tauri-apps/api/event').then(({ listen }) => {
+      listen<{ instance_id: string; restored_count: number }>('prompts://restored', (event) => {
+        setLastPromptRestore({
+          instanceId: event.payload.instance_id,
+          restoredCount: event.payload.restored_count,
+          at: Date.now(),
+        });
+        // Justification: transient indicator; auto-clears so the "resumed" flash doesn't linger
+        window.setTimeout(() => setLastPromptRestore(null), 6000);
+      }).then((fn) => {
+        unlisten = fn;
+      });
+    });
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, []);
 
 
 
@@ -371,6 +401,7 @@ export function useAccountsState() {
     paginatedAccounts,
     switchingAccountId,
     setSwitchingAccountId,
+    lastPromptRestore,
     isRefreshing,
     setIsRefreshing,
     isRefreshConfirmOpen,

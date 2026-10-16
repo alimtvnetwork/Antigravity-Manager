@@ -45,6 +45,8 @@ pub mod pid_scan;
 pub mod pid_store;
 #[path = "instance/pid_util.rs"]
 pub mod pid_util;
+#[path = "instance/post_switch_resume.rs"]
+pub mod post_switch_resume;
 #[path = "instance/process_cache.rs"]
 pub mod process_cache;
 #[path = "instance/process_record.rs"]
@@ -149,6 +151,7 @@ pub use pid_util::{
     refresh_pid_cache_if_due, refresh_saved_instance_pids, resolve_instance_pid_for_switch,
     saved_pid_matches,
 };
+pub use post_switch_resume::{cancel_post_switch_resume, schedule_post_switch_resume};
 pub use process_cache::is_instance_process_running_smart;
 pub(crate) use process_cache::{check_cached_pid_alive, focus_running_instance};
 #[cfg(test)]

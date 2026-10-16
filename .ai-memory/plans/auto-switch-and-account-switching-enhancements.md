@@ -41,10 +41,10 @@ Task-07 is the lead's alone. The lead owns shared indexes.
 ## Progress
 - [x] Spec written
 - [x] Plan enqueued
-- [ ] RCA review done
-- [ ] Resume timer done
+- [x] RCA review done (RCA-15 point 4 REGRESSED - dual backup cycle reintroduced; documented)
+- [x] Resume timer done (verified: post_switch_resume.rs, config default 10s, cancellable, prompts://restored event)
 - [ ] Backup + re-send done
-- [ ] Rerun section done
-- [ ] Audit stack traces done
+- [x] Rerun section done (verified: count 1-5 default 2, message options + randomized badge, canonical dispatch path, audit-logged; wired rerunRepoPath prop)
+- [x] Audit stack traces done (verified: 8-frame dedicated column, nullable migration, panel+export; also fixed frontend/backend payload mismatch — `route` now injected in report())
 - [ ] E2E done
 - [ ] Released, CI green

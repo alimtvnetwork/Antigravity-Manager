@@ -288,6 +288,10 @@ fn default_recency_threshold() -> u32 {
     3600
 }
 
+fn default_post_switch_resume_delay_seconds() -> u32 {
+    10
+}
+
 fn default_low_quota_threshold() -> f64 {
     15.0
 }
@@ -336,6 +340,10 @@ pub struct AutoProfileSwitcherConfig {
     pub watchdog_interval_seconds: u32,
     #[serde(default = "default_recency_threshold")]
     pub prompt_recency_threshold_seconds: u32,
+    /// Delay after a switch before the backed-up prompts are resumed on the
+    /// new account. Cancellable (re-switch supersedes; manual activity cancels).
+    #[serde(default = "default_post_switch_resume_delay_seconds")]
+    pub post_switch_resume_delay_seconds: u32,
     #[serde(default = "default_fast_forward_shortcut")]
     pub fast_forward_shortcut: String,
     #[serde(default = "default_stale_binding_timeout_hours")]
@@ -382,6 +390,7 @@ impl Default for AutoProfileSwitcherConfig {
             auto_reopen_on_switch: true,
             watchdog_interval_seconds: 120,
             prompt_recency_threshold_seconds: 3600,
+            post_switch_resume_delay_seconds: 10,
             fast_forward_shortcut: "Ctrl+Shift+F".to_string(),
             stale_binding_timeout_hours: 6,
             pid_refresh_seconds: 600,

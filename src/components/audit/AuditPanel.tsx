@@ -29,7 +29,7 @@ import { copyToClipboard } from '../../utils/clipboard';
 import { cn } from '../../utils/cn';
 import { showToast } from '../common/ToastContainer';
 import { useAuditStore, type AuditActorFilter, type AuditResultFilter } from './audit-store';
-import type { AuditActor, AuditEntry } from './audit-types';
+import type { AuditActor, AuditEntry, AuditStackFrame } from './audit-types';
 
 const SOURCE = 'audit/AuditPanel';
 
@@ -45,15 +45,32 @@ function parseParams(params: AuditEntry['params']): Record<string, unknown> {
     }
 }
 
-type CallerFrame = { functionName: string; location: string };
+type CallerFrame = AuditStackFrame;
 
 function frameFromUnknown(value: unknown): CallerFrame | null {
     if (!value || typeof value !== 'object') return null;
     const record = value as Record<string, unknown>;
-    const functionName = String(record.function || record.functionName || '').trim();
+    const fnName = String(record.function || record.functionName || '').trim();
     const location = String(record.location || record.file || '').trim();
-    if (!functionName && !location) return null;
-    return { functionName: functionName || 'unknown', location: location || 'unknown' };
+    if (!fnName && !location) return null;
+    return { function: fnName || 'unknown', location: location || 'unknown' };
+}
+
+/** Parse the dedicated `stackTrace` column (raw JSON string or decoded array). */
+function framesFromDedicatedTrace(value: unknown): CallerFrame[] {
+    let decoded: unknown = value;
+    if (typeof value === 'string') {
+        try {
+            decoded = JSON.parse(value);
+        } catch {
+            // Malformed trace: the panel renders the "unavailable" fallback below.
+            return [];
+        }
+    }
+    if (!Array.isArray(decoded)) return [];
+    return decoded
+        .map(frameFromUnknown)
+        .filter((frame): frame is CallerFrame => frame !== null);
 }
 
 function framesFromStackText(stackText: string): CallerFrame[] {
@@ -62,10 +79,10 @@ function framesFromStackText(stackText: string): CallerFrame[] {
         const trimmed = line.trim();
         const matched = trimmed.match(/^at\s+(.+?)\s+\((.+)\)$/) || trimmed.match(/^at\s+(.+)$/);
         if (!matched) continue;
-        const functionName = matched[2] ? matched[1] : 'anonymous';
+        const fnName = matched[2] ? matched[1] : 'anonymous';
         const location = matched[2] || matched[1];
         if (!location.includes('/') && !location.includes('\\') && !location.includes('.ts')) continue;
-        frames.push({ functionName, location });
+        frames.push({ function: fnName, location });
         if (frames.length === 2) break;
     }
     return frames;
@@ -122,7 +139,9 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
 
     const stackTrace = params.stackTrace || params.stack || (params.metadata as Record<string, unknown> | undefined)?.stackTrace;
     const callerInfo = params.callerInfo || params.caller || (params.metadata as Record<string, unknown> | undefined)?.callerInfo;
-    const callerFrames = lastTwoCallerFrames(params, stackTrace);
+    // Dedicated `stackTrace` column wins; legacy params shapes are the fallback.
+    const dedicatedFrames = useMemo(() => framesFromDedicatedTrace(entry.stackTrace), [entry.stackTrace]);
+    const traceFrames = dedicatedFrames.length > 0 ? dedicatedFrames : lastTwoCallerFrames(params, stackTrace);
 
     return (
         <>
@@ -169,15 +188,16 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
                         <div>
                             <h5 className="text-[10px] font-semibold text-sky-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
                                 <Terminal className="w-3 h-3" />
-                                Last two methods
+                                Stack trace{traceFrames.length > 0 ? ` (${traceFrames.length} frame${traceFrames.length === 1 ? '' : 's'})` : ''}
                             </h5>
-                            {callerFrames.length === 0 ? (
-                                <p className="font-mono text-[10px] text-slate-500">No caller frames were stored for this entry.</p>
+                            {traceFrames.length === 0 ? (
+                                <p className="font-mono text-[10px] text-slate-500">Stack trace unavailable for this entry (recorded before trace capture).</p>
                             ) : (
                                 <ol className="font-mono text-[10px] text-sky-200/90 bg-slate-950/80 p-2.5 rounded-lg border border-sky-500/20 space-y-1">
-                                    {callerFrames.map((frame) => (
-                                        <li key={`${frame.functionName}-${frame.location}`}>
-                                            <span className="text-sky-100">{frame.functionName}</span>
+                                    {traceFrames.map((frame, index) => (
+                                        <li key={`${frame.function}-${frame.location}-${index}`}>
+                                            <span className="text-slate-500 mr-1.5">{index + 1}.</span>
+                                            <span className="text-sky-100">{frame.function}</span>
                                             <span className="text-slate-500"> — </span>
                                             <span className="text-emerald-300">{frame.location}</span>
                                         </li>

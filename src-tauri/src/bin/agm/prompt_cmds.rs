@@ -45,7 +45,9 @@ pub(crate) fn dispatch_prompt_domain(subcommand: &str, args: &[String]) {
         "export-compact" | "compact-export" => crate::compact_cmds::cmd_export_compact(args),
         "import-compact" | "compact-import" => crate::compact_cmds::cmd_import_compact(args),
         "backup" | "brp" => cmd_prompts_backup(args),
+        "backup-queued" | "bqp" => crate::prompt_resend_queue_cmds::cmd_backup_queued_prompts(args),
         "restore" | "rrp" => cmd_prompts_restore(args),
+        "resend-queued" | "rqp" => crate::prompt_resend_queue_cmds::cmd_resend_queued_prompts(args),
         "resend" | "rrc" | "resend-running" => {
             crate::prompt_resend::cmd_resend_running_commands(args)
         }
@@ -67,7 +69,9 @@ pub(crate) fn cmd_prompts_help(_args: &[String]) {
     println!("  agm prompt tree                       Render project/conversation tree");
     println!("  agm prompt running                    Show currently running prompts");
     println!("  agm prompt backup                     Snapshot active prompts");
+    println!("  agm prompt backup-queued              Snapshot queued prompts only (FIFO order)");
     println!("  agm prompt restore                    Restore and re-enqueue in-flight prompts");
+    println!("  agm prompt resend-queued              Re-send all enqueued prompts in FIFO order");
     println!("  agm prompt inspect                    Observe prompt goals and liveness");
 }
 

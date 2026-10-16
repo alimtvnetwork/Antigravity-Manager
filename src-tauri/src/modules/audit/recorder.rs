@@ -61,10 +61,38 @@ pub(crate) fn caller_frames_from_backtrace(text: &str, limit: usize) -> Vec<(Str
     frames
 }
 
-fn attach_caller_frames(params: Option<serde_json::Value>) -> String {
-    let mut value = params.unwrap_or_else(|| serde_json::json!({}));
+/// Maximum stack frames stored per audit entry.
+///
+/// Cost rationale: `std::backtrace::Backtrace::force_capture()` already walks
+/// the full stack once per recorded interaction (symbol resolution is the
+/// dominant cost); parsing its textual dump is linear and bounded by this
+/// limit, so keeping more frames adds only a small `Vec` — no extra syscalls.
+/// 8 frames cover the whole UI -> recorder path while keeping rows compact.
+const STACK_TRACE_FRAME_LIMIT: usize = 8;
+
+/// The params column keeps just the two innermost frames for compactness;
+/// the full bounded trace lives in the dedicated `stack_trace` column.
+const PARAMS_FRAME_LIMIT: usize = 2;
+
+/// Serialize one `{function, location}` frame, matching the shape the
+/// frontend recorder already sends as `stack_frames`.
+fn frame_json(function_name: &str, location: &str) -> serde_json::Value {
+    serde_json::json!({
+        "function": function_name,
+        "location": location,
+    })
+}
+
+/// Capture the recording code path's caller frames once per interaction,
+/// skipping the audit recorder itself. Locations stay repo-relative so rows
+/// never store machine paths.
+fn capture_caller_frames() -> Vec<(String, String)> {
     let captured = std::backtrace::Backtrace::force_capture().to_string();
-    let frames = caller_frames_from_backtrace(&captured, 2);
+    caller_frames_from_backtrace(&captured, STACK_TRACE_FRAME_LIMIT)
+}
+
+fn attach_caller_frames(params: Option<serde_json::Value>, frames: &[(String, String)]) -> String {
+    let mut value = params.unwrap_or_else(|| serde_json::json!({}));
     if let Some(object) = value.as_object_mut() {
         let already_has_frames = object
             .get("stack_frames")
@@ -74,17 +102,93 @@ fn attach_caller_frames(params: Option<serde_json::Value>) -> String {
             return value.to_string();
         }
         let listed: Vec<serde_json::Value> = frames
-            .into_iter()
-            .map(|(function_name, location)| {
-                serde_json::json!({
-                    "function": function_name,
-                    "location": location,
-                })
-            })
+            .iter()
+            .take(PARAMS_FRAME_LIMIT)
+            .map(|(function_name, location)| frame_json(function_name, location))
             .collect();
         object.insert("stack_frames".to_string(), serde_json::Value::Array(listed));
     }
     value.to_string()
+}
+
+/// Read a caller-supplied trace out of the params payload (the frontend
+/// recorder already sends `stack_frames`, plus the `stackTrace`/`stackFrames`
+/// aliases) and normalize it into frame JSON. Returns an empty vec when the
+/// payload carries no usable frames, letting the caller fall back to the
+/// backend capture.
+fn frontend_frames_from_params(params: &serde_json::Value) -> Vec<serde_json::Value> {
+    let mut frames = Vec::new();
+    let candidate = params
+        .get("stack_frames")
+        .or_else(|| params.get("stackFrames"))
+        .or_else(|| params.get("stackTrace"));
+    let Some(array) = candidate.and_then(|value| value.as_array()) else {
+        return frames;
+    };
+    for item in array.iter().take(STACK_TRACE_FRAME_LIMIT) {
+        let function = item
+            .get("function")
+            .or_else(|| item.get("functionName"))
+            .and_then(|value| value.as_str())
+            .unwrap_or("")
+            .trim();
+        let location = item
+            .get("location")
+            .or_else(|| item.get("file"))
+            .and_then(|value| value.as_str())
+            .unwrap_or("")
+            .trim();
+        if function.is_empty() && location.is_empty() {
+            continue;
+        }
+        frames.push(frame_json(
+            if function.is_empty() {
+                "unknown"
+            } else {
+                function
+            },
+            if location.is_empty() {
+                "unknown"
+            } else {
+                location
+            },
+        ));
+    }
+    frames
+}
+
+/// Resolve the trace stored in the dedicated `stack_trace` column: prefer the
+/// caller-supplied frontend trace (it names the actual UI call path) and fall
+/// back to the backend's own captured frames. Returns `None` when no usable
+/// frame exists so the row stores NULL ("unavailable" in the panel).
+fn resolve_stack_trace(
+    params: &serde_json::Value,
+    backend_frames: &[(String, String)],
+) -> Option<String> {
+    let supplied = frontend_frames_from_params(params);
+    let frames: Vec<serde_json::Value> = if supplied.is_empty() {
+        backend_frames
+            .iter()
+            .map(|(function_name, location)| frame_json(function_name, location))
+            .collect()
+    } else {
+        supplied
+    };
+    if frames.is_empty() {
+        return None;
+    }
+    match serde_json::to_string(&frames) {
+        Ok(json) => Some(json),
+        // Justification: trace serialization is best-effort; a failure must
+        // not abort the audit record it describes.
+        Err(err) => {
+            crate::error::record_ignored(
+                Err::<(), serde_json::Error>(err),
+                "serialize audit stack trace",
+            );
+            None
+        }
+    }
 }
 
 /// Start recording UI interactions; returns the previous recording state.
@@ -172,7 +276,10 @@ pub fn record_interaction(input: RecordInteractionInput) -> AppResult<RecordInte
         input.component.as_deref(),
         input.element_id.as_deref(),
     );
-    let params = attach_caller_frames(input.params);
+    let caller_frames = capture_caller_frames();
+    let params_value = input.params.unwrap_or_else(|| serde_json::json!({}));
+    let stack_trace = resolve_stack_trace(&params_value, &caller_frames);
+    let params = attach_caller_frames(Some(params_value), &caller_frames);
     let message = input.message.unwrap_or_default();
     let id = storage::append_entry(
         Utc::now().timestamp_millis(),
@@ -183,6 +290,7 @@ pub fn record_interaction(input: RecordInteractionInput) -> AppResult<RecordInte
         &params,
         &result,
         &message,
+        stack_trace.as_deref(),
     )?;
     tracing::debug!(
         target: "ui_audit",
@@ -227,6 +335,8 @@ pub fn record_if_active(
     if !is_recording() {
         return;
     }
+    let caller_frames = capture_caller_frames();
+    let stack_trace = resolve_stack_trace(&params, &caller_frames);
     // Justification: best-effort audit recording from CLI/backend paths; must not abort primary operation.
     crate::error::record_ignored(
         storage::append_entry(
@@ -235,9 +345,10 @@ pub fn record_if_active(
             method_name,
             ui_target,
             trigger,
-            &attach_caller_frames(Some(params)),
+            &attach_caller_frames(Some(params), &caller_frames),
             result,
             message,
+            stack_trace.as_deref(),
         ),
         "record_if_active ui_audit",
     );
@@ -245,7 +356,10 @@ pub fn record_if_active(
 
 #[cfg(test)]
 mod tests {
-    use super::{caller_frames_from_backtrace, relative_frame_location};
+    use super::{
+        attach_caller_frames, caller_frames_from_backtrace, relative_frame_location,
+        resolve_stack_trace,
+    };
 
     #[test]
     fn caller_frames_keep_two_locations_and_skip_the_recorder() {
@@ -264,5 +378,56 @@ mod tests {
             relative_frame_location(r"C:\repo\src\hooks\useAuditRecorder.ts:49"),
             "src/hooks/useAuditRecorder.ts:49"
         );
+    }
+
+    #[test]
+    fn resolve_stack_trace_prefers_frontend_frames() {
+        let params = serde_json::json!({
+            "stack_frames": [
+                { "function": "handleClick", "location": "src/components/x.tsx:10" },
+                { "function": "", "location": "" },
+            ],
+        });
+        let backend = vec![("backend_fn".to_string(), "src-tauri/src/a.rs:1".to_string())];
+        let resolved = resolve_stack_trace(&params, &backend).expect("trace json");
+        assert!(resolved.contains("handleClick"));
+        assert!(!resolved.contains("backend_fn"));
+    }
+
+    #[test]
+    fn resolve_stack_trace_falls_back_to_backend_frames() {
+        let backend = vec![("backend_fn".to_string(), "src-tauri/src/a.rs:1".to_string())];
+        let from_empty = resolve_stack_trace(&serde_json::json!({}), &backend).expect("trace json");
+        assert!(from_empty.contains("backend_fn"));
+        let from_invalid = resolve_stack_trace(
+            &serde_json::json!({ "stack_frames": { "nope": true } }),
+            &backend,
+        )
+        .expect("trace json");
+        assert!(from_invalid.contains("backend_fn"));
+        assert!(resolve_stack_trace(&serde_json::json!({}), &[]).is_none());
+    }
+
+    #[test]
+    fn attach_caller_frames_keeps_frontend_frames_and_limits_injected() {
+        let frames = vec![
+            ("one".to_string(), "a.rs:1".to_string()),
+            ("two".to_string(), "b.rs:2".to_string()),
+            ("three".to_string(), "c.rs:3".to_string()),
+        ];
+        // Frontend-supplied frames are preserved untouched.
+        let kept = attach_caller_frames(
+            Some(
+                serde_json::json!({ "stack_frames": [{ "function": "ui", "location": "x.tsx:1" }] }),
+            ),
+            &frames,
+        );
+        assert!(kept.contains("\"ui\""));
+        assert!(!kept.contains("\"one\""));
+        // Backend injection is capped at PARAMS_FRAME_LIMIT frames.
+        let injected = attach_caller_frames(None, &frames);
+        assert!(injected.contains("\"one\""));
+        assert!(injected.contains("\"two\""));
+        assert!(!injected.contains("\"three\""));
     }
 }

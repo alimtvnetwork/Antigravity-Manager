@@ -76,6 +76,9 @@ pub struct InteractionEntry {
     pub params: String,
     pub result: String,
     pub message: String,
+    /// Compact JSON array of `{function, location}` frames captured at record
+    /// time. `None` for rows written before the trace column existed.
+    pub stack_trace: Option<String>,
 }
 
 /// Outcome returned by `record_ui_interaction`.

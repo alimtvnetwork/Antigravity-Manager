@@ -38,6 +38,7 @@ mod prompt_goals;
 mod prompt_import_export;
 mod prompt_mgmt;
 mod prompt_resend;
+mod prompt_resend_queue_cmds;
 mod proxy_cmds;
 mod quota_cmds;
 mod remediate_cmds;
@@ -214,6 +215,12 @@ fn main() {
         "prompts-import" | "pi" => crate::prompt_import_export::cmd_prompts_import(&cmd_args),
         "resend-running-commands" | "rrc" | "resend-running" | "resend" => {
             crate::prompt_resend::cmd_resend_running_commands(&cmd_args);
+        }
+        "resend-queued-prompts" | "resend-queued" | "rqp" => {
+            crate::prompt_resend_queue_cmds::cmd_resend_queued_prompts(&cmd_args);
+        }
+        "backup-queued-prompts" | "backup-queued" | "bqp" => {
+            crate::prompt_resend_queue_cmds::cmd_backup_queued_prompts(&cmd_args);
         }
         "copy-prompt" | "cp-prompt" | "prompt-copy" => {
             crate::prompt_cmds::dispatch_prompt_domain("copy", &cmd_args);

@@ -66,7 +66,7 @@ pub use discovery::discover_running_prompts_from_antigravity;
 // ---- backup ----
 pub use backup::{
     backup_running_prompts, count_backed_up_prompts, needs_prompt_channel_wait,
-    verify_prompts_running,
+    resend_queued_prompts_for_instance, verify_prompts_running, ResendQueuedOutcome,
 };
 // ---- dispatch ----
 pub use dispatch::{dispatch_running_prompts, parse_flexible_timestamp};

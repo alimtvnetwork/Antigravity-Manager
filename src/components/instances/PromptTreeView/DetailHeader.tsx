@@ -1,10 +1,10 @@
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useState } from 'react';
-import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2 } from 'lucide-react';
+import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import type { AgmConversationNode } from './types';
 import { formatSeqBadge, stripImagesFromPrompt } from './formatters';
-import { copyPromptAiPayload, resolvePromptBody, type PromptAiCopyKind } from './usePromptTreePromptActions';
+import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, RERUN_MESSAGE_OPTIONS, RERUN_RANDOM_MESSAGE_SET, RERUN_DEFAULT_COUNT, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
 import { classifyPromptTier } from './tierClassification';
 import { isGhostConversation } from './conversationGuards';
 import { persistClientCrash } from '../../../lib/error-listener';
@@ -73,6 +73,8 @@ export interface DetailHeaderProps {
     onFocusIde: () => void;
     onResend: () => void;
     onEnqueue: () => void;
+    /** Optional repo path used as the rerun dispatch target (falls back to ''). */
+    rerunRepoPath?: string;
     onOpenInspector: (conv: AgmConversationNode) => void;
 }
 
@@ -93,7 +95,7 @@ export function DetailHeader(props: DetailHeaderProps) {
         hasImages, instancePid, instanceSeqNum, instanceExeName, instanceNameDisplay,
         formatDuration, elapsedSeconds,
         onCopyAllWithRichImages, onCopyCleanText,
-        onCopyWithImages, onSaveImages, onExport, onFocusIde, onResend, onEnqueue, onOpenInspector,
+        onCopyWithImages, onSaveImages, onExport, onFocusIde, onResend, onEnqueue, rerunRepoPath, onOpenInspector,
     } = props;
 
     const [localNewConvTitle, setLocalNewConvTitle] = useState('');
@@ -128,6 +130,50 @@ export function DetailHeader(props: DetailHeaderProps) {
     const [localIsSendMenuOpen, setLocalIsSendMenuOpen] = useState(false);
     const isSendMenuOpen = propIsSendMenuOpen ?? propIsEnqueueMenuOpen ?? localIsSendMenuOpen;
     const setIsSendMenuOpen = propSetIsSendMenuOpen ?? propSetIsEnqueueMenuOpen ?? setLocalIsSendMenuOpen;
+
+    // RERUN SECTION (Task-04): state + dispatch handler for the rerun capsule.
+    const [isRerunMenuOpen, setIsRerunMenuOpen] = useState(false);
+    const [rerunCount, setRerunCount] = useState<number>(RERUN_DEFAULT_COUNT);
+    const [rerunMessageOption, setRerunMessageOption] = useState<RerunMessageOption>('is-it-done');
+    const [isRerunning, setIsRerunning] = useState(false);
+    const [rerunFlash, setRerunFlash] = useState<string | null>(null);
+
+    const handleRerun = async (): Promise<void> => {
+        if (isRerunning) return;
+        setIsRerunMenuOpen(false);
+        setIsRerunning(true);
+        setRerunFlash(null);
+        try {
+            const targetInstId = selectedConversation.instance_id || 'default';
+            const targetConvId = conversationTargetMode === 'new'
+                ? (newConversationTitle?.trim() || undefined)
+                : selectedConversation.conversation_id;
+            const result = await dispatchRerunMessages({
+                targetInstId,
+                repoPath: rerunRepoPath ?? '',
+                convId: targetConvId,
+                count: rerunCount,
+                messageOption: rerunMessageOption,
+                source: 'DetailHeader.rerunSection',
+            });
+            if (result.failed > 0) {
+                // Each failed rerun already landed in the error module via
+                // dispatchRerunMessages; surface a visible summary as well.
+                reportPromptActionError(
+                    new Error(`Rerun: ${result.failed} of ${result.requested} dispatch(es) failed`),
+                    'DetailHeader.rerunSection'
+                );
+            } else if (result.dispatched > 0) {
+                setRerunFlash(`Sent ×${result.dispatched}`);
+                setTimeout(() => setRerunFlash(null), 2500);
+            }
+        } catch (err) {
+            reportPromptActionError(err, 'DetailHeader.rerunSection');
+        } finally {
+            setIsRerunning(false);
+        }
+    };
+    // END RERUN SECTION (Task-04)
 
     return (
         <div className="space-y-2 pb-2.5 border-b border-slate-200 dark:border-[#40285e] shrink-0">
@@ -624,6 +670,149 @@ export function DetailHeader(props: DetailHeaderProps) {
                             </div>
                         )}
                     </div>
+
+                    {/* RERUN SECTION (Task-04): rerun capsule adjacent to the Send capsule.
+                        Dispatches a follow-up nudge message N times through the canonical
+                        sendPromptNow path (see usePromptTreePromptActions.dispatchRerunMessages). */}
+                    <div className="relative flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0 ml-1.5">
+                        {/* Main Button: Quick Rerun (with N count badge) */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                void handleRerun().catch((err) => {
+                                    reportPromptActionError(err, 'DetailHeader.rerunSection');
+                                });
+                            }}
+                            disabled={isRerunning}
+                            className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-sky-700 dark:text-sky-300 hover:bg-sky-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                            title={`Dispatch the chosen rerun nudge ${rerunCount} time(s) to the running instance`}
+                        >
+                            {rerunFlash ? (
+                                <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                            ) : (
+                                <Repeat className={cn('w-3 h-3 text-sky-500 shrink-0', isRerunning && 'animate-spin')} />
+                            )}
+                            <span>{isRerunning ? 'Rerunning…' : rerunFlash ?? `Rerun ×${rerunCount}`}</span>
+                        </button>
+
+                        {/* Split ChevronDown: Rerun Configuration Flyout */}
+                        <button
+                            type="button"
+                            onClick={() => setIsRerunMenuOpen((prev) => !prev)}
+                            className="flex items-center justify-center px-1.5 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            title="Rerun configuration: count and message"
+                        >
+                            <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isRerunMenuOpen && "rotate-180")} />
+                        </button>
+
+                        {/* Rerun Flyout: count selector + message options */}
+                        {isRerunMenuOpen && (
+                            <div
+                                className="absolute right-0 top-full mt-1.5 z-50 w-72 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl p-2 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-1.5"
+                                onMouseLeave={() => setIsRerunMenuOpen(false)}
+                            >
+                                {/* Menu Header */}
+                                <div className="px-2 pt-0.5 pb-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 select-none border-b border-slate-100 dark:border-[#40285e]/60 flex items-center justify-between">
+                                    <span>Rerun Configuration</span>
+                                    <span className="text-[9px] text-slate-400">AGM:P001</span>
+                                </div>
+
+                                {/* Count selector: Times (N) */}
+                                <div className="flex items-center justify-between px-2 py-1 text-xs">
+                                    <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
+                                        Times (N):
+                                    </span>
+                                    <div className="inline-flex rounded-lg bg-slate-100 dark:bg-purple-950/40 p-0.5 border border-slate-200/80 dark:border-purple-500/20 text-[11px]">
+                                        {Array.from({ length: RERUN_MAX_COUNT - RERUN_MIN_COUNT + 1 }, (_, idx) => RERUN_MIN_COUNT + idx).map((n) => (
+                                            <button
+                                                key={n}
+                                                type="button"
+                                                onClick={() => setRerunCount(n)}
+                                                className={cn(
+                                                    "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                    rerunCount === n
+                                                        ? "bg-white dark:bg-[#2c1a4d] text-sky-600 dark:text-sky-400 shadow-2xs font-semibold"
+                                                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                                )}
+                                                title={`Dispatch the nudge ${n} time(s)`}
+                                            >
+                                                {n}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Message options */}
+                                <div className="px-2 py-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                    Message:
+                                </div>
+                                <div className="space-y-1">
+                                    {RERUN_MESSAGE_OPTIONS.map((opt) => {
+                                        const active = rerunMessageOption === opt.value;
+                                        const isRandom = opt.value === 'randomized';
+                                        return (
+                                            <button
+                                                key={opt.value}
+                                                type="button"
+                                                onClick={() => setRerunMessageOption(opt.value)}
+                                                className={cn(
+                                                    "w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-lg text-left cursor-pointer transition-colors border",
+                                                    active
+                                                        ? "bg-sky-500/10 border-sky-500/40 text-slate-800 dark:text-slate-100"
+                                                        : "border-transparent text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e]"
+                                                )}
+                                                title={opt.hint}
+                                            >
+                                                <span className="flex items-center gap-2">
+                                                    <span className={cn("w-3 h-3 rounded-full border-2 flex items-center justify-center", active ? "border-sky-500" : "border-slate-300 dark:border-slate-600")}>
+                                                        {active && <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />}
+                                                    </span>
+                                                    <span className="font-medium">{opt.label}</span>
+                                                </span>
+                                                {isRandom && (
+                                                    <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                                                        Randomized
+                                                    </span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Built-in randomized set preview */}
+                                {rerunMessageOption === 'randomized' && (
+                                    <div className="mx-2 px-2 py-1.5 rounded-lg bg-slate-50/80 dark:bg-purple-950/20 border border-slate-200/60 dark:border-purple-500/20">
+                                        <div className="text-[9.5px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                                            Built-in set (one picked per dispatch)
+                                        </div>
+                                        <ul className="space-y-0.5 text-[10.5px] text-slate-500 dark:text-slate-400 list-disc list-inside">
+                                            {RERUN_RANDOM_MESSAGE_SET.map((m) => (
+                                                <li key={m}>{m}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {/* Dispatch Action Button inside flyout */}
+                                <div className="pt-1 border-t border-slate-100 dark:border-[#40285e]/60">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            void handleRerun().catch((err) => {
+                                                reportPromptActionError(err, 'DetailHeader.rerunSection');
+                                            });
+                                        }}
+                                        disabled={isRerunning}
+                                        className="w-full flex items-center justify-center gap-2 py-1.5 px-3 bg-sky-500/15 hover:bg-sky-500/25 text-sky-700 dark:text-sky-300 border border-sky-500/30 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                                    >
+                                        <Repeat className={cn('w-3.5 h-3.5 text-sky-500', isRerunning && 'animate-spin')} />
+                                        <span>{isRerunning ? 'Rerunning…' : `Rerun ×${rerunCount} Now`}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    {/* END RERUN SECTION (Task-04) */}
                 </div>
             </div>
         </div>

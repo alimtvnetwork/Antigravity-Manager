@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS interactions (
     trigger TEXT NOT NULL,
     params TEXT NOT NULL DEFAULT '{}',
     result TEXT NOT NULL,
-    message TEXT NOT NULL DEFAULT ''
+    message TEXT NOT NULL DEFAULT '',
+    stack_trace TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_interactions_timestamp ON interactions(timestamp);
 CREATE TABLE IF NOT EXISTS recorder_state (
@@ -58,6 +59,11 @@ fn open_db() -> AppResult<Connection> {
     let conn = Connection::open(dir.join(DB_FILE_NAME))?;
     conn.pragma_update(None, "journal_mode", "WAL")?;
     conn.execute_batch(SCHEMA_SQL)?;
+    // Justification: idempotent schema migration; failure is expected when the column already exists.
+    crate::error::record_ignored(
+        conn.execute("ALTER TABLE interactions ADD COLUMN stack_trace TEXT", []),
+        "add stack_trace column migration",
+    );
     Ok(conn)
 }
 
@@ -78,12 +84,13 @@ pub fn append_entry(
     params: &str,
     result: &str,
     message: &str,
+    stack_trace: Option<&str>,
 ) -> AppResult<i64> {
     let conn = open_db()?;
     conn.execute(
         "INSERT INTO interactions
-            (timestamp, actor, method_name, ui_target, trigger, params, result, message)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            (timestamp, actor, method_name, ui_target, trigger, params, result, message, stack_trace)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         params![
             timestamp,
             actor,
@@ -92,7 +99,8 @@ pub fn append_entry(
             trigger,
             params,
             result,
-            message
+            message,
+            stack_trace
         ],
     )?;
     Ok(conn.last_insert_rowid())
@@ -102,7 +110,7 @@ pub fn append_entry(
 pub fn list_entries(limit: u32) -> AppResult<Vec<InteractionEntry>> {
     let conn = open_db()?;
     let mut stmt = conn.prepare(
-        "SELECT id, timestamp, actor, method_name, ui_target, trigger, params, result, message
+        "SELECT id, timestamp, actor, method_name, ui_target, trigger, params, result, message, stack_trace
          FROM interactions
          ORDER BY timestamp DESC, id DESC
          LIMIT ?1",
@@ -118,6 +126,8 @@ pub fn list_entries(limit: u32) -> AppResult<Vec<InteractionEntry>> {
             params: row.get(6)?,
             result: row.get(7)?,
             message: row.get(8)?,
+            // NULL for rows recorded before the trace column existed.
+            stack_trace: row.get(9)?,
         })
     })?;
     let mut entries = Vec::new();

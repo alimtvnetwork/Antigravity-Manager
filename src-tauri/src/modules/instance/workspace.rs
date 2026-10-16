@@ -121,42 +121,19 @@ pub fn restore_and_inject_prompts_for_instance(
 }
 
 /// Re-push backed-up prompts after the IDE process can accept them.
-/// Waits the post-launch 5s, then until the prompt channel is up, then sends once.
-/// A zero-count push is retried once. The row stays `backed_up` until `agy` accepts it.
+/// Delegates to the cancellable, configurable post-switch resume timer
+/// (`instance::post_switch_resume`): the legacy hardcoded 5s delay is replaced
+/// by `post_switch_resume_delay_seconds` (default 10s), a re-switch supersedes
+/// the pending timer, and `prompts://restored` is emitted on completion.
+/// Rides the existing STAGE_5_RESTORE restore unit — no parallel pipeline.
 pub fn schedule_prompt_restore_after_launch(instance_id: String) {
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-        let first = match tokio::task::spawn_blocking({
-            let instance_id = instance_id.clone();
-            move || push_backed_up_prompts_after_channel(&instance_id)
-        })
-        .await
-        {
-            Ok(count) => count,
-            Err(err) => {
-                crate::modules::logger::log_error(&format!(
-                    "[INSTANCE_SWITCH:STAGE_5_RESTORE] Prompt restore task failed for '{instance_id}': {err}"
-                ));
-                0
-            }
-        };
-        if first > 0 {
-            return;
-        }
-        crate::modules::logger::log_warn(&format!(
-            "[INSTANCE_SWITCH:STAGE_5_RESTORE] No prompt landed for '{instance_id}' on the first post-launch push; retrying once"
-        ));
-        tokio::time::sleep(std::time::Duration::from_secs(7)).await;
-        // Justification: detached retry; a join failure is logged and the prompt stays backed_up
-        crate::error::record_ignored(
-            tokio::task::spawn_blocking(move || push_backed_up_prompts_after_channel(&instance_id))
-                .await,
-            "retry prompt restore after relaunch",
-        );
-    });
+    super::post_switch_resume::schedule_post_switch_resume(instance_id);
 }
 
-fn push_backed_up_prompts_after_channel(instance_id: &str) -> usize {
+/// The single STAGE_5_RESTORE restore unit: wait for the prompt channel, then
+/// rehydrate the snapshot and dispatch once. `pub(crate)` so the post-switch
+/// resume timer can ride this exact path instead of duplicating it.
+pub(crate) fn push_backed_up_prompts_after_channel(instance_id: &str) -> usize {
     crate::modules::logger::log_info(&format!(
         "[INSTANCE_SWITCH:STAGE_5_RESTORE] Post-launch delay elapsed for instance '{instance_id}'"
     ));

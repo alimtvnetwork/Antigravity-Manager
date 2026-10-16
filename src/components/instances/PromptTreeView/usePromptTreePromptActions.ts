@@ -8,6 +8,7 @@ import {
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 import { persistClientCrash } from '../../../lib/error-listener';
+import { auditRecord } from '../../audit/audit-client';
 import type { AgmConversationNode } from './types';
 import { isGhostConversation } from './conversationGuards';
 import { detectPromptCategory } from './tierClassification';
@@ -599,3 +600,141 @@ ${activePromptText}
 }
 
 export { IMAGE_EXTENSIONS };
+
+// ============================================================================
+// RERUN SECTION (Task-04) — appended at END of file per task ownership.
+// ----------------------------------------------------------------------------
+// Rerun support: dispatches a follow-up nudge message N times through the SAME
+// canonical dispatch path as handleResendPrompt (`sendPromptNow`) — no forked
+// logic, no new backend endpoint. Each individual rerun is audit-logged via
+// `auditRecord`; dispatch failures are routed into the error module (via
+// sendPromptNow's captureError + persistClientCrash) and recorded in the audit
+// entry as `result: 'error'`, so failures are always visible — no silent errors.
+// ============================================================================
+
+/** Message choice offered by the rerun UI picker. */
+export type RerunMessageOption = 'is-it-done' | 'is-it-published' | 'randomized';
+
+/** Picker rows rendered by the rerun UI. The randomized row is explicitly labeled. */
+export const RERUN_MESSAGE_OPTIONS: ReadonlyArray<{ value: RerunMessageOption; label: string; hint: string }> = [
+    { value: 'is-it-done', label: 'Is it done?', hint: 'Send a completion-check nudge' },
+    { value: 'is-it-published', label: 'Is it published?', hint: 'Send a publish-status nudge' },
+    {
+        value: 'randomized',
+        label: 'Randomized nudge (random pick)',
+        hint: 'Every dispatch picks ONE message at random from the built-in set',
+    },
+];
+
+/** Small built-in set of follow-up nudges used by the "randomized" option. */
+export const RERUN_RANDOM_MESSAGE_SET: ReadonlyArray<string> = [
+    'Quick status check — is it done yet?',
+    'Please continue where you left off and confirm when finished.',
+    'Give me a brief progress update.',
+    'Are you finished? Summarize the result.',
+    'Keep going — ping me when it is published.',
+];
+
+export const RERUN_FIXED_MESSAGES: Record<Exclude<RerunMessageOption, 'randomized'>, string> = {
+    'is-it-done': 'Is it done?',
+    'is-it-published': 'Is it published?',
+};
+
+export const RERUN_DEFAULT_COUNT = 2;
+export const RERUN_MIN_COUNT = 1;
+export const RERUN_MAX_COUNT = 5;
+
+/** Resolve the actual message text for one rerun dispatch. */
+export function resolveRerunMessage(option: RerunMessageOption): { message: string; pickedIndex: number | null } {
+    if (option === 'randomized') {
+        const pickedIndex = Math.floor(Math.random() * RERUN_RANDOM_MESSAGE_SET.length);
+        return { message: RERUN_RANDOM_MESSAGE_SET[pickedIndex], pickedIndex };
+    }
+    return { message: RERUN_FIXED_MESSAGES[option], pickedIndex: null };
+}
+
+export interface RerunDispatchContext {
+    /** Instance id the nudge is sent to (same resolution as handleResendPrompt). */
+    targetInstId: string;
+    /** Repo path of the target instance ('' falls back to instance default). */
+    repoPath: string;
+    /** Conversation the nudge lands in (undefined = instance default). */
+    convId?: string;
+    /** How many times the message is dispatched (clamped to 1..5). */
+    count: number;
+    messageOption: RerunMessageOption;
+    /** Audit/source label, e.g. 'DetailHeader.rerunSection'. */
+    source?: string;
+}
+
+export interface RerunDispatchResult {
+    requested: number;
+    dispatched: number;
+    failed: number;
+}
+
+/**
+ * Dispatch the chosen rerun message N times through the canonical `sendPromptNow`
+ * path (the same function handleResendPrompt uses). Each rerun is audit-logged
+ * individually; a failed rerun is audit-logged as `result: 'error'` and routed
+ * into the error module — failures are never silent.
+ */
+export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<RerunDispatchResult> {
+    const requested = Math.min(
+        RERUN_MAX_COUNT,
+        Math.max(RERUN_MIN_COUNT, Math.floor(ctx.count) || RERUN_DEFAULT_COUNT)
+    );
+    const source = ctx.source ?? 'DetailHeader.rerunSection';
+    const result: RerunDispatchResult = { requested, dispatched: 0, failed: 0 };
+    const auditBase = {
+        actor: 'user' as const,
+        methodName: 'prompt_tree_rerun_dispatch',
+        uiTarget: 'PromptTreeView | DetailHeader | RerunSection',
+        trigger: 'click' as const,
+    };
+    for (let i = 0; i < requested; i += 1) {
+        const { message, pickedIndex } = resolveRerunMessage(ctx.messageOption);
+        try {
+            // Canonical dispatch path — identical call handleResendPrompt makes.
+            await sendPromptNow(ctx.targetInstId, ctx.repoPath, message, ctx.convId);
+            result.dispatched += 1;
+            await auditRecord({
+                ...auditBase,
+                params: {
+                    source,
+                    targetInstId: ctx.targetInstId,
+                    convId: ctx.convId ?? null,
+                    messageOption: ctx.messageOption,
+                    rerunIndex: i + 1,
+                    rerunTotal: requested,
+                    messagePickedIndex: pickedIndex,
+                    message,
+                },
+                result: 'ok',
+            });
+        } catch (err) {
+            result.failed += 1;
+            const errorObj = err instanceof Error ? err : new Error(String(err) || 'rerun dispatch failed');
+            // sendPromptNow already routed this into the error store (captureError);
+            // persist the crash record as well so the failure stays visible.
+            persistClientCrash(errorObj, 'usePromptTreePromptActions.dispatchRerunMessages');
+            await auditRecord({
+                ...auditBase,
+                params: {
+                    source,
+                    targetInstId: ctx.targetInstId,
+                    convId: ctx.convId ?? null,
+                    messageOption: ctx.messageOption,
+                    rerunIndex: i + 1,
+                    rerunTotal: requested,
+                    messagePickedIndex: pickedIndex,
+                    message,
+                },
+                result: 'error',
+                message: errorObj.message,
+            });
+        }
+    }
+    return result;
+}
+// END RERUN SECTION (Task-04)
