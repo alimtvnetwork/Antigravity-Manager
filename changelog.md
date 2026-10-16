@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.211.0] - 2026-10-17
+
+### Added
+- **Telegram project picker**: `/send` lists eight projects per page, newest conversation first. Each row shows the project name and the conversation title. The user selects by number, and Next loads the next eight. The current machine is labeled This machine with a green button. Generated `Node-*` names are resolved through GitMap and cached in SQLite for `node_name_refresh_hours` (default 24). (Thanks to @aukgit)
+
+---
+
 ## [v4.210.0] - 2026-10-16
 
 ### Added
@@ -396,6 +403,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.211.0 (2026-10-17)**:
+        -   **[Telegram] Numbered project pages, conversation titles, and cached node names (Thanks to @aukgit)**:
+            -   **Description**: `/send` lists eight projects per page, newest conversation first, with the project name and the conversation title. Numbers select a row, and Next loads the next eight. The current machine is labeled This machine with a green button. A missing node alias is resolved through GitMap once and stored in SQLite until `node_name_refresh_hours` (default 24). (Thanks to @aukgit)
+
+
     *   **v4.210.0 (2026-10-16)**:
         -   **[Console Logger & Diagnostics] ANSI Color Rendering, Compact Console Timer & Idempotent Migration Log Hygiene (Thanks to @aukgit)**:
             -   **Description**: Initialized Windows console support with UTF-8 (65001), ANSI virtual terminal processing, and 18pt Consolas typography via `enable_modern_console()`; added compact `%H:%M:%S` timestamp formatting (`ConsoleTimer`) to prevent log wrapping in terminal outputs; and added `expected_best_effort` in `src-tauri/src/error.rs` to demote benign idempotent migration errors (`duplicate column name`) from `warn!` to `debug!`.
