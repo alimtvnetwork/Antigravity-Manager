@@ -342,6 +342,7 @@ fn record_cli_ui_action(
         &params_str,
         result,
         message,
+        None,
     ) {
         eprintln!("[WARN] ui audit record failed (action still proceeds): {err}");
     }
