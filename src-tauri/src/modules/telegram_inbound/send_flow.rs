@@ -10,7 +10,7 @@
 
 use once_cell::sync::Lazy;
 use serde_json::{json, Value};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -18,7 +18,6 @@ use super::open_shot::{local_machine_label, OpenShotTarget};
 use super::*;
 
 const SEND_FLOW_TTL_SECS: u64 = 600;
-const MAX_PICK_BUTTONS: usize = 8;
 /// Telegram caps `callback_data` at 64 bytes; stay comfortably below it.
 const MAX_CALLBACK_BYTES: usize = 60;
 
@@ -36,6 +35,7 @@ struct SendFlow {
     instance: Option<String>,
     conversation: Option<String>,
     stage: SendStage,
+    page: usize,
     updated_at: u64,
 }
 
@@ -78,6 +78,15 @@ fn cancel_markup() -> Value {
 /// would corrupt parsing, so they are excluded from pickers.
 fn picker_safe(token: &str) -> bool {
     !token.is_empty() && !token.contains('|') && !token.contains(':')
+}
+
+fn typed_project_index(text: &str) -> Option<usize> {
+    let number = text.parse::<usize>().ok()?;
+    if (1..=8).contains(&number) {
+        Some(number - 1)
+    } else {
+        None
+    }
 }
 
 fn callback_fits(text: &str) -> bool {
@@ -139,49 +148,6 @@ fn instance_entries() -> Vec<(String, String)> {
     out
 }
 
-/// (value, label) conversation targets for an instance, from live tracked prompts.
-fn conversation_entries(instance_id: &str) -> Vec<(String, String)> {
-    let prompts = match crate::modules::repo_db::list_all_prompts() {
-        Ok(p) => p,
-        // Justification: an unreadable prompt DB only empties the picker; the
-        // manual-entry path stays available and the error is logged.
-        Err(e) => {
-            crate::error::record_ignored(
-                Err::<(), String>(e.to_string()),
-                "list prompts for /send conversation picker",
-            );
-            return Vec::new();
-        }
-    };
-    let mut seen = HashSet::new();
-    let mut out = Vec::new();
-    for p in prompts.iter().filter(|p| p.instance_id == instance_id) {
-        let value = p
-            .session_id
-            .clone()
-            .filter(|s| !s.trim().is_empty())
-            .unwrap_or_else(|| p.project_id.clone());
-        if !picker_safe(&value) || !seen.insert(value.clone()) {
-            continue;
-        }
-        let label = match &p.session_id {
-            Some(s) if !s.trim().is_empty() => {
-                let short: String = s.chars().take(8).collect();
-                format!("{} · {}", p.project_id, short)
-            }
-            _ => p.project_id.clone(),
-        };
-        if !callback_fits(&format!("send:c:x|x|{value}")) {
-            continue;
-        }
-        out.push((value, label));
-        if out.len() >= MAX_PICK_BUTTONS {
-            break;
-        }
-    }
-    out
-}
-
 fn push_buttons(rows: &mut Vec<Value>, buttons: Vec<Value>, per_row: usize) {
     let mut row: Vec<Value> = Vec::new();
     for b in buttons {
@@ -201,10 +167,14 @@ fn machine_picker_markup() -> Value {
     let buttons: Vec<Value> = machine_entries()
         .iter()
         .map(|alias| {
-            json!({
-                "text": format!("🖥️ {}", alias),
-                "callback_data": format!("send:m:{alias}"),
-            })
+            let current = super::node_label::is_current_machine(alias);
+            let style = if current { Some("success") } else { None };
+            let mark = if current { "🟢" } else { "🖥️" };
+            super::node_label::button_json(
+                &format!("{mark} {}", super::node_label::machine_button_text(alias)),
+                &format!("send:m:{alias}"),
+                style,
+            )
         })
         .collect();
     push_buttons(&mut rows, buttons, 2);
@@ -234,37 +204,128 @@ fn instance_picker_markup(machine: &str, instances: &[(String, String)]) -> Valu
     json!({ "inline_keyboard": rows })
 }
 
-fn conversation_picker_markup(machine: &str, instance: &str, convs: &[(String, String)]) -> Value {
+fn project_picker_markup(page: &super::send_listing::PickerPage) -> Value {
     let mut rows: Vec<Value> = Vec::new();
-    let buttons: Vec<Value> = convs
+    let buttons: Vec<Value> = page
+        .rows
         .iter()
-        .filter(|(value, _)| callback_fits(&format!("send:c:{machine}|{instance}|{value}")))
-        .map(|(value, label)| {
-            json!({
-                "text": format!("💬 {}", label),
-                "callback_data": format!("send:c:{machine}|{instance}|{value}"),
-            })
+        .enumerate()
+        .map(|(index, _)| {
+            super::node_label::button_json(
+                &format!("{}", index + 1),
+                &format!("send:n:{}|{index}", page.page),
+                None,
+            )
         })
         .collect();
-    push_buttons(&mut rows, buttons, 2);
+    push_buttons(&mut rows, buttons, 4);
+    let mut nav: Vec<Value> = Vec::new();
+    if page.has_back {
+        nav.push(super::node_label::button_json(
+            "Back",
+            &format!("send:back:{}", page.page),
+            Some("primary"),
+        ));
+    }
+    if page.has_next {
+        nav.push(super::node_label::button_json(
+            "Next",
+            &format!("send:next:{}", page.page),
+            Some("primary"),
+        ));
+    }
+    if !nav.is_empty() {
+        rows.push(json!(nav));
+    }
     rows.push(json!([
-        // `send:cman` carries no params: machine/instance already live in the
-        // flow state (set when the instance was picked), so the payload stays
-        // far below Telegram's 64-byte callback_data cap by construction.
         { "text": "✏️ Type it manually", "callback_data": "send:cman" },
-        { "text": "🧹 Cancel", "callback_data": "send:cancel" }
+        super::node_label::button_json("🧹 Cancel", "send:cancel", Some("danger")),
     ]));
     json!({ "inline_keyboard": rows })
+}
+
+fn render_project_page(
+    chat_id: i64,
+    machine: &str,
+    instance: &str,
+    page: usize,
+) -> (String, Option<Value>) {
+    if let Ok(mut flows) = SEND_FLOWS.lock() {
+        if let Some(flow) = flows.get_mut(&chat_id) {
+            flow.machine = machine.to_string();
+            flow.instance = Some(instance.to_string());
+            flow.stage = SendStage::PickConversation;
+            flow.page = page;
+            flow.updated_at = now_secs();
+        }
+    }
+    let picker = super::send_listing::load_project_page(instance, page);
+    let mut out = format!(
+        "📮 <b>Send a prompt — step 3 of 3: pick the project</b>\n\
+        • <b>Machine:</b> {}\n\
+        • <b>Instance:</b> <code>{}</code>\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━\n",
+        super::node_label::machine_header_html(machine),
+        clean_for_telegram_html(instance, 48)
+    );
+    if picker.rows.is_empty() {
+        out.push_str(
+            "No projects were found for this instance. \
+            Tap <b>✏️ Type it manually</b> and reply with the conversation Seq ID \
+            (e.g. <code>C001</code>), project name, or conversation id.",
+        );
+    } else {
+        out.push_str(&super::send_listing::format_project_list(
+            &picker.rows,
+            picker.page,
+        ));
+        out.push_str(
+            "\n👆 Tap a number, or type that number. <b>Next</b> shows the next eight projects.",
+        );
+    }
+    (out, Some(project_picker_markup(&picker)))
+}
+
+fn flow_target(chat_id: i64) -> Option<(String, String)> {
+    let flows = SEND_FLOWS.lock().ok()?;
+    let flow = flows.get(&chat_id)?;
+    if flow_expired(flow) {
+        return None;
+    }
+    let instance = flow.instance.clone()?;
+    Some((flow.machine.clone(), instance))
+}
+
+fn turn_project_page(chat_id: i64, page: usize) -> (String, Option<Value>) {
+    match flow_target(chat_id) {
+        Some((machine, instance)) => render_project_page(chat_id, &machine, &instance, page),
+        None => (send_unknown(), None),
+    }
+}
+
+fn on_project_number(chat_id: i64, page: usize, index: usize) -> (String, Option<Value>) {
+    let (machine, instance) = match flow_target(chat_id) {
+        Some(pair) => pair,
+        None => return (send_unknown(), None),
+    };
+    let picker = super::send_listing::load_project_page(&instance, page);
+    match picker.rows.get(index) {
+        Some(row) => on_conversation_picked(chat_id, &machine, &instance, &row.value),
+        None => (
+            "⚠️ <b>That number is not on this page.</b> Tap a number that is listed, or send <code>/send</code> to start over.".to_string(),
+            Some(project_picker_markup(&picker)),
+        ),
+    }
 }
 
 fn destination_locked_reply(machine: &str, instance: &str, conversation: &str) -> String {
     format!(
         "🎯 <b>Destination locked</b>\n\
-        • <b>Machine:</b> <code>{}</code>\n\
+        • <b>Machine:</b> {}\n\
         • <b>Instance:</b> <code>{}</code>\n\
         • <b>Conversation:</b> <code>{}</code>\n\n\
         ✍️ Now send the prompt text as a plain message. It will go to exactly this destination — nothing is guessed.",
-        clean_for_telegram_html(machine, 48),
+        super::node_label::machine_header_html(machine),
         clean_for_telegram_html(instance, 48),
         clean_for_telegram_html(conversation, 64)
     )
@@ -292,15 +353,17 @@ pub fn start_send_flow(rest: &str) -> String {
         ━━━━━━━━━━━━━━━━━━━━━━━━\n",
     );
     for (idx, alias) in entries.iter().enumerate() {
-        let marker = if idx == 0 {
-            "📍 <i>this machine</i>"
+        let current = super::node_label::is_current_machine(alias);
+        let marker = if current {
+            "🟢 <b>this machine</b>"
         } else {
             "🌐 <i>fleet node</i>"
         };
+        let name = super::node_label::machine_button_text(alias);
         out.push_str(&format!(
-            "{}. 🖥️ <code>{}</code> {}\n",
+            "{}. <b>{}</b> {}\n",
             idx + 1,
-            clean_for_telegram_html(alias, 48),
+            clean_for_telegram_html(&name, 48),
             marker
         ));
     }
@@ -335,15 +398,16 @@ fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
                 instance: None,
                 conversation: None,
                 stage: SendStage::PickInstance,
+                page: 0,
                 updated_at: now_secs(),
             },
         );
     }
     let instances = instance_entries();
     let mut out = format!(
-        "📮 <b>Send a prompt — step 2 of 3: pick the instance on <code>{}</code></b>\n\
+        "📮 <b>Send a prompt — step 2 of 3: pick the instance on {}</b>\n\
         ━━━━━━━━━━━━━━━━━━━━━━━━\n",
-        clean_for_telegram_html(&canonical, 48)
+        super::node_label::machine_header_html(&canonical)
     );
     for (idx, (id, name)) in instances.iter().enumerate() {
         out.push_str(&format!(
@@ -396,43 +460,12 @@ fn on_instance_picked(chat_id: i64, machine: &str, instance: &str) -> (String, O
                 instance: Some(canonical_instance.clone()),
                 conversation: None,
                 stage: SendStage::PickConversation,
+                page: 0,
                 updated_at: now_secs(),
             },
         );
     }
-    let convs = conversation_entries(&canonical_instance);
-    let mut out = format!(
-        "📮 <b>Send a prompt — step 3 of 3: pick the conversation</b>\n\
-        • <b>Machine:</b> <code>{}</code>\n\
-        • <b>Instance:</b> <code>{}</code>\n\
-        ━━━━━━━━━━━━━━━━━━━━━━━━\n",
-        clean_for_telegram_html(&canonical_machine, 48),
-        clean_for_telegram_html(&canonical_instance, 48)
-    );
-    if convs.is_empty() {
-        out.push_str(
-            "No live conversations were found for this instance. \
-            Tap <b>✏️ Type it manually</b> and reply with the conversation Seq ID \
-            (e.g. <code>C001</code>), project name, or conversation id.",
-        );
-    } else {
-        for (idx, (_, label)) in convs.iter().enumerate() {
-            out.push_str(&format!(
-                "{}. 💬 <code>{}</code>\n",
-                idx + 1,
-                clean_for_telegram_html(label, 64)
-            ));
-        }
-        out.push_str("\n👆 Tap a conversation, or type the Seq ID manually.");
-    }
-    (
-        out,
-        Some(conversation_picker_markup(
-            &canonical_machine,
-            &canonical_instance,
-            &convs,
-        )),
-    )
+    render_project_page(chat_id, &canonical_machine, &canonical_instance, 0)
 }
 
 fn on_manual_conversation(chat_id: i64, machine: &str, instance: &str) -> (String, Option<Value>) {
@@ -527,6 +560,24 @@ pub async fn handle_send_callback(chat_id: i64, data: &str) -> (String, Option<V
             None => (send_unknown(), None),
         };
     }
+    if let Some(rest) = payload.strip_prefix("next:") {
+        let page = rest.parse::<usize>().unwrap_or(0);
+        return turn_project_page(chat_id, page.saturating_add(1));
+    }
+    if let Some(rest) = payload.strip_prefix("back:") {
+        let page = rest.parse::<usize>().unwrap_or(0);
+        return turn_project_page(chat_id, page.saturating_sub(1));
+    }
+    if let Some(rest) = payload.strip_prefix("n:") {
+        return match rest.split_once('|') {
+            Some((page, index)) => {
+                let page = page.parse::<usize>().unwrap_or(0);
+                let index = index.parse::<usize>().unwrap_or(usize::MAX);
+                on_project_number(chat_id, page, index)
+            }
+            None => (send_unknown(), None),
+        };
+    }
     if let Some(rest) = payload.strip_prefix("c:") {
         let mut parts = rest.splitn(3, '|');
         return match (parts.next(), parts.next(), parts.next()) {
@@ -598,6 +649,13 @@ pub async fn consume_send_prompt(_token: &str, chat_id: i64, text: &str) -> Opti
             instance: String,
             conversation: String,
         },
+        ProjectPick {
+            page: usize,
+            index: usize,
+        },
+        ProjectPage {
+            page: usize,
+        },
     }
     let next = {
         let mut flows = SEND_FLOWS.lock().ok()?;
@@ -607,6 +665,18 @@ pub async fn consume_send_prompt(_token: &str, chat_id: i64, text: &str) -> Opti
             return None;
         }
         match flow.stage {
+            SendStage::PickConversation => {
+                let page = flow.page;
+                if let Some(index) = typed_project_index(trimmed) {
+                    Next::ProjectPick { page, index }
+                } else if trimmed.eq_ignore_ascii_case("next") {
+                    Next::ProjectPage {
+                        page: page.saturating_add(1),
+                    }
+                } else {
+                    return None;
+                }
+            }
             SendStage::TypeConversation => {
                 flow.conversation = Some(trimmed.to_string());
                 flow.stage = SendStage::AwaitPrompt;
@@ -640,6 +710,14 @@ pub async fn consume_send_prompt(_token: &str, chat_id: i64, text: &str) -> Opti
     };
     match next {
         Next::LockedReply(dispatch) => Some(dispatch),
+        Next::ProjectPick { page, index } => {
+            let (reply, markup) = on_project_number(chat_id, page, index);
+            Some(SendDispatch { reply, markup })
+        }
+        Next::ProjectPage { page } => {
+            let (reply, markup) = turn_project_page(chat_id, page);
+            Some(SendDispatch { reply, markup })
+        }
         Next::Dispatch {
             machine,
             instance,
@@ -668,6 +746,7 @@ mod tests {
             instance: None,
             conversation: None,
             stage: SendStage::PickInstance,
+            page: 0,
             updated_at: now_secs(),
         };
         assert!(!flow_expired(&fresh));
@@ -680,8 +759,8 @@ mod tests {
 
     #[test]
     fn destination_locked_reply_mentions_all_parts() {
-        let reply = destination_locked_reply("W3", "default", "C001");
-        assert!(reply.contains("W3"));
+        let reply = destination_locked_reply("remote-studio", "default", "C001");
+        assert!(reply.contains("remote-studio"));
         assert!(reply.contains("default"));
         assert!(reply.contains("C001"));
         assert!(reply.contains("Destination locked"));
@@ -696,6 +775,7 @@ mod tests {
                 instance: Some("default".to_string()),
                 conversation: None,
                 stage,
+                page: 0,
                 updated_at: now_secs(),
             },
         );

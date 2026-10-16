@@ -14,6 +14,10 @@ pub(crate) fn default_card_palette() -> String {
     "riseup".to_string()
 }
 
+pub(crate) fn default_node_name_refresh_hours() -> u64 {
+    24
+}
+
 /// Telegram bot integration configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TelegramConfig {
@@ -26,6 +30,9 @@ pub struct TelegramConfig {
     /// Card palette id: riseup, obsidian, gold, indigo.
     #[serde(default = "default_card_palette")]
     pub card_palette: String,
+    /// Hours before a generated Node-* display name is resolved through GitMap again.
+    #[serde(default = "default_node_name_refresh_hours")]
+    pub node_name_refresh_hours: u64,
 }
 
 impl Default for TelegramConfig {
@@ -37,6 +44,7 @@ impl Default for TelegramConfig {
             poll_interval_secs: 5,
             notify_on_system_update: true,
             card_palette: default_card_palette(),
+            node_name_refresh_hours: default_node_name_refresh_hours(),
         }
     }
 }
