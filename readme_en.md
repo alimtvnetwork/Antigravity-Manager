@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.209.0)
+> Professional AI Account Management & Protocol Proxy System (v4.210.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.209.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.210.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,6 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
+> Latest version **v4.210.0**: Modern Console ANSI Color Logging, Telegram Card Design-Token Palettes, Idempotent Migration Log Hygiene & 45 Native AGM Skills Sync Preservation — enabled Windows UTF-8 (65001) virtual terminal console processing with ANSI color rendering, 18pt Consolas font, and a compact single-line `%H:%M:%S` `ConsoleTimer` preventing log message splitting; demoted expected idempotent SQLite migration errors (`duplicate column name`) to `debug!` in `src-tauri/src/error.rs` to eradicate console startup warnings; added 6 chromatic card palettes (`RISEUP` Emerald #10b981 and Gold #facc15 default, `OBSIDIAN`, `GOLD`, `INDIGO`, `CRIMSON`, `EMERALD`) with `/palette` commands in `src-tauri/src/modules/telegram_inbound/palette.rs`; and restored 45 native AGM agent skills across `.agents/skills` and `.cursor/skills` while shielding them from pruning during sync operations. (Thanks to @aukgit)
 > Latest version **v4.209.0**: Instance list shows `PID` and the process id, and path cells keep the filename ending. Stop and account switch kill that process and fail if it is still alive. The audit dialog reads `recent_switches`. `agm instances current` refuses to stop, switch, or delete the instance that owns the command. The Switch Account dialog uses the same dark-glass layout as the instance list. (Thanks to @aukgit)
 
 > Latest version **v4.208.0**: Auto-Switch 403 Fallback & Live Quota Sync, Fast-Forward Pool Unblocking, Complete Subprocess Window Suppression (CREATE_NO_WINDOW), Audit Log Clipboard Copy & Call Stack Inspection, Strict Email Masking, Max Backup Prompts Retention Cap & 18pt Updater Console — fixed `retrieveUserQuotaSummary` in `fetch_more.rs` with instant `{}` retry on HTTP 403 to prevent false 100% quota fallbacks when IDE 5-hour quota is depleted; broadcasted `accounts://refreshed` events in `daemon.rs` for live instance card synchronization; unblocked manual Fast-Forward by refining candidate exclusions in `manual.rs` and offloading relaunch verification to detached async tasks; suppressed popup console windows across 14 external subprocess call sites using `CREATE_NO_WINDOW` (`0x08000000`); replaced non-functional `<a download>` DOM clicks with direct clipboard copying (`copyToClipboard`) with visual `Copied!` badges (2000ms) and toast feedback in `AuditPanel.tsx`; added `#[serde(rename_all = "camelCase")]` on `InteractionEntry` and `RecordInteractionInput` to fix blank `METHOD` and `TARGET` audit columns; captured interactive elements and filtered call stacks (`new Error().stack`) in `useAuditRecorder.ts`; logged auto-switch candidate evaluations and cooldown skips to SQLite audit; strictly masked emails (`ris***@***`) across UI and backend logs; added configurable 100-prompt FIFO retention cap in Settings; and configured Win32 console with UTF-8, ANSI escape sequences, and 18pt Consolas font for the updater. (Thanks to @aukgit)

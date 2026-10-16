@@ -3,6 +3,14 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.210.0 (2026-10-16)**:
+        -   **[Console Logger & Diagnostics] ANSI Color Rendering, Compact Console Timer & Idempotent Migration Log Hygiene (Thanks to @aukgit)**:
+            -   **Description**: Initialized Windows console support with UTF-8 (65001), ANSI virtual terminal processing, and 18pt Consolas typography via `enable_modern_console()`; added compact `%H:%M:%S` timestamp formatting (`ConsoleTimer`) to prevent log wrapping in terminal outputs; and added `expected_best_effort` in `src-tauri/src/error.rs` to demote benign idempotent migration errors (`duplicate column name`) from `warn!` to `debug!`.
+        -   **[Telegram Card Palettes] Riseup Emerald/Gold Design Tokens, Chromatic Themes & Palette Switching (Thanks to @aukgit)**:
+            -   **Description**: Implemented 6 chromatic card palettes in `src-tauri/src/modules/telegram_inbound/palette.rs` adhering to `02-spec/07-design-system/tokens/design-tokens.json` (`RISEUP` Emerald #10b981 and Gold #facc15 default, `OBSIDIAN`, `GOLD`, `INDIGO`, `CRIMSON`, `EMERALD`); updated alert formatting across `telegram_alerts.rs`, `telemetry.rs`, `reports_a.rs`, and `reports_b.rs` with cohesive section markers, rules, and bullet glyphs; and added `/palette` command routing.
+        -   **[Agent Skills & Sync Safety] 45 Native AGM Skills Restoration & Cross-Repo Sync Shielding (Thanks to @aukgit)**:
+            -   **Description**: Restored 45 specialized Antigravity Manager skills across `.agents/skills` and `.cursor/skills`, documented skill navigation in `.ai-memory/what-to-read.md`, and protected AGM-specific skills in `03-ai-scripts/38-sync-prompts-skills-scripts.py` from deletion during cross-repository synchronizations.
+
     *   **v4.209.0 (2026-10-16)**:
         -   **[Instance Management] PID label, verified stop, switch dialog, and audit trail (Thanks to @aukgit)**:
             -   **Description**: The list badge shows `PID` and the process id, and path cells keep the filename ending. Stop and account switch kill that process and fail if it is still alive. The audit dialog reads `recent_switches`. `agm instances current` refuses to stop, switch, or delete the instance that owns the command. (Thanks to @aukgit)

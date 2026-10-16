@@ -1,5 +1,17 @@
 # Changelog
 
+## [v4.210.0] - 2026-10-16
+
+### Added
+- **Modern Console Logger & ANSI Color Rendering**: Initialized modern terminal console handling via `enable_modern_console()` with UTF-8 code page (65001), ANSI virtual terminal sequence processing, and 18pt Consolas font on Windows; implemented a compact single-line `%H:%M:%S` `ConsoleTimer` preventing log message line wraps; and enabled rich ANSI color styling when writing to terminal outputs. (Thanks to @aukgit)
+- **Telegram Notification Card Design-Token Palettes**: Introduced 6 chromatic card palettes (`RISEUP` Emerald #10b981 and Gold #facc15 on Slate #0f172a, `OBSIDIAN` Violet and Sky on Navy, `GOLD` Corporate Gold, `INDIGO` Electric Indigo, `CRIMSON` Luxe, `EMERALD` Mint) in `src-tauri/src/modules/telegram_inbound/palette.rs` adhering to design tokens; aligned alert cards, status reports, and telemetry broadcasts with cohesive chromatic markers, rules, and bullet glyphs; and added `/palette` command dispatching. (Thanks to @aukgit)
+- **Native AGM Skills Preservation & Sync Protection**: Restored and indexed 45 native Antigravity Manager agent skills across `.agents/skills/` and `.cursor/skills/` (including quota switching, proxy pooling, thinking store, fleet synchronization, and desktop lifecycle), updated skill inventories in `.ai-memory/what-to-read.md`, and updated `03-ai-scripts/38-sync-prompts-skills-scripts.py` to safeguard local AGM skills during repository synchronizations. (Thanks to @aukgit)
+
+### Fixed
+- **Idempotent SQLite Migration Log Hygiene**: Added `expected_best_effort()` in `src-tauri/src/error.rs` to detect anticipated idempotent SQLite schema migration errors (`duplicate column name`), demoting them from console `warn!` to `debug!` and eliminating false-positive warning noise during database initialization. (Thanks to @aukgit)
+
+---
+
 ## [v4.209.0] - 2026-10-16
 
 ### Fixed
@@ -384,6 +396,15 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.210.0 (2026-10-16)**:
+        -   **[Console Logger & Diagnostics] ANSI Color Rendering, Compact Console Timer & Idempotent Migration Log Hygiene (Thanks to @aukgit)**:
+            -   **Description**: Initialized Windows console support with UTF-8 (65001), ANSI virtual terminal processing, and 18pt Consolas typography via `enable_modern_console()`; added compact `%H:%M:%S` timestamp formatting (`ConsoleTimer`) to prevent log wrapping in terminal outputs; and added `expected_best_effort` in `src-tauri/src/error.rs` to demote benign idempotent migration errors (`duplicate column name`) from `warn!` to `debug!`.
+        -   **[Telegram Card Palettes] Riseup Emerald/Gold Design Tokens, Chromatic Themes & Palette Switching (Thanks to @aukgit)**:
+            -   **Description**: Implemented 6 chromatic card palettes in `src-tauri/src/modules/telegram_inbound/palette.rs` adhering to `02-spec/07-design-system/tokens/design-tokens.json` (`RISEUP` Emerald #10b981 and Gold #facc15 default, `OBSIDIAN`, `GOLD`, `INDIGO`, `CRIMSON`, `EMERALD`); updated alert formatting across `telegram_alerts.rs`, `telemetry.rs`, `reports_a.rs`, and `reports_b.rs` with cohesive section markers, rules, and bullet glyphs; and added `/palette` command routing.
+        -   **[Agent Skills & Sync Safety] 45 Native AGM Skills Restoration & Cross-Repo Sync Shielding (Thanks to @aukgit)**:
+            -   **Description**: Restored 45 specialized Antigravity Manager skills across `.agents/skills` and `.cursor/skills`, documented skill navigation in `.ai-memory/what-to-read.md`, and protected AGM-specific skills in `03-ai-scripts/38-sync-prompts-skills-scripts.py` from deletion during cross-repository synchronizations.
+
+
     *   **v4.209.0 (2026-10-16)**:
         -   **[Instance Management] PID label, verified stop, switch dialog, and audit trail (Thanks to @aukgit)**:
             -   **Description**: The list badge shows `PID` and the process id, and path cells keep the filename ending. Stop and account switch kill that process and fail if it is still alive. The audit dialog reads `recent_switches`. `agm instances current` refuses to stop, switch, or delete the instance that owns the command. (Thanks to @aukgit)
