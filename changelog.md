@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.208.1] - 2026-10-16
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
 ## [v4.208.0] - 2026-10-16
 
 ### Fixed
@@ -368,27 +375,21 @@
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
 
-
     *   **v4.207.0 (2026-10-16)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.206.0 (2026-10-15)**:
         -   **[Prompt Tree & Telegram] Send Dropdown Enqueue, Tree Import/Export (SQLite+JSON), Telegram Button Fixes (Thanks to @aukgit)**:
             -   **Description**: Send button dropdown now contains an "Enqueue to FIFO Queue" entry wired to the same dispatch path as the standalone Enqueue button; prompt tree gains copy-all-tree-prompts plus a unified Import/Export section (single-file SQLite DB export/import and JSON export/import); Telegram `cmd:` callback double-slash dispatch bug fixed (send-prompt, find-instance, credits-check buttons now work), 64-byte callback cap guarded, and unknown button taps show a visible notice instead of failing silently. RCAs 14-16 document each root cause.
 
-
-
     *   **v4.205.0 (2026-10-16)**:
         -   **[UI & UX Responsive Layout] Table Minimum Width Floor, Sticky Column Opaque Shield, Dual-Axis Viewport Scroll, Navbar Responsive Compaction & Window Minima (Thanks to @aukgit)**:
             -   **Description**: Enforced `min-w-[1060px]` on `<table className="w-full min-w-[1060px]">` in `src/components/accounts/AccountTable.tsx` and updated `src/pages/accounts/AccountsContent.tsx` to `overflow-auto`, preventing Column 5 (Weekly Quota) from squishing into `ACTIONS` (`WEEKLY QUOCACTIONS`) and surfacing immediate horizontal scrolling; rendered sticky `ACTIONS` column header and cells with 100% solid opaque backgrounds (`bg-slate-50 dark:bg-[#061220]`, `dark:bg-[#171025]`, `dark:bg-[#081826]`) to prevent scrolled text bleed-through; protected `src/components/instances/InstanceTable.tsx` with `min-w-[780px]`; made `NavLogo.tsx` switch to "AGM" below `lg` (1024px), saving ~95px and lowering Navbar minimum width to 670px so window controls (`btn-window-minimize`, `btn-window-maximize`, `btn-window-close`) are never pushed off-screen; added `"minWidth": 800` and `"minHeight": 520` in `src-tauri/tauri.conf.json`; and implemented a 4-tier responsive simulator toolbar (`100% Fluid`, `1280px`, `1024px`, `800px`) in `scripts/ui-builder.html`.
 
-
     *   **v4.204.1 (2026-10-16)**:
         -   **[UI & UX Enhancements] TitleBar Close Button Padding, Icon-Only Settings, Triangle Capsule Trigger, QuotaProgressBar Overhaul, Modal z-index Fix, Browser UI Builder & Binary Target Alignment (Thanks to @aukgit)**:
             -   **Description**: Added safe-area right inset padding (`pr-2.5 sm:pr-3`) and centered `overflow-visible` cross in `src/components/layout/TitleBar.tsx` and `src/components/navbar/NavSettings.tsx` to eliminate window close button clipping against window edges; converted Settings in `src/components/navbar/NavMenu.tsx` to an icon-only button and replaced the trailing round hamburger trigger with an integrated rotating micro-triangle chevron (`rounded-r-full`); hardened `handleCheckUpdates` with non-silent toast feedback ("Checking for updates..." -> "No updates available (latest version installed)"); overhauled `src/components/accounts/QuotaProgressBar.tsx` with a 10px track, 20px protruding milestone nodes with symmetrical `v` chevrons, strictly zero boundary dots at 0% and 100%, 5 internal splits (`[20, 40, 60, 80, 90]`), 6-stop spatial gradient (`#7f1d1d` to `#1af18d`), 85% resting opacity, and table row hover neon glow; removed `isolation: 'isolate'` from `src/components/navbar/Navbar.tsx` and standardized modal stacking context to `z-[99999]`; implemented browser-based UI builder workbench (`scripts/ui-builder.html` / `npm run ui:builder`) with bi-directional JSON state export/import; and aligned desktop UI binary target to `agm-ui` / `Antigravity Manager (AGM)-ui.exe` across `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` while preserving standalone CLI `agm`.
-
 
     *   **v4.204.0 (2026-10-15)**:
         -   **[Prompt Tree UI & Action Toolbar] 3-capsule segmented dark-glass toolbar, send vs enqueue decoupling, and transparent select styling (Thanks to @aukgit)**:
@@ -398,11 +399,9 @@
         -   **[CLI Methods & Backend Dispatch] CLI parity for `agm prompt send`, `agm prompt queue`, `agm queue`, `agm enqueue`, and CDP injection fallback (Thanks to @aukgit)**:
             -   **Description**: Added `agm queue`, `agm enqueue`, and `agm qe` top-level aliases, `--queue` / `-q` flags for `agm prompt [text]`, and sequence token resolution (`C001`, `P001`, `GM:#1`) in `src-tauri/src/bin/agm/main.rs`, `prompt_cmds.rs`, and `common.rs`; added empty prompt validation; hardened `src-tauri/src/modules/repo_db/agy.rs` and `prompt_dispatch.rs` with automatic fallback to loopback CDP DOM injection (`submit_prompt_via_cdp_for_instance`) when the `agy` CLI binary is absent or failing; and aligned `ssh_cmds.rs` with `SshGitmapStatus`.
 
-
     *   **v4.203.0 (2026-10-15)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.202.0 (2026-10-15)**:
         -   **[Onboarding & Privacy] Automatic CDP dismissal of Antigravity "Security Notice & Data Use" dialog with telemetry unchecked (Thanks to @aukgit)**:
@@ -411,7 +410,6 @@
             -   **Description**: Routed `agm prompt` (`prompt_dispatch.rs`), `project_cmds.rs`, and `repo_db/backup.rs` through `save_or_requeue_prompt` so `running_projects` rows always carry composite `<project>__<instance>` IDs and valid `workspace_storage_path` values (preventing `purge_corrupted_running_projects` from deleting active/queued prompts on subsequent CLI runs), and added `submit_prompt_via_cdp_for_instance` so prompts dispatched via CLI or restored from backup are typed and submitted directly inside the live Antigravity IDE conversation window.
         -   **[CLI & UI] `/settings/:tab` sub-route navigation and remote click selectors (Thanks to @aukgit)**:
             -   **Description**: Registered `settings/:tab` in `src/App.tsx` and `src/pages/Settings/useSettingsState.ts` and synchronized `UI_ROUTES` in `admin_ui.rs` so `agm ui goto settings/<tab>` opens the target settings tab cleanly.
-
 
     *   **v4.201.0 (2026-10-15)**:
         -   **[Auto-Switch & Prompt Engine] Post-switch `agy` silent auth, 403 `VALIDATION_REQUIRED` detection, and synchronous prompt restoration (Thanks to @aukgit)**:
@@ -423,11 +421,9 @@
         -   **[Installers] Rebrand to `com.alimtvnetwork`, uninstaller, and cask automation (Thanks to @aukgit)**:
             -   **Description**: Standardized bundle identifiers, Linux `.deb`/`.rpm` package detection, and Homebrew cask URLs across macOS, Linux, and Windows.
 
-
     *   **v4.200.1 (2026-10-14)**:
         -   **[Fix] Missing `tauri::Emitter` trait import broke the v4.200.0 build (Thanks to @aukgit)**:
             -   **Description**: `src-tauri/src/proxy/server/admin_ui.rs` called `AppHandle::emit` without the trait in scope (E0599). One-line import fix; v4.200.0 tag pointed at the broken commit, so this patch release carries the fix.
-
 
     *   **v4.200.0 (2026-10-14)**:
         -   **[Audit] UI interaction audit recorder (Thanks to @aukgit)**:
@@ -437,7 +433,6 @@
         -   **[Telegram] `/ui goto/ls/scroll` commands (Thanks to @aukgit)**:
             -   **Description**: The bot can now navigate the UI, list routes, and scroll to elements, with 15 new hardening tests for the `/send` flow and help text.
 
-
     *   **v4.199.0 (2026-10-14)**:
         -   **[Prompt Tree] Send, Backup, and Restore report a real agy result (Thanks to @aukgit)**:
             -   **Description**: Send passes `--conversation` and returns stderr when `agy` exits. Backup and Restore use a native dialog, and Restore dispatches the imported prompts.
@@ -446,26 +441,21 @@
         -   **[Telegram] Open the manager, screenshot it, and aim the next prompt (Thanks to @aukgit)**:
             -   **Description**: `/ui`, `/shot`, and `/target` are in the help text. A paused Supabase project is described as DNS `NXDOMAIN`.
 
-
     *   **v4.198.0 (2026-10-14)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.197.1 (2026-10-14)**:
         -   **[Instances] Prompt tree cache and crash log (Thanks to @aukgit)**:
             -   **Description**: Startup no longer deletes `prompt_tree_cache`. The cache lives 120 seconds, and `agm prompts tree` reads it. A panic while building the tree returns a backtrace instead of closing the window. The tree header has Reset, and the CLI command is `agm prompts reset-tree`. CLI checks on the previous binary listed both instances, backed up and restored prompts, sent a review prompt, and enqueued a second prompt. `agm auto-switch threshold 98` read back 98 percent and was restored to 15 percent.
 
-
     *   **v4.197.0 (2026-10-14)**:
         -   **[CI/CD] Formatting Gate Fix & Dispatch Hardening**:
             -   **Description**: Restored green CI/CD pipeline checks by resolving the `cargo fmt` signature-formatting discrepancy in `src-tauri/src/commands/instance.rs` across all OS matrix runners; includes instance error-modal deduplication with poisoned prompt-lock prevention and pending AI end-to-end test cases for prompt dispatch. (Thanks to @aukgit).
 
-
     *   **v4.196.0 (2026-10-13)**:
         -   **[Accounts UI] Quota Column Layout Fix**:
             -   **Description**: Fixed the Accounts table quota layout so the 4H Model Quota and Weekly Quota bars expand to fill their columns instead of floating as narrow right-aligned bars with dead space. The 5-slot checkpoint design, `#1af18d` progress green, full-width spatial gradient with mask reveal, and compact bar heights are all preserved; this is a layout-width change only. (Thanks to @aukgit)
-
 
     *   **v4.195.0 (2026-10-13)**:
         -   **[CI/CD & Code Quality] Macro Syntax & Error Observability**:
@@ -475,11 +465,9 @@
         -   **[Security & CI/CD] Supabase Credentials Eradication & Vault Isolation**:
             -   **Description**: Completely purged hardcoded Supabase project tokens and credentials from the tracked codebase, scripts, documentation, and test fixtures. Shifted endpoint provisioning to dynamic environment variables and automated Base64 ingestion from `repo-secrets`. Added single-liner import script `scripts/import-supabase-credentials.ps1` and resolved `cargo fmt` newline discrepancy. (Thanks to @aukgit)
 
-
     *   **v4.193.0 (2026-10-13)**:
         -   **[CI/CD & Progress Bar] Healing & Modernization**:
             -   **Description**: Resolved TypeScript index signature mismatch on `ErrorContext` in `error-store.ts` and normalized `cargo fmt` formatting in `client.rs` and `config_a.rs`. Modernized quota progress bar to Progress Green `#1af18d` with 5 slots at 20% quintile intervals, glowing apertures, and compacted right alignment. Resolved subprocess clipboard deadlock in `copy_to_system_clipboard` and added Prompt Tree action improvements and loading bar. Enforced high-contrast theme typography, email masking, and Supabase connection diagnostics. (Thanks to @aukgit)
-
 
     *   **v4.190.0 (2026-10-12)**:
         -   **[Theme] Royal Violet UI**: Implemented the approved Royal Violet design system across the app — daisyUI dark theme tokens, semantic CSS variables, and legacy navy hex remap (canvas `#090611`, panel `#171025`, primary `#7C3AED`, aurora `#A855F7`, highlight `#E879F9`). (Thanks to @aukgit)
