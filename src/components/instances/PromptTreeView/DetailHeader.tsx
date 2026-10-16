@@ -10,6 +10,18 @@ import { isGhostConversation } from './conversationGuards';
 import { persistClientCrash } from '../../../lib/error-listener';
 import { useErrorStore } from '../../../stores/error-store';
 
+function DispatchFieldHint({ id, text }: { id: string; text: string }) {
+    return (
+        <span
+            id={id}
+            role="tooltip"
+            className="pointer-events-none absolute right-0 top-full z-30 mt-1 hidden max-w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-left text-[10px] font-medium leading-snug text-slate-800 shadow-md group-hover/field:block dark:border-[#40285e] dark:bg-[#0e0818] dark:text-slate-100"
+        >
+            {text}
+        </span>
+    );
+}
+
 function reportPromptActionError(err: unknown, source: string): void {
     persistClientCrash(err, source);
     const errorObj = err instanceof Error ? err : new Error(String(err));
@@ -361,9 +373,10 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 <button
                                     type="button"
                                     onClick={() => copyPromptAndAi('json')}
-                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
-                                    title="Copy latest_response and execution_results as JSON"
+                                    className="group/field relative w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    aria-describedby="copy-ai-json-hint"
                                 >
+                                    <DispatchFieldHint id="copy-ai-json-hint" text="Copy latest_response and execution_results as JSON" />
                                     <div className="flex items-center gap-2">
                                         {copiedAiKind === 'json' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Code className="w-3.5 h-3.5 text-amber-500" />}
                                         <span>{copiedAiKind === 'json' ? 'Copied AI JSON!' : 'Copy AI results as JSON'}</span>
@@ -374,9 +387,10 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 <button
                                     type="button"
                                     onClick={() => copyPromptAndAi('text')}
-                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
-                                    title="Copy the prompt body and AI text as plain text"
+                                    className="group/field relative w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    aria-describedby="copy-ai-text-hint"
                                 >
+                                    <DispatchFieldHint id="copy-ai-text-hint" text="Copy the prompt body and AI text as plain text" />
                                     <div className="flex items-center gap-2">
                                         {copiedAiKind === 'text' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <FileText className="w-3.5 h-3.5 text-slate-400" />}
                                         <span>{copiedAiKind === 'text' ? 'Copied text!' : 'Copy prompt and AI results as text'}</span>
@@ -387,9 +401,10 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 <button
                                     type="button"
                                     onClick={() => copyPromptAndAi('md')}
-                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
-                                    title="Copy the prompt body and AI text as markdown"
+                                    className="group/field relative w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    aria-describedby="copy-ai-md-hint"
                                 >
+                                    <DispatchFieldHint id="copy-ai-md-hint" text="Copy the prompt body and AI text as markdown" />
                                     <div className="flex items-center gap-2">
                                         {copiedAiKind === 'md' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <FileText className="w-3.5 h-3.5 text-cyan-500" />}
                                         <span>{copiedAiKind === 'md' ? 'Copied markdown!' : 'Copy prompt and AI results as markdown'}</span>
@@ -479,7 +494,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 </div>
 
                                 {/* Destination: Current Conversation vs New Conversation */}
-                                <div className="flex items-center justify-between px-2 py-1 text-xs">
+                                <div className="group/field relative flex items-center justify-between px-2 py-1 text-xs">
                                     <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
                                         Destination:
                                     </span>
@@ -487,11 +502,12 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         value={conversationTargetMode}
                                         onChange={(e) => setConversationTargetMode?.(e.target.value as 'current' | 'new')}
                                         className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:ring-0 focus:outline-none cursor-pointer py-0.5 text-right"
-                                        title="Destination conversation mode"
+                                        aria-describedby="dispatch-destination-hint"
                                     >
                                         <option value="current" className="bg-white dark:bg-[#171025]">Current Conv</option>
                                         <option value="new" className="bg-white dark:bg-[#171025]">New Conv</option>
                                     </select>
+                                    <DispatchFieldHint id="dispatch-destination-hint" text="Destination conversation mode" />
                                 </div>
 
                                 {/* When "New Conversation" is selected: Inline title input */}
@@ -511,7 +527,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 )}
 
                                 {/* Suffix presets */}
-                                <div className="flex items-center justify-between px-2 py-1 text-xs">
+                                <div className="group/field relative flex items-center justify-between px-2 py-1 text-xs">
                                     <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
                                         Suffix:
                                     </span>
@@ -519,7 +535,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         value={confirmationSuffix}
                                         onChange={(e) => setConfirmationSuffix(e.target.value)}
                                         className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:ring-0 focus:outline-none cursor-pointer py-0.5 text-right max-w-[140px] truncate"
-                                        title="Confirmation suffix appended on dispatch"
+                                        aria-describedby="dispatch-suffix-hint"
                                     >
                                         <option value="None (Send as is)" className="bg-white dark:bg-[#171025]">None</option>
                                         <option value="Is it done?" className="bg-white dark:bg-[#171025]">Done?</option>
@@ -528,6 +544,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         <option value="Double check all edge cases" className="bg-white dark:bg-[#171025]">Edge cases</option>
                                         <option value="Verify build and tests" className="bg-white dark:bg-[#171025]">Verify tests</option>
                                     </select>
+                                    <DispatchFieldHint id="dispatch-suffix-hint" text="Confirmation suffix appended on dispatch" />
                                 </div>
 
                                 <div className="border-t border-slate-100 dark:border-[#40285e]/60 my-1" />
