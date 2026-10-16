@@ -396,7 +396,13 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                 }
 
                 // If remote, attempt GitMap cluster SSH execution first
-                if let Ok(out) = Command::new("gitmap")
+                let mut gm_cmd = Command::new("gitmap");
+                #[cfg(target_os = "windows")]
+                {
+                    use std::os::windows::process::CommandExt;
+                    gm_cmd.creation_flags(0x08000000);
+                }
+                if let Ok(out) = gm_cmd
                     .args(["cluster", "exec", target_node, cmd_content])
                     .output()
                 {

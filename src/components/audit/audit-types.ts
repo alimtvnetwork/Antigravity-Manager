@@ -40,7 +40,9 @@ export interface AuditEntry {
     timestamp: number | string;
     actor: AuditActor;
     methodName: string;
+    method_name?: string;
     uiTarget: string;
+    ui_target?: string;
     trigger: AuditTrigger;
     /** JSON string or already-parsed object, depending on backend serialization. */
     params: string | Record<string, unknown>;
@@ -53,7 +55,9 @@ export interface AuditEntry {
 export interface AuditRecordPayload {
     actor: AuditActor;
     methodName: string;
+    method_name?: string;
     uiTarget: string;
+    ui_target?: string;
     trigger: AuditTrigger;
     params: Record<string, unknown>;
     result: AuditResult;

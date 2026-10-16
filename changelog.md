@@ -1,5 +1,24 @@
 # Changelog
 
+## [v4.208.0] - 2026-10-16
+
+### Fixed
+- **账号配额跨组件自动同步与 403 兜底修复 (Account Quota Live Sync & 403 Fallback)**: 修复了 `retrieveUserQuotaSummary` 接口因项目 ID 无效或受限导致 HTTP 403 错误并丢失配额组从而误降级为 100% 假配额的问题，新增无项目 ID (`{}`) 即时重试机制；并在配额后台刷新时触发 `accounts://refreshed` 事件广播，前端实时订阅并即刻更新实例卡片与进度条，彻底解决 IDE 显示 0% 而 AGM 卡片显示 100% 导致无法触发自动切换的问题。 (Thanks to @aukgit)
+- **快进手动点击与候选池耗尽修复 (Fast-Forward Manual Trigger & Candidate Pool Unblocking)**: 移除了快进候选池中对未运行空闲实例的误排除，仅排除当前实例与正在运行的兄弟实例绑定的账号；并将切换后的 15 秒进程重启验证与 15 秒安全提示弹窗消除移至后台异步任务执行，避免 IPC 同步超时阻塞，使用户点击 Fast-Forward 3 秒内即刻响应。 (Thanks to @aukgit)
+- **Windows 子进程黑框弹窗彻底消除 (`CREATE_NO_WINDOW = 0x08000000`)**: 遍历消除全项目 14 处涉及 `powershell.exe`、`cmd.exe`、`gitmap`、`ssh`、`icacls` 等调用外部命令行时弹出的黑色终端控制台窗口，统一在 Windows 平台配置 `creation_flags(0x08000000)`，实现静默后台执行。 (Thanks to @aukgit)
+- **交互审计日志复制按钮修复 (Audit Log Direct Clipboard Copy)**: 修复了 `AuditPanel.tsx` 中使用虚拟 `<a download>` DOM 触发下载被 WebView2 拦截导致点击复制 JSON / JSONL 无效的问题，全面重构为直接写入系统剪贴板 (`copyToClipboard`)，并提供 2 秒的绿色 "Copied!" 状态徽标与 Toast 悬浮提示。 (Thanks to @aukgit)
+- **审计日志方法与目标列解析修复 (Audit Log Serde Alignment)**: 在 Rust 后端 `InteractionEntry` 与 `RecordInteractionInput` 结构体上补齐 `#[serde(rename_all = "camelCase")]`，修复前端因大小写映射不一致导致 `METHOD` 与 `TARGET` 列显示为空白的缺陷；并在 `audit-client.ts` 中修正 Tauri IPC 调用参数名为 `{ input: payload }`。 (Thanks to @aukgit)
+- **严格邮箱隐私脱敏与悬浮泄露消除 (Strict Email Privacy Masking)**: 彻底移除了实例卡片 `InstanceCard.tsx` 上的鼠标悬浮自动显示原邮箱行为 (`isEmailHovered`)，并清洗了 HTML DOM 原生 `title` 提示属性，杜绝鼠标悬停泄露真实邮箱地址；标准化前端与后端脱敏工具为 `ris***@***` 格式，日志与 Telegram 告警均自动脱敏。 (Thanks to @aukgit)
+- **导航栏更新图标动画优化 (Smooth Navbar Update Micro-Interaction)**: 移除了 `NavMenu.tsx` 中更新可用图标的生硬弹跳动画 (`group-hover:animate-bounce`)，替换为平滑优雅的微动上浮与缩放过渡 (`group-hover:-translate-y-0.5 group-hover:scale-110`)。 (Thanks to @aukgit)
+
+### Added
+- **审计日志调用栈与触发函数深度捕获 (Call Stack & Caller Inspection)**: 优化 `useAuditRecorder.ts` 在点击事件中向上攀爬 DOM 树寻找真正的按钮/链接交互容器，并使用 `new Error().stack` 过滤内部框架代码后提取调用函数名与源码行号，展开审计详情时呈现清晰的格式化调用栈信息。 (Thanks to @aukgit)
+- **自动切换决策与候选打分全量入库审计 (Auto-Switch Decision Audit Logging)**: 在自动切换候选打分、满额候选命中、速率限制冷却跳过以及执行切换等全链路节点调用 `audit::record_if_active`，将决策过程完整写入 `ui_audit.db`，方便随时追溯切换根因。 (Thanks to @aukgit)
+- **提示词备份条数上限设置与 FIFO 淘汰 (Max Prompt Backup Cap & Settings)**: 在后端 `backup_prompts_db` 实现了默认 100 条的严格 FIFO 限制 (`ORDER BY created_at DESC, id DESC LIMIT ?1`)，超出时自动修剪最旧备份并清理孤儿批次；并在“高级设置 (Settings → Advanced)”中新增了 `10` 至 `1000` 条的滑动条与数字输入控件。 (Thanks to @aukgit)
+- **独立更新器终端 18pt 字体与 ANSI 彩色渲染 (18pt Modern Console for Updater)**: 在 Windows 平台调用 `AllocConsole` 后配置 UTF-8 代码页 (65001)、启用原生 ANSI 虚拟终端转义序列 (`0x0004`)，并将控制台字体放大至 18pt Consolas，彻底消除更新过程中的界面错位与字体过小问题。 (Thanks to @aukgit)
+
+---
+
 ## [v4.207.0] - 2026-10-16
 
 ### Fixed
@@ -345,6 +364,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.208.0 (2026-10-16)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.207.0 (2026-10-16)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

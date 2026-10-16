@@ -174,7 +174,13 @@ pub fn import_ssh_from_gitmap() -> Result<(String, NodeSyncStats), String> {
         &["ssh", "nodes", "export-json"][..],
         &["ssh", "nodes", "--json"][..],
     ] {
-        if let Ok(out) = std::process::Command::new("gitmap").args(args).output() {
+        let mut cmd = std::process::Command::new("gitmap");
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x08000000);
+        }
+        if let Ok(out) = cmd.args(args).output() {
             if out.status.success() {
                 let stdout = String::from_utf8_lossy(&out.stdout);
                 if let Ok(conns) = decode_connections_from_json(&stdout) {

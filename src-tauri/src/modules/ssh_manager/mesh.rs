@@ -100,10 +100,22 @@ pub fn deploy_auth_key_to_target(
         let mut ssh_args = build_ssh_args_for_node(&node, None, None, false);
         ssh_args.push(remote_cmd);
 
-        let deploy_out = Command::new("ssh").args(&ssh_args).output();
+        let mut deploy_cmd = Command::new("ssh");
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            deploy_cmd.creation_flags(0x08000000);
+        }
+        let deploy_out = deploy_cmd.args(&ssh_args).output();
         let mut verify_args = build_ssh_args_for_node(&node, None, None, true);
         verify_args.push("echo AGM_SSH_OK".to_string());
-        let verified = Command::new("ssh")
+        let mut verify_cmd = Command::new("ssh");
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            verify_cmd.creation_flags(0x08000000);
+        }
+        let verified = verify_cmd
             .args(&verify_args)
             .output()
             .map(|o| {
@@ -205,7 +217,13 @@ pub fn deploy_mesh_keys(
                     };
                     let mut ssh_args = build_ssh_args_for_node(node, None, None, true);
                     ssh_args.push(gather_cmd.to_string());
-                    if let Ok(out) = Command::new("ssh").args(&ssh_args).output() {
+                    let mut cmd = Command::new("ssh");
+                    #[cfg(target_os = "windows")]
+                    {
+                        use std::os::windows::process::CommandExt;
+                        cmd.creation_flags(0x08000000);
+                    }
+                    if let Ok(out) = cmd.args(&ssh_args).output() {
                         if out.status.success() {
                             let stdout = String::from_utf8_lossy(&out.stdout);
                             let mut current_name = "id_ed25519.pub".to_string();
@@ -297,7 +315,13 @@ pub fn deploy_mesh_keys(
                     let mut ssh_args = build_ssh_args_for_node(node, None, None, true);
                     ssh_args.push(cmd);
 
-                    match Command::new("ssh").args(&ssh_args).output() {
+                    let mut cmd = Command::new("ssh");
+                    #[cfg(target_os = "windows")]
+                    {
+                        use std::os::windows::process::CommandExt;
+                        cmd.creation_flags(0x08000000);
+                    }
+                    match cmd.args(&ssh_args).output() {
                         Ok(out) if out.status.success() => KeyDeployNodeReport {
                             alias: node.alias.clone(),
                             ip_address: node.ip_address.clone(),

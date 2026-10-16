@@ -209,6 +209,7 @@ export interface AppConfig {
     thinking_cleanup_dismissed?: boolean; // [NEW] 用户是否已确认/忽略该建议
     dismissed_thinking_cleanup_version?: string; // [NEW] 用户已确认或忽略建议的目标版本号
     instance_card_max_projects?: number; // [NEW] Maximum recent projects displayed on instance card (1-3, default 3)
+    max_backup_prompts?: number; // [NEW] Maximum prompt snapshots retained in SQLite backup database (default 100, range 10-1000)
 }
 
 export interface ConversationCleanupConfig {

@@ -64,7 +64,7 @@ export async function auditIsRecording(): Promise<boolean> {
  */
 export async function auditRecord(payload: AuditRecordPayload): Promise<boolean> {
     try {
-        await invoke(AUDIT_COMMANDS.record, { entry: payload });
+        await invoke(AUDIT_COMMANDS.record, { input: payload });
         return true;
     } catch (error) {
         warn(error, AUDIT_COMMANDS.record, { trigger: payload.trigger, methodName: payload.methodName });

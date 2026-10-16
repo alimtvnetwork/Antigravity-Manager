@@ -398,9 +398,10 @@ pub async fn select_and_verify_next_best_profile(
     let mut highest_fallback_quota: f64 = 0.0;
 
     for candidate in candidates {
+        let masked_email = crate::modules::logger::mask_email(&candidate.email);
         logger::log_info(&format!(
             "[AutoSwitcher] Pre-switch live verification: checking candidate '{}' (cached quota: {:.1}%)...",
-            candidate.email, candidate.quota_percent
+            masked_email, candidate.quota_percent
         ));
 
         let mut cand_acc = match account::load_account(&candidate.account_id) {
@@ -408,7 +409,7 @@ pub async fn select_and_verify_next_best_profile(
             Err(e) => {
                 logger::log_warn(&format!(
                     "[AutoSwitcher] Could not load candidate account '{}': {}. Skipping...",
-                    candidate.email, e
+                    masked_email, e
                 ));
                 continue;
             }
@@ -422,15 +423,29 @@ pub async fn select_and_verify_next_best_profile(
         {
             logger::log_warn(&format!(
                 "[AutoSwitcher] Candidate '{}' is disabled or validation-blocked. Skipping...",
-                candidate.email
+                masked_email
             ));
             continue;
         }
         if is_account_rate_limited(&cand_acc, target_model, now_sec) {
             logger::log_warn(&format!(
                 "[AutoSwitcher] Candidate '{}' is in active proxy rate-limit cooldown for model '{}'. Skipping...",
-                candidate.email, target_model
+                masked_email, target_model
             ));
+            crate::modules::audit::record_if_active(
+                "system",
+                "programmatic",
+                "auto_switcher::cooldown_skip",
+                "instances | auto_switcher | cooldown_guard",
+                serde_json::json!({
+                    "account_id": cand_acc.id,
+                    "account_email_masked": masked_email,
+                    "cooldown_reason": "rate_limited",
+                    "model": target_model,
+                }),
+                "ok",
+                "",
+            );
             continue;
         }
 
@@ -441,7 +456,7 @@ pub async fn select_and_verify_next_best_profile(
         ) {
             logger::log_warn(&format!(
                 "[AutoSwitcher] Candidate '{}' is currently leased by another active node. Skipping...",
-                candidate.email
+                masked_email
             ));
             continue;
         }
@@ -455,7 +470,7 @@ pub async fn select_and_verify_next_best_profile(
         {
             logger::log_warn(&format!(
                 "[AutoSwitcher] Candidate '{}' is held by another VM node via inbound email broadcast. Skipping...",
-                candidate.email
+                masked_email
             ));
             continue;
         }
@@ -470,14 +485,14 @@ pub async fn select_and_verify_next_best_profile(
                 let q_val = calculate_candidate_quota(&cand_acc, target_model).unwrap_or(0.0);
                 logger::log_info(&format!(
                     "[AutoSwitcher] Candidate '{}' refreshed from Google API: {:.1}% (candidate quota)",
-                    candidate.email, q_val
+                    masked_email, q_val
                 ));
                 q_val
             }
             Err(e) => {
                 logger::log_warn(&format!(
                     "[AutoSwitcher] Failed to refresh live quota from Google API for candidate '{}': {}. Skipping...",
-                    candidate.email, e
+                    masked_email, e
                 ));
                 continue;
             }
@@ -487,8 +502,25 @@ pub async fn select_and_verify_next_best_profile(
         if fresh_4h_quota >= 100.0 {
             logger::log_info(&format!(
                 "[AutoSwitcher] Candidate '{}' confirmed with 100.0% quota for 4h window. Selected for switch!",
-                candidate.email
+                masked_email
             ));
+            crate::modules::audit::record_if_active(
+                "system",
+                "programmatic",
+                "auto_switcher::candidate_evaluation",
+                &format!("instances | auto_switcher | candidate_evaluator | {current_instance_id}"),
+                serde_json::json!({
+                    "instance_id": current_instance_id,
+                    "target_model": target_model,
+                    "threshold_percent": threshold,
+                    "selected_candidate": candidate.account_id,
+                    "selected_email_masked": masked_email,
+                    "quota_4h": fresh_4h_quota,
+                    "reason": "100% 4h window quota confirmed"
+                }),
+                "ok",
+                "",
+            );
             return Ok(Some(ProfileCandidate {
                 instance_id: candidate.instance_id,
                 account_id: candidate.account_id,
@@ -499,7 +531,7 @@ pub async fn select_and_verify_next_best_profile(
         } else {
             logger::log_info(&format!(
                 "[AutoSwitcher] Candidate '{}' live 4h window quota is {:.1}% (< 100.0%). Staging as fallback candidate...",
-                candidate.email, fresh_4h_quota
+                masked_email, fresh_4h_quota
             ));
             if fresh_4h_quota > threshold && fresh_4h_quota > highest_fallback_quota {
                 highest_fallback_quota = fresh_4h_quota;
@@ -515,12 +547,46 @@ pub async fn select_and_verify_next_best_profile(
     }
 
     if let Some(fallback) = best_fallback {
+        let fallback_masked = crate::modules::logger::mask_email(&fallback.email);
         logger::log_info(&format!(
             "[AutoSwitcher] No 100.0% quota profile found; selecting best available candidate '{}' with {:.1}% quota.",
-            fallback.email, fallback.quota_percent
+            fallback_masked, fallback.quota_percent
         ));
+        crate::modules::audit::record_if_active(
+            "system",
+            "programmatic",
+            "auto_switcher::candidate_evaluation",
+            &format!("instances | auto_switcher | candidate_evaluator | {current_instance_id}"),
+            serde_json::json!({
+                "instance_id": current_instance_id,
+                "target_model": target_model,
+                "threshold_percent": threshold,
+                "selected_candidate": fallback.account_id,
+                "selected_email_masked": fallback_masked,
+                "quota_4h": fallback.quota_percent,
+                "reason": "fallback best available candidate"
+            }),
+            "ok",
+            "",
+        );
         return Ok(Some(fallback));
     }
+
+    crate::modules::audit::record_if_active(
+        "system",
+        "programmatic",
+        "auto_switcher::candidate_evaluation",
+        &format!("instances | auto_switcher | candidate_evaluator | {current_instance_id}"),
+        serde_json::json!({
+            "instance_id": current_instance_id,
+            "target_model": target_model,
+            "threshold_percent": threshold,
+            "selected_candidate": serde_json::Value::Null,
+            "reason": "no usable quota profile found"
+        }),
+        "ok",
+        "",
+    );
 
     logger::log_warn(
         "[AutoSwitcher] All candidate profiles examined. Zero profiles verified with usable quota. Aborting rotation.",

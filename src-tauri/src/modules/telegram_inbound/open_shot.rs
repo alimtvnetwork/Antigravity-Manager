@@ -154,7 +154,13 @@ fn focus_manager_window() -> Result<(), String> {
         file.write_all(FOCUS_PS1.as_bytes())
             .map_err(|e| format!("write focus script bytes: {e}"))?;
     }
-    let output = Command::new("powershell.exe")
+    let mut ps_cmd = Command::new("powershell.exe");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        ps_cmd.creation_flags(0x08000000);
+    }
+    let output = ps_cmd
         .args([
             "-NoProfile",
             "-NonInteractive",
@@ -260,14 +266,18 @@ async fn enqueue_remote_command(
 async fn open_remote_manager(node: &str) -> Result<String, String> {
     let node_esc = clean_for_telegram_html(node, 48);
     let remote_cmd = "agm open-ui";
-    let ssh_outcome: Result<(), String> = match Command::new("gitmap")
-        .args(["cluster", "exec", node, remote_cmd])
-        .output()
+    let mut gm_cmd = Command::new("gitmap");
+    #[cfg(target_os = "windows")]
     {
-        Err(e) => Err(format!("could not run `gitmap cluster exec`: {e}")),
-        Ok(out) if out.status.success() => Ok(()),
-        Ok(out) => Err(ssh_failure_detail(&out)),
-    };
+        use std::os::windows::process::CommandExt;
+        gm_cmd.creation_flags(0x08000000);
+    }
+    let ssh_outcome: Result<(), String> =
+        match gm_cmd.args(["cluster", "exec", node, remote_cmd]).output() {
+            Err(e) => Err(format!("could not run `gitmap cluster exec`: {e}")),
+            Ok(out) if out.status.success() => Ok(()),
+            Ok(out) => Err(ssh_failure_detail(&out)),
+        };
     match ssh_outcome {
         Ok(()) => Ok(format!(
             "🖥️ <b>Opened AGM on {node_esc}</b>\nLaunched via <code>gitmap cluster exec {node_esc} \"agm open-ui\"</code>."
@@ -334,7 +344,13 @@ fn capture_local_once() -> Result<Vec<u8>, String> {
         file.write_all(WINDOW_CAPTURE_PS1.as_bytes())
             .map_err(|e| format!("write shot script bytes: {e}"))?;
     }
-    let output = Command::new("powershell.exe")
+    let mut ps_cmd = Command::new("powershell.exe");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        ps_cmd.creation_flags(0x08000000);
+    }
+    let output = ps_cmd
         .args([
             "-NoProfile",
             "-NonInteractive",
@@ -426,7 +442,13 @@ fn extract_base64_line(stdout: &str) -> Option<String> {
 /// Capture a remote fleet node's screen: ensure AGM is open there, then run a
 /// PowerShell capture that prints the PNG as base64 over `gitmap cluster exec`.
 fn capture_remote_png(node: &str) -> Result<Vec<u8>, String> {
-    let open_out = Command::new("gitmap")
+    let mut open_cmd = Command::new("gitmap");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        open_cmd.creation_flags(0x08000000);
+    }
+    let open_out = open_cmd
         .args(["cluster", "exec", node, "agm open-ui"])
         .output()
         .map_err(|e| format!("could not run `gitmap cluster exec` for {node}: {e}"))?;
@@ -444,7 +466,13 @@ fn capture_remote_png(node: &str) -> Result<Vec<u8>, String> {
 
     let encoded = encode_powershell_utf16le(REMOTE_CAPTURE_PS1);
     let remote_cmd = format!("powershell -NoProfile -NonInteractive -EncodedCommand {encoded}");
-    let out = Command::new("gitmap")
+    let mut remote_proc = Command::new("gitmap");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        remote_proc.creation_flags(0x08000000);
+    }
+    let out = remote_proc
         .args(["cluster", "exec", node, &remote_cmd])
         .output()
         .map_err(|e| format!("could not run remote capture on {node}: {e}"))?;

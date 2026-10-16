@@ -168,6 +168,7 @@ export function useInstancePage(): InstancePageApi {
                 await Promise.all([
                     fetchInstances(true),
                     fetchSwitcherStatus(),
+                    fetchAccounts(),
                     fetchRunningTasks(),
                     fetchDaemonTelemetry(),
                 ]);
@@ -191,6 +192,7 @@ export function useInstancePage(): InstancePageApi {
                 'instance://rotated',
                 'prompt://dispatched',
                 'prompt://resumed',
+                'accounts://refreshed',
             ];
             Promise.all([
                 ...events.map((ev) =>

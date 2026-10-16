@@ -50,6 +50,7 @@ impl InteractionTrigger {
 
 /// Input payload accepted by the `record_ui_interaction` Tauri command.
 #[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct RecordInteractionInput {
     pub actor: InteractionActor,
     pub method_name: String,
@@ -64,6 +65,7 @@ pub struct RecordInteractionInput {
 
 /// One recorded UI interaction: the 8 audit fields plus the DB row id.
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct InteractionEntry {
     pub id: i64,
     pub timestamp: i64,

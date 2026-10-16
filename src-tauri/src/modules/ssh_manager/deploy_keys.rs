@@ -118,11 +118,14 @@ pub(crate) fn append_key_if_missing(
 
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
         let path_str = path.to_string_lossy().to_string();
         if is_win_admin {
+            let mut icacls_cmd = Command::new("icacls");
+            icacls_cmd.creation_flags(0x08000000);
             // Justification: best-effort process spawn; failure logged
             crate::error::record_ignored(
-                Command::new("icacls")
+                icacls_cmd
                     .args([
                         &path_str,
                         "/inheritance:r",
@@ -134,9 +137,11 @@ pub(crate) fn append_key_if_missing(
                 "spawn icacls",
             );
         } else if let Ok(user) = std::env::var("USERNAME") {
+            let mut icacls_cmd = Command::new("icacls");
+            icacls_cmd.creation_flags(0x08000000);
             // Justification: best-effort process spawn; failure logged
             crate::error::record_ignored(
-                Command::new("icacls")
+                icacls_cmd
                     .args([
                         &path_str,
                         "/inheritance:r",

@@ -39,17 +39,46 @@ function currentRoute(): string {
     return window.location.hash?.replace(/^#/, '') || window.location.pathname || '/';
 }
 
+/** Climbs to nearest interactive element or falls back to original target */
+function findInteractiveTarget(el: Element | null): HTMLElement | null {
+    if (!el) return null;
+    const interactive = el.closest('button, a, input, select, textarea, [role="button"]');
+    return (interactive as HTMLElement) || (el as HTMLElement);
+}
+
+function extractStackTrace(): { callerInfo: string; stackTrace: string } {
+    try {
+        const stack = new Error().stack || '';
+        const lines = stack.split('\n').map((l) => l.trim()).filter(Boolean);
+        // Skip first line (Error) and hook internal frames
+        const filtered = lines.filter(
+            (l) =>
+                !l.includes('useAuditRecorder') &&
+                !l.includes('extractStackTrace') &&
+                !l.includes('Error') &&
+                !l.includes('report')
+        );
+        const callerInfo = filtered[0] || 'anonymous';
+        const stackTrace = filtered.slice(0, 8).join('\n');
+        return { callerInfo, stackTrace };
+    } catch {
+        return { callerInfo: 'unknown', stackTrace: '' };
+    }
+}
+
 /** Compact, secret-free description of an element: `button#save.primary`. */
 function describeElement(el: Element | null): string {
-    if (!el) return 'unknown';
-    const tag = el.tagName.toLowerCase();
-    const id = el.id ? `#${el.id}` : '';
-    const cls = el.className && typeof el.className === 'string'
-        ? `.${el.className.trim().split(/\s+/)[0]}`
+    const target = findInteractiveTarget(el);
+    if (!target) return 'unknown';
+    const tag = target.tagName.toLowerCase();
+    const id = target.id ? `#${target.id}` : '';
+    const firstClass = target.className && typeof target.className === 'string'
+        ? target.className.trim().split(/\s+/)[0]
         : '';
-    const label = el.getAttribute('aria-label');
-    const text = !label && (tag === 'button' || tag === 'a')
-        ? (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 24)
+    const cls = firstClass ? `.${firstClass}` : '';
+    const label = target.getAttribute('aria-label');
+    const text = !label && (tag === 'button' || tag === 'a' || target.getAttribute('role') === 'button')
+        ? (target.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 24)
         : '';
     const desc = `${tag}${id}${cls}${label ? `[aria:${label.slice(0, 24)}]` : ''}${text ? `("${text}")` : ''}`;
     return desc.slice(0, MAX_DESC_LEN);
@@ -57,21 +86,24 @@ function describeElement(el: Element | null): string {
 
 /** Nearest opt-in component name, else 'unknown'. */
 function componentOf(el: Element | null): string {
-    const tagged = el?.closest?.(`[${AUDIT_ATTR_COMPONENT}]`);
+    const target = findInteractiveTarget(el);
+    const tagged = target?.closest?.(`[${AUDIT_ATTR_COMPONENT}]`);
     return tagged?.getAttribute(AUDIT_ATTR_COMPONENT) || 'unknown';
 }
 
 /** Handler name: opt-in attribute wins, otherwise an inferred descriptor. */
 function methodOf(el: Element | null, trigger: AuditTrigger): string {
-    const tagged = el?.closest?.(`[${AUDIT_ATTR_METHOD}]`);
+    const target = findInteractiveTarget(el);
+    const tagged = target?.closest?.(`[${AUDIT_ATTR_METHOD}]`);
     const explicit = tagged?.getAttribute(AUDIT_ATTR_METHOD);
     if (explicit) return explicit;
-    return `${trigger}:${describeElement(el)}`;
+    return `${trigger}:${describeElement(target)}`;
 }
 
 /** `route | component | element` per the backend ui_target convention. */
 function uiTargetOf(el: Element | null): string {
-    return `${currentRoute()} | ${componentOf(el)} | ${describeElement(el)}`;
+    const target = findInteractiveTarget(el);
+    return `${currentRoute()} | ${componentOf(target)} | ${describeElement(target)}`;
 }
 
 function trackHookError(error: unknown, triggerAction: string, context?: Record<string, unknown>): void {
@@ -112,15 +144,30 @@ export function useAuditRecorder(): void {
         const handleClick = (event: MouseEvent) => {
             try {
                 if (!isRecordingActive()) return;
-                const el = event.target as Element | null;
+                const targetEl = (event.target as HTMLElement)?.closest?.('button, a, input, select, textarea, [role="button"]') || (event.target as HTMLElement | null);
+                const explicitMethod = targetEl?.closest?.(`[${AUDIT_ATTR_METHOD}]`)?.getAttribute(AUDIT_ATTR_METHOD);
+                const { callerInfo, stackTrace } = extractStackTrace();
+                const methodName = explicitMethod || methodOf(targetEl, 'click');
+
                 report({
                     actor: actorOf(event),
-                    methodName: methodOf(el, 'click'),
-                    uiTarget: uiTargetOf(el),
+                    methodName,
+                    uiTarget: uiTargetOf(targetEl),
                     trigger: 'click',
                     params: {
+                        caller: callerInfo,
+                        callerInfo,
+                        stack: stackTrace,
+                        stackTrace,
+                        metadata: {
+                            callerInfo,
+                            stackTrace,
+                        },
                         button: event.button,
-                        href: el instanceof HTMLAnchorElement ? el.href : undefined,
+                        tag: targetEl?.tagName?.toLowerCase(),
+                        ariaLabel: targetEl?.getAttribute?.('aria-label') || undefined,
+                        textSnippet: (targetEl?.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 24) || undefined,
+                        href: targetEl instanceof HTMLAnchorElement ? targetEl.href : undefined,
                         route: currentRoute(),
                     },
                     result: 'ok',
@@ -133,22 +180,34 @@ export function useAuditRecorder(): void {
         const handleInputCommit = (event: Event) => {
             try {
                 if (!isRecordingActive()) return;
-                const el = event.target as Element | null;
-                const isPassword = el instanceof HTMLInputElement && el.type === 'password';
+                const targetEl = (event.target as HTMLElement)?.closest?.('input, select, textarea') || (event.target as HTMLElement | null);
+                const isPassword = targetEl instanceof HTMLInputElement && targetEl.type === 'password';
+                const { callerInfo, stackTrace } = extractStackTrace();
+                const explicitMethod = targetEl?.closest?.(`[${AUDIT_ATTR_METHOD}]`)?.getAttribute(AUDIT_ATTR_METHOD);
+                const methodName = explicitMethod || methodOf(targetEl, 'input');
+
                 report({
                     actor: actorOf(event),
-                    methodName: methodOf(el, 'input'),
-                    uiTarget: uiTargetOf(el),
+                    methodName,
+                    uiTarget: uiTargetOf(targetEl),
                     trigger: 'input',
                     params: {
-                        tag: el?.tagName.toLowerCase(),
-                        inputType: el instanceof HTMLInputElement ? el.type : undefined,
+                        caller: callerInfo,
+                        callerInfo,
+                        stack: stackTrace,
+                        stackTrace,
+                        metadata: {
+                            callerInfo,
+                            stackTrace,
+                        },
+                        tag: targetEl?.tagName?.toLowerCase(),
+                        inputType: targetEl instanceof HTMLInputElement ? targetEl.type : undefined,
                         // Values are NEVER captured (secrets). Length only,
                         // and not even that for password fields.
                         valueLength: isPassword
                             ? undefined
-                            : el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement
-                                ? el.value.length
+                            : targetEl instanceof HTMLInputElement || targetEl instanceof HTMLTextAreaElement
+                                ? targetEl.value.length
                                 : undefined,
                         route: currentRoute(),
                     },

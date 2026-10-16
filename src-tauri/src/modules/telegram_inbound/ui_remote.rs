@@ -930,17 +930,23 @@ fn capture_once() -> Result<Vec<u8>, String> {
             file.write_all(CAPTURE_PS1.as_bytes())
                 .map_err(|e| format!("write shot script bytes: {e}"))?;
         }
-        let output = Command::new("powershell.exe")
-            .args([
-                "-NoProfile",
-                "-NonInteractive",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-File",
-                &script.to_string_lossy(),
-                "-OutPath",
-                &png.to_string_lossy(),
-            ])
+        let mut cmd = Command::new("powershell.exe");
+        cmd.args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            &script.to_string_lossy(),
+            "-OutPath",
+            &png.to_string_lossy(),
+        ]);
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x08000000);
+        }
+        let output = cmd
             .output()
             .map_err(|e| format!("start screenshot helper: {e}"))?;
         if !output.status.success() {

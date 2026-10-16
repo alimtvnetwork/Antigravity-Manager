@@ -221,7 +221,13 @@ pub fn exec_ssh_command(
                         build_ssh_args_for_node(node, port_override, id_opt.as_deref(), true);
                     ssh_args.push(cmd_str);
 
-                    match Command::new("ssh").args(&ssh_args).output() {
+                    let mut cmd = Command::new("ssh");
+                    #[cfg(target_os = "windows")]
+                    {
+                        use std::os::windows::process::CommandExt;
+                        cmd.creation_flags(0x08000000);
+                    }
+                    match cmd.args(&ssh_args).output() {
                         Ok(out) => {
                             let code = out.status.code().unwrap_or(1);
                             SshExecNodeResult {
@@ -270,7 +276,13 @@ pub fn check_gitmap_installed_status() -> SshGitmapStatus {
     let mut gitmap_version = None;
     let mut gitmap_path = None;
 
-    if let Ok(out) = Command::new("gitmap").arg("--version").output() {
+    let mut gm_cmd = Command::new("gitmap");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        gm_cmd.creation_flags(0x08000000);
+    }
+    if let Ok(out) = gm_cmd.arg("--version").output() {
         if out.status.success() {
             gitmap_installed = true;
             let v_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
@@ -288,7 +300,13 @@ pub fn check_gitmap_installed_status() -> SshGitmapStatus {
         #[cfg(not(target_os = "windows"))]
         let which_cmd = ("which", "gitmap");
 
-        if let Ok(out) = Command::new(which_cmd.0).arg(which_cmd.1).output() {
+        let mut which_proc = Command::new(which_cmd.0);
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            which_proc.creation_flags(0x08000000);
+        }
+        if let Ok(out) = which_proc.arg(which_cmd.1).output() {
             if out.status.success() {
                 if let Some(first_line) = String::from_utf8_lossy(&out.stdout).lines().next() {
                     gitmap_path = Some(first_line.trim().to_string());

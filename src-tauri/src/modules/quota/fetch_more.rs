@@ -14,107 +14,124 @@ pub(crate) async fn fetch_quota_summary(
     account_id: Option<&str>,
 ) -> Option<Vec<crate::models::quota::QuotaGroup>> {
     let client = create_standard_client(account_id).await;
-    let payload = if let Some(pid) = project_id {
-        json!({ "project": pid })
+
+    // First attempt: with project_id if available; fallback attempt: without project_id
+    let payloads = if let Some(pid) = project_id {
+        vec![(Some(pid), json!({ "project": pid })), (None, json!({}))]
     } else {
-        json!({})
+        vec![(None, json!({}))]
     };
 
-    for ep_url in QUOTA_SUMMARY_ENDPOINTS.iter() {
-        let res = client
-            .post(*ep_url)
-            .bearer_auth(access_token)
-            .header(
-                rquest::header::USER_AGENT,
-                crate::constants::NATIVE_OAUTH_USER_AGENT.as_str(),
-            )
-            .json(&payload)
-            .send()
-            .await;
+    for (current_pid, payload) in payloads {
+        for ep_url in QUOTA_SUMMARY_ENDPOINTS.iter() {
+            let res = client
+                .post(*ep_url)
+                .bearer_auth(access_token)
+                .header(
+                    rquest::header::USER_AGENT,
+                    crate::constants::NATIVE_OAUTH_USER_AGENT.as_str(),
+                )
+                .json(&payload)
+                .send()
+                .await;
 
-        match res {
-            Ok(response) => {
-                let status = response.status();
-                if !status.is_success() {
-                    if status == rquest::StatusCode::FORBIDDEN {
-                        let body_text = response.text().await.unwrap_or_default();
-                        let lower = body_text.to_lowercase();
-                        if lower.contains("validation_required")
-                            || lower.contains("verify your account")
-                            || lower.contains("further action is required")
-                            || lower.contains("validation_url")
-                            || lower.contains("appeal_url")
-                        {
-                            crate::modules::logger::log_warn(&format!(
-                                "[{}] QuotaSummary API returned 403 VALIDATION_REQUIRED; marking account validation_blocked",
-                                email
-                            ));
-                            if let Some(acc_id) = account_id {
-                                if let Ok(mut acc) = crate::modules::account::load_account(acc_id) {
-                                    crate::modules::account::mark_validation_blocked(
-                                        &mut acc,
-                                        &format!(
-                                            "QuotaSummary 403 VALIDATION_REQUIRED: {}",
-                                            body_text.trim()
-                                        ),
-                                    );
+            match res {
+                Ok(response) => {
+                    let status = response.status();
+                    if !status.is_success() {
+                        if status == rquest::StatusCode::FORBIDDEN {
+                            let body_text = response.text().await.unwrap_or_default();
+                            let lower = body_text.to_lowercase();
+                            if lower.contains("validation_required")
+                                || lower.contains("verify your account")
+                                || lower.contains("further action is required")
+                                || lower.contains("validation_url")
+                                || lower.contains("appeal_url")
+                            {
+                                crate::modules::logger::log_warn(&format!(
+                                    "[{}] QuotaSummary API returned 403 VALIDATION_REQUIRED; marking account validation_blocked",
+                                    email
+                                ));
+                                if let Some(acc_id) = account_id {
+                                    if let Ok(mut acc) =
+                                        crate::modules::account::load_account(acc_id)
+                                    {
+                                        crate::modules::account::mark_validation_blocked(
+                                            &mut acc,
+                                            &format!(
+                                                "QuotaSummary 403 VALIDATION_REQUIRED: {}",
+                                                body_text.trim()
+                                            ),
+                                        );
+                                    }
                                 }
+                                return None;
                             }
+
+                            // If 403 occurred with project_id, break out of endpoint loop to retry without project_id
+                            if current_pid.is_some() {
+                                crate::modules::logger::log_warn(&format!(
+                                    "[{}] QuotaSummary returned 403 with project {:?}; retrying without project_id",
+                                    email, current_pid
+                                ));
+                                break;
+                            }
+                        }
+                        crate::modules::logger::log_warn(&format!(
+                            "QuotaSummary API {} returned {}, trying next endpoint",
+                            ep_url, status
+                        ));
+                        continue;
+                    }
+
+                    let summary: QuotaSummaryResponse = match response.json().await {
+                        Ok(s) => s,
+                        Err(e) => {
+                            crate::modules::logger::log_warn(&format!(
+                                "QuotaSummary JSON parse failed for {}: {}",
+                                email, e
+                            ));
                             return None;
                         }
+                    };
+
+                    let groups: Vec<crate::models::quota::QuotaGroup> = summary
+                        .groups
+                        .into_iter()
+                        .map(|g| crate::models::quota::QuotaGroup {
+                            display_name: g.display_name.unwrap_or_default(),
+                            description: g.description,
+                            buckets: g
+                                .buckets
+                                .into_iter()
+                                .filter_map(|b| {
+                                    Some(crate::models::quota::QuotaBucket {
+                                        bucket_id: b.bucket_id.unwrap_or_default(),
+                                        window: b.window.unwrap_or_default(),
+                                        remaining_fraction: b.remaining_fraction?,
+                                        reset_time: b.reset_time.unwrap_or_default(),
+                                        observed_at: Some(chrono::Utc::now().timestamp_millis()),
+                                        cycle_tokens: None,
+                                        display_name: b.display_name,
+                                        description: b.description,
+                                    })
+                                })
+                                .collect(),
+                        })
+                        .collect();
+
+                    if !groups.is_empty() {
+                        tracing::debug!("[{}] QuotaSummary fetched {} groups", email, groups.len());
+                        return Some(groups);
                     }
+                }
+                Err(e) => {
                     crate::modules::logger::log_warn(&format!(
-                        "QuotaSummary API {} returned {}, trying next endpoint",
-                        ep_url, status
+                        "QuotaSummary API request failed at {}: {}",
+                        ep_url, e
                     ));
                     continue;
                 }
-
-                let summary: QuotaSummaryResponse = match response.json().await {
-                    Ok(s) => s,
-                    Err(e) => {
-                        crate::modules::logger::log_warn(&format!(
-                            "QuotaSummary JSON parse failed for {}: {}",
-                            email, e
-                        ));
-                        return None;
-                    }
-                };
-
-                let groups: Vec<crate::models::quota::QuotaGroup> = summary
-                    .groups
-                    .into_iter()
-                    .map(|g| crate::models::quota::QuotaGroup {
-                        display_name: g.display_name.unwrap_or_default(),
-                        description: g.description,
-                        buckets: g
-                            .buckets
-                            .into_iter()
-                            .filter_map(|b| {
-                                Some(crate::models::quota::QuotaBucket {
-                                    bucket_id: b.bucket_id.unwrap_or_default(),
-                                    window: b.window.unwrap_or_default(),
-                                    remaining_fraction: b.remaining_fraction?,
-                                    reset_time: b.reset_time.unwrap_or_default(),
-                                    observed_at: Some(chrono::Utc::now().timestamp_millis()),
-                                    cycle_tokens: None,
-                                    display_name: b.display_name,
-                                    description: b.description,
-                                })
-                            })
-                            .collect(),
-                    })
-                    .collect();
-
-                tracing::debug!("[{}] QuotaSummary fetched {} groups", email, groups.len());
-                return Some(groups);
-            }
-            Err(e) => {
-                crate::modules::logger::log_warn(&format!(
-                    "QuotaSummary API request failed at {}: {}",
-                    ep_url, e
-                ));
-                continue;
             }
         }
     }

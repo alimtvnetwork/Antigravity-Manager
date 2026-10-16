@@ -10,9 +10,11 @@ import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
+    AlertTriangle,
     Bot,
+    Check,
     ChevronDown,
-    Download,
+    Copy,
     FileJson,
     FileText,
     RefreshCw,
@@ -23,6 +25,9 @@ import {
     X,
 } from 'lucide-react';
 import { useErrorStore } from '../../stores/error-store';
+import { copyToClipboard } from '../../utils/clipboard';
+import { cn } from '../../utils/cn';
+import { showToast } from '../common/ToastContainer';
 import { useAuditStore, type AuditActorFilter, type AuditResultFilter } from './audit-store';
 import type { AuditActor, AuditEntry } from './audit-types';
 
@@ -62,31 +67,14 @@ function ActorBadge({ actor }: { actor: AuditActor }) {
     );
 }
 
-function downloadFile(filename: string, content: string, mime: string): void {
-    try {
-        const blob = new Blob([content], { type: mime });
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = filename;
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-        // Revoke on next tick so the download has started.
-        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (error) {
-        useErrorStore.getState().trackWarning(error, {
-            source: SOURCE,
-            triggerComponent: 'AuditPanel',
-            triggerAction: 'downloadFile',
-            context: { filename },
-        });
-    }
-}
-
 function EntryRow({ entry }: { entry: AuditEntry }) {
     const [expanded, setExpanded] = useState(false);
     const params = useMemo(() => parseParams(entry.params), [entry.params]);
+    const methodName = entry.methodName || entry.method_name || 'CLICK';
+    const uiTarget = entry.uiTarget || entry.ui_target || '-';
+
+    const stackTrace = params.stackTrace || params.stack || (params.metadata as Record<string, unknown> | undefined)?.stackTrace;
+    const callerInfo = params.callerInfo || params.caller || (params.metadata as Record<string, unknown> | undefined)?.callerInfo;
 
     return (
         <>
@@ -103,11 +91,11 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
                         {entry.trigger}
                     </span>
                 </td>
-                <td className="px-2 py-1.5 font-mono text-[10px] text-slate-200 max-w-[220px] truncate" title={entry.methodName}>
-                    {entry.methodName}
+                <td className="px-2 py-1.5 font-mono text-[10px] text-slate-200 max-w-[220px] truncate" title={methodName}>
+                    {methodName}
                 </td>
-                <td className="px-2 py-1.5 font-mono text-[10px] text-slate-400 max-w-[260px] truncate" title={entry.uiTarget}>
-                    {entry.uiTarget}
+                <td className="px-2 py-1.5 font-mono text-[10px] text-slate-400 max-w-[260px] truncate" title={uiTarget}>
+                    {uiTarget}
                 </td>
                 <td className="px-2 py-1.5">
                     {entry.result === 'ok' ? (
@@ -122,12 +110,38 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
             </tr>
             {expanded && (
                 <tr className="border-b border-slate-700/40 bg-slate-900/60">
-                    <td colSpan={7} className="px-3 py-2">
-                        <pre className="font-mono text-[10px] text-slate-300 whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
-                            {JSON.stringify(params, null, 2)}
-                        </pre>
+                    <td colSpan={7} className="px-3 py-3 space-y-2">
+                        {Boolean(callerInfo) && (
+                            <div className="flex items-center gap-2 text-[11px] font-mono text-sky-300 bg-sky-950/40 px-2.5 py-1.5 rounded-md border border-sky-500/20">
+                                <Terminal className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                                <span className="font-semibold text-sky-400">Caller:</span>
+                                <span className="truncate">{String(callerInfo)}</span>
+                            </div>
+                        )}
+                        {Boolean(stackTrace) && (
+                            <div>
+                                <h5 className="text-[10px] font-semibold text-sky-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                                    <Terminal className="w-3 h-3" />
+                                    Call Stack &amp; Source Location
+                                </h5>
+                                <pre className="font-mono text-[10px] text-sky-200/90 bg-slate-950/80 p-2.5 rounded-lg border border-sky-500/20 whitespace-pre overflow-x-auto max-h-36">
+                                    {String(stackTrace)}
+                                </pre>
+                            </div>
+                        )}
+                        <div>
+                            <h5 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                                Interaction Parameters
+                            </h5>
+                            <pre className="font-mono text-[10px] text-slate-300 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800 whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
+                                {JSON.stringify(params, null, 2)}
+                            </pre>
+                        </div>
                         {entry.message && (
-                            <p className="mt-1 text-[10px] text-red-400">{entry.message}</p>
+                            <p className="mt-1 text-[11px] font-medium text-red-400 flex items-center gap-1.5">
+                                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                {entry.message}
+                            </p>
                         )}
                     </td>
                 </tr>
@@ -160,23 +174,48 @@ export function AuditPanel() {
         [entries, actorFilter, resultFilter]
     );
 
+    const [copiedType, setCopiedType] = useState<'json' | 'jsonl' | null>(null);
+
     if (!isOpen) return null;
 
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-
-    const handleExportJson = () => {
-        downloadFile(
-            `audit-log-${stamp}.json`,
-            JSON.stringify(filtered, null, 2),
-            'application/json'
-        );
+    const handleCopyJson = async () => {
+        try {
+            const payload = JSON.stringify(filtered, null, 2);
+            const success = await copyToClipboard(payload);
+            if (success) {
+                setCopiedType('json');
+                showToast({ message: t('audit.copied_json', 'JSON copied to clipboard'), type: 'success' });
+                window.setTimeout(() => setCopiedType(null), 2000);
+            } else {
+                showToast(t('audit.copy_failed', 'Failed to copy audit log to clipboard'), 'error');
+            }
+        } catch (err) {
+            useErrorStore.getState().captureError(err, {
+                source: `${SOURCE}.handleCopyJson`,
+                triggerAction: 'copyToClipboard',
+            });
+        }
     };
 
-    const handleExportJsonl = () => {
-        const lines = filtered
-            .map((e) => JSON.stringify({ ...e, params: parseParams(e.params) }))
-            .join('\n');
-        downloadFile(`audit-log-${stamp}.jsonl`, `${lines}\n`, 'application/x-ndjson');
+    const handleCopyJsonl = async () => {
+        try {
+            const lines = filtered
+                .map((e) => JSON.stringify({ ...e, params: parseParams(e.params) }))
+                .join('\n');
+            const success = await copyToClipboard(`${lines}\n`);
+            if (success) {
+                setCopiedType('jsonl');
+                showToast({ message: t('audit.copied_jsonl', 'JSONL copied to clipboard'), type: 'success' });
+                window.setTimeout(() => setCopiedType(null), 2000);
+            } else {
+                showToast(t('audit.copy_failed', 'Failed to copy audit log to clipboard'), 'error');
+            }
+        } catch (err) {
+            useErrorStore.getState().captureError(err, {
+                source: `${SOURCE}.handleCopyJsonl`,
+                triggerAction: 'copyToClipboard',
+            });
+        }
     };
 
     const handleClear = () => {
@@ -254,22 +293,37 @@ export function AuditPanel() {
                         <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
                         {t('audit.refresh', 'Refresh')}
                     </button>
-                    <button
-                        type="button"
-                        onClick={handleExportJson}
-                        className="inline-flex items-center gap-1 rounded-full border border-slate-700/60 bg-slate-800/60 px-2.5 py-1 text-slate-300 hover:text-white hover:bg-slate-700/50 transition-colors cursor-pointer"
-                    >
-                        <FileJson className="w-3 h-3" />
-                        JSON
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleExportJsonl}
-                        className="inline-flex items-center gap-1 rounded-full border border-slate-700/60 bg-slate-800/60 px-2.5 py-1 text-slate-300 hover:text-white hover:bg-slate-700/50 transition-colors cursor-pointer"
-                    >
-                        <FileText className="w-3 h-3" />
-                        JSONL
-                    </button>
+                    {/* Contiguous Segmented Export Capsule */}
+                    <div className="inline-flex items-center rounded-full border border-slate-700/60 bg-slate-800/60 divide-x divide-slate-700/60 overflow-hidden shadow-2xs">
+                        <button
+                            type="button"
+                            onClick={handleCopyJson}
+                            className={cn(
+                                "inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-medium transition-colors cursor-pointer",
+                                copiedType === 'json'
+                                    ? "bg-emerald-500/20 text-emerald-300 font-semibold"
+                                    : "text-slate-300 hover:text-white hover:bg-slate-700/50"
+                            )}
+                            title={t('audit.copy_json_tooltip', 'Copy filtered entries as JSON to clipboard')}
+                        >
+                            {copiedType === 'json' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <FileJson className="w-3.5 h-3.5" />}
+                            {copiedType === 'json' ? t('common.copied', 'Copied!') : 'JSON'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleCopyJsonl}
+                            className={cn(
+                                "inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-medium transition-colors cursor-pointer",
+                                copiedType === 'jsonl'
+                                    ? "bg-emerald-500/20 text-emerald-300 font-semibold"
+                                    : "text-slate-300 hover:text-white hover:bg-slate-700/50"
+                            )}
+                            title={t('audit.copy_jsonl_tooltip', 'Copy filtered entries as JSONL (newline-delimited) to clipboard')}
+                        >
+                            {copiedType === 'jsonl' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <FileText className="w-3.5 h-3.5" />}
+                            {copiedType === 'jsonl' ? t('common.copied', 'Copied!') : 'JSONL'}
+                        </button>
+                    </div>
                     <button
                         type="button"
                         onClick={handleClear}
@@ -314,8 +368,8 @@ export function AuditPanel() {
 
                 {/* Footer */}
                 <div className="flex items-center gap-2 px-4 py-2 border-t border-slate-700/60 shrink-0 text-[10px] text-slate-500">
-                    <Download className="w-3 h-3" />
-                    {t('audit.export_hint', 'Exports download the currently filtered entries — attach them to bug reports.')}
+                    <Copy className="w-3 h-3" />
+                    {t('audit.export_hint', 'Copy currently filtered entries as JSON or JSONL to clipboard for bug reports.')}
                 </div>
             </div>
             <div className="absolute inset-0 z-[-1]" onClick={() => setPanelOpen(false)} />

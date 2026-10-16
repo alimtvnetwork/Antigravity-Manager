@@ -85,10 +85,13 @@ pub fn discover_local_ssh_keys() -> Result<Vec<SshKeyRecord>, String> {
 }
 
 pub(crate) fn compute_key_fingerprint(pub_path: &Path) -> String {
-    if let Ok(out) = Command::new("ssh-keygen")
-        .args(["-lf", &pub_path.to_string_lossy()])
-        .output()
+    let mut cmd = Command::new("ssh-keygen");
+    #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    if let Ok(out) = cmd.args(["-lf", &pub_path.to_string_lossy()]).output() {
         if out.status.success() {
             let line = String::from_utf8_lossy(&out.stdout);
             let parts: Vec<&str> = line.split_whitespace().collect();
@@ -147,7 +150,13 @@ pub fn create_ssh_key(name: &str, comment: Option<&str>) -> Result<SshKeyRecord,
     );
     let eff_comment = comment.unwrap_or(&default_comment);
 
-    let out = Command::new("ssh-keygen")
+    let mut cmd = Command::new("ssh-keygen");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    let out = cmd
         .args([
             "-t",
             "ed25519",
@@ -231,7 +240,10 @@ pub fn copy_ssh_public_key(name: Option<&str>) -> Result<SshKeyRecord, String> {
 
     #[cfg(target_os = "windows")]
     {
-        if let Ok(mut child) = Command::new("clip").stdin(Stdio::piped()).spawn() {
+        use std::os::windows::process::CommandExt;
+        let mut clip_cmd = Command::new("clip");
+        clip_cmd.creation_flags(0x08000000);
+        if let Ok(mut child) = clip_cmd.stdin(Stdio::piped()).spawn() {
             if let Some(ref mut stdin) = child.stdin {
                 // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
                 crate::error::record_ignored(

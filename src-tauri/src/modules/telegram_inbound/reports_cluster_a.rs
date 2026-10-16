@@ -87,9 +87,14 @@ pub async fn format_node_scoped_prompts(args_str: &str) -> String {
     } else {
         // Query remote VM node via GitMap cluster
         let mut remote_prompts_info = String::new();
-        let cmd_out = Command::new("gitmap")
-            .args(["cluster", "exec", target_alias, "agm wpr --json"])
-            .output();
+        let mut cmd = Command::new("gitmap");
+        cmd.args(["cluster", "exec", target_alias, "agm wpr --json"]);
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x08000000);
+        }
+        let cmd_out = cmd.output();
 
         let mut has_remote_data = false;
         if let Ok(out) = cmd_out {
@@ -244,7 +249,14 @@ pub fn format_projects_list() -> String {
 pub async fn format_active_prompts_report() -> String {
     let agm_tree = repo_db::format_tree_view_telegram_html(200, true);
 
-    if let Ok(out) = Command::new("gitmap").args(["agy", "active"]).output() {
+    let mut cmd = Command::new("gitmap");
+    cmd.args(["agy", "active"]);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    if let Ok(out) = cmd.output() {
         let stdout = String::from_utf8_lossy(&out.stdout);
         if !stdout.trim().is_empty()
             && (stdout.contains("Active Running Prompts") || stdout.contains("CONVERSATION ID"))
@@ -264,7 +276,14 @@ pub async fn format_active_prompts_report() -> String {
 
 /// Format workspace prompt queues in GitMap style
 pub async fn format_prompt_queues_report() -> String {
-    if let Ok(out) = Command::new("gitmap").args(["agy", "queues"]).output() {
+    let mut cmd = Command::new("gitmap");
+    cmd.args(["agy", "queues"]);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    if let Ok(out) = cmd.output() {
         let stdout = String::from_utf8_lossy(&out.stdout);
         if !stdout.trim().is_empty()
             && (stdout.contains("Prompt Queues") || stdout.contains("queued"))

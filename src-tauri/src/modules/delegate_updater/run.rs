@@ -12,12 +12,83 @@ extern "system" {
     fn AllocConsole() -> i32;
 }
 
+#[cfg(target_os = "windows")]
+mod win32_console {
+    use std::os::raw::c_void;
+
+    const STD_OUTPUT_HANDLE: u32 = 0xFFFFFFF5;
+    const ENABLE_VIRTUAL_TERMINAL_PROCESSING: u32 = 0x0004;
+    const DISABLE_NEWLINE_AUTO_RETURN: u32 = 0x0008;
+
+    #[repr(C)]
+    #[allow(dead_code)]
+    struct COORD {
+        x: i16,
+        y: i16,
+    }
+
+    #[repr(C)]
+    #[allow(dead_code)]
+    struct CONSOLE_FONT_INFOEX {
+        cb_size: u32,
+        n_font: u32,
+        dw_font_size: COORD,
+        font_family: u32,
+        font_weight: u32,
+        face_name: [u16; 32],
+    }
+
+    extern "system" {
+        fn GetStdHandle(n_std_handle: u32) -> *mut c_void;
+        fn GetConsoleMode(h_console_handle: *mut c_void, lp_mode: *mut u32) -> i32;
+        fn SetConsoleMode(h_console_handle: *mut c_void, dw_mode: u32) -> i32;
+        fn SetCurrentConsoleFontEx(
+            h_console_output: *mut c_void,
+            b_maximum_window: i32,
+            lp_console_current_font_ex: *mut CONSOLE_FONT_INFOEX,
+        ) -> i32;
+        fn SetConsoleOutputCP(w_code_page_id: u32) -> i32;
+    }
+
+    pub fn setup_modern_console() {
+        unsafe {
+            // Set UTF-8 code page (65001)
+            SetConsoleOutputCP(65001);
+
+            let handle = GetStdHandle(STD_OUTPUT_HANDLE);
+            if !handle.is_null() {
+                // Enable ANSI virtual terminal processing
+                let mut mode: u32 = 0;
+                if GetConsoleMode(handle, &mut mode) != 0 {
+                    let new_mode =
+                        mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN;
+                    SetConsoleMode(handle, new_mode);
+                }
+
+                // Set 18pt modern Consolas font
+                let mut font_info: CONSOLE_FONT_INFOEX = std::mem::zeroed();
+                font_info.cb_size = std::mem::size_of::<CONSOLE_FONT_INFOEX>() as u32;
+                font_info.dw_font_size.y = 18; // 18pt font height
+                font_info.font_weight = 600; // Semi-bold
+                let face_name_utf16: Vec<u16> = "Consolas\0".encode_utf16().collect();
+                for (i, &c) in face_name_utf16.iter().enumerate() {
+                    if i < font_info.face_name.len() {
+                        font_info.face_name[i] = c;
+                    }
+                }
+                SetCurrentConsoleFontEx(handle, 0, &mut font_info);
+            }
+        }
+    }
+}
+
 pub fn run(args: &[String]) {
     #[cfg(target_os = "windows")]
     unsafe {
         if AttachConsole(0xFFFFFFFF) == 0 {
             AllocConsole();
         }
+        win32_console::setup_modern_console();
     }
 
     if args

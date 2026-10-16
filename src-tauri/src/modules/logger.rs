@@ -311,6 +311,27 @@ pub fn log_error(message: &str) {
     error!("{}", message);
 }
 
+/// Mask sensitive email addresses for logs, telemetry, and external notifications.
+/// Example: `riseup.asia.team@gmail.com` -> `rise***@***`
+pub fn mask_email(email: &str) -> String {
+    let trimmed = email.trim();
+    if trimmed.is_empty() {
+        return "***".to_string();
+    }
+    if let Some((local, _domain)) = trimmed.split_once('@') {
+        if local.len() <= 2 {
+            format!("{}***@***", &local[..1.min(local.len())])
+        } else {
+            let shown = 4.min(local.len().saturating_sub(2)).max(1);
+            format!("{}***@***", &local[..shown])
+        }
+    } else if trimmed.len() <= 3 {
+        "***".to_string()
+    } else {
+        format!("{}***", &trimmed[..3])
+    }
+}
+
 fn format_pid_value(process_pid: Option<u32>) -> String {
     match process_pid {
         Some(pid) => pid.to_string(),

@@ -299,11 +299,23 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
             target_project, inst_flag, prompt_text
         );
         let mut dispatched_gitmap = false;
-        let gm_out = Command::new("gitmap")
+        let mut gm_cmd1 = Command::new("gitmap");
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            gm_cmd1.creation_flags(0x08000000);
+        }
+        let gm_out = gm_cmd1
             .args(["cluster", "exec", &target_node, &remote_cmd])
             .output()
             .or_else(|_| {
-                Command::new("gitmap")
+                let mut gm_cmd2 = Command::new("gitmap");
+                #[cfg(target_os = "windows")]
+                {
+                    use std::os::windows::process::CommandExt;
+                    gm_cmd2.creation_flags(0x08000000);
+                }
+                gm_cmd2
                     .args(["ssh", "exec", &remote_cmd, "--node", &target_node])
                     .output()
             });

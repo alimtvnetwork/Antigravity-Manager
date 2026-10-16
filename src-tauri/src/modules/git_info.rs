@@ -7,6 +7,21 @@ pub fn get_app_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
+fn run_git_command(args: &[&str]) -> Option<String> {
+    let mut cmd = Command::new("git");
+    cmd.args(args);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    cmd.output()
+        .ok()
+        .and_then(|out| String::from_utf8(out.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
 /// Returns the short Git commit hash
 pub fn get_git_hash() -> String {
     if let Some(h) = option_env!("AGM_GIT_HASH") {
@@ -16,14 +31,7 @@ pub fn get_git_hash() -> String {
         }
     }
     // Runtime fallback if binary runs inside a git repository
-    Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .output()
-        .ok()
-        .and_then(|out| String::from_utf8(out.stdout).ok())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "unknown".to_string())
+    run_git_command(&["rev-parse", "--short", "HEAD"]).unwrap_or_else(|| "unknown".to_string())
 }
 
 /// Returns the active Git branch name
@@ -34,14 +42,7 @@ pub fn get_git_branch() -> String {
             return trimmed.to_string();
         }
     }
-    Command::new("git")
-        .args(["rev-parse", "--abbrev-ref", "HEAD"])
-        .output()
-        .ok()
-        .and_then(|out| String::from_utf8(out.stdout).ok())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "main".to_string())
+    run_git_command(&["rev-parse", "--abbrev-ref", "HEAD"]).unwrap_or_else(|| "main".to_string())
 }
 
 /// Returns the most recent release tag (e.g., v4.78.0)
@@ -52,13 +53,7 @@ pub fn get_last_release() -> String {
             return trimmed.to_string();
         }
     }
-    Command::new("git")
-        .args(["describe", "--tags", "--abbrev=0"])
-        .output()
-        .ok()
-        .and_then(|out| String::from_utf8(out.stdout).ok())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
+    run_git_command(&["describe", "--tags", "--abbrev=0"])
         .unwrap_or_else(|| format!("v{}", env!("CARGO_PKG_VERSION")))
 }
 
@@ -70,14 +65,7 @@ pub fn get_git_full_hash() -> String {
             return trimmed.to_string();
         }
     }
-    Command::new("git")
-        .args(["rev-parse", "HEAD"])
-        .output()
-        .ok()
-        .and_then(|out| String::from_utf8(out.stdout).ok())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(get_git_hash)
+    run_git_command(&["rev-parse", "HEAD"]).unwrap_or_else(get_git_hash)
 }
 
 /// Returns the official repository Git URL

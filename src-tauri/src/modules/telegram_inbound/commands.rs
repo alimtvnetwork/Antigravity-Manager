@@ -20,7 +20,13 @@ pub fn execute_gitmap_subcommand(args_str: &str) -> String {
         trimmed.split_whitespace().collect()
     };
 
-    let output_res = Command::new("gitmap").args(&parts).output();
+    let mut cmd = Command::new("gitmap");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    let output_res = cmd.args(&parts).output();
     match output_res {
         Ok(out) => {
             let stdout = String::from_utf8_lossy(&out.stdout);
@@ -95,7 +101,13 @@ pub fn execute_agm_subcommand(args_str: &str) -> String {
     }
 
     let bin = resolve_agm_binary();
-    match Command::new(&bin).args(&parts).output() {
+    let mut cmd = Command::new(&bin);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    match cmd.args(&parts).output() {
         Ok(out) => {
             let stdout = String::from_utf8_lossy(&out.stdout);
             let stderr = String::from_utf8_lossy(&out.stderr);

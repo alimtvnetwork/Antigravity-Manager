@@ -54,7 +54,6 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
     } = api;
 
     const [isEmailRevealed, setIsEmailRevealed] = useState(false);
-    const [isEmailHovered, setIsEmailHovered] = useState(false);
 
     const data = useInstanceCardData(inst, runningTreeNodes, actionState);
     const { boundAccount, displayEmail, geminiModel, weeklyQuota, hasActiveTask, effectiveExePath, currentAction, isBusy } =
@@ -216,8 +215,6 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                         e.stopPropagation();
                                         setIsEmailRevealed((prev) => !prev);
                                     }}
-                                    onMouseEnter={() => setIsEmailHovered(true)}
-                                    onMouseLeave={() => setIsEmailHovered(false)}
                                     className={cn(
                                         'px-1.5 py-0.5 rounded-md text-[11px] font-semibold font-mono border flex items-center gap-1 min-w-0 shadow-2xs transition-colors cursor-pointer',
                                         'bg-blue-500/10 text-blue-700 border-blue-500/30',
@@ -225,13 +222,13 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                     )}
                                     title={
                                         isEmailRevealed
-                                            ? `${displayEmail} (Click to mask)`
-                                            : `${displayEmail} (Hover or click to reveal)`
+                                            ? `${maskEmail(displayEmail)} (Click to mask)`
+                                            : `${maskEmail(displayEmail)} (Click to reveal)`
                                     }
                                 >
                                     <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-500 dark:bg-[#1af18d]" />
                                     <span className="truncate">
-                                        {isEmailRevealed || isEmailHovered ? displayEmail : maskEmail(displayEmail)}
+                                        {isEmailRevealed ? displayEmail : maskEmail(displayEmail)}
                                     </span>
                                 </button>
                             ) : (

@@ -69,8 +69,31 @@ pub async fn execute_profile_rotation_with_context(
 
     logger::log_info(&format!(
         "[AutoSwitcher] Rotating instance '{}' to account '{}' (email: {}, quota: {:.1}%). Reason: {}",
-        inst_id, target.account_id, target.email, target.quota_percent, reason
+        inst_id,
+        target.account_id,
+        crate::modules::logger::mask_email(&target.email),
+        target.quota_percent,
+        reason
     ));
+
+    crate::modules::audit::record_if_active(
+        "system",
+        "programmatic",
+        "auto_switcher::execute_rotation",
+        "instances | auto_switcher | rotation_executor",
+        serde_json::json!({
+            "instance_id": inst_id,
+            "from_account": ctx.as_ref().and_then(|c| c.previous_email.as_deref()).map(crate::modules::logger::mask_email),
+            "to_account": crate::modules::logger::mask_email(&target.email),
+            "previous_quota_4h": ctx.as_ref().and_then(|c| c.previous_quota_4h),
+            "target_quota_4h": target.quota_percent,
+            "backed_up_prompts": backed_up_count,
+            "auto_resume": has_auto_resume,
+            "reason": reason
+        }),
+        "ok",
+        "",
+    );
 
     // Step 2: Trigger unified Email and Telegram notifications before switch
     let prev_email = ctx
@@ -290,7 +313,9 @@ pub async fn execute_profile_rotation_with_context(
     } else {
         logger::log_info(&format!(
             "[AutoSwitcher] Same-instance rotation on '{}' to account '{}' (email '{}')",
-            current_instance_id, target.account_id, target.email
+            current_instance_id,
+            target.account_id,
+            crate::modules::logger::mask_email(&target.email)
         ));
         if inst_id == "default" {
             // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run

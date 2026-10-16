@@ -56,6 +56,12 @@ pub struct AppConfig {
     pub thinking_cleanup_dismissed: Option<bool>, // [NEW] 用户是否已确认/忽略该建议
     #[serde(default)]
     pub dismissed_thinking_cleanup_version: Option<String>, // [NEW] 用户已确认或忽略建议的目标版本号
+    #[serde(default = "default_max_backup_prompts")]
+    pub max_backup_prompts: usize,
+}
+
+fn default_max_backup_prompts() -> usize {
+    100
 }
 
 fn default_auto_sync() -> bool {
@@ -253,6 +259,7 @@ impl AppConfig {
             suggestion_delete_thinking_store: None,
             thinking_cleanup_dismissed: None,
             dismissed_thinking_cleanup_version: None,
+            max_backup_prompts: 100,
         }
     }
 }
@@ -349,6 +356,12 @@ pub struct AutoProfileSwitcherConfig {
     pub pro_tier_multiplier: f64,
     #[serde(default = "default_free_tier_multiplier")]
     pub free_tier_multiplier: f64,
+    #[serde(default = "default_max_backup_prompts_u32")]
+    pub max_backup_prompts: u32,
+}
+
+fn default_max_backup_prompts_u32() -> u32 {
+    100
 }
 
 impl Default for AutoProfileSwitcherConfig {
@@ -377,6 +390,7 @@ impl Default for AutoProfileSwitcherConfig {
             ultra_tier_multiplier: 4.0,
             pro_tier_multiplier: 2.0,
             free_tier_multiplier: 1.0,
+            max_backup_prompts: 100,
         }
     }
 }

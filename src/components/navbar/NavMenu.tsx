@@ -212,7 +212,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
                                 className="w-full px-3 py-2 text-left text-xs flex items-center gap-2.5 rounded-lg hover:bg-blue-50/80 dark:hover:bg-blue-900/25 transition-colors cursor-pointer text-gray-700 dark:text-gray-300 group"
                                 title={t('nav.check_for_updates_title', 'Check for a new version now')}
                             >
-                                <Download className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400 group-hover:animate-bounce" />
+                                <Download className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400 transition-transform duration-300 ease-out group-hover:-translate-y-0.5 group-hover:scale-110" />
                                 <span className="font-semibold text-blue-600 dark:text-blue-400">{t('nav.check_for_updates', 'Check for Updates')}</span>
                             </button>
                         </div>

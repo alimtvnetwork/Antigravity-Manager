@@ -94,6 +94,14 @@ pub async fn check_and_rotate_with_options(
             bound_acc.quota = Some(fresh_quota);
             // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
             crate::error::record_ignored(account::save_account(&bound_acc), "save_account");
+            if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
+                use tauri::Emitter;
+                // Justification: best-effort frontend event; a dropped event only skips a UI refresh
+                crate::error::record_ignored(
+                    handle.emit("accounts://refreshed", ()),
+                    "emit accounts://refreshed",
+                );
+            }
         }
 
         let period_status = evaluate_account_period_status(

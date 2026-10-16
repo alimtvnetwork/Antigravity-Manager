@@ -348,27 +348,25 @@ pub async fn switch_account_to_instance(
             })?;
     }
 
-    // 4b. Verify the relaunched IDE actually materialized. A spawn() that
-    // returns Ok does not guarantee a running window; without this check a
-    // stillborn relaunch reports success while the user sees nothing reopen.
-    if !crate::modules::instance::verify_instance_relaunched(
-        &instance.id,
-        &instance.data_dir,
-        instance.pid,
-    ) {
-        let err_msg = format!(
-            "Account switched for '{}', but the relaunched IDE did not appear within 15s. Credentials were injected; launch the instance manually.",
-            instance.id
+    // 4b & 4c. Verify the relaunched IDE materialized and dismiss security notice in detached background task
+    // Unblocks the command immediately to achieve <3s UI responsiveness
+    let verify_inst_id = instance.id.clone();
+    let verify_data_dir = instance.data_dir.clone();
+    let verify_pid = instance.pid;
+    let cdp_email = account.email.clone();
+    tauri::async_runtime::spawn(async move {
+        let relaunched = crate::modules::instance::verify_instance_relaunched(
+            &verify_inst_id,
+            &verify_data_dir,
+            verify_pid,
         );
-        crate::modules::logger::log_error(&format!("[INSTANCE_SWITCH:ERROR] {}", err_msg));
-        return Err(err_msg);
-    }
-
-    // 4c. Automatically uncheck the Interactions data-sharing checkbox and click
-    // "Accept and continue" on the "Security Notice & Data Use" modal if shown.
-    {
-        let cdp_data_dir = std::path::PathBuf::from(&instance.data_dir);
-        let cdp_email = account.email.clone();
+        if !relaunched {
+            crate::modules::logger::log_warn(&format!(
+                "[INSTANCE_SWITCH:ASYNC_VERIFY] Instance '{}' did not appear within 15s verification window",
+                verify_inst_id
+            ));
+        }
+        let cdp_data_dir = std::path::PathBuf::from(&verify_data_dir);
         let dismissed = tokio::task::spawn_blocking({
             let data_dir = cdp_data_dir.clone();
             let email = cdp_email.clone();
@@ -389,7 +387,7 @@ pub async fn switch_account_to_instance(
                 std::time::Duration::from_secs(20),
             );
         }
-    }
+    });
 
     let target_inst_id = instance.id.clone();
     let workspace_roots = crate::modules::instance::get_instance_workspace_paths(&target_inst_id);

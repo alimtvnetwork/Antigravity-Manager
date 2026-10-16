@@ -40,6 +40,7 @@ pub(crate) async fn dispatch_telegram_switch_alert(
     };
 
     let selected_clean = details.selected_email.trim();
+    let selected_masked = crate::modules::logger::mask_email(&details.selected_email);
     let from_display = details
         .previous_email
         .as_deref()
@@ -49,7 +50,8 @@ pub(crate) async fn dispatch_telegram_switch_alert(
                 && !s.eq_ignore_ascii_case("default")
                 && !s.eq_ignore_ascii_case(selected_clean)
         })
-        .unwrap_or("(none / standby)");
+        .map(|s| crate::modules::logger::mask_email(s))
+        .unwrap_or_else(|| "(none / standby)".to_string());
 
     let prev_4h_str = details
         .previous_quota_4h
@@ -167,7 +169,7 @@ pub(crate) async fn dispatch_telegram_switch_alert(
         escape_telegram_html(&m_name),
         escape_telegram_html(&m_ip),
         escape_telegram_html(&details.instance_name),
-        escape_telegram_html(&details.selected_email)
+        escape_telegram_html(&selected_masked)
     );
 
     let prompt_section = if !prompt_preview_text.is_empty() {
@@ -204,7 +206,7 @@ pub(crate) async fn dispatch_telegram_switch_alert(
         escape_telegram_html(&from_display),
         escape_telegram_html(&prev_4h_str),
         escape_telegram_html(&prev_weekly_str),
-        escape_telegram_html(&details.selected_email),
+        escape_telegram_html(&selected_masked),
         escape_telegram_html(&target_4h_str),
         escape_telegram_html(&target_weekly_str),
         escape_telegram_html(&threshold_display),

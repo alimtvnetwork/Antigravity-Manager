@@ -13,16 +13,38 @@ export interface ToastItem {
 let toastCounter = 0;
 let addToastExternal: ((message: string, type: ToastType, duration?: number) => void) | null = null;
 
-export const showToast = (message: string, type: ToastType = 'info', duration: number = 3000) => {
+export interface ShowToastOptions {
+    message: string;
+    type?: ToastType;
+    duration?: number;
+}
+
+export const showToast = (
+    messageOrOptions: string | ShowToastOptions,
+    type: ToastType = 'info',
+    duration: number = 3000
+) => {
+    let messageText: string;
+    let finalType: ToastType = type;
+    let finalDuration: number = duration;
+
+    if (typeof messageOrOptions === 'object' && messageOrOptions !== null) {
+        messageText = messageOrOptions.message;
+        if (messageOrOptions.type) finalType = messageOrOptions.type;
+        if (messageOrOptions.duration !== undefined) finalDuration = messageOrOptions.duration;
+    } else {
+        messageText = messageOrOptions;
+    }
+
     if (addToastExternal) {
-        addToastExternal(message, type, duration);
+        addToastExternal(messageText, finalType, finalDuration);
     } else {
         console.warn('ToastContainer not mounted');
         // Tracked in the error module; toast requested before container mounted (dev-time ordering issue).
         useErrorStore.getState().trackWarning('ToastContainer not mounted when showToast called', {
-          source: 'ToastContainer.showToast',
-          triggerAction: 'show_toast',
-          context: { message: String(message).slice(0, 200) },
+            source: 'ToastContainer.showToast',
+            triggerAction: 'show_toast',
+            context: { message: String(messageText).slice(0, 200) },
         });
     }
 };

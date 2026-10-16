@@ -105,6 +105,7 @@ export function useSettingsState() {
         hidden_menu_items: [],  // Menu display settings: do not hide any menu items by default
         instance_clone_mode: 'full',
         instance_card_max_projects: 3,
+        max_backup_prompts: 100,
         auto_profile_switcher: {
             is_enabled: true,
             check_interval_seconds: 60,
@@ -252,6 +253,7 @@ export function useSettingsState() {
                 },
                 training_api_enabled: config.training_api_enabled ?? false,
                 instance_card_max_projects: config.instance_card_max_projects ?? 3,
+                max_backup_prompts: config.max_backup_prompts ?? 100,
             });
         }
     }, [config]);

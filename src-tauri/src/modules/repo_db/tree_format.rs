@@ -300,13 +300,23 @@ pub fn prompt_target_by_sequence_scoped(
             inst_flag,
             escaped_prompt
         );
-        let output = std::process::Command::new("gitmap")
+        let mut cmd1 = std::process::Command::new("gitmap");
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd1.creation_flags(0x08000000);
+        }
+        let output = cmd1
             .args(["ssh", "exec", &remote_cmd, "--node", node])
             .output()
             .or_else(|_| {
-                std::process::Command::new("gitmap")
-                    .args(["ssh", "exec", &remote_cmd])
-                    .output()
+                let mut cmd2 = std::process::Command::new("gitmap");
+                #[cfg(target_os = "windows")]
+                {
+                    use std::os::windows::process::CommandExt;
+                    cmd2.creation_flags(0x08000000);
+                }
+                cmd2.args(["ssh", "exec", &remote_cmd]).output()
             })
             .map_err(|e| format!("Failed to delegate prompt to SSH node '{}': {}", node, e))?;
 

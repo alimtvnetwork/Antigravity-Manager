@@ -200,5 +200,64 @@ pub fn backup_active_running_prompts_for_instance(
         records.push(record);
     }
 
+    let app_config = crate::modules::config::load_app_config().unwrap_or_default();
+    let cap = if app_config.max_backup_prompts > 0 {
+        app_config.max_backup_prompts
+    } else if app_config.auto_profile_switcher.max_backup_prompts > 0 {
+        app_config.auto_profile_switcher.max_backup_prompts as usize
+    } else {
+        100
+    };
+    // Justification: retention cleanup failure is non-fatal; logged and retried next backup
+    crate::error::record_ignored(
+        enforce_max_backup_prompts_cap(&conn, cap),
+        "enforce_max_backup_prompts_cap",
+    );
+
     Ok((batch_info, records))
+}
+
+/// Enforce FIFO retention cap on prompt_backups table
+pub fn enforce_max_backup_prompts_cap(conn: &Connection, max_cap: usize) -> Result<usize, String> {
+    if max_cap == 0 {
+        return Ok(0);
+    }
+
+    let total_count: usize = conn
+        .query_row("SELECT COUNT(*) FROM prompt_backups", [], |r| r.get(0))
+        .unwrap_or(0);
+
+    if total_count <= max_cap {
+        return Ok(0);
+    }
+
+    let deleted = conn
+        .execute(
+            "DELETE FROM prompt_backups 
+             WHERE id NOT IN (
+                 SELECT id FROM prompt_backups 
+                 ORDER BY created_at DESC, id DESC 
+                 LIMIT ?1
+             )",
+            params![max_cap as i64],
+        )
+        .map_err(|e| format!("Failed to prune prompt backups to cap {}: {}", max_cap, e))?;
+
+    // Prune orphaned backup_batches
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(
+        conn.execute(
+            "DELETE FROM backup_batches 
+             WHERE id NOT IN (SELECT DISTINCT backup_batch_id FROM prompt_backups)",
+            [],
+        ),
+        "prune orphaned backup_batches",
+    );
+
+    crate::modules::logger::log_info(&format!(
+        "[BackupPrompts] Enforced max cap {}: pruned {} older backup records (total was {})",
+        max_cap, deleted, total_count
+    ));
+
+    Ok(deleted)
 }

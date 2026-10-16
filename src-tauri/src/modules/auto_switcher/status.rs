@@ -202,8 +202,14 @@ pub fn start_auto_switcher() {
                     None => Some(q),
                 });
             let stage = determine_quota_stage(lowest_monitored_quota, &switcher_cfg).to_string();
-            let interval_secs =
+            let has_running_instances = cur_status.monitored_instances.iter().any(|i| i.is_running);
+            let mut interval_secs =
                 calculate_next_interval_seconds(lowest_monitored_quota, &switcher_cfg) as u64;
+
+            // Invariant: when an instance is actively running, clamp quota polling between 30s and 50s
+            if has_running_instances {
+                interval_secs = interval_secs.clamp(30, 50);
+            }
 
             let now = chrono::Utc::now().timestamp();
             let next_check_timestamp = now + interval_secs as i64;

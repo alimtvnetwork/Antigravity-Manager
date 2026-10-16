@@ -55,7 +55,13 @@ pub fn parse_gitmap_cluster_status(output: &str) -> Vec<ClusterNodeInfo> {
 
 /// Query GitMap cluster nodes via CLI
 pub fn query_gitmap_cluster_nodes() -> Vec<ClusterNodeInfo> {
-    let output_res = Command::new("gitmap").args(["cluster", "status"]).output();
+    let mut cmd = Command::new("gitmap");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    let output_res = cmd.args(["cluster", "status"]).output();
     if let Ok(out) = output_res {
         let stdout = String::from_utf8_lossy(&out.stdout);
         let parsed = parse_gitmap_cluster_status(&stdout);

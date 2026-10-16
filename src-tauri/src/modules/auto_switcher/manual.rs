@@ -24,8 +24,6 @@ pub async fn trigger_manual_rotation_for_instance(
         crate::modules::backup_prompts_db::backup_active_running_prompts(Some(&inst_id), None),
         "backup_active_running_prompts",
     );
-    let in_use_account_ids = get_active_in_use_account_ids();
-
     let registry = instance::load_registry()?;
     let current_bound = registry
         .instances
@@ -34,7 +32,7 @@ pub async fn trigger_manual_rotation_for_instance(
         .and_then(|i| i.bound_account_id.clone())
         .or_else(|| account::get_current_account_id().ok().flatten());
 
-    let mut excluded: Vec<String> = in_use_account_ids;
+    let mut excluded: Vec<String> = Vec::new();
     if let Some(ref curr) = current_bound {
         if !excluded.contains(curr) {
             excluded.push(curr.clone());
@@ -45,12 +43,18 @@ pub async fn trigger_manual_rotation_for_instance(
             }
         }
     }
-    if let Ok(Some(curr_acc)) = account::get_current_account() {
-        if !excluded.contains(&curr_acc.id) {
-            excluded.push(curr_acc.id.clone());
-        }
-        if !excluded.contains(&curr_acc.email) {
-            excluded.push(curr_acc.email.clone());
+    for inst in &registry.instances {
+        if inst.id != inst_id && instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid) {
+            if let Some(ref acc_id) = inst.bound_account_id {
+                if !excluded.contains(acc_id) {
+                    excluded.push(acc_id.clone());
+                }
+                if let Ok(acc) = account::load_account(acc_id) {
+                    if !excluded.contains(&acc.email) {
+                        excluded.push(acc.email.clone());
+                    }
+                }
+            }
         }
     }
 
