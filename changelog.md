@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.216.2] - 2026-10-17
+
+### Fixed
+- **Build fix**: `ui_cmds.rs` passed 8 arguments to `audit::append_entry` after the audit stack-trace change added a 9th `stack_trace: Option<&str>` parameter. Passing `None` for the CLI path (E0061 broke the v4.216.1 build). (Thanks to @aukgit)
+
+---
+
 ## [v4.216.1] - 2026-10-17
 
 ### Fixed
@@ -441,6 +448,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.216.2 (2026-10-17)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.216.1 (2026-10-17)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

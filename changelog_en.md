@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.216.2 (2026-10-17)**:
+        -   **[Build] Fix `append_entry` arity in `ui_cmds.rs` (Thanks to @aukgit)**:
+            -   **Description**: `ui_cmds.rs` passed 8 arguments to `audit::append_entry` after the audit stack-trace change added a 9th `stack_trace` parameter (E0061 broke the v4.216.1 build); CLI path now passes `None`.
+
     *   **v4.216.1 (2026-10-17)**:
         -   **[Build] Fix `JoinHandle` type mismatch (Thanks to @aukgit)**:
             -   **Description**: `post_switch_resume.rs` stored `tokio::task::JoinHandle` in the timer registry but `tauri::async_runtime::spawn` returns `tauri::async_runtime::JoinHandle` (E0308 broke the v4.216.0 build); registry now uses the tauri handle type.

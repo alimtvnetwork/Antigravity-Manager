@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.216.1)
+> Professional AI Account Management & Protocol Proxy System (v4.216.2)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.216.1-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.216.2-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -506,6 +506,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
+> Latest version **v4.216.2**: Build fix — `ui_cmds.rs` now passes `None` for the new `stack_trace` parameter of `audit::append_entry` (E0061 broke the v4.216.1 build). (Thanks to @aukgit)
 > Latest version **v4.216.1**: Build fix — `post_switch_resume.rs` timer registry now uses `tauri::async_runtime::JoinHandle` to match the `tauri::async_runtime::spawn` return type (E0308 broke the v4.216.0 build). (Thanks to @aukgit)
 > Latest version **v4.216.0**: Post-switch prompt resume (~10s, configurable, cancellable) rides the RCA-15 restore pipeline; durable prompt backup re-sendable later via `agm prompts resend-queued` CLI or the UI button (FIFO, deduplicated); rerun section in the prompts tree send area (count selector, "is it done?" / "is it published?" / randomized messages); audit entries now capture stack traces (function + file + line, Rust and frontend). (Thanks to @aukgit)
 > Latest version **v4.215.1**: Telegram `/expand` format-string fix; same Telegram enhancements as v4.215.0 on a green tree. (Thanks to @aukgit)
