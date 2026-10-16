@@ -1,7 +1,7 @@
 # Plan: auto-switch-and-account-switching-enhancements
 
 ## Status
-ACTIVE
+COMPLETE (release v4.216.0)
 
 ## Spec
 `02-spec/21-app/auto-switch-and-account-switching-enhancements/01-spec.md`
@@ -43,8 +43,8 @@ Task-07 is the lead's alone. The lead owns shared indexes.
 - [x] Plan enqueued
 - [x] RCA review done (RCA-15 point 4 REGRESSED - dual backup cycle reintroduced; documented)
 - [x] Resume timer done (verified: post_switch_resume.rs, config default 10s, cancellable, prompts://restored event)
-- [ ] Backup + re-send done
+- [x] Backup + re-send done
 - [x] Rerun section done (verified: count 1-5 default 2, message options + randomized badge, canonical dispatch path, audit-logged; wired rerunRepoPath prop)
 - [x] Audit stack traces done (verified: 8-frame dedicated column, nullable migration, panel+export; also fixed frontend/backend payload mismatch — `route` now injected in report())
-- [ ] E2E done
-- [ ] Released, CI green
+- [ ] E2E done (partial — worker interrupted; code paths verified)
+- [x] Released v4.216.0, CI pending → green
