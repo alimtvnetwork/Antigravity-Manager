@@ -194,5 +194,6 @@ pub use tuning::{
 };
 pub use workspace::{
     get_instance_workspace_folders, get_instance_workspace_paths, migrate_instance_workspaces,
-    restore_and_inject_prompts_for_instance, snapshot_active_workspaces,
+    restore_and_inject_prompts_for_instance, schedule_prompt_restore_after_launch,
+    snapshot_active_workspaces,
 };

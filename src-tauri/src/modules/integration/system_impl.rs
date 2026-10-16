@@ -236,36 +236,10 @@ impl SystemIntegration for DesktopIntegration {
         // STEP 5: Re-Inject the Backed-Up Running Prompts (Asynchronous 5-Second Post-Launch Restoration)
         // =========================================================================
         if needs_reinject {
-            tauri::async_runtime::spawn(async move {
-                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                crate::modules::logger::log_info(
-                    "[Desktop] [Step 5/5] 5s post-launch delay elapsed. Restoring prompts for instance default",
-                );
-                let workspace_roots =
-                    crate::modules::instance::get_instance_workspace_paths("default");
-                // Justification: post-launch prompt restore runs detached; failures are logged and retried by the scheduler
-                crate::error::record_ignored(
-                    crate::modules::instance::restore_and_inject_prompts_for_instance(
-                        "default",
-                        &workspace_roots,
-                    ),
-                    "restore and inject prompts after relaunch",
-                );
-                // Justification: post-launch prompt restore runs detached; failures are logged and retried by the scheduler
-                crate::error::record_ignored(
-                    crate::modules::backup_prompts_db::restore_running_prompts_for_instance(
-                        Some("default"),
-                        false,
-                        None,
-                    ),
-                    "restore running prompts from backup after relaunch",
-                );
-                // Justification: post-launch prompt restore runs detached; failures are logged and retried by the scheduler
-                crate::error::record_ignored(
-                    crate::modules::repo_db::dispatch_running_prompts("default"),
-                    "dispatch running prompts after relaunch",
-                );
-            });
+            crate::modules::logger::log_info(
+                "[Desktop] [Step 5/5] Scheduling 5s post-launch prompt restore for instance default",
+            );
+            crate::modules::instance::schedule_prompt_restore_after_launch("default".to_string());
             note_prompt_reinjected(true);
         } else {
             crate::modules::logger::log_info(

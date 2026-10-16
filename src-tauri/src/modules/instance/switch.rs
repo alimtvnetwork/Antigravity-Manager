@@ -392,22 +392,25 @@ pub async fn switch_account_to_instance(
     });
 
     let target_inst_id = instance.id.clone();
-    let workspace_roots = crate::modules::instance::get_instance_workspace_paths(&target_inst_id);
-    let dispatched_now = crate::modules::instance::restore_and_inject_prompts_for_instance(
-        &target_inst_id,
-        &workspace_roots,
-    )
-    .unwrap_or(0);
-    crate::modules::logger::log_info(&format!(
-        "[INSTANCE_SWITCH:STAGE_5_RESTORE] Restored and dispatched {} prompts for instance '{}'",
-        dispatched_now, target_inst_id
-    ));
+    let channel_wait = crate::modules::repo_db::needs_prompt_channel_wait(backed_up_count);
+    if channel_wait {
+        crate::modules::logger::log_info(&format!(
+            "[INSTANCE_SWITCH:STAGE_5_RESTORE] Scheduling prompt restore for instance '{}' after the IDE is up ({} backed up)",
+            target_inst_id, backed_up_count
+        ));
+        crate::modules::instance::schedule_prompt_restore_after_launch(target_inst_id.clone());
+    } else {
+        crate::modules::logger::log_info(&format!(
+            "[INSTANCE_SWITCH:STAGE_5_RESTORE] No backed-up prompt for instance '{}'",
+            target_inst_id
+        ));
+    }
 
     let restore_step = crate::modules::task_history_db::SwitchRestoreStep {
         method: "resume_task_json + sync_agy_prompt_restore".to_string(),
         restored_count: backed_up_count,
-        dispatched_count: dispatched_now,
-        prompt_channel_waited: false,
+        dispatched_count: 0,
+        prompt_channel_waited: channel_wait,
         success: true,
     };
 
@@ -522,7 +525,7 @@ pub async fn switch_account_to_instance(
             prompt_id: snap.prompt_id,
             prompt_text: snap.prompt_text,
             conversation_id: snap.conversation_id,
-            prompt_reinjected: backed_up_count > 0 || dispatched_now > 0,
+            prompt_reinjected: channel_wait,
             switch_ok: true,
             instance_id: instance.id.clone(),
             ide_type: "antigravity".to_string(),

@@ -12,6 +12,11 @@ use rusqlite::Connection;
 use std::fs;
 use std::path::PathBuf;
 
+/// True only when `agy` accepted the prompt. A resume file on disk is not enough.
+pub(crate) fn prompt_push_landed(agy_ok: bool) -> bool {
+    agy_ok
+}
+
 /// Directly dispatch/send backed-up prompts to the running projects without queuing
 pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
     let conn = connect_db()?;
@@ -147,12 +152,16 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
                 prompt.id
             ));
         }
-        let same_conversation = prompt
-            .session_id
-            .as_deref()
-            .map(|id| !id.trim().is_empty())
-            .unwrap_or(false);
-        if sent.is_err() && !(file_written && same_conversation) {
+        // The resume file is only a hint. A written file with a session id is not
+        // proof the IDE continued the prompt. Leave the row backed_up so the
+        // post-launch retry can push it once the process is accepting input.
+        if !prompt_push_landed(sent.is_ok()) {
+            if file_written {
+                crate::modules::logger::log_warn(&format!(
+                    "[RepoDB] Prompt '{}' resume file was written but agy did not accept it; left backed_up",
+                    prompt.id
+                ));
+            }
             crate::modules::logger::log_error(&format!(
                 "[RepoDB] Prompt '{}' was not re-pushed for instance '{}'; left backed_up",
                 prompt.id, instance_id
@@ -294,5 +303,11 @@ mod tests {
             )
             .unwrap();
         assert_eq!(status_after, "dispatched");
+    }
+
+    #[test]
+    fn resume_file_without_agy_does_not_count_as_restored() {
+        assert!(!prompt_push_landed(false));
+        assert!(prompt_push_landed(true));
     }
 }

@@ -99,6 +99,11 @@ pub fn restore_and_inject_prompts_for_instance(
         crate::modules::repo_db::resend_running_commands_for_instance(Some(instance_id), 20)
             .unwrap_or_default();
     let dispatched = crate::modules::repo_db::dispatch_running_prompts(instance_id).unwrap_or(0);
+    let pushed = resent.len() + dispatched;
+    // A failed push must leave the backup rows unrestored so the 5s retry can run.
+    if pushed == 0 {
+        return Ok(0);
+    }
     // Justification: background restore; marks prompt_backups rows as restored without resetting active_prompts back to backed_up
     if let Ok(conn) = crate::modules::backup_prompts_db::connect_db() {
         let now = chrono::Utc::now().timestamp();
@@ -112,7 +117,76 @@ pub fn restore_and_inject_prompts_for_instance(
     }
     // Justification: intentionally discards the ensured-goals count; the function is infallible and the scheduler re-verifies on its next tick
     let _ = crate::modules::repo_db::ensure_prompt_goals_running_for_instance(instance_id);
-    Ok(resent.len() + dispatched)
+    Ok(pushed)
+}
+
+/// Re-push backed-up prompts after the IDE process can accept them.
+/// Waits the post-launch 5s, then until the prompt channel is up, then sends once.
+/// A zero-count push is retried once. The row stays `backed_up` until `agy` accepts it.
+pub fn schedule_prompt_restore_after_launch(instance_id: String) {
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        let first = match tokio::task::spawn_blocking({
+            let instance_id = instance_id.clone();
+            move || push_backed_up_prompts_after_channel(&instance_id)
+        })
+        .await
+        {
+            Ok(count) => count,
+            Err(err) => {
+                crate::modules::logger::log_error(&format!(
+                    "[INSTANCE_SWITCH:STAGE_5_RESTORE] Prompt restore task failed for '{instance_id}': {err}"
+                ));
+                0
+            }
+        };
+        if first > 0 {
+            return;
+        }
+        crate::modules::logger::log_warn(&format!(
+            "[INSTANCE_SWITCH:STAGE_5_RESTORE] No prompt landed for '{instance_id}' on the first post-launch push; retrying once"
+        ));
+        tokio::time::sleep(std::time::Duration::from_secs(7)).await;
+        // Justification: detached retry; a join failure is logged and the prompt stays backed_up
+        crate::error::record_ignored(
+            tokio::task::spawn_blocking(move || push_backed_up_prompts_after_channel(&instance_id))
+                .await,
+            "retry prompt restore after relaunch",
+        );
+    });
+}
+
+fn push_backed_up_prompts_after_channel(instance_id: &str) -> usize {
+    crate::modules::logger::log_info(&format!(
+        "[INSTANCE_SWITCH:STAGE_5_RESTORE] Post-launch delay elapsed for instance '{instance_id}'"
+    ));
+    crate::modules::instance::wait_for_instance_prompt_channel(instance_id);
+    let before = crate::modules::repo_db::count_backed_up_prompts(instance_id);
+    // Rehydrate the snapshot first. A failed agy push leaves the row backed_up.
+    // Justification: backup rows are the snapshot; a failed read leaves the active_prompts row for dispatch
+    crate::error::record_ignored(
+        crate::modules::backup_prompts_db::restore_running_prompts_for_instance(
+            Some(instance_id),
+            false,
+            None,
+        ),
+        "restore running prompts from backup after relaunch",
+    );
+    let dispatched = match crate::modules::repo_db::dispatch_running_prompts(instance_id) {
+        Ok(count) => count,
+        Err(err) => {
+            crate::modules::logger::log_error(&format!(
+                "[INSTANCE_SWITCH:STAGE_5_RESTORE] Dispatch failed for '{instance_id}': {err}"
+            ));
+            0
+        }
+    };
+    let after = crate::modules::repo_db::count_backed_up_prompts(instance_id);
+    let pushed = dispatched.max(before.saturating_sub(after));
+    crate::modules::logger::log_info(&format!(
+        "[INSTANCE_SWITCH:STAGE_5_RESTORE] Re-pushed {pushed} prompt(s) for instance '{instance_id}' ({before} backed up before, {after} still backed up)"
+    ));
+    pushed
 }
 
 /// Snapshot all currently open or registered workspace project directories for an instance.
