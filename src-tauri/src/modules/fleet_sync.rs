@@ -855,4 +855,70 @@ mod tests {
         assert_eq!(parsed.email_quotas.unwrap().len(), 1);
         assert_eq!(parsed.switch_signals.unwrap().len(), 1);
     }
+
+    #[test]
+    fn test_fleet_sync_e2e_ingest_and_query_pipeline() {
+        let sample_payload = r##"{
+            "schema": "agm-fleet-sync-v1.0",
+            "message_type": "heartbeat",
+            "node": {
+                "node_id": "test-e2e-node-99",
+                "node_alias": "E2E Worker Machine",
+                "local_ip": "192.168.1.99",
+                "os_info": "windows 11 x86_64",
+                "agm_version": "4.207.0",
+                "uptime_seconds": 3600,
+                "is_online": true,
+                "last_heartbeat_at": 1729051200,
+                "sync_transport": "telegram"
+            },
+            "instance_count": 2,
+            "instances": [
+                {
+                    "instance_id": "inst-alpha",
+                    "instance_name": "#1 Main Instance",
+                    "bound_email": "alpha@example.com",
+                    "quota_percent": 94.5,
+                    "is_running": true,
+                    "active_prompts_count": 1,
+                    "assigned_project": "Antigravity-Manager",
+                    "memory_mb": 420.0
+                }
+            ],
+            "email_quotas": [
+                {"email": "alpha@example.com", "quota_percent": 94.5}
+            ],
+            "switch_signals": [
+                {"auto_switcher_enabled": true, "target_model": "gemini-2.5-pro"}
+            ],
+            "fast_forward_signals": [
+                {"auto_fast_forward_on_critical": true}
+            ],
+            "workspaces": [
+                {"workspace_name": "Antigravity-Manager", "project_path": "d:/work/Antigravity-Manager", "running_prompts": 1}
+            ],
+            "timestamp": 1729051200
+        }"##;
+
+        // Ingest over Telegram transport
+        let res = ingest_fleet_sync_payload(sample_payload, "telegram");
+        assert!(
+            res.is_ok(),
+            "Failed to ingest fleet sync payload: {:?}",
+            res.err()
+        );
+
+        // Query summary machines
+        let machines = get_fleet_summary_machines().expect("Failed to get fleet summary machines");
+        let found = machines.iter().find(|m| m.node_id == "test-e2e-node-99");
+        assert!(
+            found.is_some(),
+            "Node test-e2e-node-99 should be present in fleet summary"
+        );
+
+        let node = found.unwrap();
+        assert_eq!(node.node_alias, "E2E Worker Machine");
+        assert_eq!(node.local_ip, "192.168.1.99");
+        assert_eq!(node.sync_transport, "telegram");
+    }
 }
