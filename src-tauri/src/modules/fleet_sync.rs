@@ -62,6 +62,14 @@ pub struct FleetSyncPayload {
     #[serde(default)]
     pub workspaces: Vec<FleetWorkspaceSync>,
     pub timestamp: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instance_count: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub email_quotas: Option<Vec<serde_json::Value>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub switch_signals: Option<Vec<serde_json::Value>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fast_forward_signals: Option<Vec<serde_json::Value>>,
 }
 
 fn default_schema() -> String {
@@ -165,10 +173,187 @@ pub fn init_db(conn: &Connection) -> Result<(), rusqlite::Error> {
     Ok(())
 }
 
+/// Helper to extract clean JSON substring from potential Markdown blocks or surrounding telemetry text
+pub fn extract_json_envelope(raw: &str) -> &str {
+    let trimmed = raw.trim();
+    let s = if let Some(stripped) = trimmed.strip_prefix("```json") {
+        stripped.strip_suffix("```").unwrap_or(stripped).trim()
+    } else if let Some(stripped) = trimmed.strip_prefix("```") {
+        stripped.strip_suffix("```").unwrap_or(stripped).trim()
+    } else {
+        trimmed
+    };
+
+    if let (Some(start), Some(end)) = (s.find('{'), s.rfind('}')) {
+        if start <= end {
+            return &s[start..=end];
+        }
+    }
+    s
+}
+
+fn synthesize_node_info(v: &serde_json::Value) -> FleetNodeInfo {
+    let node_id = v
+        .get("node_id")
+        .and_then(|s| s.as_str())
+        .unwrap_or("remote-node")
+        .to_string();
+    let node_alias = v
+        .get("node_alias")
+        .or_else(|| v.get("alias"))
+        .or_else(|| v.get("machine_name"))
+        .and_then(|s| s.as_str())
+        .unwrap_or(&node_id)
+        .to_string();
+    let local_ip = v
+        .get("local_ip")
+        .or_else(|| v.get("ip"))
+        .and_then(|s| s.as_str())
+        .unwrap_or("127.0.0.1")
+        .to_string();
+    let os_info = v
+        .get("os_info")
+        .or_else(|| v.get("os"))
+        .and_then(|s| s.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let agm_version = v
+        .get("agm_version")
+        .or_else(|| v.get("version"))
+        .and_then(|s| s.as_str())
+        .unwrap_or(env!("CARGO_PKG_VERSION"))
+        .to_string();
+    let uptime_seconds = v
+        .get("uptime_seconds")
+        .or_else(|| v.get("uptime"))
+        .and_then(|u| u.as_u64())
+        .unwrap_or(0);
+    let is_online = v.get("is_online").and_then(|o| o.as_bool()).unwrap_or(true);
+    let last_heartbeat_at = v
+        .get("last_heartbeat_at")
+        .or_else(|| v.get("timestamp"))
+        .and_then(|t| t.as_i64())
+        .unwrap_or_else(|| Utc::now().timestamp());
+    let sync_transport = v
+        .get("sync_transport")
+        .or_else(|| v.get("transport"))
+        .and_then(|t| t.as_str())
+        .unwrap_or("json")
+        .to_string();
+
+    FleetNodeInfo {
+        node_id,
+        node_alias,
+        local_ip,
+        os_info,
+        agm_version,
+        uptime_seconds,
+        is_online,
+        last_heartbeat_at,
+        sync_transport,
+    }
+}
+
+/// Helper to parse incoming fleet sync JSON, accommodating pure envelopes and flexible Telegram / Email JSON variants
+pub fn parse_fleet_sync_payload(payload_json: &str) -> Result<FleetSyncPayload, AppError> {
+    let clean_json = extract_json_envelope(payload_json);
+
+    // 1. Direct deserialization path
+    if let Ok(payload) = serde_json::from_str::<FleetSyncPayload>(clean_json) {
+        return Ok(payload);
+    }
+
+    // 2. Fallback ladder for flexible Telegram / Email payloads
+    let v: serde_json::Value = serde_json::from_str(clean_json)
+        .map_err(|e| AppError::Config(format!("Failed to deserialize fleet sync JSON: {e}")))?;
+
+    let node = if let Some(node_val) = v.get("node") {
+        serde_json::from_value::<FleetNodeInfo>(node_val.clone())
+            .unwrap_or_else(|_| synthesize_node_info(&v))
+    } else {
+        synthesize_node_info(&v)
+    };
+
+    let instances: Vec<FleetInstanceSync> = v
+        .get("instances")
+        .and_then(|i| serde_json::from_value(i.clone()).ok())
+        .unwrap_or_default();
+
+    let accounts: Vec<serde_json::Value> = v
+        .get("accounts")
+        .and_then(|a| serde_json::from_value(a.clone()).ok())
+        .or_else(|| {
+            v.get("email_quotas")
+                .and_then(|q| serde_json::from_value(q.clone()).ok())
+        })
+        .unwrap_or_default();
+
+    let workspaces: Vec<FleetWorkspaceSync> = v
+        .get("workspaces")
+        .and_then(|w| serde_json::from_value(w.clone()).ok())
+        .unwrap_or_default();
+
+    let instance_count = v
+        .get("instance_count")
+        .or_else(|| v.get("instances_count"))
+        .and_then(|c| c.as_u64())
+        .map(|c| c as u32)
+        .or_else(|| {
+            if !instances.is_empty() {
+                Some(instances.len() as u32)
+            } else {
+                None
+            }
+        });
+
+    let email_quotas = v
+        .get("email_quotas")
+        .and_then(|eq| serde_json::from_value(eq.clone()).ok());
+
+    let switch_signals = v
+        .get("switch_signals")
+        .and_then(|ss| serde_json::from_value(ss.clone()).ok());
+
+    let fast_forward_signals = v
+        .get("fast_forward_signals")
+        .and_then(|ff| serde_json::from_value(ff.clone()).ok());
+
+    let timestamp = v
+        .get("timestamp")
+        .and_then(|t| t.as_i64())
+        .unwrap_or_else(|| Utc::now().timestamp());
+
+    let schema = v
+        .get("$schema")
+        .and_then(|s| s.as_str())
+        .unwrap_or("agm-fleet-sync-v1.0")
+        .to_string();
+
+    let message_type = v
+        .get("message_type")
+        .or_else(|| v.get("action"))
+        .and_then(|m| m.as_str())
+        .unwrap_or("heartbeat")
+        .to_string();
+
+    Ok(FleetSyncPayload {
+        schema,
+        message_type,
+        node,
+        instances,
+        accounts,
+        workspaces,
+        timestamp,
+        instance_count,
+        email_quotas,
+        switch_signals,
+        fast_forward_signals,
+    })
+}
+
 /// Ingest an incoming fleet sync JSON payload from any transport channel (e.g. Email, Telegram)
 pub fn ingest_fleet_sync_payload(payload_json: &str, transport: &str) -> Result<(), AppError> {
-    let mut payload: FleetSyncPayload = serde_json::from_str(payload_json)
-        .map_err(|e| AppError::Config(format!("Failed to deserialize fleet sync payload: {e}")))?;
+    let mut payload = parse_fleet_sync_payload(payload_json)?;
 
     if !transport.trim().is_empty() {
         payload.node.sync_transport = transport.trim().to_string();
@@ -218,7 +403,29 @@ pub fn ingest_fleet_sync_payload(payload_json: &str, transport: &str) -> Result<
         params![payload.node.node_id],
     )?;
 
-    for inst in &payload.instances {
+    let instances_to_store: Vec<FleetInstanceSync> = if payload.instances.is_empty() {
+        if let Some(count) = payload.instance_count {
+            (0..count)
+                .map(|idx| FleetInstanceSync {
+                    instance_id: format!("{}-inst-{}", payload.node.node_id, idx + 1),
+                    name: format!("Instance #{}", idx + 1),
+                    is_running: true,
+                    pid: None,
+                    bound_account_id: None,
+                    bound_email: None,
+                    data_dir: "".to_string(),
+                    executable_path: None,
+                    memory_mb: None,
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
+    } else {
+        payload.instances.clone()
+    };
+
+    for inst in &instances_to_store {
         let is_running_int = if inst.is_running { 1 } else { 0 };
         tx.execute(
             r#"
@@ -394,6 +601,63 @@ pub fn generate_local_fleet_sync_payload() -> Result<FleetSyncPayload, AppError>
         }
     }
 
+    // Gather email quotas summary
+    let mut email_quotas = Vec::new();
+    match crate::modules::account::list_accounts() {
+        Ok(acc_list) => {
+            for acc in &acc_list {
+                let quota_pct =
+                    crate::modules::auto_switcher::calculate_account_quota(acc, "gemini-2.5-pro");
+                let (q5h, q7d) = crate::modules::auto_switcher::extract_dual_window_quotas(
+                    acc,
+                    "gemini-2.5-pro",
+                );
+                email_quotas.push(serde_json::json!({
+                    "email": acc.email,
+                    "account_id": acc.id,
+                    "disabled": acc.disabled,
+                    "disabled_reason": acc.disabled_reason,
+                    "quota_percent": quota_pct,
+                    "rolling_5h_percent": q5h,
+                    "weekly_7d_percent": q7d,
+                    "priority": acc.priority,
+                }));
+            }
+        }
+        Err(e) => {
+            // Justification: email quotas extraction is best-effort during local payload assembly
+            crate::error::record_ignored(
+                Err::<(), _>(&e),
+                "list accounts for email quotas telemetry",
+            );
+        }
+    }
+
+    // Gather switch and fast-forwarding signals
+    let app_config = crate::modules::config::load_app_config().unwrap_or_default();
+    let switcher_cfg = app_config.auto_profile_switcher;
+    let switcher_status = crate::modules::auto_switcher::get_status();
+
+    let mut switch_signals = Vec::new();
+    switch_signals.push(serde_json::json!({
+        "auto_switcher_enabled": switcher_cfg.is_enabled,
+        "target_model": switcher_cfg.target_model,
+        "active_email": switcher_status.active_account_email,
+        "active_quota": switcher_status.current_quota_percent,
+        "low_quota_threshold_percent": switcher_cfg.low_quota_threshold_percent,
+        "cooldown_period_minutes": switcher_cfg.account_cooldown_minutes,
+        "monitored_instances_count": switcher_status.monitored_instances.len(),
+    }));
+
+    let mut fast_forward_signals = Vec::new();
+    fast_forward_signals.push(serde_json::json!({
+        "auto_fast_forward_on_critical": switcher_cfg.auto_fast_forward_on_critical,
+        "fast_forward_shortcut": switcher_cfg.fast_forward_shortcut,
+        "has_running_instances": instances.iter().any(|i| i.is_running),
+    }));
+
+    let instances_count = instances.len() as u32;
+
     Ok(FleetSyncPayload {
         schema: default_schema(),
         message_type: default_message_type(),
@@ -402,7 +666,23 @@ pub fn generate_local_fleet_sync_payload() -> Result<FleetSyncPayload, AppError>
         accounts,
         workspaces,
         timestamp: now,
+        instance_count: Some(instances_count),
+        email_quotas: Some(email_quotas),
+        switch_signals: Some(switch_signals),
+        fast_forward_signals: Some(fast_forward_signals),
     })
+}
+
+/// Generate pure JSON telemetry string for the current local machine node
+pub fn generate_fleet_sync_json() -> Result<String, AppError> {
+    let payload = generate_local_fleet_sync_payload()?;
+    serde_json::to_string_pretty(&payload)
+        .map_err(|e| AppError::Config(format!("Failed to serialize fleet sync payload: {e}")))
+}
+
+/// Ingest incoming fleet sync JSON from raw string across Email, Telegram, or HTTP transport channels
+pub fn ingest_fleet_sync_json(payload_json: &str, transport: &str) -> Result<(), AppError> {
+    ingest_fleet_sync_payload(payload_json, transport)
 }
 
 /// Retrieve summary list of fleet machines stored in local database
@@ -492,4 +772,87 @@ fn get_local_ip() -> String {
         }
     }
     "127.0.0.1".to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_json_envelope() {
+        let raw = "```json\n{\"foo\": \"bar\"}\n```";
+        assert_eq!(extract_json_envelope(raw), "{\"foo\": \"bar\"}");
+
+        let surrounded = "Status telemetry:\n{\"a\": 1}\nEnd of message.";
+        assert_eq!(extract_json_envelope(surrounded), "{\"a\": 1}");
+    }
+
+    #[test]
+    fn test_parse_telegram_wrapped_fleet_sync_payload() {
+        let telegram_msg = r#"
+```json
+{
+  "$schema": "agm-fleet-sync-v1.0",
+  "message_type": "heartbeat",
+  "node_id": "tele-node-42",
+  "node_alias": "Telegram Worker",
+  "instance_count": 3,
+  "email_quotas": [
+    {
+      "email": "user@example.com",
+      "quota_percent": 88.5
+    }
+  ],
+  "switch_signals": [
+    {
+      "auto_switcher_enabled": true
+    }
+  ],
+  "fast_forward_signals": [
+    {
+      "auto_fast_forward_on_critical": true
+    }
+  ]
+}
+```
+"#;
+        let parsed = parse_fleet_sync_payload(telegram_msg).expect("should parse telegram payload");
+        assert_eq!(parsed.node.node_id, "tele-node-42");
+        assert_eq!(parsed.node.node_alias, "Telegram Worker");
+        assert_eq!(parsed.instance_count, Some(3));
+        assert!(parsed.email_quotas.is_some());
+        assert!(parsed.switch_signals.is_some());
+        assert!(parsed.fast_forward_signals.is_some());
+    }
+
+    #[test]
+    fn test_parse_email_loose_json_payload() {
+        let email_msg = r#"{
+            "node": {
+                "node_id": "email-node-1",
+                "node_alias": "Email Worker",
+                "local_ip": "10.0.0.5",
+                "os_info": "linux x86_64",
+                "agm_version": "4.8.3",
+                "uptime_seconds": 1200,
+                "is_online": true,
+                "last_heartbeat_at": 1700000000,
+                "sync_transport": "email"
+            },
+            "instance_count": 2,
+            "instances": [],
+            "email_quotas": [
+                {"email": "dev@agm.local", "quota_percent": 95.0}
+            ],
+            "switch_signals": [
+                {"active_email": "dev@agm.local"}
+            ]
+        }"#;
+
+        let parsed = parse_fleet_sync_payload(email_msg).expect("should parse email payload");
+        assert_eq!(parsed.node.node_id, "email-node-1");
+        assert_eq!(parsed.instance_count, Some(2));
+        assert_eq!(parsed.email_quotas.unwrap().len(), 1);
+        assert_eq!(parsed.switch_signals.unwrap().len(), 1);
+    }
 }

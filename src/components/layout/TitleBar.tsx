@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +9,7 @@ import { useErrorStore } from '../../stores/error-store';
 export default function TitleBar() {
     const { t } = useTranslation();
     const [isMaximized, setIsMaximized] = useState(false);
+    const lastToggleRef = useRef(0);
     const [appVersion, setAppVersion] = useState<string>(
         versionData.version || versionData.Version || '0.0.0'
     );
@@ -68,6 +69,11 @@ export default function TitleBar() {
     };
 
     const handleToggleMaximize = async () => {
+        const now = Date.now();
+        if (now - lastToggleRef.current < 350) {
+            return;
+        }
+        lastToggleRef.current = now;
         try {
             const max = await invoke<boolean>('toggle_maximize_window');
             setIsMaximized(max);
@@ -114,6 +120,12 @@ export default function TitleBar() {
             data-tauri-drag-region
             onMouseDown={(e) => {
                 if ((e.target as HTMLElement).closest('button')) return;
+                if (e.detail > 1) {
+                    if (e.detail === 2) {
+                        void handleToggleMaximize();
+                    }
+                    return;
+                }
                 getCurrentWindow().startDragging();
             }}
             onDoubleClick={async (e) => {

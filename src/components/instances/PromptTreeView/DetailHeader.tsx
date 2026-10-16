@@ -25,6 +25,8 @@ export interface DetailHeaderProps {
     setConfirmationSuffix: (v: string) => void;
     conversationTargetMode?: 'current' | 'new';
     setConversationTargetMode?: (v: 'current' | 'new') => void;
+    newConversationTitle?: string;
+    setNewConversationTitle?: (title: string) => void;
     isCopiedText: boolean;
     setIsCopiedText: (v: boolean) => void;
     isCopiedRaw: boolean;
@@ -66,6 +68,8 @@ export function DetailHeader(props: DetailHeaderProps) {
         selectedConversation, activePromptText,
         confirmationSuffix, setConfirmationSuffix,
         conversationTargetMode = 'current', setConversationTargetMode,
+        newConversationTitle: propNewConversationTitle,
+        setNewConversationTitle: propSetNewConversationTitle,
         isCopiedText, setIsCopiedText,
         isCopiedAll = false, setIsCopiedAll,
         isEnqueueing, isResending, isFocusing,
@@ -79,23 +83,23 @@ export function DetailHeader(props: DetailHeaderProps) {
         onCopyWithImages, onSaveImages, onExport, onFocusIde, onResend, onEnqueue, onOpenInspector,
     } = props;
 
+    const [localNewConvTitle, setLocalNewConvTitle] = useState('');
+    const newConversationTitle = propNewConversationTitle ?? localNewConvTitle;
+    const setNewConversationTitle = propSetNewConversationTitle ?? setLocalNewConvTitle;
+    const [dispatchMode, setDispatchMode] = useState<'send' | 'enqueue'>('send');
+
     const [localCopiedText, setLocalCopiedText] = useState(false);
     const isCopiedTextActive = isCopiedText || localCopiedText;
     const [localCopiedAll, setLocalCopiedAll] = useState(false);
     const isCopiedAllActive = isCopiedAll || localCopiedAll;
 
     const [localIsCopyMenuOpen, setLocalIsCopyMenuOpen] = useState(false);
-    const [localIsSendMenuOpen, setLocalIsSendMenuOpen] = useState(false);
-    const [localIsEnqueueMenuOpen, setLocalIsEnqueueMenuOpen] = useState(false);
-
     const isCopyMenuOpen = propIsCopyMenuOpen ?? isExportMenuOpen ?? localIsCopyMenuOpen;
     const setIsCopyMenuOpen = propSetIsCopyMenuOpen ?? setIsExportMenuOpen ?? setLocalIsCopyMenuOpen;
 
-    const isSendMenuOpen = propIsSendMenuOpen ?? localIsSendMenuOpen;
-    const setIsSendMenuOpen = propSetIsSendMenuOpen ?? setLocalIsSendMenuOpen;
-
-    const isEnqueueMenuOpen = propIsEnqueueMenuOpen ?? localIsEnqueueMenuOpen;
-    const setIsEnqueueMenuOpen = propSetIsEnqueueMenuOpen ?? setLocalIsEnqueueMenuOpen;
+    const [localIsSendMenuOpen, setLocalIsSendMenuOpen] = useState(false);
+    const isSendMenuOpen = propIsSendMenuOpen ?? propIsEnqueueMenuOpen ?? localIsSendMenuOpen;
+    const setIsSendMenuOpen = propSetIsSendMenuOpen ?? propSetIsEnqueueMenuOpen ?? setLocalIsSendMenuOpen;
 
     return (
         <div className="space-y-2 pb-2.5 border-b border-slate-200 dark:border-[#40285e] shrink-0">
@@ -149,52 +153,101 @@ export function DetailHeader(props: DetailHeaderProps) {
                     </span>
                 </div>
 
-                {/* Right: The 3 Canonical Segmented Dark-Glass Action Capsules */}
-                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-                    {/* Capsule 1: Content & Media Copy Split Button [ Copy All | v ] */}
+                {/* Right: The Unified Segmented Dark-Glass Action Capsule */}
+                <div className="flex items-center shrink-0">
                     <div className="relative flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
-                        {/* Primary Click: One-Shot Copy All (Content + Images) */}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                try {
-                                    if (onCopyAllWithRichImages) {
-                                        onCopyAllWithRichImages();
-                                    } else {
-                                        onCopyWithImages();
+                        {/* Segment 1: Content & Media Copy Split Button [ Copy All | v ] */}
+                        <div className="flex items-center divide-x divide-slate-200/70 dark:divide-purple-500/20">
+                            {/* Primary Click: One-Shot Copy All (Content + Images) */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    try {
+                                        if (onCopyAllWithRichImages) {
+                                            onCopyAllWithRichImages();
+                                        } else {
+                                            onCopyWithImages();
+                                        }
+                                        setLocalCopiedAll(true);
+                                        setIsCopiedAll?.(true);
+                                        setTimeout(() => {
+                                            setLocalCopiedAll(false);
+                                            setIsCopiedAll?.(false);
+                                        }, 2000);
+                                    } catch (err) {
+                                        reportPromptActionError(err, 'DetailHeader.copyAllWithRichImages');
                                     }
-                                    setLocalCopiedAll(true);
-                                    setIsCopiedAll?.(true);
-                                    setTimeout(() => {
-                                        setLocalCopiedAll(false);
-                                        setIsCopiedAll?.(false);
-                                    }, 2000);
-                                } catch (err) {
-                                    reportPromptActionError(err, 'DetailHeader.copyAllWithRichImages');
-                                }
-                            }}
-                            className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                            title="Copy full prompt text and all embedded images in one shot"
-                        >
-                            {isCopiedAllActive ? (
-                                <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                title="Copy full prompt text and all embedded images in one shot"
+                            >
+                                {isCopiedAllActive ? (
+                                    <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                                ) : (
+                                    <Copy className="w-3 h-3 text-slate-500 dark:text-slate-400 shrink-0" />
+                                )}
+                                <span>{isCopiedAllActive ? 'Copied All!' : 'Copy All'}</span>
+                            </button>
+
+                            {/* Dropdown Chevron for Clean Text, Image Saving, and Exports */}
+                            <button
+                                type="button"
+                                onClick={() => setIsCopyMenuOpen((prev) => !prev)}
+                                className="flex items-center justify-center px-1.5 py-1 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                title="More copy and export options"
+                            >
+                                <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isCopyMenuOpen && "rotate-180")} />
+                            </button>
+                        </div>
+
+                        {/* Segment 2: Unified Dispatch Split Button [ Send N | v ] */}
+                        <div className="flex items-center divide-x divide-slate-200/70 dark:divide-purple-500/20">
+                            {/* Main Button: Quick Send (with N hotkey badge) */}
+                            {dispatchMode === 'enqueue' ? (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        void Promise.resolve(onEnqueue()).catch((err) => {
+                                            reportPromptActionError(err, 'DetailHeader.onEnqueue');
+                                        });
+                                    }}
+                                    disabled={isEnqueueing}
+                                    className="flex items-center gap-1.5 px-3 py-1 text-amber-800 dark:text-amber-300 hover:bg-amber-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                                    title="Enqueue prompt into FIFO background scheduler queue"
+                                >
+                                    <ListPlus className={cn('w-3 h-3 text-amber-500 dark:text-amber-400', isEnqueueing && 'animate-pulse')} />
+                                    <span>Enqueue</span>
+                                </button>
                             ) : (
-                                <Copy className="w-3 h-3 text-slate-500 dark:text-slate-400 shrink-0" />
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        void Promise.resolve(onResend()).catch((err) => {
+                                            reportPromptActionError(err, 'DetailHeader.onResend');
+                                        });
+                                    }}
+                                    disabled={isResending}
+                                    className="flex items-center gap-1.5 px-3 py-1 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                                    title="Immediately inject prompt to running instance (Hotkey: N)"
+                                >
+                                    <RotateCw className={cn('w-3 h-3 text-emerald-500', isResending && 'animate-spin')} />
+                                    <span>Send</span>
+                                    <kbd className="ml-0.5 px-1 py-0.2 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded text-[8.5px] font-mono font-bold">N</kbd>
+                                </button>
                             )}
-                            <span>{isCopiedAllActive ? 'Copied All!' : 'Copy All'}</span>
-                        </button>
 
-                        {/* Dropdown Chevron for Clean Text, Image Saving, and Exports */}
-                        <button
-                            type="button"
-                            onClick={() => setIsCopyMenuOpen((prev) => !prev)}
-                            className="flex items-center justify-center px-1.5 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                            title="More copy and export options"
-                        >
-                            <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isCopyMenuOpen && "rotate-180")} />
-                        </button>
+                            {/* Split ChevronDown: Unified Dispatch Configuration Popover/Menu */}
+                            <button
+                                type="button"
+                                onClick={() => setIsSendMenuOpen((prev) => !prev)}
+                                className="flex items-center justify-center px-1.5 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                title="Unified dispatch configuration popover"
+                            >
+                                <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isSendMenuOpen && "rotate-180")} />
+                            </button>
+                        </div>
 
-                        {/* Flyout Menu */}
+                        {/* Flyout 1: Copy Options Menu */}
                         {isCopyMenuOpen && (
                             <div
                                 className="absolute right-0 top-full mt-1.5 z-50 w-56 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-1"
@@ -289,7 +342,7 @@ export function DetailHeader(props: DetailHeaderProps) {
 
                                 <div className="border-t border-slate-100 dark:border-[#40285e]/60 my-1" />
 
-                                {/* Sub-item 3: Export as Markdown */}
+                                {/* Sub-item 4: Export as Markdown */}
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -305,7 +358,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     <span className="text-[10px] text-slate-400 font-mono">.md</span>
                                 </button>
 
-                                {/* Sub-item 4: Export as JSON */}
+                                {/* Sub-item 5: Export as JSON */}
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -322,49 +375,54 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 </button>
                             </div>
                         )}
-                    </div>
 
-                    {/* Capsule 2: Direct Send Split Button [ Send N | v ] */}
-                    <div className="relative flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
-                        {/* Primary Send Button with <kbd>N</kbd> */}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                void Promise.resolve(onResend()).catch((err) => {
-                                    reportPromptActionError(err, 'DetailHeader.onResend');
-                                });
-                            }}
-                            disabled={isResending}
-                            className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                            title="Immediately inject prompt to running instance (Hotkey: N)"
-                        >
-                            <RotateCw className={cn('w-3 h-3 text-emerald-500', isResending && 'animate-spin')} />
-                            <span>Send</span>
-                            <kbd className="ml-0.5 px-1 py-0.2 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded text-[8.5px] font-mono font-bold">N</kbd>
-                        </button>
-
-                        {/* Split ChevronDown Dropdown Toggle for Send Options */}
-                        <button
-                            type="button"
-                            onClick={() => setIsSendMenuOpen((prev) => !prev)}
-                            className="flex items-center justify-center px-1.5 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                            title="Send and dispatch configuration options"
-                        >
-                            <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isSendMenuOpen && "rotate-180")} />
-                        </button>
-
-                        {/* Dropdown Menu for Send Options (Destination, Suffix, Enqueue, Focus IDE) */}
+                        {/* Flyout 2: Unified Dispatch Configuration Popover/Menu */}
                         {isSendMenuOpen && (
                             <div
-                                className="absolute right-0 top-full mt-1.5 z-50 w-64 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-1"
+                                className="absolute right-0 top-full mt-1.5 z-50 w-72 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl p-2 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-1.5"
                                 onMouseLeave={() => setIsSendMenuOpen(false)}
                             >
                                 {/* Menu Header */}
-                                <div className="px-2.5 pt-1 pb-0.5 text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 select-none">
-                                    Send Options
+                                <div className="px-2 pt-0.5 pb-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 select-none border-b border-slate-100 dark:border-[#40285e]/60 flex items-center justify-between">
+                                    <span>Dispatch Configuration</span>
+                                    <span className="text-[9px] text-slate-400">AGM:P001</span>
                                 </div>
-                                {/* Destination Conversation Mode */}
-                                <div className="flex items-center justify-between px-2.5 py-1 text-xs">
+
+                                {/* Mode Toggle: Send Immediately vs Enqueue to FIFO Queue */}
+                                <div className="flex items-center justify-between px-2 py-1 text-xs">
+                                    <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
+                                        Mode:
+                                    </span>
+                                    <div className="inline-flex rounded-lg bg-slate-100 dark:bg-purple-950/40 p-0.5 border border-slate-200/80 dark:border-purple-500/20 text-[11px]">
+                                        <button
+                                            type="button"
+                                            onClick={() => setDispatchMode('send')}
+                                            className={cn(
+                                                "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                dispatchMode === 'send'
+                                                    ? "bg-white dark:bg-[#2c1a4d] text-emerald-600 dark:text-emerald-400 shadow-2xs font-semibold"
+                                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                            )}
+                                        >
+                                            Send Now
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setDispatchMode('enqueue')}
+                                            className={cn(
+                                                "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                dispatchMode === 'enqueue'
+                                                    ? "bg-white dark:bg-[#2c1a4d] text-amber-600 dark:text-amber-400 shadow-2xs font-semibold"
+                                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                            )}
+                                        >
+                                            Enqueue FIFO
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Destination: Current Conversation vs New Conversation */}
+                                <div className="flex items-center justify-between px-2 py-1 text-xs">
                                     <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
                                         Destination:
                                     </span>
@@ -372,23 +430,39 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         value={conversationTargetMode}
                                         onChange={(e) => setConversationTargetMode?.(e.target.value as 'current' | 'new')}
                                         className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:ring-0 focus:outline-none cursor-pointer py-0.5 text-right"
-                                        title="Destination conversation mode for Send"
+                                        title="Destination conversation mode"
                                     >
                                         <option value="current" className="bg-white dark:bg-[#171025]">Current Conv</option>
                                         <option value="new" className="bg-white dark:bg-[#171025]">New Conv</option>
                                     </select>
                                 </div>
 
-                                {/* Confirmation Suffix */}
-                                <div className="flex items-center justify-between px-2.5 py-1 text-xs">
+                                {/* When "New Conversation" is selected: Inline title input */}
+                                {conversationTargetMode === 'new' && (
+                                    <div className="px-2 py-1.5 space-y-1 bg-slate-50/80 dark:bg-purple-950/20 rounded-lg border border-slate-200/60 dark:border-purple-500/20">
+                                        <label className="text-[10px] font-mono text-slate-500 dark:text-slate-400 block">
+                                            New Conversation Title:
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={newConversationTitle}
+                                            onChange={(e) => setNewConversationTitle(e.target.value)}
+                                            placeholder="e.g. Bugfix auth refresh, Feature draft..."
+                                            className="w-full px-2 py-1 text-xs bg-white dark:bg-[#120a1f] border border-slate-200 dark:border-purple-500/30 rounded-md text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Suffix presets */}
+                                <div className="flex items-center justify-between px-2 py-1 text-xs">
                                     <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
                                         Suffix:
                                     </span>
                                     <select
                                         value={confirmationSuffix}
                                         onChange={(e) => setConfirmationSuffix(e.target.value)}
-                                        className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:ring-0 focus:outline-none cursor-pointer py-0.5 text-right max-w-[130px] truncate"
-                                        title="Confirmation suffix appended on Send"
+                                        className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:ring-0 focus:outline-none cursor-pointer py-0.5 text-right max-w-[140px] truncate"
+                                        title="Confirmation suffix appended on dispatch"
                                     >
                                         <option value="None (Send as is)" className="bg-white dark:bg-[#171025]">None</option>
                                         <option value="Is it done?" className="bg-white dark:bg-[#171025]">Done?</option>
@@ -401,27 +475,7 @@ export function DetailHeader(props: DetailHeaderProps) {
 
                                 <div className="border-t border-slate-100 dark:border-[#40285e]/60 my-1" />
 
-                                {/* Enqueue Action — same dispatch path as the standalone Enqueue button (Capsule 3) */}
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        void Promise.resolve(onEnqueue()).catch((err) => {
-                                            reportPromptActionError(err, 'DetailHeader.onEnqueue');
-                                        });
-                                        setIsSendMenuOpen(false);
-                                    }}
-                                    disabled={isEnqueueing}
-                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors disabled:opacity-50"
-                                    title="Enqueue prompt into FIFO background scheduler queue"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <ListPlus className={cn('w-3.5 h-3.5 text-amber-500 shrink-0', isEnqueueing && 'animate-pulse')} />
-                                        <span className="font-medium">Enqueue to FIFO Queue</span>
-                                    </div>
-                                    <span className="text-[10px] text-slate-400 font-mono">Background</span>
-                                </button>
-
-                                {/* Focus IDE Action */}
+                                {/* Focus IDE Window option */}
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -429,7 +483,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         setIsSendMenuOpen(false);
                                     }}
                                     disabled={isFocusing}
-                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors disabled:opacity-50"
+                                    className="w-full flex items-center justify-between px-2 py-1.5 text-xs text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors disabled:opacity-50"
                                 >
                                     <div className="flex items-center gap-2">
                                         <ExternalLink className={cn('w-3.5 h-3.5 text-sky-500 shrink-0', isFocusing && 'animate-spin')} />
@@ -437,70 +491,15 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     </div>
                                     <span className="text-[10px] text-slate-400 font-mono">Launch/Focus</span>
                                 </button>
-                            </div>
-                        )}
-                    </div>
 
-                    {/* Capsule 3: Background FIFO Enqueue Split Button [ Enqueue | v ] */}
-                    <div className="relative flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
-                        {/* Primary Enqueue Button */}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                void Promise.resolve(onEnqueue()).catch((err) => {
-                                    reportPromptActionError(err, 'DetailHeader.onEnqueue');
-                                });
-                            }}
-                            disabled={isEnqueueing}
-                            className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-amber-800 dark:text-amber-300 hover:bg-amber-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                            title="Enqueue prompt into FIFO background scheduler queue"
-                        >
-                            <ListPlus className={cn('w-3 h-3 text-amber-500 dark:text-amber-400', isEnqueueing && 'animate-pulse')} />
-                            <span>Enqueue</span>
-                        </button>
-
-                        {/* Split ChevronDown Dropdown Toggle for Queue Options */}
-                        <button
-                            type="button"
-                            onClick={() => setIsEnqueueMenuOpen((prev) => !prev)}
-                            className="flex items-center justify-center px-1.5 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                            title="Queue options and full inspector"
-                        >
-                            <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isEnqueueMenuOpen && "rotate-180")} />
-                        </button>
-
-                        {/* Dropdown Menu for Queue Options */}
-                        {isEnqueueMenuOpen && (
-                            <div
-                                className="absolute right-0 top-full mt-1.5 z-50 w-64 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-1"
-                                onMouseLeave={() => setIsEnqueueMenuOpen(false)}
-                            >
-                                {/* Destination Conversation Mode for Queue */}
-                                <div className="flex items-center justify-between px-2.5 py-1 text-xs">
-                                    <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
-                                        Destination:
-                                    </span>
-                                    <select
-                                        value={conversationTargetMode}
-                                        onChange={(e) => setConversationTargetMode?.(e.target.value as 'current' | 'new')}
-                                        className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:ring-0 focus:outline-none cursor-pointer py-0.5 text-right"
-                                        title="Destination conversation mode for Queue"
-                                    >
-                                        <option value="current" className="bg-white dark:bg-[#171025]">Current Conv</option>
-                                        <option value="new" className="bg-white dark:bg-[#171025]">New Conv</option>
-                                    </select>
-                                </div>
-
-                                <div className="border-t border-slate-100 dark:border-[#40285e]/60 my-1" />
-
-                                {/* Full Inspector Action */}
+                                {/* Full Inspector option */}
                                 <button
                                     type="button"
                                     onClick={() => {
                                         onOpenInspector(selectedConversation);
-                                        setIsEnqueueMenuOpen(false);
+                                        setIsSendMenuOpen(false);
                                     }}
-                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-blue-700 dark:text-cyan-300 hover:bg-blue-50 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    className="w-full flex items-center justify-between px-2 py-1.5 text-xs text-blue-700 dark:text-cyan-300 hover:bg-blue-50 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
                                 >
                                     <div className="flex items-center gap-2">
                                         <Maximize2 className="w-3.5 h-3.5 text-blue-500 dark:text-cyan-400 shrink-0" />
@@ -509,9 +508,44 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     <span className="text-[10px] text-slate-400 font-mono">Full-Screen</span>
                                 </button>
 
-                                {/* Queue Information / FIFO Notice */}
-                                <div className="px-2.5 py-1.5 text-[10px] text-slate-400 font-mono border-t border-slate-100 dark:border-[#40285e]/60 mt-1">
-                                    FIFO Scheduler: Background execution without focus interruption
+                                {/* Dispatch Action Button inside dropdown */}
+                                <div className="pt-1 border-t border-slate-100 dark:border-[#40285e]/60">
+                                    {dispatchMode === 'enqueue' ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                void Promise.resolve(onEnqueue()).catch((err) => {
+                                                    reportPromptActionError(err, 'DetailHeader.onEnqueue');
+                                                });
+                                                setIsSendMenuOpen(false);
+                                            }}
+                                            disabled={isEnqueueing}
+                                            className="w-full flex items-center justify-center gap-2 py-1.5 px-3 bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                                        >
+                                            <ListPlus className={cn('w-3.5 h-3.5 text-amber-500', isEnqueueing && 'animate-pulse')} />
+                                            <span>Enqueue to FIFO Queue</span>
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                void Promise.resolve(onResend()).catch((err) => {
+                                                    reportPromptActionError(err, 'DetailHeader.onResend');
+                                                });
+                                                setIsSendMenuOpen(false);
+                                            }}
+                                            disabled={isResending}
+                                            className="w-full flex items-center justify-center gap-2 py-1.5 px-3 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                                        >
+                                            <RotateCw className={cn('w-3.5 h-3.5 text-emerald-500', isResending && 'animate-spin')} />
+                                            <span>Send Immediately</span>
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* FIFO Scheduler Notice */}
+                                <div className="px-2 pt-0.5 text-[9.5px] text-slate-400 font-mono text-center">
+                                    FIFO Queue &amp; Direct Dispatch Invariant
                                 </div>
                             </div>
                         )}

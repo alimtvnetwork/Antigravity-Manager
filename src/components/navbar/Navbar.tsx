@@ -1,7 +1,8 @@
-import { startTransition } from 'react';
+import { startTransition, useRef } from 'react';
 import { LayoutDashboard, Users, Network, Activity, BarChart3, Settings, Lock, KeyRound, Laptop, Mail, Bug, ScrollText, Database, Wrench } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { invoke } from '@tauri-apps/api/core';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useErrorStore } from '../../stores/error-store';
 import { useDebugConsole } from '../../stores/useDebugConsole';
@@ -23,6 +24,7 @@ function Navbar() {
     const { t, i18n } = useTranslation();
     const { config, saveConfig } = useConfigStore();
     const { enable: enableDebug, disable: disableDebug, isEnabled: isDebugEnabled } = useDebugConsole();
+    const lastToggleRef = useRef(0);
 
     // Create navigation items with translated labels
     const navItems: NavItem[] = [
@@ -43,6 +45,27 @@ function Navbar() {
     ];
 
 
+    const handleToggleMaximize = async () => {
+        const now = Date.now();
+        if (now - lastToggleRef.current < 350) {
+            return;
+        }
+        lastToggleRef.current = now;
+        try {
+            await invoke('toggle_maximize_window');
+        } catch {
+            try {
+                await getCurrentWindow().toggleMaximize();
+            } catch (err) {
+                console.error('Failed to toggle maximize window:', err);
+                useErrorStore.getState().captureError(err, {
+                    source: 'Navbar.tsx',
+                    triggerAction: 'handleToggleMaximize',
+                });
+            }
+        }
+    };
+
     // Window dragging and double click maximize handlers
     const handleMouseDown = (e: React.MouseEvent<HTMLElement>) => {
         if (!isTauri()) return;
@@ -53,6 +76,12 @@ function Navbar() {
         if (target.closest('input')) return;
         if (target.closest('select')) return;
         if (target.closest('textarea')) return;
+        if (e.detail > 1) {
+            if (e.detail === 2) {
+                void handleToggleMaximize();
+            }
+            return;
+        }
         try {
             getCurrentWindow().startDragging();
         } catch (err) {
@@ -69,15 +98,7 @@ function Navbar() {
         if (target.closest('input')) return;
         if (target.closest('select')) return;
         if (target.closest('textarea')) return;
-        try {
-            await getCurrentWindow().toggleMaximize();
-        } catch (err) {
-            console.error('Failed to toggle maximize window:', err);
-            useErrorStore.getState().captureError(err, {
-                source: 'Navbar.tsx',
-                triggerAction: 'handleDoubleClick.toggleMaximize',
-            });
-        }
+        await handleToggleMaximize();
     };
 
     // Theme toggle logic (with View Transition animation)

@@ -20,24 +20,6 @@ export interface QuotaProgressBarProps {
     compact?: boolean;
 }
 
-/**
- * Local scale color at each checkpoint position. These match the stops of
- * --ui-quota-gradient (src/styles/ui-tokens.css) so a filled marker always
- * corresponds to its position on the scale.
- */
-const CHECKPOINT_SCALE_COLORS: Record<number, string> = {
-    90: '#1af18d',
-    80: '#10b981',
-    60: '#eab308',
-    40: '#f97316',
-    20: '#ef4444',
-    100: '#1af18d',
-    75: '#10b981',
-    50: '#eab308',
-    25: '#f97316',
-    0: '#7f1d1d',
-};
-
 export function QuotaProgressBar({
     percentage,
     resetTime,
@@ -48,7 +30,7 @@ export function QuotaProgressBar({
     className,
     compact = false,
     heightClassName = compact ? "h-2" : "h-2.5",
-    checkpoints = [20, 40, 60, 80, 90],
+    checkpoints = [20, 40, 60, 80],
     showCheckpoints = true,
     Icon,
 }: QuotaProgressBarProps) {
@@ -70,16 +52,16 @@ export function QuotaProgressBar({
         }
     };
 
-    const internalCheckpoints = (checkpoints && checkpoints.length > 0 ? checkpoints : [20, 40, 60, 80, 90])
+    const internalCheckpoints = (checkpoints && checkpoints.length > 0 ? checkpoints : [20, 40, 60, 80])
         .filter((cp) => cp > 0 && cp < 100)
-        .slice(0, 5);
+        .slice(0, 4);
     const sortedCheckpoints = [...internalCheckpoints].sort((a, b) => a - b);
 
     return (
         <div
             id="agm-progress-container"
             className={cn(
-                "w-full flex items-center opacity-85 hover:opacity-100 group-hover:opacity-100 transition-all duration-200 hover:drop-shadow-[0_0_8px_rgba(26,241,141,0.5)] group-hover:drop-shadow-[0_0_8px_rgba(26,241,141,0.5)]",
+                "w-full flex items-center opacity-85 hover:opacity-100 group-hover:opacity-100 transition-all duration-200 hover:drop-shadow-[0_0_3px_rgba(26,241,141,0.18)] group-hover:drop-shadow-[0_0_3px_rgba(26,241,141,0.18)]",
                 compact ? "gap-1" : "gap-2",
                 className
             )}
@@ -99,7 +81,7 @@ export function QuotaProgressBar({
             {/* Progress Bar Track — the spatial scale gradient spans the FULL track
                 width; a mask reveals only the filled percentage. The gradient is
                 never stretched into a partial fill. */}
-            <div className="relative flex-1 min-w-[140px] flex items-center">
+            <div className="relative flex-1 min-w-[126px] flex items-center">
                 <div
                     id="agm-progress-track"
                     className={cn(
@@ -130,13 +112,12 @@ export function QuotaProgressBar({
                 {/* Ambient neon glow element */}
                 <div
                     id="agm-progress-glow"
-                    className="absolute inset-0 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity duration-200 shadow-[0_0_12px_rgba(26,241,141,0.6)]"
+                    className="absolute inset-0 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity duration-200 shadow-[0_0_5px_rgba(26,241,141,0.22)]"
                 />
 
-                {/* Milestone Checkpoint Nodes (20px protruding nodes, centered vertically) */}
+                {/* Milestone Checkpoint Nodes (protruding nodes, centered vertically) */}
                 {showCheckpoints && sortedCheckpoints.map((cp, idx) => {
                     const isFilled = clamped >= cp;
-                    const scaleColor = CHECKPOINT_SCALE_COLORS[cp] ?? (cp >= 75 ? '#1af18d' : cp >= 50 ? '#eab308' : '#ef4444');
 
                     return (
                         <div
@@ -146,12 +127,12 @@ export function QuotaProgressBar({
                                 "agm-progress-node absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full flex items-center justify-center transition-all duration-300 z-10 pointer-events-none border-[1.5px]",
                                 compact ? "w-4 h-4" : "w-5 h-5",
                                 isFilled
-                                    ? "border-transparent shadow-[0_2px_8px_rgba(0,0,0,0.35)] group-hover:shadow-[0_0_12px_rgba(26,241,141,0.85)]"
+                                    ? "border-transparent shadow-[0_2px_8px_rgba(0,0,0,0.35)] group-hover:shadow-[0_0_8px_rgba(16,185,129,0.5)]"
                                     : "bg-slate-300/50 dark:bg-white/10 border-transparent shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)]"
                             )}
                             style={{
                                 left: `${cp}%`,
-                                ...(isFilled ? { backgroundColor: scaleColor } : {}),
+                                ...(isFilled ? { backgroundColor: '#10b981' } : {}),
                             }}
                             title={`Milestone ${cp}%`}
                         >

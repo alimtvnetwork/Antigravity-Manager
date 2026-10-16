@@ -98,6 +98,7 @@ export function usePromptTreePromptActions({
         setIsFocusing,
         confirmationSuffix,
         conversationTargetMode,
+        newConversationTitle,
         selectedConversationRef,
         selectedProjectRef,
         activePromptTextRef,
@@ -294,7 +295,9 @@ export function usePromptTreePromptActions({
             const targetInstId = proj?.instance_id || instanceId || 'default';
             let dispatchOk = false;
             let dispatchErr: unknown = null;
-            const targetConvId = conversationTargetMode === 'new' ? undefined : conv?.conversation_id;
+            const targetConvId = conversationTargetMode === 'new'
+                ? (newConversationTitle?.trim() || undefined)
+                : conv?.conversation_id;
             try {
                 await sendPromptNow(targetInstId, repoPath, promptContent, targetConvId);
                 dispatchOk = true;
@@ -340,7 +343,7 @@ export function usePromptTreePromptActions({
         }
     }, [
         selectedConversation, selectedProject, treeData, archivedProjectIds,
-        editedPromptText, activePromptText, confirmationSuffix, conversationTargetMode, instanceId,
+        editedPromptText, activePromptText, confirmationSuffix, conversationTargetMode, newConversationTitle, instanceId,
         selectConversation, selectedConversationRef, selectedProjectRef,
         activePromptTextRef, setSelectedProject, setActionMsg, setError, setIsResending,
     ]);
@@ -421,7 +424,9 @@ ${activePromptText}
             const promptContent = editedPromptText.trim() || activePromptText || selectedConversation.prompt_preview_200w || '';
             const repoPath = selectedProject?.repo_path || '';
             const targetInstId = selectedProject?.instance_id || instanceId || 'default';
-            const targetConvId = conversationTargetMode === 'new' ? undefined : selectedConversation.conversation_id;
+            const targetConvId = conversationTargetMode === 'new'
+                ? (newConversationTitle?.trim() || undefined)
+                : selectedConversation.conversation_id;
             await enqueuePrompt(targetInstId, repoPath, promptContent, targetConvId);
 
             setActionMsg('Prompt enqueued into FIFO scheduler queue!');
@@ -439,7 +444,7 @@ ${activePromptText}
         }
     }, [
         selectedConversation, selectedProject, editedPromptText, activePromptText,
-        conversationTargetMode, instanceId, setIsEnqueueing, setActionMsg, setError,
+        conversationTargetMode, newConversationTitle, instanceId, setIsEnqueueing, setActionMsg, setError,
     ]);
 
     const handleFocusIde = useCallback(async () => {

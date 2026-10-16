@@ -54,6 +54,7 @@ export interface SortableRowProps {
     isDragDisabled?: boolean;
     modelFilter?: 'gemini' | 'claude';
     showAllEmails?: boolean;
+    emailColWidth?: number;
 }
 
 export interface AccountRowContentProps {
@@ -78,6 +79,7 @@ export interface AccountRowContentProps {
     onViewError: () => void;
     modelFilter?: 'gemini' | 'claude';
     showAllEmails?: boolean;
+    emailColWidth?: number;
 }
 
 export function isModelProtected(protectedModels: string[] | undefined, modelName: string): boolean {

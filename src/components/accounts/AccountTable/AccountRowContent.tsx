@@ -34,6 +34,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
         onViewError,
         showPriority = false,
         showAllEmails = false,
+        emailColWidth,
     } = props;
 
     const rowState = useAccountRowState(props);
@@ -56,6 +57,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
         <>
             <td
                 className="px-2 py-0.5 align-middle border-b border-slate-200/90 dark:border-slate-800/90"
+                style={emailColWidth ? { width: `${emailColWidth}px`, minWidth: `${emailColWidth}px`, maxWidth: `${emailColWidth}px` } : undefined}
                 onMouseLeave={() => setIsHoverUnmasked(false)}
             >
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -193,7 +195,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 </div>
             </td>
 
-            <td className="px-2 py-px align-middle min-w-[210px] bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90">
+            <td className="px-2 py-px align-middle min-w-[185px] bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <div className={cn(
                         "flex items-center justify-center gap-1.5 py-0.5 px-2 rounded-md border group/error",
@@ -234,7 +236,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 )}
             </td>
 
-            <td className="px-2 py-px align-middle min-w-[210px] bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90">
+            <td className="px-2 py-px align-middle min-w-[185px] bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <span className="text-[10px] text-gray-400 italic">--</span>
                 ) : (

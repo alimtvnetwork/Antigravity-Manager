@@ -30,6 +30,11 @@ import { extractAccountResetTime, type AccountTableProps } from './AccountTable/
 
 export type { AccountTableProps } from './AccountTable/types';
 
+const EMAIL_COL_MIN = 220;
+const EMAIL_COL_MAX = 550;
+const EMAIL_COL_DEFAULT = 300;
+const EMAIL_WIDTH_STORAGE_KEY = 'agm_account_table_email_width';
+
 export function AccountTable({
     accounts,
     selectedIds,
@@ -55,6 +60,60 @@ export function AccountTable({
     showAllEmails = false,
 }: AccountTableProps) {
     const { t } = useTranslation();
+
+    const [emailColWidth, setEmailColWidth] = useState<number>(() => {
+        try {
+            const saved = localStorage.getItem(EMAIL_WIDTH_STORAGE_KEY);
+            if (saved) {
+                const parsed = parseInt(saved, 10);
+                if (!isNaN(parsed) && parsed >= EMAIL_COL_MIN && parsed <= EMAIL_COL_MAX) {
+                    return parsed;
+                }
+            }
+        } catch {
+            // localStorage not available
+        }
+        return EMAIL_COL_DEFAULT;
+    });
+
+    const handleResizeMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const startX = e.clientX;
+        const startWidth = emailColWidth;
+
+        const onMouseMove = (moveEvent: MouseEvent) => {
+            const delta = moveEvent.clientX - startX;
+            const newWidth = Math.min(EMAIL_COL_MAX, Math.max(EMAIL_COL_MIN, startWidth + delta));
+            setEmailColWidth(newWidth);
+        };
+
+        const onMouseUp = (upEvent: MouseEvent) => {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            const finalDelta = upEvent.clientX - startX;
+            const finalWidth = Math.min(EMAIL_COL_MAX, Math.max(EMAIL_COL_MIN, startWidth + finalDelta));
+            try {
+                localStorage.setItem(EMAIL_WIDTH_STORAGE_KEY, String(finalWidth));
+            } catch {
+                // ignore
+            }
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    };
+
+    const handleResetEmailWidth = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setEmailColWidth(EMAIL_COL_DEFAULT);
+        try {
+            localStorage.setItem(EMAIL_WIDTH_STORAGE_KEY, String(EMAIL_COL_DEFAULT));
+        } catch {
+            // ignore
+        }
+    };
 
     const isAccountCurrent = (acc: Account) => {
         const isIdMatch = Boolean(currentAccountId && acc.id === currentAccountId);
@@ -192,9 +251,26 @@ export function AccountTable({
                                     onChange={onToggleAll}
                                 />
                             </th>
-                            <th className="px-2 py-0.5 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[260px] whitespace-nowrap">{t('accounts.table.email')}</th>
+                            <th
+                                className="relative px-2 py-0.5 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap select-none"
+                                style={{ width: `${emailColWidth}px`, minWidth: `${emailColWidth}px`, maxWidth: `${emailColWidth}px` }}
+                            >
+                                <span>{t('accounts.table.email')}</span>
+                                {/* Interactive drag handle on right border */}
+                                <div
+                                    role="separator"
+                                    aria-orientation="vertical"
+                                    aria-label="Resize Email column"
+                                    onMouseDown={handleResizeMouseDown}
+                                    onDoubleClick={handleResetEmailWidth}
+                                    title={t('accounts.table.resize_column_hint', 'Drag to resize, double-click to reset')}
+                                    className="absolute top-0 right-0 h-full w-2 cursor-col-resize flex items-center justify-end group/resize z-10"
+                                >
+                                    <div className="w-[2px] h-3.5 bg-slate-300 dark:bg-slate-700 group-hover/resize:bg-blue-500 group-hover/resize:w-[3px] transition-all rounded-full mr-0.5" />
+                                </div>
+                            </th>
                             {/* Column 1: 4H Quota with Gemini Icon and Model Toggle */}
-                            <th className="px-2 py-0.5 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[220px] whitespace-nowrap bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#40285e]">
+                            <th className="px-2 py-0.5 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[195px] whitespace-nowrap bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#40285e]">
                                 <div className="flex items-center justify-between gap-1 w-full">
                                     <button
                                         type="button"
@@ -247,7 +323,7 @@ export function AccountTable({
                             </th>
 
                             {/* Column 2: Weekly Quota Column */}
-                            <th className="px-2 py-0.5 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[220px] whitespace-nowrap bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#40285e]">
+                            <th className="px-2 py-0.5 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[195px] whitespace-nowrap bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#40285e]">
                                 <div className="flex items-center gap-1.5">
                                     <Clock className="w-3.5 h-3.5 text-gray-400" />
                                     <span>{t('accounts.table.weekly_quota', 'Weekly Quota')}</span>
@@ -304,6 +380,7 @@ export function AccountTable({
                                     isDragDisabled={isSortingActive}
                                     modelFilter={modelFilter}
                                     showAllEmails={showAllEmails}
+                                    emailColWidth={emailColWidth}
                                 />
                             ))}
                         </tbody>
@@ -346,7 +423,8 @@ export function AccountTable({
                                         onToggleProxy={() => { }}
                                         isDisabled={Boolean(activeAccount.disabled)}
                                         onViewError={() => { }}
-                                                            />
+                                        emailColWidth={emailColWidth}
+                                    />
                                 </tr>
                             </tbody>
                         </table>

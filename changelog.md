@@ -1,5 +1,19 @@
 # Changelog
 
+## [v4.207.0] - 2026-10-16
+
+### Fixed
+- **窗口标题栏双击最大化与拖拽冲突修复 (TitleBar Double-Click Maximize)**: 在 `TitleBar.tsx` 与 `Navbar.tsx` 中拦截双击序列 (`e.detail > 1`)，防止 Windows WebView2 原生 Win32 模态拖拽循环吞没双击事件，并在双击触发时直接调用 `toggle_maximize_window` Tauri IPC 命令，保证窗口双击可靠切换全屏与最大化。 (Thanks to @aukgit)
+- **配额进度条霓虹强光弱化与 10% 宽度精简 (QuotaProgressBar Softened Glow & 10% Shrinkage)**: 弱化了配额条与表格行的过度霓虹发光（容器阴影从 `drop-shadow-[0_0_8px]` 调整为细腻的 `[0_0_3px]`，轨道发光减半）；将进度条轨道最小宽度精简 10%（从 `140px` 调整至 `126px`，表头与单元格由 `220px/210px` 调整至 `195px/185px`），为左侧邮箱列释放宝贵的水平展示空间；将里程碑检查点统一为 4 等分点 (`[20, 40, 60, 80]`)，并将彩色杂色统一为高质感的翡翠绿 `#10b981`。 (Thanks to @aukgit)
+
+### Added
+- **邮箱列交互式宽度拖拽与自定义缩放 (Resizable Email Column)**: 在 `AccountTable.tsx` 表头右侧新增交互式列宽调整手柄，支持鼠标自由拖拽缩放邮箱列宽度，设置 `[220px, 550px]` 安全阈值，双击手柄重置为默认 300px，并通过 `localStorage` 自动持久化用户偏好。 (Thanks to @aukgit)
+- **录制与空闲状态精简胶囊 (Compact IDLE & Log Capsule)**: 将原先分散的 `IDLE` 状态标签与 `Log` 日志按钮整合为单一行内 28px (`h-7`) 深色暗透分割胶囊 (`RecordingIndicator.tsx`)，采用统一的分割线与悬浮质感，显著减少顶部工具栏冗余按钮。 (Thanks to @aukgit)
+- **提示词树操作工具栏合并与新建会话直接发送 (PromptTreeView Toolbar Compaction & New Conversation Flow)**: 在 `DetailHeader.tsx` 中将原本散落的 3 个独立按钮胶囊合并为一个连续的深色暗透分割胶囊 (`[ Copy All | Send/Enqueue v ]`)；将直接发送与加入队列合二为一，提供带有快捷键 `N` 的主分流按钮与下拉配置弹窗；在下拉菜单中新增“新建会话 (New Conversation)”选项与内联会话名称输入框，用户可直接键入新会话名称并向指定项目创建并发送提示词。 (Thanks to @aukgit)
+- **纯 JSON 跨机器集群遥测与调度同步 (Fleet Remote JSON Telemetry & RCA)**: 扩展 `fleet_sync.rs` 支持生成与解析纯 JSON 集群遥测载荷，适配 Telegram Bot、IMAP 邮件与 Supabase 数据流，交换实例数量、账号配额及账号切换/快进信号；在 `02-spec/21-app/ui-and-functionality-enhancements/02-backend-fleet-and-rca-spec.md` 中完整记录提示词发送与排队修复的 4 部根因分析 (RCA)。 (Thanks to @aukgit)
+
+---
+
 ## [v4.205.0] - 2026-10-16
 
 ### Fixed
@@ -331,6 +345,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.207.0 (2026-10-16)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.206.0 (2026-10-15)**:
         -   **[Prompt Tree & Telegram] Send Dropdown Enqueue, Tree Import/Export (SQLite+JSON), Telegram Button Fixes (Thanks to @aukgit)**:
             -   **Description**: Send button dropdown now contains an "Enqueue to FIFO Queue" entry wired to the same dispatch path as the standalone Enqueue button; prompt tree gains copy-all-tree-prompts plus a unified Import/Export section (single-file SQLite DB export/import and JSON export/import); Telegram `cmd:` callback double-slash dispatch bug fixed (send-prompt, find-instance, credits-check buttons now work), 64-byte callback cap guarded, and unknown button taps show a visible notice instead of failing silently. RCAs 14-16 document each root cause.

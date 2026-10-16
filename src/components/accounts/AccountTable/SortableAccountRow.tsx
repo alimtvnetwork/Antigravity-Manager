@@ -36,6 +36,7 @@ export function SortableAccountRow({
     isDragDisabled = false,
     modelFilter = 'gemini',
     showAllEmails = false,
+    emailColWidth,
 }: SortableRowProps) {
     const { t } = useTranslation();
     const rowRef = useRef<HTMLTableRowElement | null>(null);
@@ -127,6 +128,7 @@ export function SortableAccountRow({
                 onViewError={onViewError}
                 modelFilter={modelFilter}
                 showAllEmails={showAllEmails}
+                emailColWidth={emailColWidth}
             />
         </tr>
     );
