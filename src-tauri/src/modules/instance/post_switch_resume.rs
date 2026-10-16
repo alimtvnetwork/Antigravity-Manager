@@ -18,8 +18,8 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use once_cell::sync::Lazy;
+use tauri::async_runtime::JoinHandle;
 use tauri::Emitter;
-use tokio::task::JoinHandle;
 
 use crate::modules::audit::{
     record_interaction, InteractionActor, InteractionTrigger, RecordInteractionInput,
