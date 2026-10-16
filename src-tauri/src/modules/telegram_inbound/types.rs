@@ -10,6 +10,10 @@ pub(crate) fn default_true() -> bool {
     true
 }
 
+pub(crate) fn default_card_palette() -> String {
+    "riseup".to_string()
+}
+
 /// Telegram bot integration configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TelegramConfig {
@@ -19,6 +23,9 @@ pub struct TelegramConfig {
     pub poll_interval_secs: u64,
     #[serde(default = "default_true")]
     pub notify_on_system_update: bool,
+    /// Card palette id: riseup, obsidian, gold, indigo.
+    #[serde(default = "default_card_palette")]
+    pub card_palette: String,
 }
 
 impl Default for TelegramConfig {
@@ -29,6 +36,7 @@ impl Default for TelegramConfig {
             is_enabled: false,
             poll_interval_secs: 5,
             notify_on_system_update: true,
+            card_palette: default_card_palette(),
         }
     }
 }

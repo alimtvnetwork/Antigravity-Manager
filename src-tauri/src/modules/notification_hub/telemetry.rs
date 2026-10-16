@@ -107,60 +107,107 @@ async fn dispatch_post_switch_prompt_telemetry(
                     String::new()
                 };
 
+                let palette = telegram_inbound::active_card_palette();
                 let prompt_section = if !prompt_preview_text.is_empty() {
-                    format!(
-                        "\n<blockquote expandable><b>💬 Active Prompt ({} words):</b>\n<code>{}</code></blockquote>\n",
-                        prompt_words_count,
-                        crate::modules::telegram_inbound::clean_for_telegram_html(&prompt_preview_text, 1500)
+                    telegram_inbound::prompt_note(
+                        palette,
+                        &format!("Active Prompt ({} words)", prompt_words_count),
+                        &crate::modules::telegram_inbound::clean_for_telegram_html(
+                            &prompt_preview_text,
+                            1500,
+                        ),
                     )
                 } else {
                     String::new()
                 };
 
                 let tg_text = if is_emergency {
+                    let body = telegram_inbound::section(
+                        palette,
+                        "Prompts failed to resume",
+                        &[
+                            telegram_inbound::kv(
+                                palette,
+                                "Backed up prompts",
+                                &backed_up_count.to_string(),
+                            ),
+                            telegram_inbound::kv(
+                                palette,
+                                "Restored records",
+                                &restored_count.to_string(),
+                            ),
+                            telegram_inbound::kv(
+                                palette,
+                                "Verified running",
+                                "0 — none detected",
+                            ),
+                            telegram_inbound::kv(
+                                palette,
+                                "Projects",
+                                &escape_telegram_html(&projects_display),
+                            ),
+                            telegram_inbound::kv(
+                                palette,
+                                "Version",
+                                &format!(
+                                    "{} · {}",
+                                    escape_telegram_html(&pkg_ver),
+                                    escape_telegram_html(&now_str)
+                                ),
+                            ),
+                            telegram_inbound::sub_line(
+                                palette,
+                                "Run <code>agm prompts status</code> or <code>agm prompts restore</code>",
+                            ),
+                        ],
+                    );
                     format!(
-                        "🚨 <b>Antigravity Manager: EMERGENCY ALERT</b>\n\
-                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
-                        {}\n\
-                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
-                        ⚠️ <b>Prompts Failed to Resume After Switch!</b>\n\
-                        <blockquote>\
-                        • <b>Backed Up Prompts:</b> <code>{}</code>\n\
-                        • <b>Restored Records:</b> <code>{}</code>\n\
-                        • <b>Verified Running:</b> <code>0 (FAILED TO DETECT RUNNING PROMPT)</code>\n\
-                        • <b>Projects:</b> <code>{}</code>\n\
-                        • <b>Version &amp; Timestamp:</b> <code>{}</code> | <code>{}</code>\n\
-                        • <b>Action:</b> Run <code>agm prompts status</code> or <code>agm prompts restore</code>\
-                        </blockquote>{}{}",
+                        "{} <b>Antigravity Manager · Emergency</b>\n{}\n{}\n{}\n{}{}{}{}",
+                        palette.mark,
+                        palette.rule,
                         telemetry_header,
-                        backed_up_count,
-                        restored_count,
-                        escape_telegram_html(&projects_display),
-                        escape_telegram_html(&pkg_ver),
-                        escape_telegram_html(&now_str),
+                        palette.rule,
+                        body,
                         attached_images_section,
-                        prompt_section
+                        prompt_section,
+                        telegram_inbound::theme_footer(palette)
                     )
                 } else {
+                    let body = telegram_inbound::section(
+                        palette,
+                        "Execution status",
+                        &[
+                            telegram_inbound::kv(
+                                palette,
+                                "Verified running",
+                                &format!("{} of {} backed up", verified_running, backed_up_count),
+                            ),
+                            telegram_inbound::kv(
+                                palette,
+                                "Active projects",
+                                &escape_telegram_html(&projects_display),
+                            ),
+                            telegram_inbound::kv(
+                                palette,
+                                "Version",
+                                &format!(
+                                    "{} · {}",
+                                    escape_telegram_html(&pkg_ver),
+                                    escape_telegram_html(&now_str)
+                                ),
+                            ),
+                        ],
+                    );
                     format!(
-                        "✅ <b>Antigravity Manager: Post-Switch Liveness Confirmed</b>\n\
-                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
-                        {}\n\
-                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
-                        <b>🟢 EXECUTION STATUS</b>\n\
-                        <blockquote>\
-                        • <b>Verified Running Prompts:</b> <code>{}</code> (of {} backed up)\n\
-                        • <b>Active Projects:</b> <code>{}</code>\n\
-                        • <b>Version &amp; Timestamp:</b> <code>{}</code> | <code>{}</code>\
-                        </blockquote>{}{}",
+                        "{} <b>Antigravity Manager · Post-switch liveness</b>\n{}\n{}\n{}\n{}{}{}{}",
+                        palette.mark,
+                        palette.rule,
                         telemetry_header,
-                        verified_running,
-                        backed_up_count,
-                        escape_telegram_html(&projects_display),
-                        escape_telegram_html(&pkg_ver),
-                        escape_telegram_html(&now_str),
+                        palette.rule,
+                        body,
                         attached_images_section,
-                        prompt_section
+                        prompt_section,
+                        telegram_inbound::theme_footer(palette)
                     )
                 };
 

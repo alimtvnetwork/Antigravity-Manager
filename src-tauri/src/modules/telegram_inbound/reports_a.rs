@@ -41,29 +41,55 @@ pub fn format_ping_report() -> String {
         .map(|a| a.email)
         .unwrap_or_else(|| "None".to_string());
 
+    let palette = active_card_palette();
+    let body = section(
+        palette,
+        "Node",
+        &[
+            kv(
+                palette,
+                "Active account",
+                &clean_for_telegram_html(&active_acc, 64),
+            ),
+            kv(
+                palette,
+                "App build",
+                &format!(
+                    "v{} · {}",
+                    clean_for_telegram_html(&ver, 24),
+                    clean_for_telegram_html(&hash, 24)
+                ),
+            ),
+            kv(
+                palette,
+                "Branch",
+                &format!(
+                    "{} · {}",
+                    clean_for_telegram_html(&branch, 24),
+                    clean_for_telegram_html(&last_rel, 24)
+                ),
+            ),
+            kv(palette, "Uptime", &format!("{}m", uptime_min)),
+        ],
+    );
     format!(
-        "🏓 <b>PONG — AGM v{} Online</b> ⚡\n\
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
-        🖥️ <b>Machine:</b> <code>{}</code> (<code>{}</code>) | 🏷️ <b>Alias:</b> <code>{}</code>\n\
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
-        <b>📊 NODE TELEMETRY &amp; LIFECYCLE</b>\n\
-        <blockquote>\
-        • <b>Active Account:</b> <code>{}</code>\n\
-        • <b>App Build:</b> <code>v{}</code> (commit <code>{}</code>)\n\
-        • <b>Git Branch:</b> <code>{}</code> | <b>Release:</b> <code>{}</code>\n\
-        • <b>System Uptime:</b> <code>{}m</code>\
-        </blockquote>\n\n\
-        💡 Send <code>/observe</code> for live workspaces or <code>/fleet</code> for instance map.",
+        "{} <b>Pong · AGM v{}</b>\n\
+        {}\n\
+        🖥️ <b>Machine:</b> <code>{}</code> (<code>{}</code>) · <b>Alias:</b> <code>{}</code>\n\
+        {}\n\
+        {}\
+        {} <b>Next</b>  <code>/observe</code> · <code>/fleet</code>\n\
+        {}",
+        palette.mark,
         clean_for_telegram_html(&ver, 24),
+        palette.rule,
         clean_for_telegram_html(&machine_name, 48),
         clean_for_telegram_html(&local_ip, 48),
         clean_for_telegram_html(&display_alias, 48),
-        clean_for_telegram_html(&active_acc, 64),
-        clean_for_telegram_html(&ver, 24),
-        clean_for_telegram_html(&hash, 24),
-        clean_for_telegram_html(&branch, 24),
-        clean_for_telegram_html(&last_rel, 24),
-        uptime_min
+        palette.rule,
+        body,
+        palette.bullet,
+        theme_footer(palette)
     )
 }
 

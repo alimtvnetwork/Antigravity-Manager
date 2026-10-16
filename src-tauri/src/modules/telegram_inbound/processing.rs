@@ -32,6 +32,7 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
 
     match cmd_base.as_str() {
         "start" | "help" => Some(format_help_manual()),
+        "theme" | "palette" | "color" | "colors" => Some(format_theme_reply(rest)),
         "ping" => Some(format_ping_report()),
         "open" => Some(commands::execute_open_command(rest).await),
         "screenshot" => Some(commands::execute_screenshot_command(rest).await),

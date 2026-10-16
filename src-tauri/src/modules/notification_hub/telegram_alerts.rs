@@ -172,52 +172,107 @@ pub(crate) async fn dispatch_telegram_switch_alert(
         escape_telegram_html(&selected_masked)
     );
 
+    let palette = telegram_inbound::active_card_palette();
     let prompt_section = if !prompt_preview_text.is_empty() {
-        format!(
-            "\n<blockquote expandable><b>💬 Active Prompt ({} words):</b>\n<code>{}</code></blockquote>\n",
-            prompt_words_count,
-            crate::modules::telegram_inbound::clean_for_telegram_html(&prompt_preview_text, 1500)
+        telegram_inbound::prompt_note(
+            palette,
+            &format!("Active Prompt ({} words)", prompt_words_count),
+            &crate::modules::telegram_inbound::clean_for_telegram_html(&prompt_preview_text, 1500),
         )
     } else {
         String::new()
     };
+    let quota = telegram_inbound::section(
+        palette,
+        "Quota &amp; rotation",
+        &[
+            telegram_inbound::kv(
+                palette,
+                "Previous account",
+                &escape_telegram_html(&from_display),
+            ),
+            telegram_inbound::sub_line(
+                palette,
+                &format!(
+                    "4h: {} · Week: {}",
+                    escape_telegram_html(&prev_4h_str),
+                    escape_telegram_html(&prev_weekly_str)
+                ),
+            ),
+            telegram_inbound::kv(
+                palette,
+                "Selected account",
+                &escape_telegram_html(&selected_masked),
+            ),
+            telegram_inbound::sub_line(
+                palette,
+                &format!(
+                    "4h: {} · Week: {}",
+                    escape_telegram_html(&target_4h_str),
+                    escape_telegram_html(&target_weekly_str)
+                ),
+            ),
+            telegram_inbound::kv(
+                palette,
+                "Threshold guard",
+                &format!(
+                    "{} · {}",
+                    escape_telegram_html(&threshold_display),
+                    escape_telegram_html(&trigger_label)
+                ),
+            ),
+        ],
+    );
+    let workspace = telegram_inbound::section(
+        palette,
+        "Workspace",
+        &[
+            telegram_inbound::kv(
+                palette,
+                "Projects",
+                &escape_telegram_html(&projects_display),
+            ),
+            telegram_inbound::kv(
+                palette,
+                "Prompt vault",
+                &escape_telegram_html(&backup_stats),
+            ),
+            telegram_inbound::kv(
+                palette,
+                "Event reason",
+                &escape_telegram_html(&details.reason),
+            ),
+            telegram_inbound::kv(
+                palette,
+                "Version",
+                &format!(
+                    "{} · {}",
+                    escape_telegram_html(&pkg_ver),
+                    escape_telegram_html(&now_str)
+                ),
+            ),
+        ],
+    );
 
     let text = format!(
-        "🔄 <b>Antigravity Manager: Account Rotation</b> ⚡\n\
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        "{} <b>Antigravity Manager · Account Rotation</b>\n\
         {}\n\
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
-        <b>📊 QUOTA DELTA &amp; ROTATION STATUS</b>\n\
-        <blockquote>\
-        • <b>Previous Account:</b> <code>{}</code>\n\
-        \u{2007}\u{2007}└ <i>Balances:</i> <code>4h: {} | Weekly: {}</code>\n\
-        • <b>Selected Account:</b> <code>{}</code>\n\
-        \u{2007}\u{2007}└ <i>Balances:</i> <code>4h: {} | Weekly: {}</code>\n\
-        • <b>Threshold Guard:</b> <code>{}</code> (Trigger: <i>{}</i>)\
-        </blockquote>\n\n\
-        <b>📁 WORKSPACE &amp; SYSTEM CONTEXT</b>\n\
-        <blockquote>\
-        • <b>Projects:</b> <code>{}</code>\n\
-        • <b>Prompt Vault:</b> <code>{}</code>\n\
-        • <b>Event Reason:</b> <i>{}</i>\n\
-        • <b>Version &amp; Timestamp:</b> <code>{}</code> | <code>{}</code>\
-        </blockquote>{}{}",
+        {}\n\
+        {}\n\
+        {}\
+        {}\
+        {}\
+        {}\n\
+        {}",
+        palette.mark,
+        palette.rule,
         telemetry_banner,
-        escape_telegram_html(&from_display),
-        escape_telegram_html(&prev_4h_str),
-        escape_telegram_html(&prev_weekly_str),
-        escape_telegram_html(&selected_masked),
-        escape_telegram_html(&target_4h_str),
-        escape_telegram_html(&target_weekly_str),
-        escape_telegram_html(&threshold_display),
-        escape_telegram_html(&trigger_label),
-        escape_telegram_html(&projects_display),
-        escape_telegram_html(&backup_stats),
-        escape_telegram_html(&details.reason),
-        escape_telegram_html(&pkg_ver),
-        escape_telegram_html(&now_str),
+        palette.rule,
+        quota,
+        workspace,
         attached_images_section,
-        prompt_section
+        prompt_section,
+        telegram_inbound::theme_footer(palette)
     );
 
     let reply_markup = Some(telegram_inbound::build_switch_alert_reply_markup(

@@ -122,24 +122,39 @@ async fn dispatch_telegram_update_alert(
         escape_telegram_html(&active_inst_id)
     );
 
+    let palette = telegram_inbound::active_card_palette();
+    let release = telegram_inbound::section(
+        palette,
+        "Release",
+        &[
+            telegram_inbound::kv(
+                palette,
+                "New version",
+                &format!("v{}", escape_telegram_html(current_version)),
+            ),
+            telegram_inbound::kv(
+                palette,
+                "Previous version",
+                &format!("v{}", escape_telegram_html(previous_version)),
+            ),
+            telegram_inbound::kv(palette, "Status", &escape_telegram_html(status_notes)),
+            telegram_inbound::kv(palette, "Timestamp", &escape_telegram_html(&now_str)),
+        ],
+    );
     let text = format!(
-        "🚀 <b>Antigravity Manager: System Updated!</b>\n\
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        "{} <b>Antigravity Manager · System updated</b>\n\
         {}\n\
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
-        <b>📦 RELEASE DETAILS</b>\n\
-        <blockquote>\
-        • <b>New Version:</b> <code>v{}</code>\n\
-        • <b>Previous Version:</b> <code>v{}</code>\n\
-        • <b>Status:</b> <i>{}</i>\n\
-        • <b>Timestamp:</b> <code>{}</code>\
-        </blockquote>\n\n\
-        🔗 <a href=\"https://github.com/alimtvnetwork/Antigravity-Manager/releases\"><b>Release Notes &amp; Changelog</b></a>",
+        {}\n\
+        {}\n\
+        {}\n\
+        🔗 <a href=\"https://github.com/alimtvnetwork/Antigravity-Manager/releases\"><b>Release notes</b></a>\n\
+        {}",
+        palette.mark,
+        palette.rule,
         telemetry_header,
-        escape_telegram_html(current_version),
-        escape_telegram_html(previous_version),
-        escape_telegram_html(status_notes),
-        escape_telegram_html(&now_str)
+        palette.rule,
+        release,
+        telegram_inbound::theme_footer(palette)
     );
 
     if let Err(e) =

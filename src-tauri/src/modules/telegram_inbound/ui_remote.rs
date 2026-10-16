@@ -489,12 +489,12 @@ pub fn help_copy_markup() -> Value {
 pub fn window_command_section() -> &'static str {
     "\n\
     🎨 <b>Window, screenshot, and where the next prompt goes</b>\n\
-    <blockquote>🔵 <b>This machine.</b> <code>/ui</code> opens Antigravity Manager when it is closed. <code>/shot</code> opens it only if needed, then sends a picture of the current manager window back to this chat. Each machine that runs the manager answers for its own screen.</blockquote>\n\
+    🔵 <b>This machine.</b> <code>/ui</code> opens Antigravity Manager when it is closed. <code>/shot</code> opens it only if needed, then sends a picture of the current manager window back to this chat. Each machine that runs the manager answers for its own screen.\n\
     <pre>/ui\n/shot\n/target default C001</pre>\n\
-    <blockquote>🟢 Send <code>/target &lt;instance&gt; &lt;C001&gt;</code> first — the next plain message is the prompt and goes to that conversation. <code>/target clear</code> forgets the aim. For a guided machine → instance → conversation picker with screenshot proof of delivery, use <code>/send</code>.</blockquote>\n\
-    <blockquote>🟡 <code>/open &lt;machine&gt;</code> opens AGM on a fleet machine; <code>/screenshot &lt;machine&gt;</code> photographs it. Bare <code>/open</code> / <code>/screenshot</code> stay local.</blockquote>\n\
-    <blockquote>🟣 Voice notes stay audio. Telegram does not turn them into text. Type the prompt after <code>/target</code> or <code>/send</code>.</blockquote>\n\
-    <blockquote>🟠 <b>Drive the UI remotely.</b> <code>/ui goto &lt;route&gt;</code> navigates the manager window (e.g. <code>/ui goto instances</code>); <code>/ui ls</code> lists every route; <code>/ui scroll &lt;element-id&gt;</code> scrolls an element into view and focuses it. Unknown routes list the valid ones — nothing fails silently.</blockquote>\n"
+    🟢 Send <code>/target &lt;instance&gt; &lt;C001&gt;</code> first — the next plain message is the prompt and goes to that conversation. <code>/target clear</code> forgets the aim. For a guided machine → instance → conversation picker with screenshot proof of delivery, use <code>/send</code>.\n\
+    🟡 <code>/open &lt;machine&gt;</code> opens AGM on a fleet machine; <code>/screenshot &lt;machine&gt;</code> photographs it. Bare <code>/open</code> / <code>/screenshot</code> stay local.\n\
+    🟣 Voice notes stay audio. Telegram does not turn them into text. Type the prompt after <code>/target</code> or <code>/send</code>.\n\
+    🟠 <b>Drive the UI remotely.</b> <code>/ui goto &lt;route&gt;</code> navigates the manager window (e.g. <code>/ui goto instances</code>); <code>/ui ls</code> lists every route; <code>/ui scroll &lt;element-id&gt;</code> scrolls an element into view and focuses it. Unknown routes list the valid ones — nothing fails silently.\n"
 }
 
 /// Handle `/ui`, `/shot`, `/target`, and a follow-up prompt. Other text returns None.

@@ -119,6 +119,8 @@ pub(crate) mod tests {
             "<code>/prompt --node vm-1 --instance work Audit code</code>",
             "<code>/target W3 default</code>",
             "<code>/send</code>",
+            "<code>/theme</code>",
+            "<code>/theme riseup</code>",
             "<code>/balance</code>",
             "<code>/credits</code>",
             "<code>/quota</code>",

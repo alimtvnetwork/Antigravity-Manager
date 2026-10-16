@@ -77,32 +77,47 @@ pub fn format_expand_prompt_report(query_str: &str) -> String {
                 String::new()
             };
 
+            let palette = active_card_palette();
+            let meta = section(
+                palette,
+                "Prompt",
+                &[
+                    kv(palette, "Project", &clean_for_telegram_html(&short_ws, 32)),
+                    kv(
+                        palette,
+                        "Status",
+                        &format!(
+                            "{} {} · {}",
+                            badge,
+                            clean_for_telegram_html(&p.status, 24),
+                            duration
+                        ),
+                    ),
+                    kv(palette, "Path", &clean_for_telegram_html(&p.repo_path, 80)),
+                    kv(palette, "Words", &format!("{} words", word_count)),
+                ],
+            );
             format!(
-                "📄 <b>Expanded Prompt: <code>{}</code></b> ⚡\n\
-                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
-                🖥️ <b>Machine:</b> <code>{}</code> (<code>{}</code>) | 🏷️ <b>Instance:</b> <code>{}</code>\n\
-                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
-                <b>📋 PROMPT METADATA &amp; CONTEXT</b>\n\
-                <blockquote>\
-                • <b>Workspace Project:</b> <b>{}</b>\n\
-                • <b>Lifecycle Status:</b> {} <code>{}</code> ({})\n\
-                • <b>Workspace Path:</b> <code>{}</code>\n\
-                • <b>Word Count:</b> <code>{} words</code>\
-                </blockquote>{}\n\
-                <blockquote expandable><b>💬 Instructions:</b>\n\
-                <code>{}</code></blockquote>",
+                "{} <b>Expanded prompt</b>  <code>{}</code>\n\
+                {}\n\
+                🖥️ <b>Machine:</b> <code>{}</code> (<code>{}</code>) · <b>Instance:</b> <code>{}</code>\n\
+                {}\n\
+                {}{}\
+                {}",
+                palette.mark,
                 clean_for_telegram_html(&p.id, 48),
+                palette.rule,
                 clean_for_telegram_html(&m_name, 48),
                 clean_for_telegram_html(&m_ip, 48),
                 clean_for_telegram_html(inst_id, 32),
-                clean_for_telegram_html(&short_ws, 32),
-                badge,
-                clean_for_telegram_html(&p.status, 24),
-                duration,
-                clean_for_telegram_html(&p.repo_path, 80),
-                word_count,
+                palette.rule,
+                meta,
                 attached_images_section,
-                clean_for_telegram_html(&p.prompt_content, 3500)
+                prompt_note(
+                    palette,
+                    "Instructions",
+                    &clean_for_telegram_html(&p.prompt_content, 3500),
+                )
             )
         }
         None => format!(
@@ -274,7 +289,10 @@ pub fn format_help_manual() -> String {
         • <code>/backup</code> · <code>/restore</code> · <code>/prune [N]</code> · <code>/clean</code>\n\
         • <code>/update</code> · <code>/update gitmap</code> · <code>/update all</code> · <code>/gitmap ssh update agm</code>\n\
         • <code>/email status</code> · <code>/email ping</code> · <code>/email help</code>\n\n\
-        <blockquote>🛡️ Prompts are never guessed: <code>/send</code> locks machine → instance → conversation first; <code>/target</code> aims the next plain message at one machine/instance/conversation.</blockquote>{}",
+        🎨 <b>Card theme</b>\n\
+        • <code>/theme</code> — List palettes. Default is Riseup (emerald and gold)\n\
+        • <code>/theme riseup</code> · <code>/theme obsidian</code> · <code>/theme gold</code> · <code>/theme indigo</code>\n\n\
+        🛡️ <b>Prompt aim</b>  <code>/send</code> locks machine, instance, then conversation. <code>/target</code> aims the next plain message.{}",
         clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&hash, 24),

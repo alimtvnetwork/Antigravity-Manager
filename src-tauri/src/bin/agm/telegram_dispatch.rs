@@ -26,6 +26,17 @@ pub(crate) fn cmd_telegram(args: &[String]) {
 
     if let Some(first) = args.first() {
         let first_lower = first.trim_start_matches('/').to_lowercase();
+        if first_lower == "theme" || first_lower == "palette" {
+            let name = args.get(1).map(|s| s.as_str()).unwrap_or("");
+            match telegram_inbound::set_card_palette(name) {
+                Ok(msg) => println!("{}", msg),
+                Err(e) => {
+                    eprintln!("[ERROR] {}", e);
+                    std::process::exit(1);
+                }
+            }
+            return;
+        }
         if crate::telegram_blocks_a::telegram_route_help(args, &first_lower, &t_cfg, &rt) {
             return;
         }
