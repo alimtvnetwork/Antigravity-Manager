@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.215.1 (2026-10-17)**:
+        -   **[Telegram] Fix `/expand` format-string compile error (Thanks to @aukgit)**:
+            -   **Description**: `format_expand_prompt_report` had 10 format placeholders but 9 arguments (leftover `{}` from the message rewrite); removed the stray placeholder. v4.215.0's tag pointed at the broken commit, so this patch carries the same Telegram enhancements on a green tree. (Thanks to @aukgit)
+
     *   **v4.215.0 (2026-10-17)**:
         -   **[Telegram] IDE exe on every prompt, history with one-tap rerun, professional messages (Thanks to @aukgit)**:
             -   **Description**: Every prompt the bot shows now ends with the IDE exe name (`ide_exe_line`, basename only, omitted when unknown rather than guessed). New `/history` lists recently sent prompts with a `↻ Rerun` button per row (`send:r:<id8>`, 64-byte-safe); `/rerun <id>` re-dispatches through the canonical injection path. All 64 prompt-related bot strings rewritten into professional human-readable messages: "Destination locked" is now "Destination confirmed", raw Id dumps became formatted cards with 8-char refs, jargon ("Inject", "Split DB", "Dual Seq ID", "Vault Path") purged; `/send` and `/target` added to the Telegram command menu. (Thanks to @aukgit)
