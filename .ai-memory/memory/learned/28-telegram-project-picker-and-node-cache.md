@@ -7,3 +7,5 @@ Shipped in v4.211.0 (`92e8caf5`).
 The picker used to show `project_id · session_id[:8]` in FIFO order and label this computer `Node-<digits>`. It now shows eight projects per page, newest conversation first, project name then conversation title, selected by number. The current machine button says This machine and uses Telegram `style: success`. Generated node names are cached in `node_display_cache.db` for `node_name_refresh_hours` (default 24).
 
 Do not reorder `list_all_prompts`. Do not put the conversation id in the label or in `callback_data`. Do not call GitMap on every message. Do not hold the send-flow mutex across `.await`.
+
+Fleet, the account switcher, the audit log, SSH Test Connection, the prompt tree, and conversation rename are a different note: `.ai-memory/rca/19-fleet-switch-audit-ssh-and-prompt-tree.md`. The fleet table does not fill from SSH nodes. There is no command that renames an IDE conversation.

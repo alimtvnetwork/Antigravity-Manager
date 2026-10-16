@@ -31,6 +31,7 @@ function signature, or re-running a failed pipeline.
 | [16-telegram-unknown-cmd-callback-silence.md](./16-telegram-unknown-cmd-callback-silence.md) | Unresolvable `cmd:` button taps failed silently | added user-visible "Unknown button action" fallback notice |
 | [17-instance-pid-stop-switch-and-audit-trail.md](./17-instance-pid-stop-switch-and-audit-trail.md) | List showed a bare number, Stop left the IDE running, audit trail was empty | `1632` is `inst.pid`; close returned Ok after dropping that PID; the dialog read `recent_switches` while the query returned `records` |
 | [18-telegram-project-listing-and-node-cache.md](./18-telegram-project-listing-and-node-cache.md) | `/send` step 3 showed `Node-*` and `project · conv-id`, oldest eight, numbers did nothing | picker printed `session_id` from FIFO `list_all_prompts` and stuffed the id into `callback_data`; no title lookup and no node-name cache |
+| [19-fleet-switch-audit-ssh-and-prompt-tree.md](./19-fleet-switch-audit-ssh-and-prompt-tree.md) | Fleet table stays empty after SSH works; switch dialog, audit, prompt tree, and rename get mixed together | fleet rows come from Supabase heartbeats, not `ssh_nodes.json`; Test Connection is not `send_remote_ssh_prompt`; there is no IDE conversation rename |
 
 ## Standing notes
 

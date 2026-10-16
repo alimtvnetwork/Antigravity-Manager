@@ -2,6 +2,7 @@
 
 | # | Specification File | Summary |
 | :--- | :--- | :--- |
+| `fleet-switch-audit-ssh-and-prompt-tree` | [fleet-switch-audit-ssh-and-prompt-tree/01-architecture-spec.md](./fleet-switch-audit-ssh-and-prompt-tree/01-architecture-spec.md) | Fleet heartbeats versus SSH nodes, switch quota order, audit field names, Test Connection, prompt send versus enqueue, and the missing conversation rename. |
 | `telegram-project-listing-and-ui-enhancement` | [telegram-project-listing-and-ui-enhancement/01-architecture-spec.md](./telegram-project-listing-and-ui-enhancement/01-architecture-spec.md) | Telegram `/send` lists eight projects per page by latest conversation, shows the project name and conversation title, selects by number, and labels this machine in green. Node names cache in SQLite for 24 hours. |
 | `ui-and-functionality-enhancements` | [ui-and-functionality-enhancements/readme.md](./ui-and-functionality-enhancements/readme.md) | Header double-click maximize fix, compact status pill, QuotaProgressBar 10% width shrinkage & 4 equal checkpoints, resizable Email column, PromptTreeView toolbar compaction & New Conversation flow, Prompt Send/Enqueue RCA, and fleet JSON sync. |
 | `antigravity-manager-agm-ui-and-functionality-fixes` | [antigravity-manager-agm-ui-and-functionality-fixes/01-spec.md](./antigravity-manager-agm-ui-and-functionality-fixes/01-spec.md) | Send dropdown Enqueue entry, tree copy-all + unified Import/Export (SQLite DB + JSON), Telegram `cmd:` button fixes (RCAs 14-16), E2E validation; released v4.206.0. |
