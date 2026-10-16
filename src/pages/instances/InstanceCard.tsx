@@ -218,7 +218,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                     className={cn(
                                         'px-1.5 py-0.5 rounded-md text-[11px] font-semibold font-mono border flex items-center gap-1 min-w-0 shadow-2xs transition-colors cursor-pointer',
                                         'bg-blue-500/10 text-blue-700 border-blue-500/30',
-                                        'dark:bg-[#1f1433] dark:border-[#40285e] dark:text-amber-200 hover:dark:text-white hover:dark:bg-[#2c1d47]'
+                                        'dark:bg-[#1f1433] dark:border-[#40285e] dark:text-amber-200 hover:dark:bg-[#2c1d47]'
                                     )}
                                     title={
                                         isEmailRevealed
@@ -227,7 +227,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                     }
                                 >
                                     <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-500 dark:bg-[#1af18d]" />
-                                    <span className="truncate">
+                                    <span className="truncate transition-colors group-hover:text-yellow-400 hover:text-yellow-300 dark:group-hover:text-yellow-200 dark:hover:text-yellow-200">
                                         {isEmailRevealed ? displayEmail : maskEmail(displayEmail)}
                                     </span>
                                 </button>
@@ -242,13 +242,13 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
 
                     <div className="mb-2">
                         {geminiModel || weeklyQuota ? (
-                            <div className="p-2 rounded-md bg-gray-50/90 dark:bg-[var(--ui-surface-2)] border border-gray-200/70 dark:border-[var(--ui-border-subtle)] space-y-1.5">
+                            <div className="p-2 rounded-md bg-gray-50/90 dark:bg-[var(--ui-surface-2)] border border-gray-200/70 dark:border-[var(--ui-border-subtle)] space-y-1.5 group-hover:[&_span.font-mono]:text-yellow-400 dark:group-hover:[&_span.font-mono]:text-yellow-200">
                                 {geminiModel && (
                                     <div className="space-y-0.5">
                                         <div className="flex items-center justify-between text-xs">
                                             <div className="flex items-center gap-1.5 min-w-0">
                                                 <Gemini.Color className="w-3.5 h-3.5 shrink-0" />
-                                                <span className="font-semibold text-gray-800 dark:text-gray-200 text-xs truncate">
+                                                <span className="font-semibold text-gray-800 dark:text-gray-200 text-xs truncate transition-colors group-hover:text-yellow-500 dark:group-hover:text-yellow-200">
                                                     {geminiModel.display_name || geminiModel.name || 'Gemini 3.1 Pro'} (4H)
                                                 </span>
                                             </div>
@@ -262,7 +262,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                 {weeklyQuota && (
                                     <div className={cn('space-y-0.5', geminiModel && 'pt-1 border-t border-gray-200/60 dark:border-[#40285e]/60')}>
                                         <div className="flex items-center justify-between text-xs">
-                                            <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">
+                                            <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300 transition-colors group-hover:text-yellow-500 dark:group-hover:text-yellow-200">
                                                 Weekly Quota
                                             </span>
                                         </div>

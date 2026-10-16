@@ -380,20 +380,28 @@ export const sshService = {
 
     async testSshNodeConnection(alias: string): Promise<RemotePromptDispatchResult> {
         try {
-            return await invoke<RemotePromptDispatchResult>('send_remote_ssh_prompt', {
-                payload: {
-                    node_alias: alias,
-                    instance_target: 'default',
-                    prompt_text: '__ssh_ping__',
-                },
-                node_alias: alias,
-                instance_target: 'default',
-                prompt_text: '__ssh_ping__',
-            });
+            const result = await invoke<{
+                alias?: string;
+                target?: string;
+                stdout?: string;
+                stderr?: string;
+                duration_ms?: number | string;
+                success?: boolean;
+            }>('test_ssh_node_connection', { idOrAlias: alias });
+            const duration = Number(result?.duration_ms ?? 0);
+            return {
+                node_alias: result?.alias || alias,
+                instance_target: result?.target || alias,
+                success: Boolean(result?.success),
+                command_executed: '',
+                stdout: result?.stdout || '',
+                stderr: result?.stderr || '',
+                duration_ms: Number.isFinite(duration) ? duration : 0,
+            };
         } catch (error) {
             useErrorStore.getState().captureError(error, {
                 source: 'sshService.testSshNodeConnection',
-                triggerAction: 'send_remote_ssh_prompt',
+                triggerAction: 'test_ssh_node_connection',
             });
             throw error;
         }

@@ -2,8 +2,48 @@ import { ArrowRightLeft, Search, RotateCw } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { showToast } from '../../components/common/ToastContainer';
 import { findQuotaModel } from '../../config/modelConfig';
-import type { Account } from '../../types/account';
+import type { Account, QuotaBucket, QuotaGroup } from '../../types/account';
 import type { InstancePageApi } from './instancePageTypes';
+
+function readWeeklyPercent(groups: QuotaGroup[] | undefined): number | null {
+    if (!groups?.length) return null;
+    const group =
+        groups.find((item) => {
+            const name = (item.display_name || '').toLowerCase();
+            return name.includes('gemini') || (!name.includes('claude') && !name.includes('gpt'));
+        }) || groups[0];
+    const bucket = (group?.buckets || []).find((item: QuotaBucket) => {
+        const windowName = (item.window || '').toLowerCase();
+        const bucketId = (item.bucket_id || '').toLowerCase();
+        return windowName.includes('week') || bucketId.includes('week');
+    });
+    if (!bucket || typeof bucket.remaining_fraction !== 'number' || !Number.isFinite(bucket.remaining_fraction)) {
+        return null;
+    }
+    return Math.min(100, Math.max(0, bucket.remaining_fraction * 100));
+}
+
+function accountQuotaScores(acc: Account): { fourH: number | null; weekly: number | null } {
+    if (acc.disabled || acc.quota?.is_forbidden) {
+        return { fourH: null, weekly: null };
+    }
+    const proModel = findQuotaModel(acc.quota?.models, 'gemini-pro');
+    const flashModel = findQuotaModel(acc.quota?.models, 'gemini-flash');
+    const model = proModel || flashModel;
+    const raw4h = model && Number.isFinite(model.percentage) ? model.percentage : null;
+    const fourH = raw4h === null ? null : Math.min(100, Math.max(0, raw4h));
+    return { fourH, weekly: readWeeklyPercent(acc.quota?.quota_groups) };
+}
+
+function sortScore(value: number | null): number {
+    return value === null || !Number.isFinite(value) ? 0 : value;
+}
+
+function formatQuotaPercent(value: number | null): string {
+    if (value === null || !Number.isFinite(value)) return '—';
+    const rounded = Math.round(value * 10) / 10;
+    return Number.isInteger(rounded) ? `${rounded}%` : `${rounded.toFixed(1)}%`;
+}
 
 export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
     const {
@@ -27,11 +67,19 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
         setAccountSearchQuery('');
     };
 
-    const filtered = accounts.filter((a) => {
-        const q = accountSearchQuery.toLowerCase().trim();
-        if (!q) return true;
-        return a.email.toLowerCase().includes(q) || a.id.toLowerCase().includes(q);
-    });
+    const filtered = accounts
+        .filter((a) => {
+            const q = accountSearchQuery.toLowerCase().trim();
+            if (!q) return true;
+            return a.email.toLowerCase().includes(q) || a.id.toLowerCase().includes(q);
+        })
+        .sort((a, b) => {
+            const aQuota = accountQuotaScores(a);
+            const bQuota = accountQuotaScores(b);
+            const aTotal = sortScore(aQuota.fourH) + sortScore(aQuota.weekly);
+            const bTotal = sortScore(bQuota.fourH) + sortScore(bQuota.weekly);
+            return bTotal - aTotal;
+        });
 
     const handleSelect = async (acc: Account) => {
         const targetId = switchTargetInstance.config.id;
@@ -103,10 +151,10 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                 switchTargetInstance.config.bound_account_id === acc.id ||
                                 (switchTargetInstance.config.bound_email &&
                                     switchTargetInstance.config.bound_email.toLowerCase() === acc.email.toLowerCase());
-                            const proModel = findQuotaModel(acc.quota?.models, 'gemini-pro');
-                            const flashModel = findQuotaModel(acc.quota?.models, 'gemini-flash');
-                            const model = proModel || flashModel;
-                            const pct = model ? Math.min(100, Math.max(0, model.percentage)) : 0;
+                            const { fourH, weekly } = accountQuotaScores(acc);
+                            const total =
+                                fourH === null && weekly === null ? null : sortScore(fourH) + sortScore(weekly);
+                            const barPct = fourH === null ? 0 : Math.min(100, Math.max(0, fourH));
                             const tier = (acc.quota?.subscription_tier || 'FREE').toUpperCase();
 
                             return (
@@ -142,15 +190,19 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                                 </span>
                                             ) : null}
                                         </div>
-                                        <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-                                            <span>Quota: {pct}%</span>
+                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                            <span>4h {formatQuotaPercent(fourH)}</span>
+                                            <span>Weekly {formatQuotaPercent(weekly)}</span>
+                                            <span className="font-semibold text-slate-700 dark:text-slate-200">
+                                                Total {formatQuotaPercent(total)}
+                                            </span>
                                             <div className="w-24 h-1.5 bg-slate-200 dark:bg-[#40285e] rounded-full overflow-hidden">
                                                 <div
                                                     className={cn(
                                                         'h-full rounded-full',
-                                                        pct >= 50 ? 'bg-emerald-500' : pct >= 20 ? 'bg-amber-500' : 'bg-rose-500'
+                                                        barPct >= 50 ? 'bg-emerald-500' : barPct >= 20 ? 'bg-amber-500' : 'bg-rose-500'
                                                     )}
-                                                    style={{ width: `${pct}%` }}
+                                                    style={{ width: `${barPct}%` }}
                                                 />
                                             </div>
                                         </div>
