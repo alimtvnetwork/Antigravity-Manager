@@ -33,7 +33,7 @@ All AI agents operating within GitMap-managed repositories MUST strictly adhere 
 | ❌ Committing `.env` or credentials to standard repositories | ✅ `gitmap rs text "<secret>" --slug <slug>` | Strict zero-secrets policy; stores credentials exclusively in `repo-secrets` vault. |
 | ❌ `gh run watch` or tight polling loops (`while true; sleep 5`) | ✅ `gitmap pipeline-ai status -t <eta>` or `gitmap pe -t` | Dynamic timeout waiting driven by calculated workflow ETA without burning CPU or Actions API quotas. |
 | ❌ Slow Python fleet sync (`python 03-ai-scripts/38-sync-prompts-skills-scripts.py`) | ✅ `gitmap sync [--workers 8] [--projects <path|json>]` | Native Go multi-repo synchronization across 43 repositories in <5s with 6-stage safe ceremony (backup branch, pre-pull, 5 boundaries, atomic commit). |
-| ❌ Python SQLite task manager (`python 03-ai-scripts/46-agent-sqlite-task-manager.py`) | ✅ `gitmap task <init|add|claim|complete|fail|status|schema>` | Native compiled Go SQLite task manager (<1ms) with WAL mode, single-writer locking, and 1:1 identical schema for multi-agent workflows. |
+| ❌ Python SQLite task manager (`python 03-ai-scripts/46-agent-sqlite-task-manager.py`) | ✅ `gitmap agent <task|subtask|log|diagnose|temp-clear>` | Native compiled Go SQLite task manager (<1ms) with WAL mode, single-writer locking, atomic in-flight telemetry, and crash autopsy. |
 
 ---
 
@@ -142,14 +142,31 @@ All AI agents operating within GitMap-managed repositories MUST strictly adhere 
 - `gitmap sync --no-push` — Applies changes and commits locally without pushing to remote.
 - `gitmap sync --no-release` — Disables post-sync SemVer release tagging.
 - `gitmap sync --list` — Lists all 43 registered fleet repositories and paths.
-- `gitmap task init --name "<task>" --budget <N>` — Initializes SQLite task manager in `.ai-memory/temp-agents/<slug>/agent-task.db`.
-- `gitmap task add --db <path> --code <code-id> --title <title> [--files <paths>] [--role <role>]` — Adds a subtask.
-- `gitmap task claim --db <path> --agent <agent-name>` — Claims the next pending subtask atomically.
-- `gitmap task log-action --db <path> --subtask-id <id> --agent <name> --action <action> --file <path> --details <desc>` — Logs in-flight agent action for crash forensics.
-- `gitmap task complete --db <path> --subtask-id <id> --evidence <evidence>` — Marks subtask completed.
-- `gitmap task fail --db <path> --subtask-id <id> --reason <reason>` — Marks subtask failed with reason.
-- `gitmap task status --db <path>` — Emits machine-readable JSON summary of task progress.
-- `gitmap task schema [--json|--ddl]` — Emits task database schema and DDL definitions.
+- `gitmap agent task init --name "<task>" --budget <N>` — Initializes SQLite task manager in `.ai-memory/temp-agents/<slug>/agent-task.db`.
+- `gitmap agent subtask add --json '[...]'` — Adds decomposed subtasks to the task queue.
+- `gitmap agent subtask claim --agent <agent-name>` — Claims the next pending subtask atomically.
+- `gitmap agent log --subtask <id> --agent <name> --action <action> --file <path> --details <desc>` — Logs in-flight agent action for crash forensics.
+- `gitmap agent subtask complete <id> --agent <name> --evidence <evidence>` — Marks subtask completed.
+- `gitmap agent subtask fail <id> --agent <name> --reason <reason>` — Marks subtask failed with reason.
+- `gitmap agent task status` — Emits machine-readable JSON summary of task progress.
+- `gitmap agent diagnose` — Performs deep autopsy and diagnostic reporting on agent task runs.
+- `gitmap agent crashed` — Detects crashed or abandoned agent tasks.
+- `gitmap agent temp-clear` — Safely deletes ephemeral `.ai-memory/temp-agents/` directory.
+
+### 11. Fleet Telemetry & Running-Only Delegation
+- `gitmap nodes-running-only` (alias `gitmap nro`) — Lists strictly online/open nodes (`is_online: true`), filtering out offline noise.
+- `gitmap nro --json` (`-j`) — Emits clean JSON array of online cluster nodes.
+- `gitmap nro exec "<cmd>"` — Runs SSH execution strictly across online nodes without offline timeout delays.
+- `gitmap nro tasks [--json]` — Interrogates active and pending task queues on online nodes.
+- `gitmap nro resources [--json]` — Probes CPU & RAM benchmarks across online nodes.
+- `gitmap nro ping` — Pings reachable nodes with zero timeout lag.
+- `gitmap nro pull` / `gitmap nro cp` / `gitmap nro scan` — High-speed running-only fleet operations.
+- `gitmap os --json` — Structured machine and OS identity with kernel, build, and version telemetry.
+- `gitmap cpu` / `gitmap processor` — Live & 5s cached CPU utilization, architecture, and core counts.
+- `gitmap ram` — Live & 5s cached memory capacity, free/used MB, and visual utilization meter.
+- `gitmap disk` — Disk volume capacity, free space, and mount telemetry.
+- `gitmap network [--json]` — Network adapter configuration, IPs, MAC addresses, link speeds, and throughput metrics.
+- `gitmap nodes tasks [--json] [--open-only]` — Queries local and remote node task queues with `?` role placeholder.
 
 ---
 
