@@ -322,7 +322,12 @@ pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
     create_instance_with_account(name, None)
 }
 
-/// Stop an instance process cleanly
+/// Stop an instance process and confirm the PID is gone.
 pub fn stop_instance(instance_id: &str) -> Result<(), String> {
-    close_instance(instance_id)
+    let resolved = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
+    let closed = close_instance_verified(&resolved, std::time::Duration::from_millis(5000))?;
+    if !closed {
+        return Err(format!("Instance '{resolved}' is still running after stop"));
+    }
+    Ok(())
 }

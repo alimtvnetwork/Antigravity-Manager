@@ -53,44 +53,50 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
     const isSwitching = actionState[switchTargetInstance.config.id] === 'switch';
 
     return (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[99999] p-4 overflow-y-auto">
-            <div className="bg-white dark:bg-base-200 rounded-2xl p-6 w-full max-w-lg shadow-2xl border border-gray-100 dark:border-base-100 max-h-[85vh] flex flex-col">
-                <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-base-100">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[99999] p-4 overflow-y-auto">
+            <div className="bg-white dark:bg-[#171025] rounded-2xl p-6 w-full max-w-lg shadow-2xl border border-slate-200 dark:border-[#40285e] max-h-[85vh] flex flex-col">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#40285e]">
                     <div className="flex items-center gap-2.5">
-                        <ArrowRightLeft className="w-5 h-5 text-blue-600" />
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-300 border border-teal-500/20">
+                            <ArrowRightLeft className="w-4 h-4" />
+                        </div>
                         <div>
-                            <h3 className="font-bold text-base text-gray-900 dark:text-base-content">
+                            <h3 className="font-bold text-base text-slate-900 dark:text-white">
                                 Switch Account for {switchTargetInstance.config.name}
                             </h3>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                                 Currently bound:{' '}
-                                <span className="font-mono font-medium">
+                                <span className="font-mono font-medium text-slate-700 dark:text-slate-200">
                                     {switchTargetInstance.config.bound_email || 'None'}
                                 </span>
                             </p>
                         </div>
                     </div>
-                    <button onClick={close} className="btn btn-ghost btn-xs btn-circle">
-                        ✕
+                    <button
+                        type="button"
+                        onClick={close}
+                        className="px-2.5 py-1 rounded-full text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-300 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#40285e]"
+                    >
+                        Close
                     </button>
                 </div>
 
-                <div className="pt-2 pb-1">
+                <div className="pt-3 pb-1">
                     <div className="relative">
-                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                         <input
                             type="text"
                             value={accountSearchQuery}
                             onChange={(e) => setAccountSearchQuery(e.target.value)}
                             placeholder="Filter accounts by email or ID..."
-                            className="w-full pl-8 pr-2.5 py-1 text-xs bg-gray-50 dark:bg-base-100 border border-gray-200 dark:border-base-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900 dark:text-base-content"
+                            className="w-full pl-8 pr-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#090611] border border-slate-200 dark:border-[#40285e] rounded-full focus:outline-none focus:ring-1 focus:ring-teal-500 text-slate-900 dark:text-slate-100"
                         />
                     </div>
                 </div>
 
                 <div className="overflow-y-auto py-2 space-y-2 flex-1 my-1 pr-1">
                     {filtered.length === 0 ? (
-                        <p className="text-xs text-gray-400 text-center py-4">No accounts matching filter.</p>
+                        <p className="text-xs text-slate-400 text-center py-4">No accounts matching filter.</p>
                     ) : (
                         filtered.map((acc) => {
                             const isCurrent =
@@ -109,13 +115,13 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                     className={cn(
                                         'p-3 rounded-xl border flex items-center justify-between gap-3 transition-colors',
                                         isCurrent
-                                            ? 'bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800'
-                                            : 'bg-gray-50/60 dark:bg-base-100/60 border-gray-100 dark:border-base-100 hover:border-gray-300 dark:hover:border-base-300'
+                                            ? 'bg-teal-50/70 dark:bg-teal-950/30 border-teal-300/60 dark:border-teal-700'
+                                            : 'bg-slate-50/80 dark:bg-[#090611] border-slate-200 dark:border-[#40285e] hover:border-teal-400/50'
                                     )}
                                 >
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-mono text-xs font-semibold text-gray-900 dark:text-base-content truncate">
+                                            <span className="font-mono text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
                                                 {acc.email}
                                             </span>
                                             <span
@@ -131,14 +137,14 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                                 {tier}
                                             </span>
                                             {isCurrent ? (
-                                                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
-                                                    Active
+                                                <span className="text-[10px] text-teal-700 dark:text-teal-300 font-semibold">
+                                                    Current
                                                 </span>
                                             ) : null}
                                         </div>
-                                        <div className="flex items-center gap-2 text-[11px] text-gray-500">
+                                        <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
                                             <span>Quota: {pct}%</span>
-                                            <div className="w-24 h-1.5 bg-gray-200 dark:bg-base-300 rounded-full overflow-hidden">
+                                            <div className="w-24 h-1.5 bg-slate-200 dark:bg-[#40285e] rounded-full overflow-hidden">
                                                 <div
                                                     className={cn(
                                                         'h-full rounded-full',
@@ -151,9 +157,15 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                     </div>
 
                                     <button
+                                        type="button"
                                         disabled={isCurrent || isLoading || Boolean(actionState[switchTargetInstance.config.id])}
                                         onClick={() => handleSelect(acc)}
-                                        className={cn('btn btn-xs rounded-[5px]', isCurrent ? 'btn-disabled opacity-50' : 'btn-primary')}
+                                        className={cn(
+                                            'px-3 py-1 rounded-full text-[11px] font-semibold border',
+                                            isCurrent
+                                                ? 'opacity-50 cursor-not-allowed border-slate-200 dark:border-[#40285e] text-slate-400'
+                                                : 'bg-teal-600 hover:bg-teal-500 text-white border-teal-500'
+                                        )}
                                     >
                                         {isSwitching ? (
                                             <span className="flex items-center gap-1">
@@ -172,10 +184,11 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                     )}
                 </div>
 
-                <div className="flex justify-end pt-3 border-t border-gray-100 dark:border-base-100">
+                <div className="flex justify-end pt-3 border-t border-slate-200 dark:border-[#40285e]">
                     <button
+                        type="button"
                         onClick={close}
-                        className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400 rounded-[5px]"
+                        className="px-4 py-1.5 rounded-full text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-[#40285e] dark:hover:bg-[#1d4366] text-slate-700 dark:text-slate-200"
                     >
                         {t('common.close', 'Close')}
                     </button>

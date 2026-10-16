@@ -10,6 +10,15 @@ export function formatShortPath(fullPath: string): string {
     return `...${sep}${parts[parts.length - 1]}`;
 }
 
+/** Keep the distinctive ending of a file or directory name visible in a narrow cell. */
+export function formatPathEnding(fullPath: string, keep = 32): string {
+    if (!fullPath) return '';
+    const parts = fullPath.split(/[\\/]/).filter(Boolean);
+    const last = parts[parts.length - 1] || fullPath;
+    if (last.length <= keep) return `…\\${last}`;
+    return `…${last.slice(last.length - keep)}`;
+}
+
 export function getActionLabel(action: InstanceActionType): string {
     switch (action) {
         case 'launch':

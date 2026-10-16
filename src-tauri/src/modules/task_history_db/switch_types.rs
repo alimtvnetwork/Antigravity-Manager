@@ -95,10 +95,14 @@ pub struct InstanceSwitchRecord {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct InstanceSwitchHistoryResponse {
     pub total: usize,
+    #[serde(default)]
+    pub total_switches: usize,
     pub instance_id: String,
     pub records: Vec<InstanceSwitchRecord>,
     #[serde(default)]
     pub items: Vec<InstanceSwitchRecord>,
+    #[serde(default)]
+    pub recent_switches: Vec<InstanceSwitchRecord>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

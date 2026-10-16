@@ -73,6 +73,66 @@ pub(crate) fn clear_stale_instance_lockfiles(target_data_path: &Path) {
     }
 }
 
+fn saved_pid_belongs_to_instance(
+    instance_id: &str,
+    is_default: bool,
+    clean_data: &str,
+    canonical_data: Option<&str>,
+    configured_exe: Option<&str>,
+    exe: &str,
+    name: &str,
+    args_str: &str,
+) -> bool {
+    let id = instance_id.to_lowercase();
+    let exe_l = exe.to_lowercase().replace('\\', "/");
+    let name_l = name.to_lowercase();
+    let args = args_str.to_lowercase().replace('\\', "/");
+    if name_l.contains("cursor")
+        || exe_l.contains("cursor")
+        || name_l.contains("agm")
+        || exe_l.contains("agm-alim")
+    {
+        return false;
+    }
+    let configured = configured_exe
+        .unwrap_or("")
+        .to_lowercase()
+        .replace('\\', "/");
+    if !configured.is_empty() {
+        let file = configured.rsplit('/').next().unwrap_or(&configured);
+        if !file.is_empty()
+            && file != "antigravity.exe"
+            && (exe_l.ends_with(&format!("/{file}")) || exe_l.ends_with(file))
+        {
+            return true;
+        }
+        if exe_l == configured {
+            return true;
+        }
+    }
+    if !clean_data.is_empty() && args.contains(clean_data) {
+        return true;
+    }
+    if let Some(canonical) = canonical_data {
+        let canon = canonical.to_lowercase();
+        if !canon.is_empty() && args.contains(&canon) {
+            return true;
+        }
+    }
+    let marker = format!("antigravity-{id}");
+    if exe_l.contains(&marker)
+        || name_l.contains(&marker)
+        || args.contains(&format!("/instances/{id}"))
+    {
+        return true;
+    }
+    if is_default || id == "default" {
+        let file = exe_l.rsplit('/').next().unwrap_or(&exe_l);
+        return file == "antigravity.exe";
+    }
+    false
+}
+
 pub fn close_instance_verified(
     instance_id: &str,
     timeout: std::time::Duration,
@@ -86,13 +146,55 @@ pub fn close_instance_verified(
         .ok_or_else(|| format!("Instance {} not found", instance_id))?;
     let data_dir = config.data_dir.clone();
     let is_default = config.is_default || instance_id == "default";
+    let saved_pid = config.pid.or_else(|| get_instance_saved_pid(instance_id));
+    let configured_exe = config.executable_path.clone();
 
     let live_pids = || {
         force_refresh_process_cache();
-        find_pids_for_data_dir(&data_dir, is_default)
+        let mut pids = find_pids_for_data_dir(&data_dir, is_default)
             .into_iter()
             .filter(|&pid| is_pid_alive_targeted(pid))
-            .collect::<Vec<u32>>()
+            .collect::<Vec<u32>>();
+        if let Some(pid) = saved_pid {
+            if is_pid_alive_targeted(pid) && !pids.contains(&pid) {
+                let mut system = System::new();
+                let refresh_kind = sysinfo::ProcessRefreshKind::new()
+                    .with_cmd(sysinfo::UpdateKind::Always)
+                    .with_exe(sysinfo::UpdateKind::Always);
+                system.refresh_processes_specifics(
+                    sysinfo::ProcessesToUpdate::Some(&[sysinfo::Pid::from_u32(pid)]),
+                    refresh_kind,
+                );
+                if let Some(proc) = system.process(sysinfo::Pid::from_u32(pid)) {
+                    let proc_name = proc.name().to_string_lossy().to_lowercase();
+                    let proc_exe = proc
+                        .exe()
+                        .map(|p| p.to_string_lossy().to_lowercase())
+                        .unwrap_or_default();
+                    let args_str = proc
+                        .cmd()
+                        .iter()
+                        .map(|a| a.to_string_lossy().to_lowercase().replace('\\', "/"))
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    let norm_data = data_dir.to_lowercase().replace('\\', "/");
+                    let clean_data = norm_data.trim_end_matches('/');
+                    if saved_pid_belongs_to_instance(
+                        instance_id,
+                        is_default,
+                        clean_data,
+                        None,
+                        configured_exe.as_deref(),
+                        &proc_exe,
+                        &proc_name,
+                        &args_str,
+                    ) {
+                        pids.push(pid);
+                    }
+                }
+            }
+        }
+        pids
     };
 
     let journal_start = std::time::Instant::now();
@@ -205,16 +307,16 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
                     .map(|a| a.to_string_lossy().to_lowercase().replace('\\', "/"))
                     .collect::<Vec<String>>()
                     .join(" ");
-                let inst_id_lower = instance_id.to_lowercase();
-                let is_data_match = args_str.contains(clean_data)
-                    || canonical_data
-                        .as_ref()
-                        .map_or(false, |c| !c.is_empty() && args_str.contains(c));
-                if is_default_inst
-                    || is_data_match
-                    || proc_exe.contains(&inst_id_lower)
-                    || proc_name.contains(&inst_id_lower)
-                {
+                if saved_pid_belongs_to_instance(
+                    instance_id,
+                    is_default_inst,
+                    clean_data,
+                    canonical_data.as_deref(),
+                    config.executable_path.as_deref(),
+                    &proc_exe,
+                    &proc_name,
+                    &args_str,
+                ) {
                     pids.push(saved_pid);
                 } else {
                     crate::modules::logger::log_warn(&format!(
@@ -323,17 +425,16 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
             .map(|arg| arg.to_string_lossy().to_lowercase().replace('\\', "/"))
             .collect::<Vec<_>>()
             .join(" ");
-        let inst_id_lower = instance_id.to_lowercase();
-        let owned_by_this_instance = if inst_id_lower == "default" {
-            !clean_data.is_empty() && args_str.contains(clean_data)
-        } else {
-            let exe_marker = format!("antigravity-{inst_id_lower}");
-            let home_marker = format!("/instances/{inst_id_lower}");
-            exe.contains(&exe_marker)
-                || name.contains(&exe_marker)
-                || args_str.contains(&home_marker)
-                || (!clean_data.is_empty() && args_str.contains(clean_data))
-        };
+        let owned_by_this_instance = saved_pid_belongs_to_instance(
+            instance_id,
+            is_default_inst,
+            clean_data,
+            canonical_data.as_deref(),
+            config.executable_path.as_deref(),
+            &exe,
+            &name,
+            &args_str,
+        );
         if !owned_by_this_instance
             && should_spare_pid(pid, &args_str, &exe, &name, &protected_pids, &markers)
         {
@@ -399,14 +500,8 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     let start_wait = std::time::Instant::now();
     let max_graceful = std::time::Duration::from_millis(3000);
 
-    let target_pids: Vec<sysinfo::Pid> = pids.iter().map(|&p| sysinfo::Pid::from_u32(p)).collect();
-
     loop {
-        system.refresh_processes_specifics(
-            sysinfo::ProcessesToUpdate::Some(&target_pids),
-            sysinfo::ProcessRefreshKind::new(),
-        );
-        let has_alive = target_pids.iter().any(|&pid| system.process(pid).is_some());
+        let has_alive = pids.iter().any(|&pid| is_pid_alive_targeted(pid));
 
         if !has_alive {
             crate::modules::logger::log_info(&format!(
@@ -417,6 +512,16 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
         }
 
         if start_wait.elapsed() > max_graceful {
+            let still: Vec<u32> = pids
+                .iter()
+                .copied()
+                .filter(|&pid| is_pid_alive_targeted(pid))
+                .collect();
+            if !still.is_empty() {
+                return Err(format!(
+                    "Instance '{instance_id}' PID(s) {still:?} stayed alive after taskkill"
+                ));
+            }
             #[cfg(not(target_os = "windows"))]
             {
                 crate::modules::logger::log_warn(&format!(
@@ -457,5 +562,60 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     // Small settle delay to ensure OS flushes file handles and SQLite locks
     std::thread::sleep(std::time::Duration::from_millis(150));
 
+    Ok(())
+}
+
+/// Instance id whose process is an ancestor of this CLI, when the command was
+/// started from that IDE. Cursor and the manager process are not instances.
+pub fn detect_caller_instance_id() -> Option<String> {
+    let mut system = System::new();
+    let refresh_kind = sysinfo::ProcessRefreshKind::new().with_exe(sysinfo::UpdateKind::Always);
+    system.refresh_processes_specifics(sysinfo::ProcessesToUpdate::All, refresh_kind);
+    let mut pid = std::process::id();
+    let mut ancestor_pids = Vec::new();
+    let mut ancestor_exes = Vec::new();
+    for _ in 0..24 {
+        ancestor_pids.push(pid);
+        let Some(proc) = system.process(sysinfo::Pid::from_u32(pid)) else {
+            break;
+        };
+        if let Some(exe) = proc.exe() {
+            ancestor_exes.push(exe.to_string_lossy().to_lowercase().replace('\\', "/"));
+        }
+        match proc.parent().map(|parent| parent.as_u32()) {
+            Some(parent) if parent != 0 && parent != pid => pid = parent,
+            _ => break,
+        }
+    }
+    let registry = load_registry().ok()?;
+    for inst in &registry.instances {
+        if let Some(saved) = inst.pid {
+            if ancestor_pids.contains(&saved) {
+                return Some(inst.id.clone());
+            }
+        }
+        if let Some(exe) = &inst.executable_path {
+            let norm = exe.to_lowercase().replace('\\', "/");
+            let file = norm.rsplit('/').next().unwrap_or(&norm);
+            if ancestor_exes
+                .iter()
+                .any(|ancestor| ancestor == &norm || ancestor.ends_with(&format!("/{file}")))
+            {
+                return Some(inst.id.clone());
+            }
+        }
+    }
+    None
+}
+
+pub fn refuse_if_caller_instance(target_id: &str) -> Result<(), String> {
+    let resolved = resolve_instance_id(target_id).unwrap_or_else(|_| target_id.to_string());
+    if let Some(self_id) = detect_caller_instance_id() {
+        if self_id == resolved || self_id == target_id {
+            return Err(format!(
+                "Refusing to stop, switch, or delete instance '{self_id}' because this command is running inside it"
+            ));
+        }
+    }
     Ok(())
 }

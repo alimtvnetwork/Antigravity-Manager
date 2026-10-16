@@ -222,10 +222,12 @@ pub async fn switch_account_to_instance(
             )
         })?;
     if !closed {
-        crate::modules::logger::log_warn(&format!(
-            "[INSTANCE_SWITCH] Instance '{}' closed with surviving processes; continuing with credential injection",
+        let err = format!(
+            "Instance '{}' is still running after close; account switch stopped before credentials were rewritten",
             instance.id
-        ));
+        );
+        crate::modules::logger::log_error(&format!("[INSTANCE_SWITCH:ERROR] {}", err));
+        return Err(err);
     }
 
     // 3. [Step 3/5] Inject credentials into target instance's state.vscdb & storage.json (and OS keyring) AFTER process exit

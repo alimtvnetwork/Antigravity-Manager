@@ -91,9 +91,9 @@ export default function InstanceTable({
                         <tr className="border-b border-slate-200/90 dark:border-slate-800/90 bg-slate-50/80 dark:bg-[#090611] text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                             <th className="px-2 py-1.5 min-w-[150px] max-w-[190px]">Profile & Account</th>
                             <th className="px-2 py-1.5 min-w-[160px] max-w-[200px]">Model & Weekly Quota</th>
-                            <th className="px-2 py-1.5 min-w-[90px] max-w-[110px]">Status & PID</th>
-                            <th className="px-2 py-1.5 min-w-[110px] max-w-[130px]">File / Data Path</th>
-                            <th className="px-2 py-1.5 min-w-[120px] max-w-[150px]">Executable Path</th>
+                            <th className="px-2 py-1.5 min-w-[118px] max-w-[140px]">Status & PID</th>
+                            <th className="px-2 py-1.5 min-w-[220px] max-w-[280px]">Data · Executable</th>
+                            <th className="px-2 py-1.5 min-w-[180px] max-w-[220px]">Executable Path</th>
                             <th className="px-2 py-1.5 text-right w-[130px]">Actions</th>
                         </tr>
                     </thead>

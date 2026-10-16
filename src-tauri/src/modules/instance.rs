@@ -111,7 +111,9 @@ pub use clone_helpers::{
     sanitize_cloned_instance_summaries, GEMINI_CLONE_DIRS, REQUIRED_IDE_REL_PATHS,
 };
 pub(crate) use close::clear_stale_instance_lockfiles;
-pub use close::{close_instance, close_instance_verified};
+pub use close::{
+    close_instance, close_instance_verified, detect_caller_instance_id, refuse_if_caller_instance,
+};
 pub use create::{create_instance, create_instance_with_account, stop_instance};
 pub(crate) use credentials::{inject_account_credentials, CredentialInjectOptions};
 pub use db_clone::{copy_dir_recursive, safe_clone_sqlite_db};

@@ -37,7 +37,12 @@ export default function InstanceAuditTrailModal({
             setHistory(res);
             // Auto-expand the latest switches (first 2)
             const initialExpanded: Record<string, boolean> = {};
-            (res.recent_switches || []).slice(0, AUTO_EXPAND_COUNT).forEach((sw) => {
+            const loaded = res.recent_switches?.length
+                ? res.recent_switches
+                : ((res as { records?: typeof res.recent_switches }).records
+                    || (res as { items?: typeof res.recent_switches }).items
+                    || []);
+            loaded.slice(0, AUTO_EXPAND_COUNT).forEach((sw) => {
                 initialExpanded[sw.id] = true;
             });
             setExpandedCards(initialExpanded);
@@ -78,7 +83,15 @@ export default function InstanceAuditTrailModal({
         setExpandedRawFacts((prev) => ({ ...prev, [switchId]: !prev[switchId] }));
     };
 
-    const totalSwitches = history?.total_switches ?? (history?.recent_switches?.length || 0);
+    const historyBag = history as (InstanceSwitchHistoryResponse & {
+        records?: InstanceSwitchHistoryResponse['recent_switches'];
+        items?: InstanceSwitchHistoryResponse['recent_switches'];
+        total?: number;
+    }) | null;
+    const recentSwitches = historyBag?.recent_switches?.length
+        ? historyBag.recent_switches
+        : historyBag?.records || historyBag?.items || [];
+    const totalSwitches = historyBag?.total_switches || historyBag?.total || recentSwitches.length;
 
     return (
         <div
@@ -167,7 +180,7 @@ export default function InstanceAuditTrailModal({
                             <RotateCw className="w-8 h-8 animate-spin text-amber-500 mb-3" />
                             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Loading audit trail records...</p>
                         </div>
-                    ) : !history?.recent_switches || history.recent_switches.length === 0 ? (
+                    ) : recentSwitches.length === 0 ? (
                         /* Clean Empty State */
                         <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-2xl border border-dashed border-slate-200 dark:border-[#40285e] bg-white/60 dark:bg-[#171025]/60">
                             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 mb-3">
@@ -189,15 +202,23 @@ export default function InstanceAuditTrailModal({
                         <div className="space-y-4">
                             <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-1">
                                 <span className="font-semibold uppercase tracking-wider text-[11px]">
-                                    Recent Switch Cycles ({history.recent_switches.length})
+                                    Recent Switch Cycles ({recentSwitches.length})
                                 </span>
                                 <span>Click card to expand 4-step execution details</span>
                             </div>
 
-                            {history.recent_switches.map((record) => (
+                            {recentSwitches.map((record) => (
                                 <SwitchRecordCard
                                     key={record.id}
-                                    record={record as SwitchRecord}
+                                    record={{
+                                        ...(record as SwitchRecord),
+                                        raw_payload:
+                                            (record as SwitchRecord).raw_payload
+                                            || (record as { payload_json?: string }).payload_json,
+                                        how:
+                                            (record as SwitchRecord).how
+                                            || (record as { switch_reason?: string }).switch_reason,
+                                    }}
                                     isExpanded={Boolean(expandedCards[record.id])}
                                     isUnmasked={Boolean(unmaskedEmails[record.id])}
                                     isRawOpen={Boolean(expandedRawFacts[record.id])}

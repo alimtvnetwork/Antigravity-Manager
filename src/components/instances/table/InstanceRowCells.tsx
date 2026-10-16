@@ -6,7 +6,7 @@ import { cn } from '../../../utils/cn';
 import { maskEmail } from '../../../utils/maskEmail';
 import type { Account } from '../../../types/account';
 import { QuotaProgressBar } from '../../accounts/QuotaProgressBar';
-import { formatShortPath, getActionLabel, resolveDataDir } from './instanceTableUtils';
+import { formatPathEnding, getActionLabel, resolveDataDir } from './instanceTableUtils';
 import type { InstanceActionType } from './instanceTableTypes';
 import type { InstanceStatus } from '../../../services/instanceService';
 
@@ -254,16 +254,16 @@ export function QuotaCell({ data }: { data: RowCellData }) {
 
 export function StatusCell({ inst, data }: { inst: InstanceStatus; data: RowCellData }) {
     return (
-        <td className="px-2 py-1 whitespace-nowrap min-w-[85px] max-w-[105px]">
+        <td className="px-2 py-1 whitespace-nowrap min-w-[118px] max-w-[140px]">
             {data.isBusy ? (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50/90 text-blue-700 dark:bg-cyan-950/60 dark:text-cyan-300 border border-blue-300/60 dark:border-cyan-500/40 backdrop-blur-xs animate-pulse shadow-2xs">
                     <RotateCw className="w-2.5 h-2.5 animate-spin text-blue-500 dark:text-cyan-400 shrink-0" />
                     <span>{getActionLabel(data.currentAction)}</span>
                 </span>
             ) : inst.is_running ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-50/90 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-300/50 dark:border-teal-800/80 backdrop-blur-xs">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-50/90 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-300/50 dark:border-teal-800/80 backdrop-blur-xs" title={inst.pid ? `Process id ${inst.pid}` : 'Running'}>
                     <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
-                    Running{inst.pid ? ` · ${inst.pid}` : ''}
+                    {inst.pid ? `PID ${inst.pid}` : 'Running'}
                 </span>
             ) : (
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100/90 text-slate-600 dark:bg-[#090611]/90 dark:text-slate-400 border border-slate-200 dark:border-[#40285e] backdrop-blur-xs">
@@ -282,13 +282,16 @@ interface PathCellProps {
 
 export function PathCell({ inst, isCopied, onCopy }: PathCellProps) {
     const fullPath = resolveDataDir(inst);
-    const shortPath = formatShortPath(fullPath);
+    const exeFull = inst.config.executable_path || '';
+    const dataEnding = formatPathEnding(fullPath);
+    const exeEnding = exeFull ? formatPathEnding(exeFull) : '';
+    const sameLine = exeEnding ? `${dataEnding}  ·  ${exeEnding}` : dataEnding;
     return (
-        <td className="px-2 py-1 whitespace-nowrap min-w-[110px] max-w-[130px]" title={fullPath}>
+        <td className="px-2 py-1 whitespace-nowrap min-w-[220px] max-w-[280px]" title={exeFull ? `${fullPath}\n${exeFull}` : fullPath}>
             <div className="flex items-center justify-between gap-1 text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                <div className="flex items-center gap-1 min-w-0 truncate" title={fullPath}>
+                <div className="flex items-center gap-1 min-w-0" title={fullPath}>
                     <Folder className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="truncate">{shortPath}</span>
+                    <span className="whitespace-nowrap">{sameLine}</span>
                 </div>
                 <button
                     type="button"
@@ -313,7 +316,7 @@ export function ExePathCell({ inst }: { inst: InstanceInfo }) {
             ? 'Antigravity.exe (Default)'
             : 'Default IDE');
     const shortPath = inst.config.executable_path
-        ? formatShortPath(inst.config.executable_path)
+        ? formatPathEnding(inst.config.executable_path)
         : effectivePath;
 
     const handleCopy = async () => {
@@ -330,11 +333,11 @@ export function ExePathCell({ inst }: { inst: InstanceInfo }) {
     };
 
     return (
-        <td className="px-2 py-1 whitespace-nowrap min-w-[120px] max-w-[150px]" title={effectivePath}>
+        <td className="px-2 py-1 whitespace-nowrap min-w-[180px] max-w-[220px]" title={effectivePath}>
             <div className="flex items-center justify-between gap-1 text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                <div className="flex items-center gap-1 min-w-0 truncate" title={effectivePath}>
+                <div className="flex items-center gap-1 min-w-0" title={effectivePath}>
                     <Terminal className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="truncate">{shortPath}</span>
+                    <span className="whitespace-nowrap">{shortPath}</span>
                 </div>
                 <button
                     type="button"

@@ -37,6 +37,7 @@ pub(crate) fn dispatch_instance_domain(subcommand: &str, args: &[String]) {
         "start" | "launch" | "open" => cmd_instances_start(args),
         "open-ui" | "ui" => antigravity_tools_lib::modules::delegate_updater::open_ui(args),
         "tree" | "prompts" => crate::prompt_cmds::cmd_prompts_tree(args),
+        "current" | "self" | "which-self" => cmd_instances_current(args),
         "stop" | "kill" | "close" => cmd_instances_stop(args),
         "restart" => cmd_instances_restart(args),
         "switch" | "use" => cmd_instances_switch(args),
@@ -268,11 +269,37 @@ pub(crate) fn cmd_instances_start(args: &[String]) {
     crate::instance_dispatch::cmd_instances(&forward_args);
 }
 
+pub(crate) fn cmd_instances_current(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let current = instance::detect_caller_instance_id();
+    if ctx.json_output {
+        CliEnvelope::ok(
+            "instances current",
+            current.clone(),
+            serde_json::json!({ "instance_id": current }),
+        )
+        .print_and_exit();
+    }
+    match current {
+        Some(id) => println!("{id}"),
+        None => println!("none"),
+    }
+    let _ = args;
+}
+
+fn guard_caller_instance(target_instance: &str) {
+    if let Err(err) = instance::refuse_if_caller_instance(target_instance) {
+        eprintln!("[ERROR] {err}");
+        std::process::exit(2);
+    }
+}
+
 pub(crate) fn cmd_instances_stop(args: &[String]) {
     let ctx = CliContext::parse(args);
     let target_instance = ctx
         .resolve_target_instance()
         .unwrap_or_else(|_| "default".to_string());
+    guard_caller_instance(&target_instance);
     if ctx.json_output {
         if is_daemon_running() {
             let path = format!("/instances/{}/stop", target_instance);
@@ -285,7 +312,10 @@ pub(crate) fn cmd_instances_stop(args: &[String]) {
                 }
             }
         }
-        let _ = instance::stop_instance(&target_instance);
+        if let Err(err) = instance::stop_instance(&target_instance) {
+            eprintln!("[ERROR] {err}");
+            std::process::exit(1);
+        }
         let data = serde_json::json!({ "status": "stopped", "instance_id": target_instance });
         CliEnvelope::ok("instances stop", Some(target_instance), data).print_and_exit();
     }
@@ -298,6 +328,7 @@ pub(crate) fn cmd_instances_restart(args: &[String]) {
     let target_instance = ctx
         .resolve_target_instance()
         .unwrap_or_else(|_| "default".to_string());
+    guard_caller_instance(&target_instance);
     if ctx.json_output {
         if is_daemon_running() {
             let path = format!("/instances/{}/restart", target_instance);
@@ -343,6 +374,7 @@ pub(crate) fn cmd_instances_switch(args: &[String]) {
         }
     }
 
+    guard_caller_instance(&target_instance);
     if account_query.is_none() {
         let forward_args = vec!["switch".to_string(), target_instance];
         crate::instance_dispatch::cmd_instances(&forward_args);
@@ -402,6 +434,7 @@ pub(crate) fn cmd_instances_delete(args: &[String]) {
     let target_instance = ctx
         .resolve_target_instance()
         .unwrap_or_else(|_| "default".to_string());
+    guard_caller_instance(&target_instance);
     if ctx.json_output {
         if is_daemon_running() {
             let path = format!("/instances/{}", target_instance);

@@ -1,5 +1,18 @@
 # Changelog
 
+## [v4.209.0] - 2026-10-16
+
+### Fixed
+- **Instance list PID label and path endings**: The running badge shows `PID` plus the process id. The data-path cell and the executable cell keep the filename ending on the same row. (Thanks to @aukgit)
+- **Stop and account switch now kill the instance PID**: Stop waits until the process is gone. Account switch aborts before rewriting credentials when that PID is still alive. Windows liveness uses the process exit code so a dead PID is not reported as still running. (Thanks to @aukgit)
+- **Instance audit trail**: Switch history is returned as `recent_switches` and `total_switches`, which the audit dialog reads. (Thanks to @aukgit)
+
+### Changed
+- **Switch Account dialog**: Dark-glass layout aligned with the instance list. (Thanks to @aukgit)
+- **CLI self-instance guard**: `agm instances current` prints the instance that owns this command. Stop, switch, restart, and delete refuse that instance. (Thanks to @aukgit)
+
+---
+
 ## [v4.208.1] - 2026-10-16
 
 ### Added
@@ -371,6 +384,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.209.0 (2026-10-16)**:
+        -   **[Instance Management] PID label, verified stop, switch dialog, and audit trail (Thanks to @aukgit)**:
+            -   **Description**: The list badge shows `PID` and the process id, and path cells keep the filename ending. Stop and account switch kill that process and fail if it is still alive. The audit dialog reads `recent_switches`. `agm instances current` refuses to stop, switch, or delete the instance that owns the command. (Thanks to @aukgit)
+
+
     *   **v4.208.0 (2026-10-16)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

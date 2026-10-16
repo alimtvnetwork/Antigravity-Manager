@@ -334,9 +334,11 @@ pub fn get_instance_switch_history(
 
     Ok(InstanceSwitchHistoryResponse {
         total,
+        total_switches: total,
         instance_id: inst_id_trimmed.to_string(),
         records: records.clone(),
-        items: records,
+        items: records.clone(),
+        recent_switches: records,
     })
 }
 

@@ -411,11 +411,15 @@ pub(crate) fn route_instances_stop(
             }
         };
 
+        if let Err(err) = instance::refuse_if_caller_instance(&resolved_id) {
+            eprintln!("[ERROR] {err}");
+            std::process::exit(2);
+        }
         println!(
             "[*] Stopping instance '{}' (resolved from '{}')...",
             resolved_id, target_spec
         );
-        match instance::close_instance(&resolved_id) {
+        match instance::stop_instance(&resolved_id) {
             Ok(_) => {
                 println!("[SUCCESS] Stopped instance '{}' process(es).", resolved_id);
             }
