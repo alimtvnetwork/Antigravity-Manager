@@ -1,7 +1,7 @@
 # Plan: enhance-telegram-section-and-gitmap-integration
 
 ## Status
-ACTIVE
+COMPLETE — released v4.215.0
 
 ## Spec
 `02-spec/21-app/enhance-telegram-section-and-gitmap-integration/01-spec.md`
@@ -42,8 +42,8 @@ The lead owns shared indexes (`.ai-memory/plans/readme.md`,
 ## Progress
 - [x] Spec written
 - [x] Plan enqueued
-- [ ] Message audit done
-- [ ] IDE exe names done
-- [ ] History + rerun done
-- [ ] Message rewrite done
+- [x] Message audit done (Research 01+02)
+- [x] IDE exe names done
+- [x] History + rerun done
+- [x] Message rewrite done
 - [ ] Released, CI green
