@@ -10,6 +10,7 @@ use super::*;
 extern "system" {
     fn AttachConsole(dw_process_id: u32) -> i32;
     fn AllocConsole() -> i32;
+    fn FreeConsole() -> i32;
 }
 
 #[cfg(target_os = "windows")]
@@ -48,6 +49,20 @@ mod win32_console {
             lp_console_current_font_ex: *mut CONSOLE_FONT_INFOEX,
         ) -> i32;
         fn SetConsoleOutputCP(w_code_page_id: u32) -> i32;
+        fn SetConsoleScreenBufferSize(h_console_output: *mut c_void, dw_size: COORD) -> i32;
+        fn SetConsoleWindowInfo(
+            h_console_output: *mut c_void,
+            b_absolute: i32,
+            lp_console_window: *const SMALL_RECT,
+        ) -> i32;
+    }
+
+    #[repr(C)]
+    struct SMALL_RECT {
+        left: i16,
+        top: i16,
+        right: i16,
+        bottom: i16,
     }
 
     pub fn setup_modern_console() -> bool {
@@ -70,7 +85,7 @@ mod win32_console {
 
             let mut font_info: CONSOLE_FONT_INFOEX = std::mem::zeroed();
             font_info.cb_size = std::mem::size_of::<CONSOLE_FONT_INFOEX>() as u32;
-            font_info.dw_font_size.y = 18;
+            font_info.dw_font_size.y = 16;
             font_info.font_weight = 600;
             let face_name_utf16: Vec<u16> = "Consolas\0".encode_utf16().collect();
             for (i, &c) in face_name_utf16.iter().enumerate() {
@@ -79,6 +94,29 @@ mod win32_console {
                 }
             }
             SetCurrentConsoleFontEx(handle, 0, &mut font_info);
+
+            // A short window makes long paths wrap into the next log line.
+            let _ = SetConsoleWindowInfo(
+                handle,
+                1,
+                &SMALL_RECT {
+                    left: 0,
+                    top: 0,
+                    right: 20,
+                    bottom: 8,
+                },
+            );
+            let _ = SetConsoleScreenBufferSize(handle, COORD { x: 120, y: 400 });
+            let _ = SetConsoleWindowInfo(
+                handle,
+                1,
+                &SMALL_RECT {
+                    left: 0,
+                    top: 0,
+                    right: 119,
+                    bottom: 34,
+                },
+            );
             true
         }
     }
@@ -95,12 +133,20 @@ pub fn enable_modern_console() -> bool {
     true
 }
 
+fn print_update_field(label: &str, value: &str) {
+    println!("  {label}");
+    println!("    {value}");
+}
+
 pub fn run(args: &[String]) {
     #[cfg(target_os = "windows")]
     unsafe {
-        if AttachConsole(0xFFFFFFFF) == 0 {
-            AllocConsole();
+        // The parent console belongs to the manager and is full of tracing
+        // codes. A new console keeps the update text on its own.
+        if AttachConsole(0xFFFFFFFF) != 0 {
+            FreeConsole();
         }
+        AllocConsole();
         let _ = win32_console::setup_modern_console();
     }
 
@@ -165,17 +211,17 @@ pub fn run(args: &[String]) {
         }
     }
 
-    println!("================================================================================");
-    println!("   ANTIGRAVITY MANAGER - DELEGATED UPDATE CLI ENGINE");
-    println!("================================================================================");
-    println!("  ● Update CLI Exe:   {}", current_exe.display());
-    println!("  ● Target Dir:       {}", resolved_install_dir.display());
-    println!("  ● Target UI Exe:    {}", resolved_target_exe.display());
+    println!();
+    println!("  Antigravity Manager update");
+    println!("  ------------------------------------------------------------");
+    print_update_field("CLI", &current_exe.display().to_string());
+    print_update_field("Directory", &resolved_install_dir.display().to_string());
+    print_update_field("Window", &resolved_target_exe.display().to_string());
     if let Some(pid) = opts.wait_pid {
-        println!("  ● Monitored UI PID: {}", pid);
+        print_update_field("Waiting on", &pid.to_string());
     }
-    println!("  ● Auto-Relaunch UI: {}", opts.is_relaunch);
-    println!("--------------------------------------------------------------------------------");
+    print_update_field("Reopen", if opts.is_relaunch { "yes" } else { "no" });
+    println!("  ------------------------------------------------------------");
 
     // STAGE 1: Wait for monitored UI process (and any sibling UI instances) to shut down and release file locks
     if let Some(pid) = opts.wait_pid {
@@ -280,13 +326,13 @@ pub fn run(args: &[String]) {
         }
     }
 
-    println!("================================================================================");
+    println!("  ------------------------------------------------------------");
     if update_ok {
-        println!("   UPDATE COMPLETE - Antigravity Manager Updated & Reopened.");
+        println!("  Update complete. The manager window was reopened.");
     } else {
-        println!("   UPDATE FINISHED WITH WARNINGS - Check logs above.");
+        println!("  Update finished with warnings. Read the lines above.");
     }
-    println!("================================================================================");
+    println!("  ------------------------------------------------------------");
     std::thread::sleep(Duration::from_millis(1200));
 }
 

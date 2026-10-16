@@ -65,26 +65,48 @@ $ShortcutName = "Antigravity Manager Tools"
 $Tooltip = "Antigravity Manager Tools"
 $LeftPadding = "    "
 
+function Write-UpdateLine {
+    param(
+        [string]$Prefix,
+        [string]$Message,
+        [string]$Color
+    )
+    $esc = [char]27
+    $clean = ($Message -replace "$esc\[[0-9;]*[A-Za-z]", "").Trim()
+    if ([string]::IsNullOrWhiteSpace($clean)) { return }
+    Write-Host "  $Prefix" -ForegroundColor $Color -NoNewline
+    $limit = 88
+    if ($clean.Length -le $limit) {
+        Write-Host " $clean" -ForegroundColor $Color
+        return
+    }
+    Write-Host ""
+    for ($i = 0; $i -lt $clean.Length; $i += $limit) {
+        $take = [Math]::Min($limit, $clean.Length - $i)
+        Write-Host "    $($clean.Substring($i, $take))" -ForegroundColor $Color
+    }
+}
+
 function Write-Step {
     param([string]$Message)
-    Write-Host "$LeftPadding[*] $Message" -ForegroundColor Cyan
+    Write-UpdateLine -Prefix "*" -Message $Message -Color Cyan
 }
 
 function Write-Success {
     param([string]$Message)
-    Write-Host "$LeftPadding[OK] $Message" -ForegroundColor Green
+    Write-UpdateLine -Prefix "OK" -Message $Message -Color Green
 }
 
 function Write-Warn {
     param([string]$Message)
-    Write-Host "$LeftPadding[!] $Message" -ForegroundColor Yellow
+    Write-UpdateLine -Prefix "!" -Message $Message -Color Yellow
 }
 
 function Write-Err {
     param([string]$Message)
-    Write-Host "$LeftPadding[ERROR] $Message" -ForegroundColor Red
+    Write-UpdateLine -Prefix "ERROR" -Message $Message -Color Red
     try {
-        [Console]::Error.WriteLine("$LeftPadding[ERROR] $Message")
+        [Console]::Error.WriteLine("  ERROR $Message")
     } catch {}
 }
 
@@ -2030,9 +2052,13 @@ if ($ExePath -and (Test-Path $ExePath)) {
 }
 
 Write-Host ""
-Write-Success "Installation of $FullName v$TargetVersion completed successfully!"
-Write-Host "${LeftPadding}Target Directory: $InstallDir" -ForegroundColor Gray
-Write-Host "${LeftPadding}Executable:       $ExePath" -ForegroundColor Gray
+Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
+Write-Host "  $FullName $TargetVersion is ready" -ForegroundColor Green
+Write-Host "  Directory" -ForegroundColor DarkGray
+Write-Host "    $InstallDir" -ForegroundColor Gray
+Write-Host "  Program" -ForegroundColor DarkGray
+Write-Host "    $ExePath" -ForegroundColor Gray
+Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
 Write-Host ""
 
 # Ensure Windows Add/Remove Programs (Installed Apps) reflects full branding and version
