@@ -541,6 +541,59 @@ pub fn clean_for_telegram_html(input: &str, max_chars: usize) -> String {
         .replace('>', "&gt;")
 }
 
+/// Look up an instance's recorded IDE executable path from the instance
+/// registry — the same lookup the `/send` picker performs in
+/// `send_flow::instance_entries`. Returns `None` when the registry is
+/// unreadable or the instance id is unknown.
+fn instance_executable_path(instance_id: &str) -> Option<String> {
+    match crate::modules::instance::load_registry() {
+        Ok(reg) => reg
+            .instances
+            .iter()
+            .find(|i| i.id == instance_id)
+            .and_then(|i| i.executable_path.clone()),
+        Err(e) => {
+            // Justification: the IDE line is best-effort receipt garnish; the
+            // receipt must still render when the registry is unreadable, so
+            // the line is simply omitted and the failure is tracked.
+            crate::error::record_ignored(
+                Err::<(), String>(e),
+                "load instance registry for IDE exe line",
+            );
+            None
+        }
+    }
+}
+
+/// Build the standalone "IDE exe" line for a Telegram prompt receipt, or
+/// `None` when the exe cannot be shown reliably.
+///
+/// The exe is shown only when `executable_path` is actually recorded in the
+/// registry, or for the default instance. For other instances with no
+/// recorded path the resolver would synthesize `Antigravity-{id}.exe`, which
+/// is a guess and is deliberately omitted (commit af423861). Basename/ending
+/// only — never full paths; the name is HTML-escaped for Telegram.
+pub fn ide_exe_line(instance_id: &str, executable_path: Option<&str>) -> Option<String> {
+    let is_default =
+        instance_id == "default" || instance_id == "__default__" || instance_id.is_empty();
+    let recorded = executable_path.filter(|p| !p.trim().is_empty());
+    if !is_default && recorded.is_none() {
+        return None;
+    }
+    let exe = crate::modules::instance::resolve_instance_exe_name(instance_id, recorded);
+    Some(format!(
+        "• <b>IDE:</b> <code>{}</code>\n",
+        clean_for_telegram_html(&exe, 64)
+    ))
+}
+
+/// Convenience wrapper for receipts that only know the instance id: performs
+/// the registry lookup and returns the IDE line, or `None` when unknown.
+pub fn ide_exe_line_for(instance_id: &str) -> Option<String> {
+    let path = instance_executable_path(instance_id);
+    ide_exe_line(instance_id, path.as_deref())
+}
+
 /// Strip HTML tags and decode HTML entities for clean plain text fallback
 pub fn strip_telegram_html_tags(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
@@ -606,6 +659,21 @@ pub fn format_running_duration(created_at: i64) -> String {
 #[cfg(test)]
 mod formatting_tests {
     use super::*;
+
+    #[test]
+    fn test_ide_exe_line_caution() {
+        // Unknown non-default instance: line omitted, never a guessed fallback.
+        assert!(ide_exe_line("work", None).is_none());
+        assert!(ide_exe_line("work", Some("   ")).is_none());
+        // Default instance always shows the resolved exe name.
+        let def = ide_exe_line("default", None).expect("default shows exe");
+        assert!(def.starts_with("• <b>IDE:</b> <code>"));
+        assert!(def.ends_with("</code>\n"));
+        // Recorded path: basename only, HTML-escaped.
+        let exe = ide_exe_line("work", Some("/opt/ide/A&g IDE")).expect("recorded path shows exe");
+        assert!(!exe.contains("/opt/ide/"));
+        assert!(exe.contains("A&amp;g IDE"));
+    }
 
     #[test]
     fn test_unclosed_tags_with_blockquote_expandable() {

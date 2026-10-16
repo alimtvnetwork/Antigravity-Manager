@@ -126,7 +126,7 @@ pub async fn format_node_scoped_prompts(args_str: &str) -> String {
 
             remote_prompts_info = format!(
                 "• Remote Node Status: 🟢 Registered in Fleet\n\
-                • Active Queued Prompts: <b>{}</b> pending in Supabase Secondary DB\n\
+                • {} prompts queued (waiting in the secondary database)\n\
                 • GitMap Cluster Link: Connected",
                 queued_count
             );
@@ -233,13 +233,9 @@ pub fn format_projects_list() -> String {
     }
 
     format!(
-        "📂 <b>Discovered Workspaces &amp; Projects ({} Unique Projects)</b>\n\n\
+        "📂 Workspaces & projects ({})\n\n\
         {}\
-        💡 <b>Sample Prompt Invocations:</b>\n\
-        • <b>Local workspace:</b> <code>/prompt &lt;project-id&gt; &lt;prompt text&gt;</code>\n\
-        • <b>Remote VM node:</b> <code>/prompt &lt;node-alias&gt; &lt;project-id&gt; &lt;prompt text&gt;</code>\n\
-        • <b>Active conversation:</b> <code>/prompt &lt;conversation-id&gt; &lt;prompt text&gt;</code>\n\
-        • <b>Prompt template:</b> <code>/prompt &lt;project-id&gt; read-all</code>",
+        💡 Try: <code>/prompt &lt;project-id&gt; &lt;prompt text&gt;</code> or <code>/prompt &lt;node-alias&gt; &lt;project-id&gt; &lt;prompt text&gt;</code>",
         display_idx,
         rows
     )
@@ -263,7 +259,7 @@ pub async fn format_active_prompts_report() -> String {
         {
             let cleaned = clean_for_telegram_html(stdout.trim(), 1800);
             return format!(
-                "⚡ <b>Antigravity Active Running Prompts (GitMap)</b>\n\
+                "⚡ Active prompts\n\
                 <pre>{}</pre>\n\n\
                 {}",
                 cleaned, agm_tree
@@ -290,7 +286,7 @@ pub async fn format_prompt_queues_report() -> String {
         {
             let cleaned = clean_for_telegram_html(stdout.trim(), 2800);
             return format!(
-                "📥 <b>Antigravity Workspace Prompt Queues</b>\n\n\
+                "📥 Prompt queues\n\n\
                 <pre>{}</pre>\n\n\
                 💡 Send <code>/active</code> to view running prompts or <code>/restore</code> to re-queue backed-up prompts.",
                 cleaned
@@ -305,21 +301,20 @@ pub async fn format_prompt_queues_report() -> String {
                 .filter(|p| p.status == "queued" || p.status == "pending")
                 .collect();
             if queued.is_empty() {
-                return "📥 <b>Prompt Queues:</b> All workspace queues are currently empty."
-                    .to_string();
+                return "The prompt queue is empty.".to_string();
             }
             let mut rows = String::new();
             for (i, p) in queued.iter().take(10).enumerate() {
                 let friendly_ws =
                     repo_db::format_friendly_workspace_label(&p.project_id, "", &p.repo_path);
                 let clean = repo_db::extract_smart_prompt_summary(&p.prompt_content, 80);
+                let id8 = if p.id.len() > 8 { &p.id[..8] } else { &p.id };
                 rows.push_str(&format!(
-                    "{}. [⏳ QUEUED] <code>{}</code>\n   • <b>Project:</b> <b>{}</b> (<code>{}</code>)\n   • <i>\"{}\"</i>\n\n",
+                    "{}. ⏳ {} — \"{}\" (ref <code>{}</code>)\n\n",
                     i + 1,
-                    if p.id.len() > 12 { &p.id[..12] } else { &p.id },
                     clean_for_telegram_html(&friendly_ws, 36),
-                    clean_for_telegram_html(&p.project_id, 32),
-                    clean_for_telegram_html(&clean, 80)
+                    clean_for_telegram_html(&clean, 80),
+                    clean_for_telegram_html(id8, 12)
                 ));
             }
             format!(
@@ -331,7 +326,7 @@ pub async fn format_prompt_queues_report() -> String {
             )
         }
         Err(e) => format!(
-            "⚠️ <b>Queue Check Failed:</b> <code>{}</code>",
+            "Couldn't read the prompt queue: {}",
             clean_for_telegram_html(&e, 200)
         ),
     }

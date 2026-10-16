@@ -64,7 +64,7 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
     }
 
     if filtered_tokens.is_empty() {
-        return "⚠️ <b>Missing Prompt Content:</b> Please specify both the target (e.g. <code>default</code>, <code>W3:default</code>, or Seq ID <code>C001</code>) and the prompt text.\nExample: <code>/prompt default Write unit tests</code>".to_string();
+        return "Please include both a target and your prompt, e.g. /prompt default Write unit tests".to_string();
     }
 
     // If `--node` or `--instance` was explicitly provided and the first token is NOT a C001/P001 sequence ID
@@ -103,7 +103,7 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
     }
 
     if filtered_tokens.len() < 2 {
-        return "⚠️ <b>Missing Prompt Content:</b> Please specify both the target (Seq ID <code>C001</code> / <code>P001</code> / <code>GM:#1</code>, instance, or <code>machine:instance</code>) and the prompt text.\nExample: <code>/prompt default Write unit tests</code>".to_string();
+        return "Please include both a target and your prompt, e.g. /prompt default Write unit tests".to_string();
     }
 
     let local_config = supabase_sync::load_config().unwrap_or_default();
@@ -158,7 +158,7 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
     };
 
     if prompt_text.trim().is_empty() {
-        return "⚠️ <b>Empty Prompt:</b> Prompt text cannot be empty.".to_string();
+        return "Your prompt text is empty — nothing was sent.".to_string();
     }
 
     if target_node == "local" || target_node.eq_ignore_ascii_case(&local_alias) {
@@ -173,7 +173,7 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
                 || target_project.starts_with(&p.project_id)
         });
 
-        let (final_proj_id, repo_path, resolved_instance, resolved_conv_id, seq_badge) =
+        let (final_proj_id, repo_path, resolved_instance, resolved_conv_id, _seq_badge) =
             if let Some(seq) = seq_resolved {
                 (
                     seq.project_id,
@@ -235,7 +235,7 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
 
         if let Err(e) = repo_db::save_or_requeue_prompt(&active_prompt) {
             return format!(
-                "⚠️ <b>Failed to Save Prompt:</b> <code>{}</code>",
+                "Couldn't save your prompt: {}",
                 clean_for_telegram_html(&e, 200)
             );
         }
@@ -249,44 +249,21 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
                 false
             }
         };
-        let exec_badge = if spawned {
-            "🟢 Executing via agy"
-        } else {
-            "⚪ Enqueued in Split DB"
-        };
-        let seq_line = seq_badge
-            .map(|s| {
-                format!(
-                    "• <b>Dual Seq ID:</b> <code>[{}]</code>\n",
-                    clean_for_telegram_html(&s, 36)
-                )
-            })
-            .unwrap_or_default();
-        let conv_line = resolved_conv_id
-            .map(|c| {
-                format!(
-                    "• <b>Conversation ID:</b> <code>{}</code>\n",
-                    clean_for_telegram_html(&c, 40)
-                )
-            })
-            .unwrap_or_default();
+        let exec_status = if spawned { "Executing now" } else { "Queued" };
+        let ide_line = ide_exe_line_for(&resolved_instance).unwrap_or_default();
+        let id8 = prompt_id.strip_prefix("p-").unwrap_or(&prompt_id);
 
         format!(
-            "🚀 <b>Prompt Injected Locally!</b>\n\n\
-            • <b>Prompt ID:</b> <code>{}</code>\n\
-            {}{}\
-            • <b>Instance:</b> <code>{}</code>\n\
-            • <b>Target Workspace:</b> <code>{}</code>\n\
-            • <b>Path:</b> <code>{}</code>\n\
-            • <b>Status:</b> {}\n\
-            • <b>Prompt Content:</b>\n<pre>{}</pre>",
-            clean_for_telegram_html(&prompt_id, 32),
-            seq_line,
-            conv_line,
+            "✅ <b>Prompt sent</b> to {} · {}\n\
+            <b>Status:</b> {}\n\
+            <b>Reference:</b> <code>{}</code>\n\
+            {}\
+            <b>Your prompt:</b>\n<pre>{}</pre>",
             clean_for_telegram_html(&resolved_instance, 32),
             clean_for_telegram_html(&final_proj_id, 40),
-            clean_for_telegram_html(&repo_path, 60),
-            exec_badge,
+            exec_status,
+            clean_for_telegram_html(id8, 16),
+            ide_line,
             clean_for_telegram_html(&prompt_text, 800)
         )
     } else {
@@ -339,10 +316,10 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
         }
 
         let mut enqueued_supabase = false;
+        let cmd_id = uuid::Uuid::new_v4().to_string();
         for ep in &local_config.endpoints {
             if ep.is_enabled && ep.role == "secondary" {
                 if let Ok(c) = SupabaseClient::new(ep) {
-                    let cmd_id = uuid::Uuid::new_v4().to_string();
                     let payload = json!({
                         "id": cmd_id,
                         "target_node": target_node,
@@ -362,24 +339,29 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
         }
 
         let dispatch_status = if dispatched_gitmap {
-            "🟢 Dispatched immediately via GitMap Cluster SSH"
+            "Sent via GitMap Cluster SSH"
         } else if enqueued_supabase {
-            "📥 Enqueued to Supabase Secondary DB (Node will execute on poll)"
+            "Queued on the secondary database — the node will pick it up"
         } else {
-            "⚠️ Dispatched instruction (Node recorded in queue)"
+            "Queued (the node recorded your instruction)"
         };
 
+        let ide_line =
+            ide_exe_line_for(explicit_instance.as_deref().unwrap_or("default")).unwrap_or_default();
+        let id8 = cmd_id.get(..8).unwrap_or(&cmd_id);
+
         format!(
-            "🌐 <b>Remote Prompt Dispatched!</b>\n\n\
-            • <b>Target Node:</b> <code>{}</code>\n\
-            • <b>Target Seq / Project:</b> <code>{}</code>\n\
-            • <b>Instance:</b> <code>{}</code>\n\
-            • <b>Status:</b> {}\n\
-            • <b>Prompt Content:</b>\n<pre>{}</pre>",
+            "✅ <b>Prompt sent</b> to {} · {} ({})\n\
+            <b>Status:</b> {}\n\
+            <b>Reference:</b> <code>{}</code>\n\
+            {}\
+            <b>Your prompt:</b>\n<pre>{}</pre>",
             clean_for_telegram_html(&target_node, 40),
             clean_for_telegram_html(&target_project, 40),
             clean_for_telegram_html(explicit_instance.as_deref().unwrap_or("default"), 32),
             dispatch_status,
+            clean_for_telegram_html(id8, 16),
+            ide_line,
             clean_for_telegram_html(&prompt_text, 800)
         )
     }

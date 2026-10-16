@@ -64,12 +64,11 @@ pub fn format_prompts_templates_report() -> String {
     }
 
     format!(
-        "📋 <b>Available Reusable Prompt Templates ({} Templates)</b>\n\n\
+        "📋 Prompt templates ({})\n\n\
         {}\
-        💡 <b>How to Run Templates:</b>\n\
-        • <b>Local workspace:</b> <code>/prompt &lt;project-id&gt; &lt;template-slug&gt;</code>\n\
-        • <b>Target specific node:</b> <code>&lt;node-alias&gt;:/prompt &lt;project-id&gt; &lt;template-slug&gt;</code>\n\
-        • <b>With custom instruction:</b> <code>/prompt &lt;project-id&gt; &lt;template-slug&gt; with custom notes...</code>",
+        💡 <b>Run a template:</b>\n\
+        • <code>/prompt &lt;project-id&gt; &lt;template-slug&gt;</code>\n\
+        • <code>/prompt &lt;project-id&gt; &lt;template-slug&gt; with your own notes...</code>",
         templates.len(),
         rows
     )
@@ -90,17 +89,18 @@ pub fn format_prompts_list() -> String {
                     _ => "⚪",
                 };
                 let clean = repo_db::extract_clean_user_prompt(&p.prompt_content);
+                let id8 = if p.id.len() > 8 { &p.id[..8] } else { &p.id };
                 rows.push_str(&format!(
                     "{}. [{}] <code>{}</code>\n   • <b>Project:</b> <code>{}</code>\n   • <i>\"{}\"</i>\n\n",
                     i + 1,
                     badge,
-                    clean_for_telegram_html(&p.id, 24),
+                    clean_for_telegram_html(id8, 12),
                     clean_for_telegram_html(&p.project_id, 32),
                     clean_for_telegram_html(&clean, 100)
                 ));
             }
             format!(
-                "📝 <b>State Database Prompt Queue ({} Prompts, Showing Top {})</b>\n\n\
+                "📝 Prompts ({}, showing {})\n\n\
                 {}\
                 💡 Send <code>/restore</code> to re-queue backed-up prompts.",
                 total,
@@ -108,8 +108,7 @@ pub fn format_prompts_list() -> String {
                 rows
             )
         }
-        _ => "📝 <b>Prompt Queue:</b> No prompts currently registered in split SQLite database."
-            .to_string(),
+        _ => "No prompts on record.".to_string(),
     }
 }
 

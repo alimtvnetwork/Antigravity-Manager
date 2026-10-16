@@ -15,6 +15,7 @@ pub mod node_label;
 pub mod open_shot;
 pub mod palette;
 pub mod processing;
+pub mod prompt_history;
 pub mod reports_a;
 pub mod reports_b;
 pub mod reports_cluster_a;

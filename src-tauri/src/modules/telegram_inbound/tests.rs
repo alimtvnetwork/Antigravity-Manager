@@ -70,7 +70,7 @@ pub(crate) mod tests {
         assert!(report.contains("switch threshold:"));
         assert!(report.contains("🟢 <b>Running:</b>"));
         assert!(!report.contains("Backup Batches:"));
-        assert!(report.contains("Send <code>/expand"));
+        assert!(report.contains("Send /expand"));
     }
 
     #[test]

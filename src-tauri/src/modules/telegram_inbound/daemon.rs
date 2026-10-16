@@ -297,6 +297,7 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
 
     let mut markup_opt = match cmd_base.as_str() {
         "expand" | "exp" => reports_b::resolve_expand_prompt_markup(rest),
+        "history" | "hist" => Some(super::prompt_history::format_prompt_history(8).1),
         "fleet" | "whoami" => Some(json!({
             "inline_keyboard": [
                 [
@@ -706,11 +707,7 @@ pub fn start_telegram_daemon() {
                                                             send_telegram_message_with_markup(
                                                                 &clean_token,
                                                                 chat_id,
-                                                                &format!(
-                                                                    "⚠️ <b>Unknown button action:</b> <code>{}</code>\n\
-                                                                    The menu may be stale — send a fresh command to get new buttons.",
-                                                                    clean_for_telegram_html(data, 48)
-                                                                ),
+                                                                "That button is no longer valid — send a fresh command to get new buttons.",
                                                                 None,
                                                                 false,
                                                             )

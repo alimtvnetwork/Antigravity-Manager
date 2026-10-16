@@ -177,7 +177,9 @@ fn session_text(prompt: &ActivePrompt) -> String {
         .to_string()
 }
 
-fn picker_safe(token: &str) -> bool {
+/// Shared with `prompt_history.rs` (the only other consumer) so the
+/// separator-guard helper is not duplicated a third time.
+pub(crate) fn picker_safe(token: &str) -> bool {
     !token.is_empty() && !token.contains('|') && !token.contains(':')
 }
 

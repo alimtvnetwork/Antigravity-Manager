@@ -65,7 +65,11 @@ fn clear_flow(chat_id: i64) {
 }
 
 fn send_unknown() -> String {
-    "⚠️ <b>Unknown send action.</b> Send <code>/send</code> to start over.".to_string()
+    "⚠️ That send button has expired or isn't recognized. Send /send to start fresh.".to_string()
+}
+
+fn send_cancelled() -> String {
+    "Send cancelled — no prompt was sent.".to_string()
 }
 
 fn cancel_markup() -> Value {
@@ -314,7 +318,7 @@ fn render_project_page(
     }
     let picker = super::send_listing::load_project_page(instance, page);
     let mut out = format!(
-        "📮 <b>Send a prompt — step 3 of 3: pick the project</b>\n\
+        "Where should your prompt go? (Step 3 of 3 — pick the project)\n\
         • <b>Machine:</b> {}\n\
         • <b>Instance:</b> <code>{}</code>\n\
         ━━━━━━━━━━━━━━━━━━━━━━━━\n",
@@ -323,18 +327,16 @@ fn render_project_page(
     );
     if picker.rows.is_empty() {
         out.push_str(
-            "No projects were found for this instance. \
-            Tap <b>✏️ Type it manually</b> and reply with the conversation Seq ID \
-            (e.g. <code>C001</code>), project name, or conversation id.",
+            "No projects found for this instance. \
+            Tap ✏️ Type it manually, then reply with the conversation ID \
+            (e.g. C001), project name, or conversation id.",
         );
     } else {
         out.push_str(&super::send_listing::format_project_list(
             &picker.rows,
             picker.page,
         ));
-        out.push_str(
-            "\n👆 Tap a number, or type that number. <b>Next</b> shows the next eight projects.",
-        );
+        out.push_str("\nTap a number, or type it. Tap Next for the next 8.");
     }
     (out, Some(project_picker_markup(&picker)))
 }
@@ -365,21 +367,24 @@ fn on_project_number(chat_id: i64, page: usize, index: usize) -> (String, Option
     match picker.rows.get(index) {
         Some(row) => on_conversation_picked(chat_id, &machine, &instance, &row.value),
         None => (
-            "⚠️ <b>That number is not on this page.</b> Tap a number that is listed, or send <code>/send</code> to start over.".to_string(),
+            "That number isn't on this page. Tap one of the listed numbers, or send /send to start over.".to_string(),
             Some(project_picker_markup(&picker)),
         ),
     }
 }
 
 fn destination_locked_reply(machine: &str, instance: &str, conversation: &str) -> String {
+    let ide_line = ide_exe_line_for(instance).unwrap_or_default();
     format!(
-        "🎯 <b>Destination locked</b>\n\
+        "🎯 <b>Destination confirmed</b>\n\
         • <b>Machine:</b> {}\n\
         • <b>Instance:</b> <code>{}</code>\n\
+        {}\
         • <b>Conversation:</b> <code>{}</code>\n\n\
-        ✍️ Now send the prompt text as a plain message. It will go to exactly this destination — nothing is guessed.",
+        Now send your prompt as a plain message. It will go to exactly this destination.",
         super::node_label::machine_header_html(machine),
         clean_for_telegram_html(instance, 48),
+        ide_line,
         clean_for_telegram_html(conversation, 64)
     )
 }
@@ -392,17 +397,16 @@ pub fn start_send_flow(rest: &str) -> String {
         if let Ok(mut flows) = SEND_FLOWS.lock() {
             flows.clear();
         }
-        return "🧹 <b>Send flow cancelled.</b> Nothing was dispatched.".to_string();
+        return send_cancelled();
     }
     let entries = machine_entries();
     if entries.is_empty() {
-        return "⚠️ <b>Send unavailable:</b> this machine's label cannot be shown \
-        in the destination picker (unsafe characters or too long for a button). \
-        Rename the node alias and try <code>/send</code> again."
+        return "Sending is unavailable: this machine's name can't be shown as a button. \
+        Rename the node alias and try /send again."
             .to_string();
     }
     let mut out = String::from(
-        "📮 <b>Send a prompt — step 1 of 3: pick the destination machine</b>\n\
+        "Where should your prompt go? (Step 1 of 3 — pick the machine)\n\
         ━━━━━━━━━━━━━━━━━━━━━━━━\n",
     );
     for (idx, alias) in entries.iter().enumerate() {
@@ -421,8 +425,8 @@ pub fn start_send_flow(rest: &str) -> String {
         ));
     }
     out.push_str(
-        "\n👆 Tap a machine below, then pick the instance and the conversation. \
-        The destination locks <b>before</b> any prompt text is accepted.",
+        "\nTap a machine below, then pick the instance and the conversation. \
+        The destination is confirmed before any prompt text is accepted.",
     );
     out
 }
@@ -435,10 +439,7 @@ fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
         Some(e) => e,
         None => {
             return (
-                format!(
-                    "⚠️ <b>Unknown machine:</b> <code>{}</code>. Send <code>/send</code> to pick again.",
-                    clean_for_telegram_html(alias, 48)
-                ),
+                "That machine isn't available. Send /send to pick again.".to_string(),
                 None,
             )
         }
@@ -458,14 +459,14 @@ fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
     }
     let instances = instance_entries();
     let mut out = format!(
-        "📮 <b>Send a prompt — step 2 of 3: pick the instance on {}</b>\n\
+        "Where should your prompt go? (Step 2 of 3 — pick the instance on {})\n\
         ━━━━━━━━━━━━━━━━━━━━━━━━\n",
         super::node_label::machine_header_html(&canonical)
     );
     for (idx, inst) in instances.iter().enumerate() {
         out.push_str(&format_instance_choice(idx, inst));
     }
-    out.push_str("\n👆 Tap an instance. Instance ids resolve on the target machine.");
+    out.push_str("\nTap an instance below.");
     (out, Some(instance_picker_markup(&canonical, &instances)))
 }
 
@@ -477,10 +478,8 @@ fn on_instance_picked(chat_id: i64, machine: &str, instance: &str) -> (String, O
         Some(e) => e,
         None => {
             return (
-                format!(
-                    "⚠️ <b>Unknown machine:</b> <code>{}</code>. Send <code>/send</code> to start over.",
-                    clean_for_telegram_html(machine, 48)
-                ),
+                "That machine/instance is no longer available. Send /send to start over."
+                    .to_string(),
                 None,
             )
         }
@@ -492,10 +491,8 @@ fn on_instance_picked(chat_id: i64, machine: &str, instance: &str) -> (String, O
         Some(inst) => inst.id,
         None => {
             return (
-                format!(
-                    "⚠️ <b>Unknown instance:</b> <code>{}</code>. Send <code>/send</code> to start over.",
-                    clean_for_telegram_html(instance, 48)
-                ),
+                "That machine/instance is no longer available. Send /send to start over."
+                    .to_string(),
                 None,
             )
         }
@@ -532,9 +529,9 @@ fn on_manual_conversation(chat_id: i64, machine: &str, instance: &str) -> (Strin
     }
     let _ = (machine, instance);
     (
-        "✏️ <b>Type the conversation</b>\n\
-        Reply with the conversation Seq ID (e.g. <code>C001</code>), project name, \
-        or conversation id as a plain message. The destination locks before any prompt text is accepted."
+        "Type the conversation. Reply with the conversation ID (e.g. C001), \
+        project name, or conversation id. Your destination is confirmed before \
+        any prompt text is accepted."
             .to_string(),
         Some(cancel_markup()),
     )
@@ -581,10 +578,7 @@ pub async fn handle_send_callback(chat_id: i64, data: &str) -> (String, Option<V
     };
     if payload == "cancel" {
         clear_flow(chat_id);
-        return (
-            "🧹 <b>Send flow cancelled.</b> Nothing was dispatched.".to_string(),
-            None,
-        );
+        return (send_cancelled(), None);
     }
     if let Some(alias) = payload.strip_prefix("m:") {
         return on_machine_picked(chat_id, alias);
@@ -635,6 +629,11 @@ pub async fn handle_send_callback(chat_id: i64, data: &str) -> (String, Option<V
             _ => (send_unknown(), None),
         };
     }
+    // One-tap rerun from `/history`: `send:r:<id8>` resolves the prompt
+    // server-side and re-sends it through the canonical injection path.
+    if let Some(id8) = payload.strip_prefix("r:") {
+        return super::prompt_history::rerun_prompt_by_id(id8).await;
+    }
     (send_unknown(), None)
 }
 
@@ -662,18 +661,27 @@ async fn dispatch_send_prompt(
     };
     let injected = execute_prompt_injection(&args).await;
     let proof = super::open_shot::capture_and_send_proof_shot(&target).await;
-    let reply = format!(
-        "✅ <b>Prompt sent</b>\n\
-        • <b>Machine:</b> <code>{}</code>\n\
-        • <b>Instance:</b> <code>{}</code>\n\
-        • <b>Conversation:</b> <code>{}</code>\n\n\
-        {}\n\n{}",
-        clean_for_telegram_html(machine, 48),
-        clean_for_telegram_html(instance, 48),
-        clean_for_telegram_html(conversation, 64),
-        injected,
-        proof
-    );
+    let ide_line = ide_exe_line_for(instance).unwrap_or_default();
+    let reply = if ide_line.is_empty() {
+        format!(
+            "✅ <b>Prompt delivered</b> to {} · {} · {}\n\n{}\n\n{}",
+            clean_for_telegram_html(machine, 48),
+            clean_for_telegram_html(instance, 48),
+            clean_for_telegram_html(conversation, 64),
+            injected,
+            proof
+        )
+    } else {
+        format!(
+            "✅ <b>Prompt delivered</b> to {} · {} · {}\n{}{}\n\n{}",
+            clean_for_telegram_html(machine, 48),
+            clean_for_telegram_html(instance, 48),
+            clean_for_telegram_html(conversation, 64),
+            ide_line,
+            injected,
+            proof
+        )
+    };
     SendDispatch {
         reply,
         markup: None,
@@ -811,7 +819,7 @@ mod tests {
         assert!(reply.contains("remote-studio"));
         assert!(reply.contains("default"));
         assert!(reply.contains("C001"));
-        assert!(reply.contains("Destination locked"));
+        assert!(reply.contains("Destination confirmed"));
     }
 
     fn seed_flow(chat_id: i64, stage: SendStage) {
@@ -841,7 +849,7 @@ mod tests {
         seed_flow(chat_id, SendStage::PickConversation);
 
         let (reply, markup) = on_conversation_picked(chat_id, "W3", "default", "C001");
-        assert!(reply.contains("Destination locked"));
+        assert!(reply.contains("Destination confirmed"));
         assert!(reply.contains("C001"));
         assert!(markup.is_some());
 
@@ -856,7 +864,7 @@ mod tests {
 
         // Picking again at AwaitPrompt is rejected, never silently re-locked.
         let (retry, _) = on_conversation_picked(chat_id, "W3", "default", "C002");
-        assert!(retry.contains("Unknown send action"));
+        assert!(retry.contains("isn't recognized"));
         drop_flow(chat_id);
     }
 
@@ -878,7 +886,7 @@ mod tests {
 
         // No flow for this chat: rejected, no state created.
         let (unknown, none) = on_manual_conversation(-9_001_339, "W3", "default");
-        assert!(unknown.contains("Unknown send action"));
+        assert!(unknown.contains("isn't recognized"));
         assert!(none.is_none());
         drop_flow(chat_id);
     }
@@ -890,15 +898,15 @@ mod tests {
 
         let reply = start_send_flow("cancel");
         assert!(reply.contains("cancelled"));
-        assert!(reply.contains("Nothing was dispatched"));
+        assert!(reply.contains("no prompt was sent"));
         assert!(SEND_FLOWS.lock().unwrap().is_empty());
     }
 
     #[test]
     fn send_start_lists_machines_destination_first() {
         let reply = start_send_flow("");
-        assert!(reply.contains("step 1 of 3"));
-        assert!(reply.contains("destination locks"));
+        assert!(reply.contains("Step 1 of 3"));
+        assert!(reply.contains("destination is confirmed"));
     }
 
     #[tokio::test]
@@ -915,7 +923,7 @@ mod tests {
     #[tokio::test]
     async fn send_callback_unknown_payload_is_rejected() {
         let (reply, markup) = handle_send_callback(-9_001_342, "send:bogus").await;
-        assert!(reply.contains("Unknown send action"));
+        assert!(reply.contains("isn't recognized"));
         assert!(markup.is_none());
     }
 

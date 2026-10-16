@@ -491,7 +491,7 @@ pub fn window_command_section() -> &'static str {
     🎨 <b>Window, screenshot, and where the next prompt goes</b>\n\
     🔵 <b>This machine.</b> <code>/ui</code> opens Antigravity Manager when it is closed. <code>/shot</code> opens it only if needed, then sends a picture of the current manager window back to this chat. Each machine that runs the manager answers for its own screen.\n\
     <pre>/ui\n/shot\n/target default C001</pre>\n\
-    🟢 Send <code>/target &lt;instance&gt; &lt;C001&gt;</code> first — the next plain message is the prompt and goes to that conversation. <code>/target clear</code> forgets the aim. For a guided machine → instance → conversation picker with screenshot proof of delivery, use <code>/send</code>.\n\
+    🟢 Send <code>/target &lt;instance&gt; &lt;C001&gt;</code> first — your next plain message becomes the prompt for that conversation. <code>/target clear</code> cancels. For a guided picker with delivery proof, use <code>/send</code>.\n\
     🟡 <code>/open &lt;machine&gt;</code> opens AGM on a fleet machine; <code>/screenshot &lt;machine&gt;</code> photographs it. Bare <code>/open</code> / <code>/screenshot</code> stay local.\n\
     🟣 Voice notes stay audio. Telegram does not turn them into text. Type the prompt after <code>/target</code> or <code>/send</code>.\n\
     🟠 <b>Drive the UI remotely.</b> <code>/ui goto &lt;route&gt;</code> navigates the manager window (e.g. <code>/ui goto instances</code>); <code>/ui ls</code> lists every route; <code>/ui scroll &lt;element-id&gt;</code> scrolls an element into view and focuses it. Unknown routes list the valid ones — nothing fails silently.\n"
@@ -693,8 +693,7 @@ async fn run_ui_verb(verb: UiVerb) -> LocalUiAction {
                 *guard = None;
             }
             LocalUiAction {
-                reply: "🧹 <b>Aim cleared.</b> The next plain message is no longer sent as a prompt."
-                    .to_string(),
+                reply: "Target cleared — your next message won't be sent as a prompt.".to_string(),
                 markup: None,
                 png: None,
                 caption: String::new(),
@@ -713,10 +712,7 @@ async fn run_ui_verb(verb: UiVerb) -> LocalUiAction {
             }
             LocalUiAction {
                 reply: format!(
-                    "🎯 <b>Next prompt goes here</b>\n\
-                    • <b>Instance:</b> <code>{}</code>\n\
-                    • <b>Conversation:</b> <code>{}</code>\n\
-                    Send the prompt as the next plain message. It stays aimed for 10 minutes. <code>/target clear</code> forgets it.",
+                    "🎯 Your next message will go to {} · {}. This stays active for 10 minutes. /target clear cancels it.",
                     escape_html(&instance),
                     escape_html(&conversation)
                 ),
@@ -751,19 +747,16 @@ async fn run_ui_verb(verb: UiVerb) -> LocalUiAction {
             let (png, note) = match capture_manager_png() {
                 Ok(bytes) => (
                     Some(bytes),
-                    "📸 The manager window on this machine is attached. This does not click a conversation inside the IDE.".to_string(),
+                    "A screenshot of the manager window is attached above (the conversation itself wasn't clicked).".to_string(),
                 ),
                 Err(err) => (
                     None,
-                    format!(
-                        "Screenshot was not attached: <code>{}</code>",
-                        escape_html(&err)
-                    ),
+                    format!("Screenshot unavailable: {}", escape_html(&err)),
                 ),
             };
             LocalUiAction {
                 reply: format!(
-                    "🎯 <b>Prompt sent to</b> <code>{}</code> on <code>{}</code>\n{}\n\n{}",
+                    "✅ <b>Prompt delivered</b> to <code>{}</code> on <code>{}</code>\n{}\n\n{}",
                     escape_html(&conversation),
                     escape_html(&instance),
                     note,
@@ -835,13 +828,13 @@ fn aim_status_html() -> String {
     match PROMPT_AIM.lock() {
         Ok(guard) => match guard.as_ref() {
             Some(aim) => format!(
-                "🎯 <b>Current aim</b>\n• <b>Instance:</b> <code>{}</code>\n• <b>Conversation:</b> <code>{}</code>\nThe next plain message is the prompt.",
+                "🎯 Current target: {} · {}. Your next plain message will be sent there as a prompt.",
                 escape_html(&aim.instance),
                 escape_html(&aim.conversation)
             ),
-            None => "🎯 <b>No aim set.</b> Send <code>/target default C001</code> first, then the prompt text.".to_string(),
+            None => "No target set. Send /target default C001 first, then your prompt.".to_string(),
         },
-        Err(_) => "🎯 <b>Aim lock failed.</b> Send <code>/target default C001</code> again.".to_string(),
+        Err(_) => "Target lock failed. Send <code>/target default C001</code> again.".to_string(),
     }
 }
 

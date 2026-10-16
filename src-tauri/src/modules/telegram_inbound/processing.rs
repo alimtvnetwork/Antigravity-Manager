@@ -72,6 +72,8 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
             Some(repo_db::format_tree_view_telegram_html(200, only_running))
         }
         "expand" | "exp" => Some(format_expand_prompt_report(rest)),
+        "history" | "hist" => Some(super::prompt_history::format_prompt_history(8).0),
+        "rerun" | "rr" => Some(super::prompt_history::rerun_prompt_by_id(rest).await.0),
         "active" | "running" => Some(format_active_prompts_report().await),
         "queues" | "queue" => Some(format_prompt_queues_report().await),
         "nodes" | "node" => {
@@ -249,39 +251,19 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
         "email" | "mail" => Some(execute_email_command(rest)),
         "snapshot" | "cluster" => Some(format_cluster_nodes_report().await),
         "ff" | "rotate" => {
-            let projs = repo_db::list_running_projects().unwrap_or_default();
-            let proj_names = crate::modules::notification_hub::deduplicate_names(
-                projs
-                    .into_iter()
-                    .map(|p| p.repo_name)
-                    .filter(|n| !n.is_empty()),
-            );
-            let proj_display = if !proj_names.is_empty() {
-                proj_names.join(", ")
-            } else {
-                "Antigravity-Manager".to_string()
-            };
-
             let backup_count = repo_db::backup_running_prompts("default").unwrap_or(0);
             // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
             crate::error::record_ignored(
                 backup_prompts_db::backup_active_running_prompts(Some("default"), None),
                 "backup_active_running_prompts",
             );
-            let rotate_res = auto_switcher::check_and_rotate_if_needed().await;
+            let _rotate_res = auto_switcher::check_and_rotate_if_needed().await;
             let resent = repo_db::resend_all_running_commands(20).unwrap_or_default();
             let disp = repo_db::dispatch_running_prompts("default").unwrap_or(0);
 
             Some(format!(
-                "⏩ <b>Fast-Forward &amp; Prompt Preservation:</b>\n\n\
-                • <b>Projects:</b> <code>{}</code>\n\
-                • <b>Pre-Switch Backup:</b> <code>{}</code> running prompt(s) captured\n\
-                • <b>Rotation Evaluation:</b> {}\n\
-                • <b>Post-Switch Re-injection:</b> <code>{}</code> prompt(s) resent ({} dispatched)\n\n\
-                💡 All active prompts are preserved and continue without interruption.",
-                clean_for_telegram_html(&proj_display, 80),
+                "⏩ Switched to the highest-quota account. {} prompts backed up before the switch; {} re-sent ({} sent). Everything continues without interruption.",
                 backup_count,
-                if rotate_res.is_ok() { "✅ Evaluated successfully" } else { "ℹ️ No switch required" },
                 resent.len(),
                 disp
             ))
@@ -312,38 +294,19 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                 return Some(format_active_prompts_report().await);
             }
             if lower_full.starts_with("ff:") {
-                let projs = repo_db::list_running_projects().unwrap_or_default();
-                let proj_names = crate::modules::notification_hub::deduplicate_names(
-                    projs
-                        .into_iter()
-                        .map(|p| p.repo_name)
-                        .filter(|n| !n.is_empty()),
-                );
-                let proj_display = if !proj_names.is_empty() {
-                    proj_names.join(", ")
-                } else {
-                    "Antigravity-Manager".to_string()
-                };
-
                 let backup_count = repo_db::backup_running_prompts("default").unwrap_or(0);
                 // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
                 crate::error::record_ignored(
                     backup_prompts_db::backup_active_running_prompts(Some("default"), None),
                     "backup_active_running_prompts",
                 );
-                let rotate_res = auto_switcher::check_and_rotate_if_needed().await;
+                let _rotate_res = auto_switcher::check_and_rotate_if_needed().await;
                 let resent = repo_db::resend_all_running_commands(20).unwrap_or_default();
                 let disp = repo_db::dispatch_running_prompts("default").unwrap_or(0);
 
                 return Some(format!(
-                    "⏩ <b>Fast-Forward &amp; Prompt Preservation:</b>\n\n\
-                    • <b>Projects:</b> <code>{}</code>\n\
-                    • <b>Pre-Switch Backup:</b> <code>{}</code> prompt(s) captured\n\
-                    • <b>Rotation Evaluation:</b> {}\n\
-                    • <b>Post-Switch Re-injection:</b> <code>{}</code> prompt(s) resent ({} dispatched)",
-                    clean_for_telegram_html(&proj_display, 80),
+                    "⏩ Switched to the highest-quota account. {} prompts backed up before the switch; {} re-sent ({} sent). Everything continues without interruption.",
                     backup_count,
-                    if rotate_res.is_ok() { "✅ Completed" } else { "ℹ️ Evaluated" },
                     resent.len(),
                     disp
                 ));

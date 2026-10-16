@@ -600,7 +600,7 @@ pub async fn capture_and_send_proof_shot(target: &OpenShotTarget) -> String {
         Ok(t) => t,
         Err(e) => {
             return format!(
-                "📸 <b>Proof screenshot skipped:</b> <code>{}</code>",
+                "Delivery screenshot skipped: {}",
                 clean_for_telegram_html(&e, 200)
             )
         }
@@ -621,16 +621,18 @@ pub async fn capture_and_send_proof_shot(target: &OpenShotTarget) -> String {
             let caption = format!("Delivery proof — AGM on {label}");
             match send_telegram_photo(&token, chat_id, &png, &caption, None).await {
                 Ok(_) => format!(
-                    "📸 <b>Proof:</b> screenshot from <code>{label_esc}</code> attached above."
+                    "Screenshot from {} attached above as delivery confirmation.",
+                    label_esc
                 ),
                 Err(e) => format!(
-                    "📸 <b>Proof screenshot failed:</b> captured but Telegram rejected the photo: <code>{}</code>",
+                    "Delivery screenshot couldn't be sent: {}",
                     clean_for_telegram_html(&e.to_string(), 200)
                 ),
             }
         }
         Err(e) => format!(
-            "📸 <b>Proof screenshot failed on <code>{label_esc}</code>:</b> <code>{}</code>",
+            "Couldn't capture a delivery screenshot on {}: {}",
+            label_esc,
             clean_for_telegram_html(&e, 200)
         ),
     }

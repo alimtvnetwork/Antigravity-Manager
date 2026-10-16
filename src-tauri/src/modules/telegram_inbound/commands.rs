@@ -194,7 +194,7 @@ pub fn execute_backup_command(args_str: &str) -> String {
         match backup_prompts_db::list_backup_batches(None) {
             Ok(batches) => {
                 if batches.is_empty() {
-                    return "🎒 <b>Prompt Backup Vault:</b> No backup batches stored.".to_string();
+                    return "No prompt backups stored.".to_string();
                 }
                 let mut rows = String::new();
                 for (i, b) in batches.iter().take(8).enumerate() {
@@ -206,31 +206,14 @@ pub fn execute_backup_command(args_str: &str) -> String {
                         b.is_fully_restored
                     ));
                 }
-                format!(
-                    "🎒 <b>Split SQLite Prompt Backups ({} total):</b>\n\n{}",
-                    batches.len(),
-                    rows
-                )
+                format!("📦 Prompt backups ({}):\n\n{}", batches.len(), rows)
             }
             Err(e) => format!(
-                "⚠️ <b>Backup Query Failed:</b> <code>{}</code>",
+                "Couldn't read prompt backups: {}",
                 clean_for_telegram_html(&e, 200)
             ),
         }
     } else if sub == "restore" || sub == "rrp" || sub == "resend" {
-        let projs = repo_db::list_running_projects().unwrap_or_default();
-        let proj_names = crate::modules::notification_hub::deduplicate_names(
-            projs
-                .into_iter()
-                .map(|p| p.repo_name)
-                .filter(|n| !n.is_empty()),
-        );
-        let proj_display = if !proj_names.is_empty() {
-            proj_names.join(", ")
-        } else {
-            "Antigravity-Manager".to_string()
-        };
-
         let repo_resent = repo_db::resend_all_running_commands(20).unwrap_or_default();
         // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
         crate::error::record_ignored(
@@ -239,55 +222,28 @@ pub fn execute_backup_command(args_str: &str) -> String {
         );
         match backup_prompts_db::restore_running_prompts(Some("default"), false, None) {
             Ok(records) => format!(
-                "♻️ <b>Prompt Restoration Complete:</b>\n\n\
-                • <b>Projects:</b> <code>{}</code>\n\
-                • Restored and re-queued <b>{}</b> prompt(s) from split SQLite backup.\n\
-                • Re-injected <b>{}</b> in-flight prompt(s) directly into workspaces.",
-                clean_for_telegram_html(&proj_display, 80),
+                "♻️ Restored {} prompts from backup; {} re-sent to their workspaces.",
                 records.len(),
                 repo_resent.len()
             ),
-            Err(e) => format!(
-                "⚠️ <b>Prompt Restore Failed:</b> <code>{}</code>",
-                clean_for_telegram_html(&e, 200)
-            ),
+            Err(e) => format!("Restore failed: {}", clean_for_telegram_html(&e, 200)),
         }
     } else {
-        let projs = repo_db::list_running_projects().unwrap_or_default();
-        let proj_names = crate::modules::notification_hub::deduplicate_names(
-            projs
-                .into_iter()
-                .map(|p| p.repo_name)
-                .filter(|n| !n.is_empty()),
-        );
-        let proj_display = if !proj_names.is_empty() {
-            proj_names.join(", ")
-        } else {
-            "Antigravity-Manager".to_string()
-        };
-
         // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
         crate::error::record_ignored(
             repo_db::backup_running_prompts("default"),
             "backup_running_prompts",
         );
         match backup_prompts_db::backup_active_running_prompts(Some("default"), None) {
-            Ok((batch, records)) => format!(
-                "🎒 <b>Running Prompts Backed Up Successfully!</b>\n\n\
-                • <b>Projects:</b> <code>{}</code>\n\
-                • <b>Batch ID:</b> <code>{}</code>\n\
-                • <b>Captured Prompts:</b> <b>{}</b>\n\
-                • <b>Vault Path:</b> <code>{}</code>\n\n\
-                💡 Send <code>/restore</code> anytime to resume backed-up prompts.",
-                clean_for_telegram_html(&proj_display, 80),
-                clean_for_telegram_html(&batch.id, 40),
-                records.len(),
-                clean_for_telegram_html(&batch.file_path, 120)
-            ),
-            Err(e) => format!(
-                "⚠️ <b>Backup Failed:</b> <code>{}</code>",
-                clean_for_telegram_html(&e, 200)
-            ),
+            Ok((batch, records)) => {
+                let id8 = batch.id.get(..8).unwrap_or(&batch.id);
+                format!(
+                    "✅ Backed up {} running prompts (backup {}). Send /restore anytime to resume them.",
+                    records.len(),
+                    clean_for_telegram_html(id8, 16)
+                )
+            }
+            Err(e) => format!("Backup failed: {}", clean_for_telegram_html(&e, 200)),
         }
     }
 }

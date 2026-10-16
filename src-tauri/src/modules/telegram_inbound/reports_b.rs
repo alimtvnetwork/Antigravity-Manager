@@ -46,6 +46,7 @@ pub fn format_expand_prompt_report(query_str: &str) -> String {
             let friendly_ws =
                 repo_db::format_friendly_workspace_label(&p.project_id, "", &p.repo_path);
             let short_ws = shorten_project_name(&friendly_ws);
+            let id8 = p.id.get(..8).unwrap_or(&p.id);
             let duration = format_running_duration(p.created_at);
             let badge = if p.status == "running" || p.status == "dispatched" {
                 "🟢"
@@ -53,14 +54,12 @@ pub fn format_expand_prompt_report(query_str: &str) -> String {
                 "⚪"
             };
             let m_name = crate::modules::email_watcher::detect_machine_name();
-            let m_ip = crate::modules::email_watcher::detect_local_ip();
             let inst_id = if p.instance_id.is_empty() {
                 "default"
             } else {
                 &p.instance_id
             };
             let (_, detected_images) = repo_db::extract_image_payload_or_path(&p.prompt_content);
-            let (_, word_count) = repo_db::extract_prompt_words_preview(&p.prompt_content, 200);
 
             let attached_images_section = if !detected_images.is_empty() {
                 let mut links = Vec::new();
@@ -78,51 +77,36 @@ pub fn format_expand_prompt_report(query_str: &str) -> String {
             };
 
             let palette = active_card_palette();
-            let meta = section(
-                palette,
-                "Prompt",
-                &[
-                    kv(palette, "Project", &clean_for_telegram_html(&short_ws, 32)),
-                    kv(
-                        palette,
-                        "Status",
-                        &format!(
-                            "{} {} · {}",
-                            badge,
-                            clean_for_telegram_html(&p.status, 24),
-                            duration
-                        ),
-                    ),
-                    kv(palette, "Path", &clean_for_telegram_html(&p.repo_path, 80)),
-                    kv(palette, "Words", &format!("{} words", word_count)),
-                ],
+            let status_line = format!(
+                "{} {} {}",
+                badge,
+                clean_for_telegram_html(&p.status, 24),
+                duration
             );
             format!(
-                "{} <b>Expanded prompt</b>  <code>{}</code>\n\
-                {}\n\
-                🖥️ <b>Machine:</b> <code>{}</code> (<code>{}</code>) · <b>Instance:</b> <code>{}</code>\n\
+                "{} <b>Prompt {} — {}</b>\n\
+                Machine: {} · Instance: <code>{}</code>\n\
+                Status: {}\n\
                 {}\n\
                 {}{}\
                 {}",
                 palette.mark,
-                clean_for_telegram_html(&p.id, 48),
-                palette.rule,
+                clean_for_telegram_html(id8, 16),
+                clean_for_telegram_html(&short_ws, 32),
                 clean_for_telegram_html(&m_name, 48),
-                clean_for_telegram_html(&m_ip, 48),
                 clean_for_telegram_html(inst_id, 32),
+                status_line.trim(),
                 palette.rule,
-                meta,
                 attached_images_section,
                 prompt_note(
                     palette,
-                    "Instructions",
+                    "Full text",
                     &clean_for_telegram_html(&p.prompt_content, 3500),
                 )
             )
         }
         None => format!(
-            "⚠️ <b>Prompt Not Found:</b> No prompt matched <code>{}</code>.\n\
-            💡 Send <code>/active</code> to view running prompts or <code>/prompts all</code> for all IDs.",
+            "No prompt matched \"{}\". Send /active for running prompts or /prompts all for the full list.",
             clean_for_telegram_html(query, 32)
         ),
     }
@@ -193,16 +177,12 @@ pub fn format_prompts_query_report(term: &str) -> String {
 
     if matches.is_empty() {
         return format!(
-            "🔍 <b>Prompt Query:</b> No prompts matched <code>{}</code>.\n\
-            💡 Send <code>/query</code> to view recent prompts or <code>/observe</code> for live state.",
+            "No prompts matched \"{}\". Send /query for recent prompts or /observe for the live view.",
             clean_for_telegram_html(term, 32)
         );
     }
 
-    let mut out = format!(
-        "🔍 <b>Prompts Query Results:</b> (Found {} matches)\n\n",
-        matches.len()
-    );
+    let mut out = format!("🔍 <b>{} prompts found</b>\n\n", matches.len());
 
     for (idx, p) in matches.iter().enumerate() {
         let (preview, wc) = repo_db::extract_prompt_words_preview(&p.prompt_content, 200);
@@ -216,9 +196,9 @@ pub fn format_prompts_query_report(term: &str) -> String {
         let prompt_id_short = if p.id.len() > 8 { &p.id[..8] } else { &p.id };
 
         out.push_str(&format!(
-            "<b>#{}. {} {}</b> (<code>{}</code> | {} words)\n\
+            "<b>#{}. {} {}</b> (ref <code>{}</code>, {} words)\n\
             {}\n\
-            <i>Details: <code>/expand {}</code></i>\n\n",
+            View full text: /expand {}\n\n",
             idx + 1,
             badge,
             clean_for_telegram_html(&short_ws, 24),
@@ -247,14 +227,14 @@ pub fn format_help_manual() -> String {
         ━━━━━━━━━━━━━━━━━━━━━━━━\n\
         💡 Every <code>command</code> below is tap-to-copy. Copy buttons for the essentials sit under this message.\n\n\
         🚀 <b>Easy Machine &amp; Instance Prompting</b>\n\
-        • <code>/prompt default Write unit tests</code> — Prompt local <code>default</code> instance directly\n\
-        • <code>/prompt W3:default Fix build</code> — Prompt remote machine <code>W3</code> instance <code>default</code>\n\
+        • <code>/prompt default Write unit tests</code> — Send a prompt to the local <code>default</code> instance\n\
+        • <code>/prompt W3:default Fix build</code> — Send a prompt to instance <code>default</code> on machine <code>W3</code>\n\
         • <code>/prompt --node vm-1 --instance work Audit code</code> — Explicit machine + instance prompt\n\
-        • <code>/target W3 default</code> — Aim subsequent plain messages at machine <code>W3</code> instance <code>default</code>\n\
-        • <code>/target default C001</code> — Aim next plain message at a conversation (<code>/target clear</code> forgets, <code>/where</code> shows aim)\n\
+        • <code>/target W3 default</code> — Point subsequent plain messages at machine <code>W3</code> instance <code>default</code>\n\
+        • <code>/target default C001</code> — Point the next plain message at a conversation (<code>/target clear</code> cancels, <code>/where</code> shows the target)\n\
         • <code>/send</code> — Guided 3-step picker: machine → instance → conversation, then type the prompt\n\
-        • <code>/prompt C001 Is it done?</code> — Inject into conversation (<code>C001</code>, <code>P001</code>, <code>GM:#1</code>)\n\
-        • <code>C001 your prompt here</code> — Shorthand: Seq ID + text injects directly\n\
+        • <code>/prompt C001 Is it done?</code> — Send to conversation (<code>C001</code>, <code>P001</code>, <code>GM:#1</code>)\n\
+        • <code>C001 your prompt here</code> — Shorthand: ID + text sends directly\n\
         • <code>/prompts</code> · <code>/prompt_queue</code> · <code>/templates</code> — Reusable prompt templates\n\n\
         💰 <b>Account Balance &amp; Credit Inspection</b>\n\
         • <code>/balance</code> — Dedicated per-instance &amp; standby account 4h / weekly balance dashboard\n\
@@ -292,7 +272,7 @@ pub fn format_help_manual() -> String {
         🎨 <b>Card theme</b>\n\
         • <code>/theme</code> — List palettes. Default is Riseup (emerald and gold)\n\
         • <code>/theme riseup</code> · <code>/theme obsidian</code> · <code>/theme gold</code> · <code>/theme indigo</code>\n\n\
-        🛡️ <b>Prompt aim</b>  <code>/send</code> locks machine, instance, then conversation. <code>/target</code> aims the next plain message.{}",
+        🛡️ <b>Prompt target</b>  <code>/send</code> confirms machine, instance, then conversation. <code>/target</code> points the next plain message at a conversation.{}",
         clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&ver, 24),
         clean_for_telegram_html(&hash, 24),

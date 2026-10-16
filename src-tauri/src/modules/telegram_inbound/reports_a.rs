@@ -175,7 +175,12 @@ pub fn format_observe_report() -> String {
 
             if let Some(ap) = matched_prompt {
                 seen_prompt_ids.insert(ap.id.clone());
-                let duration_str = format_running_duration(ap.created_at);
+                let raw_duration = format_running_duration(ap.created_at);
+                let duration_str = raw_duration
+                    .strip_prefix("(running ")
+                    .and_then(|s| s.strip_suffix(')'))
+                    .unwrap_or(&raw_duration)
+                    .to_string();
                 let (preview_txt, wc) =
                     repo_db::extract_prompt_words_preview(&ap.prompt_content, 200);
                 let prompt_id_short = if ap.id.len() > 8 {
@@ -190,11 +195,16 @@ pub fn format_observe_report() -> String {
                     entry.1.push((preview_txt, wc, prompt_id_short));
                 }
             } else if let Some(ref txt) = p.active_prompt {
-                let duration_str = if p.last_detected_at > 0 {
+                let raw_duration = if p.last_detected_at > 0 {
                     format_running_duration(p.last_detected_at)
                 } else {
                     String::new()
                 };
+                let duration_str = raw_duration
+                    .strip_prefix("(running ")
+                    .and_then(|s| s.strip_suffix(')'))
+                    .unwrap_or(&raw_duration)
+                    .to_string();
                 let (preview_txt, wc) = repo_db::extract_prompt_words_preview(txt, 200);
                 let entry = project_map
                     .entry(short_name.clone())
@@ -223,7 +233,12 @@ pub fn format_observe_report() -> String {
         let short_name = shorten_project_name(&friendly_ws);
         seen_prompt_ids.insert(ap.id.clone());
 
-        let duration_str = format_running_duration(ap.created_at);
+        let raw_duration = format_running_duration(ap.created_at);
+        let duration_str = raw_duration
+            .strip_prefix("(running ")
+            .and_then(|s| s.strip_suffix(')'))
+            .unwrap_or(&raw_duration)
+            .to_string();
         let (preview_txt, wc) = repo_db::extract_prompt_words_preview(&ap.prompt_content, 200);
         let prompt_id_short = if ap.id.len() > 8 {
             ap.id[..8].to_string()
@@ -239,23 +254,18 @@ pub fn format_observe_report() -> String {
     }
 
     for (name, (dur, prompts)) in &project_map {
-        let dur_display = if !dur.is_empty() {
-            format!(" {}", dur)
+        let mut block = if dur.is_empty() {
+            format!("• <b>{}</b>\n", name)
         } else {
-            String::new()
+            format!("• <b>{}</b> — running for {}\n", name, dur)
         };
-        let mut block = format!("• <b>{}</b> 🟢{}\n", name, dur_display);
-        for (preview_txt, wc, prompt_id) in prompts {
+        for (preview_txt, _wc, prompt_id) in prompts {
             block.push_str(&format!(
-                "   {} <i>({} words)</i>\n",
-                clean_for_telegram_html(preview_txt, 2500),
-                wc
+                "   {}\n",
+                clean_for_telegram_html(preview_txt, 2500)
             ));
             if !prompt_id.is_empty() {
-                block.push_str(&format!(
-                    "   <i>Expand: <code>/expand {}</code></i>\n",
-                    prompt_id
-                ));
+                block.push_str(&format!("   View full text: /expand {}\n", prompt_id));
             }
         }
         running_items.push(block);
@@ -268,7 +278,7 @@ pub fn format_observe_report() -> String {
     let mut body_sections = String::new();
     body_sections.push_str("🟢 <b>Running:</b>\n");
     if running_items.is_empty() {
-        body_sections.push_str("• None (All workspaces idle)\n");
+        body_sections.push_str("Nothing is running — all workspaces are idle\n");
     } else {
         for item in running_items {
             body_sections.push_str(&item);
@@ -329,7 +339,7 @@ pub fn format_observe_report() -> String {
         • <b>Quota / Tier:</b> {}\n\
         • <b>Update Status:</b> {}\n\n\
         {}\n\
-        💡 Send <code>/expand &lt;id&gt;</code> to view full prompt text, or <code>/active</code> for live table.",
+        💡 Send /expand <id> to read a full prompt, or /active for the live view.",
         clean_for_telegram_html(&ver, 24),
         update_notice,
         clean_for_telegram_html(&machine_name, 64),
