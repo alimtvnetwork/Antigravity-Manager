@@ -1,8 +1,11 @@
-import { Terminal, Copy, Check, ExternalLink, Sparkles, Wrench } from 'lucide-react';
+import { useState } from 'react';
+import { Terminal, Copy, Check, ExternalLink, Sparkles, Wrench, ChevronDown, FileText, Code } from 'lucide-react';
 import type { AgmConversationNode } from './types';
 import { RichMarkdownRenderer } from './markdown';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
+import { cn } from '../../../utils/cn';
+import { copyPromptAiPayload, resolvePromptBody, type PromptAiCopyKind } from './usePromptTreePromptActions';
 
 export interface ResultsViewProps {
     selectedConversation: AgmConversationNode;
@@ -22,6 +25,29 @@ export function ResultsView(props: ResultsViewProps) {
         isFocusing, instancePid, formatDuration, onFocusIde,
         elapsedSeconds,
     } = props;
+
+    const [isAiCopyMenuOpen, setIsAiCopyMenuOpen] = useState(false);
+    const [copiedAiKind, setCopiedAiKind] = useState<PromptAiCopyKind | null>(null);
+
+    const copyPromptAndAi = (kind: PromptAiCopyKind) => {
+        const promptBody = resolvePromptBody(selectedConversation);
+        void copyPromptAiPayload(kind, selectedConversation, promptBody, `ResultsView.copyPromptAi.${kind}`)
+            .then((ok) => {
+                if (!ok) return;
+                setCopiedAiKind(kind);
+                setTimeout(() => setCopiedAiKind(null), 2000);
+            })
+            .catch((err: unknown) => {
+                useErrorStore.getState().captureException(
+                    err instanceof Error ? err : new Error(String(err)),
+                    {
+                        source: `ResultsView.copyPromptAi.${kind}`,
+                        triggerAction: `copy_prompt_ai_${kind}`,
+                    }
+                );
+            });
+        setIsAiCopyMenuOpen(false);
+    };
 
     const handleCopyResults = async () => {
         try {
@@ -95,24 +121,74 @@ export function ResultsView(props: ResultsViewProps) {
                     <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                         Latest AI Response & Execution Output
                     </span>
-                    <button
-                        type="button"
-                        onClick={handleCopyResults}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-[#171025] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#40285e] hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
-                        title="Copy AI execution results to clipboard"
-                    >
-                        {isCopiedResults ? (
-                            <>
-                                <Check className="w-3.5 h-3.5 text-emerald-500" />
-                                <span>Copied AI Results!</span>
-                            </>
-                        ) : (
-                            <>
-                                <Copy className="w-3.5 h-3.5" />
-                                <span>Copy AI Results</span>
-                            </>
+                    <div className="relative flex items-center rounded-full bg-slate-100 dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] divide-x divide-slate-200 dark:divide-[#40285e]">
+                        <button
+                            type="button"
+                            onClick={handleCopyResults}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-l-full text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
+                            title="Copy AI execution results to clipboard"
+                        >
+                            {isCopiedResults ? (
+                                <>
+                                    <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                    <span>Copied AI Results!</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Copy className="w-3.5 h-3.5" />
+                                    <span>Copy AI Results</span>
+                                </>
+                            )}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setIsAiCopyMenuOpen((prev) => !prev)}
+                            className="flex items-center justify-center px-2 py-1.5 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
+                            title="Copy AI results as JSON, or prompt and AI results as text or markdown"
+                        >
+                            <ChevronDown className={cn('w-3.5 h-3.5 text-slate-400 transition-transform', isAiCopyMenuOpen && 'rotate-180')} />
+                        </button>
+                        {isAiCopyMenuOpen && (
+                            <div
+                                className="absolute right-0 top-full mt-1.5 z-50 w-80 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl p-1.5 space-y-1"
+                                onMouseLeave={() => setIsAiCopyMenuOpen(false)}
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => copyPromptAndAi('json')}
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer"
+                                >
+                                    <span className="flex items-center gap-2">
+                                        {copiedAiKind === 'json' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Code className="w-3.5 h-3.5 text-amber-500" />}
+                                        {copiedAiKind === 'json' ? 'Copied AI JSON!' : 'Copy AI results as JSON'}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 font-mono">JSON</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => copyPromptAndAi('text')}
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer"
+                                >
+                                    <span className="flex items-center gap-2">
+                                        {copiedAiKind === 'text' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <FileText className="w-3.5 h-3.5 text-slate-400" />}
+                                        {copiedAiKind === 'text' ? 'Copied text!' : 'Copy prompt and AI results as text'}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 font-mono">Text</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => copyPromptAndAi('md')}
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer"
+                                >
+                                    <span className="flex items-center gap-2">
+                                        {copiedAiKind === 'md' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <FileText className="w-3.5 h-3.5 text-cyan-500" />}
+                                        {copiedAiKind === 'md' ? 'Copied markdown!' : 'Copy prompt and AI results as markdown'}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 font-mono">.md</span>
+                                </button>
+                            </div>
                         )}
-                    </button>
+                    </div>
                 </div>
 
                 {/* 1. Assistant Text Response */}

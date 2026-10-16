@@ -112,7 +112,7 @@ export default function InstanceTable({
                                 <tr
                                     key={inst.config.id}
                                     className={cn(
-                                        'transition-colors duration-150 border-b border-slate-200/90 dark:border-slate-800/90 last:border-b-0',
+                                        'group transition-colors duration-150 border-b border-slate-200/90 dark:border-slate-800/90 last:border-b-0',
                                         data.isBusy && 'pointer-events-none select-none opacity-60',
                                         data.isActive
                                             ? 'bg-sky-50/40 dark:bg-[#0a2338] hover:bg-sky-50/70 dark:hover:bg-[#0d2c46]'

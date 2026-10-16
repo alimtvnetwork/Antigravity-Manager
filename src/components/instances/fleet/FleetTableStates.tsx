@@ -70,10 +70,10 @@ export function FleetEmptyState({ isRefreshing, onRefresh }: FleetEmptyStateProp
                 <Server className="w-6 h-6 text-slate-400" />
             </div>
             <h4 className="text-sm font-semibold text-slate-200">
-                No Remote Fleet Machines Detected
+                Shared Cluster
             </h4>
             <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto leading-relaxed">
-                This local machine is currently the sole active node registered in the Supabase cluster. Once other worker machines or fleet nodes join with the shared Supabase credentials, their status, instances, and active prompts will appear here automatically.
+                This list is the shared cluster. SSH nodes are configured under Settings, SSH and GitMap. Machines that join show their status, instances, and active prompts here.
             </p>
             <div className="mt-4 flex items-center justify-center gap-2">
                 <button

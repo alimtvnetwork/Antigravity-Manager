@@ -10,6 +10,7 @@ import {
     Upload,
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
+import { downloadPromptTreeStatusJson } from './usePromptTreeCoreActions';
 
 export interface ImportExportMenuProps {
     /** Export the full prompt tree to a portable SQLite `.db` file. */
@@ -156,6 +157,40 @@ export function ImportExportMenu(props: ImportExportMenuProps) {
                         <div className="flex items-center gap-2">
                             <FileJson className="w-3.5 h-3.5 text-amber-500" />
                             <span>Export Tree as JSON</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono">.json</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        disabled={isLoading}
+                        onClick={() => {
+                            close();
+                            void downloadPromptTreeStatusJson('running');
+                        }}
+                        className={menuItemClass}
+                        title="Download JSON for prompts whose status is running, from the tree already loaded"
+                    >
+                        <div className="flex items-center gap-2">
+                            <FileJson className="w-3.5 h-3.5 text-emerald-500" />
+                            <span>Export Running Prompts</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono">.json</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        disabled={isLoading}
+                        onClick={() => {
+                            close();
+                            void downloadPromptTreeStatusJson('queued');
+                        }}
+                        className={menuItemClass}
+                        title="Download JSON for prompts whose status is queued, from the tree already loaded"
+                    >
+                        <div className="flex items-center gap-2">
+                            <FileJson className="w-3.5 h-3.5 text-amber-500" />
+                            <span>Export Queued Prompts</span>
                         </div>
                         <span className="text-[10px] text-slate-400 font-mono">.json</span>
                     </button>

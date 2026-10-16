@@ -57,9 +57,80 @@ export async function copyPromptWithRichImages(
     }
 }
 
+export type PromptAiCopyKind = 'json' | 'text' | 'md';
+
+export function resolvePromptBody(conv: AgmConversationNode, preferred?: string): string {
+    const preferredBody = preferred?.trim();
+    if (preferredBody) return preferredBody;
+    return (conv.full_prompt_text || conv.prompt_preview_200w || '').trim();
+}
+
+/** JSON copy is only the AI fields already stored on the conversation. */
+export function buildAiResultsJson(conv: AgmConversationNode): string {
+    return JSON.stringify(
+        {
+            latest_response: conv.latest_response ?? '',
+            execution_results: conv.execution_results ?? '',
+        },
+        null,
+        2
+    );
+}
+
+export function buildPromptAndAiPlainText(promptBody: string, conv: AgmConversationNode): string {
+    const sections = [`Prompt\n${promptBody}`, `AI Response\n${conv.latest_response ?? ''}`];
+    if (conv.execution_results) {
+        sections.push(`Execution Results\n${conv.execution_results}`);
+    }
+    return sections.join('\n\n');
+}
+
+export function buildPromptAndAiMarkdown(promptBody: string, conv: AgmConversationNode): string {
+    const sections = [`# Prompt\n\n${promptBody}`, `# AI Response\n\n${conv.latest_response ?? ''}`];
+    if (conv.execution_results) {
+        sections.push(`# Execution Results\n\n${conv.execution_results}`);
+    }
+    return sections.join('\n\n');
+}
+
+export function buildPromptAiCopyPayload(
+    kind: PromptAiCopyKind,
+    conv: AgmConversationNode,
+    promptBody: string
+): string {
+    if (kind === 'json') return buildAiResultsJson(conv);
+    if (kind === 'text') return buildPromptAndAiPlainText(promptBody, conv);
+    return buildPromptAndAiMarkdown(promptBody, conv);
+}
+
+export async function copyPromptAiPayload(
+    kind: PromptAiCopyKind,
+    conv: AgmConversationNode,
+    promptBody: string,
+    source: string
+): Promise<boolean> {
+    try {
+        const ok = await copyToClipboard(buildPromptAiCopyPayload(kind, conv, promptBody));
+        if (!ok) {
+            throw new Error('clipboard copy returned false');
+        }
+        return true;
+    } catch (err) {
+        const errorObj = err instanceof Error ? err : new Error(String(err));
+        useErrorStore.getState().captureException(errorObj, {
+            source,
+            triggerAction: `copy_prompt_ai_${kind}`,
+        });
+        return false;
+    }
+}
+
 export interface PromptTreePromptActions {
     handleCopyAllWithRichImages: () => Promise<void>;
     handleCopyWithImagesRich: () => Promise<void>;
+    handleCopyAiResultsJson: () => Promise<void>;
+    handleCopyPromptAndAiText: () => Promise<void>;
+    handleCopyPromptAndAiMarkdown: () => Promise<void>;
     handleSaveImages: () => void;
     handleResendPrompt: () => Promise<void>;
     handleExport: (format: 'md' | 'json') => void;
@@ -184,6 +255,48 @@ export function usePromptTreePromptActions({
     const handleCopyWithImagesRich = useCallback(async () => {
         await handleCopyAllWithRichImages();
     }, [handleCopyAllWithRichImages]);
+
+    const copySelectedPromptAi = useCallback(async (kind: PromptAiCopyKind) => {
+        const conv = selectedConversationRef.current || selectedConversation;
+        if (!conv) {
+            setActionMsg('No prompt selected to copy');
+            setTimeout(() => setActionMsg(null), 2000);
+            return;
+        }
+        const promptBody = resolvePromptBody(conv, editedPromptText.trim() || activePromptTextRef.current || activePromptText);
+        const ok = await copyPromptAiPayload(
+            kind,
+            conv,
+            promptBody,
+            `usePromptTreePromptActions.copyPromptAi.${kind}`
+        );
+        if (!ok) {
+            setError('Failed to copy prompt and AI results');
+            return;
+        }
+        const label = kind === 'json'
+            ? 'Copied AI results as JSON'
+            : kind === 'text'
+                ? 'Copied prompt and AI results as text'
+                : 'Copied prompt and AI results as markdown';
+        setActionMsg(label);
+        setTimeout(() => setActionMsg(null), 2000);
+    }, [
+        selectedConversation, selectedConversationRef, editedPromptText, activePromptText,
+        activePromptTextRef, setActionMsg, setError,
+    ]);
+
+    const handleCopyAiResultsJson = useCallback(async () => {
+        await copySelectedPromptAi('json');
+    }, [copySelectedPromptAi]);
+
+    const handleCopyPromptAndAiText = useCallback(async () => {
+        await copySelectedPromptAi('text');
+    }, [copySelectedPromptAi]);
+
+    const handleCopyPromptAndAiMarkdown = useCallback(async () => {
+        await copySelectedPromptAi('md');
+    }, [copySelectedPromptAi]);
 
     const handleSaveImages = useCallback(() => {
         const text = activePromptText || selectedConversation?.prompt_preview_200w || '';
@@ -472,6 +585,9 @@ ${activePromptText}
     return {
         handleCopyAllWithRichImages,
         handleCopyWithImagesRich,
+        handleCopyAiResultsJson,
+        handleCopyPromptAndAiText,
+        handleCopyPromptAndAiMarkdown,
         handleSaveImages,
         handleResendPrompt,
         handleExport,

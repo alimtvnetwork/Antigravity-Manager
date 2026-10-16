@@ -4,6 +4,7 @@ import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, Ch
 import { cn } from '../../../utils/cn';
 import type { AgmConversationNode } from './types';
 import { formatSeqBadge, stripImagesFromPrompt } from './formatters';
+import { copyPromptAiPayload, resolvePromptBody, type PromptAiCopyKind } from './usePromptTreePromptActions';
 import { classifyPromptTier } from './tierClassification';
 import { isGhostConversation } from './conversationGuards';
 import { persistClientCrash } from '../../../lib/error-listener';
@@ -93,9 +94,24 @@ export function DetailHeader(props: DetailHeaderProps) {
     const [localCopiedAll, setLocalCopiedAll] = useState(false);
     const isCopiedAllActive = isCopiedAll || localCopiedAll;
 
+    const [copiedAiKind, setCopiedAiKind] = useState<PromptAiCopyKind | null>(null);
     const [localIsCopyMenuOpen, setLocalIsCopyMenuOpen] = useState(false);
     const isCopyMenuOpen = propIsCopyMenuOpen ?? isExportMenuOpen ?? localIsCopyMenuOpen;
     const setIsCopyMenuOpen = propSetIsCopyMenuOpen ?? setIsExportMenuOpen ?? setLocalIsCopyMenuOpen;
+
+    const copyPromptAndAi = (kind: PromptAiCopyKind) => {
+        const promptBody = resolvePromptBody(selectedConversation, activePromptText);
+        void copyPromptAiPayload(kind, selectedConversation, promptBody, `DetailHeader.copyPromptAi.${kind}`)
+            .then((ok) => {
+                if (!ok) return;
+                setCopiedAiKind(kind);
+                setTimeout(() => setCopiedAiKind(null), 2000);
+            })
+            .catch((err) => {
+                reportPromptActionError(err, `DetailHeader.copyPromptAi.${kind}`);
+            });
+        setIsCopyMenuOpen(false);
+    };
 
     const [localIsSendMenuOpen, setLocalIsSendMenuOpen] = useState(false);
     const isSendMenuOpen = propIsSendMenuOpen ?? propIsEnqueueMenuOpen ?? localIsSendMenuOpen;
@@ -250,7 +266,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                         {/* Flyout 1: Copy Options Menu */}
                         {isCopyMenuOpen && (
                             <div
-                                className="absolute right-0 top-full mt-1.5 z-50 w-56 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-1"
+                                className="absolute right-0 top-full mt-1.5 z-50 w-80 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-1"
                                 onMouseLeave={() => setIsCopyMenuOpen(false)}
                             >
                                 {/* Sub-item 1: Copy Clean Text Only */}
@@ -339,6 +355,47 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         <span className="text-[10px] text-slate-400 font-mono">Assets</span>
                                     </button>
                                 )}
+
+                                <div className="border-t border-slate-100 dark:border-[#40285e]/60 my-1" />
+
+                                <button
+                                    type="button"
+                                    onClick={() => copyPromptAndAi('json')}
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    title="Copy latest_response and execution_results as JSON"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        {copiedAiKind === 'json' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Code className="w-3.5 h-3.5 text-amber-500" />}
+                                        <span>{copiedAiKind === 'json' ? 'Copied AI JSON!' : 'Copy AI results as JSON'}</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-mono">JSON</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => copyPromptAndAi('text')}
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    title="Copy the prompt body and AI text as plain text"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        {copiedAiKind === 'text' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <FileText className="w-3.5 h-3.5 text-slate-400" />}
+                                        <span>{copiedAiKind === 'text' ? 'Copied text!' : 'Copy prompt and AI results as text'}</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-mono">Text</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => copyPromptAndAi('md')}
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    title="Copy the prompt body and AI text as markdown"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        {copiedAiKind === 'md' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <FileText className="w-3.5 h-3.5 text-cyan-500" />}
+                                        <span>{copiedAiKind === 'md' ? 'Copied markdown!' : 'Copy prompt and AI results as markdown'}</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-mono">.md</span>
+                                </button>
 
                                 <div className="border-t border-slate-100 dark:border-[#40285e]/60 my-1" />
 

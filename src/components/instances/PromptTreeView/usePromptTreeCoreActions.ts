@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
     setArchivedProjectsForInstance,
@@ -19,6 +19,121 @@ export interface PromptTreeCoreActions {
     handleCopyAllTreePrompts: () => Promise<void>;
     handleExportSqlite: () => Promise<void>;
     handleImportSqlite: () => Promise<void>;
+    handleExportRunningJson: () => Promise<void>;
+    handleExportQueuedJson: () => Promise<void>;
+}
+
+export type PromptTreeStatusExport = 'running' | 'queued';
+
+interface LoadedPromptTreeBinding {
+    tree: AgmProjectTreeNode[];
+    notify: (message: string | null) => void;
+}
+
+const loadedPromptTree: LoadedPromptTreeBinding = {
+    tree: [],
+    notify: () => {},
+};
+
+export function bindLoadedPromptTree(
+    tree: AgmProjectTreeNode[],
+    notify: (message: string | null) => void
+): void {
+    loadedPromptTree.tree = tree;
+    loadedPromptTree.notify = notify;
+}
+
+function conversationMatchesStatus(
+    conv: AgmProjectTreeNode['conversations'][number],
+    kind: PromptTreeStatusExport
+): boolean {
+    const status = (conv.status || '').toLowerCase();
+    const running = Boolean(conv.is_running) || status === 'running' || status.includes('running');
+    if (kind === 'running') return running;
+    const queued = Boolean(conv.is_queued) || status === 'queued' || status.includes('queue');
+    return queued && !running;
+}
+
+function collectStatusPrompts(
+    projects: AgmProjectTreeNode[],
+    kind: PromptTreeStatusExport
+): AgmProjectTreeNode[] {
+    return projects
+        .map((project) => {
+            const conversations: AgmProjectTreeNode['conversations'] = [];
+            const seen = new Set<string>();
+            const walk = (nodes: AgmProjectTreeNode['conversations'] | undefined) => {
+                for (const conv of nodes || []) {
+                    if (conversationMatchesStatus(conv, kind) && !seen.has(conv.conversation_id)) {
+                        seen.add(conv.conversation_id);
+                        conversations.push({ ...conv, sub_runs: undefined });
+                    }
+                    walk(conv.sub_runs);
+                }
+            };
+            walk(project.conversations);
+            return { ...project, conversations };
+        })
+        .filter((project) => project.conversations.length > 0);
+}
+
+function downloadJsonBlob(fileName: string, json: string): void {
+    const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+/**
+ * Download JSON for running or queued prompts from the tree already loaded
+ * in the prompt view. Uses the existing backup file writer in the desktop
+ * app and a browser download otherwise.
+ */
+export async function downloadPromptTreeStatusJson(kind: PromptTreeStatusExport): Promise<void> {
+    const projects = collectStatusPrompts(loadedPromptTree.tree, kind);
+    const promptCount = projects.reduce((sum, project) => sum + project.conversations.length, 0);
+    const payload = {
+        version: '1.0',
+        filter: kind,
+        exportedAt: new Date().toISOString(),
+        totalProjects: projects.length,
+        totalConversations: promptCount,
+        projects,
+    };
+    const jsonStr = JSON.stringify(payload, null, 2);
+    const fileName = `prompts-${kind}-${Date.now()}.json`;
+    try {
+        loadedPromptTree.notify(`Exporting ${kind} prompts...`);
+        if (!isTauri()) {
+            downloadJsonBlob(fileName, jsonStr);
+            loadedPromptTree.notify(`Exported ${promptCount} ${kind} prompt(s) as JSON.`);
+            window.setTimeout(() => loadedPromptTree.notify(null), 3000);
+            return;
+        }
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        const selected = await save({
+            defaultPath: fileName,
+            filters: [{ name: 'JSON', extensions: ['json'] }],
+        });
+        if (!selected) {
+            loadedPromptTree.notify(null);
+            return;
+        }
+        await invoke('write_prompt_backup_file', { path: selected, content: jsonStr });
+        loadedPromptTree.notify(`Exported ${promptCount} ${kind} prompt(s) to ${selected}`);
+        window.setTimeout(() => loadedPromptTree.notify(null), 4000);
+    } catch (err: unknown) {
+        useErrorStore.getState().captureError(err, {
+            source: 'PromptTreeViewModal.downloadPromptTreeStatusJson',
+            triggerAction: `export_${kind}_prompts_json`,
+        });
+        loadedPromptTree.notify(null);
+    }
 }
 
 interface TreeExportStats {
@@ -61,6 +176,12 @@ export function usePromptTreeCoreActions({
         setSelectedProject,
         restoreFileInputRef,
     } = state;
+
+    useEffect(() => {
+        bindLoadedPromptTree(treeData, (message) => {
+            setActionMsg(message);
+        });
+    }, [treeData, setActionMsg]);
 
     const togglePinProject = useCallback(
         (projectId: string, e: React.MouseEvent) => {
@@ -525,6 +646,14 @@ export function usePromptTreeCoreActions({
         }
     }, [restoreFileInputRef, loadTree, setActionMsg, setError]);
 
+    const handleExportRunningJson = useCallback(async () => {
+        await downloadPromptTreeStatusJson('running');
+    }, []);
+
+    const handleExportQueuedJson = useCallback(async () => {
+        await downloadPromptTreeStatusJson('queued');
+    }, []);
+
     return {
         togglePinProject,
         toggleArchiveProject,
@@ -535,5 +664,7 @@ export function usePromptTreeCoreActions({
         handleCopyAllTreePrompts,
         handleExportSqlite,
         handleImportSqlite,
+        handleExportRunningJson,
+        handleExportQueuedJson,
     };
 }

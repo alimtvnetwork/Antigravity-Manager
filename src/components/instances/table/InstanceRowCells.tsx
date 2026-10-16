@@ -182,7 +182,7 @@ export function ProfileCell({ inst, data, onToggleEmail, onSetActive, onSetDefau
                     {data.boundEmail ? (
                         <span
                             onClick={onToggleEmail}
-                            className="cursor-pointer hover:underline text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[150px]"
+                            className="cursor-pointer hover:underline text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[150px] transition-colors group-hover:text-yellow-400 hover:text-yellow-300 dark:group-hover:text-yellow-200 dark:hover:text-yellow-200"
                             title={data.isEmailRevealed ? data.boundEmail : 'Click to unmask email'}
                         >
                             {data.displayedEmail}
@@ -215,13 +215,13 @@ export function ProfileCell({ inst, data, onToggleEmail, onSetActive, onSetDefau
 
 export function QuotaCell({ data }: { data: RowCellData }) {
     return (
-        <td className="px-2 py-1 whitespace-nowrap min-w-[280px] w-[34%]">
+        <td className="px-2 py-1 whitespace-nowrap min-w-[280px] w-[34%] group-hover:[&_span.font-mono]:text-yellow-400 dark:group-hover:[&_span.font-mono]:text-yellow-200">
             {data.percentage !== null || data.weeklyQuota !== null ? (
                 <div className="space-y-1.5 w-full min-w-[240px]">
                     {data.percentage !== null && (
                         <div className="space-y-0.5 w-full">
                             <div className="flex items-center justify-between text-[10px] font-mono">
-                                <span className="truncate text-slate-600 dark:text-slate-300 font-semibold">
+                                <span className="truncate text-slate-600 dark:text-slate-300 font-semibold transition-colors group-hover:text-yellow-500 dark:group-hover:text-yellow-200">
                                     {data.modelName || 'Primary Model'} (4H)
                                 </span>
                             </div>
@@ -231,7 +231,7 @@ export function QuotaCell({ data }: { data: RowCellData }) {
                     {data.weeklyQuota !== null && (
                         <div className={cn('space-y-0.5 w-full', data.percentage !== null && 'pt-1 border-t border-slate-200/50 dark:border-slate-800/50')}>
                             <div className="flex items-center justify-between text-[10px] font-mono">
-                                <span className="truncate text-slate-500 dark:text-slate-400">
+                                <span className="truncate text-slate-500 dark:text-slate-400 transition-colors group-hover:text-yellow-500 dark:group-hover:text-yellow-200">
                                     Weekly Quota
                                 </span>
                             </div>
