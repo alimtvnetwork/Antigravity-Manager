@@ -89,6 +89,7 @@ def get_sync_dirs() -> list[tuple[str, str, bool]]:
     """Build dynamic sync directory mappings including shared specs 01 to 20."""
     dirs: list[tuple[str, str, bool]] = [
         ("01-prompts", "01-prompts", False),
+        # Skills update from the canonical set. Local-only skill folders are kept.
         (".agents/skills", ".agents/skills", False),
         (".cursor/skills", ".cursor/skills", False),
         ("03-ai-scripts", "03-ai-scripts", True),
@@ -395,6 +396,12 @@ def copy_single_file(
     return 0
 
 
+def keeps_local_skill_dirs(dst: Path) -> bool:
+    """True for the two skill roots. Canonical skills still update. Target-only skills stay."""
+    norm = str(dst).replace("\\", "/").rstrip("/").lower()
+    return norm.endswith("/.agents/skills") or norm.endswith("/.cursor/skills")
+
+
 def mirror_directory(
     src: Path,
     dst: Path,
@@ -409,6 +416,9 @@ def mirror_directory(
       - Existing scripts modified by repo are NEVER overwritten.
       - Unmodified scripts have upstream prioritized.
       - New scripts from src are added.
+
+    Skill roots (`.agents/skills`, `.cursor/skills`) update canonical skills and
+    never delete a skill folder that exists only in the target repository.
 
     Memory & plans protection (Boundary 4):
       - Never delete or overwrite target repo memory or plans.
@@ -432,8 +442,9 @@ def mirror_directory(
     if not is_dry_run:
         dst.mkdir(parents=True, exist_ok=True)
 
-    # 1. Clean stale files/dirs in dst that are no longer in src (SKIPPED in additive mode)
-    if not is_additive_only:
+    # 1. Clean stale files/dirs in dst that are no longer in src.
+    #    Skipped for additive trees and for skill roots so repo-local skills survive.
+    if not is_additive_only and not keeps_local_skill_dirs(dst):
         if dst.exists():
             for root, dirs, files in os.walk(dst, topdown=False):
                 rel_root = Path(root).relative_to(dst)
