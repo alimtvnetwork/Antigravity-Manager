@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.212.0] - 2026-10-17
+
+### Added
+- **Telegram picker memory**: `.ai-memory/rca/18-telegram-project-listing-and-node-cache.md` records why `/send` showed `Node-*` and `project · conv-id`, how the page, title, and 24-hour node cache work, the mistakes that break FIFO and the 64-byte callback cap, and a checklist. Indexed from `.ai-memory/what-to-read.md` and `.ai-memory/memory/learned/28-telegram-project-picker-and-node-cache.md`. (Thanks to @aukgit)
+
+---
+
 ## [v4.211.0] - 2026-10-17
 
 ### Added
@@ -403,6 +410,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.212.0 (2026-10-17)**:
+        -   **[Memory] Telegram picker root cause, checklist, and do-not-break rules (Thanks to @aukgit)**:
+            -   **Description**: `.ai-memory/rca/18-telegram-project-listing-and-node-cache.md` explains the FIFO `session_id` label, the short `send:n:` callback, the This machine button, and the 24-hour `node_display_cache`. `.ai-memory/what-to-read.md` points at it. (Thanks to @aukgit)
+
+
     *   **v4.211.0 (2026-10-17)**:
         -   **[Telegram] Numbered project pages, conversation titles, and cached node names (Thanks to @aukgit)**:
             -   **Description**: `/send` lists eight projects per page, newest conversation first, with the project name and the conversation title. Numbers select a row, and Next loads the next eight. The current machine is labeled This machine with a green button. A missing node alias is resolved through GitMap once and stored in SQLite until `node_name_refresh_hours` (default 24). (Thanks to @aukgit)
