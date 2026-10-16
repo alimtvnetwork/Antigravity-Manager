@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.214.0 (2026-10-17)**:
+        -   **[Telegram] Instance step shows the IDE exe and data folder ending (Thanks to @aukgit)**:
+            -   **Description**: `/send` step 2 adds `IDE exe` and `IDE data` under each instance. `path_ending` keeps the last section only. (Thanks to @aukgit)
+
     *   **v4.213.0 (2026-10-17)**:
         -   **[Prompt tree] Dispatch hover stays inside the menu (Thanks to @aukgit)**:
             -   **Description**: Destination, Suffix, and the Copy AI rows use an in-menu hint anchored to the right edge. A browser `title` on that right-aligned menu is clipped by the window. See `.ai-memory/rca/20-dispatch-menu-hover-clipped.md`. (Thanks to @aukgit)
