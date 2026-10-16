@@ -2,6 +2,9 @@
 
 This directory contains active issue tracking and bug reports.
 
+## Fixed in v4.209.0
+- [../rca/17-instance-pid-stop-switch-and-audit-trail.md](../rca/17-instance-pid-stop-switch-and-audit-trail.md) (solved in `52aaf4cb`: the bare number is the PID; stop returned success after dropping that PID; the audit dialog read `recent_switches` while the query returned `records`)
+
 ## Open (planned, spec 85)
 - [47-pro-badge-missing-when-tier-not-fetched-rca.md](./47-pro-badge-missing-when-tier-not-fetched-rca.md) (cache skip still open; raw-id half is issue 58)
 - [48-stack-frame-parser-swallows-url-rca.md](./48-stack-frame-parser-swallows-url-rca.md)

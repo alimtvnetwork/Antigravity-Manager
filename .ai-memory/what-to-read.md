@@ -1,10 +1,11 @@
 # What to Read
 
 > Canonical map of what the AI must read before working on this project.
-> Last updated: 2026-10-15T23:10:00Z
+> Last updated: 2026-10-16T14:35:00Z
 
 ## Changelog
 
+- 2026-10-16T14:35:00Z, Instance list PID, stop, switch, and empty audit trail: read `.ai-memory/rca/17-instance-pid-stop-switch-and-audit-trail.md` before changing `close_instance`, account switch, or the audit dialog. The number next to Running is `inst.pid`. Stop returned success after the safety filter dropped that PID. The dialog read `recent_switches` while the query returned `records`. Do not treat a sysinfo single-PID refresh as proof a Windows process is still alive. Do not stop the instance printed by `agm instances current`.
 - 2026-10-15T23:45:00Z, Blind E2E pack is complete in `.ai-memory/e2e-testing/`. Read `readme.md`, `00-decisions.md`, `05-master-checklist.md`, and `06-recorder-ui-screenshot-telegram.md` before repeating tests. File 06 is the recorder (`agm ui record`), CLI window control (`agm ui open|goto|ls|scroll|click`), `agm shot`, and the two Telegram images in `assets/screenshots/enhancing-telegram-ui-and-gitmap-integration-01.png` (literal `&nbsp;`, no buttons) and `enhancing-telegram-ui-and-gitmap-integration-02.png` (button under the card). A pass is a live card or screenshot, not a source reading.
 - 2026-10-15T23:10:00Z, Executed E2E checklists: when the user asks to repeat end-to-end tests, read `.ai-memory/e2e-testing/readme.md` first, then `00-decisions.md` and `05-master-checklist.md`, then the numbered case that matches the release (01 prompt tree, 02 live switch and resend, 03 CDP onboarding and IDE prompt, 04 telegram balance and SSH). Do not score an older installed `agm`. Restore auto-switch to 15%. The generic button flows stay in `.ai-memory/e2e-playbook/`.
 - 2026-10-14T21:35:00Z, Local CLI retest: read `02-spec/21-app/local-cli-e2e/01-retest-cases.md` before scoring prompt send or account switch. Send with `agm prompt <C-seq> --instance <id>`. `agm prompts tree` is running-only. Switch the idle copy, not Default. A copy switch must leave `~/.gemini/google_accounts.json` `active` on the Default account. Put auto-switch back to 15%.

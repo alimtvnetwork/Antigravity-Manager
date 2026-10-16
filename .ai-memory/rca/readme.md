@@ -29,6 +29,7 @@ function signature, or re-running a failed pipeline.
 | [14-telegram-cmd-callback-double-slash.md](./14-telegram-cmd-callback-double-slash.md) | Telegram send/find/credits buttons silently did nothing | `cmd:/send` hit the daemon's second dispatch site which didn't strip `/` → `//send` → lookup `None` → silent no-op; unified both sites on `normalize_cmd_callback_payload()` |
 | [15-telegram-picker-callback-64byte-cap.md](./15-telegram-picker-callback-64byte-cap.md) | Send-flow picker callbacks could exceed Telegram's 64-byte callback limit | `send:cman:{m}|{i}` payload and unconditionally-pushed local machine label; shortened to bare `send:cman` + `machine_entry_usable()` guard |
 | [16-telegram-unknown-cmd-callback-silence.md](./16-telegram-unknown-cmd-callback-silence.md) | Unresolvable `cmd:` button taps failed silently | added user-visible "Unknown button action" fallback notice |
+| [17-instance-pid-stop-switch-and-audit-trail.md](./17-instance-pid-stop-switch-and-audit-trail.md) | List showed a bare number, Stop left the IDE running, audit trail was empty | `1632` is `inst.pid`; close returned Ok after dropping that PID; the dialog read `recent_switches` while the query returned `records` |
 
 ## Standing notes
 
