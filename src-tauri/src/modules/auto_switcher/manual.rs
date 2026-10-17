@@ -45,7 +45,14 @@ pub async fn trigger_manual_rotation_for_instance(
     }
     for inst in &registry.instances {
         if inst.id != inst_id && instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid) {
-            if let Some(ref acc_id) = inst.bound_account_id {
+            let active_acc_id = inst.bound_account_id.clone().or_else(|| {
+                if inst.is_default || inst.id == "default" || inst.id == "__default__" {
+                    account::get_current_account_id().ok().flatten()
+                } else {
+                    None
+                }
+            });
+            if let Some(ref acc_id) = active_acc_id {
                 if !excluded.contains(acc_id) {
                     excluded.push(acc_id.clone());
                 }
@@ -53,6 +60,11 @@ pub async fn trigger_manual_rotation_for_instance(
                     if !excluded.contains(&acc.email) {
                         excluded.push(acc.email.clone());
                     }
+                }
+            }
+            if let Some(ref email) = inst.bound_email {
+                if !excluded.contains(email) {
+                    excluded.push(email.clone());
                 }
             }
         }

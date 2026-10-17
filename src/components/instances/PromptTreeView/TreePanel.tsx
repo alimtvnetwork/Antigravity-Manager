@@ -108,6 +108,16 @@ export function TreePanel(props: TreePanelProps) {
 
     const isScopedSingleProject = selectedProjectScope !== 'all';
 
+    const isFilterActive = searchQuery !== '' || activeFilter !== 'all' || categoryFilter !== 'all' || selectedProjectScope !== 'all';
+    const isQueuedView = activeFilter === 'queued' && Boolean(onResendQueued);
+
+    const handleResetFilters = () => {
+        setSearchQuery('');
+        setActiveFilter('all');
+        setCategoryFilter('all');
+        setSelectedProjectScope('all');
+    };
+
     const renderProject = (project: AgmProjectTreeNode) => (
         <ProjectNode
             key={project.project_id}
@@ -307,25 +317,37 @@ export function TreePanel(props: TreePanelProps) {
                     </select>
                 </div>
 
-                {/* Re-send queued prompts: visible in the queue view (Queued filter).
-                    GUI twin of `agm prompts resend-queued` — same backend, same
-                    FIFO single-dispatch pipeline, real sent/skipped/failed counts. */}
-                {activeFilter === 'queued' && onResendQueued && (
-                    <div className="flex items-center justify-end pt-1">
-                        <button
-                            type="button"
-                            onClick={onResendQueued}
-                            disabled={isResendingQueued}
-                            className={cn(
-                                "flex items-center gap-1.5 px-3 py-1 text-[10px] font-semibold rounded-full transition-colors cursor-pointer",
-                                "bg-amber-600/10 text-amber-700 dark:text-amber-300 border border-amber-500/40",
-                                "hover:bg-amber-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                            )}
-                            title="Re-send all queued prompts in FIFO order (durable backup first; already-sent prompts are skipped)"
-                        >
-                            <RotateCcw className={cn("w-2.5 h-2.5 shrink-0", isResendingQueued && "animate-spin")} />
-                            <span>{isResendingQueued ? 'Re-sending…' : 'Re-send queued prompts'}</span>
-                        </button>
+                {/* Row 3: Action Buttons (Reset Filters & Re-send queued prompts) */}
+                {(isFilterActive || isQueuedView) && (
+                    <div className="flex items-center justify-between gap-1 pt-0.5">
+                        {isFilterActive ? (
+                            <button
+                                type="button"
+                                onClick={handleResetFilters}
+                                className="flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50/80 dark:bg-blue-950/40 hover:bg-blue-100/80 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800/60 rounded-full transition-all cursor-pointer shadow-2xs"
+                                title="Reset all search and tree filters back to default"
+                            >
+                                <RotateCcw className="w-2.5 h-2.5 shrink-0" />
+                                <span>Reset Filters</span>
+                            </button>
+                        ) : <div />}
+
+                        {isQueuedView && (
+                            <button
+                                type="button"
+                                onClick={onResendQueued}
+                                disabled={isResendingQueued}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-3 py-1 text-[10px] font-semibold rounded-full transition-colors cursor-pointer",
+                                    "bg-amber-600/10 text-amber-700 dark:text-amber-300 border border-amber-500/40",
+                                    "hover:bg-amber-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                )}
+                                title="Re-send all queued prompts in FIFO order (durable backup first; already-sent prompts are skipped)"
+                            >
+                                <RotateCcw className={cn("w-2.5 h-2.5 shrink-0", isResendingQueued && "animate-spin")} />
+                                <span>{isResendingQueued ? 'Re-sending…' : 'Re-send queued prompts'}</span>
+                            </button>
+                        )}
                     </div>
                 )}
             </div>

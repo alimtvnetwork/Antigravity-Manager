@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
     ArrowRightLeft,
@@ -14,10 +15,13 @@ import {
     Terminal,
     MoreHorizontal,
     Ban,
+    FastForward,
 } from 'lucide-react';
 import { cn } from '../../../../utils/cn';
 import { useAccountStore } from '../../../../stores/useAccountStore';
+import { useInstanceStore } from '../../../../stores/useInstanceStore';
 import { useErrorStore } from '../../../../stores/error-store';
+import { showToast } from '../../../common/ToastContainer';
 import type { AccountRowContentProps } from '../types';
 import type { AccountRowState } from '../useAccountRowState';
 
@@ -50,6 +54,24 @@ export function ActionsCell(props: ActionsCellProps) {
         weeklyCell,
     } = props.rowState;
 
+    const [isFastForwarding, setIsFastForwarding] = useState(false);
+
+    const handleFastForward = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (isFastForwarding || isDisabled) return;
+        setIsFastForwarding(true);
+        try {
+            const targetInst = activeInstanceId || 'default';
+            const msg = await useInstanceStore.getState().fastForwardInstance(targetInst);
+            showToast(msg || t('instances.rotated_success', 'Rotated to next best profile!'), 'success');
+        } catch (err: any) {
+            useErrorStore.getState().trackWarning(err, { source: 'ActionsCell.handleFastForward', triggerAction: 'fast_forward' });
+            showToast(err?.message || String(err) || t('common.error'), 'error');
+        } finally {
+            setIsFastForwarding(false);
+        }
+    };
+
     return (
 <td className={cn(
     "px-2 py-0.5 sticky right-0 z-10 w-[220px] xl:w-[280px] shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center align-middle transition-colors border-b border-slate-200/90 dark:border-slate-800/90",
@@ -60,10 +82,28 @@ export function ActionsCell(props: ActionsCellProps) {
         ? "bg-blue-50 dark:bg-[#171025]"
         : isCurrent
         ? "bg-blue-50 dark:bg-[#091b2c]"
-        : "bg-white dark:bg-[#081826]",
-    "group-hover:!bg-white dark:group-hover:!bg-white"
+        : "bg-white dark:bg-[#081826]"
 )}>
     <div className="flex items-center justify-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+        {/* 1. Fast-Forward */}
+        <button
+            type="button"
+            role="button"
+            aria-label={t('instances.fast_forward', 'Fast-Forward')}
+            className={cn(
+                "p-1 rounded-[5px] transition-all",
+                (isFastForwarding || isDisabled)
+                    ? "cursor-not-allowed text-gray-400 dark:text-gray-600 opacity-40"
+                    : "text-gray-600 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-200 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-slate-200/80 dark:hover:bg-slate-700/80"
+            )}
+            onClick={handleFastForward}
+            title={t('instances.fast_forward_tooltip', 'Fast-Forward: Rotate instance to next best profile')}
+            disabled={isFastForwarding || isDisabled}
+        >
+            <FastForward className={cn("w-3.5 h-3.5", isFastForwarding && "animate-spin")} />
+        </button>
+
+        {/* 2. Refresh */}
         <button
             type="button"
             role="button"
@@ -71,8 +111,8 @@ export function ActionsCell(props: ActionsCellProps) {
             className={cn(
                 "p-1 rounded-[5px] transition-all",
                 (isRefreshing || isDisabled)
-                    ? "cursor-not-allowed text-gray-400 dark:text-gray-600"
-                    : "text-gray-600 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-800 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-slate-200/80 dark:hover:bg-slate-200/80"
+                    ? "cursor-not-allowed text-gray-400 dark:text-gray-600 opacity-40"
+                    : "text-gray-600 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-200 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-slate-200/80 dark:hover:bg-slate-700/80"
             )}
             onClick={(event) => { event.stopPropagation(); onRefresh(); }}
             title={t('common.refresh')}
@@ -80,16 +120,22 @@ export function ActionsCell(props: ActionsCellProps) {
         >
             <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
         </button>
+
+        {/* 3. Switch (Riseup Yellow 3D gradient, flattened when row idle) */}
         <div className="relative inline-flex items-center" ref={menuRef}>
             <button
                 type="button"
                 role="button"
                 aria-label={t('accounts.switch_account', 'Switch Account')}
                 className={cn(
-                    "p-1 rounded-[5px] transition-all font-medium shadow-sm active:scale-95 border inline-flex items-center justify-center",
+                    "p-1 rounded-[5px] transition-all font-medium inline-flex items-center justify-center",
                     (isSwitching || isDisabled)
-                        ? "bg-yellow-200/60 text-slate-500 border-yellow-300/60 cursor-not-allowed opacity-60"
-                        : "bg-yellow-400 text-slate-900 border-yellow-500 hover:bg-yellow-300 hover:text-black hover:border-yellow-600"
+                        ? "bg-yellow-200/40 text-slate-400 border border-yellow-300/40 cursor-not-allowed opacity-40"
+                        : cn(
+                            "opacity-40 group-hover:opacity-100 border border-yellow-500/40 text-yellow-700 dark:text-yellow-300",
+                            "group-hover:bg-gradient-to-b group-hover:from-[#FDE047] group-hover:via-[#FACC15] group-hover:to-[#EAB308] group-hover:text-slate-950 group-hover:font-bold group-hover:border-[#CA8A04] group-hover:shadow-[0_2px_0_0_#A16207,0_3px_5px_rgba(0,0,0,0.2)]",
+                            "active:translate-y-0.5 active:shadow-[0_0_0_0_#A16207]"
+                        )
                 )}
                 onClick={(e) => {
                     e.stopPropagation();
@@ -141,12 +187,35 @@ export function ActionsCell(props: ActionsCellProps) {
             )}
         </div>
 
+        {/* 4. Delete (flattened when idle, red highlight on hover) */}
+        <button
+            type="button"
+            role="button"
+            aria-label={t('common.delete', 'Delete Account')}
+            className={cn(
+                "p-1 rounded-[5px] transition-all font-medium border inline-flex items-center justify-center",
+                isDeleting
+                    ? "bg-red-300/40 text-white/50 border-red-400/40 cursor-not-allowed opacity-40"
+                    : cn(
+                        "opacity-40 group-hover:opacity-100 border-transparent text-gray-400 dark:text-gray-500",
+                        "group-hover:bg-red-500/10 group-hover:text-red-500 group-hover:border-red-500/30",
+                        "hover:!bg-red-600 hover:!text-white hover:!border-red-700 hover:shadow-sm active:scale-95"
+                    )
+            )}
+            onClick={(e) => { e.stopPropagation(); if (!isDeleting) onDelete(); }}
+            title={t('common.delete')}
+            disabled={isDeleting}
+        >
+            <Trash2 className="w-3.5 h-3.5" />
+        </button>
+
+        {/* 5. More actions dropdown */}
         <button
             ref={moreBtnRef}
             type="button"
             role="button"
             aria-label={t('common.more', 'More actions')}
-            className="p-1 text-gray-600 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-800 hover:text-slate-950 hover:bg-slate-200/80 dark:hover:bg-slate-200/80 rounded-[5px] transition-all"
+            className="p-1 text-gray-600 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-200 hover:text-slate-950 dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-slate-700/80 rounded-[5px] transition-all"
             onClick={(event) => {
                 event.stopPropagation();
                 if (showMoreMenu) {
@@ -194,6 +263,61 @@ export function ActionsCell(props: ActionsCellProps) {
                     <Ban className="w-3.5 h-3.5" />
                     {account.disabled ? t('accounts.enable_account', 'Enable Account') : t('accounts.disable_account', 'Disable Account')}
                 </button>
+                {onUpdateLabel && (
+                    <button
+                        type="button"
+                        role="button"
+                        aria-label={t('accounts.edit_label', 'Edit Label')}
+                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-100"
+                        onClick={() => {
+                            setShowMoreMenu(false);
+                            setIsEditingLabel(true);
+                        }}
+                    >
+                        <Tag className="w-3.5 h-3.5 text-orange-500" />
+                        {t('accounts.edit_label', 'Edit Label')}
+                    </button>
+                )}
+                {onWarmup && (
+                    <button
+                        type="button"
+                        role="button"
+                        aria-label={t('accounts.warmup_this', 'Warm up Account')}
+                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-100"
+                        disabled={isRefreshing || isDisabled}
+                        onClick={() => {
+                            setShowMoreMenu(false);
+                            onWarmup();
+                        }}
+                    >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        {t('accounts.warmup_this', 'Warm up Account')}
+                    </button>
+                )}
+                {onToggleProxy && (
+                    <button
+                        type="button"
+                        role="button"
+                        aria-label={account.proxy_disabled ? t('accounts.enable_proxy', 'Enable Proxy') : t('accounts.disable_proxy', 'Disable Proxy')}
+                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-100"
+                        onClick={() => {
+                            setShowMoreMenu(false);
+                            onToggleProxy();
+                        }}
+                    >
+                        {account.proxy_disabled ? (
+                            <>
+                                <ToggleRight className="w-3.5 h-3.5 text-cyan-500" />
+                                {t('accounts.enable_proxy', 'Enable Proxy')}
+                            </>
+                        ) : (
+                            <>
+                                <ToggleLeft className="w-3.5 h-3.5 text-orange-500" />
+                                {t('accounts.disable_proxy', 'Disable Proxy')}
+                            </>
+                        )}
+                    </button>
+                )}
                 <button
                     type="button"
                     role="button"
@@ -261,77 +385,6 @@ export function ActionsCell(props: ActionsCellProps) {
             </div>,
             document.body,
         )}
-        {onUpdateLabel && (
-            <button
-                type="button"
-                role="button"
-                aria-label={t('accounts.edit_label', 'Edit Label')}
-                className={cn(
-                    "hidden lg:inline-flex p-1 rounded-[5px] transition-all",
-                    account.custom_label
-                        ? "text-orange-500 hover:text-orange-600 hover:bg-orange-100/80"
-                        : "text-gray-500 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-800 hover:text-orange-500 hover:bg-slate-200/80 dark:hover:bg-slate-200/80"
-                )}
-                onClick={(e) => { e.stopPropagation(); setIsEditingLabel(true); }}
-                title={t('accounts.edit_label', 'Edit Label')}
-            >
-                <Tag className="w-3.5 h-3.5" />
-            </button>
-        )}
-
-        {onWarmup && (
-            <button
-                type="button"
-                role="button"
-                aria-label={t('accounts.warmup_this', 'Warm up Account')}
-                className={cn(
-                    "hidden xl:inline-flex p-1 rounded-[5px] transition-all",
-                    (isRefreshing || isDisabled)
-                        ? "bg-orange-50 dark:bg-orange-900/10 text-orange-600 cursor-not-allowed"
-                        : "text-gray-500 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-800 hover:text-orange-500 hover:bg-slate-200/80 dark:hover:bg-slate-200/80"
-                )}
-                onClick={(e) => { e.stopPropagation(); onWarmup(); }}
-                title={isDisabled ? t('accounts.disabled_tooltip') : (isRefreshing ? t('common.loading') : t('accounts.warmup_this', 'Warmup Account'))}
-                disabled={isRefreshing || isDisabled}
-            >
-                <Sparkles className={cn("w-3.5 h-3.5", isRefreshing && "animate-pulse")} />
-            </button>
-        )}
-        <button
-            type="button"
-            role="button"
-            aria-label={account.proxy_disabled ? t('accounts.enable_proxy', 'Enable Proxy') : t('accounts.disable_proxy', 'Disable Proxy')}
-            className={cn(
-                "p-1 rounded-[5px] transition-all",
-                account.proxy_disabled
-                    ? "text-gray-500 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-800 hover:text-cyan-600 hover:bg-slate-200/80 dark:hover:bg-slate-200/80"
-                    : "text-gray-500 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-800 hover:text-orange-600 hover:bg-slate-200/80 dark:hover:bg-slate-200/80"
-            )}
-            onClick={(e) => { e.stopPropagation(); onToggleProxy(); }}
-            title={account.proxy_disabled ? t('accounts.enable_proxy') : t('accounts.disable_proxy')}
-        >
-            {account.proxy_disabled ? (
-                <ToggleRight className="w-3.5 h-3.5" />
-            ) : (
-                <ToggleLeft className="w-3.5 h-3.5" />
-            )}
-        </button>
-        <button
-            type="button"
-            role="button"
-            aria-label={t('common.delete', 'Delete Account')}
-            className={cn(
-                "p-1 rounded-[5px] transition-all font-medium shadow-sm active:scale-95 border inline-flex items-center justify-center",
-                isDeleting
-                    ? "bg-red-300/60 text-white/70 border-red-400/60 cursor-not-allowed opacity-60"
-                    : "bg-red-600 text-white border-red-700 hover:bg-red-700 hover:text-white hover:border-red-800"
-            )}
-            onClick={(e) => { e.stopPropagation(); if (!isDeleting) onDelete(); }}
-            title={t('common.delete')}
-            disabled={isDeleting}
-        >
-            <Trash2 className="w-3.5 h-3.5" />
-        </button>
     </div>
 </td>
     );

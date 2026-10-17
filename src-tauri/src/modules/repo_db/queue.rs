@@ -187,8 +187,31 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
             clean_project_name, prompt.id, prompt.session_id
         ));
 
+        let ws_dir = PathBuf::from(&prompt.repo_path);
+        if !ws_dir.exists() {
+            crate::modules::logger::log_warn(&format!(
+                "[PromptQueueScheduler] workspace directory does not exist: '{}' for prompt '{}'; marking as failed to prevent infinite retry loop",
+                prompt.repo_path, prompt.id
+            ));
+            // Justification: mark missing workspace prompt failed to break infinite retry loop
+            crate::error::record_ignored(
+                conn.execute(
+                    "UPDATE active_prompts SET status = 'failed', updated_at = ?1 WHERE id = ?2",
+                    rusqlite::params![now, &prompt.id],
+                ),
+                "mark missing workspace prompt failed",
+            );
+            if let Ok(mut map) = get_memory_prompts_map().lock() {
+                if let Some(p) = map.get_mut(&prompt.id) {
+                    p.status = "failed".to_string();
+                    p.updated_at = now;
+                }
+            }
+            continue;
+        }
+
         // Write .antigravity_resume_task.json to project directory
-        let task_file = PathBuf::from(&prompt.repo_path).join(".antigravity_resume_task.json");
+        let task_file = ws_dir.join(".antigravity_resume_task.json");
         let (extracted_img, img_paths) = extract_image_payload_or_path(&prompt.prompt_content);
         let final_img = prompt.image_payload.clone().or(extracted_img);
         let mut payload = resume_task_document(&prompt, "dispatched", now, &img_paths);
@@ -210,6 +233,19 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
                 "[PromptQueueScheduler] agy dispatch failed for prompt '{}': {spawn_err}; keeping in queue",
                 prompt.id
             ));
+            // Justification: update updated_at on agy dispatch failure so retry backoff applies
+            crate::error::record_ignored(
+                conn.execute(
+                    "UPDATE active_prompts SET updated_at = ?1 WHERE id = ?2",
+                    rusqlite::params![now, &prompt.id],
+                ),
+                "update active_prompts updated_at on agy dispatch error",
+            );
+            if let Ok(mut map) = get_memory_prompts_map().lock() {
+                if let Some(p) = map.get_mut(&prompt.id) {
+                    p.updated_at = now;
+                }
+            }
             continue;
         }
 
@@ -422,5 +458,42 @@ mod tests {
             .collect();
 
         assert_eq!(prompt_ids, vec!["p-t1", "p-t2", "p-t3"]);
+    }
+
+    #[test]
+    fn test_missing_workspace_prompt_marked_failed() {
+        let conn = Connection::open_in_memory().unwrap();
+        assert!(init_tables(&conn).is_ok());
+
+        conn.execute(
+            "INSERT INTO running_projects (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+             VALUES ('missing-proj', 'default', 'missing-repo', '/path/to/nonexistent/workspace/dir/that/does/not/exist', NULL, 0, 100, 100)",
+            [],
+        ).unwrap();
+
+        conn.execute(
+            "INSERT INTO active_prompts (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
+             VALUES ('p-missing', 'missing-proj', 'default', '/path/to/nonexistent/workspace/dir/that/does/not/exist', 'Do something', 'gemini-2.5-pro', NULL, 'queued', 100, 100, NULL)",
+            [],
+        ).unwrap();
+
+        let ws_dir =
+            std::path::PathBuf::from("/path/to/nonexistent/workspace/dir/that/does/not/exist");
+        assert!(!ws_dir.exists());
+
+        conn.execute(
+            "UPDATE active_prompts SET status = 'failed', updated_at = ?1 WHERE id = ?2",
+            rusqlite::params![500, "p-missing"],
+        )
+        .unwrap();
+
+        let status: String = conn
+            .query_row(
+                "SELECT status FROM active_prompts WHERE id = 'p-missing'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(status, "failed");
     }
 }

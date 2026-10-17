@@ -127,7 +127,8 @@ mod win32_console {
 
             let mut font_info: CONSOLE_FONT_INFOEX = std::mem::zeroed();
             font_info.cb_size = std::mem::size_of::<CONSOLE_FONT_INFOEX>() as u32;
-            font_info.dw_font_size.y = 16;
+            font_info.font_family = 54; // FF_MODERN (0x30) | FIXED_PITCH (0x06)
+            font_info.dw_font_size.y = 18;
             font_info.font_weight = 600;
             let face_name_utf16: Vec<u16> = "Consolas\0".encode_utf16().collect();
             for (i, &c) in face_name_utf16.iter().enumerate() {
@@ -135,7 +136,21 @@ mod win32_console {
                     font_info.face_name[i] = c;
                 }
             }
-            SetCurrentConsoleFontEx(handle, 0, &mut font_info);
+            if SetCurrentConsoleFontEx(handle, 0, &mut font_info) == 0 {
+                // Fallback to Lucida Console if Consolas fails
+                let mut fallback_font: CONSOLE_FONT_INFOEX = std::mem::zeroed();
+                fallback_font.cb_size = std::mem::size_of::<CONSOLE_FONT_INFOEX>() as u32;
+                fallback_font.font_family = 54;
+                fallback_font.dw_font_size.y = 18;
+                fallback_font.font_weight = 600;
+                let lucida_utf16: Vec<u16> = "Lucida Console\0".encode_utf16().collect();
+                for (i, &c) in lucida_utf16.iter().enumerate() {
+                    if i < fallback_font.face_name.len() {
+                        fallback_font.face_name[i] = c;
+                    }
+                }
+                SetCurrentConsoleFontEx(handle, 0, &mut fallback_font);
+            }
 
             // A short window makes long paths wrap into the next log line.
             let _ = SetConsoleWindowInfo(

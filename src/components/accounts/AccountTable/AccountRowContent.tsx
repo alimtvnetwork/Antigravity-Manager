@@ -56,14 +56,14 @@ export function AccountRowContent(props: AccountRowContentProps) {
     return (
         <>
             <td
-                className="px-2 py-0.5 align-middle border-b border-slate-200/90 dark:border-slate-800/90 group-hover:!bg-white dark:group-hover:!bg-white"
+                className="px-2 py-0.5 align-middle border-b border-slate-200/90 dark:border-slate-800/90"
                 style={emailColWidth ? { width: `${emailColWidth}px`, minWidth: `${emailColWidth}px`, maxWidth: `${emailColWidth}px` } : undefined}
                 onMouseLeave={() => setIsHoverUnmasked(false)}
             >
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     <span
                         className={cn(
-                            "font-medium text-xs break-all transition-colors cursor-pointer select-text group-hover:!text-black dark:group-hover:!text-black",
+                            "font-medium text-xs break-all transition-colors cursor-pointer select-text",
                             isFocused || selected
                                 ? "text-blue-950 dark:text-blue-200"
                                 : isCurrent
@@ -122,7 +122,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
                         {/* 绑定实例徽章 */}
                         {boundInstance && (
                             <span
-                                className="flex items-center gap-1 px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-[9px] font-bold shadow-xs border border-indigo-200/50 dark:border-indigo-800/50 cursor-default"
+                                className="flex items-center gap-1 px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-[9px] font-bold shadow-xs border border-indigo-200/50 dark:border-indigo-700/60 cursor-default"
                                 title={`Bound to profile: ${boundInstance.config.name}`}
                             >
                                 <span className={cn(
@@ -201,7 +201,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 </div>
             </td>
 
-            <td className="px-2 py-px align-middle min-w-[185px] bg-slate-50/50 dark:bg-slate-900/40 group-hover:!bg-white dark:group-hover:!bg-white border-l border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90 transition-colors">
+            <td className="px-2 py-px align-middle min-w-[185px] bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90 transition-colors">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <div className={cn(
                         "flex items-center justify-center gap-1.5 py-0.5 px-2 rounded-md border group/error transition-colors",
@@ -211,12 +211,12 @@ export function AccountRowContent(props: AccountRowContentProps) {
                     )}>
                         <div className={cn(
                             "flex items-center gap-1 transition-colors",
-                            account.validation_blocked ? "text-amber-600 dark:text-amber-400 group-hover:!text-black dark:group-hover:!text-black" : "text-red-600 dark:text-red-400 group-hover:!text-black dark:group-hover:!text-black"
+                            account.validation_blocked ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"
                         )}>
                             {account.validation_blocked ? <Clock className="w-2.5 h-2.5" /> : (account.quota?.is_forbidden ? <Lock className="w-2.5 h-2.5" /> : <Ban className="w-2.5 h-2.5" />)}
                             <span className={cn(
                                 "text-[9px] font-bold truncate max-w-[80px] transition-colors",
-                                account.validation_blocked ? "text-amber-700/80 dark:text-amber-400 group-hover:!text-black dark:group-hover:!text-black" : "text-red-700/80 dark:text-red-400 group-hover:!text-black dark:group-hover:!text-black"
+                                account.validation_blocked ? "text-amber-700/80 dark:text-amber-400" : "text-red-700/80 dark:text-red-400"
                             )}>
                                 {account.validation_blocked ? validationBlockedLabel : (isDisabled ? t('accounts.status.disabled') : t('accounts.forbidden_msg'))}
                             </span>
@@ -230,7 +230,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
                             role="button"
                             aria-label={t('accounts.view_error')}
                             onClick={(e) => { e.stopPropagation(); onViewError(); }}
-                            className="text-[9px] font-medium text-blue-600 dark:text-blue-400 group-hover:!text-black dark:group-hover:!text-black hover:underline flex items-center shrink-0 transition-colors"
+                            className="text-[9px] font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center shrink-0 transition-colors"
                         >
                             {t('accounts.view_error')}
                         </button>
@@ -247,9 +247,9 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 )}
             </td>
 
-            <td className="px-2 py-px align-middle min-w-[185px] bg-slate-50/50 dark:bg-slate-900/40 group-hover:!bg-white dark:group-hover:!bg-white border-r border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90 transition-colors">
+            <td className="px-2 py-px align-middle min-w-[185px] bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90 transition-colors">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
-                    <span className="text-[10px] text-gray-400 italic group-hover:!text-black dark:group-hover:!text-black transition-colors">--</span>
+                    <span className="text-[10px] text-gray-400 italic transition-colors">--</span>
                 ) : (
                     <QuotaProgressBar
                         className="w-full"
@@ -261,8 +261,8 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 )}
             </td>
 
-            <td className="px-2.5 py-0.5 align-middle whitespace-nowrap w-[95px] border-b border-slate-200/90 dark:border-slate-800/90 group-hover:!bg-white dark:group-hover:!bg-white transition-colors">
-                <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400 group-hover:!text-black dark:group-hover:!text-black font-mono transition-colors" title={formatDateTime(account.last_used)}>
+            <td className="px-2.5 py-0.5 align-middle whitespace-nowrap w-[95px] border-b border-slate-200/90 dark:border-slate-800/90 transition-colors">
+                <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400 font-mono transition-colors" title={formatDateTime(account.last_used)}>
                     {formatDateTimeShort(account.last_used)}
                 </span>
             </td>

@@ -35,7 +35,7 @@ pub fn invalidate_all_l1_quota_cache() {
     }
 }
 
-/// Helper to store quota data into L1 cache with proactive reset time extraction
+/// Helper to store quota data into L1 cache with proactive reset time extraction and adaptive TTL
 pub(crate) fn store_l1_quota_cache(account_id: &str, quota_data: &QuotaData, now_sec: i64) {
     let earliest_reset_unix = quota_data
         .models
@@ -64,13 +64,66 @@ pub(crate) fn store_l1_quota_cache(account_id: &str, quota_data: &QuotaData, now
         )
         .min();
 
+    let target_model = crate::modules::config::load_app_config()
+        .map(|c| c.auto_profile_switcher.target_model)
+        .unwrap_or_else(|_| "gemini-2.5-pro".to_string());
+
+    let mut detected_percentage: Option<f64> = None;
+
+    // 1. Direct target model match
+    for m in &quota_data.models {
+        if crate::modules::auto_switcher::is_model_matching_target(&m.name, &target_model) {
+            detected_percentage = Some(m.percentage as f64);
+            break;
+        }
+    }
+
+    // 2. Primary / short-window quota bucket match
+    if detected_percentage.is_none() {
+        if let Some(ref groups) = quota_data.quota_groups {
+            for g in groups {
+                for b in &g.buckets {
+                    let win = b.window.to_lowercase();
+                    let bid = b.bucket_id.to_lowercase();
+                    let is_short = win.contains("5h")
+                        || win.contains("4h")
+                        || bid.contains("5h")
+                        || bid.contains("4h");
+                    if is_short && (0.0..=1.0).contains(&b.remaining_fraction) {
+                        detected_percentage = Some((b.remaining_fraction * 100.0).round());
+                        break;
+                    }
+                }
+                if detected_percentage.is_some() {
+                    break;
+                }
+            }
+        }
+    }
+
+    // 3. Fallback to first model percentage if available
+    if detected_percentage.is_none() {
+        if let Some(first) = quota_data.models.first() {
+            detected_percentage = Some(first.percentage as f64);
+        }
+    }
+
+    let percentage = detected_percentage.unwrap_or(100.0);
+    let ttl_seconds = if percentage < 20.0 {
+        120
+    } else if percentage < 50.0 {
+        180
+    } else {
+        300
+    };
+
     if let Ok(mut cache) = L1_QUOTA_CACHE.write() {
         cache.insert(
             account_id.to_string(),
             L1QuotaCacheEntry {
                 quota_data: quota_data.clone(),
                 cached_at_sec: now_sec,
-                ttl_seconds: 60,
+                ttl_seconds,
                 reset_time_unix: earliest_reset_unix,
             },
         );
@@ -361,6 +414,7 @@ pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppR
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::quota::ModelQuota;
 
     #[test]
     fn test_l1_quota_cache_roundtrip_and_invalidation() {
@@ -369,7 +423,7 @@ mod tests {
         let mut quota_data = QuotaData::new();
         quota_data.subscription_tier = Some("pro".to_string());
 
-        // 1. Store into cache
+        // 1. Store into cache with no models (default 100% -> 300s TTL)
         store_l1_quota_cache(account_id, &quota_data, now_sec);
 
         // 2. Read from cache
@@ -379,7 +433,49 @@ mod tests {
             assert!(entry.is_some());
             let entry = entry.unwrap();
             assert_eq!(entry.quota_data.subscription_tier.as_deref(), Some("pro"));
-            assert_eq!(entry.ttl_seconds, 60);
+            assert_eq!(entry.ttl_seconds, 300);
+        }
+
+        // Test adaptive TTL with low quota (< 20% -> 120s TTL)
+        let mut low_quota = QuotaData::new();
+        low_quota.models.push(ModelQuota {
+            name: "gemini-2.5-pro".to_string(),
+            percentage: 15,
+            reset_time: String::new(),
+            display_name: None,
+            supports_images: None,
+            supports_thinking: None,
+            thinking_budget: None,
+            recommended: None,
+            max_tokens: None,
+            max_output_tokens: None,
+            supported_mime_types: None,
+        });
+        store_l1_quota_cache("low_acc", &low_quota, now_sec);
+        {
+            let cache = L1_QUOTA_CACHE.read().unwrap();
+            assert_eq!(cache.get("low_acc").unwrap().ttl_seconds, 120);
+        }
+
+        // Test adaptive TTL with medium quota (< 50% -> 180s TTL)
+        let mut med_quota = QuotaData::new();
+        med_quota.models.push(ModelQuota {
+            name: "gemini-2.5-pro".to_string(),
+            percentage: 45,
+            reset_time: String::new(),
+            display_name: None,
+            supports_images: None,
+            supports_thinking: None,
+            thinking_budget: None,
+            recommended: None,
+            max_tokens: None,
+            max_output_tokens: None,
+            supported_mime_types: None,
+        });
+        store_l1_quota_cache("med_acc", &med_quota, now_sec);
+        {
+            let cache = L1_QUOTA_CACHE.read().unwrap();
+            assert_eq!(cache.get("med_acc").unwrap().ttl_seconds, 180);
         }
 
         // 3. Invalidate
