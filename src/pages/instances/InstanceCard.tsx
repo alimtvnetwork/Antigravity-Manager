@@ -25,6 +25,85 @@ import type { InstancePageApi } from './instancePageTypes';
 import { InstanceCardProjects } from './InstanceCardProjects';
 import { InstanceCardActions } from './InstanceCardActions';
 
+interface InstanceCardQuotaSectionProps {
+    geminiModel: any;
+    weeklyQuota: any;
+    boundAccount: any;
+    onRefreshQuota: (accountId: string) => void;
+}
+
+function InstanceCardQuotaSection({
+    geminiModel,
+    weeklyQuota,
+    boundAccount,
+    onRefreshQuota,
+}: InstanceCardQuotaSectionProps) {
+    if (geminiModel || weeklyQuota) {
+        return (
+            <div className="p-2 rounded-md bg-gray-50/90 dark:bg-[var(--ui-surface-2)] border border-gray-200/70 dark:border-[var(--ui-border-subtle)] space-y-1.5 group-hover:[&_span.font-mono]:text-yellow-400 dark:group-hover:[&_span.font-mono]:text-yellow-200">
+                {geminiModel && (
+                    <div className="space-y-0.5">
+                        <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                                <Gemini.Color className="w-3.5 h-3.5 shrink-0" />
+                                <span className="font-semibold text-gray-800 dark:text-gray-200 text-xs truncate transition-colors group-hover:text-yellow-500 dark:group-hover:text-yellow-200">
+                                    {geminiModel.display_name || geminiModel.name || 'Gemini 3.1 Pro'} (4H)
+                                </span>
+                            </div>
+                        </div>
+                        <QuotaProgressBar
+                            percentage={geminiModel.percentage}
+                            resetTime={geminiModel.reset_time}
+                        />
+                    </div>
+                )}
+                {weeklyQuota && (
+                    <div className={cn('space-y-0.5', geminiModel && 'pt-1 border-t border-gray-200/60 dark:border-[#40285e]/60')}>
+                        <div className="flex items-center justify-between text-xs">
+                            <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300 transition-colors group-hover:text-yellow-500 dark:group-hover:text-yellow-200">
+                                Weekly Quota
+                            </span>
+                        </div>
+                        <QuotaProgressBar
+                            isWeekly
+                            percentage={weeklyQuota.percentage}
+                            resetTime={weeklyQuota.resetTime}
+                        />
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    if (boundAccount) {
+        return (
+            <div className="p-2 rounded-md bg-gray-50/60 dark:bg-[#171025]/90 border border-gray-100 dark:border-[#40285e] flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center gap-1.5">
+                    <Gemini.Color className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                    <span className="text-[11px] text-gray-500 dark:text-gray-400">Quota not synced</span>
+                </div>
+                <button
+                    onClick={() => onRefreshQuota(boundAccount.id)}
+                    className="text-blue-600 dark:text-blue-400 hover:underline gap-1 text-[11px] cursor-pointer flex items-center"
+                >
+                    <ArrowLeftRight className="w-3 h-3 text-blue-500" />
+                    <span>Sync</span>
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="p-2 rounded-md bg-gray-50/40 dark:bg-[#171025]/60 border border-dashed border-gray-200 dark:border-[#40285e] flex items-center justify-between text-xs text-gray-400">
+            <div className="flex items-center gap-1.5">
+                <Gemini.Color className="w-3.5 h-3.5 shrink-0 opacity-40 grayscale" />
+                <span className="text-[10px] italic">No profile bound</span>
+            </div>
+            <span className="text-[10px] text-gray-400/80">Launch to assign</span>
+        </div>
+    );
+}
+
 export interface InstanceCardProps {
     api: InstancePageApi;
     inst: InstanceStatus;
@@ -241,62 +320,12 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                     </div>
 
                     <div className="mb-2">
-                        {geminiModel || weeklyQuota ? (
-                            <div className="p-2 rounded-md bg-gray-50/90 dark:bg-[var(--ui-surface-2)] border border-gray-200/70 dark:border-[var(--ui-border-subtle)] space-y-1.5 group-hover:[&_span.font-mono]:text-yellow-400 dark:group-hover:[&_span.font-mono]:text-yellow-200">
-                                {geminiModel && (
-                                    <div className="space-y-0.5">
-                                        <div className="flex items-center justify-between text-xs">
-                                            <div className="flex items-center gap-1.5 min-w-0">
-                                                <Gemini.Color className="w-3.5 h-3.5 shrink-0" />
-                                                <span className="font-semibold text-gray-800 dark:text-gray-200 text-xs truncate transition-colors group-hover:text-yellow-500 dark:group-hover:text-yellow-200">
-                                                    {geminiModel.display_name || geminiModel.name || 'Gemini 3.1 Pro'} (4H)
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <QuotaProgressBar
-                                            percentage={geminiModel.percentage}
-                                            resetTime={geminiModel.reset_time}
-                                        />
-                                    </div>
-                                )}
-                                {weeklyQuota && (
-                                    <div className={cn('space-y-0.5', geminiModel && 'pt-1 border-t border-gray-200/60 dark:border-[#40285e]/60')}>
-                                        <div className="flex items-center justify-between text-xs">
-                                            <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300 transition-colors group-hover:text-yellow-500 dark:group-hover:text-yellow-200">
-                                                Weekly Quota
-                                            </span>
-                                        </div>
-                                        <QuotaProgressBar
-                                            isWeekly
-                                            percentage={weeklyQuota.percentage}
-                                            resetTime={weeklyQuota.resetTime}
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        ) : boundAccount ? (
-                            <div className="p-2 rounded-md bg-gray-50/60 dark:bg-[#171025]/90 border border-gray-100 dark:border-[#40285e] flex items-center justify-between text-xs text-gray-500">
-                                <div className="flex items-center gap-1.5">
-                                    <Gemini.Color className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                                    <span className="text-[11px] text-gray-500 dark:text-gray-400">Quota not synced</span>
-                                </div>
-                                <button
-                                    onClick={() => refreshQuota(boundAccount.id)}
-                                    className="text-blue-600 dark:text-blue-400 hover:underline gap-1 text-[11px] cursor-pointer flex items-center"
-                                >
-                                    <ArrowLeftRight className="w-3 h-3 text-blue-500" />
-                                    <span>Sync</span>
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="p-2 rounded-md bg-gray-50/40 dark:bg-[#171025]/60 border border-dashed border-gray-200 dark:border-[#40285e] flex items-center justify-between text-xs text-gray-400">
-                                <div className="flex items-center gap-1.5">
-                                    <Gemini.Color className="w-3.5 h-3.5 shrink-0 opacity-40 grayscale" />
-                                    <span className="text-[10px] italic">No profile bound</span>
-                                </div>
-                                <span className="text-[10px] text-gray-400/80">Launch to assign</span>
-                            </div>
-                        )}
+                        <InstanceCardQuotaSection
+                            geminiModel={geminiModel}
+                            weeklyQuota={weeklyQuota}
+                            boundAccount={boundAccount}
+                            onRefreshQuota={refreshQuota}
+                        />
                     </div>
 
                     <div className="space-y-1.5 py-2 border-t border-gray-100 dark:border-[#40285e]/80 text-xs">

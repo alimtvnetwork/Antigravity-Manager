@@ -74,19 +74,34 @@ pub(crate) fn is_account_bound_to_running_sibling(
     account_email: &str,
 ) -> bool {
     registry.instances.iter().any(|i| {
-        if i.id == current_instance_id {
+        let is_running_sibling = i.id != current_instance_id
+            && crate::modules::instance::is_instance_running(&i.id, &i.data_dir, i.pid);
+        if !is_running_sibling {
             return false;
         }
-        if !crate::modules::instance::is_instance_running(&i.id, &i.data_dir, i.pid) {
-            return false;
+        let is_bound_id_match = i.bound_account_id.as_deref() == Some(account_id);
+        let is_bound_email_match = i
+            .bound_email
+            .as_deref()
+            .map(|e| e.eq_ignore_ascii_case(account_email))
+            .unwrap_or(false);
+        let is_default_instance = i.is_default || i.id == "default" || i.id == "__default__";
+        let is_default_match = is_default_instance
+            && account::get_current_account_id().ok().flatten().as_deref() == Some(account_id);
+
+        if is_bound_id_match || is_bound_email_match || is_default_match {
+            return true;
         }
-        i.bound_account_id.as_deref() == Some(account_id)
-            || i.bound_email
-                .as_deref()
-                .map(|e| e.eq_ignore_ascii_case(account_email))
-                .unwrap_or(false)
-            || ((i.is_default || i.id == "default" || i.id == "__default__")
-                && account::get_current_account_id().ok().flatten().as_deref() == Some(account_id))
+
+        if let Some(ref bid) = i.bound_account_id {
+            if let Ok(bacc) = account::load_account(bid) {
+                if bacc.email.eq_ignore_ascii_case(account_email) {
+                    return true;
+                }
+            }
+        }
+
+        false
     })
 }
 
@@ -110,6 +125,41 @@ pub fn select_candidate_profiles(
     for in_use_id in get_active_in_use_account_ids() {
         if !effective_exclusions.contains(&in_use_id) {
             effective_exclusions.push(in_use_id);
+        }
+    }
+    for inst in &registry.instances {
+        let is_running_sibling = inst.id != current_instance_id
+            && crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
+        if is_running_sibling {
+            let active_acc_id = inst.bound_account_id.clone().or_else(|| {
+                let is_default_instance =
+                    inst.is_default || inst.id == "default" || inst.id == "__default__";
+                if is_default_instance {
+                    account::get_current_account_id().ok().flatten()
+                } else {
+                    None
+                }
+            });
+            if let Some(ref acc_id) = active_acc_id {
+                if !effective_exclusions.contains(acc_id) {
+                    effective_exclusions.push(acc_id.clone());
+                }
+                if let Ok(acc) = account::load_account(acc_id) {
+                    if !effective_exclusions.contains(&acc.email) {
+                        effective_exclusions.push(acc.email.clone());
+                    }
+                }
+            }
+            if let Some(ref email) = inst.bound_email {
+                if !effective_exclusions.contains(email) {
+                    effective_exclusions.push(email.clone());
+                }
+                if let Ok(Some(acc)) = account::get_account_by_email(email) {
+                    if !effective_exclusions.contains(&acc.id) {
+                        effective_exclusions.push(acc.id.clone());
+                    }
+                }
+            }
         }
     }
     for cross_vm_acc in crate::modules::email_inbound::fetch_recent_cross_vm_switched_accounts(3600)
@@ -398,11 +448,54 @@ pub async fn select_and_verify_next_best_profile(
         "list_active_leases",
     );
 
+    let mut effective_exclusions = excluded_account_ids.to_vec();
+    if let Ok(reg) = instance::load_registry() {
+        for inst in &reg.instances {
+            let is_running_sibling = inst.id != current_instance_id
+                && crate::modules::instance::is_instance_running(
+                    &inst.id,
+                    &inst.data_dir,
+                    inst.pid,
+                );
+            if is_running_sibling {
+                let active_acc_id = inst.bound_account_id.clone().or_else(|| {
+                    let is_default_instance =
+                        inst.is_default || inst.id == "default" || inst.id == "__default__";
+                    if is_default_instance {
+                        account::get_current_account_id().ok().flatten()
+                    } else {
+                        None
+                    }
+                });
+                if let Some(ref acc_id) = active_acc_id {
+                    if !effective_exclusions.contains(acc_id) {
+                        effective_exclusions.push(acc_id.clone());
+                    }
+                    if let Ok(acc) = account::load_account(acc_id) {
+                        if !effective_exclusions.contains(&acc.email) {
+                            effective_exclusions.push(acc.email.clone());
+                        }
+                    }
+                }
+                if let Some(ref email) = inst.bound_email {
+                    if !effective_exclusions.contains(email) {
+                        effective_exclusions.push(email.clone());
+                    }
+                    if let Ok(Some(acc)) = account::get_account_by_email(email) {
+                        if !effective_exclusions.contains(&acc.id) {
+                            effective_exclusions.push(acc.id.clone());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     let candidates = select_candidate_profiles(
         current_instance_id,
         target_model,
         threshold,
-        excluded_account_ids,
+        &effective_exclusions,
     )?;
 
     if candidates.is_empty() {
@@ -424,12 +517,13 @@ pub async fn select_and_verify_next_best_profile(
 
         // Pre-switch live verification against running sibling instances on this host
         if let Ok(reg) = instance::load_registry() {
-            if is_account_bound_to_running_sibling(
+            let is_bound_to_running_sibling = is_account_bound_to_running_sibling(
                 &reg,
                 current_instance_id,
                 &candidate.account_id,
                 &candidate.email,
-            ) {
+            );
+            if is_bound_to_running_sibling {
                 logger::log_warn(&format!(
                     "[AutoSwitcher] Candidate '{}' is actively bound to running sibling instance on this host. Skipping...",
                     masked_email

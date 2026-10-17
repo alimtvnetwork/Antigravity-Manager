@@ -256,8 +256,8 @@ pub(crate) fn cmd_finish_prompts_until_green(args: &[String]) {
             break;
         }
 
-        // Low-CPU sleep
-        std::thread::sleep(Duration::from_secs(interval_sec.max(5)));
+        // Low-CPU sleep (strict >= 30s floor)
+        std::thread::sleep(Duration::from_secs(interval_sec.max(30)));
     }
 }
 
@@ -378,7 +378,7 @@ pub(crate) fn cmd_shutdown_until_green(args: &[String]) {
                     let _ = execute_native_shutdown();
                     break;
                 }
-                std::thread::sleep(Duration::from_secs(interval_sec.max(5)));
+                std::thread::sleep(Duration::from_secs(interval_sec.max(30)));
             }
             return;
         }

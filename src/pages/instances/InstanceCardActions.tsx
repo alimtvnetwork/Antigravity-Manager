@@ -103,11 +103,16 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                                                         type="button"
                                                         disabled={isBusy}
                                                         onClick={() => onSwitchAccount()}
-                                                        className="flex-1 flex items-center justify-center py-1 text-sky-600 dark:text-sky-400 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        className={cn(
+                                                            "flex-1 flex items-center justify-center py-1 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+                                                            "bg-transparent text-slate-600 dark:text-slate-400",
+                                                            "hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:text-slate-950 hover:font-bold hover:shadow-[0_2px_0_0_#A16207,0_3px_5px_rgba(0,0,0,0.2)]",
+                                                            "active:translate-y-0.5 active:shadow-[0_0_0_0_#A16207]"
+                                                        )}
                                                         title="Switch Account"
                                                     >
                                                         {currentAction === 'switch' ? (
-                                                            <RotateCw className="w-3.5 h-3.5 animate-spin text-sky-500" />
+                                                            <RotateCw className="w-3.5 h-3.5 animate-spin text-amber-700" />
                                                         ) : (
                                                             <ArrowRightLeft className="w-3.5 h-3.5" />
                                                         )}
@@ -117,11 +122,16 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                                                         type="button"
                                                         disabled={isBusy}
                                                         onClick={() => handleFastForward(inst.config.id)}
-                                                        className="flex-1 flex items-center justify-center py-1 text-amber-600 dark:text-amber-400 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        className={cn(
+                                                            "flex-1 flex items-center justify-center py-1 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+                                                            "bg-transparent text-slate-600 dark:text-slate-400",
+                                                            "hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:text-slate-950 hover:font-bold hover:shadow-[0_2px_0_0_#A16207,0_3px_5px_rgba(0,0,0,0.2)]",
+                                                            "active:translate-y-0.5 active:shadow-[0_0_0_0_#A16207]"
+                                                        )}
                                                         title="Fast Forward to Next Best"
                                                     >
                                                         {currentAction === 'fast-forward' ? (
-                                                            <RotateCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                                                            <RotateCw className="w-3.5 h-3.5 animate-spin text-amber-700" />
                                                         ) : (
                                                             <FastForward className="w-3.5 h-3.5" />
                                                         )}

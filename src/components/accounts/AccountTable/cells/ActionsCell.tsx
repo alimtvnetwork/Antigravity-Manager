@@ -132,8 +132,9 @@ export function ActionsCell(props: ActionsCellProps) {
                     (isSwitching || isDisabled)
                         ? "bg-yellow-200/40 text-slate-400 border border-yellow-300/40 cursor-not-allowed opacity-40"
                         : cn(
-                            "opacity-40 group-hover:opacity-100 border border-yellow-500/40 text-yellow-700 dark:text-yellow-300",
+                            "bg-transparent opacity-40 group-hover:opacity-100 border border-yellow-500/40 text-yellow-700 dark:text-yellow-300",
                             "group-hover:bg-gradient-to-b group-hover:from-[#FDE047] group-hover:via-[#FACC15] group-hover:to-[#EAB308] group-hover:text-slate-950 group-hover:font-bold group-hover:border-[#CA8A04] group-hover:shadow-[0_2px_0_0_#A16207,0_3px_5px_rgba(0,0,0,0.2)]",
+                            "hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:text-slate-950 hover:font-bold hover:border-[#CA8A04] hover:shadow-[0_2px_0_0_#A16207,0_3px_5px_rgba(0,0,0,0.2)]",
                             "active:translate-y-0.5 active:shadow-[0_0_0_0_#A16207]"
                         )
                 )}
@@ -197,7 +198,7 @@ export function ActionsCell(props: ActionsCellProps) {
                 isDeleting
                     ? "bg-red-300/40 text-white/50 border-red-400/40 cursor-not-allowed opacity-40"
                     : cn(
-                        "opacity-40 group-hover:opacity-100 border-transparent text-gray-400 dark:text-gray-500",
+                        "bg-transparent opacity-40 group-hover:opacity-100 border-transparent text-gray-400 dark:text-gray-500",
                         "group-hover:bg-red-500/10 group-hover:text-red-500 group-hover:border-red-500/30",
                         "hover:!bg-red-600 hover:!text-white hover:!border-red-700 hover:shadow-sm active:scale-95"
                     )

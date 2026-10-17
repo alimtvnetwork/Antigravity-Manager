@@ -44,9 +44,13 @@ pub async fn trigger_manual_rotation_for_instance(
         }
     }
     for inst in &registry.instances {
-        if inst.id != inst_id && instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid) {
+        let is_running_sibling =
+            inst.id != inst_id && instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
+        if is_running_sibling {
             let active_acc_id = inst.bound_account_id.clone().or_else(|| {
-                if inst.is_default || inst.id == "default" || inst.id == "__default__" {
+                let is_default_instance =
+                    inst.is_default || inst.id == "default" || inst.id == "__default__";
+                if is_default_instance {
                     account::get_current_account_id().ok().flatten()
                 } else {
                     None
@@ -65,6 +69,11 @@ pub async fn trigger_manual_rotation_for_instance(
             if let Some(ref email) = inst.bound_email {
                 if !excluded.contains(email) {
                     excluded.push(email.clone());
+                }
+                if let Ok(Some(acc)) = account::get_account_by_email(email) {
+                    if !excluded.contains(&acc.id) {
+                        excluded.push(acc.id.clone());
+                    }
                 }
             }
         }

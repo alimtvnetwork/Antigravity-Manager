@@ -1,6 +1,6 @@
 import { copyToClipboard } from '../../utils/clipboard';
 import { useState } from 'react';
-import { Search, Plus, Play, RotateCw, Laptop, AlertCircle, Terminal, ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
+import { Search, Plus, Play, RotateCw, Laptop, AlertCircle, Terminal, ChevronDown, ChevronRight, Copy, Check, X } from 'lucide-react';
 import type { InstancePageApi } from './instancePageTypes';
 
 export function InstancesFilterBar({ api }: { api: InstancePageApi }) {
@@ -17,6 +17,17 @@ export function InstancesFilterBar({ api }: { api: InstancePageApi }) {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full bg-transparent border-none outline-hidden text-xs text-gray-900 dark:text-base-content"
                 />
+                {Boolean(searchQuery) && (
+                    <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700/60 transition-colors cursor-pointer"
+                        title={t('common.clear', 'Clear search')}
+                        aria-label={t('common.clear', 'Clear search')}
+                    >
+                        <X className="w-3.5 h-3.5" />
+                    </button>
+                )}
             </div>
             <button
                 onClick={() => {
@@ -120,16 +131,24 @@ export function InstancesEmptyState({ api }: { api: InstancePageApi }) {
 }
 
 export function InstancesNoResultsState({ api }: { api: InstancePageApi }) {
-    const { t } = api;
+    const { t, setSearchQuery } = api;
     return (
         <div className="flex flex-col items-center justify-center py-12 text-center bg-white dark:bg-base-200 rounded-[5px] border border-gray-200/80 dark:border-base-100">
             <Search className="w-8 h-8 text-gray-400 mb-2" />
             <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 {t('instances.no_search_results', 'No profiles match your search')}
             </p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-gray-400 mt-1 mb-4">
                 {t('instances.no_search_results_desc', 'Try searching with a different name, profile ID, or email')}
             </p>
+            <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="btn btn-primary btn-sm rounded-[5px] shadow-sm gap-1.5"
+            >
+                <RotateCw className="w-3.5 h-3.5" />
+                <span>{t('instances.reset_search', 'Reset Search')}</span>
+            </button>
         </div>
     );
 }

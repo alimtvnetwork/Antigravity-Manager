@@ -39,7 +39,7 @@ export function AuditTable({ displayItems, filter, revealed, setRevealed, loadDe
                             <tr
                                 key={item.id}
                                 onDoubleClick={() => loadDetail(item.id)}
-                                className="border-t border-slate-100 dark:border-[#40285e]/60 hover:bg-slate-50/60 dark:hover:bg-[#40285e]/40 transition-colors cursor-pointer select-text"
+                                className="border-t border-slate-100 dark:border-[#40285e]/60 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 transition-colors cursor-pointer select-text"
                                 title="Double click row to view detail"
                             >
                                 {/* 1. From -> To / Subject */}

@@ -222,19 +222,32 @@ export function QuotaProgressBar({
             </div>
 
             {/* Single Column for Remaining Time and Percentage */}
-            <div className={cn("flex flex-col items-end shrink-0", compact ? "leading-none" : "leading-tight")}>
+            <div className={cn("flex flex-col items-end shrink-0 gap-0.5", compact ? "leading-none" : "leading-tight")}>
                 {resetTime ? (
-                    <span
-                        className={cn(
-                            "font-bold flex items-center gap-0.5 font-mono",
-                            compact ? "text-[9px]" : "text-[10px]",
-                            getTimeColorClass(resetTime)
-                        )}
-                        title={`Resets in ${formatTimeRemaining(resetTime)}`}
-                    >
-                        <Clock className={cn("shrink-0", compact ? "w-2 h-2" : "w-2.5 h-2.5")} />
-                        {formatTimeRemaining(resetTime)}
-                    </span>
+                    getTimeRemainingColor(resetTime) === 'success' ? (
+                        <span
+                            className={cn(
+                                "font-bold flex items-center gap-0.5 font-mono px-1.5 py-0.5 rounded-[4px] bg-emerald-500/15 text-emerald-950 dark:text-emerald-200 border border-emerald-500/30 shadow-2xs",
+                                compact ? "text-[8.5px]" : "text-[9.5px]"
+                            )}
+                            title={`Resets in ${formatTimeRemaining(resetTime)}`}
+                        >
+                            <Clock className={cn("shrink-0", compact ? "w-2 h-2" : "w-2.5 h-2.5")} />
+                            {formatTimeRemaining(resetTime)}
+                        </span>
+                    ) : (
+                        <span
+                            className={cn(
+                                "font-bold flex items-center gap-0.5 font-mono",
+                                compact ? "text-[9px]" : "text-[10px]",
+                                getTimeColorClass(resetTime)
+                            )}
+                            title={`Resets in ${formatTimeRemaining(resetTime)}`}
+                        >
+                            <Clock className={cn("shrink-0", compact ? "w-2 h-2" : "w-2.5 h-2.5")} />
+                            {formatTimeRemaining(resetTime)}
+                        </span>
+                    )
                 ) : null}
 
                 <div className="flex items-center gap-1 justify-end">
@@ -258,6 +271,13 @@ export function QuotaProgressBar({
                             clamped === 50
                                 ? "bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700/60"
                                 : "bg-rose-100 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-700/60"
+                        )}>
+                            {clamped}%
+                        </span>
+                    ) : clamped >= 60 ? (
+                        <span className={cn(
+                            "font-bold font-mono px-1.5 py-0.5 rounded-[4px] bg-emerald-500/15 text-emerald-950 dark:text-emerald-200 border border-emerald-500/30 shadow-2xs",
+                            compact ? "text-[9px]" : "text-[10px]"
                         )}>
                             {clamped}%
                         </span>

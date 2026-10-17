@@ -122,7 +122,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
                         {/* 绑定实例徽章 */}
                         {boundInstance && (
                             <span
-                                className="flex items-center gap-1 px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-[9px] font-bold shadow-xs border border-indigo-200/50 dark:border-indigo-700/60 cursor-default"
+                                className="flex items-center gap-1 px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-950 border-indigo-300 font-black dark:bg-indigo-950 dark:text-indigo-200 dark:border-indigo-500 text-[9px] shadow-xs border cursor-default"
                                 title={`Bound to profile: ${boundInstance.config.name}`}
                             >
                                 <span className={cn(
@@ -201,7 +201,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 </div>
             </td>
 
-            <td className="px-2 py-px align-middle min-w-[185px] bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90 transition-colors">
+            <td className="px-2 py-px align-middle min-w-[185px] bg-transparent border-l border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90 transition-colors">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <div className={cn(
                         "flex items-center justify-center gap-1.5 py-0.5 px-2 rounded-md border group/error transition-colors",
@@ -247,7 +247,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 )}
             </td>
 
-            <td className="px-2 py-px align-middle min-w-[185px] bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90 transition-colors">
+            <td className="px-2 py-px align-middle min-w-[185px] bg-transparent border-r border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90 transition-colors">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <span className="text-[10px] text-gray-400 italic transition-colors">--</span>
                 ) : (

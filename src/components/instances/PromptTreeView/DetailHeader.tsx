@@ -268,8 +268,24 @@ export function DetailHeader(props: DetailHeaderProps) {
                         const tierInfo = classifyPromptTier(activePromptText, selectedConversation.title);
                         return (
                             <span
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20 cursor-help"
-                                title={`Conversation #${rawSeq.replace(/^C/i, '') || '001'} (Sequential AGM Index) · ${tierInfo.tier}`}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20 cursor-help hover:border-blue-500/50 transition-colors"
+                                title={`Conversation #${rawSeq.replace(/^C/i, '') || '001'} (Sequential AGM Index) · ${tierInfo.tier} (Right-click to copy JSON parameters)`}
+                                onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const paramPayload = {
+                                        sequence: seqDisplay,
+                                        raw_sequence: rawSeq,
+                                        tier: tierInfo.tier,
+                                        conversation_id: selectedConversation.conversation_id,
+                                        instance_id: selectedConversation.instance_id || 'default',
+                                        instance_name: instanceNameDisplay,
+                                        title: selectedConversation.title || selectedConversation.short_id || '',
+                                    };
+                                    void copyToClipboard(JSON.stringify(paramPayload, null, 2)).catch((err) => {
+                                        reportPromptActionError(err, 'DetailHeader.copyBadgeParams');
+                                    });
+                                }}
                             >
                                 {tierInfo.tier === 'USER_PROMPT' && <User className="w-2.5 h-2.5 text-sky-500 shrink-0" />}
                                 {tierInfo.tier === 'SUBAGENT_INSTRUCTION' && <Bot className="w-2.5 h-2.5 text-purple-500 shrink-0" />}
@@ -352,7 +368,26 @@ export function DetailHeader(props: DetailHeaderProps) {
                     )}
 
                     {/* Subtle Instance Context (Breadcrumb style) */}
-                    <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate" title={`Instance #${instanceSeqNum} · ${instanceExeName} (${instanceNameDisplay})`}>
+                    <span
+                        className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate cursor-help hover:text-slate-200 transition-colors"
+                        title={`Instance #${instanceSeqNum} · ${instanceExeName} (${instanceNameDisplay}) (Right-click to copy context JSON)`}
+                        onContextMenu={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const contextSeq = formatSeqBadge(selectedConversation.seq_code, `C${String(instanceSeqNum).padStart(3, '0')}`).replace(/^#/, '');
+                            const contextPayload = {
+                                context: `#${contextSeq} · ${instanceNameDisplay}`,
+                                instance_seq: instanceSeqNum,
+                                instance_name: instanceNameDisplay,
+                                instance_exe: instanceExeName,
+                                instance_pid: instancePid,
+                                conversation_id: selectedConversation.conversation_id,
+                            };
+                            void copyToClipboard(JSON.stringify(contextPayload, null, 2)).catch((err) => {
+                                reportPromptActionError(err, 'DetailHeader.copyContextParams');
+                            });
+                        }}
+                    >
                         #{formatSeqBadge(selectedConversation.seq_code, `C${String(instanceSeqNum).padStart(3, '0')}`).replace(/^#/, '')} · {instanceNameDisplay}
                     </span>
                 </div>

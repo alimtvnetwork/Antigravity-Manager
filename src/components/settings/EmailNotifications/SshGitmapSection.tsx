@@ -22,6 +22,7 @@ import {
     Trash2,
     UploadCloud,
     AlertTriangle,
+    RotateCcw,
 } from 'lucide-react';
 import {
     sshService,
@@ -1050,6 +1051,21 @@ export function SshGitmapSection() {
                             className="w-24 text-xs font-mono text-gray-900 dark:text-slate-100 bg-transparent border-0 focus:ring-0 focus:outline-none"
                         />
                     </div>
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setTargetMachine('local');
+                            setTargetInstance('default');
+                            showToast('Reset target to local:default', 'info');
+                        }}
+                        disabled={targetMachine === 'local' && targetInstance === 'default'}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-full shadow-2xs hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                        title="Reset target machine to local and instance to default"
+                    >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Reset to Local</span>
+                    </button>
 
                     <input
                         type="text"

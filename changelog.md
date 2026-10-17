@@ -2,8 +2,18 @@
 
 ## [v4.227.0] - 2026-10-18
 
+### Fixed
+- **Error E9001 Root-Cause Resolution & Sibling Instance Account Isolation**: Resolved Error E9001 (`Cannot switch instance to account: Account is actively bound to running sibling instance`) during Fast-Forward and manual rotation. Actively running instances (`is_running == true`) are never marked stale or stealable in `is_instance_binding_stale_or_exhausted`; running sibling instance accounts (checking `bound_account_id`, `bound_email`, and default active account) are strictly excluded from candidate evaluation in `manual.rs`; and live pre-switch candidate verification in `selection.rs` guards against sibling account theft. (Thanks to @aukgit)
+- **Prompt Queue Missing Workspace Fail-Fast & Infinite Retry Loop Elimination**: In `PromptQueueScheduler` (`queue.rs`), added workspace existence validation to prevent infinite 5-second queue retry loops when target directories are missing; marked invalid prompts as `failed` with actionable diagnostics and applied `updated_at = now` retry backoff on dispatch errors. (Thanks to @aukgit)
+- **Supabase Connection & Heartbeat 5-Minute Error Backoff**: Added a 300-second (5-minute) error backoff in `start_sync_worker` (`fleet.rs`) on Supabase connection/heartbeat errors, eliminating repetitive DNS/connection warning storms. (Thanks to @aukgit)
+
 ### Added
-- **Release v4.227.0**: CI pipeline verified 100% green on `main` (post v4.226.3); performed minor version bump and synchronized release metadata (`version.json`, `package.json`, changelog, README), and published the stable release via the tag-triggered `release.yml` workflow. (Thanks to @aukgit)
+- **Instance Card & Account Card Toolbar Redesign & Riseup Yellow 3D**: Replaced the 4th icon (Tag) on Account and Instance cards with the Fast-Forward (`FastForward`) button; relocated Tag (Edit Label) into the More dropdown; flattened Switch (yellow) and Delete (red) buttons when idle; and applied authoritative Riseup Yellow 3D gradients (`from-[#FDE047] via-[#FACC15] to-[#EAB308]`, border `#CA8A04`, depth shadow `[0_2px_0_0_#A16207,0_3px_5px_rgba(0,0,0,0.2)]`) on hover. (Thanks to @aukgit)
+- **UI Hover Dark-Glass Contrast & Green Duration Micro-Pill Badges**: Replaced stark white hover backgrounds across `AuditTable.tsx` and account rows with balanced dark-glass styling (`hover:bg-slate-100/80 dark:hover:bg-slate-800/60`); removed inner cell opaque backgrounds; upgraded `default-copy` instance badges to high-contrast `bg-indigo-100 text-indigo-950 font-black`; and enclosed green duration text (`#1af18d`) in high-contrast micro-pill badges (`bg-emerald-500/15 text-emerald-950 dark:text-emerald-200 border-emerald-500/30 font-bold`). (Thanks to @aukgit)
+- **Background Loop Throttling & 30-Second Minimum Floor**: Enforced strict `>= 30s` minimum floor on CLI poller loops (`fpug` and `sug` in `green_cmds.rs`) and elevated `MIN_GOOGLE_QUOTA_CHECK_SECONDS` to 30 seconds. (Thanks to @aukgit)
+- **Prompt Parameter Right-Click Context Menu & 1-Click Reset Filters**: Added `onContextMenu` right-click handlers on prompt parameter badges (`#{seqDisplay}`, `USER_PROMPT`, context `#C001 · default`) in `DetailHeader.tsx` to copy clean JSON parameter payloads; added 1-click Clear `✕` button to `InstancesFilterBar` and `InstancesNoResultsState`; and added "Reset to Local" button in remote SSH prompt dispatcher. (Thanks to @aukgit)
+- **Updater Typography & Cross-Platform Terminal Fonts**: Configured Win32 updater console to 18pt Consolas (`font_family = 54`, `dw_font_size.y = 18`, `font_weight = 600`) with Lucida Console fallback for Windows, with specification for Ubuntu Mono and SF Mono. (Thanks to @aukgit)
+- **GitMap <-> AGM Mutual HMAC-SHA256 JWT Communication Bridge**: Architected secure local HTTP JWT bridge over port `:18188` with 60-second token expiration, replay nonce cache with 120s TTL, and scoped permissions (`email:read`, `cluster:sync`). (Thanks to @aukgit)
 
 ---
 
@@ -605,6 +615,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.227.0 (2026-10-18)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.226.0 (2026-10-18)**:
         -   **[E9001 Sibling Isolation & UI Redesign] Error E9001 Root-Cause Resolution, Loop Throttling, Accounts Table Dark-Glass Redesign & 3D Riseup Yellow Switch (Thanks to @aukgit)**:
             -   **Description**: Resolved Error E9001 (`Cannot switch instance to account: Account is actively bound to running sibling instance`) by guarding running instances from being considered stale or stealable in `instances.rs`, excluding running sibling accounts in `manual.rs`, and shielding candidates in `selection.rs`; prevented infinite 5-second retry loops in `PromptQueueScheduler` (`queue.rs`) for missing workspace directories by setting status to `failed` with retry backoff; implemented adaptive L1 quota cache TTL (120s/180s/300s) and 5-minute Supabase heartbeat error backoff; redesigned Accounts Table UI by removing blinding stark white hovers, flattening idle action buttons, styling Switch with Riseup Yellow 3D gradient, reordering action buttons, and moving custom label Tag into More menu; added Prompt Tree "Reset Filters" button in `TreePanel.tsx`; upgraded Win32 updater console to 18pt Consolas (`font_family = 54`); and refactored magic status strings into strongly-typed domain enums with inverted guard clauses.
