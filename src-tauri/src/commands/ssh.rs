@@ -80,9 +80,30 @@ pub async fn deploy_encrypted_ssh_bundle(
 #[tauri::command]
 pub async fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalanceItem>, String>
 {
-    tokio::task::spawn_blocking(ssh_manager::get_cluster_instances_and_balances)
-        .await
-        .map_err(|e| format!("Task join error: {}", e))?
+    match tokio::task::spawn_blocking(ssh_manager::get_cluster_instances_and_balances).await {
+        Ok(Ok(items)) => {
+            for item in &items {
+                if let Some(ref err) = item.error_message {
+                    tracing::warn!(
+                        machine = %item.machine_alias,
+                        ip = %item.machine_ip,
+                        error = %err,
+                        "Cluster instance diagnostic warning"
+                    );
+                }
+            }
+            Ok(items)
+        }
+        Ok(Err(err)) => {
+            tracing::warn!(error = %err, "Failed to retrieve cluster instances and balances");
+            Err(err)
+        }
+        Err(join_err) => {
+            let msg = format!("Task join error: {}", join_err);
+            tracing::warn!(error = %msg, "Spawn blocking join failure in get_cluster_instances_and_balances");
+            Err(msg)
+        }
+    }
 }
 
 #[tauri::command]

@@ -4,6 +4,7 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
+| [fleet-gitmap-multi-machine-sync.md](./fleet-gitmap-multi-machine-sync.md) | `COMPLETED` | Concurrency upgrade to A=3, H=2 (6 concurrent ops); backend SSH manager & W2 TCP retry ladder with 1500ms timeout; dynamic IP resolution & ${adminUser}/${linuxUser} placeholder normalization in Multi-Machine Matrix; top-right segmented pill capsule & modern Install GitMap box; cluster balance diagnostic reporting. |
 | [accounts-table-delete-hover-right-click-disable.md](./completed/accounts-table-delete-hover-right-click-disable.md) | `COMPLETED` | Fix single & batch Delete buttons via modal error-resilience and backend retry ladder, mounted right-click context menu (Disable/Enable, Delete, Switch), position-locked row hover color inversion with group-hover:!text-black, yellow highlighter Switch button, and red Remove button. |
 | [accounts-table-delete-hover-and-disable-sync.md](./completed/accounts-table-delete-hover-and-disable-sync.md) | `COMPLETED` | Fix single & batch Delete buttons via modal mounting, position-locked row hover color inversion, yellow highlighter Switch button, solid red Remove button, and account disable/enable lifecycle with auto-switch exclusion. |
 | [verify-recent-implementations.md](./completed/verify-recent-implementations.md) | `COMPLETED` | V6 Parent Task verification of Rust Audit Telemetry (compiler callsite retention, backtrace sanitization, email parity) and Frontend Prompt Tree (regex fix, dual-MIME clipboard, 5-chapter verification templates, AuditPanel fallback ladder). |

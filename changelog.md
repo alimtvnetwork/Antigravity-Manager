@@ -1,5 +1,15 @@
 # Changelog
 
+## [v4.221.0] - 2026-10-17
+
+### Added
+- **Multi-Machine Fleet Synchronization & W2 Connectivity Recovery**: Extended TCP probe timeout to 1500ms with a 2-stage retry ladder and backoff to eliminate false-offline readings on Wi-Fi and cross-subnet nodes (such as W2); added rich error diagnostics (`error_message`, `latency_ms`) to `get_cluster_instances_and_balances`. (Thanks to @aukgit)
+- **Multi-Machine Matrix Dynamic IP & Placeholder Normalization**: Resolved empty `()` bug by serializing both `machine_ip` and `ip_address` on `ClusterInstanceBalanceItem` and resolving `ip_address || machine_ip`; implemented `resolve_username_placeholders` to replace raw `${adminUser}` with `Administrator` and `${linuxUser}` with `root` across SSH connection imports, envelopes, and table rows. (Thanks to @aukgit)
+- **Settings SSH & GitMap Section UI Polish**: Replaced loose action buttons with a contiguous segmented pill capsule (`rounded-full`, dark-glass backdrop, subtle dividers) for `Import SSH from GitMap`, `Deploy Encrypted Credentials to Fleet`, and `Check Cluster Balances`; redesigned GitMap installer box with segmented pill buttons for `Copy Install Command` and `Open PowerShell & Install GitMap` with copy toast feedback; cleaned up raw filesystem path dumps into compact metadata badges (`GitMap Installed`, `RSA-2048 Vault Key Active`, `Nodes Configured`). (Thanks to @aukgit)
+- **Multi-Agent Concurrency Upgrade (A = 3, H = 2)**: Upgraded autonomous subagent orchestration capacity across `.agents/skills/execute-parent-task-with-n-steps-v6/skill.md`, `.agents/skills/gitmap/skill.md`, coding guidelines, instruction writer, and muse master skills to spawn 3 concurrent subagents with 2 operational hands each (`A × H = 6` concurrent operations). (Thanks to @aukgit)
+
+---
+
 ## [v4.220.0] - 2026-10-17
 
 ### Added
@@ -496,8 +506,8 @@
 
 *   **Version History**:
     *   **v4.221.0 (2026-10-17)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+        -   **[Multi-Machine Fleet & UI Overhaul] Fleet Sync Recovery, W2 TCP Retry Ladder, Dynamic IP Resolution, and Settings UI Overhaul (Thanks to @aukgit)**:
+            -   **Description**: Extended TCP probe timeout to 1500ms with a 2-stage retry ladder to resolve false-offline W2 machine status; normalized `${adminUser}` to `Administrator` and `${linuxUser}` to `root` across SSH connection imports and envelopes; eliminated empty `()` bug in Multi-Machine Matrix by serializing both `machine_ip` and `ip_address`; overhauled Settings SSH & GitMap actions with a contiguous segmented pill capsule, sleek metadata badges replacing raw path dumps, and active copy feedback for terminal installer commands; upgraded autonomous multi-agent concurrency capacity to A = 3, H = 2 (6 concurrent operations) across skills and coding guidelines.
 
 
     *   **v4.220.0 (2026-10-17)**:

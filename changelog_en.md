@@ -4,8 +4,8 @@
 
 *   **Version History**:
     *   **v4.221.0 (2026-10-17)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+        -   **[Multi-Machine Fleet & UI Overhaul] Fleet Sync Recovery, W2 TCP Retry Ladder, Dynamic IP Resolution, and Settings UI Overhaul (Thanks to @aukgit)**:
+            -   **Description**: Extended TCP probe timeout to 1500ms with a 2-stage retry ladder to resolve false-offline W2 machine status; normalized `${adminUser}` to `Administrator` and `${linuxUser}` to `root` across SSH connection imports and envelopes; eliminated empty `()` bug in Multi-Machine Matrix by serializing both `machine_ip` and `ip_address`; overhauled Settings SSH & GitMap actions with a contiguous segmented pill capsule, sleek metadata badges replacing raw path dumps, and active copy feedback for terminal installer commands; upgraded autonomous multi-agent concurrency capacity to A = 3, H = 2 (6 concurrent operations) across skills and coding guidelines.
 
     *   **v4.220.0 (2026-10-17)**:
         -   **[Accounts Management & UI Overhaul] Delete Remediation, Position-Locked Hover Inversion, Yellow Switch & Red Remove Buttons, and Disable Lifecycle (Thanks to @aukgit)**:

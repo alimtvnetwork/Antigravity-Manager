@@ -34,6 +34,13 @@ import { copyToClipboard } from '../../../utils/clipboard';
 import { showToast } from '../../common/ToastContainer';
 import { useErrorStore } from '../../../stores/error-store';
 
+const toast = {
+    success: (msg: string) => showToast(msg, 'success'),
+    error: (msg: string) => showToast(msg, 'error'),
+    info: (msg: string) => showToast(msg, 'info'),
+    warning: (msg: string) => showToast(msg, 'warning'),
+};
+
 export function SshGitmapSection() {
     const [status, setStatus] = useState<SshGitmapStatus | null>(null);
     const [nodes, setNodes] = useState<SshNodeRecord[]>([]);
@@ -104,9 +111,16 @@ export function SshGitmapSection() {
     const handleRefreshClusterBalances = useCallback(async () => {
         setIsLoadingBalances(true);
         try {
-            const items = await sshService.getClusterInstancesAndBalances();
-            setClusterBalances(items);
+            const res = await sshService.getClusterInstancesAndBalances();
+            setClusterBalances(res);
+            const onlineCount = res.filter((x) => x.running || x.online).length;
+            const offlineCount = res.length - onlineCount;
+            toast.success(`Checked ${res.length} cluster nodes (${onlineCount} online, ${offlineCount} offline)`);
         } catch (err: any) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'SshGitmapSection.handleRefreshClusterBalances',
+                triggerAction: 'query_cluster_balances',
+            });
             showToast(`Failed to query multi-machine balances: ${err?.message || err}`, 'error');
         } finally {
             setIsLoadingBalances(false);
@@ -125,6 +139,10 @@ export function SshGitmapSection() {
             showToast(msg || 'Opened PowerShell to install GitMap CLI', 'success');
             await loadAllSshData();
         } catch (err: any) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'SshGitmapSection.handleInstallGitmapPowershell',
+                triggerAction: 'install_gitmap_powershell',
+            });
             showToast(`GitMap installer failed: ${err?.message || err}`, 'error');
         } finally {
             setIsInstallingGitmap(false);
@@ -142,6 +160,10 @@ export function SshGitmapSection() {
             await loadAllSshData();
             await handleRefreshClusterBalances();
         } catch (err: any) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'SshGitmapSection.handleImportFromGitmap',
+                triggerAction: 'import_ssh_from_gitmap',
+            });
             showToast(`Failed to import SSH nodes from GitMap: ${err?.message || err}`, 'error');
         } finally {
             setIsImportingGitmap(false);
@@ -159,6 +181,10 @@ export function SshGitmapSection() {
                 'success'
             );
         } catch (err: any) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'SshGitmapSection.handleDeployEncryptedFleet',
+                triggerAction: 'deploy_encrypted_fleet',
+            });
             showToast(`Failed to deploy encrypted credentials: ${err?.message || err}`, 'error');
         } finally {
             setIsDeployingFleet(false);
@@ -197,6 +223,10 @@ export function SshGitmapSection() {
             setIpAddress('');
             await loadAllSshData();
         } catch (err: any) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'SshGitmapSection.handleSaveNodeRsa',
+                triggerAction: 'save_ssh_node_rsa',
+            });
             showToast(`Failed to save SSH node: ${err?.message || err}`, 'error');
         } finally {
             setIsSavingNode(false);
@@ -214,6 +244,10 @@ export function SshGitmapSection() {
                 showToast(`SSH test on "${nodeAlias}" returned warnings`, 'warning');
             }
         } catch (err: any) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'SshGitmapSection.handleTestNode',
+                triggerAction: 'test_ssh_node',
+            });
             showToast(`SSH test failed for "${nodeAlias}": ${err?.message || err}`, 'error');
         } finally {
             setTestingNodeAlias(null);
@@ -227,6 +261,10 @@ export function SshGitmapSection() {
             showToast(`Removed SSH node "${nodeAlias}"`, 'info');
             await loadAllSshData();
         } catch (err: any) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'SshGitmapSection.handleDeleteNode',
+                triggerAction: 'delete_ssh_node',
+            });
             showToast(`Failed to delete SSH node "${nodeAlias}": ${err?.message || err}`, 'error');
         } finally {
             setDeletingNodeAlias(null);
@@ -261,6 +299,10 @@ export function SshGitmapSection() {
                 showToast(`Prompt dispatch to ${machine}:${instance} reported stderr`, 'warning');
             }
         } catch (err: any) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'SshGitmapSection.handleDispatchRemotePrompt',
+                triggerAction: 'dispatch_remote_prompt',
+            });
             showToast(`Failed to send prompt to ${machine}:${instance}: ${err?.message || err}`, 'error');
         } finally {
             setIsSendingPrompt(false);
@@ -278,6 +320,10 @@ export function SshGitmapSection() {
             await sshService.triggerDownloadAndCopy(csv, 'agm-cluster-balances.csv', 'csv');
             showToast('Cluster instances & balances CSV downloaded and copied to clipboard', 'success');
         } catch (err: any) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'SshGitmapSection.handleExportClusterCsv',
+                triggerAction: 'export_cluster_csv',
+            });
             showToast(`Failed to export CSV: ${err?.message || err}`, 'error');
         } finally {
             setIsExportingCsv(false);
@@ -310,48 +356,46 @@ export function SshGitmapSection() {
                 </div>
 
                 {/* Contiguous Segmented Pill Capsule for Fleet Toolbar Actions */}
-                <div className="inline-flex flex-wrap items-center rounded-full border border-gray-200 dark:border-slate-700 bg-gray-50/90 dark:bg-slate-800/90 p-0.5 shadow-xs self-start lg:self-auto">
+                <div className="inline-flex items-center rounded-full bg-slate-900/90 dark:bg-slate-900/90 border border-slate-700/80 p-0.5 shadow-sm divide-x divide-slate-700/60 backdrop-blur-sm self-start lg:self-auto">
                     <button
                         type="button"
                         onClick={handleImportFromGitmap}
                         disabled={isImportingGitmap}
-                        className="px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 rounded-l-full transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-l-full text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
                         title="Import SSH nodes from GitMap inventory and ~/.ssh/config"
                     >
                         {isImportingGitmap ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" />
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
                         ) : (
-                            <Download className="w-3.5 h-3.5 text-indigo-500" />
+                            <Download className="w-3.5 h-3.5 text-indigo-400" />
                         )}
                         <span>Import SSH from GitMap</span>
                     </button>
-                    <div className="h-4 w-px bg-gray-200 dark:bg-slate-700" />
                     <button
                         type="button"
                         onClick={handleDeployEncryptedFleet}
                         disabled={isDeployingFleet}
-                        className="px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
                         title="Deploy RSA-2048 encrypted SSH credentials bundle to authorized fleet machines"
                     >
                         {isDeployingFleet ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-500" />
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
                         ) : (
-                            <UploadCloud className="w-3.5 h-3.5 text-emerald-500" />
+                            <UploadCloud className="w-3.5 h-3.5 text-emerald-400" />
                         )}
                         <span>Deploy Encrypted Credentials to Fleet</span>
                     </button>
-                    <div className="h-4 w-px bg-gray-200 dark:bg-slate-700" />
                     <button
                         type="button"
                         onClick={handleRefreshClusterBalances}
                         disabled={isLoadingBalances}
-                        className="px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 rounded-r-full transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-r-full text-xs font-medium text-sky-400 hover:text-sky-300 hover:bg-slate-800/80 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
                         title="Poll local and SSH nodes for active instances and 4h/weekly account balances"
                     >
                         {isLoadingBalances ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-500" />
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-400" />
                         ) : (
-                            <RefreshCw className="w-3.5 h-3.5 text-sky-500" />
+                            <RefreshCw className="w-3.5 h-3.5 text-sky-400" />
                         )}
                         <span>Check Cluster Balances</span>
                     </button>
@@ -367,23 +411,40 @@ export function SshGitmapSection() {
                 }`}
             >
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                         <div className="flex flex-wrap items-center gap-2">
                             {status?.gitmap_installed ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-200">
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                                    GitMap Installed ({status.gitmap_version || 'Active'})
+                                <span
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 dark:text-emerald-300 border border-emerald-500/30"
+                                    title={`GitMap Binary: ${status.gitmap_path || 'gitmap'}`}
+                                >
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                    GitMap Installed ({status.gitmap_version || 'v6.x'})
                                 </span>
                             ) : (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200">
-                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                                    GitMap Not Detected — Recommended for Multi-Machine Control
+                                <span
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-400 dark:text-amber-300 border border-amber-500/30"
+                                    title="GitMap CLI not found on PATH or default local locations"
+                                >
+                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                                    GitMap Not Detected
                                 </span>
                             )}
 
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                                <KeyRound className="w-3 h-3 text-indigo-500" />
-                                {status?.rsa_key_fingerprint || 'RSA-2048 Vault Key Ready'}
+                            <span
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-500/15 text-purple-400 dark:text-purple-300 border border-purple-500/30"
+                                title={status?.rsa_key_fingerprint ? `RSA Fingerprint: ${status.rsa_key_fingerprint}` : 'RSA-2048 Vault Key Active'}
+                            >
+                                <KeyRound className="w-3.5 h-3.5 text-purple-400" />
+                                RSA-2048 Vault Key Active
+                            </span>
+
+                            <span
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-700/50 text-slate-300 border border-slate-600/50"
+                                title={`Managed SSH Config: ${status?.ssh_config_path || '~/.ssh/config'}`}
+                            >
+                                <Server className="w-3.5 h-3.5 text-slate-400" />
+                                {nodes.length} Nodes Configured
                             </span>
 
                             {isLoadingStatus && (
@@ -391,39 +452,44 @@ export function SshGitmapSection() {
                             )}
                         </div>
 
-                        <p className="text-xs text-gray-600 dark:text-slate-300">
-                            {status?.gitmap_installed
-                                ? `GitMap binary path: ${status.gitmap_path || 'gitmap'} • Managed SSH Config: ${status.ssh_config_path || '~/.ssh/config'} • Nodes: ${nodes.length}`
-                                : 'Install GitMap via CLI or launch an automated PowerShell installer window to synchronize multi-machine SSH nodes, workspaces, and account quotas.'}
-                        </p>
+                        <details className="text-[11px] text-gray-500 dark:text-slate-400 cursor-pointer group">
+                            <summary className="hover:text-gray-700 dark:hover:text-slate-300 transition-colors list-none flex items-center gap-1">
+                                <span className="underline decoration-dotted">Inspect paths &amp; environment</span>
+                                <span className="text-[9px] opacity-70 group-open:rotate-180 transition-transform">▼</span>
+                            </summary>
+                            <div className="mt-1 pl-2 text-[10px] font-mono text-gray-500 dark:text-slate-400 border-l border-slate-700 space-y-0.5">
+                                <div>Binary: {status?.gitmap_path || 'gitmap'}</div>
+                                <div>SSH Config: {status?.ssh_config_path || '~/.ssh/config'}</div>
+                                {status?.rsa_key_fingerprint && <div>Fingerprint: {status.rsa_key_fingerprint}</div>}
+                            </div>
+                        </details>
                     </div>
 
-                    <div className="inline-flex flex-wrap items-center rounded-full border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-0.5 shadow-xs self-start md:self-auto">
+                    <div className="inline-flex items-center rounded-full bg-slate-900/90 border border-slate-700/80 p-0.5 shadow-sm divide-x divide-slate-700/60 self-start md:self-auto">
                         <button
                             type="button"
-                            onClick={() => handleCopyChip('gitmap-install-cmd', installCmd)}
-                            className="px-3 py-1.5 text-xs font-mono text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-l-full transition-colors flex items-center gap-1.5 cursor-pointer"
-                            title="Copy GitMap CLI install command"
+                            onClick={() => handleCopyChip('gitmap-install-cmd', installCmd, 'GitMap install command')}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-l-full text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 active:scale-95 transition-all cursor-pointer"
+                            title={`Copy: ${installCmd}`}
                         >
                             {copiedKey === 'gitmap-install-cmd' ? (
-                                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
                             ) : (
-                                <Copy className="w-3.5 h-3.5 text-gray-400" />
+                                <Copy className="w-3.5 h-3.5 text-slate-400" />
                             )}
-                            <span>{copiedKey === 'gitmap-install-cmd' ? 'Copied!' : `Copy Install Command (${installCmd})`}</span>
+                            <span>{copiedKey === 'gitmap-install-cmd' ? 'Copied Command!' : 'Copy Install Command'}</span>
                         </button>
-                        <div className="h-4 w-px bg-gray-200 dark:bg-slate-700" />
                         <button
                             type="button"
                             onClick={handleInstallGitmapPowershell}
                             disabled={isInstallingGitmap}
-                            className="px-3.5 py-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-r-full transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-r-full text-xs font-semibold text-cyan-400 hover:text-cyan-300 hover:bg-slate-800/80 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                             title="Spawn PowerShell to install or update GitMap automatically"
                         >
                             {isInstallingGitmap ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" />
                             ) : (
-                                <Terminal className="w-3.5 h-3.5" />
+                                <Terminal className="w-3.5 h-3.5 text-cyan-400" />
                             )}
                             <span>Open PowerShell &amp; Install GitMap</span>
                         </button>
@@ -782,6 +848,28 @@ export function SshGitmapSection() {
                                 </tr>
                             ) : (
                                 clusterBalances.map((item, idx) => {
+                                    const conn = nodes.find(
+                                        (n) => n.alias.toLowerCase() === item.machine_alias.toLowerCase()
+                                    );
+                                    const ip =
+                                        item.ip_address ||
+                                        (item as any).machine_ip ||
+                                        conn?.ip_address ||
+                                        '';
+                                    const isOnline = Boolean(item.online || item.running);
+                                    const nodeError =
+                                        (item as any).error_message ||
+                                        item.error ||
+                                        'Connection timed out';
+
+                                    const rawEmail = item.bound_email || '';
+                                    const displayEmail = rawEmail
+                                        .replace(/\$\{adminUser\}/g, 'Administrator')
+                                        .replace(/\$\{linuxUser\}/g, 'root');
+
+                                    const rawBadge = item.tier || (!item.is_local ? 'SSH-NODE' : '');
+                                    const badgeText = rawBadge.toUpperCase();
+
                                     const q4h = item.quota_4h_pct;
                                     const qWeek = item.quota_weekly_pct;
                                     return (
@@ -793,17 +881,20 @@ export function SshGitmapSection() {
                                                 <div className="flex items-center gap-1.5">
                                                     <span
                                                         className={`w-2 h-2 rounded-full ${
-                                                            item.online
-                                                                ? 'bg-emerald-500'
-                                                                : 'bg-rose-500'
+                                                            isOnline
+                                                                ? 'bg-emerald-500 shadow-xs shadow-emerald-500/50'
+                                                                : 'bg-rose-500 shadow-xs shadow-rose-500/50'
                                                         }`}
+                                                        title={isOnline ? 'Node online & reachable' : nodeError}
                                                     />
                                                     <span className="font-semibold text-gray-900 dark:text-slate-100">
                                                         {item.machine_alias}
                                                     </span>
-                                                    <span className="text-[10px] text-gray-400">
-                                                        ({item.ip_address})
-                                                    </span>
+                                                    {ip ? (
+                                                        <span className="text-[10px] text-gray-400">
+                                                            ({ip})
+                                                        </span>
+                                                    ) : null}
                                                 </div>
                                             </td>
                                             <td className="py-2 px-3 font-mono">
@@ -812,23 +903,38 @@ export function SshGitmapSection() {
                                                         {item.instance_name}
                                                     </span>
                                                     {item.running ? (
-                                                        <span className="px-1.5 py-0.2 rounded text-[10px] bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                                                             PID {item.pid ?? 'Active'}
                                                         </span>
+                                                    ) : isOnline ? (
+                                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50/80 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
+                                                            Reachable
+                                                        </span>
                                                     ) : (
-                                                        <span className="px-1.5 py-0.2 rounded text-[10px] bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400">
-                                                            Idle
+                                                        <span
+                                                            title={nodeError}
+                                                            className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/80 cursor-help"
+                                                        >
+                                                            Offline
                                                         </span>
                                                     )}
                                                 </div>
                                             </td>
                                             <td className="py-2 px-3 font-mono text-gray-700 dark:text-slate-300">
-                                                {item.bound_email ? (
+                                                {displayEmail ? (
                                                     <div className="flex items-center gap-1.5">
-                                                        <span>{item.bound_email}</span>
-                                                        {item.tier && (
-                                                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
-                                                                {item.tier}
+                                                        <span>{displayEmail}</span>
+                                                        {badgeText && (
+                                                            <span
+                                                                className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${
+                                                                    badgeText === 'SSH-NODE'
+                                                                        ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
+                                                                        : badgeText === 'VAULT'
+                                                                          ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                                                                          : 'bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800'
+                                                                }`}
+                                                            >
+                                                                {badgeText}
                                                             </span>
                                                         )}
                                                     </div>
@@ -930,7 +1036,7 @@ export function SshGitmapSection() {
                             <option value="local">local (This Machine)</option>
                             {nodes.map((n) => (
                                 <option key={n.alias} value={n.alias}>
-                                    {n.alias} ({n.ip_address})
+                                    {n.alias}{n.ip_address ? ` (${n.ip_address})` : ''}
                                 </option>
                             ))}
                         </select>

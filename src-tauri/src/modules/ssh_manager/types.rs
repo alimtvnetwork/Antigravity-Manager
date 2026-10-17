@@ -206,6 +206,12 @@ pub struct SaveSshNodeRsaPayload {
 pub struct ClusterInstanceBalanceItem {
     pub machine_alias: String,
     pub machine_ip: String,
+    #[serde(default, alias = "ip_address")]
+    pub ip_address: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latency_ms: Option<u64>,
     pub is_local: bool,
     pub instance_id: String,
     pub instance_name: String,

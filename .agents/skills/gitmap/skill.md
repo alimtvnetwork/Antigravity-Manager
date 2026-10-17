@@ -152,6 +152,7 @@ All AI agents operating within GitMap-managed repositories MUST strictly adhere 
 - `gitmap agent diagnose` — Performs deep autopsy and diagnostic reporting on agent task runs.
 - `gitmap agent crashed` — Detects crashed or abandoned agent tasks.
 - `gitmap agent temp-clear` — Safely deletes ephemeral `.ai-memory/temp-agents/` directory.
+- **Multi-Agent Orchestration Capacity (A = 3, H = 2):** Native support for `A = 3` concurrent autonomous subagents, each handling `H = 2` operational hands, delivering `A × H = 6` concurrent subtask operations across disjoint file boxes with zero collisions.
 
 ### 11. Fleet Telemetry & Running-Only Delegation
 - `gitmap nodes-running-only` (alias `gitmap nro`) — Lists strictly online/open nodes (`is_online: true`), filtering out offline noise.

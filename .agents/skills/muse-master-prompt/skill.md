@@ -11,11 +11,11 @@ Canonical Execution Engine: [`01-prompts/14-execute/02-execute-parent-task-with-
 
 ```text
 N = 300 (Total self-loop steps budget — editable top-header parameter, default: 300)
-A = 2   (MANDATORY number of spawned autonomous subagents running concurrently via invoke_subagent, default: 2)
+A = 3   (MANDATORY number of spawned autonomous subagents running concurrently via invoke_subagent, default: 3)
 H = 2   (Operational hands per agent: dual-task batch capacity & parallel tool dispatch, default: 2)
 C = 30  (Tool calls per worker before it must report, default: 30)
 
-System Concurrency Capacity = A × H = 2 agents × 2 hands = 4 concurrent subtask operations
+System Concurrency Capacity = A × H = 3 agents × 2 hands = 6 concurrent subtask operations
 PHASE_1_BUDGET = N / 2   (Steps 1 .. 150: Planning, Parallel Discovery Subagents, Detailed Spec, and Lean Subtask Generation)
 PHASE_2_BUDGET = N / 2   (Steps 151 .. 300: Mandatory Parallel Subagent Execution, Self-Looping, Targeted Quality Linting)
 WAVES = ceil(subtasks / (A x H))
@@ -25,19 +25,19 @@ WAVES = ceil(subtasks / (A x H))
 > **Top-Instruction Priority Mandate (Above Precedence / Preamble Precedence):**
 > Whatever directives, constraints, checklists, or user instructions are given ABOVE this prompt/skill (in the user preamble or header blocks) are HIGHEST PRIORITY and strictly NON-NEGOTIABLE. Inspect and follow the instructions above with absolute precedence.
 
-[/goal](slashCommand;goal) Autonomously boot the session through Phases 0–5 without permission-seeking, FIRST showcase the confirmed task breakdown in visible chat during Turn 1, capture requests verbatim, spawn autonomous subagents via `invoke_subagent` (A = 2, H = 2; solo execution of multi-part work is an auto-reject failure) in disjoint file boxes using GitMap high-speed commands as primary, prove every single claim with concrete evidence, enforce coding guidelines to 100%, and finish each task with one atomic GitMap commit (`gitmap cpf "<module> - <summary>"` / `gitmap cpb "<module> - <summary>"`) using hyphen format pushed immediately.
+[/goal](slashCommand;goal) Autonomously boot the session through Phases 0–5 without permission-seeking, FIRST showcase the confirmed task breakdown in visible chat during Turn 1, capture requests verbatim, spawn autonomous subagents via `invoke_subagent` (A = 3, H = 2; solo execution of multi-part work is an auto-reject failure) in disjoint file boxes using GitMap high-speed commands as primary, prove every single claim with concrete evidence, enforce coding guidelines to 100%, and finish each task with one atomic GitMap commit (`gitmap cpf "<module> - <summary>"` / `gitmap cpb "<module> - <summary>"`) using hyphen format pushed immediately.
 
 [/learn](slashCommand;learn) Enforce the Top-Instruction Priority Mandate: whatever directives are provided ABOVE this prompt outrank everything below. Turn 1 of any task MUST showcase the given task list in visible chat before any background execution. Operating contract lives in memory; active tasks live in SQLite task manager and ledger.
 
 [/plan](slashCommand;plan) Execute thorough step-by-step planning before execution. Ensure all deliverables, architecture boundaries, and requirements are clearly defined in the audit ledger and subtask plans before dispatching worker waves.
 
-### 🚨 MANDATORY SUBAGENT SPAWNING GATE (A = 2, H = 2 — ZERO SOLO EXECUTION ALLOWED)
+### 🚨 MANDATORY SUBAGENT SPAWNING GATE (A = 3, H = 2 — ZERO SOLO EXECUTION ALLOWED)
 
 - **ACTUAL TOOL CALL REQUIRED:** You must ACTUALLY CALL the `invoke_subagent` tool via your tool-calling API. Do NOT just print the text "Dispatched Worker..." and stop. If you only print text, the agents will not spawn and the task will fail! You must execute the `invoke_subagent` JSON tool payload.
-- **3-STAGE MANDATORY DISPATCH:** You must invoke `A = 2` agents (`invoke_subagent`) at every stage of multi-part work:
-  1. **Planning Step (A = 2 `research` subagents):** Spawn 2 read-only discovery subagents (`TypeName: "research"`) to research the codebase and return findings; lead writes the unified plan.
-  2. **Spec Step (A = 2 `self` subagents or lead):** Spawn 2 subagents (`TypeName: "self"`) to author modular, disjoint spec files and subtasks.
-  3. **Execution Step (A = 2 `self` worker subagents):** Spawn 2 worker subagents (`TypeName: "self"`) to execute code modifications in strictly disjoint file boxes.
+- **3-STAGE MANDATORY DISPATCH:** You must invoke `A = 3` agents (`invoke_subagent`) at every stage of multi-part work:
+  1. **Planning Step (A = 3 `research` subagents):** Spawn 3 read-only discovery subagents (`TypeName: "research"`) to research the codebase and return findings; lead writes the unified plan.
+  2. **Spec Step (A = 3 `self` subagents or lead):** Spawn 3 subagents (`TypeName: "self"`) to author modular, disjoint spec files and subtasks.
+  3. **Execution Step (A = 3 `self` worker subagents):** Spawn 3 worker subagents (`TypeName: "self"`) to execute code modifications in strictly disjoint file boxes.
 - **SOLO EXECUTION IS AN AUTO-REJECT FAILURE:** The lead orchestrator is **STRICTLY FORBIDDEN** from executing planning, spec writing, or code changes solo for multi-part tasks without calling the `invoke_subagent` tool.
 
 ---

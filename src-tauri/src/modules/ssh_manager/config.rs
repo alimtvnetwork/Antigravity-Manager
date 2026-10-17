@@ -114,16 +114,14 @@ pub(crate) fn build_managed_ssh_config_block() -> String {
         } else {
             default_key.clone()
         };
-        let user = if c.username.trim().is_empty() {
-            "root"
-        } else {
-            c.username.trim()
-        };
+        let resolved_user = resolve_username_placeholders(&c.username, &c.os);
+        let port = if c.port == 0 { 22 } else { c.port };
         b.push_str(&format!(
-            "Host {}\n    HostName {}\n    User {}\n    Port 22\n",
+            "Host {}\n    HostName {}\n    User {}\n    Port {}\n",
             c.alias.trim(),
             c.ip_address.trim(),
-            user
+            resolved_user,
+            port
         ));
         if !key_file.is_empty() {
             b.push_str(&format!("    IdentityFile {}\n", key_file));

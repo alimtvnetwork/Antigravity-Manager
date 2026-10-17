@@ -7,18 +7,39 @@ use std::time::{Duration, Instant};
 
 use super::*;
 
-/// Check TCP port 22 liveness for a host/IP
+/// Check TCP port liveness for a host/IP with 1500ms minimum timeout and 2-stage retry ladder
 pub fn check_tcp_liveness(host: &str, port: u16, timeout_ms: u64) -> bool {
-    let addr_str = format!("{}:{}", host.trim(), port);
-    if let Ok(mut addrs) = addr_str.to_socket_addrs() {
-        if let Some(sock_addr) = addrs.next() {
-            return TcpStream::connect_timeout(&sock_addr, Duration::from_millis(timeout_ms))
-                .is_ok();
+    let effective_timeout = if timeout_ms == 0 {
+        1500
+    } else {
+        timeout_ms.max(1500)
+    };
+    let duration = Duration::from_millis(effective_timeout);
+
+    for attempt in 0..2 {
+        if attempt > 0 {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+
+        let addr_str = format!("{}:{}", host.trim(), port);
+        let mut connected = false;
+
+        if let Ok(mut addrs) = addr_str.to_socket_addrs() {
+            if let Some(sock_addr) = addrs.next() {
+                connected = TcpStream::connect_timeout(&sock_addr, duration).is_ok();
+            }
+        }
+        if !connected {
+            if let Ok(sock_addr) = addr_str.parse::<SocketAddr>() {
+                connected = TcpStream::connect_timeout(&sock_addr, duration).is_ok();
+            }
+        }
+
+        if connected {
+            return true;
         }
     }
-    if let Ok(sock_addr) = addr_str.parse::<SocketAddr>() {
-        return TcpStream::connect_timeout(&sock_addr, Duration::from_millis(timeout_ms)).is_ok();
-    }
+
     false
 }
 
@@ -426,6 +447,9 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
         items.push(ClusterInstanceBalanceItem {
             machine_alias: local_machine.clone(),
             machine_ip: local_ip.clone(),
+            ip_address: Some(local_ip.clone()),
+            error_message: None,
+            latency_ms: Some(0),
             is_local: true,
             instance_id: "default".to_string(),
             instance_name: "default".to_string(),
@@ -478,6 +502,9 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
             items.push(ClusterInstanceBalanceItem {
                 machine_alias: local_machine.clone(),
                 machine_ip: local_ip.clone(),
+                ip_address: Some(local_ip.clone()),
+                error_message: None,
+                latency_ms: Some(0),
                 is_local: true,
                 instance_id: inst.id.clone(),
                 instance_name: inst.name.clone(),
@@ -503,24 +530,39 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
             continue;
         }
         let port = if conn.port == 0 { 22 } else { conn.port };
-        let reachable = check_tcp_liveness(&conn.ip_address, port, 600);
+        let start = Instant::now();
+        let reachable = check_tcp_liveness(&conn.ip_address, port, 1500);
+        let elapsed_ms = start.elapsed().as_millis() as u64;
+        let resolved_user = resolve_username_placeholders(&conn.username, &conn.os);
+
+        let (status_label, error_message) = if reachable {
+            ("reachable".to_string(), None)
+        } else {
+            (
+                "offline".to_string(),
+                Some(format!(
+                    "TCP port {} unreachable on {} (timeout 1500ms)",
+                    port, conn.ip_address
+                )),
+            )
+        };
+
         items.push(ClusterInstanceBalanceItem {
             machine_alias: conn.alias.clone(),
             machine_ip: conn.ip_address.clone(),
+            ip_address: Some(conn.ip_address.clone()),
+            error_message,
+            latency_ms: Some(elapsed_ms),
             is_local: false,
             instance_id: "default".to_string(),
             instance_name: format!("{}:default", conn.alias),
             running: reachable,
-            bound_email: format!("{}@{}", conn.username, conn.alias),
+            bound_email: format!("{}@{}", resolved_user, conn.alias),
             tier: "SSH-NODE".to_string(),
             quota_4h_pct: 100.0,
             quota_weekly_pct: 100.0,
             active_model: target_model.clone(),
-            status_label: if reachable {
-                "reachable".to_string()
-            } else {
-                "offline".to_string()
-            },
+            status_label,
         });
     }
 

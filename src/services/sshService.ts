@@ -39,6 +39,7 @@ export interface SaveSshNodeRsaPayload {
 export interface ClusterInstanceBalanceItem {
     machine_alias: string;
     ip_address: string;
+    machine_ip?: string;
     is_local: boolean;
     online: boolean;
     instance_id: string;
@@ -51,6 +52,8 @@ export interface ClusterInstanceBalanceItem {
     quota_weekly_pct: number | null;
     last_updated: string;
     error?: string | null;
+    error_message?: string | null;
+    latency_ms?: number | null;
 }
 
 export interface RemotePromptDispatchPayload {
@@ -288,7 +291,19 @@ export const sshService = {
         try {
             const items = await invoke<ClusterInstanceBalanceItem[]>('get_cluster_instances_and_balances');
             if (Array.isArray(items)) {
-                return items;
+                return items.map((raw) => {
+                    const item = { ...raw };
+                    item.ip_address = item.ip_address || (item as any).machine_ip || '';
+                    if (item.online === undefined) {
+                        item.online = Boolean(item.running);
+                    }
+                    if (item.bound_email && typeof item.bound_email === 'string') {
+                        item.bound_email = item.bound_email
+                            .replace(/\$\{adminUser\}/g, 'Administrator')
+                            .replace(/\$\{linuxUser\}/g, 'root');
+                    }
+                    return item;
+                });
             }
             return [];
         } catch (primaryError) {
@@ -320,7 +335,12 @@ export const sshService = {
                 const nowIso = new Date().toISOString();
                 return instances.map((inst): ClusterInstanceBalanceItem => {
                     const cfg = inst?.config || inst || {};
-                    const boundEmail = cfg.bound_email || null;
+                    let boundEmail = cfg.bound_email || null;
+                    if (boundEmail && typeof boundEmail === 'string') {
+                        boundEmail = boundEmail
+                            .replace(/\$\{adminUser\}/g, 'Administrator')
+                            .replace(/\$\{linuxUser\}/g, 'root');
+                    }
                     const boundAcc =
                         (cfg.bound_account_id && accountById.get(String(cfg.bound_account_id))) ||
                         (boundEmail && accountByEmail.get(String(boundEmail).toLowerCase())) ||
@@ -337,6 +357,7 @@ export const sshService = {
                     return {
                         machine_alias: 'local',
                         ip_address: '127.0.0.1',
+                        machine_ip: '127.0.0.1',
                         is_local: true,
                         online: true,
                         instance_id: String(cfg.id || 'default'),
@@ -349,6 +370,8 @@ export const sshService = {
                         quota_weekly_pct: pctWeekly,
                         last_updated: nowIso,
                         error: null,
+                        error_message: null,
+                        latency_ms: 0,
                     };
                 });
             } catch (fallbackError) {

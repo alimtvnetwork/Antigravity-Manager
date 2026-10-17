@@ -40,6 +40,28 @@ pub fn load_ssh_connections() -> Result<Vec<SshConnectionRecord>, String> {
     Ok(Vec::new())
 }
 
+/// Resolve username placeholders (`${adminUser}`, `${linuxUser}`) and apply OS-appropriate defaults
+pub fn resolve_username_placeholders(raw: &str, os: &str) -> String {
+    let trimmed = raw.trim();
+    let is_windows = os.trim().to_ascii_lowercase().contains("win");
+    let default_user = if is_windows { "Administrator" } else { "root" };
+
+    if trimmed.is_empty() {
+        return default_user.to_string();
+    }
+
+    let resolved = trimmed
+        .replace("${adminUser}", "Administrator")
+        .replace("${linuxUser}", "root");
+
+    let clean = resolved.trim();
+    if clean.is_empty() {
+        default_user.to_string()
+    } else {
+        clean.to_string()
+    }
+}
+
 /// Normalize a list of SSH connections so that any non-empty password is encrypted with `encrypt_password_rsa` (`ag_rsa_v1_`)
 pub fn ensure_connections_rsa_encrypted(conns: &[SshConnectionRecord]) -> Vec<SshConnectionRecord> {
     conns
@@ -84,7 +106,10 @@ pub fn save_ssh_connections(
 
 /// Build a GitMap-compatible SshNodesExportEnvelope from connections
 pub fn build_envelope_from_connections(conns: &[SshConnectionRecord]) -> SshNodesExportEnvelope {
-    let safe_conns = ensure_connections_rsa_encrypted(conns);
+    let mut safe_conns = ensure_connections_rsa_encrypted(conns);
+    for c in &mut safe_conns {
+        c.username = resolve_username_placeholders(&c.username, &c.os);
+    }
     let nodes: Vec<SshNodeExportItem> = safe_conns
         .iter()
         .enumerate()
@@ -100,11 +125,7 @@ pub fn build_envelope_from_connections(conns: &[SshConnectionRecord]) -> SshNode
                 numeric_id: idx + 1,
                 alias: c.alias.clone(),
                 ip_address: c.ip_address.clone(),
-                username: if c.username.is_empty() {
-                    "root".to_string()
-                } else {
-                    c.username.clone()
-                },
+                username: resolve_username_placeholders(&c.username, &c.os),
                 port: if c.port == 0 { 22 } else { c.port },
                 os: if c.os.is_empty() {
                     "linux".to_string()
@@ -209,11 +230,7 @@ pub(crate) fn nodes_to_connections(nodes: &[SshNodeExportItem]) -> Vec<SshConnec
         .map(|n| SshConnectionRecord {
             alias: n.alias.clone(),
             ip_address: n.ip_address.clone(),
-            username: if n.username.is_empty() {
-                "root".to_string()
-            } else {
-                n.username.clone()
-            },
+            username: resolve_username_placeholders(&n.username, &n.os),
             port: if n.port == 0 { 22 } else { n.port },
             encrypted_password: n.encrypted_password.clone(),
             encryption_algo: "RSA-2048".to_string(),
@@ -247,16 +264,15 @@ pub fn sync_ssh_connections_locally(
     for inc in &ensure_connections_rsa_encrypted(incoming_list) {
         let mut normalized_inc = inc.clone();
         normalized_inc.key_path = resolve_usable_key_path(&normalized_inc.key_path);
-        if normalized_inc.username.is_empty() {
-            normalized_inc.username = "root".to_string();
+        if normalized_inc.os.is_empty() {
+            normalized_inc.os = "linux".to_string();
         }
+        normalized_inc.username =
+            resolve_username_placeholders(&normalized_inc.username, &normalized_inc.os);
         if normalized_inc.port == 0 {
             normalized_inc.port = 22;
         }
         normalized_inc.encryption_algo = "RSA-2048".to_string();
-        if normalized_inc.os.is_empty() {
-            normalized_inc.os = "linux".to_string();
-        }
 
         let pos = existing.iter().position(|e| {
             (!normalized_inc.alias.is_empty()
