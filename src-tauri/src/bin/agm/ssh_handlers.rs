@@ -327,9 +327,8 @@ pub(crate) fn handle_ssh_keys(args: &[String]) {
             v.extend(args.get(1..).unwrap_or(&[]).iter().cloned());
             v
         }
-        "config" => vec!["config".to_string()],
         "export" | "export-json" | "export-bundle" | "import" | "import-json" | "import-bundle"
-        | "authorize" | "auth" | "install" | "deploy" | "distribute" => Vec::new(),
+        | "authorize" | "auth" | "install" | "deploy" | "distribute" | "config" => Vec::new(),
         _ => vec!["list".to_string()],
     };
 

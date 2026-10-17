@@ -15,15 +15,21 @@ export interface SshGitmapStatus {
 }
 
 export interface SshNodeRecord {
+    id?: string;
     alias: string;
     ip_address: string;
+    host?: string;
     port: number;
     username: string;
     os: string;
     auth_method: string;
-    key_path: string;
+    key_path: string | null;
     has_encrypted_password: boolean;
+    has_password?: boolean;
     encrypted_password_preview?: string;
+    encryption_algo?: string;
+    source?: string;
+    last_status?: string;
 }
 
 export interface SaveSshNodeRsaPayload {
@@ -206,7 +212,17 @@ export const sshService = {
     async listSshNodes(): Promise<SshNodeRecord[]> {
         try {
             const nodes = await invoke<SshNodeRecord[]>('list_ssh_nodes');
-            return Array.isArray(nodes) ? nodes : [];
+            return Array.isArray(nodes)
+                ? nodes.map((n) => ({
+                      ...n,
+                      ip_address: n.ip_address || (n as any).host || '',
+                      host: (n as any).host || n.ip_address || '',
+                      has_encrypted_password:
+                          n.has_encrypted_password !== undefined
+                              ? Boolean(n.has_encrypted_password)
+                              : Boolean((n as any).has_password),
+                  }))
+                : [];
         } catch (error) {
             useErrorStore.getState().trackWarning(error, {
                 source: 'sshService.listSshNodes',
@@ -410,7 +426,7 @@ export const sshService = {
                 stderr?: string;
                 duration_ms?: number | string;
                 success?: boolean;
-            }>('test_ssh_node_connection', { idOrAlias: alias });
+            }>('test_ssh_node_connection', { idOrAlias: alias, id_or_alias: alias });
             const duration = Number(result?.duration_ms ?? 0);
             return {
                 node_alias: result?.alias || alias,

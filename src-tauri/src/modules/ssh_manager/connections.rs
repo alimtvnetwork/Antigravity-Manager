@@ -355,12 +355,23 @@ pub fn to_ssh_node_record(conn: &SshConnectionRecord) -> SshNodeRecord {
     } else {
         "agent".to_string()
     };
+    let preview = if has_pw {
+        Some(if conn.encrypted_password.len() > 14 {
+            format!("{}***", &conn.encrypted_password[..11])
+        } else {
+            "ag_rsa_v1_***".to_string()
+        })
+    } else {
+        None
+    };
+    let resolved_user = resolve_username_placeholders(&conn.username, &conn.os);
     SshNodeRecord {
         id: conn.alias.to_lowercase(),
         alias: conn.alias.clone(),
         host: conn.ip_address.clone(),
+        ip_address: conn.ip_address.clone(),
         port: if conn.port == 0 { 22 } else { conn.port },
-        username: conn.username.clone(),
+        username: resolved_user,
         auth_method,
         key_path: if conn.key_path.trim().is_empty() {
             None
@@ -373,6 +384,8 @@ pub fn to_ssh_node_record(conn: &SshConnectionRecord) -> SshNodeRecord {
             None
         },
         has_password: has_pw,
+        has_encrypted_password: has_pw,
+        encrypted_password_preview: preview,
         encryption_algo: if conn.encryption_algo.trim().is_empty() {
             "RSA-2048".to_string()
         } else {

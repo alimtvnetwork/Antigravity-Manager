@@ -145,6 +145,21 @@ pub(crate) fn replace_managed_block(content: &str, block: &str) -> String {
             return format!("{}{}{}", before, block, after);
         }
     }
+
+    const GITMAP_CONFIG_MARKER_START: &str = "# --- gitmap managed (do not edit) ---";
+    const GITMAP_CONFIG_MARKER_END: &str = "# --- end gitmap managed ---";
+    if let (Some(start), Some(end)) = (
+        content.find(GITMAP_CONFIG_MARKER_START),
+        content.find(GITMAP_CONFIG_MARKER_END),
+    ) {
+        if end >= start {
+            let end_idx = end + GITMAP_CONFIG_MARKER_END.len();
+            let before = &content[..start];
+            let after = &content[end_idx..];
+            return format!("{}{}{}", before, block, after);
+        }
+    }
+
     if content.trim().is_empty() {
         format!("{}\n", block)
     } else {

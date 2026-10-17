@@ -22,6 +22,8 @@ pub async fn install_gitmap_powershell(open_window: Option<bool>) -> Result<Stri
 #[tauri::command]
 pub async fn list_ssh_nodes() -> Result<Vec<SshNodeRecord>, String> {
     tokio::task::spawn_blocking(|| {
+        // Justification: best-effort sync of ~/.ssh/config on node listing; failure is recorded, in-memory nodes remain authoritative
+        crate::error::record_ignored(ssh_manager::update_ssh_config(false), "update_ssh_config");
         let conns = ssh_manager::load_ssh_connections()?;
         Ok(conns.iter().map(ssh_manager::to_ssh_node_record).collect())
     })
@@ -46,12 +48,13 @@ pub async fn delete_ssh_node(id_or_alias: String) -> Result<bool, String> {
 #[tauri::command]
 pub async fn test_ssh_node_connection(id_or_alias: String) -> Result<SshExecNodeResult, String> {
     tokio::task::spawn_blocking(move || {
+        let clean = id_or_alias.trim();
         let cmd = vec!["echo AGM_SSH_OK".to_string()];
-        let results = ssh_manager::exec_ssh_command(&id_or_alias, &cmd, None, None, None)?;
+        let results = ssh_manager::exec_ssh_command(clean, &cmd, None, None, None)?;
         results
             .into_iter()
             .next()
-            .ok_or_else(|| format!("No SSH node matched '{}'", id_or_alias))
+            .ok_or_else(|| format!("No SSH node matched '{}'", clean))
     })
     .await
     .map_err(|e| format!("Task join error: {}", e))?

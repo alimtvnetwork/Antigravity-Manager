@@ -242,7 +242,8 @@ export function SshGitmapSection() {
             if (res.success) {
                 showToast(`SSH connection to "${nodeAlias}" verified (${res.duration_ms}ms)`, 'success');
             } else {
-                showToast(`SSH test on "${nodeAlias}" returned warnings`, 'warning');
+                const reason = res.stderr?.trim() || res.stdout?.trim() || 'Connection failed or node unreachable';
+                showToast(`SSH test on "${nodeAlias}" failed: ${reason}`, 'error');
             }
         } catch (err: any) {
             useErrorStore.getState().trackWarning(err, {
@@ -703,7 +704,7 @@ export function SshGitmapSection() {
                                             {node.alias}
                                         </td>
                                         <td className="py-2 px-3 font-mono text-gray-600 dark:text-slate-300">
-                                            {node.ip_address}:{node.port || 22}
+                                            {(node.ip_address || (node as any).host || 'unknown')}:{node.port || 22}
                                         </td>
                                         <td className="py-2 px-3 font-mono text-gray-600 dark:text-slate-300">
                                             {node.username}
@@ -712,7 +713,7 @@ export function SshGitmapSection() {
                                             {node.os || 'linux'}
                                         </td>
                                         <td className="py-2 px-3">
-                                            {node.has_encrypted_password ? (
+                                            {(node.has_encrypted_password || (node as any).has_password) ? (
                                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                                                     <Lock className="w-2.5 h-2.5" />
                                                     RSA-2048 Encrypted ({node.encrypted_password_preview || 'ag_rsa_v1_***'})

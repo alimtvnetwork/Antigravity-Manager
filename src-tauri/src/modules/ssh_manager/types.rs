@@ -169,13 +169,21 @@ pub struct SshGitmapStatus {
 pub struct SshNodeRecord {
     pub id: String,
     pub alias: String,
+    #[serde(default)]
     pub host: String,
+    #[serde(default)]
+    pub ip_address: String,
     pub port: u16,
     pub username: String,
     pub auth_method: String,
     pub key_path: Option<String>,
     pub encrypted_password: Option<String>,
+    #[serde(default)]
     pub has_password: bool,
+    #[serde(default)]
+    pub has_encrypted_password: bool,
+    #[serde(default)]
+    pub encrypted_password_preview: Option<String>,
     pub encryption_algo: String,
     pub os: String,
     pub source: String,
@@ -193,7 +201,7 @@ pub struct SaveSshNodeRsaPayload {
     #[serde(default = "default_ssh_port")]
     pub port: u16,
     pub username: String,
-    #[serde(default)]
+    #[serde(default, alias = "plaintext_password", alias = "password")]
     pub raw_password: Option<String>,
     #[serde(default)]
     pub key_path: Option<String>,

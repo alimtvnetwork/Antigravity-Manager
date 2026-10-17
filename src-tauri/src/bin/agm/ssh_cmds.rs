@@ -135,6 +135,35 @@ pub(crate) fn handle_ssh_nodes(args: &[String]) {
     }
 }
 
+pub(crate) fn handle_ssh_test(args: &[String]) {
+    let target = args.first().map(|s| s.as_str()).unwrap_or("all");
+    println!("Testing SSH connectivity to '{}'...", target);
+    let cmd = vec!["echo AGM_SSH_OK".to_string()];
+    match ssh_manager::exec_ssh_command(target, &cmd, None, None, None) {
+        Ok(results) => {
+            println!("\n  STATUS   ALIAS  IP              PORT  DURATION  DETAILS");
+            println!("  --------------------------------------------------------------");
+            for r in results {
+                let status_str = if r.success { "ONLINE" } else { "OFFLINE" };
+                let dur = format!("{}ms", r.duration_ms);
+                let details = if r.success {
+                    "reachable (AGM_SSH_OK)".to_string()
+                } else if !r.stderr.is_empty() {
+                    r.stderr.trim().to_string()
+                } else {
+                    "unreachable or connection failed".to_string()
+                };
+                println!(
+                    "  {:<8} {:<6} {:<15} {:<5} {:<9} {}",
+                    status_str, r.alias, r.ip_address, r.port, dur, details
+                );
+            }
+            println!();
+        }
+        Err(e) => eprintln!("[ERROR] SSH test error: {}", e),
+    }
+}
+
 pub(crate) fn handle_ssh_exec(args: &[String]) {
     let mut gitmap_args = vec!["exec".to_string()];
     gitmap_args.extend(args.iter().cloned());
@@ -384,6 +413,11 @@ pub(crate) fn cmd_ssh(args: &[String]) {
         return;
     }
 
+    if first == "test" || first == "check" || first == "check-all" || first == "ping" {
+        handle_ssh_test(&args[1..]);
+        return;
+    }
+
     if first == "exec" || first == "se" {
         handle_ssh_exec(&args[1..]);
         return;
@@ -416,6 +450,11 @@ pub(crate) fn cmd_ssh(args: &[String]) {
 
     if first == "keys" || first == "key" {
         crate::ssh_handlers::handle_ssh_keys(&args[1..]);
+        return;
+    }
+
+    if first == "config" {
+        crate::ssh_handlers::handle_ssh_keys(&["config".to_string()]);
         return;
     }
 
