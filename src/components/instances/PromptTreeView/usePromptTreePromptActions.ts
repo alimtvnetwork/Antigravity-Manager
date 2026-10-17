@@ -381,7 +381,7 @@ export function usePromptTreePromptActions({
                 ? (conv.prompt_preview_200w || '')
                 : (editedPromptText.trim() || activePromptTextRef.current || activePromptText || conv?.prompt_preview_200w || '');
             const repoPath = proj?.repo_path || '';
-            const targetInstId = proj?.instance_id || instanceId || 'default';
+            const targetInstId = selectedConversation?.instance_id || conv?.instance_id || proj?.instance_id || instanceId || 'default';
             const targetConvId = conversationTargetMode === 'new'
                 ? (newConversationTitle?.trim() || undefined)
                 : conv?.conversation_id;
@@ -508,25 +508,44 @@ ${activePromptText}
     );
 
     const handleEnqueuePrompt = useCallback(async () => {
-        if (!selectedConversation) {
+        let conv = selectedConversationRef.current || selectedConversation;
+        let proj = selectedProjectRef.current || selectedProject;
+
+        // Fallback 1: If selectedConversation is null, find most recent non-empty conversation in selectedProject
+        if (!conv && proj && proj.conversations.length > 0) {
+            const candidates = proj.conversations.filter(
+                (c) => !isGhostConversation(c) && !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+            );
+            if (candidates.length > 0) {
+                const sorted = [...candidates].sort((a, b) => {
+                    const aTime = new Date(a.last_modified).getTime() || 0;
+                    const bTime = new Date(b.last_modified).getTime() || 0;
+                    return bTime - aTime;
+                });
+                conv = sorted[0];
+                selectConversation(conv, proj);
+            }
+        }
+
+        if (!conv) {
             // Visible no-op guard: previously a silent return that made the
             // Queue button appear dead with no feedback.
             useErrorStore.getState().trackWarning('Queue: no conversation selected', {
                 source: 'PromptTreeViewModal.handleEnqueuePrompt',
                 triggerAction: 'resolve_queue_target',
             });
-            setError('Queue failed: no conversation selected â€” select a prompt first.');
+            setError('Queue failed: no conversation selected — select a prompt first.');
             return;
         }
         try {
             setIsEnqueueing(true);
             setActionMsg('Enqueueing prompt into FIFO scheduler queue...');
-            let promptContent = editedPromptText.trim() || activePromptText || selectedConversation.prompt_preview_200w || '';
-            const repoPath = selectedProject?.repo_path || '';
-            const targetInstId = selectedProject?.instance_id || instanceId || 'default';
+            let promptContent = editedPromptText.trim() || activePromptTextRef.current || activePromptText || conv.prompt_preview_200w || '';
+            const repoPath = proj?.repo_path || selectedProject?.repo_path || '';
+            const targetInstId = selectedConversation?.instance_id || conv.instance_id || proj?.instance_id || instanceId || 'default';
             const targetConvId = conversationTargetMode === 'new'
                 ? (newConversationTitle?.trim() || undefined)
-                : selectedConversation.conversation_id;
+                : conv.conversation_id;
 
             if (confirmationSuffix && confirmationSuffix !== 'None (Send as is)' && confirmationSuffix !== 'none') {
                 const templateType = parseVerificationTypeFromSuffix(confirmationSuffix);
@@ -570,8 +589,10 @@ ${activePromptText}
             setIsEnqueueing(false);
         }
     }, [
-        selectedConversation, selectedProject, editedPromptText, activePromptText, confirmationSuffix,
-        conversationTargetMode, newConversationTitle, instanceId, setIsEnqueueing, setActionMsg, setError,
+        selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef,
+        editedPromptText, activePromptText, activePromptTextRef, confirmationSuffix,
+        conversationTargetMode, newConversationTitle, instanceId, selectConversation,
+        setIsEnqueueing, setActionMsg, setError,
     ]);
 
     const handleFocusIde = useCallback(async () => {
@@ -607,7 +628,7 @@ ${activePromptText}
         setActionMsg(`Resending ${count === 'all' ? 'all' : count} prompt(s)...`);
         const res = await dispatchMultiPromptResend({
             conversationId: conv.conversation_id,
-            instanceId: proj?.instance_id || instanceId || 'default',
+            instanceId: selectedConversation?.instance_id || conv.instance_id || proj?.instance_id || instanceId || 'default',
             repoPath: proj?.repo_path || '',
             count,
             prompts,
@@ -631,7 +652,7 @@ ${activePromptText}
         const prompts = extractConversationPromptsList(conv);
         setActionMsg(`Synthesizing ${count}-prompt verification audit & enqueueing...`);
         const ok = await handleVerifyLastPromptsAndEnqueue({
-            instanceId: proj?.instance_id || instanceId || 'default',
+            instanceId: selectedConversation?.instance_id || conv.instance_id || proj?.instance_id || instanceId || 'default',
             repoPath: proj?.repo_path || '',
             conversationId: conv.conversation_id,
             convTitle: conv.title || conv.short_id,
@@ -656,7 +677,7 @@ ${activePromptText}
         }
         setActionMsg('Cloning conversation and compacting memory handoff...');
         const newTitle = await handleCloneAndCompactConversation({
-            instanceId: proj?.instance_id || instanceId || 'default',
+            instanceId: selectedConversation?.instance_id || conv.instance_id || proj?.instance_id || instanceId || 'default',
             repoPath: proj?.repo_path || '',
             sourceConv: conv,
         });

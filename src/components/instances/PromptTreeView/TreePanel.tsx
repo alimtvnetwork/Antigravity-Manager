@@ -106,11 +106,14 @@ export function TreePanel(props: TreePanelProps) {
 
     const isEffectiveLoading = isLoading ?? subLoading;
 
+    const isScopedSingleProject = selectedProjectScope !== 'all';
+
     const renderProject = (project: AgmProjectTreeNode) => (
         <ProjectNode
             key={project.project_id}
             project={project}
-            isExpanded={Boolean(expandedProjects[project.project_id])}
+            isExpanded={isScopedSingleProject || Boolean(expandedProjects[project.project_id])}
+            isScopedSingleProject={isScopedSingleProject}
             isSelected={selectedProjectId === project.project_id}
             isPinned={pinnedProjectIds.includes(project.project_id)}
             isArchived={archivedProjectIds.includes(project.project_id)}
@@ -135,22 +138,39 @@ export function TreePanel(props: TreePanelProps) {
         <div className="w-80 sm:w-96 flex flex-col border-r border-slate-200 dark:border-[#40285e] bg-slate-50/50 dark:bg-[#090611]/60">
             {/* Search Input & Filter Controls */}
             <div className="p-3 border-b border-slate-200 dark:border-[#40285e] shrink-0 space-y-2">
-                {/* Project Scope Dropdown */}
-                <div className="flex items-center gap-1.5 bg-white dark:bg-[#171025] px-2 py-1 rounded-[5px] border border-slate-200 dark:border-[#40285e]">
-                    <Folder className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                    <select
-                        value={selectedProjectScope}
-                        onChange={(e) => setSelectedProjectScope(e.target.value)}
-                        className="w-full text-xs font-medium bg-transparent border-0 focus:ring-0 focus:outline-none text-slate-800 dark:text-slate-200 cursor-pointer"
-                        title="Filter tree by project scope"
-                    >
-                        <option value="all" className="dark:bg-[#171025]">All Projects ({treeData.length})</option>
-                        {treeData.map((p) => (
-                            <option key={p.project_id} value={p.project_id} className="dark:bg-[#171025]">
-                                {p.repo_name} {p.is_running ? '●' : ''} ({p.conversations.length} convs)
-                            </option>
-                        ))}
-                    </select>
+                {/* Project Scope Dropdown & Quick Pin Header */}
+                <div className="flex items-center justify-between gap-1.5 bg-white dark:bg-[#171025] px-2 py-1 rounded-[5px] border border-slate-200 dark:border-[#40285e]">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <Folder className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                        <select
+                            value={selectedProjectScope}
+                            onChange={(e) => setSelectedProjectScope(e.target.value)}
+                            className="w-full text-xs font-medium bg-transparent border-0 focus:ring-0 focus:outline-none text-slate-800 dark:text-slate-200 cursor-pointer truncate"
+                            title="Filter tree by project scope"
+                        >
+                            <option value="all" className="dark:bg-[#171025]">All Projects ({treeData.length})</option>
+                            {treeData.map((p) => (
+                                <option key={p.project_id} value={p.project_id} className="dark:bg-[#171025]">
+                                    {p.repo_name} {p.is_running ? '●' : ''} ({p.conversations.length} convs)
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    {selectedProjectScope !== 'all' && (
+                        <button
+                            type="button"
+                            onClick={(e) => onTogglePin(selectedProjectScope, e)}
+                            className={cn(
+                                "p-1 rounded-[4px] transition-colors cursor-pointer shrink-0",
+                                pinnedProjectIds.includes(selectedProjectScope)
+                                    ? "text-amber-500 bg-amber-50 dark:bg-amber-950/40"
+                                    : "text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#40285e]"
+                            )}
+                            title={pinnedProjectIds.includes(selectedProjectScope) ? "Unpin project" : "Pin project to prompt view"}
+                        >
+                            <Pin className={cn("w-3.5 h-3.5", pinnedProjectIds.includes(selectedProjectScope) && "fill-current")} />
+                        </button>
+                    )}
                 </div>
 
                 {/* Search Input */}

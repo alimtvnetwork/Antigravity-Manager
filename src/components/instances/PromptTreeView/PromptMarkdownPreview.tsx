@@ -1,10 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type React from 'react';
 import { Check, Copy, ChevronDown, ChevronRight, Brain, Code } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 import { TruncatedContextCallout } from './TruncatedContextCallout';
+import { PromptImagePreviewModal } from './PromptImagePreviewModal';
+import { PromptImageContextMenu } from './PromptImageContextMenu';
 
 export interface PromptMarkdownPreviewProps {
     content: string;
@@ -113,7 +115,12 @@ function LavenderThinkingCard({ content }: { content: string }) {
 /**
  * Parses inline markdown tokens (links, images, bold, italics, code, omission banners).
  */
-function parseInlineMarkdown(text: string, onToggleExpand?: () => void): React.ReactNode[] {
+function parseInlineMarkdown(
+    text: string,
+    onToggleExpand?: () => void,
+    onImageClick?: (src: string, alt?: string) => void,
+    onImageContextMenu?: (e: React.MouseEvent, src: string, alt?: string) => void
+): React.ReactNode[] {
     if (text.length > MAX_INLINE_BLOCK_BYTES) {
         return [
             <span key="oversized-text" className="text-xs text-slate-700 dark:text-slate-300">
@@ -180,15 +187,33 @@ function parseInlineMarkdown(text: string, onToggleExpand?: () => void): React.R
             );
         } else if (imgSrc !== undefined) {
             rawNodes.push(
-                <img
-                    key={`img-${match.index}`}
-                    src={imgSrc}
-                    alt={imgAlt || ''}
-                    className="inline-block max-h-48 max-w-full my-1 rounded-lg border border-slate-200 dark:border-[#40285e]"
-                    onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
+                <span
+                    key={`img-wrap-${match.index}`}
+                    className="relative inline-block my-1.5 group cursor-pointer"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onImageClick?.(imgSrc, imgAlt);
                     }}
-                />
+                    onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onImageContextMenu?.(e, imgSrc, imgAlt);
+                    }}
+                    title="Click to preview in lightbox · Right-click for options"
+                >
+                    <img
+                        key={`img-${match.index}`}
+                        src={imgSrc}
+                        alt={imgAlt || ''}
+                        className="inline-block max-h-56 max-w-full rounded-lg border border-slate-200 dark:border-[#40285e] group-hover:border-purple-500/70 shadow-sm transition-all duration-150 group-hover:scale-[1.01]"
+                        onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                        }}
+                    />
+                    <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[10px] bg-black/75 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none font-mono shadow-sm">
+                        Preview
+                    </span>
+                </span>
             );
         } else if (linkUrl !== undefined) {
             rawNodes.push(
@@ -274,10 +299,35 @@ export function PromptMarkdownPreview({
     onToggleExpand,
     isTruncated = false,
 }: PromptMarkdownPreviewProps) {
+    const [previewImageSrc, setPreviewImageSrc] = useState<string | null>(null);
+    const [previewAltText, setPreviewAltText] = useState<string>('');
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+    const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
+    const [contextMenuImageSrc, setContextMenuImageSrc] = useState<string | null>(null);
+    const [contextMenuAlt, setContextMenuAlt] = useState<string>('');
+    const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
+
+    const handleImageClick = useCallback((src: string, alt?: string) => {
+        setPreviewImageSrc(src);
+        setPreviewAltText(alt || '');
+        setIsPreviewOpen(true);
+    }, []);
+
+    const handleImageContextMenu = useCallback((e: React.MouseEvent, src: string, alt?: string) => {
+        setContextMenuPos({ x: e.clientX, y: e.clientY });
+        setContextMenuImageSrc(src);
+        setContextMenuAlt(alt || '');
+        setIsContextMenuOpen(true);
+    }, []);
+
     const renderedNodes = useMemo(() => {
         if (!content) {
             return <span className="text-slate-400 italic">No content</span>;
         }
+
+        const renderInline = (text: string) =>
+            parseInlineMarkdown(text, onToggleExpand, handleImageClick, handleImageContextMenu);
 
         const lines = content.split('\n');
         const elements: React.ReactNode[] = [];
@@ -403,7 +453,7 @@ export function PromptMarkdownPreview({
             if (line.startsWith('# ')) {
                 elements.push(
                     <h1 key={`h1-${i}`} className="text-base font-bold text-slate-900 dark:text-white mt-4 mb-2 pb-1 border-b border-slate-200 dark:border-purple-500/30">
-                        {parseInlineMarkdown(line.slice(2), onToggleExpand)}
+                        {renderInline(line.slice(2))}
                     </h1>
                 );
                 continue;
@@ -411,7 +461,7 @@ export function PromptMarkdownPreview({
             if (line.startsWith('## ')) {
                 elements.push(
                     <h2 key={`h2-${i}`} className="text-sm font-bold text-slate-900 dark:text-white mt-3.5 mb-1.5 pb-0.5 border-b border-slate-200/70 dark:border-purple-500/20">
-                        {parseInlineMarkdown(line.slice(3), onToggleExpand)}
+                        {renderInline(line.slice(3))}
                     </h2>
                 );
                 continue;
@@ -419,7 +469,7 @@ export function PromptMarkdownPreview({
             if (line.startsWith('### ')) {
                 elements.push(
                     <h3 key={`h3-${i}`} className="text-xs font-bold text-purple-700 dark:text-purple-300 mt-2.5 mb-1">
-                        {parseInlineMarkdown(line.slice(4), onToggleExpand)}
+                        {renderInline(line.slice(4))}
                     </h3>
                 );
                 continue;
@@ -427,7 +477,7 @@ export function PromptMarkdownPreview({
             if (line.startsWith('#### ')) {
                 elements.push(
                     <h4 key={`h4-${i}`} className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-2 mb-0.5">
-                        {parseInlineMarkdown(line.slice(5), onToggleExpand)}
+                        {renderInline(line.slice(5))}
                     </h4>
                 );
                 continue;
@@ -440,7 +490,7 @@ export function PromptMarkdownPreview({
                         key={`quote-${i}`}
                         className="my-1.5 border-l-2 border-purple-500/60 bg-purple-500/5 px-3 py-1.5 rounded-r text-xs text-slate-700 dark:text-slate-300 italic"
                     >
-                        {parseInlineMarkdown(line.slice(2), onToggleExpand)}
+                        {renderInline(line.slice(2))}
                     </blockquote>
                 );
                 continue;
@@ -452,7 +502,7 @@ export function PromptMarkdownPreview({
                     <div key={`li-${i}`} className="flex items-start gap-2 my-0.5 text-xs text-slate-800 dark:text-slate-200">
                         <span className="text-purple-500 font-bold shrink-0 leading-relaxed">•</span>
                         <div className="flex-1 leading-relaxed">
-                            {parseInlineMarkdown(line.trim().slice(2), onToggleExpand)}
+                            {renderInline(line.trim().slice(2))}
                         </div>
                     </div>
                 );
@@ -468,7 +518,7 @@ export function PromptMarkdownPreview({
             // Standard paragraph
             elements.push(
                 <p key={`p-${i}`} className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed my-1">
-                    {parseInlineMarkdown(line, onToggleExpand)}
+                    {renderInline(line)}
                 </p>
             );
         }
@@ -487,7 +537,7 @@ export function PromptMarkdownPreview({
         flushTable(lines.length);
 
         return elements;
-    }, [content, onToggleExpand]);
+    }, [content, onToggleExpand, handleImageClick, handleImageContextMenu]);
 
     return (
         <div className={cn('prose prose-xs dark:prose-invert max-w-none font-sans', className)}>
@@ -502,6 +552,28 @@ export function PromptMarkdownPreview({
                         ⚡ Expand complete transcript content...
                     </button>
                 </div>
+            )}
+
+            <PromptImagePreviewModal
+                isOpen={isPreviewOpen}
+                imageSrc={previewImageSrc}
+                altText={previewAltText}
+                onClose={() => setIsPreviewOpen(false)}
+            />
+
+            {isContextMenuOpen && contextMenuImageSrc && (
+                <PromptImageContextMenu
+                    isOpen={isContextMenuOpen}
+                    position={contextMenuPos}
+                    imageSrc={contextMenuImageSrc}
+                    altText={contextMenuAlt}
+                    onClose={() => setIsContextMenuOpen(false)}
+                    onOpenPreview={(src, alt) => {
+                        setPreviewImageSrc(src);
+                        setPreviewAltText(alt || '');
+                        setIsPreviewOpen(true);
+                    }}
+                />
             )}
         </div>
     );

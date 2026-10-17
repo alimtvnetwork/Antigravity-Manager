@@ -1,7 +1,7 @@
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat, MessageSquare } from 'lucide-react';
+import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import type { AgmConversationNode } from './types';
 import { formatSeqBadge, stripImagesFromPrompt } from './formatters';
@@ -85,7 +85,6 @@ export interface DetailHeaderProps {
 
 export function DetailHeader(props: DetailHeaderProps) {
     const {
-        previewTab, setPreviewTab,
         selectedConversation, activePromptText,
         confirmationSuffix, setConfirmationSuffix,
         conversationTargetMode = 'current', setConversationTargetMode,
@@ -257,8 +256,8 @@ export function DetailHeader(props: DetailHeaderProps) {
     };
 
     return (
-        <div className="space-y-2 pb-2.5 border-b border-slate-200 dark:border-[#40285e] shrink-0">
-            {/* Row 1: Identity & Badges & Breadcrumb Context */}
+        <div className="pb-2.5 border-b border-slate-200 dark:border-[#40285e] shrink-0 relative z-30">
+            {/* Header Row: Identity & Badges & Breadcrumb Context (Left) + Action Capsule (Right) */}
             <div className="flex items-center justify-between gap-2.5 flex-wrap min-w-0">
                 {/* Left: Indicator 1 (Sequence + Tier), Indicator 2 (Status Capsule), Title, Instance Context */}
                 <div className="flex items-center gap-2 flex-wrap min-w-0">
@@ -357,12 +356,9 @@ export function DetailHeader(props: DetailHeaderProps) {
                         #{formatSeqBadge(selectedConversation.seq_code, `C${String(instanceSeqNum).padStart(3, '0')}`).replace(/^#/, '')} · {instanceNameDisplay}
                     </span>
                 </div>
-            </div>
 
-            {/* Row 2: Action Controls Toolbar & Navigation Tabs (Cleanly segmented and non-colliding) */}
-            <div className="flex items-center justify-between gap-2 flex-wrap min-w-0 pt-0.5 relative z-30">
-                {/* Left: The Unified Segmented Dark-Glass Action Capsule */}
-                <div className="flex items-center shrink-0">
+                {/* Right: The Unified Segmented Dark-Glass Action Capsule */}
+                <div className="flex items-center shrink-0 ml-auto">
                     <div className="relative flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
                         {/* Segment 1: Content & Media Copy Split Button [ Copy All | v ] */}
                         <div className="flex items-center divide-x divide-slate-200/70 dark:divide-purple-500/20">
@@ -1041,51 +1037,6 @@ export function DetailHeader(props: DetailHeaderProps) {
                     </div>
                     {/* END RERUN SECTION (Task-04) */}
                 </div>
-
-                {/* Right: Primary Navigation Tabs Capsule */}
-                {previewTab && setPreviewTab && (
-                    <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
-                        <button
-                            type="button"
-                            onClick={() => setPreviewTab('instruction')}
-                            className={cn(
-                                "flex items-center gap-1.5 px-3 py-1 rounded-l-full text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
-                                previewTab === 'instruction'
-                                    ? "bg-blue-600 text-white shadow-2xs"
-                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
-                            )}
-                            title="View original prompt instruction"
-                        >
-                            <MessageSquare className="w-3.5 h-3.5" />
-                            <span>Prompt Instruction</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => setPreviewTab('results')}
-                            className={cn(
-                                "flex items-center gap-1.5 px-3 py-1 rounded-r-full text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
-                                previewTab === 'results'
-                                    ? "bg-blue-600 text-white shadow-2xs"
-                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
-                            )}
-                            title="View AI execution outputs, responses and tools"
-                        >
-                            {selectedConversation.is_running ? (
-                                <span className="relative flex h-2 w-2">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#1af18d]"></span>
-                                </span>
-                            ) : (
-                                <Terminal className="w-3.5 h-3.5 text-cyan-500" />
-                            )}
-                            <span>AI Results & Outputs</span>
-                            {(selectedConversation.execution_results || selectedConversation.latest_response) && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                            )}
-                        </button>
-                    </div>
-                )}
             </div>
 
             {/* Suffix Template Management Modal */}
