@@ -1,5 +1,15 @@
 # Changelog
 
+## [v4.224.0] - 2026-10-17
+
+### Added
+- **Modernized Compact Telegram Notification Cards with White Text Values**: Redesigned all Telegram alert cards (Account Rotation, Post-Switch Liveness, Emergency Alerts, and System Updates) to be ~40% more vertically compact; all key values are indented on the next line in high-contrast bold white text (`kv_block`, `kv_white`); eliminated duplicate fields (`Bound` in header, `Event reason` in workspace); and clamped project lists to top-3 with a compact `(+N more)` badge. (Thanks to @aukgit)
+- **Telegram Inbound Step 2 Multi-Machine Collision Shielding & Debounce Guard**: Resolved duplicate Step 2 prompt wizard dispatch in Telegram by enforcing strict destination matching via `node_label::is_current_machine()`; non-target cluster nodes silently drop incoming callbacks, while the target node suppresses rapid duplicate taps (<3s) to prevent repeated messages. (Thanks to @aukgit)
+- **Node Network Identity, IP Address & Signal Attribution in Telegram**: Enhanced Telegram machine and instance pickers with explicit node alias, IP address, and mesh signal indicators (`[alias • ip • 📶 signal]`); instance selection buttons now display `🏷️ {name} ({alias} • {ip})` arranged in single-column layouts for maximum legibility. (Thanks to @aukgit)
+- **Clean Action-Only Inline Keyboard Markups**: Purged the duplicate top-row static banner button from Account Rotation alerts (`build_switch_alert_reply_markup`), presenting only functional action buttons: `[ 💰 Check Balance ] [ 📥 Export CSV ]`, `[ 🚀 Prompt Instance ] [ 🔄 Refresh Status ]`, and `[ 📋 Copy Prompt ]`. (Thanks to @aukgit)
+
+---
+
 ## [v4.223.0] - 2026-10-17
 
 ### Added
@@ -556,6 +566,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.224.0 (2026-10-17)**:
+        -   **[Telegram Alerts & Collision Shielding] Compact Layout with Next-Line White Text Values, Step 2 Multi-Machine Deduplication, Node IP & Signal Attribution, and Action-Only Keyboards (Thanks to @aukgit)**:
+            -   **Description**: Modernized all Telegram alert cards (Account Rotation, Post-Switch Liveness, Emergency Alerts, System Updates) to be ~40% more vertically compact with key values indented on the next line in high-contrast bright white text (`kv_block`, `kv_white`); removed duplicate header and workspace fields; clamped project lists to top-3; eliminated duplicate Step 2 prompt wizard dispatch via `node_label::is_current_machine()` destination matching and <3s debounce guard; enriched instance selectors with explicit node alias, IP, and signal indicators (`🏷️ {name} ({alias} • {ip})`) in single-column layout; and streamlined Account Rotation inline keyboards to functional action-only buttons.
+
+
     *   **v4.223.0 (2026-10-17)**:
         -   **[Prompt Tree & Telegram Shielding] Custom Right-Click Context Menu, Right-Aligned Navigation Tabs, Header Dead-Space Removal, Top Toolbar Copy All Consolidation, and Telegram Cluster Routing Shielding (Thanks to @aukgit)**:
             -   **Description**: Added right-click custom context menus to Project headers (`ProjectContextMenu.tsx`) with Import into Project, Export (JSON, SQLite DB, YAML), and Rerun (Queued or All) actions; wired context menus and keyboard accessibility to child subagents and prompt turns with active selection highlights (`bg-sky-500/10 border-l-2 border-sky-500 text-sky-400`); relocated primary navigation tabs (`[ Prompt Instruction | AI Results & Outputs ]`) to the right side of Row 2 in `DetailHeader.tsx` and eliminated the redundant 3rd row in `DetailTabs.tsx` to recover ~44px of vertical height; consolidated all copy operations into the top-level `[ Copy All | v ]` segmented capsule and removed redundant bottom copy buttons in `PromptInstructionView.tsx`; eliminated cluster-wide prompt broadcast storms by binding `target_node_id` in Supabase `command_queue` payloads across `injection.rs`, `open_shot.rs`, and `processing.rs`; unified current machine detection via `node_label::is_current_machine()`; deduplicated machine entries in Telegram picker; added native CLI support for `agm prompt <target> [flags] <prompt_text>`; and redesigned destination locked UX with expandable blockquotes for past prompts and clear instruction for direct prompt typing.
