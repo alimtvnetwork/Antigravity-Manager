@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "generated_at": "2026-10-18T05:27:00Z",
+  "repository": "alimtvnetwork/Antigravity-Manager",
+  "policy": {
+    "historical_cutoff": "4.160.0",
+    "whitelist_rule": "strict_preserve",
+    "whitelisted_versions": [
+      "v4.190.0",
+      "v4.206.0",
+      "v4.225.0",
+      "v4.226.3",
+      "v4.227.0"
+    ]
+  },
+  "summary": {
+    "total_post_cutoff_discovered": 7,
+    "total_whitelisted_preserved": 5,
+    "total_purged_targets": 2
+  },
+  "preserved_whitelist": [
+    {
+      "tag_name": "v4.190.0",
+      "normalized_semver": "4.190.0",
+      "is_historical": false,
+      "is_post_cutoff": true,
+      "is_whitelisted": true,
+      "is_purge_target": false,
+      "has_github_release": true,
+      "is_remote_tag_present": true,
+      "is_local_tag_present": true
+    },
+    {
+      "tag_name": "v4.206.0",
+      "normalized_semver": "4.206.0",
+      "is_historical": false,
+      "is_post_cutoff": true,
+      "is_whitelisted": true,
+      "is_purge_target": false,
+      "has_github_release": true,
+      "is_remote_tag_present": true,
+      "is_local_tag_present": true
+    },
+    {
+      "tag_name": "v4.225.0",
+      "normalized_semver": "4.225.0",
+      "is_historical": false,
+      "is_post_cutoff": true,
+      "is_whitelisted": true,
+      "is_purge_target": false,
+      "has_github_release": true,
+      "is_remote_tag_present": true,
+      "is_local_tag_present": true
+    },
+    {
+      "tag_name": "v4.226.3",
+      "normalized_semver": "4.226.3",
+      "is_historical": false,
+      "is_post_cutoff": true,
+      "is_whitelisted": true,
+      "is_purge_target": false,
+      "has_github_release": true,
+      "is_remote_tag_present": true,
+      "is_local_tag_present": true
+    },
+    {
+      "tag_name": "v4.227.0",
+      "normalized_semver": "4.227.0",
+      "is_historical": false,
+      "is_post_cutoff": true,
+      "is_whitelisted": true,
+      "is_purge_target": false,
+      "has_github_release": false,
+      "is_remote_tag_present": true,
+      "is_local_tag_present": true
+    }
+  ],
+  "purge_targets": [
+    {
+      "tag_name": "v4.226.0",
+      "normalized_semver": "4.226.0",
+      "is_historical": false,
+      "is_post_cutoff": true,
+      "is_whitelisted": false,
+      "is_purge_target": true,
+      "has_github_release": true,
+      "is_remote_tag_present": true,
+      "is_local_tag_present": true,
+      "pruned_at": "2026-10-18T05:27:40Z"
+    },
+    {
+      "tag_name": "v4.226.2",
+      "normalized_semver": "4.226.2",
+      "is_historical": false,
+      "is_post_cutoff": true,
+      "is_whitelisted": false,
+      "is_purge_target": true,
+      "has_github_release": false,
+      "is_remote_tag_present": true,
+      "is_local_tag_present": true,
+      "pruned_at": "2026-10-18T05:28:15Z"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+[
+  {
+    "timestamp": "2026-10-18T05:27:39Z",
+    "target": "v4.226.0",
+    "operation": "DELETE_GITHUB_RELEASE",
+    "command": "gh release delete v4.226.0 --yes --repo alimtvnetwork/Antigravity-Manager",
+    "exit_code": 0,
+    "status": "SUCCESS"
+  },
+  {
+    "timestamp": "2026-10-18T05:27:52Z",
+    "target": "v4.226.0",
+    "operation": "DELETE_REMOTE_GIT_TAG",
+    "command": "git push origin --delete v4.226.0",
+    "exit_code": 0,
+    "status": "SUCCESS"
+  },
+  {
+    "timestamp": "2026-10-18T05:27:55Z",
+    "target": "v4.226.0",
+    "operation": "DELETE_LOCAL_GIT_TAG",
+    "command": "git tag -d v4.226.0",
+    "exit_code": 0,
+    "status": "SUCCESS"
+  },
+  {
+    "timestamp": "2026-10-18T05:28:13Z",
+    "target": "v4.226.2",
+    "operation": "DELETE_REMOTE_GIT_TAG",
+    "command": "git push origin --delete v4.226.2",
+    "exit_code": 0,
+    "status": "SUCCESS"
+  },
+  {
+    "timestamp": "2026-10-18T05:28:17Z",
+    "target": "v4.226.2",
+    "operation": "DELETE_LOCAL_GIT_TAG",
+    "command": "git tag -d v4.226.2",
+    "exit_code": 0,
+    "status": "SUCCESS"
+  },
+  {
+    "timestamp": "2026-10-18T05:28:26Z",
+    "target": "ALL_TRACKING_TAGS",
+    "operation": "PRUNE_REMOTE_TRACKING_TAGS",
+    "command": "git fetch --prune --prune-tags origin",
+    "exit_code": 0,
+    "status": "SUCCESS"
+  }
+]
