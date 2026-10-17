@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.219.0 (2026-10-17)**:
+        -   **[Prompt Tree & Delegate Updater] Rich Verification Chapter Engine, Dual-MIME Image Transmission, Rerun Chapter Engine & Console Formatting**:
+            -   **Description**: Implemented 5-chapter prompt verification architecture (`verificationTemplates.ts`) for "Is it done?", "Is it released?", "Are you confident?", and "Edge Cases & Tests" embedding un-truncated original prompts; fixed image extraction regex index bug and implemented dual-MIME clipboard priming on dispatch; upgraded rerun engine to wrap full prompt context with round progression; fixed Windows console newline staircase wrapping in delegate updater and aligned summary fields.
+
     *   **v4.218.0 (2026-10-17)**:
         -   **[Repository Issues & System Hardening] Clean Stale Versions CLI, Telegram Fixes, Combined Instance Columns, Prompt Tree Layout & Multi-Segment Quota Bar**:
             -   **Description**: Added `agm clean-other-versions` CLI command, dynamic host versioning in Telegram, internal ID stripping from prompts, configurable 100/200-word summaries with resend buttons, combined IDE Exe & Data directory column, PromptTree DetailHeader overlap resolution and live disk sync, rich clipboard media copying, 5-segment color quota bar, interaction telemetry attributes, and clean process termination.
