@@ -13,7 +13,7 @@
 ### Subtask 01: Backend E9001 Root-Cause Fix & Throttling Hygiene
 **File:** `.ai-memory/plans/subtasks/antigravity-manager-agm-codebase-review-and-refactoring/01-backend-e9001-and-throttling.md`
 **Owner:** Worker 01
-**Status:** In Progress
+**Status:** Completed
 **Scope:**
 1. In `src-tauri/src/modules/auto_switcher/instances.rs`:
    - In `is_instance_binding_stale_or_exhausted`: return `false` if `is_running == true`.
@@ -33,7 +33,7 @@
 ### Subtask 02: Frontend Accounts Table UI Modernization & Tree Reset
 **File:** `.ai-memory/plans/subtasks/antigravity-manager-agm-codebase-review-and-refactoring/02-frontend-accounts-ui-and-tree.md`
 **Owner:** Worker 02
-**Status:** In Progress
+**Status:** Completed
 **Scope:**
 1. In `src/components/accounts/AccountTable/SortableAccountRow.tsx`:
    - Remove blinding `hover:!bg-white dark:hover:!bg-white hover:!text-black dark:hover:!text-black`.
@@ -56,7 +56,7 @@
 
 ## Execution Waves
 
-| Wave | Workers | Focus |
-|---|---|---|
-| **Wave 1** | Worker 01 (Backend) & Worker 02 (Frontend & System) | E9001 fix, queue throttling, Accounts UI hover, 3D switch button, terminal updater font, tree filter reset |
-| **Wave 2** | Lead Orchestrator | Quality verification (`cargo fmt`, `cargo clippy`, `npm run build`), release bump, and GitMap verification |
+| Wave | Workers | Focus | Status |
+|---|---|---|---|
+| **Wave 1** | Worker 01 (Backend) & Worker 02 (Frontend & System) | E9001 fix, queue throttling, Accounts UI hover, 3D switch button, terminal updater font, tree filter reset | **PASSED** |
+| **Wave 2** | Lead Orchestrator | Quality verification (`cargo fmt`, `cargo clippy`, `npm run build`), release bump (`4.226.0`), and GitMap verification | **PASSED** |
