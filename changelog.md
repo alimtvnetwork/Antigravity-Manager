@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.227.0] - 2026-10-18
+
+### Added
+- **Release v4.227.0**: CI pipeline verified 100% green on `main` (post v4.226.3); performed minor version bump and synchronized release metadata (`version.json`, `package.json`, changelog, README), and published the stable release via the tag-triggered `release.yml` workflow. (Thanks to @aukgit)
+
+---
+
 ## [v4.226.1] - 2026-10-17
 
 ### Added
