@@ -4,7 +4,7 @@ use super::agy::{enqueue_prompt_for_instance, spawn_prompt_via_agy};
 use super::backup::backup_running_prompts;
 use super::detection::{extract_image_payload_or_path, resume_task_document};
 use super::liveness::is_prompt_running_for_project;
-use super::models::ActivePrompt;
+use super::models::{ActivePrompt, ProjectAuditRationaleType, PromptAuditCriteriaType};
 use super::schema::{connect_db, init_tables};
 use super::state::get_memory_prompts_map;
 use super::tree::invalidate_prompt_tree_cache;
@@ -95,6 +95,7 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
             let is_match = norm_target == "all"
                 || norm_inst == norm_target
                 || (is_target_default && is_inst_default);
+            let rationale = ProjectAuditRationaleType::from_dispatch(is_match);
             crate::modules::logger::log_instance_prompt_audit(
                 &norm_target,
                 "check_and_dispatch_enqueued_prompts",
@@ -102,13 +103,9 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
                 &repo_path,
                 "",
                 None,
-                "PromptDispatcher:InstanceMatching",
+                PromptAuditCriteriaType::PromptDispatcherInstanceMatching.as_str(),
                 is_match,
-                if is_match {
-                    "PROMPT_DISPATCH_MATCHED"
-                } else {
-                    "PROMPT_DISPATCH_REJECTED"
-                },
+                rationale.as_str(),
             );
             if !is_match {
                 continue;

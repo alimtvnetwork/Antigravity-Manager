@@ -2,7 +2,9 @@
 
 use super::failed_commands::decode_uri_to_path;
 use super::liveness::is_prompt_running_for_project;
-use super::models::{ActivePrompt, RunningProject};
+use super::models::{
+    ActivePrompt, ProjectAuditRationaleType, PromptAuditCriteriaType, RunningProject,
+};
 use super::schema::connect_db;
 use super::tree::invalidate_prompt_tree_cache;
 use chrono::Utc;
@@ -107,6 +109,10 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
             is_instance_active && is_prompt_running_for_project(&raw_path, target_id);
 
         let pid_opt = pids.first().copied();
+        let criteria = PromptAuditCriteriaType::WorkspaceStorageScanAndProcessLiveness;
+        let rationale =
+            ProjectAuditRationaleType::from_liveness(is_project_active, is_instance_active);
+
         crate::modules::logger::log_instance_prompt_audit(
             target_id,
             &instance.name,
@@ -114,15 +120,9 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
             &raw_path,
             &ws_folder.to_string_lossy(),
             pid_opt,
-            "WorkspaceStorageScan + ProcessLiveness",
+            criteria.as_str(),
             is_project_active,
-            if is_project_active {
-                "ACTIVE_IN_FLIGHT_TASKS"
-            } else if !is_instance_active {
-                "INSTANCE_PROCESS_DEAD"
-            } else {
-                "IDLE_NO_ACTIVE_TASKS"
-            },
+            rationale.as_str(),
         );
 
         projects.push(RunningProject {

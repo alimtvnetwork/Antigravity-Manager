@@ -3,6 +3,7 @@
 use super::dispatch::parse_flexible_timestamp;
 use super::failed_commands::decode_uri_to_path;
 use super::gemini_dirs::gemini_dirs_for_instance;
+use super::models::{ProjectAuditRationaleType, PromptAuditCriteriaType};
 use super::project_queries::normalize_path_for_compare;
 use super::schema::connect_db;
 use super::sequences::extract_prompt_words_preview;
@@ -41,9 +42,9 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
             project_id,
             "process_table",
             None,
-            "Gate0:HostProcessLiveness",
+            PromptAuditCriteriaType::Gate0HostProcessLiveness.as_str(),
             false,
-            "INSTANCE_PROCESS_DEAD",
+            ProjectAuditRationaleType::InstanceProcessDead.as_str(),
         );
         return false;
     }
@@ -109,9 +110,9 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                             &p.repo_path,
                             "memory_prompts_map",
                             host_pid,
-                            "Gate1:MemoryPromptsMap",
+                            PromptAuditCriteriaType::Gate1MemoryPromptsMap.as_str(),
                             true,
-                            "ACTIVE_PROMPT_MEMORY",
+                            ProjectAuditRationaleType::ActivePromptMemory.as_str(),
                         );
                         return true;
                     }
@@ -169,9 +170,9 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                 &clean_worker_path,
                 "active_agy_workers_map",
                 Some(pid),
-                "Gate2:ActiveAgyWorkers",
+                PromptAuditCriteriaType::Gate2ActiveAgyWorkers.as_str(),
                 true,
-                "ACTIVE_WORKER_MATCHED",
+                ProjectAuditRationaleType::ActiveWorkerMatched.as_str(),
             );
             return true;
         }
@@ -202,9 +203,9 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                 project_id,
                 "active_prompts_table",
                 host_pid,
-                "Gate3:ActivePromptsSQLite",
+                PromptAuditCriteriaType::Gate3ActivePromptsSqlite.as_str(),
                 true,
-                "ACTIVE_PROMPT_DB_RUNNING",
+                ProjectAuditRationaleType::ActivePromptDbRunning.as_str(),
             );
             return true;
         }
@@ -324,9 +325,9 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                                             &clean_p,
                                             &summaries_db.to_string_lossy(),
                                             host_pid,
-                                            "Gate4:ConversationSummariesLiveTurn",
+                                            PromptAuditCriteriaType::Gate4ConversationSummariesLiveTurn.as_str(),
                                             true,
-                                            "CONVERSATION_SUMMARY_ACTIVE_TURN",
+                                            ProjectAuditRationaleType::ConversationSummaryActiveTurn.as_str(),
                                         );
                                         return true;
                                     }
@@ -346,9 +347,9 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
         project_id,
         "all_evaluated_databases",
         host_pid,
-        "Gate0-4:AllEvaluationsCompleted",
+        PromptAuditCriteriaType::Gate0To4AllEvaluationsCompleted.as_str(),
         false,
-        "IDLE_NO_ACTIVE_TASKS",
+        ProjectAuditRationaleType::IdleNoActiveTasks.as_str(),
     );
 
     false

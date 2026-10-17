@@ -2,7 +2,7 @@
 
 use super::agy::spawn_or_replace_prompt_via_agy;
 use super::detection::extract_image_payload_or_path;
-use super::models::ActivePrompt;
+use super::models::{ActivePrompt, ProjectAuditRationaleType, PromptAuditCriteriaType};
 use super::schema::{connect_db, init_tables};
 use super::state::{get_dispatched_prompts_cache, reset_dispatched_prompts_cache};
 use super::tree::invalidate_prompt_tree_cache;
@@ -79,6 +79,7 @@ pub fn resend_running_commands_for_instance(
                 }
             };
             let target_display = target_inst_opt.as_deref().unwrap_or("all");
+            let rationale = ProjectAuditRationaleType::from_dispatch(is_match);
             crate::modules::logger::log_instance_prompt_audit(
                 target_display,
                 "resend_running_commands_for_instance",
@@ -86,13 +87,9 @@ pub fn resend_running_commands_for_instance(
                 &p.repo_path,
                 "",
                 None,
-                "PromptDispatcher:InstanceMatching",
+                PromptAuditCriteriaType::PromptDispatcherInstanceMatching.as_str(),
                 is_match,
-                if is_match {
-                    "PROMPT_DISPATCH_MATCHED"
-                } else {
-                    "PROMPT_DISPATCH_REJECTED"
-                },
+                rationale.as_str(),
             );
             is_match
         })
