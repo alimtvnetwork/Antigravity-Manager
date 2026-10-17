@@ -16,6 +16,7 @@ This directory contains deterministic prompt transformation templates specifical
 | **08** | [`08-run-letterly-cursor.md`](08-run-letterly-cursor.md) | Run Script | Formats input into run instructions via `./run.ps1` / `./run.sh` with auto dependency install | `letterly-run` |
 | **09** | [`09-execute-with-verification-letterly-cursor.md`](09-execute-with-verification-letterly-cursor.md) | Execute + Retrospective Audit | Formats input into execute N-steps with mandatory retrospective AI verification at task end | `letterly-execute-with-verification` |
 | **10** | [`10-execute-with-release-letterly-cursor.md`](10-execute-with-release-letterly-cursor.md) | Execute + Minor Release | Formats input into execute N-steps followed directly by green CI verification and minor release | `letterly-execute-with-release` |
+| **11** | [`11-git-pull-first-letterly-cursor.md`](11-git-pull-first-letterly-cursor.md) | Git Pull First | Formats input into pull-first execution directives ensuring gitmap pull runs before any work | `letterly-git-pull-first` |
 
 ## Core Invariants
 
