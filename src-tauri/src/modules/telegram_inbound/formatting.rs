@@ -185,25 +185,14 @@ pub fn sanitize_telegram_html_entities(text: &str) -> String {
 
 /// Build rich inline keyboard markup for Account Rotation (Switch) Alerts
 pub fn build_switch_alert_reply_markup(
-    instance_name: &str,
+    _instance_name: &str,
     _selected_email: &str,
-    target_4h: &str,
-    target_weekly: &str,
+    _target_4h: &str,
+    _target_weekly: &str,
     prompt_text: &str,
     asset_urls: &[String],
 ) -> serde_json::Value {
     let mut keyboard_rows: Vec<Vec<serde_json::Value>> = Vec::new();
-    let inst_label = if instance_name.trim().is_empty() {
-        "default"
-    } else {
-        instance_name.trim()
-    };
-
-    keyboard_rows.push(vec![json!({
-        "text": format!("🟢 {} | 4h: {} | Wk: {}", inst_label, target_4h, target_weekly),
-        "callback_data": "cmd:/balance"
-    })]);
-
     keyboard_rows.push(vec![
         json!({
             "text": "💰 Check Balance",

@@ -92,6 +92,16 @@ pub fn kv(palette: CardPalette, label: &str, value: &str) -> String {
     )
 }
 
+/// Compact multiline item where label is on line 1, and value is on the next line in high-contrast white text.
+pub fn kv_white(palette: CardPalette, label: &str, value: &str) -> String {
+    format!("{} <b>{}</b>\n    <b>{}</b>", palette.bullet, label, value)
+}
+
+/// Compact multiline item where label is on line 1, and formatted content is on the next line.
+pub fn kv_block(palette: CardPalette, label: &str, content_html: &str) -> String {
+    format!("{} <b>{}</b>\n    {}", palette.bullet, label, content_html)
+}
+
 pub fn sub_line(palette: CardPalette, text: &str) -> String {
     format!("    {} <i>{}</i>", palette.bullet, text)
 }
@@ -197,6 +207,20 @@ mod tests {
         let note = prompt_note(GOLD, "Prompt", "hello");
         assert!(note.contains("<pre>"));
         assert!(!note.contains("<blockquote"));
+    }
+
+    #[test]
+    fn test_kv_white_and_kv_block_render_next_line_white_text() {
+        let white_item = kv_white(RISEUP, "Selected account", "ziha***@***");
+        assert!(white_item.contains("▸ <b>Selected account</b>\n    <b>ziha***@***</b>"));
+
+        let block_item = kv_block(
+            RISEUP,
+            "Previous account",
+            "<b>morg***@***</b> (4h: <b>39.0%</b>)",
+        );
+        assert!(block_item
+            .contains("▸ <b>Previous account</b>\n    <b>morg***@***</b> (4h: <b>39.0%</b>)"));
     }
 
     #[test]

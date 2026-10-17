@@ -105,56 +105,61 @@ async fn dispatch_telegram_update_alert(
 
     let m_name = email_watcher::detect_machine_name();
     let m_ip = email_watcher::detect_local_ip();
-    let now_str = chrono::Utc::now()
-        .format("%Y-%m-%d %H:%M:%S UTC")
-        .to_string();
-
     let status_notes = details.unwrap_or("System update successfully applied.");
 
     let active_inst_id = crate::modules::instance::load_registry()
         .map(|r| r.active_instance_id)
         .unwrap_or_else(|_| "default".to_string());
 
-    let telemetry_header = format!(
-        "🖥️ <b>Machine:</b> <code>{}</code> (<code>{}</code>)\n🏷️ <b>Instance:</b> <code>{}</code>",
-        escape_telegram_html(&m_name),
-        escape_telegram_html(&m_ip),
-        escape_telegram_html(&active_inst_id)
-    );
+    let node_line = if !m_ip.is_empty() && m_ip != "127.0.0.1" && m_ip != "Unknown IP" {
+        format!(
+            "🖥️ <b>Machine:</b> <b>{}</b> [<code>{}</code>] • 🏷️ <b>Instance:</b> <b>{}</b>",
+            escape_telegram_html(&m_name),
+            escape_telegram_html(&m_ip),
+            escape_telegram_html(&active_inst_id)
+        )
+    } else {
+        format!(
+            "🖥️ <b>Machine:</b> <b>{}</b> • 🏷️ <b>Instance:</b> <b>{}</b>",
+            escape_telegram_html(&m_name),
+            escape_telegram_html(&active_inst_id)
+        )
+    };
 
     let palette = telegram_inbound::active_card_palette();
     let release = telegram_inbound::section(
         palette,
         "Release",
         &[
-            telegram_inbound::kv(
+            telegram_inbound::kv_block(
                 palette,
-                "New version",
-                &format!("v{}", escape_telegram_html(current_version)),
+                "Version update",
+                &format!(
+                    "<b>v{}</b> (from <b>v{}</b>)",
+                    escape_telegram_html(current_version),
+                    escape_telegram_html(previous_version)
+                ),
             ),
-            telegram_inbound::kv(
+            telegram_inbound::kv_block(
                 palette,
-                "Previous version",
-                &format!("v{}", escape_telegram_html(previous_version)),
+                "Update status",
+                &format!("<b>{}</b>", escape_telegram_html(status_notes)),
             ),
-            telegram_inbound::kv(palette, "Status", &escape_telegram_html(status_notes)),
-            telegram_inbound::kv(palette, "Timestamp", &escape_telegram_html(&now_str)),
         ],
     );
     let text = format!(
-        "{} <b>Antigravity Manager · System updated</b>\n\
+        "{} <b>Antigravity Manager · System Updated</b>\n\
         {}\n\
-        {}\n\
-        {}\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
         {}\n\
         🔗 <a href=\"https://github.com/alimtvnetwork/Antigravity-Manager/releases\"><b>Release notes</b></a>\n\
-        {}",
+        <i>{} Antigravity Manager v{} · {}</i>",
         palette.mark,
-        palette.rule,
-        telemetry_header,
-        palette.rule,
+        node_line,
         release,
-        telegram_inbound::theme_footer(palette)
+        palette.mark,
+        escape_telegram_html(current_version),
+        palette.label
     );
 
     if let Err(e) =

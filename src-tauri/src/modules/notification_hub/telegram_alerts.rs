@@ -91,16 +91,58 @@ pub(crate) async fn dispatch_telegram_switch_alert(
             _ => vec!["Antigravity-Manager".to_string()],
         }
     };
-    let projects_display = raw_projects.join(", ");
 
-    let backup_stats = match (
+    let meaningful_projects: Vec<String> = {
+        let filtered: Vec<String> = raw_projects
+            .iter()
+            .filter(|p| {
+                !p.eq_ignore_ascii_case("unnamed-project")
+                    && !p.eq_ignore_ascii_case("project")
+                    && !p.trim().is_empty()
+            })
+            .cloned()
+            .collect();
+        if filtered.is_empty() {
+            raw_projects
+        } else {
+            filtered
+        }
+    };
+    let total_projects = meaningful_projects.len();
+    let projects_formatted = if total_projects == 0 {
+        "<b>Antigravity-Manager</b>".to_string()
+    } else if total_projects <= 3 {
+        meaningful_projects
+            .iter()
+            .map(|p| format!("<b>{}</b>", escape_telegram_html(p)))
+            .collect::<Vec<_>>()
+            .join(", ")
+    } else {
+        let top3 = meaningful_projects[..3]
+            .iter()
+            .map(|p| format!("<b>{}</b>", escape_telegram_html(p)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!("{} <i>(+{} more)</i>", top3, total_projects - 3)
+    };
+
+    let vault_summary = match (
         details.backed_up_prompts_count,
         details.restored_prompts_count,
     ) {
-        (Some(b), Some(r)) => format!("{} captured | {} re-injected", b, r),
-        (Some(b), None) => format!("{} captured", b),
-        (None, Some(r)) => format!("{} re-injected", r),
-        (None, None) => "preserved (SQLite split db)".to_string(),
+        (Some(b), Some(r)) if b > 0 || r > 0 => {
+            format!("<b>{} captured</b> • <b>{} restored</b>", b, r)
+        }
+        (Some(b), _) if b > 0 => format!("<b>{} captured</b>", b),
+        _ => "<b>0 active prompts</b> (SQLite split-db)".to_string(),
+    };
+
+    let trigger_summary = if !details.reason.trim().is_empty() {
+        details.reason.trim()
+    } else if details.is_auto {
+        "Auto-Switcher (Quota boundary)"
+    } else {
+        "Manual rotation triggered by user"
     };
 
     // Extract active running prompt and any associated images for this instance
@@ -164,13 +206,20 @@ pub(crate) async fn dispatch_telegram_switch_alert(
         String::new()
     };
 
-    let telemetry_banner = format!(
-        "🖥️ <b>Machine:</b> <code>{}</code> (<code>{}</code>) | 🏷️ <b>Instance:</b> <code>{}</code> | 👤 <b>Bound:</b> <code>{}</code>",
-        escape_telegram_html(&m_name),
-        escape_telegram_html(&m_ip),
-        escape_telegram_html(&details.instance_name),
-        escape_telegram_html(&selected_masked)
-    );
+    let node_line = if !m_ip.is_empty() && m_ip != "127.0.0.1" && m_ip != "Unknown IP" {
+        format!(
+            "🖥️ <b>Machine:</b> <b>{}</b> [<code>{}</code>] • 🏷️ <b>Instance:</b> <b>{}</b>",
+            escape_telegram_html(&m_name),
+            escape_telegram_html(&m_ip),
+            escape_telegram_html(&details.instance_name),
+        )
+    } else {
+        format!(
+            "🖥️ <b>Machine:</b> <b>{}</b> • 🏷️ <b>Instance:</b> <b>{}</b>",
+            escape_telegram_html(&m_name),
+            escape_telegram_html(&details.instance_name),
+        )
+    };
 
     let palette = telegram_inbound::active_card_palette();
     let prompt_section = if !prompt_preview_text.is_empty() {
@@ -182,97 +231,74 @@ pub(crate) async fn dispatch_telegram_switch_alert(
     } else {
         String::new()
     };
+
     let quota = telegram_inbound::section(
         palette,
         "Quota &amp; rotation",
         &[
-            telegram_inbound::kv(
+            telegram_inbound::kv_block(
                 palette,
                 "Previous account",
-                &escape_telegram_html(&from_display),
-            ),
-            telegram_inbound::sub_line(
-                palette,
                 &format!(
-                    "4h: {} · Week: {}",
+                    "<b>{}</b> (4h: <b>{}</b> · Week: <b>{}</b>)",
+                    escape_telegram_html(&from_display),
                     escape_telegram_html(&prev_4h_str),
                     escape_telegram_html(&prev_weekly_str)
                 ),
             ),
-            telegram_inbound::kv(
+            telegram_inbound::kv_block(
                 palette,
                 "Selected account",
-                &escape_telegram_html(&selected_masked),
-            ),
-            telegram_inbound::sub_line(
-                palette,
                 &format!(
-                    "4h: {} · Week: {}",
+                    "<b>{}</b> (4h: <b>{}</b> · Week: <b>{}</b>)",
+                    escape_telegram_html(&selected_masked),
                     escape_telegram_html(&target_4h_str),
                     escape_telegram_html(&target_weekly_str)
                 ),
             ),
-            telegram_inbound::kv(
+            telegram_inbound::kv_block(
                 palette,
-                "Threshold guard",
+                "Rotation trigger",
                 &format!(
-                    "{} · {}",
-                    escape_telegram_html(&threshold_display),
-                    escape_telegram_html(&trigger_label)
+                    "<b>{}</b> (Guard: <b>{}</b>)",
+                    escape_telegram_html(trigger_summary),
+                    escape_telegram_html(&threshold_display)
                 ),
             ),
         ],
     );
+
     let workspace = telegram_inbound::section(
         palette,
         "Workspace",
         &[
-            telegram_inbound::kv(
+            telegram_inbound::kv_block(
                 palette,
-                "Projects",
-                &escape_telegram_html(&projects_display),
+                &format!("Active projects ({})", total_projects),
+                &projects_formatted,
             ),
-            telegram_inbound::kv(
-                palette,
-                "Prompt vault",
-                &escape_telegram_html(&backup_stats),
-            ),
-            telegram_inbound::kv(
-                palette,
-                "Event reason",
-                &escape_telegram_html(&details.reason),
-            ),
-            telegram_inbound::kv(
-                palette,
-                "Version",
-                &format!(
-                    "{} · {}",
-                    escape_telegram_html(&pkg_ver),
-                    escape_telegram_html(&now_str)
-                ),
-            ),
+            telegram_inbound::kv_block(palette, "Prompt vault", &vault_summary),
         ],
     );
 
     let text = format!(
         "{} <b>Antigravity Manager · Account Rotation</b>\n\
         {}\n\
-        {}\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
         {}\n\
         {}\
         {}\
-        {}\
         {}\n\
-        {}",
+        <i>{} Antigravity Manager {} · {}</i>",
         palette.mark,
-        palette.rule,
-        telemetry_banner,
-        palette.rule,
+        node_line,
         quota,
         workspace,
         attached_images_section,
         prompt_section,
-        telegram_inbound::theme_footer(palette)
+        palette.mark,
+        escape_telegram_html(&pkg_ver),
+        palette.label
     );
 
     let reply_markup = Some(telegram_inbound::build_switch_alert_reply_markup(
