@@ -54,7 +54,7 @@ pub(crate) fn read_conversation_summary_rows(conn: &Connection) -> Vec<Conversat
             cid: row.get(0)?,
             preview: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
             status: String::new(),
-            not_fully_idle: 0,
+            not_fully_idle: 1,
             workspace_uris: row.get(2)?,
             last_modified_time: None,
         })

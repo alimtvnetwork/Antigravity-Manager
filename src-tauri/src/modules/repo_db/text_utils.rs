@@ -55,7 +55,8 @@ pub fn strip_internal_id_wrappers(raw: &str) -> String {
     text.trim().to_string()
 }
 
-/// Extract clean prompt text by stripping <USER_REQUEST> / <ADDITIONAL_METADATA> tags if present
+/// Extract clean prompt text by stripping <USER_REQUEST> / <ADDITIONAL_METADATA> tags if present.
+/// If stripping XML tags results in an empty string, falls back to returning the original trimmed prompt.
 pub fn extract_clean_user_prompt(raw: &str) -> String {
     let mut text = raw.trim();
     if let Some(start) = text.find("<USER_REQUEST>") {
@@ -72,7 +73,12 @@ pub fn extract_clean_user_prompt(raw: &str) -> String {
     if let Some(end) = text.find("<CONTEXT_SUMMARY>") {
         text = &text[..end];
     }
-    strip_internal_id_wrappers(text.trim())
+    let cleaned = strip_internal_id_wrappers(text.trim());
+    if cleaned.trim().is_empty() && !raw.trim().is_empty() {
+        raw.trim().to_string()
+    } else {
+        cleaned
+    }
 }
 
 /// Extract smart, readable summary of a prompt for display in CLI and Telegram.
@@ -297,6 +303,9 @@ mod tests {
 
         let simple = "Simple task prompt";
         assert_eq!(extract_clean_user_prompt(simple), "Simple task prompt");
+
+        let stripped_empty = "<ADDITIONAL_METADATA>only meta</ADDITIONAL_METADATA>";
+        assert_eq!(extract_clean_user_prompt(stripped_empty), stripped_empty);
     }
 
     #[test]

@@ -106,11 +106,24 @@ export function TreePanel(props: TreePanelProps) {
 
     const isEffectiveLoading = isLoading ?? subLoading;
 
+    const isScopedSingleProject = selectedProjectScope !== 'all';
+
+    const isFilterActive = searchQuery !== '' || activeFilter !== 'all' || categoryFilter !== 'all' || selectedProjectScope !== 'all';
+    const isQueuedView = activeFilter === 'queued' && Boolean(onResendQueued);
+
+    const handleResetFilters = () => {
+        setSearchQuery('');
+        setActiveFilter('all');
+        setCategoryFilter('all');
+        setSelectedProjectScope('all');
+    };
+
     const renderProject = (project: AgmProjectTreeNode) => (
         <ProjectNode
             key={project.project_id}
             project={project}
-            isExpanded={Boolean(expandedProjects[project.project_id])}
+            isExpanded={isScopedSingleProject || Boolean(expandedProjects[project.project_id])}
+            isScopedSingleProject={isScopedSingleProject}
             isSelected={selectedProjectId === project.project_id}
             isPinned={pinnedProjectIds.includes(project.project_id)}
             isArchived={archivedProjectIds.includes(project.project_id)}
@@ -135,22 +148,39 @@ export function TreePanel(props: TreePanelProps) {
         <div className="w-80 sm:w-96 flex flex-col border-r border-slate-200 dark:border-[#40285e] bg-slate-50/50 dark:bg-[#090611]/60">
             {/* Search Input & Filter Controls */}
             <div className="p-3 border-b border-slate-200 dark:border-[#40285e] shrink-0 space-y-2">
-                {/* Project Scope Dropdown */}
-                <div className="flex items-center gap-1.5 bg-white dark:bg-[#171025] px-2 py-1 rounded-[5px] border border-slate-200 dark:border-[#40285e]">
-                    <Folder className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                    <select
-                        value={selectedProjectScope}
-                        onChange={(e) => setSelectedProjectScope(e.target.value)}
-                        className="w-full text-xs font-medium bg-transparent border-0 focus:ring-0 focus:outline-none text-slate-800 dark:text-slate-200 cursor-pointer"
-                        title="Filter tree by project scope"
-                    >
-                        <option value="all" className="dark:bg-[#171025]">All Projects ({treeData.length})</option>
-                        {treeData.map((p) => (
-                            <option key={p.project_id} value={p.project_id} className="dark:bg-[#171025]">
-                                {p.repo_name} {p.is_running ? '●' : ''} ({p.conversations.length} convs)
-                            </option>
-                        ))}
-                    </select>
+                {/* Project Scope Dropdown & Quick Pin Header */}
+                <div className="flex items-center justify-between gap-1.5 bg-white dark:bg-[#171025] px-2 py-1 rounded-[5px] border border-slate-200 dark:border-[#40285e]">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <Folder className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                        <select
+                            value={selectedProjectScope}
+                            onChange={(e) => setSelectedProjectScope(e.target.value)}
+                            className="w-full text-xs font-medium bg-transparent border-0 focus:ring-0 focus:outline-none text-slate-800 dark:text-slate-200 cursor-pointer truncate"
+                            title="Filter tree by project scope"
+                        >
+                            <option value="all" className="dark:bg-[#171025]">All Projects ({treeData.length})</option>
+                            {treeData.map((p) => (
+                                <option key={p.project_id} value={p.project_id} className="dark:bg-[#171025]">
+                                    {p.repo_name} {p.is_running ? '●' : ''} ({p.conversations.length} convs)
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    {selectedProjectScope !== 'all' && (
+                        <button
+                            type="button"
+                            onClick={(e) => onTogglePin(selectedProjectScope, e)}
+                            className={cn(
+                                "p-1 rounded-[4px] transition-colors cursor-pointer shrink-0",
+                                pinnedProjectIds.includes(selectedProjectScope)
+                                    ? "text-amber-500 bg-amber-50 dark:bg-amber-950/40"
+                                    : "text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#40285e]"
+                            )}
+                            title={pinnedProjectIds.includes(selectedProjectScope) ? "Unpin project" : "Pin project to prompt view"}
+                        >
+                            <Pin className={cn("w-3.5 h-3.5", pinnedProjectIds.includes(selectedProjectScope) && "fill-current")} />
+                        </button>
+                    )}
                 </div>
 
                 {/* Search Input */}
@@ -287,25 +317,37 @@ export function TreePanel(props: TreePanelProps) {
                     </select>
                 </div>
 
-                {/* Re-send queued prompts: visible in the queue view (Queued filter).
-                    GUI twin of `agm prompts resend-queued` — same backend, same
-                    FIFO single-dispatch pipeline, real sent/skipped/failed counts. */}
-                {activeFilter === 'queued' && onResendQueued && (
-                    <div className="flex items-center justify-end pt-1">
-                        <button
-                            type="button"
-                            onClick={onResendQueued}
-                            disabled={isResendingQueued}
-                            className={cn(
-                                "flex items-center gap-1.5 px-3 py-1 text-[10px] font-semibold rounded-full transition-colors cursor-pointer",
-                                "bg-amber-600/10 text-amber-700 dark:text-amber-300 border border-amber-500/40",
-                                "hover:bg-amber-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                            )}
-                            title="Re-send all queued prompts in FIFO order (durable backup first; already-sent prompts are skipped)"
-                        >
-                            <RotateCcw className={cn("w-2.5 h-2.5 shrink-0", isResendingQueued && "animate-spin")} />
-                            <span>{isResendingQueued ? 'Re-sending…' : 'Re-send queued prompts'}</span>
-                        </button>
+                {/* Row 3: Action Buttons (Reset Filters & Re-send queued prompts) */}
+                {(isFilterActive || isQueuedView) && (
+                    <div className="flex items-center justify-between gap-1 pt-0.5">
+                        {isFilterActive ? (
+                            <button
+                                type="button"
+                                onClick={handleResetFilters}
+                                className="flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50/80 dark:bg-blue-950/40 hover:bg-blue-100/80 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800/60 rounded-full transition-all cursor-pointer shadow-2xs"
+                                title="Reset all search and tree filters back to default"
+                            >
+                                <RotateCcw className="w-2.5 h-2.5 shrink-0" />
+                                <span>Reset Filters</span>
+                            </button>
+                        ) : <div />}
+
+                        {isQueuedView && (
+                            <button
+                                type="button"
+                                onClick={onResendQueued}
+                                disabled={isResendingQueued}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-3 py-1 text-[10px] font-semibold rounded-full transition-colors cursor-pointer",
+                                    "bg-amber-600/10 text-amber-700 dark:text-amber-300 border border-amber-500/40",
+                                    "hover:bg-amber-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                )}
+                                title="Re-send all queued prompts in FIFO order (durable backup first; already-sent prompts are skipped)"
+                            >
+                                <RotateCcw className={cn("w-2.5 h-2.5 shrink-0", isResendingQueued && "animate-spin")} />
+                                <span>{isResendingQueued ? 'Re-sending…' : 'Re-send queued prompts'}</span>
+                            </button>
+                        )}
                     </div>
                 )}
             </div>

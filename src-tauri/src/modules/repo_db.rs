@@ -43,9 +43,10 @@ pub mod verification;
 // ---- models ----
 pub use models::{
     ActivePrompt, AgmConversationNode, AgmProjectTreeNode, AgmSequenceResolution,
-    AutoResumePromptInfo, AutoResumeResult, FailedCommandRecord, ProjectExecutionInfo,
-    ProjectLivenessEvaluation, PromptGoalHeartbeatConfig, PromptLivenessProbe, RunningProject,
-    SwitchPromptSnap, TranscriptInspection,
+    AutoResumePromptInfo, AutoResumeResult, FailedCommandRecord, ProjectAuditRationaleType,
+    ProjectExecutionInfo, ProjectLivenessEvaluation, PromptAuditCriteriaType,
+    PromptGoalHeartbeatConfig, PromptLivenessProbe, RunningProject, SwitchPromptSnap,
+    TranscriptInspection,
 };
 // ---- state ----
 pub use state::{get_dispatched_prompts_cache, get_memory_prompt, reset_dispatched_prompts_cache};

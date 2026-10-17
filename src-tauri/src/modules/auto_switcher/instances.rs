@@ -31,6 +31,11 @@ pub fn is_instance_binding_stale_or_exhausted(
     target_model: &str,
     now_sec: i64,
 ) -> bool {
+    // If actively running, an instance's binding is NEVER stale or available for theft!
+    if is_running {
+        return false;
+    }
+
     let stale_timeout_secs = (stale_timeout_hours.clamp(1, 24) as i64) * 3600;
     let is_stale_time = inst.last_used > 0 && (now_sec - inst.last_used) > stale_timeout_secs;
 
@@ -218,4 +223,44 @@ pub fn is_account_in_use_core(
         }
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::InstanceConfig;
+
+    #[test]
+    fn test_running_instance_binding_is_never_stale_or_exhausted() {
+        let inst = InstanceConfig {
+            id: "test-running-inst".to_string(),
+            name: "Running Instance".to_string(),
+            data_dir: "/tmp/running".to_string(),
+            executable_path: None,
+            extensions_dir: None,
+            bound_account_id: Some("exhausted-acc".to_string()),
+            bound_email: None,
+            created_at: 100,
+            last_used: 100, // very old timestamp
+            is_default: false,
+            pid: None,
+            seq_num: Some(1),
+        };
+
+        // When is_running is true, it MUST return false immediately
+        let is_stale =
+            is_instance_binding_stale_or_exhausted(&inst, true, 6, "gemini-2.5-pro", 100_000);
+        assert!(
+            !is_stale,
+            "Actively running instance binding must never be considered stale or exhausted"
+        );
+
+        // When is_running is false and last_used is old, it returns true
+        let is_stale_stopped =
+            is_instance_binding_stale_or_exhausted(&inst, false, 6, "gemini-2.5-pro", 100_000);
+        assert!(
+            is_stale_stopped,
+            "Stopped instance with expired last_used must be considered stale"
+        );
+    }
 }

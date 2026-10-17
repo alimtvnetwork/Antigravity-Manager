@@ -1,4 +1,69 @@
+use std::fmt;
+
 use super::*;
+
+/// Canonical identifier for the default shared instance.
+pub const DEFAULT_INSTANCE_ID: &str = "default";
+
+/// Legacy internal identifier for the default instance preserved for backward database compatibility.
+pub const LEGACY_DEFAULT_INSTANCE_ID: &str = "__default__";
+
+/// Determine whether the given instance identifier designates the default instance.
+/// Matches "default", "__default__", or an empty / whitespace-only string.
+#[inline]
+pub fn is_default_instance(id: &str) -> bool {
+    let trimmed = id.trim();
+    trimmed.is_empty()
+        || trimmed.eq_ignore_ascii_case(DEFAULT_INSTANCE_ID)
+        || trimmed == LEGACY_DEFAULT_INSTANCE_ID
+}
+
+/// Normalize an arbitrary instance identifier: returns "default" if it represents
+/// the default instance, or the trimmed identifier otherwise.
+#[inline]
+pub fn normalize_instance_id<'a>(id: &'a str) -> &'a str {
+    if is_default_instance(id) {
+        DEFAULT_INSTANCE_ID
+    } else {
+        id.trim()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum InstanceModeType {
+    Default,
+    Isolated,
+}
+
+impl InstanceModeType {
+    #[inline]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Default => "default",
+            Self::Isolated => "isolated",
+        }
+    }
+
+    #[inline]
+    pub const fn from_bool(is_default: bool) -> Self {
+        if is_default {
+            Self::Default
+        } else {
+            Self::Isolated
+        }
+    }
+
+    #[inline]
+    pub const fn is_default(&self) -> bool {
+        matches!(self, Self::Default)
+    }
+}
+
+impl fmt::Display for InstanceModeType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
 
 pub(crate) fn resolve_switch_context(
     new_email: &str,
@@ -15,7 +80,7 @@ pub(crate) fn resolve_switch_context(
 
     let mut inst_id = instance_spec.to_string();
     let mut inst_name = instance_spec.to_string();
-    let mut is_default = instance_spec.eq_ignore_ascii_case("default");
+    let mut is_default = is_default_instance(instance_spec);
 
     if let Ok(registry) = crate::modules::instance::load_registry() {
         let found = registry
@@ -35,7 +100,7 @@ pub(crate) fn resolve_switch_context(
         if let Some(inst) = found {
             inst_id = inst.id.clone();
             inst_name = inst.name.clone();
-            is_default = inst.is_default || inst.id == "default";
+            is_default = inst.is_default || is_default_instance(&inst.id);
 
             if old_email.is_empty() || old_email.eq_ignore_ascii_case(new_email) {
                 if let Some(ref b_email) = inst.bound_email {
@@ -74,13 +139,14 @@ pub(crate) fn resolve_switch_context(
         }
     }
 
-    let instance_mode = if is_default {
-        "default".to_string()
-    } else {
-        "isolated".to_string()
-    };
+    let instance_mode = InstanceModeType::from_bool(is_default);
 
-    (old_email, inst_id, inst_name, instance_mode)
+    (
+        old_email,
+        inst_id,
+        inst_name,
+        instance_mode.as_str().to_string(),
+    )
 }
 
 #[derive(Debug, Clone, Default)]
@@ -111,7 +177,7 @@ pub fn resolve_current_telemetry_identity() -> (String, String, String, String) 
         .unwrap_or_else(|_| crate::modules::email_watcher::detect_machine_name());
     let ip = crate::modules::email_watcher::detect_local_ip();
 
-    let mut instance_id = "default".to_string();
+    let mut instance_id = DEFAULT_INSTANCE_ID.to_string();
     let mut bound_email = String::new();
 
     if let Ok(registry) = crate::modules::instance::load_registry() {
@@ -119,7 +185,12 @@ pub fn resolve_current_telemetry_identity() -> (String, String, String, String) 
             .instances
             .iter()
             .find(|i| i.id == registry.active_instance_id)
-            .or_else(|| registry.instances.iter().find(|i| i.is_default))
+            .or_else(|| {
+                registry
+                    .instances
+                    .iter()
+                    .find(|i| i.is_default || is_default_instance(&i.id))
+            })
             .or_else(|| registry.instances.first());
 
         if let Some(inst) = active {

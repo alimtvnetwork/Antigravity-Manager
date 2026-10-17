@@ -118,8 +118,106 @@ export function extractAssets(text: string): { images: string[]; files: string[]
 }
 
 /**
+ * Converts a base64 string to a Blob.
+ */
+export function base64ToBlob(base64Data: string, mimeType = 'image/png'): Blob {
+    const byteString = atob(base64Data);
+    const arrayBuffer = new ArrayBuffer(byteString.length);
+    const uint8Array = new Uint8Array(arrayBuffer);
+    for (let i = 0; i < byteString.length; i++) {
+        uint8Array[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([uint8Array], { type: mimeType });
+}
+
+/**
+ * Converts an image URI (Base64 data URI, HTTP URL, or local file/blob URI)
+ * into a true PNG binary Blob (image/png) for native clipboard insertion.
+ */
+export async function convertImageUriToPngBlob(imageUri: string): Promise<Blob | null> {
+    try {
+        if (!imageUri || !imageUri.trim()) return null;
+        const cleanUri = imageUri.trim();
+
+        // 1. If it's already a PNG data URI, decode base64 directly to binary blob
+        if (cleanUri.startsWith('data:image/png;base64,')) {
+            const base64 = cleanUri.slice('data:image/png;base64,'.length);
+            return base64ToBlob(base64, 'image/png');
+        }
+
+        // 2. Offscreen rendering to HTMLCanvasElement to guarantee standard PNG binary encoding
+        return await new Promise<Blob | null>((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth || img.width || 300;
+                    canvas.height = img.naturalHeight || img.height || 150;
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        resolve(null);
+                        return;
+                    }
+                    ctx.drawImage(img, 0, 0);
+                    canvas.toBlob((blob) => {
+                        resolve(blob);
+                    }, 'image/png');
+                } catch {
+                    resolve(null);
+                }
+            };
+            img.onerror = () => {
+                resolve(null);
+            };
+            img.src = cleanUri;
+        });
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Writes a single image directly to the system clipboard as a native binary PNG (image/png).
+ * This enables pasting directly into apps like Gemini Web, Photoshop, Paint, Discord, etc.
+ */
+export async function writeNativeImageToClipboard(
+    imageUri: string,
+    onSuccess?: (msg: string) => void,
+    onError?: (err: unknown) => void
+): Promise<boolean> {
+    try {
+        if (!imageUri || !imageUri.trim()) {
+            throw new Error('No image URI provided to copy');
+        }
+        const pngBlob = await convertImageUriToPngBlob(imageUri);
+        if (!pngBlob) {
+            throw new Error('Failed to convert image to PNG binary blob');
+        }
+        if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
+            throw new Error('Clipboard API unavailable in this environment');
+        }
+        const item = new ClipboardItem({
+            'image/png': pngBlob,
+        });
+        await navigator.clipboard.write([item]);
+        const msg = 'Image copied to clipboard as native PNG!';
+        onSuccess?.(msg);
+        showToast({ message: msg, type: 'success' });
+        return true;
+    } catch (err) {
+        useErrorStore.getState().trackWarning(err, {
+            source: 'clipboard.writeNativeImageToClipboard',
+            triggerAction: 'write_native_image',
+        });
+        onError?.(err);
+        return false;
+    }
+}
+
+/**
  * Copies markdown prompt content and embedded images into system clipboard
- * simultaneously using dual MIME types ('text/html' and 'text/plain')
+ * simultaneously using triple/dual MIME types ('image/png', 'text/html', and 'text/plain')
  * with a resilient tri-stage fallback ladder (Async Clipboard API -> DOM execCommand -> Native IPC).
  */
 export async function copyPromptWithRichImages(
@@ -171,12 +269,39 @@ export async function copyPromptWithRichImages(
         const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
         const textBlob = new Blob([markdownText], { type: 'text/plain' });
 
-        const item = new ClipboardItem({
-            'text/html': htmlBlob,
-            'text/plain': textBlob,
-        });
+        // Extract first image to attach true binary image/png alongside html and text
+        const { images } = extractAssets(markdownText);
+        let pngBlob: Blob | null = null;
+        if (images.length > 0) {
+            pngBlob = await convertImageUriToPngBlob(images[0]);
+        }
 
-        await navigator.clipboard.write([item]);
+        let isWritten = false;
+        if (pngBlob) {
+            try {
+                const item = new ClipboardItem({
+                    'image/png': pngBlob,
+                    'text/html': htmlBlob,
+                    'text/plain': textBlob,
+                });
+                await navigator.clipboard.write([item]);
+                isWritten = true;
+            } catch (tripleErr) {
+                useErrorStore.getState().trackWarning(tripleErr, {
+                    source: 'PromptTree.copyPromptWithRichImages.tripleMime',
+                    triggerAction: 'clipboard.write.triple',
+                });
+            }
+        }
+
+        if (!isWritten) {
+            const item = new ClipboardItem({
+                'text/html': htmlBlob,
+                'text/plain': textBlob,
+            });
+            await navigator.clipboard.write([item]);
+        }
+
         const successMsg = 'Copied full prompt with embedded rich images to clipboard!';
         onSuccess?.(successMsg);
         showToast({ message: successMsg, type: 'success' });

@@ -41,6 +41,7 @@ export interface ProjectNodeProps {
     onTogglePin: (projectId: string, e: React.MouseEvent) => void;
     onToggleArchive: (projectId: string, e: React.MouseEvent) => void;
     onProjectContextMenu?: (e: React.MouseEvent, repoName: string, project?: AgmProjectTreeNode) => void;
+    isScopedSingleProject?: boolean;
 }
 
 export function sortConversations(
@@ -304,6 +305,7 @@ export function ProjectNode(props: ProjectNodeProps) {
         onTogglePin,
         onToggleArchive,
         onProjectContextMenu,
+        isScopedSingleProject = false,
     } = props;
 
     const filteredConvs = project.conversations.filter((c) => {
@@ -366,124 +368,135 @@ export function ProjectNode(props: ProjectNodeProps) {
 
     return (
         <div key={project.project_id} className="space-y-0.5">
-            {/* Layer 1: Project Row */}
-            <div
-                onClick={() => {
-                    onSelectProject(project);
-                    onToggleExpand(project.project_id);
-                }}
-                onContextMenu={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (onProjectContextMenu) {
-                        onProjectContextMenu(e, project.repo_name, project);
-                    } else {
-                        setProjectMenuPos({ x: e.clientX, y: e.clientY });
-                    }
-                }}
-                className={cn(
-                    'group flex items-center justify-between rounded-[5px] px-2.5 py-1.5 text-xs font-semibold cursor-pointer transition-colors',
-                    isSelected
-                        ? 'bg-blue-100/70 text-blue-900 dark:bg-blue-950/60 dark:text-cyan-300'
-                        : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#171025]'
-                )}
-                title={`Project: ${project.repo_name} · ${totalProjectPrompts} prompts total`}
-            >
-                <div className="flex items-center gap-1.5 min-w-0">
-                    {isExpanded ? (
-                        <ChevronDown className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                    ) : (
-                        <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+            {/* Layer 1: Project Row (Hidden when a specific project is selected in the scope dropdown) */}
+            {!isScopedSingleProject && (
+                <div
+                    onClick={() => {
+                        onSelectProject(project);
+                        onToggleExpand(project.project_id);
+                    }}
+                    onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (onProjectContextMenu) {
+                            onProjectContextMenu(e, project.repo_name, project);
+                        } else {
+                            setProjectMenuPos({ x: e.clientX, y: e.clientY });
+                        }
+                    }}
+                    className={cn(
+                        'group flex items-center justify-between rounded-[5px] px-2.5 py-1.5 text-xs font-semibold cursor-pointer transition-colors',
+                        isSelected
+                            ? 'bg-blue-100/70 text-blue-900 dark:bg-blue-950/60 dark:text-cyan-300'
+                            : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#171025]'
                     )}
-                    <Folder className="h-4 w-4 text-amber-500 shrink-0" />
-                    <span
-                        className={cn(
-                            'text-[9px] font-mono px-1 py-0.2 rounded-[3px] shrink-0 font-medium whitespace-nowrap',
-                            isSelected
-                                ? 'bg-blue-600/20 text-blue-700 dark:text-cyan-300 border border-blue-500/30'
-                                : 'bg-slate-200 dark:bg-[#40285e] text-slate-600 dark:text-cyan-400'
+                    title={`Project: ${project.repo_name} · ${totalProjectPrompts} prompts total`}
+                >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                        {isExpanded ? (
+                            <ChevronDown className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        ) : (
+                            <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                         )}
-                        title={project.gitmap_seq_code || (project.seq_id ? `Project #${project.seq_id}` : undefined)}
-                    >
-                        {formatSeqBadge(project.seq_code, '#P001')}
-                    </span>
-                    <span className="truncate">{project.repo_name}</span>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                    {runningCount > 0 && (
-                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30">
-                            <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#1af18d] shadow-[0_0_6px_rgba(26,241,141,0.9)] animate-pulse"></span>
-                            </span>
-                            <span className="text-[9px] font-bold font-mono text-emerald-700 dark:text-[#1af18d]">
-                                {runningCount} RUNNING
-                            </span>
-                        </div>
-                    )}
-                    {queuedCount > 0 && (
-                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30">
-                            <Clock className="w-2.5 h-2.5 text-amber-500 shrink-0" />
-                            <span className="text-[9px] font-bold font-mono text-amber-700 dark:text-amber-300">
-                                {queuedCount} QUEUED
-                            </span>
-                        </div>
-                    )}
-                    {/* Project Action Button Cluster - Hover Only */}
-                    <div className={cn(
-                        "flex items-center gap-0.5 transition-opacity duration-150 shrink-0",
-                        isPinned || isArchived || isRefreshing
-                            ? "opacity-100"
-                            : "opacity-0 group-hover:opacity-100"
-                    )}>
-                        <button
-                            type="button"
-                            onClick={(e) => onRefresh(project.project_id, e)}
-                            disabled={isRefreshing}
-                            className="p-1 rounded-[5px] text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
-                            title="Refresh this project"
-                        >
-                            <RotateCw className={cn("w-3 h-3", isRefreshing && "animate-spin text-blue-500")} />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={(e) => onTogglePin(project.project_id, e)}
+                        <Folder className="h-4 w-4 text-amber-500 shrink-0" />
+                        <span
                             className={cn(
-                                "p-1 rounded-[5px] transition-colors cursor-pointer",
-                                isPinned
-                                    ? "text-amber-500 bg-amber-50 dark:bg-amber-950/40"
-                                    : "text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#40285e]"
+                                'text-[9px] font-mono px-1 py-0.2 rounded-[3px] shrink-0 font-medium whitespace-nowrap',
+                                isSelected
+                                    ? 'bg-blue-600/20 text-blue-700 dark:text-cyan-300 border border-blue-500/30'
+                                    : 'bg-slate-200 dark:bg-[#40285e] text-slate-600 dark:text-cyan-400'
                             )}
-                            title={isPinned ? "Unpin project" : "Pin project to top"}
+                            title={project.gitmap_seq_code || (project.seq_id ? `Project #${project.seq_id}` : undefined)}
                         >
-                            <Pin className={cn("w-3 h-3", isPinned && "fill-current")} />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={(e) => onToggleArchive(project.project_id, e)}
-                            className={cn(
-                                "p-1 rounded-[5px] transition-colors cursor-pointer",
-                                isArchived
-                                    ? "text-rose-500 bg-rose-50 dark:bg-rose-950/40"
-                                    : "text-slate-400 hover:text-rose-500 hover:bg-slate-200 dark:hover:bg-[#40285e]"
-                            )}
-                            title={isArchived ? "Unarchive project" : "Archive / Less Favorite (Thumbs Down)"}
-                        >
-                            {isArchived ? (
-                                <ArchiveRestore className="w-3 h-3 text-rose-500" />
-                            ) : (
-                                <Archive className="w-3 h-3" />
-                            )}
-                        </button>
+                            {formatSeqBadge(project.seq_code, '#P001')}
+                        </span>
+                        <span className="truncate">{project.repo_name}</span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                        {runningCount > 0 && (
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#1af18d] shadow-[0_0_6px_rgba(26,241,141,0.9)] animate-pulse"></span>
+                                </span>
+                                <span className="text-[9px] font-bold font-mono text-emerald-700 dark:text-[#1af18d]">
+                                    {runningCount} RUNNING
+                                </span>
+                            </div>
+                        )}
+                        {queuedCount > 0 && (
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30">
+                                <Clock className="w-2.5 h-2.5 text-amber-500 shrink-0" />
+                                <span className="text-[9px] font-bold font-mono text-amber-700 dark:text-amber-300">
+                                    {queuedCount} QUEUED
+                                </span>
+                            </div>
+                        )}
+                        {/* Project Action Button Cluster - Hover Only */}
+                        <div className={cn(
+                            "flex items-center gap-0.5 transition-opacity duration-150 shrink-0",
+                            isPinned || isArchived || isRefreshing
+                                ? "opacity-100"
+                                : "opacity-0 group-hover:opacity-100"
+                        )}>
+                            <button
+                                type="button"
+                                onClick={(e) => onRefresh(project.project_id, e)}
+                                disabled={isRefreshing}
+                                className="p-1 rounded-[5px] text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
+                                title="Refresh this project"
+                            >
+                                <RotateCw className={cn("w-3 h-3", isRefreshing && "animate-spin text-blue-500")} />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={(e) => onTogglePin(project.project_id, e)}
+                                className={cn(
+                                    "p-1 rounded-[5px] transition-colors cursor-pointer",
+                                    isPinned
+                                        ? "text-amber-500 bg-amber-50 dark:bg-amber-950/40"
+                                        : "text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#40285e]"
+                                )}
+                                title={isPinned ? "Unpin project" : "Pin project to top"}
+                            >
+                                <Pin className={cn("w-3 h-3", isPinned && "fill-current")} />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={(e) => onToggleArchive(project.project_id, e)}
+                                className={cn(
+                                    "p-1 rounded-[5px] transition-colors cursor-pointer",
+                                    isArchived
+                                        ? "text-rose-500 bg-rose-50 dark:bg-rose-950/40"
+                                        : "text-slate-400 hover:text-rose-500 hover:bg-slate-200 dark:hover:bg-[#40285e]"
+                                )}
+                                title={isArchived ? "Unarchive project" : "Archive / Less Favorite (Thumbs Down)"}
+                            >
+                                {isArchived ? (
+                                    <ArchiveRestore className="w-3 h-3 text-rose-500" />
+                                ) : (
+                                    <Archive className="w-3 h-3" />
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* Layer 2: Conversations List */}
-            {isExpanded && (
-                <div className="ml-4 pl-2 border-l border-slate-200 dark:border-[#40285e]/60 space-y-0.5 py-0.5">
+            {(isExpanded || isScopedSingleProject) && (
+                <div className={cn(
+                    "space-y-0.5 py-0.5",
+                    !isScopedSingleProject && "ml-4 pl-2 border-l border-slate-200 dark:border-[#40285e]/60"
+                )}>
                     {/* Active Conversations */}
                     <ConversationListWithGrouping convList={activeConversations} {...listProps} />
+
+                    {activeConversations.length === 0 && staleConversations.length === 0 && (
+                        <div className="py-8 text-center text-xs text-slate-400">
+                            No conversations found in {project.repo_name}.
+                        </div>
+                    )}
 
                     {/* Collapsible Stale / Empty Prompts Node */}
                     {staleConversations.length > 0 && (

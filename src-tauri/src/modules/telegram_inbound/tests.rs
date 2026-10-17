@@ -293,4 +293,44 @@ pub(crate) mod tests {
             || id_input.to_lowercase().starts_with("fix");
         assert!(!is_id_prompt);
     }
+
+    #[test]
+    fn test_prompt_execution_status_type_enum() {
+        use super::types::PromptExecutionStatusType;
+        let executing = PromptExecutionStatusType::from_spawned(true);
+        assert_eq!(executing, PromptExecutionStatusType::ExecutingNow);
+        assert_eq!(executing.display_label(), "Executing now");
+        assert_eq!(executing.to_string(), "Executing now");
+        assert!(executing.is_executing());
+        assert!(!executing.is_queued());
+
+        let queued = PromptExecutionStatusType::from_spawned(false);
+        assert_eq!(queued, PromptExecutionStatusType::Queued);
+        assert_eq!(queued.display_label(), "Queued");
+        assert_eq!(queued.to_string(), "Queued");
+        assert!(queued.is_queued());
+        assert!(!queued.is_executing());
+    }
+
+    #[test]
+    fn test_remote_dispatch_status_type_enum() {
+        use super::types::RemoteDispatchStatusType;
+        let gitmap = RemoteDispatchStatusType::resolve(true, false);
+        assert_eq!(gitmap, RemoteDispatchStatusType::GitMapClusterSsh);
+        assert_eq!(gitmap.to_string(), "Sent via GitMap Cluster SSH");
+
+        let supabase = RemoteDispatchStatusType::resolve(false, true);
+        assert_eq!(supabase, RemoteDispatchStatusType::SupabaseQueued);
+        assert_eq!(
+            supabase.to_string(),
+            "Queued on the secondary database — the node will pick it up"
+        );
+
+        let local = RemoteDispatchStatusType::resolve(false, false);
+        assert_eq!(local, RemoteDispatchStatusType::LocalRecorded);
+        assert_eq!(
+            local.to_string(),
+            "Queued (the node recorded your instruction)"
+        );
+    }
 }

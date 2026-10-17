@@ -11,8 +11,9 @@ import type { PromptTreeState } from './usePromptTreeState';
 import type { ExportScopeParams } from './PromptTreeExportModal';
 
 export interface PromptTreeCoreActions {
-    togglePinProject: (projectId: string, e: React.MouseEvent) => void;
-    toggleArchiveProject: (projectId: string, e: React.MouseEvent) => void;
+    togglePinProject: (projectId: string, e?: React.MouseEvent) => void;
+    toggleArchiveProject: (projectId: string, e?: React.MouseEvent) => void;
+    isProjectPinned: (projectId: string) => boolean;
     handleRefreshSingleProject: (projectId: string, e: React.MouseEvent) => Promise<void>;
     handleBackup: () => Promise<void>;
     handleFileRestore: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -225,9 +226,14 @@ export function usePromptTreeCoreActions({
         });
     }, [treeData, setActionMsg]);
 
+    const isProjectPinned = useCallback(
+        (projectId: string): boolean => pinnedProjectIds.includes(projectId),
+        [pinnedProjectIds]
+    );
+
     const togglePinProject = useCallback(
-        (projectId: string, e: React.MouseEvent) => {
-            e.stopPropagation();
+        (projectId: string, e?: React.MouseEvent) => {
+            e?.stopPropagation?.();
             setPinnedProjectIds((prev) => {
                 const next = prev.includes(projectId) ? prev.filter((id) => id !== projectId) : [...prev, projectId];
                 try {
@@ -246,8 +252,8 @@ export function usePromptTreeCoreActions({
     );
 
     const toggleArchiveProject = useCallback(
-        (projectId: string, e: React.MouseEvent) => {
-            e.stopPropagation();
+        (projectId: string, e?: React.MouseEvent) => {
+            e?.stopPropagation?.();
             const isCurrentlyArchived = archivedProjectIds.includes(projectId);
             let nextArchived: string[];
             if (isCurrentlyArchived) {
@@ -895,6 +901,7 @@ export function usePromptTreeCoreActions({
     return {
         togglePinProject,
         toggleArchiveProject,
+        isProjectPinned,
         handleRefreshSingleProject,
         handleBackup,
         handleFileRestore,

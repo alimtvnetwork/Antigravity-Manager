@@ -17,6 +17,9 @@ export interface ConversationNodeProps {
     onSelect: (conv: AgmConversationNode, project: AgmProjectTreeNode) => void;
     onOpenInspector: (conv: AgmConversationNode, repoPath: string) => void;
     onRenameConversation?: (conversationId: string, newTitle: string) => Promise<void> | void;
+    onResendPrompts?: (count: number | 'all') => void;
+    onEnqueue?: () => void;
+    onRerunConversation?: (convoId: string, nudgeType: string) => void;
 }
 
 export function getConversationStatus(conv: AgmConversationNode): { isRunning: boolean; isQueued: boolean } {
@@ -45,6 +48,9 @@ export function ConversationNode({
     onSelect,
     onOpenInspector,
     onRenameConversation,
+    onResendPrompts,
+    onEnqueue,
+    onRerunConversation,
 }: ConversationNodeProps) {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editingTitle, setEditingTitle] = useState(conv.title || '');
@@ -364,6 +370,9 @@ export function ConversationNode({
                         setTurnMenuPos(null);
                         onOpenInspector(turnMenuPos.turnConv, project.repo_path);
                     }}
+                    onResendPrompts={onResendPrompts}
+                    onEnqueue={onEnqueue}
+                    onRerunConversation={onRerunConversation}
                 />
             )}
 
@@ -386,6 +395,9 @@ export function ConversationNode({
                         setContextMenuPos(null);
                         onOpenInspector(conv, project.repo_path);
                     }}
+                    onResendPrompts={onResendPrompts}
+                    onEnqueue={onEnqueue}
+                    onRerunConversation={onRerunConversation}
                 />
             )}
         </>

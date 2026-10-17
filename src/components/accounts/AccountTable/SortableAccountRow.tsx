@@ -94,20 +94,20 @@ export function SortableAccountRow({
                     setContextMenuPos({ x: e.clientX, y: e.clientY });
                 }}
                 className={cn(
-                    "group ui-interactive-row border-b border-slate-200/90 dark:border-slate-800/90 border-l-2 font-medium transition-all duration-200 ease-in-out hover:!bg-white dark:hover:!bg-white hover:!text-black dark:hover:!text-black",
+                    "group ui-interactive-row border-b border-slate-200/90 dark:border-slate-800/90 border-l-2 font-medium transition-all duration-200 ease-in-out hover:bg-slate-100/70 dark:hover:bg-slate-800/50",
                     isFocused
-                        ? "bg-teal-50/90 dark:bg-[#171025] text-slate-900 dark:text-cyan-300 font-medium border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/90 dark:border-slate-800/90 shadow-md ring-1 ring-cyan-500/30 hover:!bg-white dark:hover:!bg-white hover:!text-black dark:hover:!text-black"
+                        ? "bg-teal-50/90 dark:bg-[#171025] text-slate-900 dark:text-cyan-300 font-medium border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/90 dark:border-slate-800/90 shadow-md ring-1 ring-cyan-500/30"
                         : isCurrent
-                        ? cn(SELECTED_ROW_CLASSES, "font-medium border-b border-slate-200/90 dark:border-slate-800/90 hover:!bg-white dark:hover:!bg-white hover:!text-black dark:hover:!text-black hover:shadow-xs")
+                        ? cn(SELECTED_ROW_CLASSES, "font-medium border-b border-slate-200/90 dark:border-slate-800/90 hover:shadow-xs")
                         : selected
-                        ? "bg-blue-50/90 dark:bg-[#171025] text-blue-950 dark:text-blue-100 border-l-blue-500 font-medium shadow-xs ring-1 ring-blue-500/30 hover:!bg-white dark:hover:!bg-white hover:!text-black dark:hover:!text-black hover:shadow-xs"
+                        ? "bg-blue-50/90 dark:bg-[#171025] text-blue-950 dark:text-blue-100 border-l-blue-500 font-medium shadow-xs ring-1 ring-blue-500/30 hover:shadow-xs"
                         : isDragging
-                        ? "bg-blue-100 dark:bg-blue-900/30 shadow-lg hover:!bg-white dark:hover:!bg-white hover:!text-black dark:hover:!text-black"
-                        : "border-l-transparent text-gray-800 dark:text-gray-200 font-medium hover:!bg-white dark:hover:!bg-white hover:!text-black dark:hover:!text-black hover:border-l-blue-500/80 dark:hover:border-l-[var(--ui-interactive)] hover:shadow-xs"
+                        ? "bg-blue-100 dark:bg-blue-900/30 shadow-lg"
+                        : "border-l-transparent text-gray-800 dark:text-gray-200 font-medium hover:border-l-blue-500/80 dark:hover:border-l-[var(--ui-interactive)] hover:shadow-xs"
                 )}
             >
                 {/* 拖拽手柄 */}
-                <td className="pl-2 py-0.5 w-7 align-middle border-b border-slate-200/90 dark:border-slate-800/90 group-hover:!bg-white dark:group-hover:!bg-white">
+                <td className="pl-2 py-0.5 w-7 align-middle border-b border-slate-200/90 dark:border-slate-800/90">
                     <div
                         {...(!isDragDisabled ? attributes : {})}
                         {...(!isDragDisabled ? listeners : {})}
@@ -123,7 +123,7 @@ export function SortableAccountRow({
                     </div>
                 </td>
                 {/* 复选框 */}
-                <td className="px-1.5 py-0.5 w-8 align-middle border-b border-slate-200/90 dark:border-slate-800/90 group-hover:!bg-white dark:group-hover:!bg-white">
+                <td className="px-1.5 py-0.5 w-8 align-middle border-b border-slate-200/90 dark:border-slate-800/90">
                     <input
                         type="checkbox"
                         className="checkbox checkbox-xs rounded border-2 border-gray-400 dark:border-gray-500 checked:border-blue-600 checked:bg-blue-600 [--chkbg:theme(colors.blue.600)] [--chkfg:white]"

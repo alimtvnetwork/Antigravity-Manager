@@ -368,8 +368,9 @@ pub fn start_sync_worker() {
                 Err(e) => {
                     tracing::warn!(
                         target: "supabase_sync",
-                        "Failed to load config in background sync worker: {e}"
+                        "Failed to load config in background sync worker: {e}; backing off for 300 seconds"
                     );
+                    tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
                     continue;
                 }
             };
@@ -383,11 +384,14 @@ pub fn start_sync_worker() {
                     continue;
                 }
                 if ep.role == "root" {
-                    // Justification: best-effort call; failure logged without changing control flow
-                    crate::error::record_ignored(
-                        send_heartbeat(ep, &config.node_alias).await,
-                        "send_heartbeat",
-                    );
+                    if let Err(e) = send_heartbeat(ep, &config.node_alias).await {
+                        tracing::warn!(
+                            target: "supabase_sync",
+                            "Failed to send heartbeat to Supabase endpoint '{}': {e}; backing off for 300 seconds",
+                            ep.url
+                        );
+                        tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
+                    }
                 }
             }
         }

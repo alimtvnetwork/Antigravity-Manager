@@ -54,6 +54,7 @@ pub(crate) fn dispatch_prompt_domain(subcommand: &str, args: &[String]) {
         "resend" | "rrc" | "resend-running" => {
             crate::prompt_resend::cmd_resend_running_commands(args)
         }
+        "rerun" | "r" => crate::prompt_goals::cmd_rerun(args),
         "copy" | "cp" => cmd_prompts_copy(args),
         "purge" | "clean" => cmd_prompts_purge(args),
         "template" | "templates" | "suffix" => cmd_prompts_template(args),
@@ -69,6 +70,9 @@ pub(crate) fn cmd_prompts_help(_args: &[String]) {
     println!("  agm prompt queue [target] \"<text>\"    Enqueue prompt into SQLite FIFO queue");
     println!("  agm queue [target] \"<text>\"           Top-level shortcut to enqueue prompt");
     println!("  agm enqueue [target] \"<text>\"         Top-level alias to enqueue prompt");
+    println!(
+        "  agm prompt rerun [N]                  Rerun prompt follow-up nudge N times (alias: r)"
+    );
     println!("  agm prompt [target] \"<text>\" [--queue] Dispatch prompt immediately (or queue if --queue)");
     println!("  agm prompt list                       List active prompts");
     println!("  agm prompt tree                       Render project/conversation tree");

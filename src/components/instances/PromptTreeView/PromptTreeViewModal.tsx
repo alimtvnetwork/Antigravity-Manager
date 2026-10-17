@@ -306,6 +306,40 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         setExpandedStaleGroups,
     ]);
 
+    // Synchronize selected project and first conversation when project scope dropdown changes
+    useEffect(() => {
+        if (!isOpen || selectedProjectScope === 'all' || treeData.length === 0) return;
+        const target = treeData.find((p) => p.project_id === selectedProjectScope);
+        if (!target) return;
+        setSelectedProject(target);
+        setExpandedProjects((prev) => ({ ...prev, [target.project_id]: true }));
+
+        // If currently selected conversation already belongs to this target project, keep it
+        const hasCurrentInProject = selectedConversation && target.conversations.some((c) => c.conversation_id === selectedConversation.conversation_id);
+        if (hasCurrentInProject) return;
+
+        if (target.conversations && target.conversations.length > 0) {
+            const validConvs = target.conversations.filter(
+                (c) => !isGhostConversation(c) && !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+            );
+            const pool = validConvs.length > 0 ? validConvs : target.conversations;
+            const sorted = [...pool].sort((a, b) => {
+                const aRunning = Boolean(a.is_running);
+                const bRunning = Boolean(b.is_running);
+                if (aRunning !== bRunning) return aRunning ? -1 : 1;
+                const aTime = new Date(a.last_modified).getTime() || 0;
+                const bTime = new Date(b.last_modified).getTime() || 0;
+                return bTime - aTime;
+            });
+            if (sorted[0]) {
+                selectConversation(sorted[0], target);
+                if (isStaleOrEmptyConversation(sorted[0])) {
+                    setExpandedStaleGroups((prev) => ({ ...prev, [target.project_id]: true }));
+                }
+            }
+        }
+    }, [isOpen, selectedProjectScope, treeData, selectedConversation, selectConversation, setSelectedProject, setExpandedProjects, setExpandedStaleGroups]);
+
     // Hotkey: 'N' triggers Send Now
     useEffect(() => {
         if (!isOpen) return;

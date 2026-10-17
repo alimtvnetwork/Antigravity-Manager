@@ -15,6 +15,7 @@ import {
     ChevronDown,
     FolderInput,
     Repeat,
+    ListPlus,
 } from 'lucide-react';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
@@ -27,7 +28,10 @@ import {
     exportConversationAsYaml,
     exportConversationAsSqlite,
     extractConversationPromptsList,
+    dispatchRerunMessages,
 } from './usePromptTreePromptActions';
+import { enqueuePrompt } from '../../../services/instanceService';
+import { cn } from '../../../utils/cn';
 
 export interface ConversationContextMenuProps {
     x: number;
@@ -35,9 +39,12 @@ export interface ConversationContextMenuProps {
     conversationId: string;
     currentTitle: string;
     onClose: () => void;
-    onRename: () => void;
+    onRename?: () => void;
     onInspect: () => void;
     onResendPrompts?: (count: number | 'all') => void;
+    onEnqueue?: () => void;
+    onRerun?: () => void;
+    onCopyPrompt?: () => void;
     onVerifyLastPrompts?: (count: number) => void;
     onCloneAndCompact?: () => void;
     onImportConversation?: (convoId: string) => void;
@@ -59,6 +66,9 @@ export function ConversationContextMenu({
     onRename,
     onInspect,
     onResendPrompts,
+    onEnqueue,
+    onRerun,
+    onCopyPrompt,
     onVerifyLastPrompts,
     onCloneAndCompact,
     onImportConversation,
@@ -71,13 +81,16 @@ export function ConversationContextMenu({
     instanceId,
 }: ConversationContextMenuProps) {
     const menuRef = useRef<HTMLDivElement>(null);
-    const [copied, setCopied] = useState(false);
+    const [isIdCopied, setIsIdCopied] = useState(false);
+    const [isPromptCopied, setIsPromptCopied] = useState(false);
+    const [isEnqueueing, setIsEnqueueing] = useState(false);
+    const [isRerunning, setIsRerunning] = useState(false);
     const [isResendSubmenuOpen, setIsResendSubmenuOpen] = useState(false);
     const [isCustomNDialogOpen, setIsCustomNDialogOpen] = useState(false);
     const [customNCount, setCustomNCount] = useState<number>(5);
 
     const left = Math.max(8, Math.min(x, window.innerWidth - 260));
-    const top = Math.max(8, Math.min(y, window.innerHeight - 440));
+    const top = Math.max(8, Math.min(y, window.innerHeight - 480));
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -110,10 +123,115 @@ export function ConversationContextMenu({
     const handleCopyId = async (e: React.MouseEvent) => {
         e.stopPropagation();
         await copyToClipboard(conversationId);
-        setCopied(true);
+        setIsIdCopied(true);
         setTimeout(() => {
             onClose();
         }, 400);
+    };
+
+    const handleCopyPromptText = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onCopyPrompt) {
+            onCopyPrompt();
+            setIsPromptCopied(true);
+            setTimeout(() => onClose(), 400);
+            return;
+        }
+        const textToCopy = conversationNode
+            ? (conversationNode.full_prompt_text || conversationNode.prompt_preview_200w || currentTitle)
+            : currentTitle;
+        if (!textToCopy) return;
+        try {
+            await copyToClipboard(textToCopy);
+            setIsPromptCopied(true);
+            setTimeout(() => {
+                onClose();
+            }, 400);
+        } catch (err) {
+            useErrorStore.getState().captureException(
+                err instanceof Error ? err : new Error(String(err)),
+                {
+                    source: 'ConversationContextMenu.handleCopyPromptText',
+                    triggerAction: 'copy_prompt_text',
+                }
+            );
+        }
+    };
+
+    const handleDoEnqueue = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (isEnqueueing) return;
+        if (onEnqueue) {
+            onEnqueue();
+            onClose();
+            return;
+        }
+        setIsEnqueueing(true);
+        try {
+            const promptText = conversationNode
+                ? (conversationNode.full_prompt_text || conversationNode.prompt_preview_200w || currentTitle)
+                : currentTitle;
+            if (promptText) {
+                await enqueuePrompt(
+                    instanceId || 'default',
+                    repoPath || '',
+                    promptText,
+                    conversationId
+                );
+            }
+            onClose();
+        } catch (err) {
+            useErrorStore.getState().captureException(
+                err instanceof Error ? err : new Error(String(err)),
+                {
+                    source: 'ConversationContextMenu.handleDoEnqueue',
+                    triggerAction: 'enqueue_prompt',
+                }
+            );
+        } finally {
+            setIsEnqueueing(false);
+        }
+    };
+
+    const handleDoRerun = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (isRerunning) return;
+        if (onRerun) {
+            onRerun();
+            onClose();
+            return;
+        }
+        if (onRerunConversation) {
+            onRerunConversation(conversationId, 'is-it-done');
+            onClose();
+            return;
+        }
+        setIsRerunning(true);
+        try {
+            const originalPrompt = conversationNode
+                ? (conversationNode.full_prompt_text || conversationNode.prompt_preview_200w || currentTitle)
+                : currentTitle;
+            await dispatchRerunMessages({
+                targetInstId: instanceId || 'default',
+                repoPath: repoPath || '',
+                convId: conversationId,
+                count: 1,
+                messageOption: 'is-it-done',
+                originalPrompt,
+                source: 'ConversationContextMenu.handleDoRerun',
+            });
+            onClose();
+        } catch (err) {
+            useErrorStore.getState().captureException(
+                err instanceof Error ? err : new Error(String(err)),
+                {
+                    source: 'ConversationContextMenu.handleDoRerun',
+                    triggerAction: 'rerun_conversation',
+                }
+            );
+        } finally {
+            setIsRerunning(false);
+        }
     };
 
     const handleDoResend = async (count: number | 'all') => {
@@ -268,7 +386,7 @@ export function ConversationContextMenu({
     return createPortal(
         <div
             ref={menuRef}
-            className="fixed z-[10000] min-w-[230px] rounded-xl border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025] py-1.5 shadow-2xl text-xs text-slate-800 dark:text-slate-200 select-none font-poppins animate-in fade-in zoom-in-95 duration-100"
+            className="fixed z-[10000] min-w-[240px] rounded-xl border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025] py-1.5 shadow-2xl text-xs text-slate-800 dark:text-slate-200 select-none font-poppins animate-in fade-in zoom-in-95 duration-100"
             style={{ top, left }}
             onClick={(e) => e.stopPropagation()}
             onContextMenu={(e) => {
@@ -281,24 +399,25 @@ export function ConversationContextMenu({
                 {currentTitle || conversationId.slice(0, 8)}
             </div>
 
-            {/* Rename Conversation (Triple-trigger trigger 3, with F2 hint) */}
+            {/* Core Action 1: Inspect Transcript */}
             <button
                 type="button"
                 className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 cursor-pointer"
                 onClick={(e) => {
                     e.stopPropagation();
-                    onRename();
+                    onInspect();
                     onClose();
                 }}
+                title="Inspect conversation transcript in full inspector"
             >
                 <div className="flex items-center gap-2.5">
-                    <Pencil className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
-                    <span>Rename Conversation</span>
+                    <FileSearch className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
+                    <span className="font-medium">Inspect Transcript</span>
                 </div>
-                <kbd className="text-[9px] font-mono font-semibold px-1 py-0.2 rounded bg-slate-100 dark:bg-purple-950/40 text-slate-400 border border-slate-200 dark:border-purple-500/20">F2</kbd>
+                <span className="text-[9px] font-mono text-cyan-500 font-bold">Inspect</span>
             </button>
 
-            {/* Resend Prompts Submenu */}
+            {/* Core Action 2: Resend Prompts Submenu */}
             <div className="relative">
                 <button
                     type="button"
@@ -310,7 +429,7 @@ export function ConversationContextMenu({
                 >
                     <div className="flex items-center gap-2.5">
                         <RotateCw className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                        <span>Resend Prompts</span>
+                        <span className="font-medium">Resend Prompts</span>
                     </div>
                     {isResendSubmenuOpen ? (
                         <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
@@ -389,27 +508,92 @@ export function ConversationContextMenu({
                 )}
             </div>
 
-            {/* Rerun Nudge Action */}
+            {/* Core Action 3: Enqueue to FIFO Queue */}
             <button
                 type="button"
-                className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-sky-500/10 hover:text-sky-600 dark:hover:text-sky-400 cursor-pointer"
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onClose();
-                    if (onRerunConversation) {
-                        onRerunConversation(conversationId, 'is-it-done');
-                    } else {
-                        void handleDoResend(1);
-                    }
-                }}
+                disabled={isEnqueueing}
+                className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400 cursor-pointer disabled:opacity-50"
+                onClick={handleDoEnqueue}
+                title="Enqueue prompt into FIFO background scheduler queue"
+            >
+                <div className="flex items-center gap-2.5">
+                    <ListPlus className={cn("w-3.5 h-3.5 text-amber-500 shrink-0", isEnqueueing && "animate-pulse")} />
+                    <span className="font-medium">{isEnqueueing ? 'Enqueueing…' : 'Enqueue to FIFO Queue'}</span>
+                </div>
+                <span className="text-[9px] font-mono text-amber-500 font-bold">Queue</span>
+            </button>
+
+            {/* Core Action 4: Rerun Nudge Action */}
+            <button
+                type="button"
+                disabled={isRerunning}
+                className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-sky-500/10 hover:text-sky-600 dark:hover:text-sky-400 cursor-pointer disabled:opacity-50"
+                onClick={handleDoRerun}
                 title="Dispatch a fast rerun nudge (is-it-done) to this conversation"
             >
                 <div className="flex items-center gap-2.5">
-                    <Repeat className="w-3.5 h-3.5 text-sky-500 shrink-0" />
-                    <span>Rerun Nudge (Is It Done?)</span>
+                    <Repeat className={cn("w-3.5 h-3.5 text-sky-500 shrink-0", isRerunning && "animate-spin")} />
+                    <span className="font-medium">{isRerunning ? 'Rerunning…' : 'Rerun Nudge (Is It Done?)'}</span>
                 </div>
-                <span className="text-[9px] font-mono text-sky-400">Nudge</span>
+                <span className="text-[9px] font-mono text-sky-400 font-bold">Rerun</span>
             </button>
+
+            {/* Core Action 5: Copy Prompt Text */}
+            <button
+                type="button"
+                className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-[#251b3a] cursor-pointer"
+                onClick={handleCopyPromptText}
+                title="Copy prompt text of this conversation or turn"
+            >
+                <div className="flex items-center gap-2.5">
+                    {isPromptCopied ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    ) : (
+                        <Copy className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
+                    )}
+                    <span>{isPromptCopied ? 'Copied Prompt!' : 'Copy Prompt Text'}</span>
+                </div>
+                <span className="text-[9px] font-mono text-slate-400">Copy</span>
+            </button>
+
+            {/* Core Action 5b: Copy Conversation ID */}
+            <button
+                type="button"
+                className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-[#251b3a] cursor-pointer"
+                onClick={handleCopyId}
+                title="Copy conversation UUID to clipboard"
+            >
+                <div className="flex items-center gap-2.5">
+                    {isIdCopied ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    ) : (
+                        <Copy className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
+                    )}
+                    <span>{isIdCopied ? 'Copied ID!' : 'Copy Conversation ID'}</span>
+                </div>
+                <span className="text-[9px] font-mono text-slate-400">UUID</span>
+            </button>
+
+            <div className="my-1 border-t border-slate-100 dark:border-[#2b1b42]" />
+
+            {/* Rename Conversation (F2) */}
+            {onRename && (
+                <button
+                    type="button"
+                    className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-purple-500/10 hover:text-purple-600 dark:hover:text-purple-400 cursor-pointer"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onRename();
+                        onClose();
+                    }}
+                >
+                    <div className="flex items-center gap-2.5">
+                        <Pencil className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                        <span>Rename Conversation</span>
+                    </div>
+                    <kbd className="text-[9px] font-mono font-semibold px-1 py-0.2 rounded bg-slate-100 dark:bg-purple-950/40 text-slate-400 border border-slate-200 dark:border-purple-500/20">F2</kbd>
+                </button>
+            )}
 
             {/* Verify Last 10 Prompts & Enqueue */}
             <button
@@ -499,38 +683,6 @@ export function ConversationContextMenu({
                     <span>Export Conversation as YAML...</span>
                 </div>
                 <span className="text-[9px] font-mono text-slate-400">.yaml</span>
-            </button>
-
-            <div className="my-1 border-t border-slate-100 dark:border-[#2b1b42]" />
-
-            {/* Inspect Transcript */}
-            <button
-                type="button"
-                className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-[#251b3a] cursor-pointer"
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onInspect();
-                    onClose();
-                }}
-            >
-                <FileSearch className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
-                <span>Inspect Transcript</span>
-            </button>
-
-            {/* Copy Conversation ID */}
-            <button
-                type="button"
-                className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-[#251b3a] cursor-pointer"
-                onClick={handleCopyId}
-            >
-                <div className="flex items-center gap-2.5">
-                    {copied ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    ) : (
-                        <Copy className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
-                    )}
-                    <span>{copied ? 'Copied ID!' : 'Copy Conversation ID'}</span>
-                </div>
             </button>
         </div>,
         document.body

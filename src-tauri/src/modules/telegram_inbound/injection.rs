@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::process::Command;
 
+use super::types::{PromptExecutionStatusType, RemoteDispatchStatusType};
 use super::*;
 
 /// Execute prompt injection to local workspace or remote cluster node (supports Dual AGM/GitMap Seq IDs P001/C001, --instance, and --node)
@@ -163,211 +164,221 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
         return "Your prompt text is empty — nothing was sent.".to_string();
     }
 
-    if super::node_label::is_current_machine(&target_node) {
-        // 1. First attempt resolution via Dual AGM/GitMap Sequence ID (`P001`, `GM:#1`, `C001`, `GM:<cid>`, or conv UUID prefix)
-        let seq_resolved = repo_db::resolve_agm_sequence_target(&target_project);
+    if !super::node_label::is_current_machine(&target_node) {
+        return execute_remote_prompt_injection(
+            &target_node,
+            &target_project,
+            &prompt_text,
+            explicit_instance.as_deref(),
+            &local_config,
+        )
+        .await;
+    }
 
-        let projects = repo_db::get_live_project_execution_info();
-        let matched_proj = projects.iter().find(|p| {
-            p.project_id.eq_ignore_ascii_case(&target_project)
-                || p.repo_name.eq_ignore_ascii_case(&target_project)
-                || p.project_id.starts_with(&target_project)
-                || target_project.starts_with(&p.project_id)
-        });
+    // 1. First attempt resolution via Dual AGM/GitMap Sequence ID (`P001`, `GM:#1`, `C001`, `GM:<cid>`, or conv UUID prefix)
+    let seq_resolved = repo_db::resolve_agm_sequence_target(&target_project);
 
-        let (final_proj_id, repo_path, resolved_instance, resolved_conv_id, _seq_badge) =
-            if let Some(seq) = seq_resolved {
-                (
-                    seq.project_id,
-                    seq.repo_path,
-                    explicit_instance.clone().unwrap_or(seq.instance_id),
-                    seq.conversation_id,
-                    Some(format!("AGM:{} | {}", seq.seq_code, seq.gitmap_seq_code)),
-                )
-            } else if let Some(p) = matched_proj {
-                (
-                    p.project_id.clone(),
-                    p.repo_path.clone(),
-                    explicit_instance
-                        .clone()
-                        .unwrap_or_else(|| "default".to_string()),
-                    None,
-                    None,
-                )
+    let projects = repo_db::get_live_project_execution_info();
+    let matched_proj = projects.iter().find(|p| {
+        p.project_id.eq_ignore_ascii_case(&target_project)
+            || p.repo_name.eq_ignore_ascii_case(&target_project)
+            || p.project_id.starts_with(&target_project)
+            || target_project.starts_with(&p.project_id)
+    });
+
+    let (final_proj_id, repo_path, resolved_instance, resolved_conv_id, _seq_badge) =
+        if let Some(seq) = seq_resolved {
+            (
+                seq.project_id,
+                seq.repo_path,
+                explicit_instance.clone().unwrap_or(seq.instance_id),
+                seq.conversation_id,
+                Some(format!("AGM:{} | {}", seq.seq_code, seq.gitmap_seq_code)),
+            )
+        } else if let Some(p) = matched_proj {
+            (
+                p.project_id.clone(),
+                p.repo_path.clone(),
+                explicit_instance
+                    .clone()
+                    .unwrap_or_else(|| "default".to_string()),
+                None,
+                None,
+            )
+        } else {
+            let p_buf = PathBuf::from(&target_project);
+            let (pid, rpath) = if p_buf.exists() && p_buf.is_dir() {
+                (target_project.clone(), target_project.clone())
+            } else if let Some(first_p) = projects.first() {
+                (first_p.project_id.clone(), first_p.repo_path.clone())
             } else {
-                let p_buf = PathBuf::from(&target_project);
-                let (pid, rpath) = if p_buf.exists() && p_buf.is_dir() {
-                    (target_project.clone(), target_project.clone())
-                } else if let Some(first_p) = projects.first() {
-                    (first_p.project_id.clone(), first_p.repo_path.clone())
-                } else {
-                    (
-                        "local-project".to_string(),
-                        std::env::current_dir()
-                            .map(|p| p.to_string_lossy().to_string())
-                            .unwrap_or_else(|_| ".".to_string()),
-                    )
-                };
                 (
-                    pid,
-                    rpath,
-                    explicit_instance
-                        .clone()
-                        .unwrap_or_else(|| "default".to_string()),
-                    None,
-                    None,
+                    "local-project".to_string(),
+                    std::env::current_dir()
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_else(|_| ".".to_string()),
                 )
             };
-
-        let prompt_id = format!("p-{}", &uuid::Uuid::new_v4().to_string()[..8]);
-        let resolved_prompt = wrap_telegram_prompt(&prompt_text);
-        let active_prompt = repo_db::ActivePrompt {
-            id: prompt_id.clone(),
-            project_id: final_proj_id.clone(),
-            instance_id: resolved_instance.clone(),
-            repo_path: repo_path.clone(),
-            prompt_content: resolved_prompt.clone(),
-            model: None,
-            session_id: resolved_conv_id.clone(),
-            status: "running".to_string(),
-            created_at: Utc::now().timestamp(),
-            updated_at: Utc::now().timestamp(),
-            image_payload: None,
+            (
+                pid,
+                rpath,
+                explicit_instance
+                    .clone()
+                    .unwrap_or_else(|| "default".to_string()),
+                None,
+                None,
+            )
         };
 
-        if let Err(e) = repo_db::save_or_requeue_prompt(&active_prompt) {
-            return format!(
-                "Couldn't save your prompt: {}",
-                clean_for_telegram_html(&e, 200)
-            );
-        }
+    let prompt_id = format!("p-{}", &uuid::Uuid::new_v4().to_string()[..8]);
+    let resolved_prompt = wrap_telegram_prompt(&prompt_text);
+    let active_prompt = repo_db::ActivePrompt {
+        id: prompt_id.clone(),
+        project_id: final_proj_id.clone(),
+        instance_id: resolved_instance.clone(),
+        repo_path: repo_path.clone(),
+        prompt_content: resolved_prompt.clone(),
+        model: None,
+        session_id: resolved_conv_id.clone(),
+        status: "running".to_string(),
+        created_at: Utc::now().timestamp(),
+        updated_at: Utc::now().timestamp(),
+        image_payload: None,
+    };
 
-        let spawned = match repo_db::spawn_prompt_via_agy(&active_prompt) {
-            Ok(()) => true,
-            Err(spawn_err) => {
-                crate::modules::logger::log_warn(&format!(
-                    "[Telegram] agy spawn failed for inbound prompt: {spawn_err}"
-                ));
-                false
-            }
-        };
-        let exec_status = if spawned { "Executing now" } else { "Queued" };
-        let ide_line = ide_exe_line_for(&resolved_instance).unwrap_or_default();
-        let id8 = prompt_id.strip_prefix("p-").unwrap_or(&prompt_id);
-
-        format!(
-            "✅ <b>Prompt sent</b> to {} · {}\n\
-            <b>Status:</b> {}\n\
-            <b>Reference:</b> <code>{}</code>\n\
-            {}\
-            <b>Your prompt:</b>\n<pre>{}</pre>",
-            clean_for_telegram_html(&resolved_instance, 32),
-            clean_for_telegram_html(&final_proj_id, 40),
-            exec_status,
-            clean_for_telegram_html(id8, 16),
-            ide_line,
-            clean_for_telegram_html(&repo_db::strip_internal_id_wrappers(&prompt_text), 800)
-        )
-    } else {
-        let inst_flag = explicit_instance
-            .as_deref()
-            .map(|i| format!(" --instance {}", i))
-            .unwrap_or_default();
-        let remote_cmd = format!(
-            "agm prompt {}{} \"{}\"",
-            target_project, inst_flag, prompt_text
+    if let Err(e) = repo_db::save_or_requeue_prompt(&active_prompt) {
+        return format!(
+            "Couldn't save your prompt: {}",
+            clean_for_telegram_html(&e, 200)
         );
-        let mut dispatched_gitmap = false;
-        let mut gm_cmd1 = Command::new("gitmap");
-        #[cfg(target_os = "windows")]
-        {
-            use std::os::windows::process::CommandExt;
-            gm_cmd1.creation_flags(0x08000000);
+    }
+
+    let spawned = match repo_db::spawn_prompt_via_agy(&active_prompt) {
+        Ok(()) => true,
+        Err(spawn_err) => {
+            crate::modules::logger::log_warn(&format!(
+                "[Telegram] agy spawn failed for inbound prompt: {spawn_err}"
+            ));
+            false
         }
-        let gm_out = gm_cmd1
-            .args(["cluster", "exec", &target_node, &remote_cmd])
-            .output()
-            .or_else(|_| {
-                let mut gm_cmd2 = Command::new("gitmap");
-                #[cfg(target_os = "windows")]
-                {
-                    use std::os::windows::process::CommandExt;
-                    gm_cmd2.creation_flags(0x08000000);
-                }
-                gm_cmd2
-                    .args(["ssh", "exec", &remote_cmd, "--node", &target_node])
-                    .output()
-            });
-        if let Ok(out) = gm_out {
-            if out.status.success() {
+    };
+    let exec_status = PromptExecutionStatusType::from_spawned(spawned);
+    let ide_line = ide_exe_line_for(&resolved_instance).unwrap_or_default();
+    let id8 = prompt_id.strip_prefix("p-").unwrap_or(&prompt_id);
+
+    format!(
+        "✅ <b>Prompt sent</b> to {} · {}\n\
+        <b>Status:</b> {}\n\
+        <b>Reference:</b> <code>{}</code>\n\
+        {}\
+        <b>Your prompt:</b>\n<pre>{}</pre>",
+        clean_for_telegram_html(&resolved_instance, 32),
+        clean_for_telegram_html(&final_proj_id, 40),
+        exec_status,
+        clean_for_telegram_html(id8, 16),
+        ide_line,
+        clean_for_telegram_html(&repo_db::strip_internal_id_wrappers(&prompt_text), 800)
+    )
+}
+
+/// Dispatch prompt injection to a remote cluster node via GitMap cluster exec, SSH, or Supabase queue
+pub async fn execute_remote_prompt_injection(
+    target_node: &str,
+    target_project: &str,
+    prompt_text: &str,
+    explicit_instance: Option<&str>,
+    local_config: &supabase_sync::SupabaseConfig,
+) -> String {
+    let inst_flag = explicit_instance
+        .map(|i| format!(" --instance {}", i))
+        .unwrap_or_default();
+    let remote_cmd = format!(
+        "agm prompt {}{} \"{}\"",
+        target_project, inst_flag, prompt_text
+    );
+    let mut dispatched_gitmap = false;
+    let mut gm_cmd1 = Command::new("gitmap");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        gm_cmd1.creation_flags(0x08000000);
+    }
+    let gm_out = gm_cmd1
+        .args(["cluster", "exec", target_node, &remote_cmd])
+        .output()
+        .or_else(|_| {
+            let mut gm_cmd2 = Command::new("gitmap");
+            #[cfg(target_os = "windows")]
+            {
+                use std::os::windows::process::CommandExt;
+                gm_cmd2.creation_flags(0x08000000);
+            }
+            gm_cmd2
+                .args(["ssh", "exec", &remote_cmd, "--node", target_node])
+                .output()
+        });
+    if let Ok(out) = gm_out {
+        if out.status.success() {
+            dispatched_gitmap = true;
+        }
+    }
+    if !dispatched_gitmap {
+        if let Ok(results) = crate::modules::ssh_manager::exec_ssh_command(
+            target_node,
+            std::slice::from_ref(&remote_cmd),
+            None,
+            None,
+            None,
+        ) {
+            if results.iter().any(|r| r.success) {
                 dispatched_gitmap = true;
             }
         }
-        if !dispatched_gitmap {
-            if let Ok(results) = crate::modules::ssh_manager::exec_ssh_command(
-                &target_node,
-                std::slice::from_ref(&remote_cmd),
-                None,
-                None,
-                None,
-            ) {
-                if results.iter().any(|r| r.success) {
-                    dispatched_gitmap = true;
-                }
-            }
-        }
-
-        let mut enqueued_supabase = false;
-        let cmd_id = uuid::Uuid::new_v4().to_string();
-        for ep in &local_config.endpoints {
-            if ep.is_enabled && ep.role == "secondary" {
-                if let Ok(c) = SupabaseClient::new(ep) {
-                    let payload = json!({
-                        "id": cmd_id,
-                        "target_node": target_node,
-                        "target_node_id": target_node,
-                        "source": "telegram",
-                        "project_id": target_project,
-                        "instance_id": explicit_instance.clone().unwrap_or_else(|| "default".to_string()),
-                        "command": "prompt",
-                        "command_text": remote_cmd,
-                        "prompt": prompt_text,
-                        "status": "pending",
-                        "created_at": Utc::now().timestamp()
-                    });
-                    if c.insert("command_queue", payload).await.is_ok() {
-                        enqueued_supabase = true;
-                        break;
-                    }
-                }
-            }
-        }
-
-        let dispatch_status = if dispatched_gitmap {
-            "Sent via GitMap Cluster SSH"
-        } else if enqueued_supabase {
-            "Queued on the secondary database — the node will pick it up"
-        } else {
-            "Queued (the node recorded your instruction)"
-        };
-
-        let ide_line =
-            ide_exe_line_for(explicit_instance.as_deref().unwrap_or("default")).unwrap_or_default();
-        let id8 = cmd_id.get(..8).unwrap_or(&cmd_id);
-
-        format!(
-            "✅ <b>Prompt sent</b> to {} · {} ({})\n\
-            <b>Status:</b> {}\n\
-            <b>Reference:</b> <code>{}</code>\n\
-            {}\
-            <b>Your prompt:</b>\n<pre>{}</pre>",
-            clean_for_telegram_html(&target_node, 40),
-            clean_for_telegram_html(&target_project, 40),
-            clean_for_telegram_html(explicit_instance.as_deref().unwrap_or("default"), 32),
-            dispatch_status,
-            clean_for_telegram_html(id8, 16),
-            ide_line,
-            clean_for_telegram_html(&prompt_text, 800)
-        )
     }
+
+    let mut enqueued_supabase = false;
+    let cmd_id = uuid::Uuid::new_v4().to_string();
+    for ep in &local_config.endpoints {
+        if ep.is_enabled && ep.role == "secondary" {
+            if let Ok(c) = SupabaseClient::new(ep) {
+                let payload = json!({
+                    "id": cmd_id,
+                    "target_node": target_node,
+                    "target_node_id": target_node,
+                    "source": "telegram",
+                    "project_id": target_project,
+                    "instance_id": explicit_instance.unwrap_or("default"),
+                    "command": "prompt",
+                    "command_text": remote_cmd,
+                    "prompt": prompt_text,
+                    "status": "pending",
+                    "created_at": Utc::now().timestamp()
+                });
+                if c.insert("command_queue", payload).await.is_ok() {
+                    enqueued_supabase = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    let dispatch_status = RemoteDispatchStatusType::resolve(dispatched_gitmap, enqueued_supabase);
+
+    let ide_line = ide_exe_line_for(explicit_instance.unwrap_or("default")).unwrap_or_default();
+    let id8 = cmd_id.get(..8).unwrap_or(&cmd_id);
+
+    format!(
+        "✅ <b>Prompt sent</b> to {} · {} ({})\n\
+        <b>Status:</b> {}\n\
+        <b>Reference:</b> <code>{}</code>\n\
+        {}\
+        <b>Your prompt:</b>\n<pre>{}</pre>",
+        clean_for_telegram_html(target_node, 40),
+        clean_for_telegram_html(target_project, 40),
+        clean_for_telegram_html(explicit_instance.unwrap_or("default"), 32),
+        dispatch_status,
+        clean_for_telegram_html(id8, 16),
+        ide_line,
+        clean_for_telegram_html(prompt_text, 800)
+    )
 }

@@ -2,7 +2,7 @@
 
 use super::agy::spawn_or_replace_prompt_via_agy;
 use super::detection::resume_task_document;
-use super::models::ActivePrompt;
+use super::models::{ActivePrompt, ProjectAuditRationaleType, PromptAuditCriteriaType};
 use super::schema::{connect_db, init_tables};
 use super::state::{get_dispatched_prompts_cache, get_memory_prompts_map};
 use super::tree::invalidate_prompt_tree_cache;
@@ -77,6 +77,7 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
             } else {
                 prompt_inst == target_inst
             };
+            let rationale = ProjectAuditRationaleType::from_dispatch(is_match);
             crate::modules::logger::log_instance_prompt_audit(
                 &target_inst,
                 "dispatch_running_prompts",
@@ -84,13 +85,9 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
                 &p.repo_path,
                 "",
                 None,
-                "PromptDispatcher:InstanceMatching",
+                PromptAuditCriteriaType::PromptDispatcherInstanceMatching.as_str(),
                 is_match,
-                if is_match {
-                    "PROMPT_DISPATCH_MATCHED"
-                } else {
-                    "PROMPT_DISPATCH_REJECTED"
-                },
+                rationale.as_str(),
             );
             is_match
         })

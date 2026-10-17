@@ -88,3 +88,157 @@ pub(crate) static LAST_TELEGRAM_STATUS: Lazy<Arc<RwLock<TelegramWatcherStatus>>>
             error_message: None,
         }))
     });
+
+/// Execution status for inbound prompts injected into AGM
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PromptExecutionStatusType {
+    ExecutingNow,
+    Queued,
+}
+
+impl PromptExecutionStatusType {
+    #[inline]
+    pub fn from_spawned(is_spawned: bool) -> Self {
+        if is_spawned {
+            Self::ExecutingNow
+        } else {
+            Self::Queued
+        }
+    }
+
+    #[inline]
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::ExecutingNow => "executing_now",
+            Self::Queued => "queued",
+        }
+    }
+
+    #[inline]
+    pub fn display_label(&self) -> &'static str {
+        match self {
+            Self::ExecutingNow => "Executing now",
+            Self::Queued => "Queued",
+        }
+    }
+
+    #[inline]
+    pub fn is_executing(&self) -> bool {
+        matches!(self, Self::ExecutingNow)
+    }
+
+    #[inline]
+    pub fn is_queued(&self) -> bool {
+        matches!(self, Self::Queued)
+    }
+}
+
+impl std::fmt::Display for PromptExecutionStatusType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.display_label())
+    }
+}
+
+/// Remote cluster dispatch resolution status for cross-node commands
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RemoteDispatchStatusType {
+    GitMapClusterSsh,
+    SupabaseQueued,
+    LocalRecorded,
+}
+
+impl RemoteDispatchStatusType {
+    #[inline]
+    pub fn resolve(is_dispatched_gitmap: bool, is_enqueued_supabase: bool) -> Self {
+        if is_dispatched_gitmap {
+            Self::GitMapClusterSsh
+        } else if is_enqueued_supabase {
+            Self::SupabaseQueued
+        } else {
+            Self::LocalRecorded
+        }
+    }
+
+    #[inline]
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::GitMapClusterSsh => "gitmap_cluster_ssh",
+            Self::SupabaseQueued => "supabase_queued",
+            Self::LocalRecorded => "local_recorded",
+        }
+    }
+
+    #[inline]
+    pub fn display_label(&self) -> &'static str {
+        match self {
+            Self::GitMapClusterSsh => "Sent via GitMap Cluster SSH",
+            Self::SupabaseQueued => "Queued on the secondary database — the node will pick it up",
+            Self::LocalRecorded => "Queued (the node recorded your instruction)",
+        }
+    }
+}
+
+impl std::fmt::Display for RemoteDispatchStatusType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.display_label())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_prompt_execution_status_type_methods() {
+        let exec = PromptExecutionStatusType::from_spawned(true);
+        assert_eq!(exec, PromptExecutionStatusType::ExecutingNow);
+        assert_eq!(exec.as_str(), "executing_now");
+        assert_eq!(exec.display_label(), "Executing now");
+        assert_eq!(exec.to_string(), "Executing now");
+        assert!(exec.is_executing());
+        assert!(!exec.is_queued());
+
+        let queued = PromptExecutionStatusType::from_spawned(false);
+        assert_eq!(queued, PromptExecutionStatusType::Queued);
+        assert_eq!(queued.as_str(), "queued");
+        assert_eq!(queued.display_label(), "Queued");
+        assert_eq!(queued.to_string(), "Queued");
+        assert!(!queued.is_executing());
+        assert!(queued.is_queued());
+    }
+
+    #[test]
+    fn test_remote_dispatch_status_type_resolution() {
+        let ssh = RemoteDispatchStatusType::resolve(true, false);
+        assert_eq!(ssh, RemoteDispatchStatusType::GitMapClusterSsh);
+        assert_eq!(ssh.as_str(), "gitmap_cluster_ssh");
+        assert_eq!(ssh.display_label(), "Sent via GitMap Cluster SSH");
+        assert_eq!(ssh.to_string(), "Sent via GitMap Cluster SSH");
+
+        let supa = RemoteDispatchStatusType::resolve(false, true);
+        assert_eq!(supa, RemoteDispatchStatusType::SupabaseQueued);
+        assert_eq!(supa.as_str(), "supabase_queued");
+        assert_eq!(
+            supa.display_label(),
+            "Queued on the secondary database — the node will pick it up"
+        );
+        assert_eq!(
+            supa.to_string(),
+            "Queued on the secondary database — the node will pick it up"
+        );
+
+        let local = RemoteDispatchStatusType::resolve(false, false);
+        assert_eq!(local, RemoteDispatchStatusType::LocalRecorded);
+        assert_eq!(local.as_str(), "local_recorded");
+        assert_eq!(
+            local.display_label(),
+            "Queued (the node recorded your instruction)"
+        );
+        assert_eq!(
+            local.to_string(),
+            "Queued (the node recorded your instruction)"
+        );
+    }
+}

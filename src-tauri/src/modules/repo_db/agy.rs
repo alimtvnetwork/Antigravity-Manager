@@ -157,7 +157,12 @@ pub fn spawn_or_replace_prompt_via_agy(
     }
 
     let clean_prompt = extract_clean_user_prompt(&prompt.prompt_content);
-    if clean_prompt.trim().is_empty() {
+    let prompt_to_run = if clean_prompt.trim().is_empty() {
+        prompt.prompt_content.trim().to_string()
+    } else {
+        clean_prompt
+    };
+    if prompt_to_run.trim().is_empty() {
         let message = format!("prompt content for '{}' is empty", prompt.id);
         crate::modules::logger::log_warn(&format!("[RepoDB] {message}"));
         return Err(message);
@@ -209,7 +214,7 @@ pub fn spawn_or_replace_prompt_via_agy(
             }
         }
 
-        cmd.arg("-p").arg(truncate_utf8(&clean_prompt, 24000));
+        cmd.arg("-p").arg(truncate_utf8(&prompt_to_run, 24000));
 
         #[cfg(target_os = "windows")]
         {
@@ -268,7 +273,7 @@ pub fn spawn_or_replace_prompt_via_agy(
                         if status.success() {
                             let _ = crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
                                 &prompt.instance_id,
-                                &clean_prompt,
+                                &prompt_to_run,
                             );
                             return Ok(());
                         }
@@ -301,11 +306,11 @@ pub fn spawn_or_replace_prompt_via_agy(
                 let _ =
                     crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
                         &prompt.instance_id,
-                        &clean_prompt,
+                        &prompt_to_run,
                     );
                 crate::modules::logger::log_info(&format!(
                     "[RepoDB] Dispatched agy execution for prompt '{}' (PID: {:?}, inst: '{}') in '{}': {:.60}...",
-                    prompt.id, child_pid, prompt.instance_id, prompt.repo_path, clean_prompt
+                    prompt.id, child_pid, prompt.instance_id, prompt.repo_path, prompt_to_run
                 ));
 
                 let prompt_id = prompt.id.clone();
@@ -733,9 +738,14 @@ pub fn send_prompt_now_for_instance(
 
         // Fallback: Direct DevTools insertion into running Antigravity IDE
         let clean_prompt = extract_clean_user_prompt(prompt_content);
+        let fallback_prompt = if clean_prompt.trim().is_empty() {
+            prompt_content.trim()
+        } else {
+            clean_prompt.as_str()
+        };
         let cdp_ok = crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
             &canonical_inst,
-            &clean_prompt,
+            fallback_prompt,
         );
 
         if cdp_ok {
@@ -787,7 +797,13 @@ pub fn enqueue_prompt_for_instance(
     prompt_content: &str,
     conversation_id: Option<&str>,
 ) -> Result<ActivePrompt, String> {
-    if extract_clean_user_prompt(prompt_content).trim().is_empty() {
+    let clean_prompt = extract_clean_user_prompt(prompt_content);
+    let prompt_to_check = if clean_prompt.trim().is_empty() {
+        prompt_content.trim()
+    } else {
+        clean_prompt.as_str()
+    };
+    if prompt_to_check.is_empty() {
         return Err("prompt content is empty".to_string());
     }
     crate::modules::instance::scan_and_cache_all_running_instances();
@@ -922,10 +938,13 @@ pub fn drain_next_queued_prompt_for_workspace(instance_id: &str, repo_path: &str
         return;
     };
 
-    if extract_clean_user_prompt(&prompt.prompt_content)
-        .trim()
-        .is_empty()
-    {
+    let clean_prompt = extract_clean_user_prompt(&prompt.prompt_content);
+    let prompt_to_check = if clean_prompt.trim().is_empty() {
+        prompt.prompt_content.trim()
+    } else {
+        clean_prompt.as_str()
+    };
+    if prompt_to_check.is_empty() {
         // Justification: purge corrupt empty queued prompt row so it cannot block the FIFO queue
         crate::error::record_ignored(
             conn.execute(

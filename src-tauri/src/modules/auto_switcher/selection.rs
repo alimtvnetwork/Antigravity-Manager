@@ -66,6 +66,30 @@ pub(crate) fn is_account_validation_blocked(acc: &Account, now_sec: i64) -> bool
     }
 }
 
+/// Check if an account (by ID or email) is actively bound to or active on any running sibling instance on this host
+pub(crate) fn is_account_bound_to_running_sibling(
+    registry: &crate::models::InstanceRegistry,
+    current_instance_id: &str,
+    account_id: &str,
+    account_email: &str,
+) -> bool {
+    registry.instances.iter().any(|i| {
+        if i.id == current_instance_id {
+            return false;
+        }
+        if !crate::modules::instance::is_instance_running(&i.id, &i.data_dir, i.pid) {
+            return false;
+        }
+        i.bound_account_id.as_deref() == Some(account_id)
+            || i.bound_email
+                .as_deref()
+                .map(|e| e.eq_ignore_ascii_case(account_email))
+                .unwrap_or(false)
+            || ((i.is_default || i.id == "default" || i.id == "__default__")
+                && account::get_current_account_id().ok().flatten().as_deref() == Some(account_id))
+    })
+}
+
 /// Discover, score, and rank candidate profiles with 100% 4h quota accounts prioritized
 pub fn select_candidate_profiles(
     current_instance_id: &str,
@@ -137,6 +161,14 @@ pub fn select_candidate_profiles(
         }
 
         if let Ok(acc) = account::load_account(acc_id) {
+            if is_account_bound_to_running_sibling(
+                &registry,
+                current_instance_id,
+                &acc.id,
+                &acc.email,
+            ) {
+                continue;
+            }
             if is_account_excluded(&effective_exclusions, &acc.id, &acc.email) {
                 continue;
             }
@@ -211,17 +243,10 @@ pub fn select_candidate_profiles(
             continue;
         }
 
-        // Check if bound to an instance running on this machine
-        let bound_inst = registry
-            .instances
-            .iter()
-            .find(|i| i.bound_account_id.as_deref() == Some(&acc.id));
-        if let Some(inst) = bound_inst {
-            if inst.id != current_instance_id
-                && crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid)
-            {
-                continue;
-            }
+        // Check if bound to or active on any running sibling instance on this host
+        if is_account_bound_to_running_sibling(&registry, current_instance_id, &acc.id, &acc.email)
+        {
+            continue;
         }
 
         let is_period_finished = is_account_period_finished(acc, target_model, now_sec);
@@ -272,20 +297,13 @@ pub fn select_candidate_profiles(
                 continue;
             }
 
-            let bound_inst = registry
-                .instances
-                .iter()
-                .find(|i| i.bound_account_id.as_deref() == Some(&acc.id));
-            if let Some(inst) = bound_inst {
-                if inst.id != current_instance_id
-                    && crate::modules::instance::is_instance_running(
-                        &inst.id,
-                        &inst.data_dir,
-                        inst.pid,
-                    )
-                {
-                    continue;
-                }
+            if is_account_bound_to_running_sibling(
+                &registry,
+                current_instance_id,
+                &acc.id,
+                &acc.email,
+            ) {
+                continue;
             }
 
             let quota = calculate_candidate_quota(acc, target_model).unwrap_or(0.0);
@@ -403,6 +421,23 @@ pub async fn select_and_verify_next_best_profile(
 
     for candidate in candidates {
         let masked_email = crate::modules::logger::mask_email(&candidate.email);
+
+        // Pre-switch live verification against running sibling instances on this host
+        if let Ok(reg) = instance::load_registry() {
+            if is_account_bound_to_running_sibling(
+                &reg,
+                current_instance_id,
+                &candidate.account_id,
+                &candidate.email,
+            ) {
+                logger::log_warn(&format!(
+                    "[AutoSwitcher] Candidate '{}' is actively bound to running sibling instance on this host. Skipping...",
+                    masked_email
+                ));
+                continue;
+            }
+        }
+
         logger::log_info(&format!(
             "[AutoSwitcher] Pre-switch live verification: checking candidate '{}' (cached quota: {:.1}%)...",
             masked_email, candidate.quota_percent
@@ -683,5 +718,42 @@ mod tests {
 
         acc.validation_blocked_until = Some(now_sec - 10);
         assert!(!is_account_validation_blocked(&acc, now_sec));
+    }
+
+    #[test]
+    fn test_is_account_bound_to_running_sibling_stopped_or_self() {
+        use crate::models::{InstanceConfig, InstanceRegistry};
+        let mut reg = InstanceRegistry::default();
+        let inst1 = InstanceConfig {
+            id: "inst-1".to_string(),
+            name: "Instance 1".to_string(),
+            data_dir: "/tmp/inst1".to_string(),
+            executable_path: None,
+            extensions_dir: None,
+            bound_account_id: Some("acc-1".to_string()),
+            bound_email: Some("acc1@test.local".to_string()),
+            created_at: 100,
+            last_used: 100,
+            is_default: false,
+            pid: None,
+            seq_num: Some(1),
+        };
+        reg.instances.push(inst1);
+
+        // When self is inst-1, it is not considered a sibling
+        assert!(!is_account_bound_to_running_sibling(
+            &reg,
+            "inst-1",
+            "acc-1",
+            "acc1@test.local"
+        ));
+
+        // When target is inst-2, but inst-1 is NOT running (pid is 0/none and fake path), it returns false
+        assert!(!is_account_bound_to_running_sibling(
+            &reg,
+            "inst-2",
+            "acc-1",
+            "acc1@test.local"
+        ));
     }
 }

@@ -816,6 +816,29 @@ pub async fn handle_send_callback(chat_id: i64, data: &str) -> (String, Option<V
     (send_unknown(), None)
 }
 
+/// Search project conversation tree for a conversation matching short ID, UUID prefix, or sequence code
+fn find_conversation_in_tree(
+    tree: &[crate::modules::repo_db::models::AgmProjectTreeNode],
+    cid8: &str,
+) -> Option<(
+    crate::modules::repo_db::models::AgmProjectTreeNode,
+    crate::modules::repo_db::models::AgmConversationNode,
+)> {
+    let cid8_lower = cid8.to_lowercase();
+    tree.iter().find_map(|proj| {
+        proj.conversations.iter().find_map(|conv| {
+            if conv.short_id.eq_ignore_ascii_case(cid8)
+                || conv.conversation_id.to_lowercase().starts_with(&cid8_lower)
+                || conv.seq_code.eq_ignore_ascii_case(cid8)
+            {
+                Some((proj.clone(), conv.clone()))
+            } else {
+                None
+            }
+        })
+    })
+}
+
 /// Handle turn rerun or turn verification callbacks (`send:t:<cid8>:<turn>` / `send:v:<cid8>:<turn>`)
 pub async fn handle_turn_rerun_callback(
     _chat_id: i64,
@@ -847,27 +870,7 @@ pub async fn handle_turn_rerun_callback(
 
     // Lookup conversation across active instances and prompt sequences
     let tree = crate::modules::repo_db::get_project_conversation_tree(200, false);
-    let mut matched_target = None;
-
-    for proj in &tree {
-        for conv in &proj.conversations {
-            if conv.short_id.eq_ignore_ascii_case(cid8)
-                || conv
-                    .conversation_id
-                    .to_lowercase()
-                    .starts_with(&cid8.to_lowercase())
-                || conv.seq_code.eq_ignore_ascii_case(cid8)
-            {
-                matched_target = Some((proj.clone(), conv.clone()));
-                break;
-            }
-        }
-        if matched_target.is_some() {
-            break;
-        }
-    }
-
-    let (proj, conv) = match matched_target {
+    let (proj, conv) = match find_conversation_in_tree(&tree, cid8) {
         Some(m) => m,
         None => {
             // Fallback: check sequence resolution directly
