@@ -90,6 +90,8 @@ pub(crate) fn print_help_json() {
                     { "name": "query", "aliases": ["search", "find", "prompts query"], "flags": ["[term]", "--words <W>", "--limit <N>", "--status <S>", "--json"], "description": "Query cached SQLite prompts with ≥200-word preview" },
                     { "name": "prune", "aliases": ["pr", "clear-cache"], "flags": ["--keep <N>", "--preflight", "--undo", "--json"], "description": "Safely prune older conversations (guards active prompts & ≥5 sessions)" },
                     { "name": "resend-running-commands", "aliases": ["rrc"], "flags": ["[N]", "--json", "-f [path]"], "description": "Resend commands before close/switch & sync image paths" },
+                    { "name": "resend-queued", "aliases": ["rqp", "resend-queued-prompts", "prompts resend-queued"], "flags": ["[N]", "--all", "-i <instance>", "--json"], "description": "Durably snapshot the queue, then re-send all enqueued prompts in FIFO order (deduped)" },
+                    { "name": "backup-queued", "aliases": ["bqp", "backup-queued-prompts", "prompts backup-queued"], "flags": ["--all", "-i <instance>", "-f <file>", "--json"], "description": "Back up only queued prompts in strict FIFO order (text, destination, images)" },
                     { "name": "queue-scheduler", "aliases": ["scheduler", "qs"], "flags": ["--once", "[instance]"], "description": "10-minute automated queue bookkeeping: auto-push FIFO prompts when project is idle" }
                 ]
             },
@@ -254,6 +256,12 @@ pub(crate) fn print_help() {
     println!("          gitmap ssh exec vm-01 \"agm status\"            # Query remote machine via GitMap SSH");
     println!("    resend-running-commands, rrc [N] [--json] [-f [path]]");
     println!("        Resend commands before close/switch & sync image paths to resume file");
+    println!("    resend-queued, rqp [N] [--all] [-i <instance>] [--json]");
+    println!("        Snapshot the queue durably, then re-send all enqueued prompts in FIFO order (deduped)");
+    println!("    backup-queued, bqp [--all] [-i <instance>] [-f <file>] [--json]");
+    println!(
+        "        Back up only queued prompts in strict FIFO order (text, destination, images)"
+    );
     println!("    prune, pr [--keep <N>] [--json]");
     println!("        Safely prune older conversations (guards active prompts & guarantees ≥5 sessions per active workspace)");
     println!();

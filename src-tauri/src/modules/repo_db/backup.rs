@@ -271,9 +271,12 @@ pub fn resend_queued_prompts_for_instance(
             model: Some("gemini-3.8-flash-high".to_string()),
             session_id: Some(rec.conversation_id.clone()),
             status: "queued".to_string(),
-            // Preserve the original enqueue time so the dispatch pass below
-            // reads FIFO order (ORDER BY created_at ASC, id ASC).
-            created_at: rec.created_at,
+            // Preserve FIFO order for the dispatch pass below (which reads
+            // ORDER BY created_at ASC, id ASC): the backup's sequence_id is the
+            // authoritative FIFO position, so stagger created_at by it. Without
+            // this, same-batch records share created_at and the random-id
+            // tiebreak could dispatch a later prompt before an earlier one.
+            created_at: rec.created_at + rec.sequence_id.max(0),
             updated_at: now,
             image_payload: rec.images_payload.clone(),
         };
