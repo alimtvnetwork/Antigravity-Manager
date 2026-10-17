@@ -9,9 +9,9 @@ pub async fn notify_account_switched_details(mut details: SwitchNotificationDeta
     let selected_clean = details.selected_email.trim().to_string();
 
     if let Ok(mut guard) = LAST_SWITCH_DISPATCH.lock() {
-        if guard.0.eq_ignore_ascii_case(&selected_clean) && (now_ts - guard.1).abs() <= 5 {
+        if guard.0.eq_ignore_ascii_case(&selected_clean) && (now_ts - guard.1).abs() <= 30 {
             let line = format!(
-                "[Notify] skipped duplicate switch to {} within 5s",
+                "[Notify] skipped duplicate switch to {} within 30s",
                 selected_clean
             );
             logger::log_info(&line);

@@ -29,9 +29,13 @@ pub fn start_prompt_goal_heartbeat(
         crate::error::record_ignored(fs::create_dir_all(&ws_dir), "create workspace directory");
     }
 
-    let interval = if interval_secs == 0 { 5 } else { interval_secs };
+    let interval = if interval_secs == 0 {
+        30
+    } else {
+        interval_secs.max(30)
+    };
     let prompt_text = if prompt.trim().is_empty() {
-        "Continuous 5-second prompt goal heartbeat verification".to_string()
+        "Continuous 30-second prompt goal heartbeat verification".to_string()
     } else {
         prompt.trim().to_string()
     };
@@ -171,7 +175,11 @@ pub fn run_prompt_goal_worker_loop(
 ) {
     let ws_dir = PathBuf::from(repo_path);
     let config_path = ws_dir.join(".antigravity_goal_heartbeat.json");
-    let interval = if interval_secs == 0 { 5 } else { interval_secs };
+    let interval = if interval_secs == 0 {
+        30
+    } else {
+        interval_secs.max(30)
+    };
     let my_pid = std::process::id();
 
     loop {
