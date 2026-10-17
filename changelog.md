@@ -1,5 +1,20 @@
 # Changelog
 
+## [v4.226.0] - 2026-10-18
+
+### Fixed
+- **Error E9001 Root-Cause Resolution & Sibling Instance Account Isolation**: Fixed Error E9001 (`Cannot switch instance to account: Account is actively bound to running sibling instance`) during Fast-Forward and manual rotation. Actively running instances (`is_running == true`) are never marked stale or stealable in `is_instance_binding_stale_or_exhausted`; running sibling instance accounts (checking `bound_account_id`, `bound_email`, and default active account) are strictly excluded from candidate evaluation in `manual.rs`; and live pre-switch candidate verification in `selection.rs` guards against sibling account theft. (Thanks to @aukgit)
+- **Prompt Queue Non-Existent Workspace Handling & Infinite Retry Loop Elimination**: In `PromptQueueScheduler` (`queue.rs`), added workspace existence validation to prevent infinite 5-second queue retry loops when target directories are missing; marked invalid prompts as `failed` with actionable diagnostics and applied `updated_at = now` retry backoff on dispatch errors. (Thanks to @aukgit)
+
+### Added
+- **Accounts Table UI Redesign & Riseup Yellow 3D Switch Button**: Stripped blinding stark white hover backgrounds (`hover:!bg-white`) across `SortableAccountRow.tsx` and `AccountRowContent.tsx` in favor of subtle dark-glass styling (`hover:bg-slate-100/70 dark:hover:bg-slate-800/50`); enhanced bound instance badge (`Default Copy`) contrast; flattened Delete and Switch action buttons when row is idle; styled Switch button with Riseup Yellow 3D gradient; reordered action buttons (Fast-Forward `>>`, Refresh `↻`, 3D Riseup Yellow Switch, Delete `🗑️`, More `···`); and moved custom label Tag edit into More dropdown. (Thanks to @aukgit)
+- **Prompt Tree View Reset Filters**: Added an interactive "Reset Filters" button in `TreePanel.tsx` that appears when any filter is active, resetting search query, status filter, category filter, and project scope in a single click. (Thanks to @aukgit)
+- **Adaptive L1 Quota Cache TTL & Supabase Error Backoff**: Implemented adaptive L1 quota cache expiration in `quota_fetch.rs` (120s for depleted <20%, 180s for <50%, 300s for healthy >=50% quota), reducing Google OAuth quota polling overhead; added 300-second (5-minute) error backoff in `start_sync_worker` (`fleet.rs`) on Supabase connection/heartbeat errors. (Thanks to @aukgit)
+- **Win32 Updater Console 18pt Consolas Font**: Upgraded Win32 console updater font in `delegate_updater/run.rs` to 18pt Consolas (`font_family = 54`, `FF_MODERN | FIXED_PITCH`, `weight = 600`) with Lucida Console fallback for crisp readability during updates. (Thanks to @aukgit)
+- **Codebase Hygiene & DRY Domain Enums**: Replaced magic status literals with strongly-typed enums (`PromptExecutionStatusType`, `RemoteDispatchStatusType`, `CommandExecutionStatusType`, `ProjectAuditRationaleType`, `PromptAuditCriteriaType`, `AuditTaskStatus`); flattened nested if pyramids with guard clauses across `goal_heartbeat.rs`, `detection.rs`, `tree_collect.rs`, and `pid_scan.rs`. (Thanks to @aukgit)
+
+---
+
 ## [v4.225.0] - 2026-10-17
 
 ### Added
@@ -576,6 +591,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.226.0 (2026-10-18)**:
+        -   **[E9001 Sibling Isolation & UI Redesign] Error E9001 Root-Cause Resolution, Loop Throttling, Accounts Table Dark-Glass Redesign & 3D Riseup Yellow Switch (Thanks to @aukgit)**:
+            -   **Description**: Resolved Error E9001 (`Cannot switch instance to account: Account is actively bound to running sibling instance`) by guarding running instances from being considered stale or stealable in `instances.rs`, excluding running sibling accounts in `manual.rs`, and shielding candidates in `selection.rs`; prevented infinite 5-second retry loops in `PromptQueueScheduler` (`queue.rs`) for missing workspace directories by setting status to `failed` with retry backoff; implemented adaptive L1 quota cache TTL (120s/180s/300s) and 5-minute Supabase heartbeat error backoff; redesigned Accounts Table UI by removing blinding stark white hovers, flattening idle action buttons, styling Switch with Riseup Yellow 3D gradient, reordering action buttons, and moving custom label Tag into More menu; added Prompt Tree "Reset Filters" button in `TreePanel.tsx`; upgraded Win32 updater console to 18pt Consolas (`font_family = 54`); and refactored magic status strings into strongly-typed domain enums with inverted guard clauses.
+
+
     *   **v4.225.0 (2026-10-17)**:
         -   **[System Broadcasting & 30s Interval Guard] Cross-System 30-Second Minimum Interval Guard & Broadcast Storm Suppression Across Antigravity Manager & GitMap (Thanks to @aukgit)**:
             -   **Description**: Enforced an architectural invariant across Antigravity Manager and GitMap mandating that all periodic background broadcasts, polling schedulers, worker tickers, and notification dispatchers operate at intervals of not less than 30 seconds (`>= 30s`) to prevent CPU spikes, database lock contention, and notification storms; clamped the detached prompt goal heartbeat worker loop in `goal_heartbeat.rs` to a strict 30-second minimum (`interval_secs.max(30)`, default 30s); expanded the duplicate switch notification broadcast suppression window in `channels.rs` from 5s to 30s (`(now_ts - guard.1).abs() <= 30`), completely preventing rapid notification storms across Email, Telegram, and Supabase; and aligned GitMap task synchronization defaults (`TaskMinInterval = 30`, `TaskDefaultInterval = 30` in `constants_task.go`), clamped async periodic monitors (`gitmap async -t`) to `>= 30s`, clamped macro runner intervals to `>= 30s`, and enforced minimum 30s cluster distribution heartbeat loops.
