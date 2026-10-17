@@ -1,5 +1,4 @@
-import { copyToClipboard } from '../../../utils/clipboard';
-import { Copy, Check, RotateCcw, ChevronUp, ChevronDown } from 'lucide-react';
+import { Check, RotateCcw, ChevronUp, ChevronDown } from 'lucide-react';
 import type { AgmConversationNode, AgmProjectTreeNode, ViewMode } from './types';
 import { RichMarkdownRenderer } from './markdown';
 import { countWords, formatPromptForMarkdown } from './formatters';
@@ -18,8 +17,8 @@ export interface PromptInstructionViewProps {
     totalWords: number;
     activeWordCount: number;
     formatByteSize: (bytes: number) => string;
-    isCopied: boolean;
-    setIsCopied: (v: boolean) => void;
+    isCopied?: boolean;
+    setIsCopied?: (v: boolean) => void;
     isCopiedAll?: boolean;
     onCopyAllWithRichImages?: () => void;
     openInspector: (conv: AgmConversationNode, repoPath: string) => void;
@@ -35,8 +34,6 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         activePromptText, editedPromptText, setEditedPromptText,
         displayedMarkdown, showAllWords, setShowAllWords,
         isTruncated, totalWords, activeWordCount, formatByteSize,
-        isCopied, setIsCopied,
-        isCopiedAll = false, onCopyAllWithRichImages,
         openInspector, selectedProject, activeByteCount,
         setActivePromptText, setActionMsg,
     } = props;
@@ -102,54 +99,6 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                         )}
                     </button>
                 )}
-
-                {onCopyAllWithRichImages && (
-                    <button
-                        type="button"
-                        onClick={onCopyAllWithRichImages}
-                        data-ui-name="prompt-bottom-copy-all-btn"
-                        data-ui-id={`prompt-bottom-copy-all-${selectedConversation.conversation_id}`}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-xs font-semibold bg-indigo-50 dark:bg-[#171025] text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-[#40285e] hover:bg-indigo-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
-                        title="Copy full prompt text and all embedded rich images in one shot"
-                    >
-                        {isCopiedAll ? (
-                            <>
-                                <Check className="w-3.5 h-3.5 text-emerald-500" />
-                                <span>Copied All!</span>
-                            </>
-                        ) : (
-                            <>
-                                <Copy className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
-                                <span>Copy All (Content + Images)</span>
-                            </>
-                        )}
-                    </button>
-                )}
-
-                <button
-                    type="button"
-                    onClick={() => {
-                        copyToClipboard(activePromptText);
-                        setIsCopied(true);
-                        setTimeout(() => setIsCopied(false), 2000);
-                    }}
-                    data-ui-name="prompt-copy-full-text-btn"
-                    data-ui-id={`prompt-copy-full-text-${selectedConversation.conversation_id}`}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-xs font-semibold bg-slate-100 dark:bg-[#171025] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#40285e] hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
-                    title="Copy full prompt text to clipboard"
-                >
-                    {isCopied ? (
-                        <>
-                            <Check className="w-3.5 h-3.5 text-emerald-500" />
-                            <span>Copied Full Prompt!</span>
-                        </>
-                    ) : (
-                        <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>Copy Full Prompt</span>
-                        </>
-                    )}
-                </button>
             </div>
         </div>
     </div>
@@ -169,54 +118,6 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
             ) : (
                 'No prompt content recorded.'
             )}
-        </div>
-        <div className="flex items-center justify-end gap-2 pt-1">
-            {onCopyAllWithRichImages && (
-                <button
-                    type="button"
-                    onClick={onCopyAllWithRichImages}
-                    data-ui-name="prompt-raw-bottom-copy-all-btn"
-                    data-ui-id={`prompt-raw-bottom-copy-all-${selectedConversation.conversation_id}`}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-xs font-semibold bg-indigo-50 dark:bg-[#171025] text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-[#40285e] hover:bg-indigo-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
-                    title="Copy full prompt text and all embedded rich images in one shot"
-                >
-                    {isCopiedAll ? (
-                        <>
-                            <Check className="w-3.5 h-3.5 text-emerald-500" />
-                            <span>Copied All!</span>
-                        </>
-                    ) : (
-                        <>
-                            <Copy className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
-                            <span>Copy All (Content + Images)</span>
-                        </>
-                    )}
-                </button>
-            )}
-            <button
-                type="button"
-                onClick={() => {
-                    copyToClipboard(activePromptText);
-                    setIsCopied(true);
-                    setTimeout(() => setIsCopied(false), 2000);
-                }}
-                data-ui-name="prompt-raw-copy-btn"
-                data-ui-id={`prompt-raw-copy-${selectedConversation.conversation_id}`}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-xs font-semibold bg-slate-100 dark:bg-[#171025] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#40285e] hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
-                title="Copy raw text to clipboard"
-            >
-                {isCopied ? (
-                    <>
-                        <Check className="w-3.5 h-3.5 text-emerald-500" />
-                        <span>Copied Raw!</span>
-                    </>
-                ) : (
-                    <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>Copy Raw</span>
-                    </>
-                )}
-            </button>
         </div>
     </div>
 )}

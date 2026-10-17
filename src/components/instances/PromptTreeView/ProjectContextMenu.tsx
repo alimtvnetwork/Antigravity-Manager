@@ -8,6 +8,8 @@ import {
     ArchiveRestore,
     FileJson,
     Database,
+    FolderInput,
+    Repeat,
     FileText,
 } from 'lucide-react';
 
@@ -16,12 +18,18 @@ export interface ProjectContextMenuProps {
     y: number;
     projectId: string;
     projectName: string;
+    repoPath?: string;
     isPinned: boolean;
     isArchived: boolean;
     onClose: () => void;
     onRefresh: () => void;
     onTogglePin: () => void;
     onToggleArchive: () => void;
+    onImportProject?: (repo: string) => void;
+    onOpenImport?: () => void;
+    onRerunProject?: (repo: string) => void;
+    onRerunQueued?: () => void;
+    onRerunAll?: () => void;
     onExportJson: () => void;
     onExportSqlite: () => void;
     onExportYaml: () => void;
@@ -32,20 +40,28 @@ export function ProjectContextMenu({
     y,
     projectId,
     projectName,
+    repoPath: _repoPath,
     isPinned,
     isArchived,
     onClose,
     onRefresh,
     onTogglePin,
     onToggleArchive,
+    onImportProject,
+    onOpenImport,
+    onRerunProject,
+    onRerunQueued,
+    onRerunAll,
     onExportJson,
     onExportSqlite,
     onExportYaml,
 }: ProjectContextMenuProps) {
     const menuRef = useRef<HTMLDivElement>(null);
 
-    const left = Math.max(8, Math.min(x, window.innerWidth - 230));
-    const top = Math.max(8, Math.min(y, window.innerHeight - 280));
+    const MENU_WIDTH = 230;
+    const MENU_HEIGHT = 380;
+    const left = Math.max(8, Math.min(x, window.innerWidth - MENU_WIDTH));
+    const top = Math.max(8, Math.min(y, window.innerHeight - MENU_HEIGHT));
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -136,6 +152,65 @@ export function ProjectContextMenu({
                 )}
                 <span>{isArchived ? 'Unarchive Project' : 'Archive Project'}</span>
             </button>
+
+            <div className="border-t border-slate-100 dark:border-[#2b1b42] my-1" />
+
+            {/* Import Prompts into Project */}
+            <button
+                type="button"
+                className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-[#251b3a] cursor-pointer"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    if (onImportProject) {
+                        onImportProject(projectName || projectId);
+                    } else if (onOpenImport) {
+                        onOpenImport();
+                    }
+                    onClose();
+                }}
+            >
+                <FolderInput className="w-3.5 h-3.5 text-sky-500" />
+                <span>Import Prompts into Project...</span>
+            </button>
+
+            {/* Rerun Project Prompts */}
+            <button
+                type="button"
+                className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-[#251b3a] cursor-pointer"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    if (onRerunProject) {
+                        onRerunProject(projectName || projectId);
+                    } else if (onRerunQueued) {
+                        onRerunQueued();
+                    }
+                    onClose();
+                }}
+            >
+                <div className="flex items-center gap-2.5">
+                    <RotateCw className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>Rerun Queued Prompts</span>
+                </div>
+                <span className="text-[10px] font-mono text-slate-400">FIFO</span>
+            </button>
+
+            {onRerunAll && (
+                <button
+                    type="button"
+                    className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-[#251b3a] cursor-pointer"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onRerunAll();
+                        onClose();
+                    }}
+                >
+                    <div className="flex items-center gap-2.5">
+                        <Repeat className="w-3.5 h-3.5 text-blue-500" />
+                        <span>Rerun All Prompts</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-slate-400">All</span>
+                </button>
+            )}
 
             <div className="border-t border-slate-100 dark:border-[#2b1b42] my-1" />
             <div className="px-3 pt-0.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">

@@ -36,10 +36,13 @@ async fn deliver_send_flow_callback(
     let (reply, markup) = super::send_flow::handle_send_callback(chat_id, data).await;
     // Justification: the picker reply is already computed and flow state is
     // updated; a Telegram send failure is logged without changing the flow.
-    crate::error::record_ignored(
-        send_telegram_message_with_markup(token, chat_id, &reply, markup, false).await,
-        "send /send picker reply",
-    );
+    // If reply is empty (e.g. this node dropped callback intended for another machine), do not send a message.
+    if !reply.trim().is_empty() {
+        crate::error::record_ignored(
+            send_telegram_message_with_markup(token, chat_id, &reply, markup, false).await,
+            "send /send picker reply",
+        );
+    }
     if !cb_id.is_empty() {
         let ans_url = format!("https://api.telegram.org/bot{}/answerCallbackQuery", token);
         // Justification: best-effort send; failure logged without changing control flow

@@ -106,3 +106,5 @@ scratch/*.dump
 # GitMap & Task Persistence
 .gitmap/backup/
 .antigravity_*.json
+*.db
+

@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.222.3-3B82F6?style=flat-square" alt="Version v4.222.3">
+    <img src="https://img.shields.io/badge/Version-v4.223.0-3B82F6?style=flat-square" alt="Version v4.223.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -115,7 +115,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.222.3)**
+**Bar 2: Version-Based Installation (v4.223.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -565,6 +565,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
+> Latest version **v4.223.0**: Prompt Tree Custom Right-Click Menu, Right-Aligned Primary Navigation Tabs, Header Dead-Space Removal, Top Toolbar Copy All Consolidation & Telegram Cluster Shielding — added right-click context menus directly to project headers (`ProjectContextMenu.tsx`) with Import, Export (JSON/SQLite/YAML), and Rerun actions; wired right-click triggers and keyboard navigation (`Enter`, `Space`, `F2`) across conversations, subagents, and individual execution turns with active selection highlights; relocated primary navigation tabs ("Prompt Instruction" vs "AI Results & Outputs") to the right side of Row 2 in `DetailHeader.tsx` and eliminated the redundant 3rd row in `DetailTabs.tsx` to reclaim ~44px of vertical height; consolidated all copy actions into the top-level `[ Copy All | v ]` segmented capsule and purged redundant footer copy buttons in `PromptInstructionView.tsx`; eliminated cluster-wide prompt broadcast storms by binding `target_node_id` in Supabase `command_queue` payloads across `injection.rs`, `open_shot.rs`, and `processing.rs`; unified local machine identification via `node_label::is_current_machine()`, deduplicated "This machine" buttons in Telegram picker, added native CLI support for `agm prompt <target> [flags] <prompt_text>`, and redesigned destination locked UX so direct message typing is front-and-center while folding past prompts into expandable blockquotes. (Thanks to @aukgit)
 > Latest version **v4.221.1**: Multi-Machine Fleet Synchronization & W2 Connectivity Recovery (extended TCP probe timeout to 1500ms with a 2-stage retry ladder and latency/error diagnostics to resolve false-offline W2 status), Multi-Machine Matrix Dynamic IP & Placeholder Normalization (serialized `machine_ip` and `ip_address` to eliminate empty `()` display; normalized `${adminUser}` to `Administrator` and `${linuxUser}` to `root`), Settings SSH & GitMap Section UI Overhaul (contiguous segmented pill capsule for fleet actions, sleek metadata badges replacing raw path dumps, and segmented terminal install controls with copy toast feedback), and Multi-Agent Concurrency Upgrade to A = 3, H = 2 (6 concurrent operations) across skills and coding guidelines. (Thanks to @aukgit)
 > Latest version **v4.220.0**: Accounts Table Delete Remediation & Modal Mounting (resolved non-responsive single-item and bulk Delete buttons by mounting dedicated destructive `ModalDialog` components in `AccountsDialogs.tsx`), Position-Locked Table Row Hover Inversion (inverts row to pure white background and black text with static geometry to eliminate layout jitter), Action Buttons Color Scheme Overhaul (prominent yellow highlighter Switch button `⇄` and solid red Remove button `🗑️` with crisp white icon), and Account Disable / Enable Lifecycle (selection toolbar `<Ban>` button, action menu toggle, `disabled` model persistence, and 100% auto-switcher candidate exclusion with permissive manual user switching). (Thanks to @aukgit)
 > Latest version **v4.219.0**: Prompt Tree Rich Verification Chapter Engine (`verificationTemplates.ts` with 5-chapter structure for "Is it done?", "Is it released?", "Are you confident?", "Edge Cases & Tests"), Rerun Chapter Engine with progression counter (`Round ${round} of ${total}`) and full prompt preservation, and Dual-MIME rich image clipboard priming on prompt resend/enqueue. (Thanks to @aukgit)

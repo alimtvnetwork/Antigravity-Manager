@@ -58,9 +58,11 @@ fn flow_expired(flow: &SendFlow) -> bool {
     now_secs().saturating_sub(flow.updated_at) > SEND_FLOW_TTL_SECS
 }
 
-fn clear_flow(chat_id: i64) {
+fn clear_flow(chat_id: i64) -> bool {
     if let Ok(mut flows) = SEND_FLOWS.lock() {
-        flows.remove(&chat_id);
+        flows.remove(&chat_id).is_some()
+    } else {
+        false
     }
 }
 
@@ -108,19 +110,38 @@ fn machine_entry_usable(label: &str) -> bool {
 fn machine_entries() -> Vec<String> {
     let local = local_machine_label();
     let mut entries = Vec::new();
+    let mut has_current_machine = false;
+
     // The local entry anchors the whole flow, but an unusable label must not
     // silently poison the picker: it is held to the same guards as fleet
     // nodes, and the empty state is reported to the user by `start_send_flow`.
     if machine_entry_usable(&local) {
         entries.push(local);
+        has_current_machine = true;
     } else {
         tracing::warn!(
-            "local machine label is not picker-safe; /send destination picker will be empty"
+            "local machine label is not picker-safe; /send destination picker will check cluster nodes"
         );
     }
     for node in query_gitmap_cluster_nodes() {
         let alias = node.alias.trim();
-        if machine_entry_usable(alias) && !entries.iter().any(|e| e.eq_ignore_ascii_case(alias)) {
+        if !machine_entry_usable(alias) {
+            continue;
+        }
+
+        let is_current = super::node_label::is_current_machine(alias);
+        if is_current {
+            if has_current_machine {
+                // Already have a local machine entry; skip duplicate
+                continue;
+            } else {
+                entries.push(alias.to_string());
+                has_current_machine = true;
+                continue;
+            }
+        }
+
+        if !entries.iter().any(|e| e.eq_ignore_ascii_case(alias)) {
             entries.push(alias.to_string());
         }
     }
@@ -295,7 +316,7 @@ fn project_picker_markup(page: &super::send_listing::PickerPage) -> Value {
         rows.push(json!(nav));
     }
     rows.push(json!([
-        { "text": "✏️ Type it manually", "callback_data": "send:cman" },
+        { "text": "✏️ Enter Project / Conv ID", "callback_data": "send:cman" },
         super::node_label::button_json("🧹 Cancel", "send:cancel", Some("danger")),
     ]));
     json!({ "inline_keyboard": rows })
@@ -328,7 +349,7 @@ fn render_project_page(
     if picker.rows.is_empty() {
         out.push_str(
             "No projects found for this instance. \
-            Tap ✏️ Type it manually, then reply with the conversation ID \
+            Tap ✏️ Enter Project / Conv ID, then reply with the conversation ID \
             (e.g. C001), project name, or conversation id.",
         );
     } else {
@@ -381,7 +402,9 @@ fn destination_locked_reply(machine: &str, instance: &str, conversation: &str) -
         • <b>Instance:</b> <code>{}</code>\n\
         {}\
         • <b>Conversation:</b> <code>{}</code>\n\n\
-        Now send your prompt as a plain message. It will go to exactly this destination.",
+        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        💬 <b>Type your prompt below</b> and send it as a plain chat message.\n\
+        It will be dispatched immediately to this destination.",
         super::node_label::machine_header_html(machine),
         clean_for_telegram_html(instance, 48),
         ide_line,
@@ -411,17 +434,25 @@ pub fn start_send_flow(rest: &str) -> String {
     );
     for (idx, alias) in entries.iter().enumerate() {
         let current = super::node_label::is_current_machine(alias);
-        let marker = if current {
-            "🟢 <b>this machine</b>"
+        let (node_alias, ip, signal) = super::cluster::resolve_node_network_info(alias);
+        let ip_part = if ip.is_empty() || ip == "Unknown IP" {
+            String::new()
         } else {
-            "🌐 <i>fleet node</i>"
+            format!(" • <code>{ip}</code>")
         };
-        let name = super::node_label::machine_button_text(alias);
+        let (icon, role) = if current {
+            ("🟢", "<b>This machine</b>")
+        } else {
+            ("🌐", "<i>Fleet node</i>")
+        };
         out.push_str(&format!(
-            "{}. <b>{}</b> {}\n",
+            "{}. {} <b>{}</b> [{} • 📶 Signal: {}]{}\n",
             idx + 1,
-            clean_for_telegram_html(&name, 48),
-            marker
+            icon,
+            clean_for_telegram_html(&node_alias, 48),
+            role,
+            clean_for_telegram_html(&signal, 32),
+            ip_part
         ));
     }
     out.push_str(
@@ -432,6 +463,24 @@ pub fn start_send_flow(rest: &str) -> String {
 }
 
 fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
+    // Collision shielding guard: if this node is NOT the picked target, check if it's another known node in the cluster.
+    // If it is another node, that node's daemon will handle it, so this node must remain silent.
+    let is_current = super::node_label::is_current_machine(alias);
+    if !is_current {
+        let cluster_nodes = super::cluster::query_gitmap_cluster_nodes();
+        let is_known_cluster_node = cluster_nodes
+            .iter()
+            .any(|n| n.alias.eq_ignore_ascii_case(alias) || n.ip_address.trim() == alias);
+        if is_known_cluster_node {
+            tracing::info!(
+                "Dropping send:m:{} callback on node {} — targeted for different machine",
+                alias,
+                local_machine_label()
+            );
+            return (String::new(), None);
+        }
+    }
+
     let canonical = match machine_entries()
         .into_iter()
         .find(|e| e.eq_ignore_ascii_case(alias))
@@ -471,6 +520,15 @@ fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
 }
 
 fn on_instance_picked(chat_id: i64, machine: &str, instance: &str) -> (String, Option<Value>) {
+    if !super::node_label::is_current_machine(machine) {
+        tracing::debug!(
+            "Dropping send:i:{}|{} callback on node {} — targeted for different machine",
+            machine,
+            instance,
+            local_machine_label()
+        );
+        return (String::new(), None);
+    }
     let canonical_machine = match machine_entries()
         .into_iter()
         .find(|e| e.eq_ignore_ascii_case(machine))
@@ -529,9 +587,9 @@ fn on_manual_conversation(chat_id: i64, machine: &str, instance: &str) -> (Strin
     }
     let _ = (machine, instance);
     (
-        "Type the conversation. Reply with the conversation ID (e.g. C001), \
-        project name, or conversation id. Your destination is confirmed before \
-        any prompt text is accepted."
+        "Type the conversation. 📁 <b>Step 3 of 3: Enter Project or Conversation ID</b>\n\n\
+        Reply with the <b>project name</b> (e.g. <code>Antigravity-Manager</code>), sequence code (e.g. <code>C001</code>, <code>P001</code>), or conversation ID.\n\n\
+        ⚠️ <i>Note: This specifies WHERE your prompt will run. You will type your actual prompt text in the next step!</i>"
             .to_string(),
         Some(cancel_markup()),
     )
@@ -606,13 +664,13 @@ fn on_conversation_picked(
     if !recent.is_empty() {
         let summary_words = super::config::load_config()
             .map(|c| c.prompt_summary_words)
-            .unwrap_or(100);
-        reply.push_str("\n\n📜 <b>Recent prompts for this destination:</b>");
+            .unwrap_or(80);
+        reply.push_str("\n\n📜 <i>Optional: Tap below to resend a past prompt instead:</i>");
         for (idx, p) in recent.iter().enumerate() {
             let id8 = if p.id.len() >= 8 { &p.id[..8] } else { &p.id };
             let snippet = super::prompt_history::prompt_preview(p, summary_words);
             reply.push_str(&format!(
-                "\n<b>{}.</b> <code>{}</code>\n<pre>{}</pre>",
+                "\n<blockquote expandable><b>{}. [<code>{}</code>]</b>\n<pre>{}</pre></blockquote>",
                 idx + 1,
                 id8,
                 snippet
@@ -624,7 +682,7 @@ fn on_conversation_picked(
         }
     }
     markup_rows.push(vec![
-        json!({ "text": "🧹 Cancel", "callback_data": "send:cancel" }),
+        json!({ "text": "🧹 Cancel Flow", "callback_data": "send:cancel" }),
     ]);
 
     (reply, Some(json!({ "inline_keyboard": markup_rows })))
@@ -692,7 +750,11 @@ pub async fn handle_send_callback(chat_id: i64, data: &str) -> (String, Option<V
     // One-tap rerun from `/history`: `send:r:<id8>` resolves the prompt
     // server-side and re-sends it through the canonical injection path.
     if let Some(id8) = payload.strip_prefix("r:") {
-        return super::prompt_history::rerun_prompt_by_id(id8).await;
+        let (reply, markup) = super::prompt_history::rerun_prompt_by_id(id8).await;
+        if reply.contains("No prompt found") {
+            return (String::new(), None);
+        }
+        return (reply, markup);
     }
     // Turn Rerun: send:t:<cid8>:<turn>
     if let Some(rest) = payload.strip_prefix("t:") {
@@ -949,8 +1011,7 @@ async fn dispatch_send_prompt(
     conversation: &str,
     prompt: &str,
 ) -> SendDispatch {
-    let local = local_machine_label();
-    let is_local = machine.eq_ignore_ascii_case(&local) || machine.eq_ignore_ascii_case("local");
+    let is_local = super::node_label::is_current_machine(machine);
     let target = if is_local {
         OpenShotTarget::Local
     } else {
@@ -1038,18 +1099,39 @@ pub async fn consume_send_prompt(_token: &str, chat_id: i64, text: &str) -> Opti
                 }
             }
             SendStage::TypeConversation => {
-                flow.conversation = Some(trimmed.to_string());
-                flow.stage = SendStage::AwaitPrompt;
-                flow.updated_at = now_secs();
-                let reply = destination_locked_reply(
-                    &flow.machine.clone(),
-                    flow.instance.as_deref().unwrap_or("default"),
-                    trimmed,
-                );
-                Next::LockedReply(SendDispatch {
-                    reply,
-                    markup: Some(cancel_markup()),
-                })
+                let is_likely_prompt = trimmed.split_whitespace().count() > 3
+                    || trimmed.to_lowercase().starts_with("please")
+                    || trimmed.to_lowercase().starts_with("fix")
+                    || trimmed.to_lowercase().starts_with("implement")
+                    || trimmed.to_lowercase().starts_with("add");
+
+                if is_likely_prompt {
+                    // Gracefully route directly to the default project rather than naming the conversation the entire prompt!
+                    let machine = flow.machine.clone();
+                    let instance = flow
+                        .instance
+                        .clone()
+                        .unwrap_or_else(|| "default".to_string());
+                    flows.remove(&chat_id);
+                    Next::Dispatch {
+                        machine,
+                        instance,
+                        conversation: "default".to_string(),
+                    }
+                } else {
+                    flow.conversation = Some(trimmed.to_string());
+                    flow.stage = SendStage::AwaitPrompt;
+                    flow.updated_at = now_secs();
+                    let reply = destination_locked_reply(
+                        &flow.machine.clone(),
+                        flow.instance.as_deref().unwrap_or("default"),
+                        trimmed,
+                    );
+                    Next::LockedReply(SendDispatch {
+                        reply,
+                        markup: Some(cancel_markup()),
+                    })
+                }
             }
             SendStage::AwaitPrompt => {
                 let machine = flow.machine.clone();

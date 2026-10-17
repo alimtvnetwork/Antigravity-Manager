@@ -1,7 +1,7 @@
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat } from 'lucide-react';
+import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat, MessageSquare } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import type { AgmConversationNode } from './types';
 import { formatSeqBadge, stripImagesFromPrompt } from './formatters';
@@ -35,6 +35,8 @@ function reportPromptActionError(err: unknown, source: string): void {
 }
 
 export interface DetailHeaderProps {
+    previewTab?: 'instruction' | 'results';
+    setPreviewTab?: (v: 'instruction' | 'results') => void;
     selectedConversation: AgmConversationNode;
     activePromptText: string;
     confirmationSuffix: string;
@@ -83,12 +85,14 @@ export interface DetailHeaderProps {
 
 export function DetailHeader(props: DetailHeaderProps) {
     const {
+        previewTab, setPreviewTab,
         selectedConversation, activePromptText,
         confirmationSuffix, setConfirmationSuffix,
         conversationTargetMode = 'current', setConversationTargetMode,
         newConversationTitle: propNewConversationTitle,
         setNewConversationTitle: propSetNewConversationTitle,
         isCopiedText, setIsCopiedText,
+        isCopied = false, setIsCopied,
         isCopiedAll = false, setIsCopiedAll,
         isEnqueueing, isResending, isFocusing,
         isCopyMenuOpen: propIsCopyMenuOpen, setIsCopyMenuOpen: propSetIsCopyMenuOpen,
@@ -106,6 +110,8 @@ export function DetailHeader(props: DetailHeaderProps) {
     const setNewConversationTitle = propSetNewConversationTitle ?? setLocalNewConvTitle;
     const [dispatchMode, setDispatchMode] = useState<'send' | 'enqueue'>('send');
 
+    const [localCopied, setLocalCopied] = useState(false);
+    const isCopiedActive = isCopied || localCopied;
     const [localCopiedText, setLocalCopiedText] = useState(false);
     const isCopiedTextActive = isCopiedText || localCopiedText;
     const [localCopiedAll, setLocalCopiedAll] = useState(false);
@@ -353,9 +359,9 @@ export function DetailHeader(props: DetailHeaderProps) {
                 </div>
             </div>
 
-            {/* Row 2: Action Controls Toolbar (Cleanly segmented and non-colliding) */}
-            <div className="flex items-center justify-end gap-2 flex-wrap min-w-0 pt-0.5 relative z-30">
-                {/* The Unified Segmented Dark-Glass Action Capsule */}
+            {/* Row 2: Action Controls Toolbar & Navigation Tabs (Cleanly segmented and non-colliding) */}
+            <div className="flex items-center justify-between gap-2 flex-wrap min-w-0 pt-0.5 relative z-30">
+                {/* Left: The Unified Segmented Dark-Glass Action Capsule */}
                 <div className="flex items-center shrink-0">
                     <div className="relative flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
                         {/* Segment 1: Content & Media Copy Split Button [ Copy All | v ] */}
@@ -486,6 +492,32 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 className="absolute right-0 top-full mt-1.5 z-50 w-80 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-1"
                                 onMouseLeave={() => setIsCopyMenuOpen(false)}
                             >
+                                {/* Sub-item 0: Copy Full Prompt (Raw Text) */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        void copyToClipboard(activePromptText).catch((err) => {
+                                            reportPromptActionError(err, 'DetailHeader.copyFullPrompt');
+                                        });
+                                        if (setIsCopied) {
+                                            setIsCopied(true);
+                                            setTimeout(() => setIsCopied(false), 2000);
+                                        }
+                                        setLocalCopied(true);
+                                        setTimeout(() => setLocalCopied(false), 2000);
+                                        setIsCopyMenuOpen(false);
+                                    }}
+                                    data-ui-name="prompt-menu-copy-full-text-btn"
+                                    data-ui-id={`prompt-menu-copy-full-text-${selectedConversation.conversation_id}`}
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        {isCopiedActive ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                                        <span>{isCopiedActive ? 'Copied Full Prompt!' : 'Copy Full Prompt'}</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-mono">Raw Text</span>
+                                </button>
+
                                 {/* Sub-item 1: Copy Clean Text Only */}
                                 <button
                                     type="button"
@@ -1009,6 +1041,51 @@ export function DetailHeader(props: DetailHeaderProps) {
                     </div>
                     {/* END RERUN SECTION (Task-04) */}
                 </div>
+
+                {/* Right: Primary Navigation Tabs Capsule */}
+                {previewTab && setPreviewTab && (
+                    <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => setPreviewTab('instruction')}
+                            className={cn(
+                                "flex items-center gap-1.5 px-3 py-1 rounded-l-full text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
+                                previewTab === 'instruction'
+                                    ? "bg-blue-600 text-white shadow-2xs"
+                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                            )}
+                            title="View original prompt instruction"
+                        >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>Prompt Instruction</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setPreviewTab('results')}
+                            className={cn(
+                                "flex items-center gap-1.5 px-3 py-1 rounded-r-full text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
+                                previewTab === 'results'
+                                    ? "bg-blue-600 text-white shadow-2xs"
+                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                            )}
+                            title="View AI execution outputs, responses and tools"
+                        >
+                            {selectedConversation.is_running ? (
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#1af18d]"></span>
+                                </span>
+                            ) : (
+                                <Terminal className="w-3.5 h-3.5 text-cyan-500" />
+                            )}
+                            <span>AI Results & Outputs</span>
+                            {(selectedConversation.execution_results || selectedConversation.latest_response) && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                            )}
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Suffix Template Management Modal */}

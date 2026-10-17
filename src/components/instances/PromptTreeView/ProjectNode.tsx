@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
     Folder,
     ChevronRight,
@@ -10,11 +11,14 @@ import {
     Bot,
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
+import { useErrorStore } from '../../../stores/error-store';
 import type { AgmConversationNode, AgmProjectTreeNode } from './types';
 import { isGhostConversation, isStaleOrEmptyConversation } from './conversationGuards';
 import { classifyPromptTier, assembleConversationHierarchy } from './tierClassification';
 import { formatSeqBadge } from './formatters';
 import { ConversationNode, getConversationStatus } from './ConversationNode';
+import { ProjectContextMenu } from './ProjectContextMenu';
+import { ConversationContextMenu } from './ConversationContextMenu';
 
 export interface ProjectNodeProps {
     project: AgmProjectTreeNode;
@@ -36,6 +40,7 @@ export interface ProjectNodeProps {
     onRefresh: (projectId: string, e: React.MouseEvent) => void;
     onTogglePin: (projectId: string, e: React.MouseEvent) => void;
     onToggleArchive: (projectId: string, e: React.MouseEvent) => void;
+    onProjectContextMenu?: (e: React.MouseEvent, repoName: string, project?: AgmProjectTreeNode) => void;
 }
 
 export function sortConversations(
@@ -93,6 +98,11 @@ function ConversationListWithGrouping({
     }
 
     const hierarchy = assembleConversationHierarchy(convList);
+    const [subagentMenuPos, setSubagentMenuPos] = useState<{
+        x: number;
+        y: number;
+        conv: AgmConversationNode;
+    } | null>(null);
 
     return (
         <>
@@ -116,10 +126,26 @@ function ConversationListWithGrouping({
                                 return (
                                     <div
                                         key={subNode.primaryNode.conversation_id}
+                                        tabIndex={0}
                                         onClick={() => onSelectConversation(subNode.primaryNode, project)}
                                         onDoubleClick={() => onOpenInspector(subNode.primaryNode, project.repo_path)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                onSelectConversation(subNode.primaryNode, project);
+                                            }
+                                        }}
+                                        onContextMenu={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            setSubagentMenuPos({
+                                                x: e.clientX,
+                                                y: e.clientY,
+                                                conv: subNode.primaryNode,
+                                            });
+                                        }}
                                         className={cn(
-                                            "relative flex items-center justify-between rounded-[5px] px-2 py-1 text-xs cursor-pointer transition-colors group",
+                                            "relative flex items-center justify-between rounded-[5px] px-2 py-1 text-xs cursor-pointer transition-colors group outline-none focus-visible:ring-1 focus-visible:ring-purple-400",
                                             isSubSelected
                                                 ? "bg-purple-600 text-white font-medium shadow-2xs"
                                                 : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#171025]"
@@ -171,11 +197,92 @@ function ConversationListWithGrouping({
                     )}
                 </div>
             ))}
+
+            {subagentMenuPos && (
+                <ConversationContextMenu
+                    x={subagentMenuPos.x}
+                    y={subagentMenuPos.y}
+                    conversationId={subagentMenuPos.conv.conversation_id}
+                    currentTitle={subagentMenuPos.conv.title || subagentMenuPos.conv.short_id || ''}
+                    conversationNode={subagentMenuPos.conv}
+                    repoPath={project.repo_path}
+                    instanceId={subagentMenuPos.conv.instance_id || project.instance_id}
+                    onClose={() => setSubagentMenuPos(null)}
+                    onRename={() => {
+                        setSubagentMenuPos(null);
+                    }}
+                    onInspect={() => {
+                        setSubagentMenuPos(null);
+                        onOpenInspector(subagentMenuPos.conv, project.repo_path);
+                    }}
+                />
+            )}
         </>
     );
 }
 
+function exportProjectAsJson(project: AgmProjectTreeNode): void {
+    const data = JSON.stringify(project, null, 2);
+    const blob = new Blob([data], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `project-${project.repo_name || project.project_id}-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function exportProjectAsYaml(project: AgmProjectTreeNode): void {
+    const lines = [
+        `project_id: "${project.project_id}"`,
+        `repo_name: "${project.repo_name}"`,
+        `repo_path: "${project.repo_path}"`,
+        `total_conversations: ${project.conversations.length}`,
+        `conversations:`,
+    ];
+    for (const c of project.conversations) {
+        lines.push(`  - id: "${c.conversation_id}"`);
+        lines.push(`    title: "${(c.title || '').replace(/"/g, '\\"')}"`);
+        lines.push(`    step_count: ${c.step_count || 1}`);
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/yaml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `project-${project.repo_name || project.project_id}-${Date.now()}.yaml`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+async function exportProjectAsSqlite(project: AgmProjectTreeNode): Promise<void> {
+    try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('export_prompt_tree_section', {
+            scope: {
+                target_type: 'project',
+                project_id: project.project_id,
+                project_name: project.repo_name,
+            },
+            format: 'sqlite',
+            options: { format: 'sqlite', embed_images: false },
+        });
+    } catch (err) {
+        useErrorStore.getState().captureException(
+            err instanceof Error ? err : new Error(String(err)),
+            {
+                source: 'ProjectNode.exportProjectAsSqlite',
+                triggerAction: 'export_project_sqlite',
+            }
+        );
+    }
+}
+
 export function ProjectNode(props: ProjectNodeProps) {
+    const [projectMenuPos, setProjectMenuPos] = useState<{ x: number; y: number } | null>(null);
     const {
         project,
         isExpanded,
@@ -196,6 +303,7 @@ export function ProjectNode(props: ProjectNodeProps) {
         onRefresh,
         onTogglePin,
         onToggleArchive,
+        onProjectContextMenu,
     } = props;
 
     const filteredConvs = project.conversations.filter((c) => {
@@ -263,6 +371,15 @@ export function ProjectNode(props: ProjectNodeProps) {
                 onClick={() => {
                     onSelectProject(project);
                     onToggleExpand(project.project_id);
+                }}
+                onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (onProjectContextMenu) {
+                        onProjectContextMenu(e, project.repo_name, project);
+                    } else {
+                        setProjectMenuPos({ x: e.clientX, y: e.clientY });
+                    }
                 }}
                 className={cn(
                     'group flex items-center justify-between rounded-[5px] px-2.5 py-1.5 text-xs font-semibold cursor-pointer transition-colors',
@@ -400,6 +517,43 @@ export function ProjectNode(props: ProjectNodeProps) {
                         </div>
                     )}
                 </div>
+            )}
+
+            {projectMenuPos && (
+                <ProjectContextMenu
+                    x={projectMenuPos.x}
+                    y={projectMenuPos.y}
+                    projectId={project.project_id}
+                    projectName={project.repo_name}
+                    repoPath={project.repo_path}
+                    isPinned={isPinned}
+                    isArchived={isArchived}
+                    onClose={() => setProjectMenuPos(null)}
+                    onRefresh={() => {
+                        setProjectMenuPos(null);
+                        onRefresh(project.project_id, {} as React.MouseEvent);
+                    }}
+                    onTogglePin={() => {
+                        setProjectMenuPos(null);
+                        onTogglePin(project.project_id, {} as React.MouseEvent);
+                    }}
+                    onToggleArchive={() => {
+                        setProjectMenuPos(null);
+                        onToggleArchive(project.project_id, {} as React.MouseEvent);
+                    }}
+                    onExportJson={() => {
+                        setProjectMenuPos(null);
+                        exportProjectAsJson(project);
+                    }}
+                    onExportSqlite={() => {
+                        setProjectMenuPos(null);
+                        void exportProjectAsSqlite(project);
+                    }}
+                    onExportYaml={() => {
+                        setProjectMenuPos(null);
+                        exportProjectAsYaml(project);
+                    }}
+                />
             )}
         </div>
     );

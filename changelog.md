@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.223.0] - 2026-10-17
+
+### Added
+- **Prompt Tree Right-Click Custom Context Menus (`Project` & `Conversation` & `Turns`)**: Added right-click context menus directly to Project headers (`ProjectContextMenu.tsx`) with Import into Project, Export (JSON, SQLite DB, YAML), and Rerun (Queued or All) actions; attached context menus and keyboard accessibility (`Enter`, `Space`, `tabIndex={0}`) to child subagent items and individual prompt turn entries (`ConversationNode.tsx`); implemented viewport boundary clamping (`createPortal` within `window.innerWidth - 240` and `window.innerHeight - 380`) to eliminate off-screen menu clipping; and applied high-contrast active selection highlights (`bg-sky-500/10 border-l-2 border-sky-500 text-sky-400 font-medium`) for active conversation turns. (Thanks to @aukgit)
+- **Top Toolbar Right-Aligned Navigation Tabs & Vertical Dead-Space Recovery**: Redesigned Row 2 of `DetailHeader.tsx` into a `justify-between` toolbar, relocating primary navigation tabs (`[ Prompt Instruction | AI Results & Outputs ]`) to the right side of the toolbar row beside top-level action capsules; eliminated the redundant 3rd row navigation tabs and borders in `DetailTabs.tsx` to reclaim ~44px of vertical height for expanded prompt reading and result inspection; streamlined ViewMode toggles (`[ Preview | Raw | Edit ]`) and Details into a compact sub-bar directly above content. (Thanks to @aukgit)
+- **Top-Level Copy All Consolidation & Redundant Footer Buttons Removal**: Consolidated all prompt copy operations into the top-level `[ Copy All | v ]` segmented capsule in `DetailHeader.tsx` (Copy All Content+Images, Copy Full Prompt, Copy Clean Text, and Save Images); purged duplicate bottom copy buttons across Preview and Raw modes in `PromptInstructionView.tsx`. (Thanks to @aukgit)
+- **Telegram Inbound Machine Routing & Fleet Broadcast Storm Shielding**: Eliminated multi-machine response collisions by normalizing Supabase `public.command_queue` payloads with explicit `target_node_id` (previously defaulting to wildcard `'*'`) across `injection.rs`, `open_shot.rs`, and `processing.rs`; unified current machine detection via `node_label::is_current_machine()`; deduplicated machine entries in `machine_entries()` so only a single "This machine" button is generated; and added native CLI support for `agm prompt <target> [flags] <prompt_text>` in `cli/prompts.rs` to allow GitMap cluster execution and SSH remote prompts to succeed directly. (Thanks to @aukgit)
+- **Telegram Prompt Input UX & Destination Locked Flow**: Redesigned `destination_locked_reply()` with prominent visual dividers and clear instruction (`💬 Type your prompt below and send it as a plain chat message`); encapsulated past prompts in Telegram Bot API 7.2+ `<blockquote expandable>` so direct typing is the obvious primary action; renamed Step 3 manual target button to `[✏️ Enter Project / Conv ID]`; and added graceful prompt-detection fallback in `SendStage::TypeConversation` to route direct prompt text to the default project. (Thanks to @aukgit)
+
+---
+
 ## [v4.222.3] - 2026-10-17
 
 ### Added
@@ -545,6 +556,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.223.0 (2026-10-17)**:
+        -   **[Prompt Tree & Telegram Shielding] Custom Right-Click Context Menu, Right-Aligned Navigation Tabs, Header Dead-Space Removal, Top Toolbar Copy All Consolidation, and Telegram Cluster Routing Shielding (Thanks to @aukgit)**:
+            -   **Description**: Added right-click custom context menus to Project headers (`ProjectContextMenu.tsx`) with Import into Project, Export (JSON, SQLite DB, YAML), and Rerun (Queued or All) actions; wired context menus and keyboard accessibility to child subagents and prompt turns with active selection highlights (`bg-sky-500/10 border-l-2 border-sky-500 text-sky-400`); relocated primary navigation tabs (`[ Prompt Instruction | AI Results & Outputs ]`) to the right side of Row 2 in `DetailHeader.tsx` and eliminated the redundant 3rd row in `DetailTabs.tsx` to recover ~44px of vertical height; consolidated all copy operations into the top-level `[ Copy All | v ]` segmented capsule and removed redundant bottom copy buttons in `PromptInstructionView.tsx`; eliminated cluster-wide prompt broadcast storms by binding `target_node_id` in Supabase `command_queue` payloads across `injection.rs`, `open_shot.rs`, and `processing.rs`; unified current machine detection via `node_label::is_current_machine()`; deduplicated machine entries in Telegram picker; added native CLI support for `agm prompt <target> [flags] <prompt_text>`; and redesigned destination locked UX with expandable blockquotes for past prompts and clear instruction for direct prompt typing.
+
+
     *   **v4.222.0 (2026-10-17)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

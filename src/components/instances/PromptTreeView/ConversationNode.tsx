@@ -49,6 +49,12 @@ export function ConversationNode({
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editingTitle, setEditingTitle] = useState(conv.title || '');
     const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+    const [turnMenuPos, setTurnMenuPos] = useState<{
+        x: number;
+        y: number;
+        turnConv: AgmConversationNode;
+    } | null>(null);
+    const [selectedTurnNumber, setSelectedTurnNumber] = useState<number | null>(null);
     const [isExpanded, setIsExpanded] = useState<boolean>(Boolean(conv.is_running));
 
     const { isRunning, isQueued } = getConversationStatus(conv);
@@ -100,7 +106,10 @@ export function ConversationNode({
             <div
                 key={conv.conversation_id}
                 tabIndex={0}
-                onClick={() => onSelect(conv, project)}
+                onClick={() => {
+                    setSelectedTurnNumber(null);
+                    onSelect(conv, project);
+                }}
                 onDoubleClick={() => onOpenInspector(conv, project.repo_path)}
                 onKeyDown={(e) => {
                     if (isSelected && e.key === 'F2') {
@@ -117,9 +126,11 @@ export function ConversationNode({
                 }}
                 className={cn(
                     'group flex items-center justify-between rounded-[5px] px-2 py-1.5 text-xs cursor-pointer transition-colors relative outline-none focus-visible:ring-1 focus-visible:ring-cyan-500/50',
-                    isSelected
+                    isSelected && selectedTurnNumber === null
                         ? 'bg-blue-600 text-white font-medium shadow-2xs'
-                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#171025]'
+                        : isSelected
+                          ? 'bg-sky-500/10 border-l-2 border-sky-500 text-sky-400 font-medium'
+                          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#171025]'
                 )}
                 title={`${conv.title || 'Conversation'} · ${conv.step_count || 1} steps · Click to view (F2 to rename)`}
             >
@@ -244,36 +255,49 @@ export function ConversationNode({
                     {conv.prompts.map((turn, tIdx) => {
                         const isLastTurn = tIdx === conv.prompts!.length - 1;
                         const hasImages = turn.media_paths && turn.media_paths.length > 0;
+                        const isTurnActive = isSelected && selectedTurnNumber === turn.turn_number;
+                        const createTurnConv = (): AgmConversationNode => ({
+                            ...conv,
+                            prompt_preview_200w: turn.preview_200w || turn.prompt_text.slice(0, 200),
+                            full_prompt_text: turn.prompt_text,
+                            latest_step_summary: `Turn ${turn.turn_number} · ${turn.status}`,
+                            is_running: turn.is_running,
+                            is_queued: turn.is_queued,
+                            status: turn.status,
+                        });
+
                         return (
                             <div
                                 key={`turn-${turn.step_index}-${turn.turn_number}`}
+                                tabIndex={0}
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    const turnConv: AgmConversationNode = {
-                                        ...conv,
-                                        prompt_preview_200w: turn.preview_200w || turn.prompt_text.slice(0, 200),
-                                        full_prompt_text: turn.prompt_text,
-                                        latest_step_summary: `Turn ${turn.turn_number} · ${turn.status}`,
-                                        is_running: turn.is_running,
-                                        is_queued: turn.is_queued,
-                                        status: turn.status,
-                                    };
-                                    onSelect(turnConv, project);
+                                    setSelectedTurnNumber(turn.turn_number);
+                                    onSelect(createTurnConv(), project);
                                 }}
                                 onDoubleClick={(e) => {
                                     e.stopPropagation();
-                                    const turnConv: AgmConversationNode = {
-                                        ...conv,
-                                        prompt_preview_200w: turn.preview_200w || turn.prompt_text.slice(0, 200),
-                                        full_prompt_text: turn.prompt_text,
-                                        latest_step_summary: `Turn ${turn.turn_number} · ${turn.status}`,
-                                        is_running: turn.is_running,
-                                        is_queued: turn.is_queued,
-                                        status: turn.status,
-                                    };
-                                    onOpenInspector(turnConv, project.repo_path);
+                                    onOpenInspector(createTurnConv(), project.repo_path);
                                 }}
-                                className="group/turn flex items-center justify-between rounded-[4px] px-1.5 py-1 text-xs cursor-pointer hover:bg-slate-100 dark:hover:bg-[#1a1228] transition-colors"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setSelectedTurnNumber(turn.turn_number);
+                                        onSelect(createTurnConv(), project);
+                                    }
+                                }}
+                                onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setTurnMenuPos({ x: e.clientX, y: e.clientY, turnConv: createTurnConv() });
+                                }}
+                                className={cn(
+                                    "group/turn flex items-center justify-between rounded-[4px] px-1.5 py-1 text-xs cursor-pointer transition-colors outline-none focus-visible:ring-1 focus-visible:ring-sky-500/50",
+                                    isTurnActive
+                                        ? "bg-sky-500/10 border-l-2 border-sky-500 text-sky-400 font-medium"
+                                        : "hover:bg-slate-100 dark:hover:bg-[#1a1228]"
+                                )}
                                 title={`Turn ${turn.turn_number} (${turn.status}) · Click to inspect prompt`}
                             >
                                 <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
@@ -321,6 +345,26 @@ export function ConversationNode({
                         );
                     })}
                 </div>
+            )}
+
+            {turnMenuPos && (
+                <ConversationContextMenu
+                    x={turnMenuPos.x}
+                    y={turnMenuPos.y}
+                    conversationId={turnMenuPos.turnConv.conversation_id}
+                    currentTitle={turnMenuPos.turnConv.latest_step_summary || `Turn ${turnMenuPos.turnConv.seq_code}`}
+                    conversationNode={turnMenuPos.turnConv}
+                    repoPath={project.repo_path}
+                    instanceId={turnMenuPos.turnConv.instance_id || project.instance_id}
+                    onClose={() => setTurnMenuPos(null)}
+                    onRename={() => {
+                        setTurnMenuPos(null);
+                    }}
+                    onInspect={() => {
+                        setTurnMenuPos(null);
+                        onOpenInspector(turnMenuPos.turnConv, project.repo_path);
+                    }}
+                />
             )}
 
             {contextMenuPos && (

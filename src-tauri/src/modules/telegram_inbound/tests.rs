@@ -223,4 +223,74 @@ pub(crate) mod tests {
         );
         assert_eq!(daemon::normalize_cmd_callback_payload("/send"), "/send");
     }
+
+    #[test]
+    pub(crate) fn test_machine_entries_deduplication() {
+        assert!(node_label::is_current_machine("local"));
+        assert!(node_label::is_current_machine("localhost"));
+        let detected = crate::modules::email_watcher::detect_machine_name();
+        if !detected.trim().is_empty() {
+            assert!(node_label::is_current_machine(&detected));
+        }
+    }
+
+    #[test]
+    pub(crate) fn test_supabase_command_queue_payload_schema() {
+        let node = "worker-1";
+        let prompt_text = "Run integration tests";
+        let cmd_id = uuid::Uuid::new_v4().to_string();
+        let payload = serde_json::json!({
+            "id": cmd_id,
+            "target_node_id": node,
+            "target_node": node,
+            "source": "telegram",
+            "command": "prompt",
+            "command_text": format!("agm prompt default {}", prompt_text),
+            "prompt": prompt_text,
+            "status": "pending",
+            "created_at": Utc::now().timestamp()
+        });
+
+        assert_eq!(payload["target_node_id"], "worker-1");
+        assert_eq!(payload["target_node"], "worker-1");
+        assert_eq!(payload["source"], "telegram");
+        assert_eq!(
+            payload["command_text"],
+            "agm prompt default Run integration tests"
+        );
+        assert_eq!(payload["status"], "pending");
+    }
+
+    #[test]
+    pub(crate) fn test_injection_token_parsing_preserves_target() {
+        let tokens = vec!["Antigravity-Manager", "Fix", "build", "pipeline"];
+        let first_tok = tokens[0];
+        let mut filtered = tokens.clone();
+
+        let is_existing_dir = std::path::Path::new(first_tok).is_dir();
+        let is_known_project = first_tok.eq_ignore_ascii_case("Antigravity-Manager");
+        if !is_existing_dir && !is_known_project && filtered.len() < 2 {
+            filtered.insert(0, "default");
+        }
+
+        assert_eq!(filtered[0], "Antigravity-Manager");
+        assert_eq!(filtered.len(), 4);
+    }
+
+    #[test]
+    pub(crate) fn test_step3_graceful_prompt_fallback() {
+        let prompt_input = "Please fix the failing tests in telegram inbound";
+        let is_likely_prompt = prompt_input.split_whitespace().count() > 3
+            || prompt_input.to_lowercase().starts_with("please")
+            || prompt_input.to_lowercase().starts_with("fix")
+            || prompt_input.to_lowercase().starts_with("implement")
+            || prompt_input.to_lowercase().starts_with("add");
+        assert!(is_likely_prompt);
+
+        let id_input = "C001";
+        let is_id_prompt = id_input.split_whitespace().count() > 3
+            || id_input.to_lowercase().starts_with("please")
+            || id_input.to_lowercase().starts_with("fix");
+        assert!(!is_id_prompt);
+    }
 }

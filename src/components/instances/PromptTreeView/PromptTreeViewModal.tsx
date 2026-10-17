@@ -608,8 +608,10 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                     <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#171025]">
                         <PromptTreeErrorBoundary onReset={() => setSelectedConversation(null)}>
                             {selectedConversation ? (
-                                <div className="flex-1 flex flex-col px-5 py-3.5 overflow-y-auto space-y-3">
+                                <div className="flex-1 flex flex-col px-5 py-3.5 overflow-y-auto space-y-1.5">
                                     <DetailHeader
+                                        previewTab={previewTab}
+                                        setPreviewTab={setPreviewTab}
                                         selectedConversation={selectedConversation}
                                         activePromptText={activePromptText}
                                         confirmationSuffix={confirmationSuffix}
@@ -825,6 +827,8 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                             project_name: projectContextMenu.project.repo_name,
                         }, 'yaml');
                     }}
+                    onImportProject={() => coreActions.handleOpenImportModal()}
+                    onRerunProject={() => void coreActions.handleResendQueued()}
                 />
             )}
 

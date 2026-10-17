@@ -98,8 +98,15 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
             filtered_tokens[0] = "default";
         }
     } else if !is_seq_like && (explicit_node.is_some() || explicit_instance.is_some()) {
-        // Support `/prompt --node vm-1 --instance work Audit code` without requiring a dummy project token
-        filtered_tokens.insert(0, "default");
+        let is_existing_dir = std::path::Path::new(first_tok).is_dir();
+        let is_known_project = repo_db::get_live_project_execution_info().iter().any(|p| {
+            p.project_id.eq_ignore_ascii_case(first_tok)
+                || p.repo_name.eq_ignore_ascii_case(first_tok)
+        });
+        if !is_existing_dir && !is_known_project && filtered_tokens.len() < 2 {
+            // Support `/prompt --node vm-1 --instance work Audit code` without requiring a dummy project token
+            filtered_tokens.insert(0, "default");
+        }
     }
 
     if filtered_tokens.len() < 2 {
@@ -107,21 +114,16 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
     }
 
     let local_config = supabase_sync::load_config().unwrap_or_default();
-    let local_alias = if local_config.node_alias.trim().is_empty() {
-        email_watcher::detect_machine_name()
-    } else {
-        local_config.node_alias.clone()
-    };
     let gitmap_nodes = query_gitmap_cluster_nodes();
     let ssh_nodes = crate::modules::ssh_manager::load_ssh_connections().unwrap_or_default();
 
     let is_first_token_remote_node = explicit_node.is_none()
         && (gitmap_nodes.iter().any(|n| {
             n.alias.eq_ignore_ascii_case(filtered_tokens[0])
-                && !n.alias.eq_ignore_ascii_case(&local_alias)
+                && !super::node_label::is_current_machine(&n.alias)
         }) || ssh_nodes.iter().any(|n| {
             n.alias.eq_ignore_ascii_case(filtered_tokens[0])
-                && !n.alias.eq_ignore_ascii_case(&local_alias)
+                && !super::node_label::is_current_machine(&n.alias)
         }));
 
     let (target_node, target_project, prompt_text) = if let Some(exp_node) = explicit_node {
@@ -135,7 +137,7 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
         (node.to_string(), proj.to_string(), text)
     } else {
         let first = filtered_tokens[0];
-        if first.eq_ignore_ascii_case("local") || first.eq_ignore_ascii_case(&local_alias) {
+        if super::node_label::is_current_machine(first) {
             if filtered_tokens.len() >= 3 {
                 let proj = filtered_tokens[1];
                 (
@@ -161,7 +163,7 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
         return "Your prompt text is empty — nothing was sent.".to_string();
     }
 
-    if target_node == "local" || target_node.eq_ignore_ascii_case(&local_alias) {
+    if super::node_label::is_current_machine(&target_node) {
         // 1. First attempt resolution via Dual AGM/GitMap Sequence ID (`P001`, `GM:#1`, `C001`, `GM:<cid>`, or conv UUID prefix)
         let seq_resolved = repo_db::resolve_agm_sequence_target(&target_project);
 
@@ -323,9 +325,12 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
                     let payload = json!({
                         "id": cmd_id,
                         "target_node": target_node,
+                        "target_node_id": target_node,
+                        "source": "telegram",
                         "project_id": target_project,
                         "instance_id": explicit_instance.clone().unwrap_or_else(|| "default".to_string()),
                         "command": "prompt",
+                        "command_text": remote_cmd,
                         "prompt": prompt_text,
                         "status": "pending",
                         "created_at": Utc::now().timestamp()

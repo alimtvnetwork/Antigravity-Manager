@@ -22,34 +22,105 @@ pub fn is_generated_node_alias(alias: &str) -> bool {
 
 /// True when `alias` addresses the machine running this bot.
 pub fn is_current_machine(alias: &str) -> bool {
-    let alias = alias.trim();
-    if alias.eq_ignore_ascii_case("local") || alias.eq_ignore_ascii_case("localhost") {
+    let target = alias.trim();
+    if target.is_empty() {
+        return false;
+    }
+    if target.eq_ignore_ascii_case("local") || target.eq_ignore_ascii_case("localhost") {
         return true;
     }
+
+    let local_ip = crate::modules::email_watcher::detect_local_ip();
+    if !local_ip.is_empty() && target.eq_ignore_ascii_case(&local_ip) {
+        return true;
+    }
+
     let fleet = super::open_shot::local_machine_label();
-    if alias.eq_ignore_ascii_case(fleet.trim()) {
+    if !fleet.is_empty() && target.eq_ignore_ascii_case(fleet.trim()) {
         return true;
     }
+
     let detected = crate::modules::email_watcher::detect_machine_name();
-    alias.eq_ignore_ascii_case(detected.trim())
+    if !detected.is_empty() && target.eq_ignore_ascii_case(detected.trim()) {
+        return true;
+    }
+
+    let cluster_nodes = super::cluster::query_gitmap_cluster_nodes();
+    let my_cluster_alias = cluster_nodes
+        .iter()
+        .find(|n| !local_ip.is_empty() && n.ip_address.trim() == local_ip.trim())
+        .map(|n| n.alias.clone());
+
+    if let Some(ref my_alias) = my_cluster_alias {
+        if target.eq_ignore_ascii_case(my_alias) {
+            return true;
+        }
+    }
+
+    if let Some((t_alias, t_ip)) = target.split_once('|') {
+        if is_current_machine(t_alias) || is_current_machine(t_ip) {
+            return true;
+        }
+    }
+
+    // If target matches a remote cluster node's alias or IP, it is explicitly NOT this machine!
+    for node in &cluster_nodes {
+        let is_target = node.alias.eq_ignore_ascii_case(target) || node.ip_address.trim() == target;
+        if is_target {
+            let is_this_machine = (!local_ip.is_empty()
+                && node.ip_address.trim() == local_ip.trim())
+                || my_cluster_alias
+                    .as_deref()
+                    .map(|a| a.eq_ignore_ascii_case(&node.alias))
+                    .unwrap_or(false)
+                || (!fleet.is_empty() && node.alias.eq_ignore_ascii_case(fleet.trim()))
+                || (!detected.is_empty() && node.alias.eq_ignore_ascii_case(detected.trim()));
+            return is_this_machine;
+        }
+    }
+
+    false
 }
 
-/// Button label: `This machine` on this host, otherwise the cached proper name.
+/// Button label: includes alias and IP for complete clarity.
 pub fn machine_button_text(alias: &str) -> String {
+    let (node_alias, ip, _) = super::cluster::resolve_node_network_info(alias);
     if is_current_machine(alias) {
-        "This machine".to_string()
+        if ip != "Unknown IP" && !ip.is_empty() {
+            format!("This machine ({node_alias} \u{2022} {ip})")
+        } else {
+            format!("This machine ({node_alias})")
+        }
+    } else if ip != "Unknown IP" && !ip.is_empty() {
+        format!("{node_alias} ({ip})")
     } else {
         display_name_for(alias)
     }
 }
 
-/// HTML header. The current machine uses the green circle; others use the desktop mark.
+/// HTML header: clear with alias, IP, and signal where the prompt is going.
 pub fn machine_header_html(alias: &str) -> String {
-    if is_current_machine(alias) {
-        "\u{1F7E2} <b>This machine</b>".to_string()
+    let is_current = is_current_machine(alias);
+    let (node_alias, ip, signal) = super::cluster::resolve_node_network_info(alias);
+    let signal_label = if signal.starts_with("Signal:") || signal.starts_with("📶") {
+        signal
     } else {
-        let name = escape_html(&display_name_for(alias));
-        format!("\u{1F5A5}\u{FE0F} <b>{name}</b>")
+        format!("Signal: {signal}")
+    };
+    if is_current {
+        format!(
+            "\u{1F7E2} <b>This machine</b> [<code>{}</code> \u{2022} <code>{}</code> \u{2022} \u{1F4F6} {}]",
+            escape_html(&node_alias),
+            escape_html(&ip),
+            escape_html(&signal_label)
+        )
+    } else {
+        format!(
+            "\u{1F5A5}\u{FE0F} <b>Remote node: {}</b> [<code>{}</code> \u{2022} \u{1F4F6} {}]",
+            escape_html(&node_alias),
+            escape_html(&ip),
+            escape_html(&signal_label)
+        )
     }
 }
 

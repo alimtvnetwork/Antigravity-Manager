@@ -13,6 +13,8 @@ import {
     FileText,
     ChevronRight,
     ChevronDown,
+    FolderInput,
+    Repeat,
 } from 'lucide-react';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
@@ -38,6 +40,8 @@ export interface ConversationContextMenuProps {
     onResendPrompts?: (count: number | 'all') => void;
     onVerifyLastPrompts?: (count: number) => void;
     onCloneAndCompact?: () => void;
+    onImportConversation?: (convoId: string) => void;
+    onRerunConversation?: (convoId: string, nudgeType: string) => void;
     onExportJson?: () => void;
     onExportSqlite?: () => void;
     onExportYaml?: () => void;
@@ -57,6 +61,8 @@ export function ConversationContextMenu({
     onResendPrompts,
     onVerifyLastPrompts,
     onCloneAndCompact,
+    onImportConversation,
+    onRerunConversation,
     onExportJson,
     onExportSqlite,
     onExportYaml,
@@ -71,7 +77,7 @@ export function ConversationContextMenu({
     const [customNCount, setCustomNCount] = useState<number>(5);
 
     const left = Math.max(8, Math.min(x, window.innerWidth - 260));
-    const top = Math.max(8, Math.min(y, window.innerHeight - 380));
+    const top = Math.max(8, Math.min(y, window.innerHeight - 440));
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -383,6 +389,28 @@ export function ConversationContextMenu({
                 )}
             </div>
 
+            {/* Rerun Nudge Action */}
+            <button
+                type="button"
+                className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-sky-500/10 hover:text-sky-600 dark:hover:text-sky-400 cursor-pointer"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onClose();
+                    if (onRerunConversation) {
+                        onRerunConversation(conversationId, 'is-it-done');
+                    } else {
+                        void handleDoResend(1);
+                    }
+                }}
+                title="Dispatch a fast rerun nudge (is-it-done) to this conversation"
+            >
+                <div className="flex items-center gap-2.5">
+                    <Repeat className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                    <span>Rerun Nudge (Is It Done?)</span>
+                </div>
+                <span className="text-[9px] font-mono text-sky-400">Nudge</span>
+            </button>
+
             {/* Verify Last 10 Prompts & Enqueue */}
             <button
                 type="button"
@@ -413,10 +441,29 @@ export function ConversationContextMenu({
 
             <div className="my-1 border-t border-slate-100 dark:border-[#2b1b42]" />
 
-            {/* Section: Export Triggers */}
+            {/* Section: Import & Export Triggers */}
             <div className="px-3 pt-0.5 text-[9px] font-mono uppercase text-slate-400 dark:text-slate-500 tracking-wider">
-                Export
+                Import & Export
             </div>
+
+            {/* Import into Conversation */}
+            {onImportConversation && (
+                <button
+                    type="button"
+                    className="flex w-full items-center justify-between px-3 py-1 text-left transition-colors hover:bg-sky-500/10 hover:text-sky-600 dark:hover:text-sky-400 cursor-pointer"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onImportConversation(conversationId);
+                        onClose();
+                    }}
+                >
+                    <div className="flex items-center gap-2.5">
+                        <FolderInput className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                        <span>Import into Conversation...</span>
+                    </div>
+                    <span className="text-[9px] font-mono text-slate-400">Import</span>
+                </button>
+            )}
 
             <button
                 type="button"

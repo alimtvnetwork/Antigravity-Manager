@@ -53,8 +53,53 @@ pub fn parse_gitmap_cluster_status(output: &str) -> Vec<ClusterNodeInfo> {
     nodes
 }
 
-/// Query GitMap cluster nodes via CLI
+/// Query GitMap cluster nodes via CLI with JSON output first, falling back to text status
 pub fn query_gitmap_cluster_nodes() -> Vec<ClusterNodeInfo> {
+    // 1. Prefer gitmap cluster nodes --json for exact aliases and IPs
+    let mut cmd_json = Command::new("gitmap");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd_json.creation_flags(0x08000000);
+    }
+    if let Ok(out) = cmd_json.args(["cluster", "nodes", "--json"]).output() {
+        if out.status.success() {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(stdout.trim()) {
+                if let Some(arr) = val.as_array() {
+                    let mut nodes = Vec::new();
+                    for item in arr {
+                        let alias = item["alias"].as_str().unwrap_or("").trim().to_string();
+                        let ip = item["ip"]
+                            .as_str()
+                            .or_else(|| item["ipAddress"].as_str())
+                            .unwrap_or("")
+                            .trim()
+                            .to_string();
+                        if !alias.is_empty() {
+                            nodes.push(ClusterNodeInfo {
+                                alias,
+                                ip_address: if ip.is_empty() {
+                                    "Cluster Mesh".to_string()
+                                } else {
+                                    ip
+                                },
+                                status: "ready".to_string(),
+                                source: "GitMap Fleet".to_string(),
+                                last_seen: Some(Utc::now().to_rfc3339()),
+                                uptime_seconds: 0,
+                            });
+                        }
+                    }
+                    if !nodes.is_empty() {
+                        return nodes;
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Fallback to gitmap cluster status
     let mut cmd = Command::new("gitmap");
     #[cfg(target_os = "windows")]
     {
@@ -70,6 +115,72 @@ pub fn query_gitmap_cluster_nodes() -> Vec<ClusterNodeInfo> {
         }
     }
     Vec::new()
+}
+
+/// Resolve node network info: returns (canonical_alias, ip_address, signal_label)
+pub fn resolve_node_network_info(target_or_alias: &str) -> (String, String, String) {
+    let target = target_or_alias.trim();
+    let local_ip = email_watcher::detect_local_ip();
+    let local_name = email_watcher::detect_machine_name();
+    let cluster_nodes = query_gitmap_cluster_nodes();
+
+    // Check if target is explicitly this local machine
+    if target.eq_ignore_ascii_case("local")
+        || target.eq_ignore_ascii_case("localhost")
+        || (!local_ip.is_empty() && target.eq_ignore_ascii_case(&local_ip))
+        || (!local_name.is_empty() && target.eq_ignore_ascii_case(&local_name))
+    {
+        let my_alias = cluster_nodes
+            .iter()
+            .find(|n| n.ip_address.trim() == local_ip.trim())
+            .map(|n| n.alias.clone())
+            .unwrap_or_else(|| {
+                if !local_name.is_empty() {
+                    local_name.clone()
+                } else {
+                    "local".to_string()
+                }
+            });
+        return (my_alias, local_ip, "Local Ready".to_string());
+    }
+
+    // Match against cluster nodes by alias or IP
+    if let Some(matched) = cluster_nodes
+        .iter()
+        .find(|n| n.alias.eq_ignore_ascii_case(target) || n.ip_address.trim() == target)
+    {
+        let is_me = !local_ip.is_empty() && matched.ip_address.trim() == local_ip.trim();
+        let signal = if is_me {
+            "Local Ready".to_string()
+        } else if matched.status.eq_ignore_ascii_case("ready")
+            || matched.status.eq_ignore_ascii_case("connected")
+            || matched.status.eq_ignore_ascii_case("online")
+        {
+            "Cluster Mesh Connected".to_string()
+        } else if matched.status.eq_ignore_ascii_case("offline") {
+            "Offline".to_string()
+        } else {
+            matched.status.clone()
+        };
+        return (matched.alias.clone(), matched.ip_address.clone(), signal);
+    }
+
+    // Fallback: check if target is a compound alias|ip
+    if let Some((a, ip)) = target.split_once('|') {
+        let (resolved_a, resolved_ip, sig) = resolve_node_network_info(a);
+        let final_ip = if resolved_ip == "Unknown IP" || resolved_ip.is_empty() {
+            ip.trim().to_string()
+        } else {
+            resolved_ip
+        };
+        return (resolved_a, final_ip, sig);
+    }
+
+    (
+        target.to_string(),
+        "Unknown IP".to_string(),
+        "Unregistered Node".to_string(),
+    )
 }
 
 /// Query Supabase Root DB nodes table

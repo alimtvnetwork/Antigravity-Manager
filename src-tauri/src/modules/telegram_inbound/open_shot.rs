@@ -43,27 +43,45 @@ enum ShotMachine {
     Remote(String),
 }
 
-/// This machine's fleet display name: Supabase node alias, else the OS machine name.
+/// This machine's fleet display name: GitMap cluster alias by local IP, Supabase node alias, else OS machine name.
 pub fn local_machine_label() -> String {
-    match supabase_sync::load_config() {
-        Ok(cfg) if !cfg.node_alias.trim().is_empty() => cfg.node_alias.trim().to_string(),
-        Ok(_) => email_watcher::detect_machine_name(),
-        Err(e) => {
-            // Justification: the alias is display-only; an unreadable config falls back to the OS machine name.
-            crate::error::record_ignored(Err::<(), _>(e), "load supabase config for node alias");
-            email_watcher::detect_machine_name()
+    // 1. Check if Supabase sync config has an explicit custom node_alias (not generic placeholder)
+    if let Ok(cfg) = supabase_sync::load_config() {
+        let alias = cfg.node_alias.trim();
+        if !alias.is_empty()
+            && !alias.eq_ignore_ascii_case("node")
+            && !alias.eq_ignore_ascii_case("ai-main")
+        {
+            return alias.to_string();
         }
     }
+
+    // 2. Resolve via local IP matching GitMap cluster nodes (e.g. w1 @ 192.168.1.3, main @ 192.168.1.20)
+    let local_ip = email_watcher::detect_local_ip();
+    if !local_ip.is_empty() {
+        for node in cluster::query_gitmap_cluster_nodes() {
+            if node.ip_address.trim() == local_ip.trim() && !node.alias.trim().is_empty() {
+                return node.alias.trim().to_string();
+            }
+        }
+    }
+
+    // 3. Fallback to Supabase node_alias if any
+    if let Ok(cfg) = supabase_sync::load_config() {
+        let alias = cfg.node_alias.trim();
+        if !alias.is_empty() {
+            return alias.to_string();
+        }
+    }
+
+    email_watcher::detect_machine_name()
 }
 
 /// Resolve the `[machine]` argument of `/open` / `/screenshot` against the
 /// existing fleet model (local alias + GitMap cluster node aliases).
 pub fn resolve_machine_target(arg: &str) -> Result<OpenShotTarget, String> {
     let token = arg.trim();
-    let local = local_machine_label();
-
-    if token.is_empty() || token.eq_ignore_ascii_case("local") || token.eq_ignore_ascii_case(&local)
-    {
+    if token.is_empty() || super::node_label::is_current_machine(token) {
         return Ok(OpenShotTarget::Local);
     }
     if token.eq_ignore_ascii_case("all") {
@@ -71,12 +89,12 @@ pub fn resolve_machine_target(arg: &str) -> Result<OpenShotTarget, String> {
     }
     let nodes = query_gitmap_cluster_nodes();
     if let Some(node) = nodes.iter().find(|n| n.alias.eq_ignore_ascii_case(token)) {
-        if node.alias.eq_ignore_ascii_case(&local) {
+        if super::node_label::is_current_machine(&node.alias) {
             return Ok(OpenShotTarget::Local);
         }
         return Ok(OpenShotTarget::Remote(node.alias.clone()));
     }
-    let mut known = vec![local];
+    let mut known = vec![local_machine_label()];
     known.extend(nodes.iter().map(|n| n.alias.clone()));
     Err(format!(
         "Unknown machine '{token}'. Known machines: {}. Send /nodes for the live fleet list.",
@@ -245,6 +263,8 @@ async fn enqueue_remote_command(
         let payload = json!({
             "id": uuid::Uuid::new_v4().to_string(),
             "target_node": node,
+            "target_node_id": node,
+            "source": "telegram",
             "command": command,
             "command_text": command_text,
             "status": "pending",

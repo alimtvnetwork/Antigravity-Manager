@@ -362,18 +362,9 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
 
             if let Some((target_node, cmd_content)) = node_selector {
                 let s_config = supabase_sync::load_config().unwrap_or_default();
-                let local_alias = if s_config.node_alias.trim().is_empty() {
-                    email_watcher::detect_machine_name()
-                } else {
-                    s_config.node_alias.clone()
-                };
-                let local_ip = email_watcher::detect_local_ip();
 
                 // If targeting current local node, execute directly!
-                if target_node.eq_ignore_ascii_case("local")
-                    || target_node.eq_ignore_ascii_case(&local_alias)
-                    || target_node.eq_ignore_ascii_case(&local_ip)
-                {
+                if super::node_label::is_current_machine(target_node) {
                     return Box::pin(process_telegram_command_text(cmd_content)).await;
                 }
 
@@ -411,7 +402,10 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                             let cmd_payload = json!({
                                 "id": cmd_id,
                                 "target_node": target_node,
+                                "target_node_id": target_node,
+                                "source": "telegram",
                                 "command": cmd_content,
+                                "command_text": cmd_content,
                                 "status": "pending",
                                 "created_at": Utc::now().timestamp()
                             });
