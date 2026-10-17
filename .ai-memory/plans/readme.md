@@ -4,6 +4,7 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
+| [prompt-tree-image-resend-and-status-templates.md](./completed/prompt-tree-image-resend-and-status-templates.md) | `COMPLETED` | Dual-MIME rich image extraction & relative attachment link rewriting, 5-chapter prompt verification architecture ('Is it done?', 'Is it released?', 'Are you confident?', 'Edge Cases & Tests'), and iteration-tracked rerun prompt preservation. |
 | [antigravity-manager-agm-repository-issues.md](./antigravity-manager-agm-repository-issues.md) | `COMPLETED` | Telegram stale version clean CLI (agm ov), prompt ID stripping, configurable word summary, instance table unified exe/data column, PromptTree overlap fix & sync, copy-all-with-images, and multi-segment quota bar. |
 | [instance-management-and-ui-ux-synchronization.md](./instance-management-and-ui-ux-synchronization.md) | `COMPLETED` | Instance audit trail visibility (switches & all operations), switch dialog UI/UX consistency, CLI caller IDE self-preservation, lightweight test instance lifecycle, and E2E verification. Released v4.217.0. |
 | [telegram-project-listing-and-ui-enhancement.md](./telegram-project-listing-and-ui-enhancement.md) | `ACTIVE` | Numbered Telegram project pages, conversation titles, green This machine label, and a 24-hour GitMap node-name cache. |

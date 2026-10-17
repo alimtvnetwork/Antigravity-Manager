@@ -13,50 +13,14 @@ import type { AgmConversationNode } from './types';
 import { isGhostConversation } from './conversationGuards';
 import { detectPromptCategory } from './tierClassification';
 import type { PromptTreeState } from './usePromptTreeState';
+import { copyPromptWithRichImages, extractPromptImages } from './clipboard';
+import {
+    buildRichVerificationPrompt,
+    buildRerunPrompt,
+    parseVerificationTypeFromSuffix,
+} from './verificationTemplates';
 
-export async function copyPromptWithRichImages(
-    promptText: string,
-    onSuccess: (message: string) => void,
-    onError: (err: unknown) => void
-): Promise<boolean> {
-    if (!promptText || !promptText.trim()) {
-        return false;
-    }
-
-    try {
-        // 1. Synthesize rich HTML payload converting Markdown images to styled HTML <img> tags
-        const htmlContent = promptText
-            .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" style="max-width:100%; border-radius: 8px; margin: 8px 0;" /><br />')
-            .replace(/\n/g, '<br />');
-
-        const blobHtml = new Blob([htmlContent], { type: 'text/html' });
-        const blobText = new Blob([promptText], { type: 'text/plain' });
-
-        const item = new ClipboardItem({
-            'text/html': blobHtml,
-            'text/plain': blobText,
-        });
-
-        await navigator.clipboard.write([item]);
-        onSuccess('Copied full prompt with embedded rich images to clipboard!');
-        return true;
-    } catch (err) {
-        // Fallback ladder adhering to "No Silent Errors" rule
-        useErrorStore.getState().trackWarning(err, {
-            source: 'clipboard.copyPromptWithRichImages',
-            triggerAction: 'navigator.clipboard.write',
-        });
-
-        const fallbackOk = await copyToClipboard(promptText);
-        if (fallbackOk) {
-            onSuccess('Copied clean prompt text to clipboard (rich media unsupported in current context)');
-            return true;
-        }
-
-        onError(err);
-        return false;
-    }
-}
+export { copyPromptWithRichImages } from './clipboard';
 
 export type PromptAiCopyKind = 'json' | 'text' | 'md';
 
@@ -182,14 +146,16 @@ export function usePromptTreePromptActions({
         const images: string[] = [];
         const files: string[] = [];
 
-        const imgRegex = /!\[(.*?)\]\((https?:\/\/.*?|data:image\/.*?;base64,.*?)\)/g;
-        let match;
+        const imgRegex = /!\[(.*?)\]\((https?:\/\/.*?|data:image\/[^;]+;base64,[A-Za-z0-9+/=]+|[^\s)]+?\.(?:png|jpe?g|gif|webp|svg))\)/gi;
+        let match: RegExpExecArray | null;
         while ((match = imgRegex.exec(text)) !== null) {
-            images.push(match[1]);
+            if (match[2]) {
+                images.push(match[2].trim());
+            }
         }
 
         const fileRegex = /(?:file:\/\/\/|[a-zA-Z]:\\|\/)[^\s)"]+/g;
-        let fileMatch;
+        let fileMatch: RegExpExecArray | null;
         while ((fileMatch = fileRegex.exec(text)) !== null) {
             if (!fileMatch[0].match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) {
                 files.push(fileMatch[0]);
@@ -398,43 +364,47 @@ export function usePromptTreePromptActions({
             let promptContent = (!selectedConversation && conv)
                 ? (conv.prompt_preview_200w || '')
                 : (editedPromptText.trim() || activePromptTextRef.current || activePromptText || conv?.prompt_preview_200w || '');
-            if (confirmationSuffix && confirmationSuffix !== 'None (Send as is)') {
-                promptContent = `${promptContent}\n\n${confirmationSuffix}`;
-            }
             const repoPath = proj?.repo_path || '';
-
-            // 1. Dispatch prompt directly to running instance via sendPromptNow.
-            // Track real dispatch outcome: the backend returns Err when the agy
-            // CLI spawn fails, and the success message must not show in that case.
             const targetInstId = proj?.instance_id || instanceId || 'default';
-            let dispatchOk = false;
-            let dispatchErr: unknown = null;
             const targetConvId = conversationTargetMode === 'new'
                 ? (newConversationTitle?.trim() || undefined)
                 : conv?.conversation_id;
+
+            if (confirmationSuffix && confirmationSuffix !== 'None (Send as is)' && confirmationSuffix !== 'none') {
+                const templateType = parseVerificationTypeFromSuffix(confirmationSuffix);
+                if (templateType !== 'none') {
+                    promptContent = buildRichVerificationPrompt(templateType, {
+                        originalPrompt: promptContent,
+                        instanceId: targetInstId,
+                        repoPath,
+                        convId: targetConvId,
+                    });
+                }
+            }
+
+            // 1. Rewrite prompt to lightweight relative markdown links if Base64 images exist
+            const { rewrittenPrompt } = extractPromptImages(promptContent);
+
+            // 2. Dispatch rewritten prompt directly to running instance via sendPromptNow.
+            // Track real dispatch outcome: the backend returns Err when the agy
+            // CLI spawn fails, and the success message must not show in that case.
+            let dispatchOk = false;
+            let dispatchErr: unknown = null;
             try {
-                await sendPromptNow(targetInstId, repoPath, promptContent, targetConvId);
+                await sendPromptNow(targetInstId, repoPath, rewrittenPrompt, targetConvId);
                 dispatchOk = true;
             } catch (sendErr) {
                 dispatchErr = sendErr;
                 persistClientCrash(sendErr, 'PromptTreeViewModal.handleSend');
             }
 
-            // 2. Copy prompt content to clipboard so user can paste immediately (manual fallback).
-            // Use the robust helper: copyToClipboard throws
-            // NotAllowedError when the document is not focused (e.g. the IDE
-            // window stole focus during dispatch) — the execCommand fallback
-            // covers that case instead of just logging a warning.
+            // 3. Prime system clipboard concurrently with dual-MIME rich HTML images for immediate pasting.
             try {
-                const copied = await copyToClipboard(promptContent);
-                if (!copied) {
-                    throw new Error('clipboard copy returned false');
-                }
+                await copyPromptWithRichImages(promptContent);
             } catch (clipErr) {
-                // Tracked in the error module; send dispatch already attempted above, user pastes manually if needed.
                 useErrorStore.getState().trackWarning(clipErr, {
                     source: 'PromptTreeViewModal.handleSend',
-                    triggerAction: 'copy_prompt_fallback',
+                    triggerAction: 'copy_prompt_rich_fallback',
                 });
             }
 
@@ -535,13 +505,40 @@ ${activePromptText}
         try {
             setIsEnqueueing(true);
             setActionMsg('Enqueueing prompt into FIFO scheduler queue...');
-            const promptContent = editedPromptText.trim() || activePromptText || selectedConversation.prompt_preview_200w || '';
+            let promptContent = editedPromptText.trim() || activePromptText || selectedConversation.prompt_preview_200w || '';
             const repoPath = selectedProject?.repo_path || '';
             const targetInstId = selectedProject?.instance_id || instanceId || 'default';
             const targetConvId = conversationTargetMode === 'new'
                 ? (newConversationTitle?.trim() || undefined)
                 : selectedConversation.conversation_id;
-            await enqueuePrompt(targetInstId, repoPath, promptContent, targetConvId);
+
+            if (confirmationSuffix && confirmationSuffix !== 'None (Send as is)' && confirmationSuffix !== 'none') {
+                const templateType = parseVerificationTypeFromSuffix(confirmationSuffix);
+                if (templateType !== 'none') {
+                    promptContent = buildRichVerificationPrompt(templateType, {
+                        originalPrompt: promptContent,
+                        instanceId: targetInstId,
+                        repoPath,
+                        convId: targetConvId,
+                    });
+                }
+            }
+
+            // 1. Rewrite prompt to lightweight relative markdown links if Base64 images exist
+            const { rewrittenPrompt } = extractPromptImages(promptContent);
+
+            // 2. Enqueue rewritten prompt into FIFO queue
+            await enqueuePrompt(targetInstId, repoPath, rewrittenPrompt, targetConvId);
+
+            // 3. Prime system clipboard concurrently with dual-MIME rich HTML images for immediate pasting
+            try {
+                await copyPromptWithRichImages(promptContent);
+            } catch (clipErr) {
+                useErrorStore.getState().trackWarning(clipErr, {
+                    source: 'PromptTreeViewModal.handleEnqueuePrompt',
+                    triggerAction: 'copy_enqueue_rich_fallback',
+                });
+            }
 
             setActionMsg('Prompt enqueued into FIFO scheduler queue!');
             setTimeout(() => setActionMsg(null), 3500);
@@ -557,7 +554,7 @@ ${activePromptText}
             setIsEnqueueing(false);
         }
     }, [
-        selectedConversation, selectedProject, editedPromptText, activePromptText,
+        selectedConversation, selectedProject, editedPromptText, activePromptText, confirmationSuffix,
         conversationTargetMode, newConversationTitle, instanceId, setIsEnqueueing, setActionMsg, setError,
     ]);
 
@@ -663,6 +660,8 @@ export interface RerunDispatchContext {
     /** How many times the message is dispatched (clamped to 1..5). */
     count: number;
     messageOption: RerunMessageOption;
+    /** Full original prompt text to embed into Chapter 4. */
+    originalPrompt?: string;
     /** Audit/source label, e.g. 'DetailHeader.rerunSection'. */
     source?: string;
 }
@@ -693,10 +692,13 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
         trigger: 'click' as const,
     };
     for (let i = 0; i < requested; i += 1) {
-        const { message, pickedIndex } = resolveRerunMessage(ctx.messageOption);
+        const { message: rawMessage, pickedIndex } = resolveRerunMessage(ctx.messageOption);
+        const richPrompt = buildRerunPrompt(ctx.originalPrompt || '', i + 1, requested);
+        const message = richPrompt || rawMessage;
+        const { rewrittenPrompt } = extractPromptImages(message);
         try {
             // Canonical dispatch path — identical call handleResendPrompt makes.
-            await sendPromptNow(ctx.targetInstId, ctx.repoPath, message, ctx.convId);
+            await sendPromptNow(ctx.targetInstId, ctx.repoPath, rewrittenPrompt, ctx.convId);
             result.dispatched += 1;
             await auditRecord({
                 ...auditBase,

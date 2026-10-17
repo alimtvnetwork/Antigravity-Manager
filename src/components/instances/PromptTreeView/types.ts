@@ -91,3 +91,18 @@ export interface HierarchicalConversationNode {
     isExpanded: boolean;
 }
 
+export interface ExtractedPromptImage {
+    alt: string;
+    dataUri: string;
+    mimeType: string;
+    byteLength: number;
+    hash: string;
+}
+
+export interface PromptRewriteResult {
+    rewrittenPrompt: string;
+    hasImages: boolean;
+    images: ExtractedPromptImage[];
+}
+
+

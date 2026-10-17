@@ -9,6 +9,7 @@ import { classifyPromptTier } from './tierClassification';
 import { isGhostConversation } from './conversationGuards';
 import { persistClientCrash } from '../../../lib/error-listener';
 import { useErrorStore } from '../../../stores/error-store';
+import { VERIFICATION_OPTIONS, parseVerificationTypeFromSuffix } from './verificationTemplates';
 
 function DispatchFieldHint({ id, text }: { id: string; text: string }) {
     return (
@@ -148,14 +149,16 @@ export function DetailHeader(props: DetailHeaderProps) {
             const targetConvId = conversationTargetMode === 'new'
                 ? (newConversationTitle?.trim() || undefined)
                 : selectedConversation.conversation_id;
+            const originalPrompt = activePromptText || selectedConversation?.prompt_preview_200w || '';
             const result = await dispatchRerunMessages({
                 targetInstId,
                 repoPath: rerunRepoPath ?? '',
                 convId: targetConvId,
                 count: rerunCount,
                 messageOption: rerunMessageOption,
+                originalPrompt,
                 source: 'DetailHeader.rerunSection',
-            });
+            } as any);
             if (result.failed > 0) {
                 // Each failed rerun already landed in the error module via
                 // dispatchRerunMessages; surface a visible summary as well.
@@ -581,17 +584,19 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         Suffix:
                                     </span>
                                     <select
-                                        value={confirmationSuffix}
-                                        onChange={(e) => setConfirmationSuffix(e.target.value)}
+                                        value={parseVerificationTypeFromSuffix(confirmationSuffix)}
+                                        onChange={(e) => {
+                                            const nextVal = e.target.value;
+                                            setConfirmationSuffix(nextVal === 'none' ? 'None (Send as is)' : nextVal);
+                                        }}
                                         className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:ring-0 focus:outline-none cursor-pointer py-0.5 text-right max-w-[140px] truncate"
                                         aria-describedby="dispatch-suffix-hint"
                                     >
-                                        <option value="None (Send as is)" className="bg-white dark:bg-[#171025]">None</option>
-                                        <option value="Is it done?" className="bg-white dark:bg-[#171025]">Done?</option>
-                                        <option value="Is it released?" className="bg-white dark:bg-[#171025]">Released?</option>
-                                        <option value="Are you sure about it?" className="bg-white dark:bg-[#171025]">Sure?</option>
-                                        <option value="Double check all edge cases" className="bg-white dark:bg-[#171025]">Edge cases</option>
-                                        <option value="Verify build and tests" className="bg-white dark:bg-[#171025]">Verify tests</option>
+                                        {VERIFICATION_OPTIONS.map((opt) => (
+                                            <option key={opt.value} value={opt.value} className="bg-white dark:bg-[#171025]">
+                                                {opt.dropdownLabel || opt.label}
+                                            </option>
+                                        ))}
                                     </select>
                                     <DispatchFieldHint id="dispatch-suffix-hint" text="Confirmation suffix appended on dispatch" />
                                 </div>

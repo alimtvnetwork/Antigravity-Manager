@@ -1,6 +1,121 @@
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 import { showToast } from '../../common/ToastContainer';
+import type { ExtractedPromptImage, PromptRewriteResult } from './types';
+
+/**
+ * Computes a fast deterministic 8-character hex hash for image data URI deduplication and filenames.
+ */
+export function computeImageHash(data: string): string {
+    let hash = 0;
+    for (let i = 0; i < Math.min(data.length, 16384); i++) {
+        hash = ((hash << 5) - hash) + data.charCodeAt(i);
+        hash |= 0;
+    }
+    return Math.abs(hash).toString(16).padStart(8, '0');
+}
+
+/**
+ * Extracts inline Base64 data URIs and remote image URLs from markdown text.
+ * Rewrites inline multi-megabyte Base64 payloads into compact relative attachment links
+ * for safe CLI and IPC dispatch.
+ */
+export function extractPromptImages(text: string): PromptRewriteResult {
+    if (!text) {
+        return { rewrittenPrompt: '', hasImages: false, images: [] };
+    }
+
+    const images: ExtractedPromptImage[] = [];
+    const imageRegex = /!\[(.*?)\]\((data:image\/([a-zA-Z0-9+.-]+);base64,[a-zA-Z0-9+/=]+|https?:\/\/[^\s)]+)\)/g;
+
+    let rewritten = text;
+    let match: RegExpExecArray | null;
+
+    const matcher = new RegExp(imageRegex);
+    while ((match = matcher.exec(text)) !== null) {
+        const alt = match[1] || 'image';
+        const sourceUri = match[2];
+        const isBase64 = sourceUri.startsWith('data:image/');
+        const mimeSubtype = match[3];
+
+        let mimeType = 'image/png';
+        let ext = 'png';
+
+        if (isBase64) {
+            mimeType = mimeSubtype ? `image/${mimeSubtype}` : 'image/png';
+            ext = mimeSubtype ? mimeSubtype.replace('+xml', '') : 'png';
+            if (ext === 'jpeg') ext = 'jpg';
+        } else {
+            const extMatch = sourceUri.match(/\.(png|jpe?g|webp|gif|svg)(?:\?.*)?$/i);
+            if (extMatch) {
+                ext = extMatch[1].toLowerCase();
+                if (ext === 'jpg') ext = 'jpeg';
+                mimeType = `image/${ext}`;
+            }
+        }
+
+        const hash = computeImageHash(sourceUri);
+        const byteLength = isBase64
+            ? Math.round((sourceUri.length * 3) / 4)
+            : sourceUri.length;
+
+        images.push({
+            alt,
+            dataUri: sourceUri,
+            mimeType,
+            byteLength,
+            hash,
+        });
+
+        // For inline Base64 data URIs, rewrite prompt to compact relative path
+        if (isBase64) {
+            const relativePath = `./.antigravity/attachments/attachment-${hash}.${ext}`;
+            rewritten = rewritten.replace(match[0], `![${alt}](${relativePath})`);
+        }
+    }
+
+    return {
+        rewrittenPrompt: rewritten,
+        hasImages: images.length > 0,
+        images,
+    };
+}
+
+/**
+ * Re-exports rewriting helper for IPC dispatch workflows.
+ */
+export function rewritePromptForIpcDispatch(promptText: string): PromptRewriteResult {
+    return extractPromptImages(promptText);
+}
+
+/**
+ * Extracts embedded image URLs/data URIs and referenced file paths from prompt text.
+ * Fixed regex ensures match[2] (the actual URL or data URI) is captured rather than match[1] (alt text).
+ */
+export function extractAssets(text: string): { images: string[]; files: string[] } {
+    const images: string[] = [];
+    const files: string[] = [];
+
+    const imgRegex = /!\[(.*?)\]\((https?:\/\/.*?|data:image\/[^;]+;base64,[A-Za-z0-9+/=]+|[^\s)]+?\.(?:png|jpe?g|gif|webp|svg))\)/gi;
+    let match: RegExpExecArray | null;
+    while ((match = imgRegex.exec(text)) !== null) {
+        if (match[2]) {
+            images.push(match[2].trim());
+        }
+    }
+
+    const fileRegex = /(?:file:\/\/\/|[a-zA-Z]:\\|\/)[^\s)"]+/g;
+    let fileMatch: RegExpExecArray | null;
+    while ((fileMatch = fileRegex.exec(text)) !== null) {
+        if (!fileMatch[0].match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) {
+            files.push(fileMatch[0]);
+        } else {
+            images.push(fileMatch[0]);
+        }
+    }
+
+    return { images, files };
+}
 
 /**
  * Copies markdown prompt content and embedded images into system clipboard
