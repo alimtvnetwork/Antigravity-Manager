@@ -18,6 +18,8 @@ mod win32_console {
     use std::os::raw::c_void;
 
     const STD_OUTPUT_HANDLE: u32 = 0xFFFFFFF5;
+    const ENABLE_PROCESSED_OUTPUT: u32 = 0x0001;
+    const ENABLE_WRAP_AT_EOL_OUTPUT: u32 = 0x0002;
     const ENABLE_VIRTUAL_TERMINAL_PROCESSING: u32 = 0x0004;
     const DISABLE_NEWLINE_AUTO_RETURN: u32 = 0x0008;
 
@@ -55,6 +57,7 @@ mod win32_console {
             b_absolute: i32,
             lp_console_window: *const SMALL_RECT,
         ) -> i32;
+        fn SetConsoleTitleW(lp_console_title: *const u16) -> i32;
     }
 
     #[repr(C)]
@@ -70,6 +73,11 @@ mod win32_console {
             // Set UTF-8 code page (65001)
             SetConsoleOutputCP(65001);
 
+            let title_utf16: Vec<u16> = "Antigravity Manager - CLI Updater\0"
+                .encode_utf16()
+                .collect();
+            SetConsoleTitleW(title_utf16.as_ptr());
+
             let handle = GetStdHandle(STD_OUTPUT_HANDLE);
             if handle.is_null() {
                 return false;
@@ -78,7 +86,17 @@ mod win32_console {
             if GetConsoleMode(handle, &mut mode) == 0 {
                 return false;
             }
-            let new_mode = mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN;
+            // CRITICAL: DISABLE_NEWLINE_AUTO_RETURN (0x0008) must NOT be set!
+            // When DISABLE_NEWLINE_AUTO_RETURN is enabled, '\n' (LF) moves down without
+            // returning to column 0, causing consecutive output lines to staircase across
+            // the terminal window. We ensure ENABLE_PROCESSED_OUTPUT, ENABLE_WRAP_AT_EOL_OUTPUT,
+            // and ENABLE_VIRTUAL_TERMINAL_PROCESSING are enabled, and explicitly mask OFF
+            // DISABLE_NEWLINE_AUTO_RETURN.
+            let new_mode = (mode
+                | ENABLE_PROCESSED_OUTPUT
+                | ENABLE_WRAP_AT_EOL_OUTPUT
+                | ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+                & !DISABLE_NEWLINE_AUTO_RETURN;
             if SetConsoleMode(handle, new_mode) == 0 {
                 return false;
             }
@@ -134,8 +152,7 @@ pub fn enable_modern_console() -> bool {
 }
 
 fn print_update_field(label: &str, value: &str) {
-    println!("  {label}");
-    println!("    {value}");
+    println!("  {:<14} : {}", label, value);
 }
 
 pub fn run(args: &[String]) {
