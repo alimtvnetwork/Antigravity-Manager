@@ -4,6 +4,7 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
+| [git-tag-and-release-page-management.md](./git-tag-and-release-page-management.md) | `COMPLETED` | Retention of exact tags & release pages 4.190, 4.206, 4.225, 4.226 post-4.160; safe purge of all other post-4.160 tags & GitHub Releases on origin (alimtvnetwork/Antigravity-Manager), local tag pruning, GitMap CLI capability gap documentation & repo cache task. |
 | [code-dryness-100-steps-master-plan.md](./code-dryness-100-steps-master-plan.md) | `ACTIVE` | Comprehensive 100-step master plan for Code DRYness & Guard Inversion across Antigravity Manager: status & enum centralization, duration constants, nested-if guard clause inversion, and function decomposition. |
 | [fleet-node-navigation-and-error-log-plan.md](./fleet-node-navigation-and-error-log-plan.md) | `ACTIVE` | Non-destructive plan mode for 5 error log patterns (prompt queue storm, Supabase NXDOMAIN, Broken Pipe, SQLite lock upgrade deadlock, missing storage.json) and GitMap multi-tier node navigation & fleet mesh architecture. |
 | [system-wide-broadcasting-and-30s-interval-guard.md](./completed/system-wide-broadcasting-and-30s-interval-guard.md) | `COMPLETED` | System-wide broadcasting design pattern, audit of background schedulers and pollers across Antigravity Manager & GitMap, enforcement of strict >= 30-second minimum interval guard, quiet periods, and sliding debounces. |
