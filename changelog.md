@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.221.1] - 2026-10-17
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
 ## [v4.221.0] - 2026-10-17
 
 ### Added
@@ -509,16 +516,13 @@
         -   **[Multi-Machine Fleet & UI Overhaul] Fleet Sync Recovery, W2 TCP Retry Ladder, Dynamic IP Resolution, and Settings UI Overhaul (Thanks to @aukgit)**:
             -   **Description**: Extended TCP probe timeout to 1500ms with a 2-stage retry ladder to resolve false-offline W2 machine status; normalized `${adminUser}` to `Administrator` and `${linuxUser}` to `root` across SSH connection imports and envelopes; eliminated empty `()` bug in Multi-Machine Matrix by serializing both `machine_ip` and `ip_address`; overhauled Settings SSH & GitMap actions with a contiguous segmented pill capsule, sleek metadata badges replacing raw path dumps, and active copy feedback for terminal installer commands; upgraded autonomous multi-agent concurrency capacity to A = 3, H = 2 (6 concurrent operations) across skills and coding guidelines.
 
-
     *   **v4.220.0 (2026-10-17)**:
         -   **[Accounts Management & UI Overhaul] Delete Remediation, Position-Locked Hover Inversion, Yellow Switch & Red Remove Buttons, and Disable Lifecycle (Thanks to @aukgit)**:
             -   **Description**: Resolved non-responsive single and batch Delete buttons by mounting dedicated destructive `ModalDialog` components in `AccountsDialogs.tsx`; implemented table row color inversion to white background and black text with static geometry to eliminate layout jitter; styled Switch button with prominent yellow highlighter theme and styled Remove button with solid red background and white icon; added account disable/enable lifecycle via selection toolbar and action menu with auto-switcher candidate exclusion.
 
-
     *   **v4.219.0 (2026-10-17)**:
         -   **[Prompt Tree & Delegate Updater] Rich Verification Chapter Engine, Dual-MIME Image Transmission, Rerun Chapter Engine & Console Formatting**:
             -   **Description**: Implemented 5-chapter prompt verification architecture (`verificationTemplates.ts`) for "Is it done?", "Is it released?", "Are you confident?", and "Edge Cases & Tests" embedding un-truncated original prompts; fixed image extraction regex index bug and implemented dual-MIME clipboard priming on dispatch; upgraded rerun engine to wrap full prompt context with round progression; fixed Windows console newline staircase wrapping in delegate updater and aligned summary fields.
-
 
     *   **v4.218.0 (2026-10-17)**:
         -   **[Repository Issues & System Hardening] Clean Stale Versions CLI, Telegram Fixes, Combined Instance Columns, Prompt Tree Layout & Multi-Segment Quota Bar**:
@@ -528,51 +532,41 @@
         -   **[Instance Management & UI/UX Synchronization] Instance Audit Trail, Switch UI, CLI Caller Guard & Test Sandboxing**:
             -   **Description**: Instance audit trail multi-source loading (switches + all operations), switch account dialog dark-glass styling & quota sorting, CLI caller IDE self-preservation guard, lightweight test instance lifecycle (`create-test`, `rm-test`), and automated E2E test suite. (Thanks to @aukgit)
 
-
     *   **v4.216.2 (2026-10-17)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.216.1 (2026-10-17)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
 
-
     *   **v4.216.0 (2026-10-17)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.215.1 (2026-10-17)**:
         -   **[Telegram] Fix `/expand` format-string compile error (Thanks to @aukgit)**:
             -   **Description**: `format_expand_prompt_report` had 10 format placeholders but 9 arguments (leftover `{}` from the message rewrite); removed the stray placeholder. v4.215.0's tag pointed at the broken commit, so this patch carries the same Telegram enhancements on a green tree. (Thanks to @aukgit)
 
-
     *   **v4.215.0 (2026-10-17)**:
         -   **[Telegram] IDE exe on every prompt, history with one-tap rerun, professional messages (Thanks to @aukgit)**:
             -   **Description**: Every prompt the bot shows now ends with the IDE exe name (`ide_exe_line`, basename only, omitted when unknown rather than guessed). New `/history` lists recently sent prompts with a `↻ Rerun` button per row (`send:r:<id8>`, 64-byte-safe); `/rerun <id>` re-dispatches through the canonical injection path. All 64 prompt-related bot strings rewritten into professional human-readable messages: "Destination locked" is now "Destination confirmed", raw Id dumps became formatted cards with 8-char refs, jargon ("Inject", "Split DB", "Dual Seq ID", "Vault Path") purged; `/send` and `/target` added to the Telegram command menu. (Thanks to @aukgit)
-
 
     *   **v4.214.0 (2026-10-17)**:
         -   **[Telegram] Instance step shows the IDE exe and data folder ending (Thanks to @aukgit)**:
             -   **Description**: `/send` step 2 adds `IDE exe` and `IDE data` under each instance. `path_ending` keeps the last section only. (Thanks to @aukgit)
 
-
     *   **v4.213.0 (2026-10-17)**:
         -   **[Prompt tree] Dispatch hover stays inside the menu (Thanks to @aukgit)**:
             -   **Description**: Destination, Suffix, and the Copy AI rows use an in-menu hint anchored to the right edge. A browser `title` on that right-aligned menu is clipped by the window. See `.ai-memory/rca/20-dispatch-menu-hover-clipped.md`. (Thanks to @aukgit)
-
 
     *   **v4.212.0 (2026-10-17)**:
         -   **[Memory] Telegram picker root cause, checklist, and do-not-break rules (Thanks to @aukgit)**:
             -   **Description**: `.ai-memory/rca/18-telegram-project-listing-and-node-cache.md` explains the FIFO `session_id` label, the short `send:n:` callback, the This machine button, and the 24-hour `node_display_cache`. `.ai-memory/what-to-read.md` points at it. (Thanks to @aukgit)
 
-
     *   **v4.211.0 (2026-10-17)**:
         -   **[Telegram] Numbered project pages, conversation titles, and cached node names (Thanks to @aukgit)**:
             -   **Description**: `/send` lists eight projects per page, newest conversation first, with the project name and the conversation title. Numbers select a row, and Next loads the next eight. The current machine is labeled This machine with a green button. A missing node alias is resolved through GitMap once and stored in SQLite until `node_name_refresh_hours` (default 24). (Thanks to @aukgit)
-
 
     *   **v4.210.0 (2026-10-16)**:
         -   **[Console Logger & Diagnostics] ANSI Color Rendering, Compact Console Timer & Idempotent Migration Log Hygiene (Thanks to @aukgit)**:
@@ -582,11 +576,9 @@
         -   **[Agent Skills & Sync Safety] 45 Native AGM Skills Restoration & Cross-Repo Sync Shielding (Thanks to @aukgit)**:
             -   **Description**: Restored 45 specialized Antigravity Manager skills across `.agents/skills` and `.cursor/skills`, documented skill navigation in `.ai-memory/what-to-read.md`, and protected AGM-specific skills in `03-ai-scripts/38-sync-prompts-skills-scripts.py` from deletion during cross-repository synchronizations.
 
-
     *   **v4.209.0 (2026-10-16)**:
         -   **[Instance Management] PID label, verified stop, switch dialog, and audit trail (Thanks to @aukgit)**:
             -   **Description**: The list badge shows `PID` and the process id, and path cells keep the filename ending. Stop and account switch kill that process and fail if it is still alive. The audit dialog reads `recent_switches`. `agm instances current` refuses to stop, switch, or delete the instance that owns the command. (Thanks to @aukgit)
-
 
     *   **v4.208.0 (2026-10-16)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
