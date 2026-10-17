@@ -26,19 +26,22 @@ pub fn prepare_isolated_update_cli(caller_pid: u32) -> Result<PathBuf, String> {
     // 1. Direct sibling CLI in current executable directory
     candidates.push(current_dir.join(bin_name));
 
-    // 2. Installed CLI in standard user directories
+    // 2. Current running executable itself (contains the full delegate-update, update, and open-ui engine)
+    if !candidates.contains(&current_exe) {
+        candidates.push(current_exe.clone());
+    }
+
+    // 3. Installed CLI in standard user directories (prefer fresh agm.exe, never stale agm-update-cli.exe)
     #[cfg(target_os = "windows")]
     if let Ok(local) = env::var("LOCALAPPDATA") {
         let local_path = PathBuf::from(&local);
-        candidates.push(local_path.join("agm-cli").join("agm-update-cli.exe"));
-        candidates.push(local_path.join("agm-cli").join("agm.exe"));
         candidates.push(local_path.join("Programs").join("agm-alim").join("agm.exe"));
+        candidates.push(local_path.join("agm-cli").join("agm.exe"));
     }
 
     #[cfg(not(target_os = "windows"))]
     if let Ok(home) = env::var("HOME") {
         let home_path = PathBuf::from(&home);
-        candidates.push(home_path.join(".local").join("bin").join("agm-update-cli"));
         candidates.push(home_path.join(".local").join("bin").join("agm"));
     }
 

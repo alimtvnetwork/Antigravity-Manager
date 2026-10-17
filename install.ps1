@@ -74,13 +74,12 @@ function Write-UpdateLine {
     $esc = [char]27
     $clean = ($Message -replace "$esc\[[0-9;]*[A-Za-z]", "").Trim()
     if ([string]::IsNullOrWhiteSpace($clean)) { return }
-    Write-Host "  $Prefix" -ForegroundColor $Color -NoNewline
     $limit = 88
     if ($clean.Length -le $limit) {
-        Write-Host " $clean" -ForegroundColor $Color
+        Write-Host "  $Prefix $clean" -ForegroundColor $Color
         return
     }
-    Write-Host ""
+    Write-Host "  $Prefix" -ForegroundColor $Color
     for ($i = 0; $i -lt $clean.Length; $i += $limit) {
         $take = [Math]::Min($limit, $clean.Length - $i)
         Write-Host "    $($clean.Substring($i, $take))" -ForegroundColor $Color

@@ -18,6 +18,7 @@ mod win32_console {
     use std::os::raw::c_void;
 
     const STD_OUTPUT_HANDLE: u32 = 0xFFFFFFF5;
+    const STD_ERROR_HANDLE: u32 = 0xFFFFFFF4;
     const ENABLE_PROCESSED_OUTPUT: u32 = 0x0001;
     const ENABLE_WRAP_AT_EOL_OUTPUT: u32 = 0x0002;
     const ENABLE_VIRTUAL_TERMINAL_PROCESSING: u32 = 0x0004;
@@ -41,6 +42,14 @@ mod win32_console {
         face_name: [u16; 32],
     }
 
+    #[repr(C)]
+    struct SMALL_RECT {
+        left: i16,
+        top: i16,
+        right: i16,
+        bottom: i16,
+    }
+
     extern "system" {
         fn GetStdHandle(n_std_handle: u32) -> *mut c_void;
         fn GetConsoleMode(h_console_handle: *mut c_void, lp_mode: *mut u32) -> i32;
@@ -50,6 +59,7 @@ mod win32_console {
             b_maximum_window: i32,
             lp_console_current_font_ex: *mut CONSOLE_FONT_INFOEX,
         ) -> i32;
+        fn SetConsoleCP(w_code_page_id: u32) -> i32;
         fn SetConsoleOutputCP(w_code_page_id: u32) -> i32;
         fn SetConsoleScreenBufferSize(h_console_output: *mut c_void, dw_size: COORD) -> i32;
         fn SetConsoleWindowInfo(
@@ -60,44 +70,58 @@ mod win32_console {
         fn SetConsoleTitleW(lp_console_title: *const u16) -> i32;
     }
 
-    #[repr(C)]
-    struct SMALL_RECT {
-        left: i16,
-        top: i16,
-        right: i16,
-        bottom: i16,
-    }
-
-    pub fn setup_modern_console() -> bool {
+    pub fn set_updater_title() {
         unsafe {
-            // Set UTF-8 code page (65001)
-            SetConsoleOutputCP(65001);
-
-            let title_utf16: Vec<u16> = "Antigravity Manager - CLI Updater\0"
+            let title_utf16: Vec<u16> = "Antigravity Manager — CLI Updater\0"
                 .encode_utf16()
                 .collect();
             SetConsoleTitleW(title_utf16.as_ptr());
+        }
+    }
+
+    /// Configure console handles for standard CRLF line breaks and ANSI VT processing.
+    /// CRITICAL: DISABLE_NEWLINE_AUTO_RETURN (0x0008) must NEVER be enabled.
+    pub fn ensure_clean_newline_mode() -> bool {
+        unsafe {
+            SetConsoleOutputCP(65001);
+            SetConsoleCP(65001);
+
+            let mut all_ok = true;
+            for &handle_id in &[STD_OUTPUT_HANDLE, STD_ERROR_HANDLE] {
+                let handle = GetStdHandle(handle_id);
+                if handle.is_null() {
+                    continue;
+                }
+                let mut mode: u32 = 0;
+                if GetConsoleMode(handle, &mut mode) != 0 {
+                    let mode_with_vt = (mode
+                        | ENABLE_PROCESSED_OUTPUT
+                        | ENABLE_WRAP_AT_EOL_OUTPUT
+                        | ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+                        & !DISABLE_NEWLINE_AUTO_RETURN;
+
+                    if SetConsoleMode(handle, mode_with_vt) == 0 {
+                        let mode_fallback =
+                            (mode | ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT)
+                                & !DISABLE_NEWLINE_AUTO_RETURN;
+                        if SetConsoleMode(handle, mode_fallback) == 0 {
+                            all_ok = false;
+                        }
+                    }
+                }
+            }
+            all_ok
+        }
+    }
+
+    /// Setup the dedicated updater console window appearance (font, title, buffer size).
+    pub fn setup_dedicated_updater_console() -> bool {
+        unsafe {
+            ensure_clean_newline_mode();
+            set_updater_title();
 
             let handle = GetStdHandle(STD_OUTPUT_HANDLE);
             if handle.is_null() {
-                return false;
-            }
-            let mut mode: u32 = 0;
-            if GetConsoleMode(handle, &mut mode) == 0 {
-                return false;
-            }
-            // CRITICAL: DISABLE_NEWLINE_AUTO_RETURN (0x0008) must NOT be set!
-            // When DISABLE_NEWLINE_AUTO_RETURN is enabled, '\n' (LF) moves down without
-            // returning to column 0, causing consecutive output lines to staircase across
-            // the terminal window. We ensure ENABLE_PROCESSED_OUTPUT, ENABLE_WRAP_AT_EOL_OUTPUT,
-            // and ENABLE_VIRTUAL_TERMINAL_PROCESSING are enabled, and explicitly mask OFF
-            // DISABLE_NEWLINE_AUTO_RETURN.
-            let new_mode = (mode
-                | ENABLE_PROCESSED_OUTPUT
-                | ENABLE_WRAP_AT_EOL_OUTPUT
-                | ENABLE_VIRTUAL_TERMINAL_PROCESSING)
-                & !DISABLE_NEWLINE_AUTO_RETURN;
-            if SetConsoleMode(handle, new_mode) == 0 {
                 return false;
             }
 
@@ -140,10 +164,10 @@ mod win32_console {
     }
 }
 
-/// Enable console colors and a readable Consolas face. False when stdout is not a console.
+/// Enable console colors and clean newlines without altering window size or title.
 #[cfg(windows)]
 pub fn enable_modern_console() -> bool {
-    win32_console::setup_modern_console()
+    win32_console::ensure_clean_newline_mode()
 }
 
 #[cfg(not(windows))]
@@ -152,7 +176,7 @@ pub fn enable_modern_console() -> bool {
 }
 
 fn print_update_field(label: &str, value: &str) {
-    println!("  {:<14} : {}", label, value);
+    println!("    {:<14} : {}", label, value);
 }
 
 pub fn run(args: &[String]) {
@@ -164,7 +188,7 @@ pub fn run(args: &[String]) {
             FreeConsole();
         }
         AllocConsole();
-        let _ = win32_console::setup_modern_console();
+        let _ = win32_console::setup_dedicated_updater_console();
     }
 
     if args
@@ -229,21 +253,24 @@ pub fn run(args: &[String]) {
     }
 
     println!();
-    println!("  Antigravity Manager update");
-    println!("  ------------------------------------------------------------");
-    print_update_field("CLI", &current_exe.display().to_string());
-    print_update_field("Directory", &resolved_install_dir.display().to_string());
-    print_update_field("Window", &resolved_target_exe.display().to_string());
+    println!("  ╔════════════════════════════════════════════════════════════╗");
+    println!("  ║        Antigravity Manager — Standalone CLI Updater        ║");
+    println!("  ╚════════════════════════════════════════════════════════════╝");
+    println!();
+    print_update_field("CLI Binary", &current_exe.display().to_string());
+    print_update_field("Install Path", &resolved_install_dir.display().to_string());
+    print_update_field("Target App", &resolved_target_exe.display().to_string());
     if let Some(pid) = opts.wait_pid {
-        print_update_field("Waiting on", &pid.to_string());
+        print_update_field("Waiting PID", &pid.to_string());
     }
-    print_update_field("Reopen", if opts.is_relaunch { "yes" } else { "no" });
-    println!("  ------------------------------------------------------------");
+    print_update_field("Relaunch UI", if opts.is_relaunch { "Yes" } else { "No" });
+    println!("  ────────────────────────────────────────────────────────────");
+    println!();
 
     // STAGE 1: Wait for monitored UI process (and any sibling UI instances) to shut down and release file locks
     if let Some(pid) = opts.wait_pid {
         println!(
-            "[*] Stage 1/3: Waiting for Antigravity Manager UI (PID {}) to exit cleanly...",
+            "  [*] Stage 1/3: Waiting for Antigravity Manager UI (PID {}) to exit cleanly...",
             pid
         );
         let start = std::time::Instant::now();
@@ -254,13 +281,13 @@ pub fn run(args: &[String]) {
 
         if is_pid_alive(pid) {
             println!(
-                "[!] UI process (PID {}) still active after 10s. Terminating to release file locks...",
+                "  [!] UI process (PID {}) still active after 10s. Terminating to release file locks...",
                 pid
             );
             force_kill_pid(pid);
             std::thread::sleep(Duration::from_millis(800));
         } else {
-            println!("[OK] UI process exited cleanly.");
+            println!("  [OK] UI process exited cleanly.");
         }
     }
 
@@ -268,7 +295,7 @@ pub fn run(args: &[String]) {
     let my_pid = std::process::id();
     if is_ui_process_running_excluding(my_pid) {
         println!(
-            "[*] Closing remaining Antigravity Manager UI instances before binary replacement..."
+            "  [*] Closing remaining Antigravity Manager UI instances before binary replacement..."
         );
         kill_other_ui_processes(my_pid);
         std::thread::sleep(Duration::from_millis(700));
@@ -276,7 +303,7 @@ pub fn run(args: &[String]) {
 
     // STAGE 2: Delegate to `<self_exe> update --force --no-launch --install-dir <DIR>`
     println!(
-        "[*] Stage 2/3: Running CLI update command (`{} update --force --no-launch`)...",
+        "  [*] Stage 2/3: Running CLI update command (`{} update --force --no-launch`)...",
         current_exe
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
@@ -310,10 +337,16 @@ pub fn run(args: &[String]) {
         }
     };
 
+    #[cfg(target_os = "windows")]
+    {
+        win32_console::ensure_clean_newline_mode();
+        win32_console::set_updater_title();
+    }
+
     // STAGE 3: Delegate to `<self_exe> open-ui --target-exe <EXE> --install-dir <DIR>`
     if opts.is_relaunch {
         println!(
-            "[*] Stage 3/3: Running CLI instruction to reopen UI (`{} open-ui`)...",
+            "  [*] Stage 3/3: Reopening Antigravity Manager UI (`{} open-ui`)...",
             current_exe
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
@@ -343,13 +376,15 @@ pub fn run(args: &[String]) {
         }
     }
 
-    println!("  ------------------------------------------------------------");
+    println!();
+    println!("  ────────────────────────────────────────────────────────────");
     if update_ok {
-        println!("  Update complete. The manager window was reopened.");
+        println!("  [OK] Update complete. The manager window was reopened.");
     } else {
-        println!("  Update finished with warnings. Read the lines above.");
+        println!("  [!] Update finished with warnings. Read the lines above.");
     }
-    println!("  ------------------------------------------------------------");
+    println!("  ────────────────────────────────────────────────────────────");
+    println!();
     std::thread::sleep(Duration::from_millis(1200));
 }
 
@@ -407,6 +442,7 @@ pub fn run_cli_update(args: &[String]) -> bool {
 
         let status = Command::new("powershell.exe")
             .args([
+                "-NoLogo",
                 "-NoProfile",
                 "-ExecutionPolicy",
                 "Bypass",
@@ -414,6 +450,12 @@ pub fn run_cli_update(args: &[String]) -> bool {
                 &ps_script,
             ])
             .status();
+
+        #[cfg(target_os = "windows")]
+        {
+            win32_console::ensure_clean_newline_mode();
+            win32_console::set_updater_title();
+        }
 
         match status {
             Ok(s) if s.success() => {
