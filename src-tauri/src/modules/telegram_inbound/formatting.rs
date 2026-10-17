@@ -656,6 +656,20 @@ pub fn format_running_duration(created_at: i64) -> String {
     }
 }
 
+/// Truncate or clamp text to a maximum number of words.
+pub fn clamp_words(text: &str, max_words: usize) -> String {
+    let clean = text.trim();
+    if clean.is_empty() || max_words == 0 {
+        return clean.to_string();
+    }
+    let words: Vec<&str> = clean.split_whitespace().collect();
+    if words.len() <= max_words {
+        clean.to_string()
+    } else {
+        format!("{}...", words[..max_words].join(" "))
+    }
+}
+
 #[cfg(test)]
 mod formatting_tests {
     use super::*;

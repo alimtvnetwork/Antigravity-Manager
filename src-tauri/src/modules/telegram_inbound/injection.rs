@@ -264,7 +264,7 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
             exec_status,
             clean_for_telegram_html(id8, 16),
             ide_line,
-            clean_for_telegram_html(&prompt_text, 800)
+            clean_for_telegram_html(&repo_db::strip_internal_id_wrappers(&prompt_text), 800)
         )
     } else {
         let inst_flag = explicit_instance

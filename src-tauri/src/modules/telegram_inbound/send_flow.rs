@@ -537,6 +537,41 @@ fn on_manual_conversation(chat_id: i64, machine: &str, instance: &str) -> (Strin
     )
 }
 
+fn recent_prompts_for_destination(
+    instance: &str,
+    conversation: &str,
+    limit: usize,
+) -> Vec<crate::modules::repo_db::ActivePrompt> {
+    let all = match crate::modules::repo_db::list_all_prompts() {
+        Ok(p) => p,
+        Err(_) => return Vec::new(),
+    };
+    let mut matching: Vec<_> = all
+        .into_iter()
+        .filter(|p| {
+            if !p.instance_id.is_empty() && !instance.is_empty() && p.instance_id != instance {
+                return false;
+            }
+            if let Some(ref s) = p.session_id {
+                if s.eq_ignore_ascii_case(conversation) {
+                    return true;
+                }
+            }
+            if p.project_id.eq_ignore_ascii_case(conversation) {
+                return true;
+            }
+            let label = super::send_listing::project_label(&p.repo_path, &p.project_id, instance);
+            if label.eq_ignore_ascii_case(conversation) {
+                return true;
+            }
+            false
+        })
+        .collect();
+    matching.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    matching.truncate(limit);
+    matching
+}
+
 fn on_conversation_picked(
     chat_id: i64,
     machine: &str,
@@ -564,10 +599,35 @@ fn on_conversation_picked(
     if !updated {
         return (send_unknown(), None);
     }
-    (
-        destination_locked_reply(machine, instance, conversation),
-        Some(cancel_markup()),
-    )
+
+    let mut reply = destination_locked_reply(machine, instance, conversation);
+    let recent = recent_prompts_for_destination(instance, conversation, 3);
+    let mut markup_rows: Vec<Vec<Value>> = Vec::new();
+    if !recent.is_empty() {
+        let summary_words = super::config::load_config()
+            .map(|c| c.prompt_summary_words)
+            .unwrap_or(100);
+        reply.push_str("\n\n📜 <b>Recent prompts for this destination:</b>");
+        for (idx, p) in recent.iter().enumerate() {
+            let id8 = if p.id.len() >= 8 { &p.id[..8] } else { &p.id };
+            let snippet = super::prompt_history::prompt_preview(p, summary_words);
+            reply.push_str(&format!(
+                "\n<b>{}.</b> <code>{}</code>\n<pre>{}</pre>",
+                idx + 1,
+                id8,
+                snippet
+            ));
+            markup_rows.push(vec![json!({
+                "text": format!("↻ Resend {id8}"),
+                "callback_data": format!("send:r:{id8}")
+            })]);
+        }
+    }
+    markup_rows.push(vec![
+        json!({ "text": "🧹 Cancel", "callback_data": "send:cancel" }),
+    ]);
+
+    (reply, Some(json!({ "inline_keyboard": markup_rows })))
 }
 
 /// Handle `send:*` inline-keyboard callbacks. Returns the reply text and markup.
@@ -822,6 +882,8 @@ mod tests {
         assert!(reply.contains("Destination confirmed"));
     }
 
+    static TEST_FLOW_MUTEX: Mutex<()> = Mutex::new(());
+
     fn seed_flow(chat_id: i64, stage: SendStage) {
         let mut flows = SEND_FLOWS.lock().unwrap();
         flows.insert(
@@ -845,6 +907,7 @@ mod tests {
 
     #[test]
     fn send_stage_transition_pick_conversation_locks_destination() {
+        let _lock = TEST_FLOW_MUTEX.lock().unwrap();
         let chat_id: i64 = -9_001_337;
         seed_flow(chat_id, SendStage::PickConversation);
 
@@ -870,6 +933,7 @@ mod tests {
 
     #[test]
     fn send_stage_transition_manual_conversation() {
+        let _lock = TEST_FLOW_MUTEX.lock().unwrap();
         let chat_id: i64 = -9_001_338;
         seed_flow(chat_id, SendStage::PickConversation);
 
@@ -893,6 +957,7 @@ mod tests {
 
     #[test]
     fn send_cancel_clears_pending_flows() {
+        let _lock = TEST_FLOW_MUTEX.lock().unwrap();
         let chat_id: i64 = -9_001_340;
         seed_flow(chat_id, SendStage::PickInstance);
 
@@ -911,6 +976,7 @@ mod tests {
 
     #[tokio::test]
     async fn send_callback_cancel_clears_flow() {
+        let _lock = TEST_FLOW_MUTEX.lock().unwrap();
         let chat_id: i64 = -9_001_341;
         seed_flow(chat_id, SendStage::PickInstance);
 
@@ -949,6 +1015,7 @@ mod tests {
 
     #[tokio::test]
     async fn send_callback_cman_accepts_short_and_legacy_payloads() {
+        let _lock = TEST_FLOW_MUTEX.lock().unwrap();
         // New short form: params come from the flow state, payload stays tiny.
         let chat_id: i64 = -9_001_343;
         seed_flow(chat_id, SendStage::PickConversation);

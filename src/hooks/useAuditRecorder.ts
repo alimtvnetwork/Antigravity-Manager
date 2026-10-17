@@ -78,12 +78,14 @@ function extractStackTrace(): { callerInfo: string; stackTrace: string; stackFra
     }
 }
 
-/** Compact, secret-free description of an element: `button#save.primary`. */
+/** Compact, secret-free description of an element: `button#save.primary` or `[ui:my-btn]`. */
 function describeElement(el: Element | null): string {
     const target = findInteractiveTarget(el);
     if (!target) return 'unknown';
+    const uiName = target.getAttribute('data-ui-name') || target.closest?.('[data-ui-name]')?.getAttribute('data-ui-name');
+    const uiId = target.getAttribute('data-ui-id') || target.closest?.('[data-ui-id]')?.getAttribute('data-ui-id');
     const tag = target.tagName.toLowerCase();
-    const id = target.id ? `#${target.id}` : '';
+    const id = target.id ? `#${target.id}` : (uiId ? `[${uiId}]` : '');
     const firstClass = target.className && typeof target.className === 'string'
         ? target.className.trim().split(/\s+/)[0]
         : '';
@@ -92,7 +94,8 @@ function describeElement(el: Element | null): string {
     const text = !label && (tag === 'button' || tag === 'a' || target.getAttribute('role') === 'button')
         ? (target.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 24)
         : '';
-    const desc = `${tag}${id}${cls}${label ? `[aria:${label.slice(0, 24)}]` : ''}${text ? `("${text}")` : ''}`;
+    const uiPrefix = uiName ? `[${uiName}] ` : '';
+    const desc = `${uiPrefix}${tag}${id}${cls}${label ? `[aria:${label.slice(0, 24)}]` : ''}${text ? `("${text}")` : ''}`;
     return desc.slice(0, MAX_DESC_LEN);
 }
 
@@ -109,6 +112,8 @@ function methodOf(el: Element | null, trigger: AuditTrigger): string {
     const tagged = target?.closest?.(`[${AUDIT_ATTR_METHOD}]`);
     const explicit = tagged?.getAttribute(AUDIT_ATTR_METHOD);
     if (explicit) return explicit;
+    const uiName = target?.getAttribute('data-ui-name') || target?.closest?.('[data-ui-name]')?.getAttribute('data-ui-name');
+    if (uiName) return `${trigger}:${uiName}`;
     return `${trigger}:${describeElement(target)}`;
 }
 
@@ -167,6 +172,8 @@ export function useAuditRecorder(): void {
                 if (!isRecordingActive()) return;
                 const targetEl = (event.target as HTMLElement)?.closest?.('button, a, input, select, textarea, [role="button"]') || (event.target as HTMLElement | null);
                 const explicitMethod = targetEl?.closest?.(`[${AUDIT_ATTR_METHOD}]`)?.getAttribute(AUDIT_ATTR_METHOD);
+                const uiName = targetEl?.getAttribute('data-ui-name') || targetEl?.closest?.('[data-ui-name]')?.getAttribute('data-ui-name');
+                const uiId = targetEl?.getAttribute('data-ui-id') || targetEl?.closest?.('[data-ui-id]')?.getAttribute('data-ui-id');
                 const { callerInfo, stackTrace, stackFrames } = extractStackTrace();
                 const methodName = explicitMethod || methodOf(targetEl, 'click');
 
@@ -185,6 +192,8 @@ export function useAuditRecorder(): void {
                             callerInfo,
                             stackTrace,
                         },
+                        uiName: uiName || undefined,
+                        uiId: uiId || undefined,
                         button: event.button,
                         tag: targetEl?.tagName?.toLowerCase(),
                         ariaLabel: targetEl?.getAttribute?.('aria-label') || undefined,
@@ -205,6 +214,8 @@ export function useAuditRecorder(): void {
             try {
                 if (!isRecordingActive()) return;
                 const targetEl = (event.target as HTMLElement)?.closest?.('input, select, textarea') || (event.target as HTMLElement | null);
+                const uiName = targetEl?.getAttribute('data-ui-name') || targetEl?.closest?.('[data-ui-name]')?.getAttribute('data-ui-name');
+                const uiId = targetEl?.getAttribute('data-ui-id') || targetEl?.closest?.('[data-ui-id]')?.getAttribute('data-ui-id');
                 const isPassword = targetEl instanceof HTMLInputElement && targetEl.type === 'password';
                 const { callerInfo, stackTrace, stackFrames } = extractStackTrace();
                 const explicitMethod = targetEl?.closest?.(`[${AUDIT_ATTR_METHOD}]`)?.getAttribute(AUDIT_ATTR_METHOD);
@@ -225,6 +236,8 @@ export function useAuditRecorder(): void {
                             callerInfo,
                             stackTrace,
                         },
+                        uiName: uiName || undefined,
+                        uiId: uiId || undefined,
                         tag: targetEl?.tagName?.toLowerCase(),
                         inputType: targetEl instanceof HTMLInputElement ? targetEl.type : undefined,
                         // Values are NEVER captured (secrets). Length only,

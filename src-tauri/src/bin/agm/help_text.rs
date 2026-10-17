@@ -72,7 +72,8 @@ pub(crate) fn print_help_json() {
                     { "name": "delegate-update", "aliases": ["ui-update-runner"], "flags": ["--wait-pid <PID>", "--relaunch", "--target-exe <EXE>"], "description": "Delegated out-of-process updater for AGM UI & CLI (zero file-locks & auto-relaunch)" },
                     { "name": "sync", "aliases": [], "flags": [], "description": "Synchronize local accounts, instances, and DB vaults" },
                     { "name": "pull", "aliases": [], "flags": [], "description": "Execute git pull origin main in repository root" },
-                    { "name": "ssh", "aliases": [], "flags": ["<target>", "--update"], "description": "Connect to remote VM via SSH or run remote command" }
+                    { "name": "ssh", "aliases": [], "flags": ["<target>", "--update"], "description": "Connect to remote VM via SSH or run remote command" },
+                    { "name": "clean-other-versions", "aliases": ["ov", "versions clean"], "flags": ["--dry-run", "--verbose"], "description": "Scan and remove stale versions, .old files, and updater artifacts" }
                 ]
             },
             {

@@ -5,6 +5,8 @@ use tracing::{error, info, warn};
 
 mod commands;
 
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub mod constants;
 
 pub mod error;

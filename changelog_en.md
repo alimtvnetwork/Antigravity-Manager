@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.218.0 (2026-10-17)**:
+        -   **[Repository Issues & System Hardening] Clean Stale Versions CLI, Telegram Fixes, Combined Instance Columns, Prompt Tree Layout & Multi-Segment Quota Bar**:
+            -   **Description**: Added `agm clean-other-versions` CLI command, dynamic host versioning in Telegram, internal ID stripping from prompts, configurable 100/200-word summaries with resend buttons, combined IDE Exe & Data directory column, PromptTree DetailHeader overlap resolution and live disk sync, rich clipboard media copying, 5-segment color quota bar, interaction telemetry attributes, and clean process termination.
+
     *   **v4.217.0 (2026-10-17)**:
         -   **[Instance Management & UI/UX Synchronization] Instance Audit Trail, Switch UI, CLI Caller Guard & Test Sandboxing (Thanks to @aukgit)**:
             -   **Description**: Instance audit trail multi-source loading (switches + all operations), switch account dialog dark-glass styling & quota sorting, CLI caller IDE self-preservation guard, lightweight test instance lifecycle (`create-test`, `rm-test`), and automated E2E test suite.

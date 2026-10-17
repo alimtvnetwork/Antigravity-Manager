@@ -317,6 +317,11 @@ pub fn exit_app_fully(app_handle: &tauri::AppHandle) -> ! {
     // Spawn dedicated OS thread for cleanup to completely avoid Tokio runtime re-entrancy panics
     // when invoked from async IPC command handlers or Tokio worker pools.
     let cleanup_thread = std::thread::spawn(move || {
+        // 0. Terminate active agy background workers, telegram daemon, and email watcher
+        let _term_count = crate::modules::repo_db::terminate_all_active_agy_workers();
+        crate::modules::telegram_inbound::stop_telegram_daemon();
+        crate::modules::email_watcher::stop_email_watcher();
+
         let _ = tauri::async_runtime::block_on(async {
             // 1. Terminate cloudflared tunnel subprocess
             if let Some(cf_state) =

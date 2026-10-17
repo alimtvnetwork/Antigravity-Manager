@@ -91,13 +91,13 @@ pub use prompts_crud::{insert_active_prompt, list_active_prompts, save_or_requeu
 // ---- text_utils ----
 pub use text_utils::{
     extract_clean_user_prompt, extract_smart_prompt_summary, format_friendly_workspace_label,
-    get_git_branch_for_path, lookup_conversation_title,
+    get_git_branch_for_path, lookup_conversation_title, strip_internal_id_wrappers,
 };
 // ---- agy ----
 pub use agy::{
     copy_text_to_clipboard_sync, copy_to_system_clipboard, drain_next_queued_prompt_for_workspace,
     enqueue_prompt_for_instance, send_prompt_now_for_instance, spawn_or_replace_prompt_via_agy,
-    spawn_prompt_via_agy, terminate_agy_workers_for_instance,
+    spawn_prompt_via_agy, terminate_agy_workers_for_instance, terminate_all_active_agy_workers,
 };
 // ---- resend ----
 pub use resend::{resend_all_running_commands, resend_running_commands_for_instance};

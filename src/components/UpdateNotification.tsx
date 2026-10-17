@@ -137,31 +137,34 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
         ${isVisible && !isClosing ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-4 opacity-0 scale-95'}
       `}
     >
-      <div className="
+      <div
+        data-ui-name="update-notification"
+        data-ui-id="update-notification-card"
+        className="
         relative overflow-hidden
-        w-72 p-3
-        rounded-xl
-        border border-emerald-500/35 dark:border-[#1af18d]/35
-        shadow-[0_10px_32px_rgb(0,0,0,0.16)] dark:shadow-[0_12px_36px_rgb(0,0,0,0.55)]
+        w-80 p-3.5
+        rounded-2xl
+        border border-slate-300 dark:border-purple-500/30
+        shadow-[0_12px_40px_rgba(0,0,0,0.18)] dark:shadow-[0_12px_40px_rgba(124,58,237,0.18)]
         backdrop-blur-xl
-        bg-white/95 dark:bg-[#141824]/95
+        bg-white/95 dark:bg-[#120a1f]/95
         group
       ">
-        <div className="absolute -top-8 -right-8 w-20 h-20 bg-[#1af18d]/20 rounded-full blur-xl pointer-events-none transition-colors duration-500" />
-        <div className="absolute -bottom-8 -left-8 w-20 h-20 bg-[#1af18d]/10 rounded-full blur-xl pointer-events-none transition-colors duration-500" />
+        <div className="absolute -top-8 -right-8 w-24 h-24 bg-purple-500/20 dark:bg-[#1af18d]/15 rounded-full blur-2xl pointer-events-none transition-colors duration-500" />
+        <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-[#1af18d]/15 dark:bg-purple-600/15 rounded-full blur-2xl pointer-events-none transition-colors duration-500" />
 
         <div className="relative z-10">
-          <div className="flex items-start justify-between mb-1.5">
-            <div className="flex items-center gap-1.5">
-              <div className="p-1 rounded-md bg-[#1af18d] shadow-xs">
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-xl bg-gradient-to-br from-emerald-400 to-[#1af18d] shadow-[0_0_10px_rgba(26,241,141,0.35)] shrink-0">
                 {updateState === 'ready' ? (
-                  <CheckCircle className="w-3 h-3 text-slate-950" />
+                  <CheckCircle className="w-3.5 h-3.5 text-slate-950" />
                 ) : (
-                  <Sparkles className="w-3 h-3 text-slate-950" />
+                  <Sparkles className="w-3.5 h-3.5 text-slate-950" />
                 )}
               </div>
               <div>
-                <h3 className="font-semibold text-xs text-gray-800 dark:text-white leading-tight">
+                <h3 className="font-semibold text-xs text-gray-900 dark:text-white leading-tight">
                   {updateState === 'ready'
                     ? t('update_notification.ready')
                     : updateState === 'manual'
@@ -173,12 +176,12 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                           : t('update_notification.checking_title', 'Checking for updates...')}
                 </h3>
                 {updateInfo && (
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <p className="text-[10px] font-medium text-[#0f8f55] dark:text-[#1af18d]">
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="font-mono text-[10px] font-bold text-emerald-600 dark:text-[#1af18d] bg-emerald-500/10 dark:bg-[#1af18d]/10 px-2 py-0.5 rounded-full border border-emerald-500/20 dark:border-[#1af18d]/30 shadow-2xs">
                       v{updateInfo.latest_version}
-                    </p>
+                    </span>
                     {updateInfo.channel === 'beta' && (
-                      <span className="px-1.5 py-0.2 text-[10px] font-semibold rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
                         Beta
                       </span>
                     )}
@@ -189,22 +192,25 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
 
             {(updateState === 'error' || updateState === 'ready' || updateState === 'manual') && (
               <button
+                type="button"
+                data-ui-name="update-close-btn"
+                data-ui-id="update-notification-close"
                 onClick={handleClose}
                 className="
-                  p-0.5 rounded-full
-                  text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300
+                  p-1 rounded-full
+                  text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-white
                   hover:bg-black/5 dark:hover:bg-white/10
-                  transition-all duration-200
+                  transition-all duration-200 cursor-pointer
                 "
                 aria-label={t('common.cancel')}
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
 
           {/* Status message */}
-          <div className="mb-2">
+          <div className="mb-2.5">
             <p className="text-[11px] text-gray-600 dark:text-gray-300 leading-snug">
               {updateState === 'downloading' && t('update_notification.downloading')}
               {updateState === 'ready' && t('update_notification.restart_prompt')}
@@ -220,15 +226,15 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
           {/* Progress bar during download */}
           {updateState === 'downloading' && (
             <div className="mb-2">
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+              <div className="w-full bg-gray-200 dark:bg-gray-700/80 rounded-full h-1.5 overflow-hidden">
                 <div
-                  className="bg-[#1af18d] h-1.5 rounded-full transition-all duration-300"
+                  className="bg-gradient-to-r from-emerald-500 to-[#1af18d] h-1.5 rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(26,241,141,0.5)]"
                   style={{ width: `${downloadProgress}%` }}
                 />
               </div>
               <div className="flex items-center justify-between mt-1">
-                <p className="text-[10px] text-gray-500">{downloadProgress}%</p>
-                <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                <p className="text-[10px] text-gray-500 font-mono">{downloadProgress}%</p>
+                <Loader2 className="w-3 h-3 animate-spin text-emerald-500" />
               </div>
             </div>
           )}
@@ -237,15 +243,17 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
           {updateState === 'ready' && (
             <div className="flex gap-1.5">
               <button
+                type="button"
+                data-ui-name="update-restart-btn"
+                data-ui-id="update-notification-restart"
                 onClick={handleRestart}
                 className="
-                  flex-1 group/btn
-                  relative overflow-hidden
-                  bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500
-                  text-white font-medium text-xs
-                  py-1 px-2.5 rounded-lg
-                  shadow-xs shadow-green-500/20
-                  transition-all duration-300
+                  flex-1
+                  bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300
+                  text-slate-950 font-semibold text-xs
+                  py-1.5 px-3 rounded-full
+                  shadow-[0_0_12px_rgba(26,241,141,0.25)]
+                  transition-all duration-200
                   flex items-center justify-center gap-1.5
                   active:scale-[0.98] cursor-pointer
                 "
@@ -254,11 +262,15 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                 <span>{t('update_notification.btn_restart')}</span>
               </button>
               <button
+                type="button"
+                data-ui-name="update-later-btn"
+                data-ui-id="update-notification-later"
                 onClick={handleClose}
                 className="
-                  px-2 py-1 rounded-lg
-                  text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200
-                  hover:bg-black/5 dark:hover:bg-white/10
+                  px-3 py-1.5 rounded-full
+                  border border-slate-300 dark:border-slate-700/60
+                  bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/60 dark:hover:bg-slate-700/60
+                  text-slate-600 hover:text-slate-800 dark:text-slate-300 dark:hover:text-white
                   transition-all duration-200
                   text-xs font-medium cursor-pointer
                 "
@@ -270,20 +282,22 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
 
           {/* Installer / Manual download button */}
           {updateState === 'manual' && (
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1.5">
               <div className="flex gap-1.5">
                 <button
+                  type="button"
+                  data-ui-name="update-install-btn"
+                  data-ui-id="update-notification-install"
                   onClick={handleRunInstaller}
                   disabled={isInstalling}
                   className="
-                    flex-1 group/btn
-                    relative overflow-hidden
-                    bg-[#1af18d] hover:bg-[#45f5a8]
-                    disabled:bg-[#1af18d]/50 disabled:cursor-not-allowed
-                    text-slate-950 font-medium
-                    py-1 px-2.5 rounded-lg
-                    shadow-xs shadow-[#1af18d]/30
-                    transition-all duration-300
+                    flex-1
+                    bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300
+                    disabled:from-emerald-500/40 disabled:to-teal-400/40 disabled:cursor-not-allowed
+                    text-slate-950 font-semibold
+                    py-1.5 px-3 rounded-full
+                    shadow-[0_0_12px_rgba(26,241,141,0.25)]
+                    transition-all duration-200
                     flex items-center justify-center gap-1.5
                     active:scale-[0.98] cursor-pointer text-xs
                   "
@@ -301,15 +315,18 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                   )}
                 </button>
                 <button
+                  type="button"
+                  data-ui-name="update-later-btn"
+                  data-ui-id="update-notification-later"
                   onClick={handleClose}
                   disabled={isInstalling}
                   className="
-                    px-2.5 py-1 rounded-lg
-                    bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-700/90
-                    border border-slate-200/80 dark:border-white/10
-                    text-slate-700 hover:text-slate-900 dark:text-slate-200 dark:hover:text-white
+                    px-3 py-1.5 rounded-full
+                    bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/60 dark:hover:bg-slate-700/60
+                    border border-slate-300 dark:border-slate-700/60
+                    text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white
                     transition-all duration-200
-                    text-xs font-medium cursor-pointer
+                    text-xs font-medium cursor-pointer disabled:opacity-50
                   "
                 >
                   {t('update_notification.btn_later')}
@@ -317,6 +334,8 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
               </div>
               <button
                 type="button"
+                data-ui-name="update-github-link"
+                data-ui-id="update-notification-github"
                 onClick={async () => {
                   if (updateInfo) {
                     try {
@@ -328,7 +347,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                   }
                 }}
                 disabled={isInstalling}
-                className="text-[10px] font-medium text-emerald-700 hover:text-emerald-600 dark:text-[#1af18d]/90 dark:hover:text-[#1af18d] text-center transition-colors py-0.5 cursor-pointer"
+                className="text-[10px] font-medium text-emerald-600 hover:text-emerald-500 dark:text-[#1af18d]/90 dark:hover:text-[#1af18d] text-center transition-colors py-0.5 cursor-pointer"
               >
                 {t('update_notification.btn_view_github', 'View on GitHub')}
               </button>
@@ -338,6 +357,9 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
           {/* Error state — retry button */}
           {updateState === 'error' && (
             <button
+              type="button"
+              data-ui-name="update-retry-btn"
+              data-ui-id="update-notification-retry"
               onClick={() => {
                 downloadStarted.current = false;
                 setUpdateState('checking');
@@ -348,11 +370,11 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                 w-full
                 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500
                 text-white font-medium
-                py-1.5 px-3 rounded-lg
-                shadow-xs shadow-blue-500/25
-                transition-all duration-300
+                py-1.5 px-3 rounded-full
+                shadow-[0_0_12px_rgba(124,58,237,0.25)]
+                transition-all duration-200
                 flex items-center justify-center gap-1.5 text-xs
-                active:scale-[0.98]
+                active:scale-[0.98] cursor-pointer
               "
             >
               <RotateCcw className="w-3.5 h-3.5" />

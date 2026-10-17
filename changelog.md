@@ -1,5 +1,20 @@
 # Changelog
 
+## [v4.218.0] - 2026-10-17
+
+### Added
+- **Stale Versions Clean CLI (`agm clean-other-versions` / `agm ov`)**: Added `clean-other-versions` command (with aliases `ov` and `versions clean`) to detect and purge stale/legacy binaries across user profile and system install paths, safely reclaiming disk space while strictly preserving SQLite databases and configuration files.
+- **Telegram Dynamic Host Versioning & Prompt Sanitization**: Bound Telegram version reporting dynamically to host version; stripped internal synthetic ID tags (`Id: ...`) from prompt dispatches; resolved high-DPI desktop and window screenshot capture with PNG magic byte verification.
+- **Configurable Telegram Prompt Summaries & One-Tap Resend**: Added configurable prompt summary word count (100 or 200 words, via `agm telegram config --summary-words <100|200>`), clamped preview length, and added inline `↻ Resend` callback buttons on project prompt histories.
+- **Instances List View Single Combined Column & Primary Actions**: Combined IDE Executable and Data Directory into a single high-density `IDE EXE & DATA` column, eliminated list view horizontal overflow with proportional 5-column layout, and promoted the Prompts button outside into the primary action group.
+- **Prompt Tree DetailHeader Overlap Resolution & Transcript Sync**: Fixed toolbar collision between action dropdowns and view mode capsules (`DetailHeader.tsx`), and enhanced `Refresh` to bust both SWR and SQLite caches for immediate live re-reads of conversation turns.
+- **Rich Media & Image Clipboard Pipeline**: Upgraded `copyPromptWithRichImages` to generate dual-MIME `ClipboardItem` (`text/html` and `text/plain`) preserving embedded images across rich text applications and markdown editors.
+- **5-Tier Multi-Segment Quota Progress Bar**: Redesigned QuotaProgressBar track and milestone indicators into 5 distinct quintile color segments (Red `#ef4444`, Orange `#f97316`, Amber `#eab308`, Lime `#10b981`, Emerald Neon `#1af18d`).
+- **Interaction Telemetry & Audit Log Copy**: Attached `data-ui-name` and `data-ui-id` to UI elements, mapped friendly action names in audit records, added a `📋 Copy Summary` button to AuditPanel, and filtered high-frequency system telemetry from active logs.
+- **Process Exit Cleanliness**: Hooked active `agy` worker termination, Telegram daemon shutdown, and email watcher teardown into `exit_app_fully` before application exit.
+
+---
+
 ## [v4.217.0] - 2026-10-17
 
 ### Added
@@ -459,6 +474,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.218.0 (2026-10-17)**:
+        -   **[Repository Issues & System Hardening] Clean Stale Versions CLI, Telegram Fixes, Combined Instance Columns, Prompt Tree Layout & Multi-Segment Quota Bar**:
+            -   **Description**: Added `agm clean-other-versions` CLI command, dynamic host versioning in Telegram, internal ID stripping from prompts, configurable 100/200-word summaries with resend buttons, combined IDE Exe & Data directory column, PromptTree DetailHeader overlap resolution and live disk sync, rich clipboard media copying, 5-segment color quota bar, interaction telemetry attributes, and clean process termination.
+
     *   **v4.217.0 (2026-10-17)**:
         -   **[Instance Management & UI/UX Synchronization] Instance Audit Trail, Switch UI, CLI Caller Guard & Test Sandboxing**:
             -   **Description**: Instance audit trail multi-source loading (switches + all operations), switch account dialog dark-glass styling & quota sorting, CLI caller IDE self-preservation guard, lightweight test instance lifecycle (`create-test`, `rm-test`), and automated E2E test suite. (Thanks to @aukgit)

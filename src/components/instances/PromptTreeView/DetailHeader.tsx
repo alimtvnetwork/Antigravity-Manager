@@ -175,10 +175,28 @@ export function DetailHeader(props: DetailHeaderProps) {
     };
     // END RERUN SECTION (Task-04)
 
+    const handleCopyAll = () => {
+        try {
+            if (onCopyAllWithRichImages) {
+                onCopyAllWithRichImages();
+            } else {
+                onCopyWithImages();
+            }
+            setLocalCopiedAll(true);
+            setIsCopiedAll?.(true);
+            setTimeout(() => {
+                setLocalCopiedAll(false);
+                setIsCopiedAll?.(false);
+            }, 2000);
+        } catch (err) {
+            reportPromptActionError(err, 'DetailHeader.copyAllWithRichImages');
+        }
+    };
+
     return (
         <div className="space-y-2 pb-2.5 border-b border-slate-200 dark:border-[#40285e] shrink-0">
-            {/* Row 1: Identity, Badges & Actions */}
-            <div className="flex items-center justify-between gap-2.5 flex-wrap">
+            {/* Row 1: Identity & Badges & Breadcrumb Context */}
+            <div className="flex items-center justify-between gap-2.5 flex-wrap min-w-0">
                 {/* Left: Indicator 1 (Sequence + Tier), Indicator 2 (Status Capsule), Title, Instance Context */}
                 <div className="flex items-center gap-2 flex-wrap min-w-0">
                     {/* Indicator 1: Clean Sequence Code with compact Origin Tier Icon */}
@@ -226,8 +244,11 @@ export function DetailHeader(props: DetailHeaderProps) {
                         #{formatSeqBadge(selectedConversation.seq_code, `C${String(instanceSeqNum).padStart(3, '0')}`).replace(/^#/, '')} · {instanceNameDisplay}
                     </span>
                 </div>
+            </div>
 
-                {/* Right: The Unified Segmented Dark-Glass Action Capsule */}
+            {/* Row 2: Action Controls Toolbar (Cleanly segmented and non-colliding) */}
+            <div className="flex items-center justify-end gap-2 flex-wrap min-w-0 pt-0.5 relative z-30">
+                {/* The Unified Segmented Dark-Glass Action Capsule */}
                 <div className="flex items-center shrink-0">
                     <div className="relative flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
                         {/* Segment 1: Content & Media Copy Split Button [ Copy All | v ] */}
@@ -235,23 +256,9 @@ export function DetailHeader(props: DetailHeaderProps) {
                             {/* Primary Click: One-Shot Copy All (Content + Images) */}
                             <button
                                 type="button"
-                                onClick={() => {
-                                    try {
-                                        if (onCopyAllWithRichImages) {
-                                            onCopyAllWithRichImages();
-                                        } else {
-                                            onCopyWithImages();
-                                        }
-                                        setLocalCopiedAll(true);
-                                        setIsCopiedAll?.(true);
-                                        setTimeout(() => {
-                                            setLocalCopiedAll(false);
-                                            setIsCopiedAll?.(false);
-                                        }, 2000);
-                                    } catch (err) {
-                                        reportPromptActionError(err, 'DetailHeader.copyAllWithRichImages');
-                                    }
-                                }}
+                                onClick={handleCopyAll}
+                                data-ui-name="prompt-copy-all-btn"
+                                data-ui-id={`prompt-copy-all-${selectedConversation.conversation_id}`}
                                 className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title="Copy full prompt text and all embedded images in one shot"
                             >
@@ -267,6 +274,8 @@ export function DetailHeader(props: DetailHeaderProps) {
                             <button
                                 type="button"
                                 onClick={() => setIsCopyMenuOpen((prev) => !prev)}
+                                data-ui-name="prompt-copy-options-btn"
+                                data-ui-id={`prompt-copy-options-${selectedConversation.conversation_id}`}
                                 className="flex items-center justify-center px-1.5 py-1 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title="More copy and export options"
                             >
@@ -286,6 +295,8 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         });
                                     }}
                                     disabled={isEnqueueing}
+                                    data-ui-name="prompt-enqueue-btn"
+                                    data-ui-id={`prompt-enqueue-${selectedConversation.conversation_id}`}
                                     className="flex items-center gap-1.5 px-3 py-1 text-amber-800 dark:text-amber-300 hover:bg-amber-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
                                     title="Enqueue prompt into FIFO background scheduler queue"
                                 >
@@ -301,6 +312,8 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         });
                                     }}
                                     disabled={isResending}
+                                    data-ui-name="prompt-send-btn"
+                                    data-ui-id={`prompt-send-${selectedConversation.conversation_id}`}
                                     className="flex items-center gap-1.5 px-3 py-1 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
                                     title="Immediately inject prompt to running instance (Hotkey: N)"
                                 >
@@ -314,6 +327,8 @@ export function DetailHeader(props: DetailHeaderProps) {
                             <button
                                 type="button"
                                 onClick={() => setIsSendMenuOpen((prev) => !prev)}
+                                data-ui-name="prompt-dispatch-options-btn"
+                                data-ui-id={`prompt-dispatch-options-${selectedConversation.conversation_id}`}
                                 className="flex items-center justify-center px-1.5 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title="Unified dispatch configuration popover"
                             >
@@ -365,23 +380,11 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     <button
                                         type="button"
                                         onClick={() => {
-                                            try {
-                                                if (onCopyAllWithRichImages) {
-                                                    onCopyAllWithRichImages();
-                                                } else {
-                                                    onCopyWithImages();
-                                                }
-                                                setLocalCopiedAll(true);
-                                                setIsCopiedAll?.(true);
-                                                setTimeout(() => {
-                                                    setLocalCopiedAll(false);
-                                                    setIsCopiedAll?.(false);
-                                                }, 2000);
-                                            } catch (err) {
-                                                reportPromptActionError(err, 'DetailHeader.onCopyWithImages');
-                                            }
+                                            handleCopyAll();
                                             setIsCopyMenuOpen(false);
                                         }}
+                                        data-ui-name="prompt-menu-copy-images-btn"
+                                        data-ui-id={`prompt-menu-copy-images-${selectedConversation.conversation_id}`}
                                         className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
                                     >
                                         <div className="flex items-center gap-2">
@@ -684,6 +687,8 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 });
                             }}
                             disabled={isRerunning}
+                            data-ui-name="prompt-rerun-btn"
+                            data-ui-id={`prompt-rerun-${selectedConversation.conversation_id}`}
                             className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-sky-700 dark:text-sky-300 hover:bg-sky-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
                             title={`Dispatch the chosen rerun nudge ${rerunCount} time(s) to the running instance`}
                         >
@@ -699,6 +704,8 @@ export function DetailHeader(props: DetailHeaderProps) {
                         <button
                             type="button"
                             onClick={() => setIsRerunMenuOpen((prev) => !prev)}
+                            data-ui-name="prompt-rerun-options-btn"
+                            data-ui-id={`prompt-rerun-options-${selectedConversation.conversation_id}`}
                             className="flex items-center justify-center px-1.5 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             title="Rerun configuration: count and message"
                         >

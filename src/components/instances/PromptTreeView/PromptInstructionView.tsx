@@ -107,6 +107,8 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                     <button
                         type="button"
                         onClick={onCopyAllWithRichImages}
+                        data-ui-name="prompt-bottom-copy-all-btn"
+                        data-ui-id={`prompt-bottom-copy-all-${selectedConversation.conversation_id}`}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-xs font-semibold bg-indigo-50 dark:bg-[#171025] text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-[#40285e] hover:bg-indigo-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
                         title="Copy full prompt text and all embedded rich images in one shot"
                     >
@@ -131,6 +133,8 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                         setIsCopied(true);
                         setTimeout(() => setIsCopied(false), 2000);
                     }}
+                    data-ui-name="prompt-copy-full-text-btn"
+                    data-ui-id={`prompt-copy-full-text-${selectedConversation.conversation_id}`}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-xs font-semibold bg-slate-100 dark:bg-[#171025] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#40285e] hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
                     title="Copy full prompt text to clipboard"
                 >
@@ -171,6 +175,8 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                 <button
                     type="button"
                     onClick={onCopyAllWithRichImages}
+                    data-ui-name="prompt-raw-bottom-copy-all-btn"
+                    data-ui-id={`prompt-raw-bottom-copy-all-${selectedConversation.conversation_id}`}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-xs font-semibold bg-indigo-50 dark:bg-[#171025] text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-[#40285e] hover:bg-indigo-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
                     title="Copy full prompt text and all embedded rich images in one shot"
                 >
@@ -194,6 +200,8 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                     setIsCopied(true);
                     setTimeout(() => setIsCopied(false), 2000);
                 }}
+                data-ui-name="prompt-raw-copy-btn"
+                data-ui-id={`prompt-raw-copy-${selectedConversation.conversation_id}`}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] text-xs font-semibold bg-slate-100 dark:bg-[#171025] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#40285e] hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
                 title="Copy raw text to clipboard"
             >

@@ -4,6 +4,7 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
+| [antigravity-manager-agm-repository-issues.md](./antigravity-manager-agm-repository-issues.md) | `COMPLETED` | Telegram stale version clean CLI (agm ov), prompt ID stripping, configurable word summary, instance table unified exe/data column, PromptTree overlap fix & sync, copy-all-with-images, and multi-segment quota bar. |
 | [instance-management-and-ui-ux-synchronization.md](./instance-management-and-ui-ux-synchronization.md) | `COMPLETED` | Instance audit trail visibility (switches & all operations), switch dialog UI/UX consistency, CLI caller IDE self-preservation, lightweight test instance lifecycle, and E2E verification. Released v4.217.0. |
 | [telegram-project-listing-and-ui-enhancement.md](./telegram-project-listing-and-ui-enhancement.md) | `ACTIVE` | Numbered Telegram project pages, conversation titles, green This machine label, and a 24-hour GitMap node-name cache. |
 | [antigravity-manager-agm-ui-and-functionality-fixes.md](./antigravity-manager-agm-ui-and-functionality-fixes.md) | `COMPLETED` | Send dropdown Enqueue entry, tree copy-all + unified Import/Export (SQLite+JSON), Telegram `cmd:` double-slash fix + 64-byte cap guards + unknown-action fallback (RCAs 14-16), E2E validation docs; released v4.206.0. |

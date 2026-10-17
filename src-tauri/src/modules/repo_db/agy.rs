@@ -105,6 +105,37 @@ pub fn terminate_agy_workers_for_instance(instance_id: &str) -> usize {
     terminated
 }
 
+/// Terminate all active `agy` worker processes across all instances during application shutdown.
+pub fn terminate_all_active_agy_workers() -> usize {
+    let mut workers = match get_active_agy_workers().lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    if workers.is_empty() {
+        return 0;
+    }
+    let pids: Vec<sysinfo::Pid> = workers
+        .values()
+        .map(|&pid| sysinfo::Pid::from_u32(pid))
+        .collect();
+    let mut sys = sysinfo::System::new();
+    sys.refresh_processes_specifics(
+        sysinfo::ProcessesToUpdate::Some(&pids),
+        sysinfo::ProcessRefreshKind::new().with_exe(sysinfo::UpdateKind::OnlyIfNotSet),
+    );
+    let mut terminated = 0;
+    for (ws_key, pid) in workers.drain() {
+        if let Some(proc) = sys.process(sysinfo::Pid::from_u32(pid)) {
+            crate::modules::logger::log_info(&format!(
+                "[Shutdown] Terminating active agy worker (pid {pid}) for workspace {ws_key}"
+            ));
+            proc.kill();
+            terminated += 1;
+        }
+    }
+    terminated
+}
+
 /// Helper to spawn `agy` CLI to execute a prompt in a workspace.
 /// Uses `--conversation` (not `--resume`, which agy rejects) and `-p`.
 pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> Result<(), String> {

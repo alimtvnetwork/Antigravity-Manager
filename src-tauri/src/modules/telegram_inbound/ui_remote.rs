@@ -967,10 +967,13 @@ fn manager_process_running() -> bool {
     let mut sys = sysinfo::System::new();
     sys.refresh_processes(sysinfo::ProcessesToUpdate::All);
     sys.processes().values().any(|proc| {
-        proc.name()
-            .to_string_lossy()
-            .to_ascii_lowercase()
-            .contains("agm-alim")
+        let name = proc.name().to_string_lossy().to_ascii_lowercase();
+        name.contains("agm-alim")
+            || name.contains("agm-ui")
+            || name.contains("antigravity-tools")
+            || name == "agm"
+            || name == "agm.exe"
+            || name.contains("antigravity_manager")
     })
 }
 
@@ -1003,26 +1006,47 @@ public class AgmWinShot {
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
   public struct RECT { public int L; public int T; public int R; public int B; }
 }
 "@
-$proc = Get-Process -Name 'agm-alim' -ErrorAction SilentlyContinue |
+[void][AgmWinShot]::SetProcessDPIAware()
+$procNames = @('agm-alim', 'agm-ui', 'antigravity-tools', 'agm', 'antigravity_manager')
+$proc = Get-Process -Name $procNames -ErrorAction SilentlyContinue |
   Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } |
   Sort-Object -Property WorkingSet64 -Descending |
   Select-Object -First 1
-if (-not $proc) { throw 'Antigravity Manager window handle was not found' }
-$h = $proc.MainWindowHandle
-[void][AgmWinShot]::ShowWindow($h, 9)
-[void][AgmWinShot]::SetForegroundWindow($h)
-Start-Sleep -Milliseconds 350
+$h = [IntPtr]::Zero
+if ($proc) {
+  $h = $proc.MainWindowHandle
+  [void][AgmWinShot]::ShowWindow($h, 9)
+  [void][AgmWinShot]::SetForegroundWindow($h)
+  Start-Sleep -Milliseconds 350
+}
+if ($h -eq [IntPtr]::Zero) {
+  $h = [AgmWinShot]::GetForegroundWindow()
+}
 $rect = New-Object AgmWinShot+RECT
-if (-not [AgmWinShot]::GetWindowRect($h, [ref]$rect)) { throw 'GetWindowRect failed' }
-$w = $rect.R - $rect.L
-$ht = $rect.B - $rect.T
-if ($w -lt 40 -or $ht -lt 40) { throw "window is too small (${w}x${ht})" }
-$bmp = New-Object System.Drawing.Bitmap $w, $ht
-$g = [System.Drawing.Graphics]::FromImage($bmp)
-$g.CopyFromScreen($rect.L, $rect.T, 0, 0, (New-Object System.Drawing.Size($w, $ht)))
+$captured = $false
+if ($h -ne [IntPtr]::Zero -and [AgmWinShot]::GetWindowRect($h, [ref]$rect)) {
+  $w = $rect.R - $rect.L
+  $ht = $rect.B - $rect.T
+  if ($w -ge 40 -and $ht -ge 40) {
+    $bmp = New-Object System.Drawing.Bitmap $w, $ht
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.CopyFromScreen($rect.L, $rect.T, 0, 0, (New-Object System.Drawing.Size($w, $ht)))
+    $captured = $true
+  }
+}
+if (-not $captured) {
+  $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+  $w = $bounds.Width
+  $ht = $bounds.Height
+  $bmp = New-Object System.Drawing.Bitmap $w, $ht
+  $g = [System.Drawing.Graphics]::FromImage($bmp)
+  $g.CopyFromScreen($bounds.X, $bounds.Y, 0, 0, (New-Object System.Drawing.Size($w, $ht)))
+}
 $bmp.Save($OutPath, [System.Drawing.Imaging.ImageFormat]::Png)
 $g.Dispose()
 $bmp.Dispose()

@@ -37,6 +37,19 @@ interface PromptTreeSwrEntry {
 // Module-level in-memory SWR cache across modal mount/unmount lifecycles
 const promptTreeSwrCache = new Map<string, PromptTreeSwrEntry>();
 
+/** Invalidate in-memory SWR cache across instances or for a specific instance */
+export function invalidatePromptTreeCache(targetInstanceId?: string): void {
+    if (targetInstanceId) {
+        promptTreeSwrCache.delete(targetInstanceId);
+        if (targetInstanceId === 'default' || targetInstanceId === '__default__') {
+            promptTreeSwrCache.delete('default');
+            promptTreeSwrCache.delete('__default__');
+        }
+    } else {
+        promptTreeSwrCache.clear();
+    }
+}
+
 // Shared loading state emitter so TreePanel can observe initial load and render skeletons
 export const promptTreeLoadingEmitter = {
     isLoading: false,
@@ -251,6 +264,17 @@ export function usePromptTreeData({
             }
             setError(null);
             try {
+                if (isForce) {
+                    invalidatePromptTreeCache(instanceId);
+                    try {
+                        await invoke('reset_prompt_tree_cache', { instanceId: instanceId || null });
+                    } catch (resetErr: unknown) {
+                        useErrorStore.getState().trackWarning(resetErr, {
+                            source: 'usePromptTreeData.loadTree.resetCache',
+                            triggerAction: 'reset_prompt_tree_cache',
+                        });
+                    }
+                }
                 const data = await invoke<AgmProjectTreeNode[]>('get_project_conversation_tree', {
                     instanceId: instanceId || undefined,
                     maxWords: 2000,

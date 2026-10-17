@@ -11,6 +11,7 @@ use antigravity_tools_lib::modules::cli::{
 mod account_cmds;
 mod account_mgmt;
 mod cache_cmds;
+mod clean_versions_cmds;
 mod common;
 mod compact_cmds;
 mod doctor_cmds;
@@ -323,6 +324,20 @@ fn main() {
         "sync" => crate::proxy_cmds::cmd_sync(&cmd_args),
         "pull" => crate::proxy_cmds::cmd_pull(&cmd_args),
         "clean" | "purge" => crate::misc_cmds::cmd_clean(&cmd_args),
+        "clean-other-versions" | "clean_other_versions" | "ov" => {
+            crate::clean_versions_cmds::cmd_clean_other_versions(&cmd_args)
+        }
+        "versions" => {
+            if cmd_args
+                .first()
+                .map(|s| s == "clean" || s == "purge")
+                .unwrap_or(false)
+            {
+                crate::clean_versions_cmds::cmd_clean_other_versions(&cmd_args[1..]);
+            } else {
+                crate::clean_versions_cmds::cmd_clean_other_versions(&cmd_args);
+            }
+        }
         "prune" | "pr" | "clear-cache" | "cache-clear" => {
             crate::cache_cmds::cmd_clear_cache(&cmd_args)
         }

@@ -198,7 +198,9 @@ where
         let message = visitor.message.unwrap_or_default();
 
         // Skip empty messages and internal noise
-        if message.is_empty() && visitor.fields.is_empty() {
+        if (message.is_empty() && visitor.fields.is_empty())
+            || crate::modules::logger::should_filter_log(&message)
+        {
             return;
         }
 

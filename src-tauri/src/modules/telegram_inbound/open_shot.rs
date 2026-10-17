@@ -101,10 +101,13 @@ fn manager_process_running() -> bool {
     let mut sys = sysinfo::System::new();
     sys.refresh_processes(sysinfo::ProcessesToUpdate::All);
     sys.processes().values().any(|proc| {
-        proc.name()
-            .to_string_lossy()
-            .to_ascii_lowercase()
-            .contains("agm-alim")
+        let name = proc.name().to_string_lossy().to_ascii_lowercase();
+        name.contains("agm-alim")
+            || name.contains("agm-ui")
+            || name.contains("antigravity-tools")
+            || name == "agm"
+            || name == "agm.exe"
+            || name.contains("antigravity_manager")
     })
 }
 
@@ -373,9 +376,13 @@ fn capture_local_once() -> Result<Vec<u8>, String> {
             stdout.trim()
         ));
     }
+    fn is_valid_png(bytes: &[u8]) -> bool {
+        bytes.len() >= 8 && &bytes[0..8] == b"\x89PNG\r\n\x1a\n"
+    }
+
     let bytes = std::fs::read(&png).map_err(|e| format!("read screenshot: {e}"))?;
-    if bytes.len() < 32 {
-        return Err("screenshot file was empty".to_string());
+    if bytes.len() < 32 || !is_valid_png(&bytes) {
+        return Err("screenshot file was empty or corrupted PNG".to_string());
     }
     // Justification: the PNG bytes are already in memory; deleting the temp files is cleanup.
     crate::error::record_ignored(std::fs::remove_file(&png), "remove temp screenshot");
@@ -423,20 +430,42 @@ fn encode_powershell_utf16le(script: &str) -> String {
     base64::engine::general_purpose::STANDARD.encode(&bytes)
 }
 
-/// Pick the base64 payload line out of `gitmap cluster exec` stdout, ignoring
-/// any wrapper/log lines the transport may add.
+/// Pick the base64 payload out of `gitmap cluster exec` stdout, ignoring
+/// any wrapper/log lines and concatenating wrapped lines to avoid byte corruption.
 fn extract_base64_line(stdout: &str) -> Option<String> {
-    stdout
-        .lines()
-        .map(str::trim)
-        .filter(|line| {
-            line.len() >= 100
-                && line
-                    .chars()
-                    .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=')
-        })
-        .last()
-        .map(str::to_string)
+    let mut b64_chunks = Vec::new();
+    for line in stdout.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty()
+            || trimmed.starts_with("gitmap:")
+            || trimmed.starts_with("[log]")
+            || trimmed == "DONE"
+            || trimmed.starts_with("OK ")
+        {
+            continue;
+        }
+        if trimmed.len() >= 4
+            && trimmed
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=')
+        {
+            b64_chunks.push(trimmed);
+        }
+    }
+    if b64_chunks.is_empty() {
+        return None;
+    }
+    let joined = b64_chunks.concat();
+    if joined.len() >= 100 {
+        Some(joined)
+    } else {
+        None
+    }
+}
+
+/// Check if bytes begin with standard PNG signature (\x89PNG\r\n\x1a\n).
+fn is_valid_png(bytes: &[u8]) -> bool {
+    bytes.len() >= 8 && bytes.starts_with(b"\x89PNG\r\n\x1a\n")
 }
 
 /// Capture a remote fleet node's screen: ensure AGM is open there, then run a
@@ -489,8 +518,10 @@ fn capture_remote_png(node: &str) -> Result<Vec<u8>, String> {
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(&b64)
         .map_err(|e| format!("decode remote screenshot from {node}: {e}"))?;
-    if bytes.len() < 32 {
-        return Err(format!("remote screenshot from {node} was empty"));
+    if bytes.len() < 32 || !is_valid_png(&bytes) {
+        return Err(format!(
+            "remote screenshot from {node} was corrupted or invalid PNG"
+        ));
     }
     Ok(bytes)
 }
@@ -649,9 +680,14 @@ public class AgmWinFocus {
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
 }
 "@
-$proc = Get-Process -Name 'agm-alim' -ErrorAction SilentlyContinue |
+$procNames = @('agm-alim', 'agm-ui', 'antigravity-tools', 'agm', 'antigravity_manager')
+$proc = Get-Process -Name $procNames -ErrorAction SilentlyContinue |
   Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } |
+  Sort-Object -Property WorkingSet64 -Descending |
   Select-Object -First 1
+if (-not $proc) {
+  $proc = Get-Process | Where-Object { $_.MainWindowTitle -like '*Antigravity*' -and $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
+}
 if (-not $proc) { throw 'Antigravity Manager window handle was not found' }
 [void][AgmWinFocus]::ShowWindow($proc.MainWindowHandle, 9)
 if (-not [AgmWinFocus]::SetForegroundWindow($proc.MainWindowHandle)) { throw 'SetForegroundWindow failed' }
@@ -671,26 +707,47 @@ public class AgmWinShot {
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
   public struct RECT { public int L; public int T; public int R; public int B; }
 }
 "@
-$proc = Get-Process -Name 'agm-alim' -ErrorAction SilentlyContinue |
+[void][AgmWinShot]::SetProcessDPIAware()
+$procNames = @('agm-alim', 'agm-ui', 'antigravity-tools', 'agm', 'antigravity_manager')
+$proc = Get-Process -Name $procNames -ErrorAction SilentlyContinue |
   Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } |
   Sort-Object -Property WorkingSet64 -Descending |
   Select-Object -First 1
-if (-not $proc) { throw 'Antigravity Manager window handle was not found' }
-$h = $proc.MainWindowHandle
-[void][AgmWinShot]::ShowWindow($h, 9)
-[void][AgmWinShot]::SetForegroundWindow($h)
-Start-Sleep -Milliseconds 350
+$h = [IntPtr]::Zero
+if ($proc) {
+  $h = $proc.MainWindowHandle
+  [void][AgmWinShot]::ShowWindow($h, 9)
+  [void][AgmWinShot]::SetForegroundWindow($h)
+  Start-Sleep -Milliseconds 350
+}
+if ($h -eq [IntPtr]::Zero) {
+  $h = [AgmWinShot]::GetForegroundWindow()
+}
 $rect = New-Object AgmWinShot+RECT
-if (-not [AgmWinShot]::GetWindowRect($h, [ref]$rect)) { throw 'GetWindowRect failed' }
-$w = $rect.R - $rect.L
-$ht = $rect.B - $rect.T
-if ($w -lt 40 -or $ht -lt 40) { throw "window is too small (${w}x${ht})" }
-$bmp = New-Object System.Drawing.Bitmap $w, $ht
-$g = [System.Drawing.Graphics]::FromImage($bmp)
-$g.CopyFromScreen($rect.L, $rect.T, 0, 0, (New-Object System.Drawing.Size($w, $ht)))
+$captured = $false
+if ($h -ne [IntPtr]::Zero -and [AgmWinShot]::GetWindowRect($h, [ref]$rect)) {
+  $w = $rect.R - $rect.L
+  $ht = $rect.B - $rect.T
+  if ($w -ge 40 -and $ht -ge 40) {
+    $bmp = New-Object System.Drawing.Bitmap $w, $ht
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.CopyFromScreen($rect.L, $rect.T, 0, 0, (New-Object System.Drawing.Size($w, $ht)))
+    $captured = $true
+  }
+}
+if (-not $captured) {
+  $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+  $w = $bounds.Width
+  $ht = $bounds.Height
+  $bmp = New-Object System.Drawing.Bitmap $w, $ht
+  $g = [System.Drawing.Graphics]::FromImage($bmp)
+  $g.CopyFromScreen($bounds.X, $bounds.Y, 0, 0, (New-Object System.Drawing.Size($w, $ht)))
+}
 $bmp.Save($OutPath, [System.Drawing.Imaging.ImageFormat]::Png)
 $g.Dispose()
 $bmp.Dispose()
@@ -710,31 +767,52 @@ public class AgmRemoteShot {
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
   public struct RECT { public int L; public int T; public int R; public int B; }
 }
 "@
-$proc = Get-Process -Name 'agm-alim' -ErrorAction SilentlyContinue |
+[void][AgmRemoteShot]::SetProcessDPIAware()
+$procNames = @('agm-alim', 'agm-ui', 'antigravity-tools', 'agm', 'antigravity_manager')
+$proc = Get-Process -Name $procNames -ErrorAction SilentlyContinue |
   Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } |
   Sort-Object -Property WorkingSet64 -Descending |
   Select-Object -First 1
-if (-not $proc) { throw 'Antigravity Manager window handle was not found' }
-$h = $proc.MainWindowHandle
-[void][AgmRemoteShot]::ShowWindow($h, 9)
-[void][AgmRemoteShot]::SetForegroundWindow($h)
-Start-Sleep -Milliseconds 350
+$h = [IntPtr]::Zero
+if ($proc) {
+  $h = $proc.MainWindowHandle
+  [void][AgmRemoteShot]::ShowWindow($h, 9)
+  [void][AgmRemoteShot]::SetForegroundWindow($h)
+  Start-Sleep -Milliseconds 350
+}
+if ($h -eq [IntPtr]::Zero) {
+  $h = [AgmRemoteShot]::GetForegroundWindow()
+}
 $rect = New-Object AgmRemoteShot+RECT
-if (-not [AgmRemoteShot]::GetWindowRect($h, [ref]$rect)) { throw 'GetWindowRect failed' }
-$w = $rect.R - $rect.L
-$ht = $rect.B - $rect.T
-if ($w -lt 40 -or $ht -lt 40) { throw "window is too small (${w}x${ht})" }
-$bmp = New-Object System.Drawing.Bitmap $w, $ht
-$g = [System.Drawing.Graphics]::FromImage($bmp)
-$g.CopyFromScreen($rect.L, $rect.T, 0, 0, (New-Object System.Drawing.Size($w, $ht)))
+$captured = $false
+if ($h -ne [IntPtr]::Zero -and [AgmRemoteShot]::GetWindowRect($h, [ref]$rect)) {
+  $w = $rect.R - $rect.L
+  $ht = $rect.B - $rect.T
+  if ($w -ge 40 -and $ht -ge 40) {
+    $bmp = New-Object System.Drawing.Bitmap $w, $ht
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.CopyFromScreen($rect.L, $rect.T, 0, 0, (New-Object System.Drawing.Size($w, $ht)))
+    $captured = $true
+  }
+}
+if (-not $captured) {
+  $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+  $w = $bounds.Width
+  $ht = $bounds.Height
+  $bmp = New-Object System.Drawing.Bitmap $w, $ht
+  $g = [System.Drawing.Graphics]::FromImage($bmp)
+  $g.CopyFromScreen($bounds.X, $bounds.Y, 0, 0, (New-Object System.Drawing.Size($w, $ht)))
+}
 $ms = New-Object System.IO.MemoryStream
 $bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
 $g.Dispose()
 $bmp.Dispose()
-[Convert]::ToBase64String($ms.ToArray())
+[Console]::Out.Write([Convert]::ToBase64String($ms.ToArray()))
 "#;
 
 #[cfg(test)]

@@ -37,6 +37,60 @@ pub(crate) fn cmd_telegram(args: &[String]) {
             }
             return;
         }
+        if first_lower == "config" {
+            let mut summary_words = None;
+            let mut iter = args[1..].iter().peekable();
+            while let Some(arg) = iter.next() {
+                if arg == "--summary-words" || arg == "-w" || arg == "--words" {
+                    if let Some(val) = iter.next() {
+                        match val.parse::<usize>() {
+                            Ok(w) if w > 0 => summary_words = Some(w),
+                            _ => {
+                                eprintln!("[ERROR] --summary-words requires a positive integer (e.g. 100 or 200)");
+                                std::process::exit(1);
+                            }
+                        }
+                    } else {
+                        eprintln!("[ERROR] Missing argument for --summary-words");
+                        std::process::exit(1);
+                    }
+                }
+            }
+
+            if let Some(words) = summary_words {
+                t_cfg.prompt_summary_words = words;
+                if let Err(e) = telegram_inbound::save_config(&t_cfg) {
+                    eprintln!("[ERROR] Failed to save Telegram config: {}", e);
+                    std::process::exit(1);
+                }
+                println!("[+] Telegram prompt summary word count set to: {}", words);
+                return;
+            }
+
+            // Display current configuration
+            println!("=== Telegram Configuration ===");
+            println!("  Enabled: {}", t_cfg.is_enabled);
+            println!(
+                "  Bot Token: {}",
+                if t_cfg.bot_token.is_empty() {
+                    "(not set)"
+                } else {
+                    "(configured)"
+                }
+            );
+            println!(
+                "  Chat ID: {}",
+                t_cfg
+                    .allowed_chat_id
+                    .map(|c| c.to_string())
+                    .unwrap_or_else(|| "(none)".to_string())
+            );
+            println!("  Prompt Summary Words: {}", t_cfg.prompt_summary_words);
+            println!("  Card Palette: {}", t_cfg.card_palette);
+            println!("  Poll Interval: {}s", t_cfg.poll_interval_secs);
+            println!("\nUsage: agm telegram config --summary-words <100|200>");
+            return;
+        }
         if crate::telegram_blocks_a::telegram_route_help(args, &first_lower, &t_cfg, &rt) {
             return;
         }

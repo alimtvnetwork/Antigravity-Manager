@@ -122,19 +122,63 @@ function ActorBadge({ actor }: { actor: AuditActor }) {
 }
 
 const METHOD_LABELS: Record<string, string> = {
-    send_prompt_now: 'Send prompt now',
-    enqueue_prompt: 'Enqueue prompt',
+    send_prompt_now: 'Send Prompt Now',
+    enqueue_prompt: 'Enqueue Prompt',
+    'instance-row-prompts-btn': 'Prompts & History',
+    'instance-row-switch-btn': 'Switch Profile',
+    'instance-row-stop-btn': 'Stop Instance',
+    'instance-row-restart-btn': 'Restart Instance',
+    'instance-row-more-menu-btn': 'More Options Menu',
+    'instance-menu-delete-cache': 'Delete Cache & Re-inject',
+    'instance-menu-fast-forward': 'Fast Forward Shortcut',
+    'instance-menu-open-folder': 'Open Data Directory',
+    'instance-menu-copy-token': 'Copy Auth Token',
+    'prompt-tree-refresh-btn': 'Refresh Prompt Tree',
+    'prompt-tree-copy-all-btn': 'Copy All With Images',
+    'prompt-tree-send-now-btn': 'Send Prompt Now',
+    'prompt-tree-enqueue-btn': 'Enqueue Prompt',
+    'prompt-tree-instructions-tab': 'Prompt Instructions View',
+    'prompt-tree-results-tab': 'AI Results & Outputs View',
+    'quota-progress-bar': 'Quota Progress Bar',
+    'quota-progress-track': 'Quota Progress Track',
+    'quota-milestone-node': 'Quota Milestone Node',
 };
 
-function humanMethodLabel(methodName: string): string {
-    return METHOD_LABELS[methodName] ?? methodName;
+function humanMethodLabel(methodName: string, uiName?: unknown): string {
+    if (typeof uiName === 'string' && uiName) {
+        if (METHOD_LABELS[uiName]) return METHOD_LABELS[uiName];
+        return uiName
+            .replace(/-(btn|tab|menu|card|item|view)$/, '')
+            .replace(/-/g, ' ')
+            .replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+    if (METHOD_LABELS[methodName]) {
+        return METHOD_LABELS[methodName];
+    }
+    if (methodName.startsWith('click:')) {
+        const sub = methodName.slice(6);
+        if (METHOD_LABELS[sub]) return `Click: ${METHOD_LABELS[sub]}`;
+        if (sub.includes('-')) {
+            const formatted = sub
+                .replace(/-(btn|tab|menu|card|item|view)$/, '')
+                .replace(/-/g, ' ')
+                .replace(/\b\w/g, (c) => c.toUpperCase());
+            return `Click: ${formatted}`;
+        }
+        return `Click: ${sub}`;
+    }
+    if (methodName.startsWith('input:')) {
+        const sub = methodName.slice(6);
+        return `Input: ${sub}`;
+    }
+    return methodName;
 }
 
 function EntryRow({ entry }: { entry: AuditEntry }) {
     const [expanded, setExpanded] = useState(false);
     const params = useMemo(() => parseParams(entry.params), [entry.params]);
     const methodName = entry.methodName || entry.method_name || 'CLICK';
-    const methodLabel = humanMethodLabel(methodName);
+    const methodLabel = humanMethodLabel(methodName, params.uiName);
     const uiTarget = entry.uiTarget || entry.ui_target || '-';
 
     const stackTrace = params.stackTrace || params.stack || (params.metadata as Record<string, unknown> | undefined)?.stackTrace;
@@ -261,9 +305,70 @@ export function AuditPanel() {
         [entries, actorFilter, resultFilter]
     );
 
-    const [copiedType, setCopiedType] = useState<'json' | 'jsonl' | null>(null);
+    const [copiedType, setCopiedType] = useState<'json' | 'jsonl' | 'summary' | null>(null);
 
     if (!isOpen) return null;
+
+    const handleCopySummary = async () => {
+        try {
+            const total = filtered.length;
+            const actorCounts: Record<string, number> = {};
+            const resultCounts: Record<string, number> = {};
+            const triggerCounts: Record<string, number> = {};
+
+            filtered.forEach((e) => {
+                actorCounts[e.actor] = (actorCounts[e.actor] || 0) + 1;
+                resultCounts[e.result] = (resultCounts[e.result] || 0) + 1;
+                triggerCounts[e.trigger] = (triggerCounts[e.trigger] || 0) + 1;
+            });
+
+            const recentEntries = filtered.slice(0, 10).map((e, idx) => {
+                const time = formatTimestamp(e.timestamp);
+                const p = parseParams(e.params);
+                const mName = e.methodName || e.method_name || 'CLICK';
+                const label = humanMethodLabel(mName, p.uiName);
+                const target = e.uiTarget || e.ui_target || '-';
+                return `  ${idx + 1}. [${time}] [${e.actor.toUpperCase()}] [${e.result.toUpperCase()}] ${label} (${target})`;
+            });
+
+            const summaryLines = [
+                `========================================`,
+                `INTERACTION AUDIT LOG SUMMARY`,
+                `Generated: ${new Date().toISOString()}`,
+                `Total Filtered Entries: ${total} (out of ${entries.length} total)`,
+                `========================================`,
+                ``,
+                `[BREAKDOWN BY ACTOR]`,
+                ...Object.entries(actorCounts).map(([actor, count]) => `  - ${actor}: ${count}`),
+                ``,
+                `[BREAKDOWN BY RESULT]`,
+                ...Object.entries(resultCounts).map(([res, count]) => `  - ${res}: ${count}`),
+                ``,
+                `[BREAKDOWN BY TRIGGER]`,
+                ...Object.entries(triggerCounts).map(([trig, count]) => `  - ${trig}: ${count}`),
+                ``,
+                `[RECENT INTERACTIONS (Up to 10)]`,
+                ...(recentEntries.length > 0 ? recentEntries : ['  (None)']),
+                ``,
+                `========================================`,
+            ];
+
+            const summaryText = summaryLines.join('\n');
+            const success = await copyToClipboard(summaryText);
+            if (success) {
+                setCopiedType('summary');
+                showToast({ message: t('audit.copied_summary', 'Audit summary copied to clipboard'), type: 'success' });
+                window.setTimeout(() => setCopiedType(null), 2000);
+            } else {
+                showToast(t('audit.copy_failed', 'Failed to copy audit log to clipboard'), 'error');
+            }
+        } catch (err) {
+            useErrorStore.getState().captureError(err, {
+                source: `${SOURCE}.handleCopySummary`,
+                triggerAction: 'copyToClipboard',
+            });
+        }
+    };
 
     const handleCopyJson = async () => {
         try {
@@ -332,6 +437,8 @@ export function AuditPanel() {
                     </div>
                     <button
                         type="button"
+                        data-ui-name="audit-close-btn"
+                        data-ui-id="audit-modal-close"
                         onClick={() => setPanelOpen(false)}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-700/60 transition-colors cursor-pointer"
                         aria-label={t('common.close', 'Close')}
@@ -373,6 +480,8 @@ export function AuditPanel() {
                     <div className="flex-1" />
                     <button
                         type="button"
+                        data-ui-name="audit-refresh-btn"
+                        data-ui-id="audit-refresh"
                         onClick={() => void refreshEntries()}
                         disabled={isLoading}
                         className="inline-flex items-center gap-1 rounded-full border border-slate-700/60 bg-slate-800/60 px-2.5 py-1 text-slate-300 hover:text-white hover:bg-slate-700/50 transition-colors cursor-pointer disabled:opacity-50"
@@ -384,6 +493,24 @@ export function AuditPanel() {
                     <div className="inline-flex items-center rounded-full border border-slate-700/60 bg-slate-800/60 divide-x divide-slate-700/60 overflow-hidden shadow-2xs">
                         <button
                             type="button"
+                            data-ui-name="audit-copy-summary-btn"
+                            data-ui-id="audit-copy-summary"
+                            onClick={handleCopySummary}
+                            className={cn(
+                                "inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-medium transition-colors cursor-pointer",
+                                copiedType === 'summary'
+                                    ? "bg-emerald-500/20 text-emerald-300 font-semibold"
+                                    : "text-slate-300 hover:text-white hover:bg-slate-700/50"
+                            )}
+                            title={t('audit.copy_summary_tooltip', 'Copy human-readable audit summary to clipboard')}
+                        >
+                            {copiedType === 'summary' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            {copiedType === 'summary' ? t('common.copied', 'Copied!') : t('audit.summary', 'Copy Summary')}
+                        </button>
+                        <button
+                            type="button"
+                            data-ui-name="audit-copy-json-btn"
+                            data-ui-id="audit-copy-json"
                             onClick={handleCopyJson}
                             className={cn(
                                 "inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-medium transition-colors cursor-pointer",
@@ -398,6 +525,8 @@ export function AuditPanel() {
                         </button>
                         <button
                             type="button"
+                            data-ui-name="audit-copy-jsonl-btn"
+                            data-ui-id="audit-copy-jsonl"
                             onClick={handleCopyJsonl}
                             className={cn(
                                 "inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-medium transition-colors cursor-pointer",
@@ -413,6 +542,8 @@ export function AuditPanel() {
                     </div>
                     <button
                         type="button"
+                        data-ui-name="audit-clear-btn"
+                        data-ui-id="audit-clear"
                         onClick={handleClear}
                         className="inline-flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/10 px-2.5 py-1 text-red-300 hover:text-red-200 hover:bg-red-500/20 transition-colors cursor-pointer"
                     >

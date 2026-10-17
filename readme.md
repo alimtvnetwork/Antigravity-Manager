@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.217.0-3B82F6?style=flat-square" alt="Version v4.217.0">
+    <img src="https://img.shields.io/badge/Version-v4.218.0-3B82F6?style=flat-square" alt="Version v4.218.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -115,7 +115,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.217.0)**
+**Bar 2: Version-Based Installation (v4.218.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -559,6 +559,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
+> Latest version **v4.218.0**: Repository Issues & System Hardening — Added `agm clean-other-versions` (`agm ov`) CLI command to purge stale/legacy binaries while strictly preserving SQLite databases; dynamic Telegram versioning; internal ID stripping from prompts; configurable 100/200-word summaries with resend buttons; combined IDE Exe & Data directory column; PromptTree DetailHeader overlap resolution & live disk sync; rich clipboard media copying; 5-tier color-segmented quota bar; interaction telemetry attributes; and clean process exit.
 > Latest version **v4.217.0**: Instance Audit Trail Visibility (split-DB & `hot_tasks_cache` alias resolution, dual-tab 'Switch Cycles' vs 'All Operations' with auto-fallback), Switch Account Dialog UI/UX Consistency (dark-glass modal, top-right 'X' close button, row hover highlights, Current checkmark badge, color-coded quota badges), Active Caller IDE Detection & Self-Preservation Guard (`detect_caller_instance_id` via ancestor process command-line inspection and env checks, exit code 2 refusal on self-mutation), and Lightweight Test Instance Lifecycle (`agm instances create-test` / `rm-test` transient sandboxes without binary duplication). (Thanks to @aukgit)
 > Latest version **v4.216.2**: Build fix — `ui_cmds.rs` now passes `None` for the new `stack_trace` parameter of `audit::append_entry` (E0061 broke the v4.216.1 build). (Thanks to @aukgit)
 > Latest version **v4.216.1**: Build fix — `post_switch_resume.rs` timer registry now uses `tauri::async_runtime::JoinHandle` to match the `tauri::async_runtime::spawn` return type (E0308 broke the v4.216.0 build). (Thanks to @aukgit)

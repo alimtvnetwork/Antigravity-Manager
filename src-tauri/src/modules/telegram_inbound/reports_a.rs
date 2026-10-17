@@ -316,6 +316,7 @@ pub fn format_observe_report() -> String {
         && last_rel != current_ver
         && last_rel != ver
         && last_rel != "unknown"
+        && crate::modules::update_checker::compare_versions(last_rel.trim_start_matches('v'), &ver)
     {
         (
             format!("🚀 <b>Update Available:</b> <code>{}</code> (current: <code>v{}</code> — Send <code>/update</code>)", last_rel, ver),

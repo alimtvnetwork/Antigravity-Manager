@@ -5,6 +5,56 @@ use rusqlite::Connection;
 use std::fs;
 use std::path::Path;
 
+/// Strip unnecessary internal ID wrappers (e.g. 'Id: ...', 'ID: ...', '[Id: ...]')
+pub fn strip_internal_id_wrappers(raw: &str) -> String {
+    let mut text = raw.trim();
+    let mut changed = true;
+    while changed {
+        changed = false;
+        let trimmed = text.trim_start();
+
+        let lower = trimmed.to_lowercase();
+        if lower.starts_with("id:")
+            || lower.starts_with("id :")
+            || lower.starts_with("prompt_id:")
+            || lower.starts_with("prompt id:")
+            || lower.starts_with("session_id:")
+            || lower.starts_with("session id:")
+            || lower.starts_with("traceability id:")
+        {
+            if let Some(colon_pos) = trimmed.find(':') {
+                let rest = trimmed[colon_pos + 1..].trim_start();
+                if let Some(newline_pos) = rest.find('\n') {
+                    text = rest[newline_pos + 1..].trim();
+                    changed = true;
+                    continue;
+                } else {
+                    let parts: Vec<&str> = rest.splitn(2, char::is_whitespace).collect();
+                    if parts.len() == 2 && !parts[1].trim().is_empty() {
+                        text = parts[1].trim();
+                        changed = true;
+                        continue;
+                    }
+                }
+            }
+        } else if trimmed.starts_with('[') {
+            if let Some(close_bracket) = trimmed.find(']') {
+                let bracket_content = trimmed[1..close_bracket].trim().to_lowercase();
+                if bracket_content.starts_with("id:")
+                    || bracket_content.starts_with("id :")
+                    || bracket_content.starts_with("prompt_id:")
+                    || bracket_content.starts_with("ref:")
+                {
+                    text = trimmed[close_bracket + 1..].trim();
+                    changed = true;
+                    continue;
+                }
+            }
+        }
+    }
+    text.trim().to_string()
+}
+
 /// Extract clean prompt text by stripping <USER_REQUEST> / <ADDITIONAL_METADATA> tags if present
 pub fn extract_clean_user_prompt(raw: &str) -> String {
     let mut text = raw.trim();
@@ -22,7 +72,7 @@ pub fn extract_clean_user_prompt(raw: &str) -> String {
     if let Some(end) = text.find("<CONTEXT_SUMMARY>") {
         text = &text[..end];
     }
-    text.trim().to_string()
+    strip_internal_id_wrappers(text.trim())
 }
 
 /// Extract smart, readable summary of a prompt for display in CLI and Telegram.

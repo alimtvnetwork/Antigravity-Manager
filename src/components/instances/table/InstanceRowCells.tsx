@@ -280,6 +280,51 @@ interface PathCellProps {
     onCopy: () => void;
 }
 
+export interface IdeExeAndDataCellProps {
+    inst: InstanceStatus;
+    isCopied: boolean;
+    onCopy: () => void;
+}
+
+export function IdeExeAndDataCell({ inst, isCopied, onCopy }: IdeExeAndDataCellProps) {
+    const fullPath = resolveDataDir(inst);
+    const exeFull = inst.config.executable_path || '';
+    const exeName = exeFull
+        ? (exeFull.split(/[/\\]/).filter(Boolean).pop() || exeFull)
+        : (inst.config.is_default || inst.config.id === 'default' ? 'Antigravity.exe' : 'Default IDE');
+    const dataEnding = formatPathEnding(fullPath);
+
+    return (
+        <td
+            className="px-2 py-1 whitespace-nowrap min-w-[160px] max-w-[220px]"
+            title={`IDE: ${exeFull || exeName}\nData: ${fullPath}`}
+        >
+            <div className="flex items-center justify-between gap-1 text-[11px] font-mono">
+                <div className="flex flex-col min-w-0 leading-tight">
+                    <div className="flex items-center gap-1 min-w-0 text-slate-700 dark:text-slate-200 font-semibold" title={exeFull || exeName}>
+                        <Terminal className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span className="truncate">{exeName}</span>
+                    </div>
+                    <div className="flex items-center gap-1 min-w-0 text-[10px] text-slate-500 dark:text-slate-400" title={fullPath}>
+                        <Folder className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span className="truncate">{dataEnding || '—'}</span>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    onClick={onCopy}
+                    data-ui-name="copy-path-btn"
+                    data-ui-id={`copy-path-${inst.config.id}`}
+                    className="p-1 rounded-[5px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer shrink-0 ml-1"
+                    title={isCopied ? 'Copied!' : 'Copy full data path'}
+                >
+                    {isCopied ? <Check className="w-3 h-3 text-teal-500" /> : <Copy className="w-3 h-3" />}
+                </button>
+            </div>
+        </td>
+    );
+}
+
 export function PathCell({ inst, isCopied, onCopy }: PathCellProps) {
     const fullPath = resolveDataDir(inst);
     const exeFull = inst.config.executable_path || '';

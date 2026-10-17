@@ -55,11 +55,14 @@ pub fn format_prompt_history(limit: usize) -> (String, Value) {
             json!({ "inline_keyboard": [] }),
         );
     }
-    let mut text = "📜 <b>Sent Prompt History</b> — newest first, tap ↻ to re-run\n".to_string();
+    let summary_words = super::config::load_config()
+        .map(|c| c.prompt_summary_words)
+        .unwrap_or(100);
+    let mut text = "📜 <b>Sent Prompt History</b> — newest first, tap ↻ to resend\n".to_string();
     let mut keyboard: Vec<Vec<Value>> = Vec::new();
     for (index, prompt) in prompts.iter().enumerate() {
         let id8 = id_prefix(&prompt.id);
-        let preview = clean_for_telegram_html(&prompt_preview(prompt), PREVIEW_CHARS);
+        let preview = prompt_preview(prompt, summary_words);
         text.push_str(&format!(
             "\n<b>{}.</b> <code>{}</code> <i>{}</i> • <i>{}</i>\n   {}\n   <pre>{}</pre>\n",
             index + 1,
@@ -73,7 +76,7 @@ pub fn format_prompt_history(limit: usize) -> (String, Value) {
         // gets no button instead of corrupting the keyboard.
         if let Some(payload) = rerun_callback(prompt) {
             keyboard.push(vec![json!({
-                "text": format!("↻ Rerun {id8}"),
+                "text": format!("↻ Resend {id8}"),
                 "callback_data": payload,
             })]);
         }
@@ -218,17 +221,10 @@ fn rerun_callback(prompt: &ActivePrompt) -> Option<String> {
     Some(payload)
 }
 
-fn prompt_preview(prompt: &ActivePrompt) -> String {
-    // Stored `prompt_content` may be wrapped by `wrap_telegram_prompt`;
-    // unwrapping is not attempted (see the resend decision above), so the
-    // preview shows the stored bytes verbatim, first non-empty line.
-    prompt
-        .prompt_content
-        .lines()
-        .map(str::trim)
-        .find(|line| !line.is_empty())
-        .unwrap_or("(empty prompt)")
-        .to_string()
+pub(crate) fn prompt_preview(prompt: &ActivePrompt, max_words: usize) -> String {
+    let stripped = crate::modules::repo_db::strip_internal_id_wrappers(&prompt.prompt_content);
+    let clamped = super::formatting::clamp_words(&stripped, max_words);
+    clean_for_telegram_html(&clamped, 1000)
 }
 
 /// `instance → conversation/project`. (Task-02 owns IDE exe display — the
@@ -313,5 +309,15 @@ mod tests {
     #[test]
     fn format_sent_at_renders_utc() {
         assert_eq!(format_sent_at(1_760_000_000), "2025-10-09 08:53 UTC");
+    }
+
+    #[test]
+    fn prompt_preview_strips_internal_ids_and_clamps() {
+        let mut p = sample_prompt();
+        p.prompt_content =
+            "Id: sess-abc\nFirst word second word third word fourth word".to_string();
+        let preview = super::prompt_preview(&p, 3);
+        assert!(!preview.contains("Id:"));
+        assert!(preview.contains("First word second..."));
     }
 }

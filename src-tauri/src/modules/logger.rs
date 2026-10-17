@@ -403,3 +403,67 @@ pub fn log_instance_prompt_audit(
     );
     info!("{line}");
 }
+
+static FILTER_NOISY_TELEMETRY: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(true);
+
+/// Enable or disable filtering of noisy system telemetry (HEARTBEAT, TOKEN_USAGE, TELEMETRY).
+pub fn set_filter_noisy_telemetry(enabled: bool) {
+    FILTER_NOISY_TELEMETRY.store(enabled, std::sync::atomic::Ordering::SeqCst);
+}
+
+/// Check if noisy system telemetry filtering is enabled.
+pub fn is_filter_noisy_telemetry_enabled() -> bool {
+    FILTER_NOISY_TELEMETRY.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+/// Check if a log line or message represents noisy background telemetry.
+pub fn is_noisy_system_telemetry(msg: &str) -> bool {
+    let lower = msg.to_ascii_lowercase();
+    lower.contains("heartbeat")
+        || lower.contains("token_usage")
+        || lower.contains("telemetry")
+        || lower.contains("[heartbeat]")
+        || lower.contains("[token_usage]")
+        || lower.contains("[telemetry]")
+}
+
+/// Check if a log message should be filtered out from active consoles and streams.
+pub fn should_filter_log(msg: &str) -> bool {
+    if is_filter_noisy_telemetry_enabled() {
+        is_noisy_system_telemetry(msg)
+    } else {
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_noisy_system_telemetry() {
+        assert!(is_noisy_system_telemetry(
+            "Heartbeat ping received from node W1"
+        ));
+        assert!(is_noisy_system_telemetry("TOKEN_USAGE: 1250 tokens used"));
+        assert!(is_noisy_system_telemetry(
+            "[TELEMETRY] Reported 5 instances"
+        ));
+        assert!(!is_noisy_system_telemetry(
+            "Switched account to user@example.com"
+        ));
+        assert!(!is_noisy_system_telemetry("Prompt dispatched successfully"));
+    }
+
+    #[test]
+    fn test_should_filter_log() {
+        set_filter_noisy_telemetry(true);
+        assert!(should_filter_log("HEARTBEAT tick"));
+        assert!(!should_filter_log("Normal operation completed"));
+
+        set_filter_noisy_telemetry(false);
+        assert!(!should_filter_log("HEARTBEAT tick"));
+        set_filter_noisy_telemetry(true); // reset
+    }
+}

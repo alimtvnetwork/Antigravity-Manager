@@ -18,6 +18,10 @@ pub(crate) fn default_node_name_refresh_hours() -> u64 {
     24
 }
 
+pub(crate) fn default_prompt_summary_words() -> usize {
+    100
+}
+
 /// Telegram bot integration configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TelegramConfig {
@@ -33,6 +37,9 @@ pub struct TelegramConfig {
     /// Hours before a generated Node-* display name is resolved through GitMap again.
     #[serde(default = "default_node_name_refresh_hours")]
     pub node_name_refresh_hours: u64,
+    /// Word limit for previous project prompt summaries (e.g. 100 or 200).
+    #[serde(default = "default_prompt_summary_words")]
+    pub prompt_summary_words: usize,
 }
 
 impl Default for TelegramConfig {
@@ -45,6 +52,7 @@ impl Default for TelegramConfig {
             notify_on_system_update: true,
             card_palette: default_card_palette(),
             node_name_refresh_hours: default_node_name_refresh_hours(),
+            prompt_summary_words: default_prompt_summary_words(),
         }
     }
 }

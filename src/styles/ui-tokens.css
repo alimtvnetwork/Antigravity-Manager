@@ -40,25 +40,29 @@
   --ui-amber-35: rgb(245 191 88 / 0.35);           /* Active-card edge tint */
   --ui-success-glow: rgb(26 241 141 / 0.4);        /* Restrained endpoint glow */
 
-  /* ---- Quota / progress scale ---- */
+  /* ---- Quota / progress scale (5 quintiles) ---- */
   --ui-quota-track: #171025;         /* Bar track background */
   --ui-quota-track-border: #40285e; /* Bar track border */
-  --ui-quota-stop-0:   #7f1d1d; /* 0%   - Deep Crimson Dark Red */
-  --ui-quota-stop-15:  #dc2626; /* 15%  - Crimson Red */
-  --ui-quota-stop-35:  #ea580c; /* 35%  - Warm Orange */
-  --ui-quota-stop-55:  #eab308; /* 55%  - Warm Golden Yellow */
-  --ui-quota-stop-75:  #10b981; /* 75%  - Mint Emerald */
-  --ui-quota-stop-100: #1af18d; /* 100% - Vibrant Terminal Neon Green */
+  --ui-quota-stop-0:   #ef4444; /* 0-20%   - Red */
+  --ui-quota-stop-20:  #f97316; /* 20-40%  - Orange */
+  --ui-quota-stop-40:  #eab308; /* 40-60%  - Amber */
+  --ui-quota-stop-60:  #10b981; /* 60-80%  - Lime/Green */
+  --ui-quota-stop-80:  #1af18d; /* 80-100% - Cyan/Emerald Neon */
+  --ui-quota-stop-100: #1af18d;
 
-  /* Continuous 6-stop spatial scale. Rendered full-width on the track and
+  /* Continuous 5-quintile multi-segment spatial scale. Rendered full-width on the track and
      revealed by the current percentage — NEVER stretched into a partial fill. */
   --ui-quota-gradient: linear-gradient(
     90deg,
-    #7f1d1d 0%,
-    #dc2626 15%,
-    #ea580c 35%,
-    #eab308 55%,
-    #10b981 75%,
+    #ef4444 0%,
+    #ef4444 20%,
+    #f97316 20%,
+    #f97316 40%,
+    #eab308 40%,
+    #eab308 60%,
+    #10b981 60%,
+    #10b981 80%,
+    #1af18d 80%,
     #1af18d 100%
   );
 }
