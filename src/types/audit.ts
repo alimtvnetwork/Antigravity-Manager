@@ -1,9 +1,18 @@
+/**
+ * Canonical task execution status emitted by the task history database.
+ * - 'queued': Task is scheduled and awaiting execution slot.
+ * - 'running': Task is actively executing.
+ * - 'ok': Task finished successfully.
+ * - 'fail': Task terminated with an error or unhandled panic.
+ */
+export type AuditTaskStatus = 'queued' | 'running' | 'ok' | 'fail';
+
 export interface TaskRecord {
     id: string;
     action_code: number;
     action: string;
     action_label: string;
-    status: string;
+    status: AuditTaskStatus;
     subject: string;
     detail: string;
     instance_id: string;
@@ -117,7 +126,7 @@ export interface InstanceSwitchRecord {
     to_email: string;
     created_at: number;
     finished_at?: number | null;
-    status: string;
+    status: AuditTaskStatus | string;
     switch_reason: string;
     how: string;
     steps?: SwitchAuditSteps;
@@ -128,5 +137,15 @@ export interface InstanceSwitchHistoryResponse {
     instance_id: string;
     total_switches: number;
     recent_switches: InstanceSwitchRecord[];
+}
+
+/** Check if a task status represents a completed terminal state. */
+export function isTaskTerminal(status: AuditTaskStatus | string): boolean {
+    return status === 'ok' || status === 'fail';
+}
+
+/** Check if a task status represents an in-flight active state. */
+export function isTaskInFlight(status: AuditTaskStatus | string): boolean {
+    return status === 'queued' || status === 'running';
 }
 

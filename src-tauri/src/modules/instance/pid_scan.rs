@@ -145,6 +145,51 @@ fn get_windows_8_3_short_path(_path: &str) -> Option<String> {
     None
 }
 
+/// Verify whether binary path or executable name matches Antigravity IDE indicators
+fn has_ide_markers(exe: &str, name: &str) -> bool {
+    let exe_path = Path::new(exe);
+    if let Some(parent) = exe_path.parent() {
+        parent.join("resources").join("app.asar").exists()
+            || parent
+                .join("resources")
+                .join("bin")
+                .join("language_server.exe")
+                .exists()
+            || parent
+                .join("resources")
+                .join("bin")
+                .join("language_server")
+                .exists()
+            || exe.ends_with("antigravity.exe")
+            || exe.ends_with("/antigravity")
+            || name == "antigravity.exe"
+            || name == "antigravity"
+    } else {
+        name == "antigravity.exe" || name == "antigravity"
+    }
+}
+
+/// Climb parent PID chain up to max_depth levels to check membership in target_set
+fn has_ancestor_in(
+    start_pid: u32,
+    parent_map: &HashMap<u32, u32>,
+    target_set: &std::collections::HashSet<u32>,
+    max_depth: usize,
+) -> bool {
+    let mut curr = start_pid;
+    for _ in 0..max_depth {
+        if target_set.contains(&curr) {
+            return true;
+        }
+        if let Some(&parent) = parent_map.get(&curr) {
+            curr = parent;
+        } else {
+            break;
+        }
+    }
+    false
+}
+
 /// Inspect running Antigravity processes matching an instance data_dir
 pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
     let processes = get_cached_antigravity_processes();
@@ -242,27 +287,7 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
                 matched_pids.push(pid_u32);
             }
         } else if is_default_candidate {
-            let exe_path = std::path::Path::new(exe);
-            let has_ide_markers = if let Some(parent) = exe_path.parent() {
-                parent.join("resources").join("app.asar").exists()
-                    || parent
-                        .join("resources")
-                        .join("bin")
-                        .join("language_server.exe")
-                        .exists()
-                    || parent
-                        .join("resources")
-                        .join("bin")
-                        .join("language_server")
-                        .exists()
-                    || exe.ends_with("antigravity.exe")
-                    || exe.ends_with("/antigravity")
-                    || name == "antigravity.exe"
-                    || name == "antigravity"
-            } else {
-                name == "antigravity.exe" || name == "antigravity"
-            };
-            if has_ide_markers {
+            if has_ide_markers(exe, name) {
                 default_candidate_pids.push(pid_u32);
             }
         }
@@ -271,20 +296,7 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
     if is_default {
         // Only accept processes whose ancestors do NOT belong to any instance process
         for cand_pid in default_candidate_pids {
-            let mut curr = cand_pid;
-            let mut is_instance_descendant = false;
-            for _ in 0..10 {
-                if instance_root_pids.contains(&curr) {
-                    is_instance_descendant = true;
-                    break;
-                }
-                if let Some(&p) = parent_map.get(&curr) {
-                    curr = p;
-                } else {
-                    break;
-                }
-            }
-            if !is_instance_descendant {
+            if !has_ancestor_in(cand_pid, &parent_map, &instance_root_pids, 10) {
                 matched_pids.push(cand_pid);
             }
         }
@@ -297,18 +309,10 @@ pub fn find_pids_for_data_dir(data_dir: &str, is_default: bool) -> Vec<u32> {
             if matched_set.contains(&pid_u32) {
                 continue;
             }
-            let mut curr = pid_u32;
-            for _ in 0..10 {
-                if let Some(&p) = parent_map.get(&curr) {
-                    // Strictly match ancestors belonging to this specific instance
-                    if matched_set.contains(&p) {
-                        matched_pids.push(pid_u32);
-                        matched_set.insert(pid_u32);
-                        break;
-                    }
-                    curr = p;
-                } else {
-                    break;
+            if let Some(&parent) = parent_map.get(&pid_u32) {
+                if has_ancestor_in(parent, &parent_map, &matched_set, 10) {
+                    matched_pids.push(pid_u32);
+                    matched_set.insert(pid_u32);
                 }
             }
         }

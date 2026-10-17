@@ -50,78 +50,90 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
     let mut projects = Vec::new();
     let now = Utc::now().timestamp();
 
-    if storage_dir.exists() {
-        if let Ok(entries) = fs::read_dir(&storage_dir) {
-            for entry in entries.flatten() {
-                let ws_folder = entry.path();
-                if ws_folder.is_dir() {
-                    let ws_json_path = ws_folder.join("workspace.json");
-                    if ws_json_path.exists() {
-                        if let Ok(content) = fs::read_to_string(&ws_json_path) {
-                            if let Ok(json_val) =
-                                serde_json::from_str::<serde_json::Value>(&content)
-                            {
-                                let folder_uri =
-                                    json_val.get("folder").and_then(|v| v.as_str()).or_else(|| {
-                                        json_val.get("configuration").and_then(|v| v.as_str())
-                                    });
+    // If storage dir does not exist, return empty project list early
+    if !storage_dir.exists() {
+        invalidate_prompt_tree_cache(Some(target_id));
+        return Ok(projects);
+    }
 
-                                if let Some(uri) = folder_uri {
-                                    let raw_path = decode_uri_to_path(uri);
-                                    let project_path = Path::new(&raw_path);
-                                    let repo_name = project_path
-                                        .file_name()
-                                        .map(|n| n.to_string_lossy().to_string())
-                                        .unwrap_or_else(|| "unnamed-project".to_string());
+    let Ok(entries) = fs::read_dir(&storage_dir) else {
+        invalidate_prompt_tree_cache(Some(target_id));
+        return Ok(projects);
+    };
 
-                                    let base_project_id = format!(
-                                        "{}-{}",
-                                        repo_name.to_lowercase(),
-                                        entry.file_name().to_string_lossy()
-                                    );
-                                    let composite_id =
-                                        format!("{}__{}", base_project_id, target_id);
-
-                                    let is_project_active = is_instance_active
-                                        && is_prompt_running_for_project(&raw_path, target_id);
-
-                                    let pid_opt = pids.first().copied();
-                                    crate::modules::logger::log_instance_prompt_audit(
-                                        target_id,
-                                        &instance.name,
-                                        &repo_name,
-                                        &raw_path,
-                                        &ws_folder.to_string_lossy(),
-                                        pid_opt,
-                                        "WorkspaceStorageScan + ProcessLiveness",
-                                        is_project_active,
-                                        if is_project_active {
-                                            "ACTIVE_IN_FLIGHT_TASKS"
-                                        } else if !is_instance_active {
-                                            "INSTANCE_PROCESS_DEAD"
-                                        } else {
-                                            "IDLE_NO_ACTIVE_TASKS"
-                                        },
-                                    );
-
-                                    projects.push(RunningProject {
-                                        id: composite_id,
-                                        instance_id: target_id.to_string(),
-                                        repo_name,
-                                        repo_path: raw_path,
-                                        workspace_storage_path: Some(
-                                            ws_folder.to_string_lossy().to_string(),
-                                        ),
-                                        is_running: is_project_active,
-                                        last_detected_at: now,
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+    for entry in entries.flatten() {
+        let ws_folder = entry.path();
+        if !ws_folder.is_dir() {
+            continue;
         }
+
+        let ws_json_path = ws_folder.join("workspace.json");
+        if !ws_json_path.exists() {
+            continue;
+        }
+
+        let Ok(content) = fs::read_to_string(&ws_json_path) else {
+            continue;
+        };
+
+        let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&content) else {
+            continue;
+        };
+
+        let folder_uri = json_val
+            .get("folder")
+            .and_then(|v| v.as_str())
+            .or_else(|| json_val.get("configuration").and_then(|v| v.as_str()));
+
+        let Some(uri) = folder_uri else {
+            continue;
+        };
+
+        let raw_path = decode_uri_to_path(uri);
+        let project_path = Path::new(&raw_path);
+        let repo_name = project_path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "unnamed-project".to_string());
+
+        let base_project_id = format!(
+            "{}-{}",
+            repo_name.to_lowercase(),
+            entry.file_name().to_string_lossy()
+        );
+        let composite_id = format!("{}__{}", base_project_id, target_id);
+
+        let is_project_active =
+            is_instance_active && is_prompt_running_for_project(&raw_path, target_id);
+
+        let pid_opt = pids.first().copied();
+        crate::modules::logger::log_instance_prompt_audit(
+            target_id,
+            &instance.name,
+            &repo_name,
+            &raw_path,
+            &ws_folder.to_string_lossy(),
+            pid_opt,
+            "WorkspaceStorageScan + ProcessLiveness",
+            is_project_active,
+            if is_project_active {
+                "ACTIVE_IN_FLIGHT_TASKS"
+            } else if !is_instance_active {
+                "INSTANCE_PROCESS_DEAD"
+            } else {
+                "IDLE_NO_ACTIVE_TASKS"
+            },
+        );
+
+        projects.push(RunningProject {
+            id: composite_id,
+            instance_id: target_id.to_string(),
+            repo_name,
+            repo_path: raw_path,
+            workspace_storage_path: Some(ws_folder.to_string_lossy().to_string()),
+            is_running: is_project_active,
+            last_detected_at: now,
+        });
     }
 
     // Persist discovered projects into repo database safely without wiping fallback entries

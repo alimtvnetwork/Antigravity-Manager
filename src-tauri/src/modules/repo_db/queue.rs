@@ -398,6 +398,12 @@ mod tests {
         assert!(init_tables(&conn).is_ok());
 
         conn.execute(
+            "INSERT INTO running_projects (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+             VALUES ('test-proj', 'default', 'test-repo', '/test/repo', NULL, 1, 100, 100)",
+            [],
+        ).unwrap();
+
+        conn.execute(
             "INSERT INTO active_prompts (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
              VALUES ('p-t1', 'test-proj', 'default', '/test/repo', 'First prompt', 'gemini-2.5-pro', NULL, 'queued', 100, 100, NULL),
                     ('p-t2', 'test-proj', 'default', '/test/repo', 'Second prompt', 'gemini-2.5-pro', NULL, 'queued', 200, 200, NULL),

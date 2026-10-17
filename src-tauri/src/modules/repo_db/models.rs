@@ -1,6 +1,78 @@
 //! Repo DB: models
 
 use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::str::FromStr;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ActivePromptStatus {
+    Running,
+    BackedUp,
+    Dispatched,
+    Queued,
+    Pending,
+    Completed,
+}
+
+impl ActivePromptStatus {
+    /// Return the canonical database string representation.
+    #[inline]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Running => "running",
+            Self::BackedUp => "backed_up",
+            Self::Dispatched => "dispatched",
+            Self::Queued => "queued",
+            Self::Pending => "pending",
+            Self::Completed => "completed",
+        }
+    }
+
+    /// Check if the prompt is actively executing or dispatched.
+    #[inline]
+    pub const fn is_active(&self) -> bool {
+        matches!(self, Self::Running | Self::Dispatched)
+    }
+
+    /// Check if the prompt is waiting in the dispatch queue.
+    #[inline]
+    pub const fn is_queued_or_pending(&self) -> bool {
+        matches!(self, Self::Queued | Self::Pending)
+    }
+
+    /// Check if the prompt reached terminal completion.
+    #[inline]
+    pub const fn is_terminal(&self) -> bool {
+        matches!(self, Self::Completed)
+    }
+}
+
+impl fmt::Display for ActivePromptStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl FromStr for ActivePromptStatus {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "running" => Ok(Self::Running),
+            "backed_up" | "backedup" => Ok(Self::BackedUp),
+            "dispatched" | "in_flight" => Ok(Self::Dispatched),
+            "queued" => Ok(Self::Queued),
+            "pending" => Ok(Self::Pending),
+            "completed" | "done" => Ok(Self::Completed),
+            other => Err(format!("Unknown ActivePromptStatus: '{other}'")),
+        }
+    }
+}
+
+/// Common status subsets for SQL queries across repo_db
+pub const ACTIVE_PROMPT_IN_FLIGHT_STATUSES: &[&str] = &["running", "in_flight", "dispatched"];
+pub const ACTIVE_PROMPT_QUEUED_STATUSES: &[&str] = &["queued", "pending"];
 
 /// Represents an active or running project workspace
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,6 +114,12 @@ pub struct ActivePrompt {
     pub updated_at: i64,
     #[serde(default)]
     pub image_payload: Option<String>,
+}
+
+impl ActivePrompt {
+    pub fn prompt_status(&self) -> Result<ActivePromptStatus, String> {
+        self.status.parse()
+    }
 }
 
 /// Metadata for an auto-resumed prompt
@@ -217,6 +295,9 @@ pub struct AgmProjectTreeNode {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repeat_badge: Option<String>,
 }
+
+pub type ProjectConversationItem = AgmProjectTreeNode;
+pub type ConversationItem = AgmConversationNode;
 
 /// Resolved target from an AGM or GitMap Sequence ID (`P001`, `AGM:P001`, `GM:#1`, `C001`, `AGM:C001`, `GM:<cid>`, or conversation UUID prefix)
 #[derive(Debug, Clone, Serialize, Deserialize)]

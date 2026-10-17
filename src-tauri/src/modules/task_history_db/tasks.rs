@@ -15,9 +15,36 @@ pub fn record(
 ) {
     match enqueue(action, subject, status, instance_id) {
         Ok(id) => {
-            if status != "queued" && status != "running" {
+            let is_terminal = status
+                .parse::<AuditTaskStatus>()
+                .map(|s| s.is_terminal())
+                .unwrap_or_else(|_| !matches!(status, "queued" | "running"));
+            if is_terminal {
                 // Justification: best-effort call; failure logged without changing control flow
                 crate::error::record_ignored(complete(&id, status, detail, None), "complete");
+            }
+        }
+        Err(err) => {
+            crate::modules::logger::log_warn(&format!("[History] record failed: {}", err));
+        }
+    }
+}
+
+pub fn record_task(
+    action: AuditAction,
+    subject: &str,
+    status: AuditTaskStatus,
+    detail: &str,
+    instance_id: Option<&str>,
+) {
+    match enqueue(action, subject, status.as_str(), instance_id) {
+        Ok(id) => {
+            if status.is_terminal() {
+                // Justification: best-effort call; failure logged without changing control flow
+                crate::error::record_ignored(
+                    complete(&id, status.as_str(), detail, None),
+                    "complete",
+                );
             }
         }
         Err(err) => {

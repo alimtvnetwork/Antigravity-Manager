@@ -1,7 +1,41 @@
 use crate::modules::logger;
+use std::fmt;
 
 use super::telegram_alerts::dispatch_telegram_switch_alert;
 use super::*;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum NotificationChannelType {
+    Email,
+    Telegram,
+    Supabase,
+}
+
+impl NotificationChannelType {
+    #[inline]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Email => "email",
+            Self::Telegram => "telegram",
+            Self::Supabase => "supabase",
+        }
+    }
+
+    #[inline]
+    pub const fn display_name(&self) -> &'static str {
+        match self {
+            Self::Email => "Email Alert",
+            Self::Telegram => "Telegram Bot",
+            Self::Supabase => "Supabase Fleet Sync",
+        }
+    }
+}
+
+impl fmt::Display for NotificationChannelType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
 
 pub const DUP_SWITCH_SUPPRESSION_SECS: i64 = 30;
 
@@ -157,7 +191,11 @@ pub(crate) fn redact_secrets(text: &str) -> String {
     out
 }
 
-pub(crate) fn record_channel(name: &str, result: Result<String, String>) -> String {
+pub(crate) fn record_channel(
+    channel: NotificationChannelType,
+    result: Result<String, String>,
+) -> String {
+    let name = channel.as_str();
     match result {
         Ok(msg) => {
             let line = format!("[Notify] {}: OK {}", name, msg);
@@ -181,11 +219,17 @@ pub(crate) fn record_channel(name: &str, result: Result<String, String>) -> Stri
 }
 
 async fn deliver_switch_channels(details: &SwitchNotificationDetails) -> String {
-    let email = record_channel("email", dispatch_email_switch_alert(details));
+    let email = record_channel(
+        NotificationChannelType::Email,
+        dispatch_email_switch_alert(details),
+    );
     dispatch_self_json_in_use_broadcast(details);
-    let telegram = record_channel("telegram", dispatch_telegram_switch_alert(details).await);
+    let telegram = record_channel(
+        NotificationChannelType::Telegram,
+        dispatch_telegram_switch_alert(details).await,
+    );
     let supabase = record_channel(
-        "supabase",
+        NotificationChannelType::Supabase,
         crate::modules::supabase_sync::push_and_read_instance_email(&details.instance_id)
             .await
             .map_err(|err| redact_secrets(&err.to_string())),

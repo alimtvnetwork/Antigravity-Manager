@@ -359,6 +359,38 @@ pub fn stop_prompt_goal_workers_for_instance(instance_id: &str, data_dir: &str) 
     stopped
 }
 
+/// Check heartbeat timestamp freshness and read the last non-empty line
+fn check_heartbeat_freshness(
+    file_path: &str,
+    interval_secs: u64,
+    now: i64,
+) -> (bool, Option<String>) {
+    let hb_p = Path::new(file_path);
+    if !hb_p.exists() {
+        return (false, None);
+    }
+
+    let is_fresh = fs::metadata(hb_p)
+        .ok()
+        .and_then(|meta| meta.modified().ok())
+        .map(|modified| {
+            let dt: chrono::DateTime<Utc> = modified.into();
+            let age = now - dt.timestamp();
+            age <= (interval_secs as i64 + 4)
+        })
+        .unwrap_or(false);
+
+    let last_line = fs::read_to_string(hb_p).ok().and_then(|content| {
+        content
+            .lines()
+            .rev()
+            .find(|l| !l.trim().is_empty())
+            .map(|s| s.to_string())
+    });
+
+    (is_fresh, last_line)
+}
+
 /// Inspect prompt goal status across workspaces for an instance
 pub fn inspect_prompt_goal_status(
     _instance_id: &str,
@@ -368,34 +400,18 @@ pub fn inspect_prompt_goal_status(
     for ws in workspaces {
         let ws_p = Path::new(ws);
         let cfg_p = ws_p.join(".antigravity_goal_heartbeat.json");
-        if cfg_p.exists() {
-            if let Ok(c) = fs::read_to_string(&cfg_p) {
-                if let Ok(cfg) = serde_json::from_str::<PromptGoalHeartbeatConfig>(&c) {
-                    let hb_p = Path::new(&cfg.heartbeat_file);
-                    let mut is_fresh = false;
-                    let mut last_line = None;
-                    if hb_p.exists() {
-                        if let Ok(meta) = fs::metadata(hb_p) {
-                            if let Ok(modified) = meta.modified() {
-                                let dt: chrono::DateTime<Utc> = modified.into();
-                                let age = now - dt.timestamp();
-                                if age <= (cfg.interval_secs as i64 + 4) {
-                                    is_fresh = true;
-                                }
-                            }
-                        }
-                        if let Ok(content) = fs::read_to_string(hb_p) {
-                            last_line = content
-                                .lines()
-                                .rev()
-                                .find(|l| !l.trim().is_empty())
-                                .map(|s| s.to_string());
-                        }
-                    }
-                    return (is_fresh, Some(cfg.heartbeat_file), last_line);
-                }
-            }
+        if !cfg_p.exists() {
+            continue;
         }
+        let Ok(c) = fs::read_to_string(&cfg_p) else {
+            continue;
+        };
+        let Ok(cfg) = serde_json::from_str::<PromptGoalHeartbeatConfig>(&c) else {
+            continue;
+        };
+        let (is_fresh, last_line) =
+            check_heartbeat_freshness(&cfg.heartbeat_file, cfg.interval_secs, now);
+        return (is_fresh, Some(cfg.heartbeat_file), last_line);
     }
     (false, None, None)
 }
@@ -417,42 +433,32 @@ pub fn ensure_prompt_goals_running_for_instance(instance_id: &str) -> usize {
     for ws in &workspaces {
         let ws_p = Path::new(ws);
         let cfg_p = ws_p.join(".antigravity_goal_heartbeat.json");
-        if cfg_p.exists() {
-            if let Ok(c) = fs::read_to_string(&cfg_p) {
-                if let Ok(cfg) = serde_json::from_str::<PromptGoalHeartbeatConfig>(&c) {
-                    let hb_p = Path::new(&cfg.heartbeat_file);
-                    let mut is_alive = false;
-                    if hb_p.exists() {
-                        if let Ok(meta) = fs::metadata(hb_p) {
-                            if let Ok(mod_time) = meta.modified() {
-                                let dt: chrono::DateTime<Utc> = mod_time.into();
-                                if (now - dt.timestamp()) <= (cfg.interval_secs as i64 + 4) {
-                                    is_alive = true;
-                                }
-                            }
-                        }
-                    }
-                    if !is_alive {
-                        crate::modules::logger::log_info(&format!(
-                            "[PromptGoal] Prompt goal heartbeat stopped in '{}', auto-reinvoking for instance '{}'...",
-                            ws, instance_id
-                        ));
-                        if let Ok(registry) = crate::modules::instance::load_registry() {
-                            if let Some(inst) =
-                                registry.instances.iter().find(|i| i.id == instance_id)
-                            {
-                                if let Ok(_) = start_prompt_goal_heartbeat(
-                                    instance_id,
-                                    &inst.data_dir,
-                                    ws,
-                                    &cfg.heartbeat_file,
-                                    &cfg.prompt_content,
-                                    cfg.interval_secs,
-                                ) {
-                                    reinvoked += 1;
-                                }
-                            }
-                        }
+        if !cfg_p.exists() {
+            continue;
+        }
+        let Ok(c) = fs::read_to_string(&cfg_p) else {
+            continue;
+        };
+        let Ok(cfg) = serde_json::from_str::<PromptGoalHeartbeatConfig>(&c) else {
+            continue;
+        };
+        let (is_alive, _) = check_heartbeat_freshness(&cfg.heartbeat_file, cfg.interval_secs, now);
+        if !is_alive {
+            crate::modules::logger::log_info(&format!(
+                "[PromptGoal] Prompt goal heartbeat stopped in '{}', auto-reinvoking for instance '{}'...",
+                ws, instance_id
+            ));
+            if let Ok(registry) = crate::modules::instance::load_registry() {
+                if let Some(inst) = registry.instances.iter().find(|i| i.id == instance_id) {
+                    if let Ok(_) = start_prompt_goal_heartbeat(
+                        instance_id,
+                        &inst.data_dir,
+                        ws,
+                        &cfg.heartbeat_file,
+                        &cfg.prompt_content,
+                        cfg.interval_secs,
+                    ) {
+                        reinvoked += 1;
                     }
                 }
             }
