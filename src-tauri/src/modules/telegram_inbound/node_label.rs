@@ -35,26 +35,14 @@ pub fn is_current_machine(alias: &str) -> bool {
         return true;
     }
 
-    let fleet = super::open_shot::local_machine_label();
-    if !fleet.is_empty() && target.eq_ignore_ascii_case(fleet.trim()) {
-        return true;
-    }
-
     let detected = crate::modules::email_watcher::detect_machine_name();
     if !detected.is_empty() && target.eq_ignore_ascii_case(detected.trim()) {
         return true;
     }
 
-    let cluster_nodes = super::cluster::query_gitmap_cluster_nodes();
-    let my_cluster_alias = cluster_nodes
-        .iter()
-        .find(|n| !local_ip.is_empty() && n.ip_address.trim() == local_ip.trim())
-        .map(|n| n.alias.clone());
-
-    if let Some(ref my_alias) = my_cluster_alias {
-        if target.eq_ignore_ascii_case(my_alias) {
-            return true;
-        }
+    let fleet = super::open_shot::local_machine_label();
+    if !fleet.is_empty() && target.eq_ignore_ascii_case(fleet.trim()) {
+        return true;
     }
 
     if let Some((t_alias, t_ip)) = target.split_once('|') {
@@ -63,38 +51,42 @@ pub fn is_current_machine(alias: &str) -> bool {
         }
     }
 
-    // If target matches a remote cluster node's alias or IP, it is explicitly NOT this machine!
-    for node in &cluster_nodes {
-        let is_target = node.alias.eq_ignore_ascii_case(target) || node.ip_address.trim() == target;
-        if is_target {
-            let is_this_machine = (!local_ip.is_empty()
-                && node.ip_address.trim() == local_ip.trim())
-                || my_cluster_alias
-                    .as_deref()
-                    .map(|a| a.eq_ignore_ascii_case(&node.alias))
-                    .unwrap_or(false)
-                || (!fleet.is_empty() && node.alias.eq_ignore_ascii_case(fleet.trim()))
-                || (!detected.is_empty() && node.alias.eq_ignore_ascii_case(detected.trim()));
-            return is_this_machine;
+    let cluster_nodes = super::cluster::query_gitmap_cluster_nodes();
+    let my_cluster_node = cluster_nodes
+        .iter()
+        .find(|n| !local_ip.is_empty() && n.ip_address.trim() == local_ip.trim());
+
+    if let Some(my_node) = my_cluster_node {
+        if target.eq_ignore_ascii_case(&my_node.alias) {
+            return true;
         }
     }
 
     false
 }
 
-/// Button label: includes alias and IP for complete clarity.
+/// Button label: includes alias, IP, and signal for complete multi-machine clarity.
 pub fn machine_button_text(alias: &str) -> String {
-    let (node_alias, ip, _) = super::cluster::resolve_node_network_info(alias);
+    let (node_alias, ip, signal) = super::cluster::resolve_node_network_info(alias);
+    let signal_short = if signal.contains("Direct") || signal.contains("100%") {
+        "100%"
+    } else if signal.contains("98%") || signal.contains("Online") || signal.contains("Mesh") {
+        "98%"
+    } else if signal.contains("Offline") || signal.contains("0%") {
+        "0%"
+    } else {
+        "Active"
+    };
     if is_current_machine(alias) {
         if ip != "Unknown IP" && !ip.is_empty() {
-            format!("This machine ({node_alias} \u{2022} {ip})")
+            format!("This machine ({node_alias} \u{2022} {ip} \u{2022} \u{1F4F6} {signal_short})")
         } else {
-            format!("This machine ({node_alias})")
+            format!("This machine ({node_alias} \u{2022} \u{1F4F6} {signal_short})")
         }
     } else if ip != "Unknown IP" && !ip.is_empty() {
-        format!("{node_alias} ({ip})")
+        format!("{node_alias} ({ip} \u{2022} \u{1F4F6} {signal_short})")
     } else {
-        display_name_for(alias)
+        format!("{node_alias} (\u{1F4F6} {signal_short})")
     }
 }
 
@@ -102,7 +94,7 @@ pub fn machine_button_text(alias: &str) -> String {
 pub fn machine_header_html(alias: &str) -> String {
     let is_current = is_current_machine(alias);
     let (node_alias, ip, signal) = super::cluster::resolve_node_network_info(alias);
-    let signal_label = if signal.starts_with("Signal:") || signal.starts_with("📶") {
+    let signal_label = if signal.starts_with("Signal:") || signal.starts_with("\u{1F4F6}") {
         signal
     } else {
         format!("Signal: {signal}")

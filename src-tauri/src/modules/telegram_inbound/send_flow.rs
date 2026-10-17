@@ -166,12 +166,20 @@ fn path_ending(path: &str) -> String {
         .to_string()
 }
 
-fn format_instance_choice(index: usize, inst: &PickerInstance) -> String {
+fn format_instance_choice(index: usize, inst: &PickerInstance, machine: &str, ip: &str) -> String {
+    let host_tag = if !ip.is_empty() && ip != "Unknown IP" {
+        format!(" \u{2022} <i>{machine} [{ip}]</i>")
+    } else if !machine.is_empty() {
+        format!(" \u{2022} <i>{machine}</i>")
+    } else {
+        String::new()
+    };
     let mut line = format!(
-        "{}. 🏷️ <b>{}</b> (<code>{}</code>)\n",
+        "{}. 🏷️ <b>{}</b> (<code>{}</code>){}\n",
         index + 1,
         clean_for_telegram_html(&inst.name, 48),
-        clean_for_telegram_html(&inst.id, 48)
+        clean_for_telegram_html(&inst.id, 48),
+        host_tag
     );
     if !inst.exe_ending.is_empty() {
         line.push_str(&format!(
@@ -266,18 +274,24 @@ pub fn send_entry_markup() -> Value {
 }
 
 fn instance_picker_markup(machine: &str, instances: &[PickerInstance]) -> Value {
+    let (node_alias, ip, _) = super::cluster::resolve_node_network_info(machine);
     let mut rows: Vec<Value> = Vec::new();
     let buttons: Vec<Value> = instances
         .iter()
         .filter(|inst| callback_fits(&format!("send:i:{machine}|{}", inst.id)))
         .map(|inst| {
+            let label = if !ip.is_empty() && ip != "Unknown IP" {
+                format!("🏷️ {} ({} \u{2022} {})", inst.name, node_alias, ip)
+            } else {
+                format!("🏷️ {} ({})", inst.name, node_alias)
+            };
             json!({
-                "text": format!("🏷️ {}", inst.name),
+                "text": label,
                 "callback_data": format!("send:i:{machine}|{}", inst.id),
             })
         })
         .collect();
-    push_buttons(&mut rows, buttons, 2);
+    push_buttons(&mut rows, buttons, 1);
     rows.push(json!([{ "text": "🧹 Cancel", "callback_data": "send:cancel" }]));
     json!({ "inline_keyboard": rows })
 }
@@ -463,34 +477,52 @@ pub fn start_send_flow(rest: &str) -> String {
 }
 
 fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
-    // Collision shielding guard: if this node is NOT the picked target, check if it's another known node in the cluster.
-    // If it is another node, that node's daemon will handle it, so this node must remain silent.
+    // 1. Collision shielding guard: only the target machine responds to send:m:<alias>!
     let is_current = super::node_label::is_current_machine(alias);
     if !is_current {
-        let cluster_nodes = super::cluster::query_gitmap_cluster_nodes();
-        let is_known_cluster_node = cluster_nodes
-            .iter()
-            .any(|n| n.alias.eq_ignore_ascii_case(alias) || n.ip_address.trim() == alias);
-        if is_known_cluster_node {
-            tracing::info!(
-                "Dropping send:m:{} callback on node {} — targeted for different machine",
-                alias,
-                local_machine_label()
-            );
-            return (String::new(), None);
+        tracing::info!(
+            "Dropping send:m:{} callback on node {} — targeted for different machine",
+            alias,
+            local_machine_label()
+        );
+        return (String::new(), None);
+    }
+
+    // 2. Debounce guard: if chat already has a fresh Step 2 flow for this machine (<3s), suppress duplicate message.
+    if let Ok(flows) = SEND_FLOWS.lock() {
+        if let Some(existing) = flows.get(&chat_id) {
+            let is_same_machine = existing.machine.eq_ignore_ascii_case(alias)
+                || (super::node_label::is_current_machine(alias)
+                    && super::node_label::is_current_machine(&existing.machine));
+            if existing.stage == SendStage::PickInstance
+                && is_same_machine
+                && now_secs().saturating_sub(existing.updated_at) < 3
+            {
+                tracing::info!(
+                    "Suppressing duplicate send:m:{} callback within debounce window for chat {}",
+                    alias,
+                    chat_id
+                );
+                return (String::new(), None);
+            }
         }
     }
 
-    let canonical = match machine_entries()
-        .into_iter()
-        .find(|e| e.eq_ignore_ascii_case(alias))
-    {
+    let canonical = match machine_entries().into_iter().find(|e| {
+        e.eq_ignore_ascii_case(alias)
+            || (alias.eq_ignore_ascii_case("local") && super::node_label::is_current_machine(e))
+            || (alias.eq_ignore_ascii_case("localhost") && super::node_label::is_current_machine(e))
+    }) {
         Some(e) => e,
         None => {
-            return (
-                "That machine isn't available. Send /send to pick again.".to_string(),
-                None,
-            )
+            if super::node_label::is_current_machine(alias) {
+                local_machine_label()
+            } else {
+                return (
+                    "That machine isn't available. Send /send to pick again.".to_string(),
+                    None,
+                );
+            }
         }
     };
     if let Ok(mut flows) = SEND_FLOWS.lock() {
@@ -507,15 +539,32 @@ fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
         );
     }
     let instances = instance_entries();
+    let (node_alias, ip, signal) = super::cluster::resolve_node_network_info(&canonical);
+    let signal_clean = if signal.starts_with("📶") {
+        signal.clone()
+    } else {
+        format!("📶 {signal}")
+    };
+
     let mut out = format!(
-        "Where should your prompt go? (Step 2 of 3 — pick the instance on {})\n\
-        ━━━━━━━━━━━━━━━━━━━━━━━━\n",
-        super::node_label::machine_header_html(&canonical)
+        "🎯 <b>Where should your prompt go? (Step 2 of 3 — pick the instance)</b>\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        📡 <b>Target Machine:</b> {}\n\
+        • <b>Machine Alias:</b> <code>{}</code>\n\
+        • <b>IP Address:</b> <code>{}</code>\n\
+        • <b>Signal Status:</b> {}\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        Instances available on <b>{}</b>:\n",
+        super::node_label::machine_header_html(&canonical),
+        clean_for_telegram_html(&node_alias, 48),
+        clean_for_telegram_html(&ip, 48),
+        clean_for_telegram_html(&signal_clean, 48),
+        clean_for_telegram_html(&node_alias, 48),
     );
     for (idx, inst) in instances.iter().enumerate() {
-        out.push_str(&format_instance_choice(idx, inst));
+        out.push_str(&format_instance_choice(idx, inst, &node_alias, &ip));
     }
-    out.push_str("\nTap an instance below.");
+    out.push_str("\nTap an instance below to continue.");
     (out, Some(instance_picker_markup(&canonical, &instances)))
 }
 
@@ -1401,11 +1450,12 @@ mod tests {
             exe_ending: "Antigravity.exe".to_string(),
             data_ending: "default-copy-5597".to_string(),
         };
-        let text = format_instance_choice(1, &inst);
+        let text = format_instance_choice(1, &inst, "w1", "192.168.1.3");
         assert!(text.contains("IDE exe"));
         assert!(text.contains("Antigravity.exe"));
         assert!(text.contains("IDE data"));
         assert!(text.contains("default-copy-5597"));
+        assert!(text.contains("w1 [192.168.1.3]"));
         assert!(!text.contains(":\\"));
         assert!(!text.contains("/home/"));
     }
@@ -1443,5 +1493,53 @@ mod tests {
                 || oversized_reply.contains("expired")
                 || oversized_reply.contains("isn't recognized")
         );
+    }
+
+    #[test]
+    fn test_step2_machine_shielding_and_signal_details() {
+        let _lock = TEST_FLOW_MUTEX.lock().unwrap();
+        let chat_id: i64 = -9_001_350;
+
+        // 1. Non-local machine callback must be dropped cleanly without replying
+        let (dropped_reply, dropped_markup) =
+            on_machine_picked(chat_id, "definitely-not-this-machine");
+        assert!(
+            dropped_reply.is_empty(),
+            "non-local callback must drop reply"
+        );
+        assert!(
+            dropped_markup.is_none(),
+            "non-local callback must drop markup"
+        );
+
+        // 2. Local machine callback produces Step 2 with alias, IP, and signal
+        let (step2_reply, step2_markup) = on_machine_picked(chat_id, "local");
+        assert!(
+            step2_reply.contains("Step 2 of 3"),
+            "must contain Step 2 header"
+        );
+        assert!(
+            step2_reply.contains("Machine Alias:"),
+            "must display machine alias"
+        );
+        assert!(
+            step2_reply.contains("IP Address:"),
+            "must display IP address"
+        );
+        assert!(
+            step2_reply.contains("Signal Status:"),
+            "must display signal status"
+        );
+        assert!(step2_markup.is_some(), "must provide instance buttons");
+
+        // 3. Immediate repeat within debounce window (<3s) must be suppressed to prevent duplicate messages
+        let (suppressed_reply, suppressed_markup) = on_machine_picked(chat_id, "local");
+        assert!(
+            suppressed_reply.is_empty(),
+            "immediate duplicate tap must be suppressed"
+        );
+        assert!(suppressed_markup.is_none());
+
+        drop_flow(chat_id);
     }
 }

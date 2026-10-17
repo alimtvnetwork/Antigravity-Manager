@@ -43,38 +43,52 @@ enum ShotMachine {
     Remote(String),
 }
 
-/// This machine's fleet display name: GitMap cluster alias by local IP, Supabase node alias, else OS machine name.
+/// This machine's fleet display name: GitMap cluster alias by local IP or hostname,
+/// validated Supabase node alias (non-conflicting with remote nodes), else OS machine name.
 pub fn local_machine_label() -> String {
-    // 1. Check if Supabase sync config has an explicit custom node_alias (not generic placeholder)
-    if let Ok(cfg) = supabase_sync::load_config() {
-        let alias = cfg.node_alias.trim();
-        if !alias.is_empty()
-            && !alias.eq_ignore_ascii_case("node")
-            && !alias.eq_ignore_ascii_case("ai-main")
-        {
-            return alias.to_string();
-        }
-    }
-
-    // 2. Resolve via local IP matching GitMap cluster nodes (e.g. w1 @ 192.168.1.3, main @ 192.168.1.20)
     let local_ip = email_watcher::detect_local_ip();
+    let local_name = email_watcher::detect_machine_name();
+    let cluster_nodes = cluster::query_gitmap_cluster_nodes();
+
+    // 1. Resolve dynamically via local IP matching GitMap cluster nodes
     if !local_ip.is_empty() {
-        for node in cluster::query_gitmap_cluster_nodes() {
+        for node in &cluster_nodes {
             if node.ip_address.trim() == local_ip.trim() && !node.alias.trim().is_empty() {
                 return node.alias.trim().to_string();
             }
         }
     }
 
-    // 3. Fallback to Supabase node_alias if any
-    if let Ok(cfg) = supabase_sync::load_config() {
-        let alias = cfg.node_alias.trim();
-        if !alias.is_empty() {
-            return alias.to_string();
+    // 2. Resolve dynamically via local machine name matching GitMap cluster nodes
+    if !local_name.is_empty() {
+        for node in &cluster_nodes {
+            if node.alias.trim().eq_ignore_ascii_case(local_name.trim()) {
+                return node.alias.trim().to_string();
+            }
         }
     }
 
-    email_watcher::detect_machine_name()
+    // 3. Check Supabase sync config if configured, dynamically ensuring it does not conflict with a remote cluster node
+    if let Ok(cfg) = supabase_sync::load_config() {
+        let alias = cfg.node_alias.trim();
+        if !alias.is_empty() {
+            let is_remote_cluster_node = !local_ip.is_empty()
+                && cluster_nodes.iter().any(|n| {
+                    n.alias.trim().eq_ignore_ascii_case(alias)
+                        && !n.ip_address.trim().is_empty()
+                        && n.ip_address.trim() != local_ip.trim()
+                });
+            if !is_remote_cluster_node {
+                return alias.to_string();
+            }
+        }
+    }
+
+    if !local_name.is_empty() {
+        local_name
+    } else {
+        "local".to_string()
+    }
 }
 
 /// Resolve the `[machine]` argument of `/open` / `/screenshot` against the

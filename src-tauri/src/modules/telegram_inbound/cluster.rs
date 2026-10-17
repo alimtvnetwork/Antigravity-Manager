@@ -124,15 +124,35 @@ pub fn resolve_node_network_info(target_or_alias: &str) -> (String, String, Stri
     let local_name = email_watcher::detect_machine_name();
     let cluster_nodes = query_gitmap_cluster_nodes();
 
-    // Check if target is explicitly this local machine
+    // 1. Match against cluster nodes by alias or IP (authoritative cluster fleet ground truth)
+    if let Some(matched) = cluster_nodes
+        .iter()
+        .find(|n| n.alias.eq_ignore_ascii_case(target) || n.ip_address.trim() == target)
+    {
+        let is_me = !local_ip.is_empty() && matched.ip_address.trim() == local_ip.trim();
+        let signal = if is_me {
+            "100% (Direct Local)".to_string()
+        } else if matched.status.eq_ignore_ascii_case("ready")
+            || matched.status.eq_ignore_ascii_case("connected")
+            || matched.status.eq_ignore_ascii_case("online")
+        {
+            "98% (Online Mesh)".to_string()
+        } else if matched.status.eq_ignore_ascii_case("offline") {
+            "0% (Offline)".to_string()
+        } else {
+            matched.status.clone()
+        };
+        return (matched.alias.clone(), matched.ip_address.clone(), signal);
+    }
+
+    // 2. Check if target is explicitly this local machine (local, localhost, or matching local_ip)
     if target.eq_ignore_ascii_case("local")
         || target.eq_ignore_ascii_case("localhost")
         || (!local_ip.is_empty() && target.eq_ignore_ascii_case(&local_ip))
-        || (!local_name.is_empty() && target.eq_ignore_ascii_case(&local_name))
     {
         let my_alias = cluster_nodes
             .iter()
-            .find(|n| n.ip_address.trim() == local_ip.trim())
+            .find(|n| !local_ip.is_empty() && n.ip_address.trim() == local_ip.trim())
             .map(|n| n.alias.clone())
             .unwrap_or_else(|| {
                 if !local_name.is_empty() {
@@ -141,31 +161,10 @@ pub fn resolve_node_network_info(target_or_alias: &str) -> (String, String, Stri
                     "local".to_string()
                 }
             });
-        return (my_alias, local_ip, "Local Ready".to_string());
+        return (my_alias, local_ip, "100% (Direct Local)".to_string());
     }
 
-    // Match against cluster nodes by alias or IP
-    if let Some(matched) = cluster_nodes
-        .iter()
-        .find(|n| n.alias.eq_ignore_ascii_case(target) || n.ip_address.trim() == target)
-    {
-        let is_me = !local_ip.is_empty() && matched.ip_address.trim() == local_ip.trim();
-        let signal = if is_me {
-            "Local Ready".to_string()
-        } else if matched.status.eq_ignore_ascii_case("ready")
-            || matched.status.eq_ignore_ascii_case("connected")
-            || matched.status.eq_ignore_ascii_case("online")
-        {
-            "Cluster Mesh Connected".to_string()
-        } else if matched.status.eq_ignore_ascii_case("offline") {
-            "Offline".to_string()
-        } else {
-            matched.status.clone()
-        };
-        return (matched.alias.clone(), matched.ip_address.clone(), signal);
-    }
-
-    // Fallback: check if target is a compound alias|ip
+    // 3. Fallback: check if target is a compound alias|ip
     if let Some((a, ip)) = target.split_once('|') {
         let (resolved_a, resolved_ip, sig) = resolve_node_network_info(a);
         let final_ip = if resolved_ip == "Unknown IP" || resolved_ip.is_empty() {
@@ -174,6 +173,19 @@ pub fn resolve_node_network_info(target_or_alias: &str) -> (String, String, Stri
             resolved_ip
         };
         return (resolved_a, final_ip, sig);
+    }
+
+    // 4. Fallback for non-cluster custom name matching local detected name
+    if !local_name.is_empty() && target.eq_ignore_ascii_case(&local_name) {
+        return (
+            local_name,
+            if !local_ip.is_empty() {
+                local_ip
+            } else {
+                "127.0.0.1".to_string()
+            },
+            "100% (Direct Local)".to_string(),
+        );
     }
 
     (
