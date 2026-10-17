@@ -68,20 +68,20 @@ export function SortableAccountRow({
             ref={setMergedRef}
             style={style as React.CSSProperties}
             className={cn(
-                "group ui-interactive-row border-b border-slate-200/90 dark:border-slate-800/90 border-l-2 transition-all duration-200 ease-in-out",
+                "group ui-interactive-row border-b border-slate-200/90 dark:border-slate-800/90 border-l-2 transition-all duration-200 ease-in-out hover:!bg-white dark:hover:!bg-white hover:!text-black dark:hover:!text-black",
                 isFocused
-                    ? "bg-teal-50/90 dark:bg-[#171025] text-slate-900 dark:text-cyan-300 font-bold border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/90 dark:border-slate-800/90 shadow-md ring-1 ring-cyan-500/30"
+                    ? "bg-teal-50/90 dark:bg-[#171025] text-slate-900 dark:text-cyan-300 font-bold border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/90 dark:border-slate-800/90 shadow-md ring-1 ring-cyan-500/30 hover:!bg-white dark:hover:!bg-white hover:!text-black dark:hover:!text-black"
                     : isCurrent
-                    ? cn(SELECTED_ROW_CLASSES, "border-b border-slate-200/90 dark:border-slate-800/90 hover:bg-slate-200/70 dark:hover:bg-[var(--ui-surface-pressed)] hover:shadow-xs")
+                    ? cn(SELECTED_ROW_CLASSES, "border-b border-slate-200/90 dark:border-slate-800/90 hover:!bg-white dark:hover:!bg-white hover:!text-black dark:hover:!text-black hover:shadow-xs")
                     : selected
-                    ? "bg-blue-50/90 dark:bg-[#171025] text-blue-950 dark:text-blue-100 border-l-blue-500 font-semibold shadow-xs ring-1 ring-blue-500/30 hover:bg-blue-100/70 dark:hover:bg-[var(--ui-surface-pressed)] hover:shadow-xs"
+                    ? "bg-blue-50/90 dark:bg-[#171025] text-blue-950 dark:text-blue-100 border-l-blue-500 font-semibold shadow-xs ring-1 ring-blue-500/30 hover:!bg-white dark:hover:!bg-white hover:!text-black dark:hover:!text-black hover:shadow-xs"
                     : isDragging
                     ? "bg-blue-100 dark:bg-blue-900/30 shadow-lg"
-                    : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-100/80 dark:hover:bg-[var(--ui-surface-hover)] hover:border-l-blue-500/80 dark:hover:border-l-[var(--ui-interactive)] hover:shadow-xs"
+                    : "border-l-transparent text-gray-800 dark:text-gray-200 hover:!bg-white dark:hover:!bg-white hover:!text-black dark:hover:!text-black hover:border-l-blue-500/80 dark:hover:border-l-[var(--ui-interactive)] hover:shadow-xs"
             )}
         >
             {/* 拖拽手柄 */}
-            <td className="pl-2 py-0.5 w-7 align-middle border-b border-slate-200/90 dark:border-slate-800/90">
+            <td className="pl-2 py-0.5 w-7 align-middle border-b border-slate-200/90 dark:border-slate-800/90 group-hover:!bg-white dark:group-hover:!bg-white">
                 <div
                     {...(!isDragDisabled ? attributes : {})}
                     {...(!isDragDisabled ? listeners : {})}
@@ -97,7 +97,7 @@ export function SortableAccountRow({
                 </div>
             </td>
             {/* 复选框 */}
-            <td className="px-1.5 py-0.5 w-8 align-middle border-b border-slate-200/90 dark:border-slate-800/90">
+            <td className="px-1.5 py-0.5 w-8 align-middle border-b border-slate-200/90 dark:border-slate-800/90 group-hover:!bg-white dark:group-hover:!bg-white">
                 <input
                     type="checkbox"
                     className="checkbox checkbox-xs rounded border-2 border-gray-400 dark:border-gray-500 checked:border-blue-600 checked:bg-blue-600 [--chkbg:theme(colors.blue.600)] [--chkfg:white]"

@@ -13,8 +13,10 @@ import {
     Repeat2,
     Terminal,
     MoreHorizontal,
+    Ban,
 } from 'lucide-react';
 import { cn } from '../../../../utils/cn';
+import { useAccountStore } from '../../../../stores/useAccountStore';
 import type { AccountRowContentProps } from '../types';
 import type { AccountRowState } from '../useAccountRowState';
 
@@ -57,21 +59,36 @@ export function ActionsCell(props: ActionsCellProps) {
         : isCurrent
         ? "bg-blue-50 dark:bg-[#091b2c]"
         : "bg-white dark:bg-[#081826]",
-    !isCurrent && !selected && !isFocused ? "group-hover:bg-slate-50 dark:group-hover:bg-[#171025]" : ""
+    "group-hover:!bg-white dark:group-hover:!bg-white"
 )}>
     <div className="flex items-center justify-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
         <button
             type="button"
-            className={`p-1 text-gray-500 dark:text-gray-400 rounded-[5px] transition-all ${(isRefreshing || isDisabled) ? 'cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+            role="button"
+            aria-label={t('common.refresh', 'Refresh')}
+            className={cn(
+                "p-1 rounded-[5px] transition-all",
+                (isRefreshing || isDisabled)
+                    ? "cursor-not-allowed text-gray-400 dark:text-gray-600"
+                    : "text-gray-600 dark:text-gray-400 group-hover:text-slate-800 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-slate-200/80 dark:hover:bg-slate-200/80"
+            )}
             onClick={(event) => { event.stopPropagation(); onRefresh(); }}
             title={t('common.refresh')}
             disabled={isRefreshing || isDisabled}
         >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
         </button>
         <div className="relative inline-flex items-center" ref={menuRef}>
             <button
-                className={`p-1 text-gray-500 dark:text-gray-400 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
+                type="button"
+                role="button"
+                aria-label={t('accounts.switch_account', 'Switch Account')}
+                className={cn(
+                    "p-1 rounded-[5px] transition-all font-medium shadow-sm active:scale-95 border inline-flex items-center justify-center",
+                    (isSwitching || isDisabled)
+                        ? "bg-yellow-200/60 text-slate-500 border-yellow-300/60 cursor-not-allowed opacity-60"
+                        : "bg-yellow-400 text-slate-900 border-yellow-500 hover:bg-yellow-300 hover:text-black hover:border-yellow-600"
+                )}
                 onClick={(e) => {
                     e.stopPropagation();
                     const targetInst = activeInstanceId || 'default';
@@ -88,7 +105,7 @@ export function ActionsCell(props: ActionsCellProps) {
                 })())}
                 disabled={isSwitching || isDisabled}
             >
-                <ArrowRightLeft className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
+                <ArrowRightLeft className={cn("w-3.5 h-3.5", isSwitching && "animate-spin")} />
             </button>
 
             {showInstanceMenu && (
@@ -98,6 +115,8 @@ export function ActionsCell(props: ActionsCellProps) {
                     </div>
                     {instances.map((inst) => (
                         <button
+                            type="button"
+                            role="button"
                             key={inst.config.id}
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -122,7 +141,9 @@ export function ActionsCell(props: ActionsCellProps) {
         <button
             ref={moreBtnRef}
             type="button"
-            className="p-1 text-gray-500 dark:text-gray-400 hover:text-slate-950 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-[5px] transition-all"
+            role="button"
+            aria-label={t('common.more', 'More actions')}
+            className="p-1 text-gray-600 dark:text-gray-400 group-hover:text-slate-800 hover:text-slate-950 hover:bg-slate-200/80 dark:hover:bg-slate-200/80 rounded-[5px] transition-all"
             onClick={(event) => {
                 event.stopPropagation();
                 if (showMoreMenu) {
@@ -144,6 +165,36 @@ export function ActionsCell(props: ActionsCellProps) {
             >
                 <button
                     type="button"
+                    role="button"
+                    aria-label={account.disabled ? t('accounts.enable_account', 'Enable Account') : t('accounts.disable_account', 'Disable Account')}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-100"
+                    onClick={async () => {
+                        setShowMoreMenu(false);
+                        try {
+                            const store = useAccountStore.getState() as any;
+                            if (typeof store.toggleAccountDisabled === 'function') {
+                                await store.toggleAccountDisabled(account.id, !account.disabled);
+                            } else {
+                                const { invoke } = await import('@tauri-apps/api/core');
+                                await invoke('toggle_account_disabled', {
+                                    accountId: account.id,
+                                    disabled: !account.disabled,
+                                    reason: !account.disabled ? 'Disabled by user' : undefined,
+                                });
+                                await store.fetchAccounts();
+                            }
+                        } catch (err) {
+                            console.error('Failed to toggle account disabled:', err);
+                        }
+                    }}
+                >
+                    <Ban className="w-3.5 h-3.5" />
+                    {account.disabled ? t('accounts.enable_account', 'Enable Account') : t('accounts.disable_account', 'Disable Account')}
+                </button>
+                <button
+                    type="button"
+                    role="button"
+                    aria-label={t('accounts.switch_to_ide', 'IDE switch')}
                     className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-100"
                     disabled={isSwitching || isDisabled}
                     onClick={() => { setShowMoreMenu(false); onSwitch('ide'); }}
@@ -153,6 +204,8 @@ export function ActionsCell(props: ActionsCellProps) {
                 </button>
                 <button
                     type="button"
+                    role="button"
+                    aria-label={t('accounts.switch_to_agy', 'CLI switch')}
                     className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-100"
                     disabled={isSwitching || isDisabled}
                     onClick={() => { setShowMoreMenu(false); onSwitch('agy'); }}
@@ -162,6 +215,8 @@ export function ActionsCell(props: ActionsCellProps) {
                 </button>
                 <button
                     type="button"
+                    role="button"
+                    aria-label={t('common.details')}
                     className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-100"
                     onClick={() => { setShowMoreMenu(false); onViewDetails(); }}
                 >
@@ -170,6 +225,8 @@ export function ActionsCell(props: ActionsCellProps) {
                 </button>
                 <button
                     type="button"
+                    role="button"
+                    aria-label={t('accounts.device_fingerprint')}
                     className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-100"
                     onClick={() => { setShowMoreMenu(false); onViewDevice(); }}
                 >
@@ -178,6 +235,8 @@ export function ActionsCell(props: ActionsCellProps) {
                 </button>
                 <button
                     type="button"
+                    role="button"
+                    aria-label={t('common.export')}
                     className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-100"
                     onClick={() => { setShowMoreMenu(false); onExport(); }}
                 >
@@ -186,6 +245,8 @@ export function ActionsCell(props: ActionsCellProps) {
                 </button>
                 <button
                     type="button"
+                    role="button"
+                    aria-label={showEmail ? t('accounts.hide_email') : t('accounts.show_email')}
                     className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-100"
                     onClick={() => setShowEmail((current) => !current)}
                 >
@@ -199,11 +260,14 @@ export function ActionsCell(props: ActionsCellProps) {
         )}
         {onUpdateLabel && (
             <button
+                type="button"
+                role="button"
+                aria-label={t('accounts.edit_label', 'Edit Label')}
                 className={cn(
                     "hidden lg:inline-flex p-1 rounded-[5px] transition-all",
                     account.custom_label
-                        ? "text-orange-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30"
-                        : "text-gray-500 dark:text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/30"
+                        ? "text-orange-500 hover:text-orange-600 hover:bg-orange-100/80"
+                        : "text-gray-500 dark:text-gray-400 group-hover:text-slate-700 hover:text-orange-500 hover:bg-orange-100/80"
                 )}
                 onClick={(e) => { e.stopPropagation(); setIsEditingLabel(true); }}
                 title={t('accounts.edit_label', 'Edit Label')}
@@ -214,20 +278,31 @@ export function ActionsCell(props: ActionsCellProps) {
 
         {onWarmup && (
             <button
-                className={`hidden xl:inline-flex p-1 text-gray-500 dark:text-gray-400 rounded-[5px] transition-all ${(isRefreshing || isDisabled) ? 'bg-orange-50 dark:bg-orange-900/10 text-orange-600 dark:text-orange-400 cursor-not-allowed' : 'hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30'}`}
+                type="button"
+                role="button"
+                aria-label={t('accounts.warmup_this', 'Warm up Account')}
+                className={cn(
+                    "hidden xl:inline-flex p-1 rounded-[5px] transition-all",
+                    (isRefreshing || isDisabled)
+                        ? "bg-orange-50 dark:bg-orange-900/10 text-orange-600 cursor-not-allowed"
+                        : "text-gray-500 dark:text-gray-400 group-hover:text-slate-700 hover:text-orange-500 hover:bg-orange-100/80"
+                )}
                 onClick={(e) => { e.stopPropagation(); onWarmup(); }}
                 title={isDisabled ? t('accounts.disabled_tooltip') : (isRefreshing ? t('common.loading') : t('accounts.warmup_this', 'Warmup Account'))}
                 disabled={isRefreshing || isDisabled}
             >
-                <Sparkles className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-pulse' : ''}`} />
+                <Sparkles className={cn("w-3.5 h-3.5", isRefreshing && "animate-pulse")} />
             </button>
         )}
         <button
+            type="button"
+            role="button"
+            aria-label={account.proxy_disabled ? t('accounts.enable_proxy', 'Enable Proxy') : t('accounts.disable_proxy', 'Disable Proxy')}
             className={cn(
                 "p-1 rounded-[5px] transition-all",
                 account.proxy_disabled
-                    ? "text-gray-500 dark:text-gray-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30"
-                    : "text-gray-500 dark:text-gray-400 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30"
+                    ? "text-gray-500 dark:text-gray-400 group-hover:text-slate-700 hover:text-cyan-600 hover:bg-cyan-100/80"
+                    : "text-gray-500 dark:text-gray-400 group-hover:text-slate-700 hover:text-orange-600 hover:bg-orange-100/80"
             )}
             onClick={(e) => { e.stopPropagation(); onToggleProxy(); }}
             title={account.proxy_disabled ? t('accounts.enable_proxy') : t('accounts.disable_proxy')}
@@ -239,7 +314,15 @@ export function ActionsCell(props: ActionsCellProps) {
             )}
         </button>
         <button
-            className="p-1 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-[5px] transition-all"
+            type="button"
+            role="button"
+            aria-label={t('common.delete', 'Delete Account')}
+            className={cn(
+                "p-1 rounded-[5px] transition-all font-medium shadow-sm active:scale-95 border inline-flex items-center justify-center",
+                isDisabled
+                    ? "bg-red-300/60 text-white/70 border-red-400/60 cursor-not-allowed opacity-60"
+                    : "bg-red-600 text-white border-red-700 hover:bg-red-700 hover:text-white hover:border-red-800"
+            )}
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
             title={t('common.delete')}
         >

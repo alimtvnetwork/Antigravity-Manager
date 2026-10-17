@@ -56,7 +56,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
     return (
         <>
             <td
-                className="px-2 py-0.5 align-middle border-b border-slate-200/90 dark:border-slate-800/90"
+                className="px-2 py-0.5 align-middle border-b border-slate-200/90 dark:border-slate-800/90 group-hover:!bg-white dark:group-hover:!bg-white"
                 style={emailColWidth ? { width: `${emailColWidth}px`, minWidth: `${emailColWidth}px`, maxWidth: `${emailColWidth}px` } : undefined}
                 onMouseLeave={() => setIsHoverUnmasked(false)}
             >
@@ -68,7 +68,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
                             ? "text-blue-950 dark:text-blue-200 font-bold"
                             : isCurrent
                             ? "text-blue-900 dark:text-amber-300 font-bold drop-shadow-xs"
-                            : "text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-cyan-300"
+                            : "text-gray-900 dark:text-gray-100 group-hover:!text-black dark:group-hover:!text-black"
                         )}
                         title={showAllEmails || showEmail || isHoverUnmasked ? account.email : maskEmail(account.email)}
                         onDoubleClick={(event) => {
@@ -195,7 +195,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 </div>
             </td>
 
-            <td className="px-2 py-px align-middle min-w-[185px] bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90">
+            <td className="px-2 py-px align-middle min-w-[185px] bg-slate-50/50 dark:bg-slate-900/40 group-hover:!bg-white dark:group-hover:!bg-white border-l border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <div className={cn(
                         "flex items-center justify-center gap-1.5 py-0.5 px-2 rounded-md border group/error",
@@ -236,7 +236,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 )}
             </td>
 
-            <td className="px-2 py-px align-middle min-w-[185px] bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90">
+            <td className="px-2 py-px align-middle min-w-[185px] bg-slate-50/50 dark:bg-slate-900/40 group-hover:!bg-white dark:group-hover:!bg-white border-r border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <span className="text-[10px] text-gray-400 italic">--</span>
                 ) : (
@@ -250,8 +250,8 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 )}
             </td>
 
-            <td className="px-2.5 py-0.5 align-middle whitespace-nowrap w-[95px] border-b border-slate-200/90 dark:border-slate-800/90">
-                <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400 font-mono" title={formatDateTime(account.last_used)}>
+            <td className="px-2.5 py-0.5 align-middle whitespace-nowrap w-[95px] border-b border-slate-200/90 dark:border-slate-800/90 group-hover:!bg-white dark:group-hover:!bg-white">
+                <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400 group-hover:!text-black dark:group-hover:!text-black font-mono" title={formatDateTime(account.last_used)}>
                     {formatDateTimeShort(account.last_used)}
                 </span>
             </td>

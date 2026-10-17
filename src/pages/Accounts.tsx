@@ -1,4 +1,4 @@
-import { Search, List, LayoutGrid, Trash2, ToggleLeft, ToggleRight, LocateFixed, RefreshCw, ChevronDown, Download, Loader2, Sparkles, Upload } from "lucide-react";
+import { Search, List, LayoutGrid, Trash2, ToggleLeft, ToggleRight, LocateFixed, RefreshCw, ChevronDown, Download, Loader2, Sparkles, Upload, Ban, CheckCircle2 } from "lucide-react";
 import AddAccountDialog from "../components/accounts/AddAccountDialog";
 import { useAccountsState } from "./accounts/useAccountsState";
 import { useAccountsHandlers } from "./accounts/useAccountsHandlers";
@@ -20,7 +20,7 @@ export default function Accounts() {
     filterCounts, filteredAccounts, isRefreshing, searchInputRef, currentAccount
   } = state;
   const {
-    handlePageChange, handleAddAccount, handleBatchDelete, handleBatchToggleProxy, handleRefreshClick, handleFocusActiveAccount
+    handlePageChange, handleAddAccount, handleBatchDelete, handleBatchToggleProxy, handleRefreshClick, handleFocusActiveAccount, handleBatchToggleDisable
   } = handlers;
   return (
     <div className="h-full flex flex-col px-2.5 sm:px-4 pt-1.5 pb-4 gap-2.5 max-w-[1920px] mx-auto w-full min-w-0">
@@ -126,6 +126,24 @@ export default function Accounts() {
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span className="hidden xl:inline">{t("accounts.delete_selected", { count: selectedIds.size })}</span>
+            </button>
+            <button
+              type="button"
+              className="px-2.5 py-1 text-amber-600 dark:text-amber-400 text-xs font-semibold hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors flex items-center gap-1.5 cursor-pointer"
+              onClick={() => handleBatchToggleDisable(true)}
+              title={t("accounts.disable_selected", { count: selectedIds.size, defaultValue: `Disable Selected (${selectedIds.size})` })}
+            >
+              <Ban className="w-3.5 h-3.5" />
+              <span className="hidden xl:inline">{t("accounts.disable_selected", { count: selectedIds.size, defaultValue: `Disable Selected (${selectedIds.size})` })}</span>
+            </button>
+            <button
+              type="button"
+              className="px-2.5 py-1 text-teal-600 dark:text-teal-400 text-xs font-semibold hover:bg-teal-50 dark:hover:bg-teal-950/30 transition-colors flex items-center gap-1.5 cursor-pointer"
+              onClick={() => handleBatchToggleDisable(false)}
+              title={t("accounts.enable_selected", { count: selectedIds.size, defaultValue: `Enable Selected (${selectedIds.size})` })}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span className="hidden xl:inline">{t("accounts.enable_selected", { count: selectedIds.size, defaultValue: `Enable Selected (${selectedIds.size})` })}</span>
             </button>
             <button
               className="px-2.5 py-1 text-orange-600 dark:text-orange-400 text-xs font-semibold hover:bg-orange-50 dark:hover:bg-orange-950/30 transition-colors flex items-center gap-1.5 cursor-pointer"

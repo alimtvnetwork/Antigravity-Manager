@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.220.0 (2026-10-17)**:
+        -   **[Accounts Management & UI Overhaul] Delete Remediation, Position-Locked Hover Inversion, Yellow Switch & Red Remove Buttons, and Disable Lifecycle (Thanks to @aukgit)**:
+            -   **Description**: Resolved non-responsive single and batch Delete buttons by mounting dedicated destructive `ModalDialog` components in `AccountsDialogs.tsx`; implemented table row color inversion to white background and black text with static geometry to eliminate layout jitter; styled Switch button with prominent yellow highlighter theme and styled Remove button with solid red background and white icon; added account disable/enable lifecycle via selection toolbar and action menu with auto-switcher candidate exclusion.
+
     *   **v4.219.0 (2026-10-17)**:
         -   **[Prompt Tree & Delegate Updater] Rich Verification Chapter Engine, Dual-MIME Image Transmission, Rerun Chapter Engine & Console Formatting**:
             -   **Description**: Implemented 5-chapter prompt verification architecture (`verificationTemplates.ts`) for "Is it done?", "Is it released?", "Are you confident?", and "Edge Cases & Tests" embedding un-truncated original prompts; fixed image extraction regex index bug and implemented dual-MIME clipboard priming on dispatch; upgraded rerun engine to wrap full prompt context with round progression; fixed Windows console newline staircase wrapping in delegate updater and aligned summary fields.

@@ -350,3 +350,79 @@ pub fn reorder_accounts(account_ids: &[String]) -> Result<(), String> {
 
     save_account_index(&index)
 }
+
+/// Toggle disabled status for an account (atomically updating account file and index summary)
+pub fn toggle_account_disabled(
+    account_id: &str,
+    disabled: bool,
+    reason: Option<&str>,
+) -> Result<(), String> {
+    let _lock = ACCOUNT_INDEX_LOCK
+        .lock()
+        .map_err(|e| format!("failed_to_acquire_lock: {}", e))?;
+
+    let mut account = load_account(account_id)?;
+    account.disabled = disabled;
+    account.disabled_reason = if disabled {
+        reason
+            .map(|s| s.to_string())
+            .or_else(|| Some("user_disabled".to_string()))
+    } else {
+        None
+    };
+    account.disabled_at = if disabled {
+        Some(chrono::Utc::now().timestamp())
+    } else {
+        None
+    };
+
+    save_account(&account)?;
+
+    // Atomically update index summary
+    let mut index = load_account_index()?;
+    if let Some(summary) = index.accounts.iter_mut().find(|a| a.id == account_id) {
+        summary.disabled = disabled;
+        save_account_index(&index)?;
+    }
+
+    Ok(())
+}
+
+/// Batch set disabled status for multiple accounts
+pub fn set_accounts_disabled(
+    account_ids: &[String],
+    disabled: bool,
+    reason: Option<&str>,
+) -> Result<(), String> {
+    let _lock = ACCOUNT_INDEX_LOCK
+        .lock()
+        .map_err(|e| format!("failed_to_acquire_lock: {}", e))?;
+
+    let mut index = load_account_index()?;
+    let now = chrono::Utc::now().timestamp();
+
+    for id in account_ids {
+        if let Ok(mut account) = load_account(id) {
+            account.disabled = disabled;
+            account.disabled_reason = if disabled {
+                reason
+                    .map(|s| s.to_string())
+                    .or_else(|| Some("user_disabled".to_string()))
+            } else {
+                None
+            };
+            account.disabled_at = if disabled { Some(now) } else { None };
+            // Justification: best-effort file update per account in batch; index update is atomic
+            crate::error::record_ignored(
+                save_account(&account),
+                "save_account in set_accounts_disabled",
+            );
+        }
+
+        if let Some(summary) = index.accounts.iter_mut().find(|a| &a.id == id) {
+            summary.disabled = disabled;
+        }
+    }
+
+    save_account_index(&index)
+}

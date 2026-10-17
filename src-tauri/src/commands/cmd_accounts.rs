@@ -439,3 +439,52 @@ pub async fn update_account_label(account_id: String, label: String) -> Result<(
 
     Ok(())
 }
+
+/// Toggle account disabled status
+#[tauri::command]
+pub async fn toggle_account_disabled(
+    app: tauri::AppHandle,
+    proxy_state: tauri::State<'_, crate::commands::proxy::ProxyServiceState>,
+    account_id: String,
+    disabled: bool,
+    reason: Option<String>,
+) -> Result<(), String> {
+    modules::logger::log_info(&format!(
+        "Toggle account disabled status: {} -> disabled={}",
+        account_id, disabled
+    ));
+
+    modules::account::toggle_account_disabled(&account_id, disabled, reason.as_deref())?;
+
+    // Reload token pool if running
+    // Justification: proxy pool reload after toggle disabled is best-effort sync
+    crate::error::record_ignored(
+        crate::commands::proxy::reload_proxy_accounts(proxy_state).await,
+        "reload proxy accounts after toggle disabled",
+    );
+
+    crate::modules::tray::update_tray_menus(&app);
+    Ok(())
+}
+
+/// Batch set account disabled status
+#[tauri::command]
+pub async fn set_accounts_disabled(
+    app: tauri::AppHandle,
+    proxy_state: tauri::State<'_, crate::commands::proxy::ProxyServiceState>,
+    account_ids: Vec<String>,
+    disabled: bool,
+    reason: Option<String>,
+) -> Result<(), String> {
+    modules::account::set_accounts_disabled(&account_ids, disabled, reason.as_deref())?;
+
+    // Reload token pool if running
+    // Justification: proxy pool reload after batch set disabled is best-effort sync
+    crate::error::record_ignored(
+        crate::commands::proxy::reload_proxy_accounts(proxy_state).await,
+        "reload proxy accounts after batch set disabled",
+    );
+
+    crate::modules::tray::update_tray_menus(&app);
+    Ok(())
+}

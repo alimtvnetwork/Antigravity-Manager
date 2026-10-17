@@ -32,6 +32,8 @@ interface AccountState {
     warmUpAccount: (accountId: string) => Promise<string>;
     updateAccountLabel: (accountId: string, label: string) => Promise<void>;
     updateAccountPriority: (accountId: string, priority: number) => Promise<void>;
+    toggleAccountDisabled: (accountId: string, disabled: boolean, reason?: string) => Promise<void>;
+    setAccountsDisabled: (accountIds: string[], disabled: boolean, reason?: string) => Promise<void>;
 }
 
 export const useAccountStore = create<AccountState>((set, get) => ({
@@ -331,6 +333,26 @@ export const useAccountStore = create<AccountState>((set, get) => ({
             set({ accounts: updatedAccounts });
         } catch (error) {
             console.error('[AccountStore] Update label failed:', error);
+            throw error;
+        }
+    },
+
+    toggleAccountDisabled: async (accountId: string, disabled: boolean, reason?: string) => {
+        try {
+            await accountService.toggleAccountDisabled(accountId, disabled, reason);
+            await get().fetchAccounts();
+        } catch (error) {
+            console.error('[AccountStore] Toggle account disabled failed:', error);
+            throw error;
+        }
+    },
+
+    setAccountsDisabled: async (accountIds: string[], disabled: boolean, reason?: string) => {
+        try {
+            await accountService.setAccountsDisabled(accountIds, disabled, reason);
+            await get().fetchAccounts();
+        } catch (error) {
+            console.error('[AccountStore] Set accounts disabled failed:', error);
             throw error;
         }
     },

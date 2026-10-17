@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.219.0-3B82F6?style=flat-square" alt="Version v4.219.0">
+    <img src="https://img.shields.io/badge/Version-v4.220.0-3B82F6?style=flat-square" alt="Version v4.220.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -115,7 +115,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.219.0)**
+**Bar 2: Version-Based Installation (v4.220.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -466,6 +466,11 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
 
 ## 🔄 What's New
 
+- **v4.220.0** (2026-10-17):
+  - **Accounts Table Delete Remediation & Modal Mounting**: Resolved non-responsive single-item and bulk-selection Delete buttons by mounting dedicated destructive `ModalDialog` components in `AccountsDialogs.tsx`, driving `executeDelete()` and `executeBatchDelete()` with error-store telemetry tracking. (Thanks to @aukgit)
+  - **Position-Locked Table Row Hover Inversion**: Implemented row color inversion to pure white background and pure black text without layout shift or jitter, preserving static font-weight and border metrics, with full opacity alignment across quota cells and sticky actions column. (Thanks to @aukgit)
+  - **Action Buttons Color Scheme Overhaul**: Styled Switch button (`⇄`) with prominent yellow highlighter theme (`bg-yellow-400 text-slate-900 border-yellow-500`) and styled Remove button (`🗑️`) with solid red background and crisp white icon (`bg-red-600 text-white border-red-700`). (Thanks to @aukgit)
+  - **Account Disable / Enable Lifecycle & Auto-Switch Exclusion**: Added disable options via selection toolbar (`<Ban>`) and row context menu; persisted `disabled: bool` in account state; guaranteed 100% exclusion from automated daemon rotations and candidate scoring while preserving permissive manual user switching. (Thanks to @aukgit)
 - **v4.176.0** (2026-10-10):
   - **Smart Instance Process Cache Warm-Up & Closed-PID Recovery**: Initialized `warm_up_smart_process_cache` on startup to pre-warm the process cache across instances; implemented closed-PID vitality promotion and fresh OS re-scans before declaring instances offline, enforcing a strict zero-relaunch guarantee and eliminating repeated IDE reopening. (Thanks to @aukgit)
   - **Adaptive FIFO Prompt Queue Background Ticker**: Enhanced `start_prompt_queue_scheduler` to dynamically tick every 5s when queued prompts exist and back off to 30s when empty, enforcing strict First-In-First-Out ordering (`ORDER BY created_at ASC, id ASC`) and standardizing `.antigravity_resume_task.json` through `resume_task_document(...)`. (Thanks to @aukgit)

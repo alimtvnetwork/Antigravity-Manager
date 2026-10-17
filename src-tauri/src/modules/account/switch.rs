@@ -39,10 +39,33 @@ pub async fn switch_account(
         &account.email,
         normalized_instance_id,
     );
-    if account.disabled || account.proxy_disabled || account.validation_blocked {
+    // Validation block strictly forbids all switches (anti-abuse / CAPTCHA required)
+    if account.validation_blocked {
         return Err(format!(
-            "Cannot switch to account '{}': Account is disabled or blocked (disabled: {}, proxy_disabled: {}, validation_blocked: {})",
-            account.email, account.disabled, account.proxy_disabled, account.validation_blocked
+            "Cannot switch to account '{}': Account is blocked for verification (validation_blocked: true)",
+            account.email
+        ));
+    }
+
+    // If account was disabled by invalid_grant (revoked credentials), block with clear instruction
+    if account.disabled
+        && account
+            .disabled_reason
+            .as_deref()
+            .unwrap_or("")
+            .contains("invalid_grant")
+    {
+        return Err(format!(
+            "Cannot switch to account '{}': Refresh token is expired or revoked (invalid_grant). Please re-authenticate.",
+            account.email
+        ));
+    }
+
+    // User-disabled accounts are permitted for manual switch
+    if account.disabled {
+        crate::modules::logger::log_info(&format!(
+            "[Switch] Manual user switch to user-disabled account '{}' permitted.",
+            account.email
         ));
     }
 

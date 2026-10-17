@@ -79,6 +79,10 @@ pub(crate) fn compute_weekly_hours_elapsed(
 /// - Weekly quota < 8% treated as 0 (below viable threshold for Gemini).
 /// - Claude/3p buckets are excluded.
 pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
+    if acc.disabled || acc.proxy_disabled {
+        return 0.0;
+    }
+
     let period_stat = evaluate_account_period_status(acc, target_model, 20.0, now_sec);
     let is_period_finished = period_stat
         .as_ref()
@@ -189,6 +193,10 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
 /// - Otherwise (4h quota == 100% or period finished): returns base weekly score.
 /// Sort direction: DESCENDING (highest score selected first).
 pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
+    if acc.disabled || acc.proxy_disabled {
+        return 0.0;
+    }
+
     let period_stat = evaluate_account_period_status(acc, target_model, 20.0, now_sec);
     let is_period_finished = period_stat
         .as_ref()
@@ -214,6 +222,10 @@ pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) 
 ///   Score = 4h percentage % × (score what we have) = ((q_4h / 100.0) * base_weekly_score).
 /// - Accounts with weekly quota < 8% strictly evaluate to 0.0.
 pub fn score_candidate_account_fallback(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
+    if acc.disabled || acc.proxy_disabled {
+        return 0.0;
+    }
+
     let period_stat = evaluate_account_period_status(acc, target_model, 20.0, now_sec);
     let is_period_finished = period_stat
         .as_ref()
@@ -536,6 +548,42 @@ mod tests {
             fallback_score > 0.0,
             "Fallback score for 95% quota account must be > 0.0, got {}",
             fallback_score
+        );
+    }
+
+    #[test]
+    fn test_score_candidate_account_disabled_is_zero() {
+        let now_sec = 1790090000;
+        let future_time = "2026-09-30T14:30:00Z";
+        let mut acc = make_test_account(
+            "acc-disabled",
+            "disabled@test.local",
+            "gemini-pro",
+            100,
+            future_time,
+        );
+        acc.disabled = true;
+
+        assert_eq!(
+            calculate_weekly_base_score(&acc, "gemini-pro", now_sec),
+            0.0
+        );
+        assert_eq!(score_candidate_account(&acc, "gemini-pro", now_sec), 0.0);
+        assert_eq!(
+            score_candidate_account_fallback(&acc, "gemini-pro", now_sec),
+            0.0
+        );
+
+        acc.disabled = false;
+        acc.proxy_disabled = true;
+        assert_eq!(
+            calculate_weekly_base_score(&acc, "gemini-pro", now_sec),
+            0.0
+        );
+        assert_eq!(score_candidate_account(&acc, "gemini-pro", now_sec), 0.0);
+        assert_eq!(
+            score_candidate_account_fallback(&acc, "gemini-pro", now_sec),
+            0.0
         );
     }
 }

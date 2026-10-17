@@ -63,18 +63,18 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             id={`account-row-${account.id}`}
             ref={rowRef}
             className={cn(
-            "group transition-all duration-200 border-b border-slate-200/90 dark:border-slate-800/90 border-l-2",
+            "group transition-all duration-200 border-b border-slate-200/90 dark:border-slate-800/90 border-l-2 hover:!bg-white dark:hover:!bg-white hover:!text-black dark:hover:!text-black",
             isFocused
-                ? "bg-teal-50/90 dark:bg-[#171025] text-slate-900 dark:text-cyan-300 font-bold border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/90 dark:border-slate-800/90 shadow-md ring-1 ring-cyan-500/30"
+                ? "bg-teal-50/90 dark:bg-[#171025] text-slate-900 dark:text-cyan-300 font-bold border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/90 dark:border-slate-800/90 shadow-md ring-1 ring-cyan-500/30 hover:!bg-white dark:hover:!bg-white hover:!text-black dark:hover:!text-black"
                 : isCurrent
-                ? cn(SELECTED_ROW_CLASSES, "border-b border-slate-200/90 dark:border-slate-800/90 hover:bg-slate-200/60 dark:hover:bg-[#171025]")
+                ? cn(SELECTED_ROW_CLASSES, "border-b border-slate-200/90 dark:border-slate-800/90 hover:!bg-white dark:hover:!bg-white hover:!text-black dark:hover:!text-black")
                 : selected
-                ? "bg-blue-50/90 dark:bg-[#171025] text-blue-950 dark:text-blue-100 border-l-blue-500 dark:border-l-blue-500 font-semibold shadow-xs ring-1 ring-blue-500/30"
-                : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50/80 dark:hover:bg-[#171025]/60 hover:text-slate-900 dark:hover:text-white hover:border-l-blue-500/70",
+                ? "bg-blue-50/90 dark:bg-[#171025] text-blue-950 dark:text-blue-100 border-l-blue-500 dark:border-l-blue-500 font-semibold shadow-xs ring-1 ring-blue-500/30 hover:!bg-white dark:hover:!bg-white hover:!text-black dark:hover:!text-black"
+                : "border-l-transparent text-gray-800 dark:text-gray-200 hover:!bg-white dark:hover:!bg-white hover:!text-black dark:hover:!text-black hover:border-l-blue-500/70",
             (isRefreshing || isDisabled) && "opacity-70"
         )}>
             {/* 序号 */}
-            <td className="pl-6 py-1 w-12">
+            <td className="pl-6 py-1 w-12 group-hover:!bg-white dark:group-hover:!bg-white">
                 <input
                     type="checkbox"
                     className="checkbox checkbox-xs rounded border-2 border-gray-400 dark:border-gray-500 checked:border-blue-600 checked:bg-blue-600 [--chkbg:theme(colors.blue.600)] [--chkfg:white]"
@@ -85,7 +85,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* 邮箱 */}
-            <td className="px-4 py-0.5">
+            <td className="px-4 py-0.5 group-hover:!bg-white dark:group-hover:!bg-white">
                 <div className="flex items-center gap-3">
                     <span className={cn(
                         "font-medium text-sm truncate max-w-[180px] xl:max-w-none transition-colors",
@@ -93,7 +93,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                             ? "text-blue-950 dark:text-blue-200 font-bold"
                             : isCurrent
                             ? "text-blue-900 dark:text-amber-300 font-bold"
-                            : "text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400"
+                            : "text-gray-900 dark:text-gray-100 group-hover:!text-black dark:group-hover:!text-black"
                     )} title={account.email}>
                         {maskEmail(account.email)}
                     </span>
@@ -145,7 +145,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* 4H 模型配额 */}
-            <td className="px-2.5 py-0.5 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#40285e]">
+            <td className="px-2.5 py-0.5 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 group-hover:!bg-white dark:group-hover:!bg-white border-l border-slate-300 dark:border-[#40285e]">
                 {account.quota?.is_forbidden ? (
                     <div className="flex items-center gap-1.5 text-[10px] text-rose-600 dark:text-rose-400 bg-rose-500/10 p-1 rounded-[5px] border border-rose-400/20">
                         <Ban className="w-3 h-3 shrink-0" />
@@ -162,7 +162,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* Weekly 配额 */}
-            <td className="px-2.5 py-0.5 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#40285e]">
+            <td className="px-2.5 py-0.5 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 group-hover:!bg-white dark:group-hover:!bg-white border-r border-slate-300 dark:border-[#40285e]">
                 {account.quota?.is_forbidden ? (
                     <span className="text-[10px] text-gray-400 italic">--</span>
                 ) : (
@@ -199,29 +199,45 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* 最后使用 */}
-            <td className="px-2 py-0.5 align-middle whitespace-nowrap w-[95px]">
-                <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400 font-mono" title={formatDateTime(account.last_used)}>
+            <td className="px-2 py-0.5 align-middle whitespace-nowrap w-[95px] group-hover:!bg-white dark:group-hover:!bg-white">
+                <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400 group-hover:!text-black dark:group-hover:!text-black font-mono" title={formatDateTime(account.last_used)}>
                     {formatDateOnly(account.last_used)}
                 </span>
             </td>
 
             {/* 操作 */}
-            <td className="px-4 py-0.5">
-                <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+            <td className="px-4 py-0.5 group-hover:!bg-white dark:group-hover:!bg-white">
+                <div className="flex items-center gap-0.5 opacity-80 group-hover:opacity-100 transition-opacity">
                     {/* 1. Refresh button (first) */}
                     <button
-                        className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-[5px] transition-all ${(isRefreshing || isDisabled) ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
+                        type="button"
+                        role="button"
+                        aria-label={t('common.refresh', 'Refresh')}
+                        className={cn(
+                            "p-1.5 rounded-[5px] transition-all",
+                            (isRefreshing || isDisabled)
+                                ? "bg-slate-100 dark:bg-slate-800/50 text-slate-400 cursor-not-allowed"
+                                : "text-gray-500 dark:text-gray-400 group-hover:text-slate-800 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-200/80 dark:hover:bg-slate-200/80"
+                        )}
                         onClick={(e) => { e.stopPropagation(); onRefresh(); }}
                         title={isDisabled ? t('accounts.disabled_tooltip') : (isRefreshing ? t('common.refreshing') : t('common.refresh'))}
                         disabled={isRefreshing || isDisabled}
                     >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
                     </button>
 
                     {/* 2. 切换/实例选择按钮 (排在第二位) */}
                     <div className="relative inline-flex items-center" ref={menuRef}>
                         <button
-                            className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
+                            type="button"
+                            role="button"
+                            aria-label={t('accounts.switch_account', 'Switch Account')}
+                            className={cn(
+                                "p-1.5 rounded-[5px] transition-all font-medium shadow-sm active:scale-95 border inline-flex items-center justify-center",
+                                (isSwitching || isDisabled)
+                                    ? "bg-yellow-200/60 text-slate-500 border-yellow-300/60 cursor-not-allowed opacity-60"
+                                    : "bg-yellow-400 text-slate-900 border-yellow-500 hover:bg-yellow-300 hover:text-black hover:border-yellow-600"
+                            )}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 const targetInst = activeInstanceId || 'default';
@@ -238,7 +254,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                             })())}
                             disabled={isSwitching || isDisabled}
                         >
-                            <ArrowRightLeft className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
+                            <ArrowRightLeft className={cn("w-3.5 h-3.5", isSwitching && "animate-spin")} />
                         </button>
 
                         {showInstanceMenu && (
@@ -248,6 +264,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                                 </div>
                                 {instances.map((inst) => (
                                     <button
+                                        type="button"
                                         key={inst.config.id}
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -271,32 +288,44 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
 
                     {/* 3. 详情与其它操作 */}
                     <button
-                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-[5px] transition-all"
+                        type="button"
+                        role="button"
+                        aria-label={t('common.details', 'Details')}
+                        className="p-1.5 text-gray-500 dark:text-gray-400 group-hover:text-slate-800 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-slate-200/80 dark:hover:bg-slate-200/80 rounded-[5px] transition-all"
                         onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
                         title={t('common.details')}
                     >
                         <Info className="w-3.5 h-3.5" />
                     </button>
                     <button
-                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-[5px] transition-all"
+                        type="button"
+                        role="button"
+                        aria-label={t('accounts.device_fingerprint', 'Device Fingerprint')}
+                        className="p-1.5 text-gray-500 dark:text-gray-400 group-hover:text-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-200/80 dark:hover:bg-slate-200/80 rounded-[5px] transition-all"
                         onClick={(e) => { e.stopPropagation(); onViewDevice(); }}
                         title={t('accounts.device_fingerprint')}
                     >
                         <Fingerprint className="w-3.5 h-3.5" />
                     </button>
                     <button
-                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-[5px] transition-all"
+                        type="button"
+                        role="button"
+                        aria-label={t('common.export', 'Export')}
+                        className="p-1.5 text-gray-500 dark:text-gray-400 group-hover:text-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-200/80 dark:hover:bg-slate-200/80 rounded-[5px] transition-all"
                         onClick={(e) => { e.stopPropagation(); onExport(); }}
                         title={t('common.export')}
                     >
                         <Download className="w-3.5 h-3.5" />
                     </button>
                     <button
+                        type="button"
+                        role="button"
+                        aria-label={account.proxy_disabled ? t('accounts.enable_proxy', 'Enable Proxy') : t('accounts.disable_proxy', 'Disable Proxy')}
                         className={cn(
                             "p-1.5 rounded-[5px] transition-all",
                             account.proxy_disabled
-                                ? "text-gray-500 dark:text-gray-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30"
-                                : "text-gray-500 dark:text-gray-400 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30"
+                                ? "text-gray-500 dark:text-gray-400 group-hover:text-slate-800 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30"
+                                : "text-gray-500 dark:text-gray-400 group-hover:text-slate-800 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30"
                         )}
                         onClick={(e) => { e.stopPropagation(); onToggleProxy(); }}
                         title={account.proxy_disabled ? t('accounts.enable_proxy') : t('accounts.disable_proxy')}
@@ -308,7 +337,15 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                         )}
                     </button>
                     <button
-                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-[5px] transition-all"
+                        type="button"
+                        role="button"
+                        aria-label={t('common.delete', 'Delete Account')}
+                        className={cn(
+                            "p-1.5 rounded-[5px] transition-all font-medium shadow-sm active:scale-95 border inline-flex items-center justify-center",
+                            isDisabled
+                                ? "bg-red-300/60 text-white/70 border-red-400/60 cursor-not-allowed opacity-60"
+                                : "bg-red-600 text-white border-red-700 hover:bg-red-700 hover:text-white hover:border-red-800"
+                        )}
                         onClick={(e) => { e.stopPropagation(); onDelete(); }}
                         title={t('common.delete')}
                     >

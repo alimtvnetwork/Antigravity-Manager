@@ -71,6 +71,9 @@ export function AccountCardActions({
                     maxLength={15}
                 />
                 <button
+                    type="button"
+                    role="button"
+                    aria-label={t('common.save', 'Save')}
                     className="p-1.5 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-[5px] transition-all"
                     onClick={handleSaveLabel}
                     title={t('common.save', 'Save')}
@@ -78,6 +81,9 @@ export function AccountCardActions({
                     <Check className="w-4 h-4" />
                 </button>
                 <button
+                    type="button"
+                    role="button"
+                    aria-label={t('common.cancel', 'Cancel')}
                     className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-[5px] transition-all"
                     onClick={handleCancelLabel}
                     title={t('common.cancel', 'Cancel')}
@@ -90,44 +96,67 @@ export function AccountCardActions({
     <div className="flex flex-wrap items-center justify-center gap-1 w-full">
         {/* 1. Refresh button (top priority) */}
         <button
-            className={`p-1.5 rounded-[5px] transition-all ${isRefreshing
-                ? 'text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20'
-                : 'text-gray-400 hover:text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/20'}`}
+            type="button"
+            role="button"
+            aria-label={t('common.refresh', 'Refresh')}
+            className={cn(
+                "p-1.5 rounded-[5px] transition-all",
+                isRefreshing
+                    ? 'text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20'
+                    : 'text-gray-400 hover:text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/20'
+            )}
             onClick={(e) => { e.stopPropagation(); onRefresh(); }}
             disabled={isRefreshing || isDisabled}
             title={isDisabled ? t('accounts.disabled_tooltip') : t('common.refresh')}
         >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
         </button>
 
         {/* 2. Switch operations group */}
         <button
-            className={`p-1.5 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
+            type="button"
+            role="button"
+            aria-label={t('accounts.switch_to_classic', 'Switch to Antigravity (Classic)')}
+            className={cn(
+                "p-1.5 rounded-[5px] transition-all font-medium shadow-sm active:scale-95 border inline-flex items-center justify-center",
+                (isSwitching || isDisabled)
+                    ? "bg-yellow-200/60 text-slate-500 border-yellow-300/60 cursor-not-allowed opacity-60"
+                    : "bg-yellow-400 text-slate-900 border-yellow-500 hover:bg-yellow-300 hover:text-black hover:border-yellow-600"
+            )}
             onClick={(e) => { e.stopPropagation(); onSwitch(); }}
             title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_classic', 'Switch to Antigravity (Classic)'))}
             disabled={isSwitching || isDisabled}
         >
-            <ArrowRightLeft className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
+            <ArrowRightLeft className={cn("w-3.5 h-3.5", isSwitching && "animate-spin")} />
         </button>
         <button
+            type="button"
+            role="button"
+            aria-label={t('accounts.switch_to_ide', 'Switch to Antigravity IDE')}
             className={`p-1.5 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30'}`}
             onClick={(e) => { e.stopPropagation(); onSwitch('ide'); }}
             title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_ide', 'Switch to Antigravity IDE'))}
             disabled={isSwitching || isDisabled}
         >
-            <Repeat2 className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
+            <Repeat2 className={cn("w-3.5 h-3.5", isSwitching && "animate-spin")} />
         </button>
         <button
+            type="button"
+            role="button"
+            aria-label={t('accounts.switch_to_agy', 'Switch to Antigravity CLI (agy)')}
             className={`p-1.5 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30'}`}
             onClick={(e) => { e.stopPropagation(); onSwitch('agy'); }}
             title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_agy', 'Switch to Antigravity CLI (agy)'))}
             disabled={isSwitching || isDisabled}
         >
-            <Terminal className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
+            <Terminal className={cn("w-3.5 h-3.5", isSwitching && "animate-spin")} />
         </button>
 
         {/* 3. Details and auxiliary operations */}
         <button
+            type="button"
+            role="button"
+            aria-label={t('common.details')}
             className="p-1.5 text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-[5px] transition-all"
             onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
             title={t('common.details')}
@@ -135,6 +164,9 @@ export function AccountCardActions({
             <Info className="w-3.5 h-3.5" />
         </button>
         <button
+            type="button"
+            role="button"
+            aria-label={t('accounts.device_fingerprint')}
             className="p-1.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-[5px] transition-all"
             onClick={(e) => { e.stopPropagation(); onViewDevice(); }}
             title={t('accounts.device_fingerprint')}
@@ -144,6 +176,9 @@ export function AccountCardActions({
         {/* Custom label button */}
         {onUpdateLabel && (
             <button
+                type="button"
+                role="button"
+                aria-label={t('accounts.edit_label', 'Edit Label')}
                 className={cn(
                     "p-1.5 rounded-[5px] transition-all",
                     account.custom_label
@@ -157,40 +192,60 @@ export function AccountCardActions({
             </button>
         )}
         <button
-            className={`p-1.5 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
+            type="button"
+            role="button"
+            aria-label={t('accounts.switch_to_classic', 'Switch to Antigravity (Classic)')}
+            className={cn(
+                "p-1.5 rounded-[5px] transition-all font-medium shadow-sm active:scale-95 border inline-flex items-center justify-center",
+                (isSwitching || isDisabled)
+                    ? "bg-yellow-200/60 text-slate-500 border-yellow-300/60 cursor-not-allowed opacity-60"
+                    : "bg-yellow-400 text-slate-900 border-yellow-500 hover:bg-yellow-300 hover:text-black hover:border-yellow-600"
+            )}
             onClick={(e) => { e.stopPropagation(); onSwitch('classic'); }}
             title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_classic', 'Switch to Antigravity (Classic)'))}
             disabled={isSwitching || isDisabled}
         >
-            <ArrowRightLeft className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
+            <ArrowRightLeft className={cn("w-3.5 h-3.5", isSwitching && "animate-spin")} />
         </button>
         <button
+            type="button"
+            role="button"
+            aria-label={t('accounts.switch_to_ide', 'Switch to Antigravity IDE')}
             className={`p-1.5 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30'}`}
             onClick={(e) => { e.stopPropagation(); onSwitch('ide'); }}
             title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_ide', 'Switch to Antigravity IDE'))}
             disabled={isSwitching || isDisabled}
         >
-            <Repeat2 className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
+            <Repeat2 className={cn("w-3.5 h-3.5", isSwitching && "animate-spin")} />
         </button>
         <button
+            type="button"
+            role="button"
+            aria-label={t('accounts.switch_to_agy', 'Switch to Antigravity CLI (agy)')}
             className={`p-1.5 rounded-[5px] transition-all ${(isSwitching || isDisabled) ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30'}`}
             onClick={(e) => { e.stopPropagation(); onSwitch('agy'); }}
             title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_agy', 'Switch to Antigravity CLI (agy)'))}
             disabled={isSwitching || isDisabled}
         >
-            <Terminal className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
+            <Terminal className={cn("w-3.5 h-3.5", isSwitching && "animate-spin")} />
         </button>
         {onWarmup && (
             <button
+                type="button"
+                role="button"
+                aria-label={t('accounts.warmup_this', 'Warm up this account')}
                 className={`p-1.5 rounded-[5px] transition-all ${(isRefreshing || isDisabled) ? 'text-orange-600 bg-orange-50 dark:bg-orange-900/10 cursor-not-allowed' : 'text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/30'}`}
                 onClick={(e) => { e.stopPropagation(); onWarmup(); }}
                 title={isDisabled ? t('accounts.disabled_tooltip') : (isRefreshing ? t('common.loading') : t('accounts.warmup_this', 'Warm up this account'))}
                 disabled={isRefreshing || isDisabled}
             >
-                <Sparkles className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-pulse' : ''}`} />
+                <Sparkles className={cn("w-3.5 h-3.5", isRefreshing && "animate-pulse")} />
             </button>
         )}
         <button
+            type="button"
+            role="button"
+            aria-label={t('common.export')}
             className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-[5px] transition-all"
             onClick={(e) => { e.stopPropagation(); onExport(); }}
             title={t('common.export')}
@@ -198,6 +253,9 @@ export function AccountCardActions({
             <Download className="w-3.5 h-3.5" />
         </button>
         <button
+            type="button"
+            role="button"
+            aria-label={account.proxy_disabled ? t('accounts.enable_proxy') : t('accounts.disable_proxy')}
             className={cn(
                 "p-1.5 rounded-[5px] transition-all",
                 account.proxy_disabled
@@ -214,7 +272,15 @@ export function AccountCardActions({
             )}
         </button>
         <button
-            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-[5px] transition-all"
+            type="button"
+            role="button"
+            aria-label={t('common.delete', 'Delete Account')}
+            className={cn(
+                "p-1.5 rounded-[5px] transition-all font-medium shadow-sm active:scale-95 border inline-flex items-center justify-center",
+                isDisabled
+                    ? "bg-red-300/60 text-white/70 border-red-400/60 cursor-not-allowed opacity-60"
+                    : "bg-red-600 text-white border-red-700 hover:bg-red-700 hover:text-white hover:border-red-800"
+            )}
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
             title={t('common.delete')}
         >

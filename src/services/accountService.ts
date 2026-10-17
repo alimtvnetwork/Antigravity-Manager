@@ -246,3 +246,19 @@ export async function deployAccountsToFleet(
 ): Promise<FleetDeployResult> {
     return await invoke('deploy_accounts_to_fleet', { includeMain, exceptNodes });
 }
+
+export async function toggleAccountDisabled(
+    accountId: string,
+    disabled: boolean,
+    reason?: string
+): Promise<void> {
+    return await invoke('toggle_account_disabled', { accountId, disabled, reason });
+}
+
+export async function setAccountsDisabled(
+    accountIds: string[],
+    disabled: boolean,
+    reason?: string
+): Promise<void> {
+    return await invoke('set_accounts_disabled', { accountIds, disabled, reason });
+}
