@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.227.1] - 2026-10-17
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
 ## [v4.227.0] - 2026-10-18
 
 ### Fixed
@@ -618,7 +625,6 @@
     *   **v4.227.0 (2026-10-18)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.226.0 (2026-10-18)**:
         -   **[E9001 Sibling Isolation & UI Redesign] Error E9001 Root-Cause Resolution, Loop Throttling, Accounts Table Dark-Glass Redesign & 3D Riseup Yellow Switch (Thanks to @aukgit)**:
