@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::process::Command;
 
+use super::types::{PromptExecutionStatusType, RemoteDispatchStatusType};
 use super::*;
 
 /// Execute prompt injection to local workspace or remote cluster node (supports Dual AGM/GitMap Seq IDs P001/C001, --instance, and --node)
@@ -261,7 +262,7 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
             false
         }
     };
-    let exec_status = if spawned { "Executing now" } else { "Queued" };
+    let exec_status = PromptExecutionStatusType::from_spawned(spawned);
     let ide_line = ide_exe_line_for(&resolved_instance).unwrap_or_default();
     let id8 = prompt_id.strip_prefix("p-").unwrap_or(&prompt_id);
 
@@ -361,13 +362,7 @@ pub async fn execute_remote_prompt_injection(
         }
     }
 
-    let dispatch_status = if dispatched_gitmap {
-        "Sent via GitMap Cluster SSH"
-    } else if enqueued_supabase {
-        "Queued on the secondary database — the node will pick it up"
-    } else {
-        "Queued (the node recorded your instruction)"
-    };
+    let dispatch_status = RemoteDispatchStatusType::resolve(dispatched_gitmap, enqueued_supabase);
 
     let ide_line = ide_exe_line_for(explicit_instance.unwrap_or("default")).unwrap_or_default();
     let id8 = cmd_id.get(..8).unwrap_or(&cmd_id);
