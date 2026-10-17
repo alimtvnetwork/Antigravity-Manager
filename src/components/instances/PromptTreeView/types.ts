@@ -27,6 +27,21 @@ export interface AgmConversationNode {
     latest_response?: string;
     execution_results?: string;
     tool_calls_summary?: string;
+    prompts?: AgmPromptTurnNode[];
+}
+
+export interface AgmPromptTurnNode {
+    turn_number: number;
+    step_index: number;
+    prompt_text: string;
+    preview_200w: string;
+    status: 'RUNNING' | 'QUEUED' | 'COMPLETED' | string;
+    is_running: boolean;
+    is_queued: boolean;
+    timestamp: string;
+    created_at: number;
+    media_paths: string[];
+    media_thumbnails: string[];
 }
 
 
@@ -59,7 +74,13 @@ export interface PromptTreeViewModalProps {
     sequenceNumber?: number;
     executablePath?: string;
     initialSelectedProjectId?: string;
+    renameConversation?: (conversationId: string, newTitle: string) => Promise<void> | void;
 }
+
+export interface TreePanelProps {
+    renameConversation?: (conversationId: string, newTitle: string) => Promise<void> | void;
+}
+
 
 export type ViewMode = 'preview' | 'raw' | 'edit';
 

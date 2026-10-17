@@ -191,16 +191,14 @@ def is_bump_script(path: Path) -> bool:
 
 
 def is_protected_memory_or_plan(path: Path) -> bool:
-    """Check if file or directory belongs to protected .ai-memory areas or target-repo domain skills.
+    """Check if file or directory belongs to protected .ai-memory areas.
 
     Protects plans/, temp-agents/, cicd-issues/, memory/, ambiguous-questions/,
-    and operational memory files, as well as repo-specific domain skills (agm-*) in target repositories.
+    and operational memory files in target repositories.
+    Target repositories own their operational memory logs and execution plans.
     These files must NEVER be overwritten, mirrored, or deleted during sync.
     """
     norm = str(path).replace("\\", "/").lower()
-
-    if "/agm-" in norm or "skills/agm-" in norm or path.name.lower().startswith("agm-"):
-        return True
 
     if ".ai-memory/memory" in norm:
         return True
@@ -443,53 +441,11 @@ def mirror_directory(
         dst.mkdir(parents=True, exist_ok=True)
 
     # 1. Clean stale files/dirs in dst that are no longer in src.
-    #    Skipped for additive trees and for skill roots so repo-local skills survive.
-    if not is_additive_only and not keeps_local_skill_dirs(dst):
-        if dst.exists():
-            for root, dirs, files in os.walk(dst, topdown=False):
-                rel_root = Path(root).relative_to(dst)
-                src_root = src / rel_root
+    # User Mandate & Non-Destructive Invariant: Under NO circumstances should any additional file
+    # created or updated by the target repository on its own be removed. The sync engine must be
+    # strictly non-destructive for repo-owned files: only update/replace canonical assets and add
+    # new canonical assets. Stale file deletion in target repositories is strictly disabled.
 
-                for f in files:
-                    dst_file = Path(root) / f
-                    src_file = src_root / f
-
-                    if f in EXCLUDE_NAMES:
-                        continue
-
-                    if dst_file.suffix.lower() in EXCLUDE_EXTS:
-                        continue
-
-                    if is_spec_21(dst_file):
-                        continue
-
-                    if is_protected_memory_or_plan(dst_file):
-                        continue
-
-                    if not src_file.exists():
-                        if not is_dry_run:
-                            dst_file.unlink(missing_ok=True)
-
-                        removed += 1
-
-                for d in dirs:
-                    dst_dir = Path(root) / d
-                    src_dir = src_root / d
-
-                    if d in EXCLUDE_NAMES:
-                        continue
-
-                    if is_spec_21(dst_dir):
-                        continue
-
-                    if is_protected_memory_or_plan(dst_dir):
-                        continue
-
-                    if not src_dir.exists():
-                        if not is_dry_run:
-                            shutil.rmtree(dst_dir, ignore_errors=True)
-
-                        removed += 1
 
     # 2. Copy files from src to dst
     for root, dirs, files in os.walk(src):
@@ -678,6 +634,18 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
             if legacy_dir.exists():
                 shutil.rmtree(legacy_dir, ignore_errors=True)
 
+        # Purge deprecated scripts superseded by native gitmap agent commands
+        for dep_script in (
+            "03-ai-scripts/46-agent-sqlite-task-manager.py",
+            ".agents/scripts/46-agent-sqlite-task-manager.py",
+        ):
+            dep_path = target / dep_script
+            if dep_path.exists():
+                try:
+                    dep_path.unlink()
+                except Exception:
+                    pass
+
     # 4. Mirror directories and conditional coding guidelines cleanly
     total_copied = 0
     total_removed = 0
@@ -724,7 +692,7 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
     # 6. Commit changes on base branch and push
     run_cmd("git add -A", target)
     commit_msg = (
-        "feat(sync): sync v6 prompts, sqlite task manager, skills, and coding guidelines"
+        "feat(sync) - sync canonical prompts, skills, gitmap agent standards, and purge deprecated 46 task manager"
     )
     code, out, err = run_cmd(f'git commit -m "{commit_msg}"', target)
 
@@ -795,7 +763,7 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
 
     if is_ver_updated:
         run_cmd("git add -A", target)
-        run_cmd(f'git commit -m "chore(version): bump to {release_tag}"', target)
+        run_cmd(f'git commit -m "chore(version) - bump to {release_tag}"', target)
 
     run_cmd(
         f'git tag -a {release_tag} -m "Release {release_tag} - Synchronize prompts, skills, AI scripts, and coding guidelines"',
@@ -808,7 +776,7 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
 
     # Merge back into base branch and push
     run_cmd(f"git checkout {base_branch}", target)
-    run_cmd(f'git merge {release_branch} -m "chore(release): merge {release_tag} [skip ci]"', target)
+    run_cmd(f'git merge {release_branch} -m "chore(release) - merge {release_tag} [skip ci]"', target)
 
     if not is_no_push:
         p_code, p_out, p_err = run_cmd(f"git push origin {base_branch}", target)

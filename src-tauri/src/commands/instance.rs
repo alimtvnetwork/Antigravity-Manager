@@ -1,5 +1,11 @@
+use crate::error::AppError;
 use crate::models::instance::{InstanceConfig, InstanceStatus};
 use crate::modules::instance;
+use crate::modules::instance::post_switch_resume::{
+    cancel_post_switch_resume as cancel_resume_internal, force_dispatch_resume,
+    get_instance_pending_resume as get_inst_resume_internal, get_pending_resumes,
+    ScheduledResumeEntry,
+};
 
 #[tauri::command]
 pub fn list_instances() -> Result<Vec<InstanceStatus>, String> {
@@ -635,4 +641,69 @@ pub async fn sync_instance_pid_and_quota(instance_id: String) -> Result<Instance
 #[tauri::command]
 pub async fn sync_all_instances_and_quotas() -> Result<Vec<InstanceStatus>, String> {
     instance::sync_all_instances_and_quotas_logic().await
+}
+
+#[tauri::command]
+pub async fn get_pending_post_switch_resumes() -> Result<Vec<ScheduledResumeEntry>, AppError> {
+    Ok(get_pending_resumes())
+}
+
+#[tauri::command]
+pub async fn get_instance_pending_resume(
+    instance_id: String,
+) -> Result<Option<ScheduledResumeEntry>, AppError> {
+    let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
+    Ok(get_inst_resume_internal(&resolved_id))
+}
+
+#[tauri::command]
+pub async fn cancel_post_switch_resume(instance_id: String) -> Result<bool, AppError> {
+    let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
+    Ok(cancel_resume_internal(
+        &resolved_id,
+        "User requested cancellation",
+    ))
+}
+
+#[tauri::command]
+pub async fn force_dispatch_pending_resume(
+    app: tauri::AppHandle,
+    instance_id: String,
+) -> Result<(), AppError> {
+    let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
+    force_dispatch_resume(&app, &resolved_id).await
+}
+
+#[tauri::command]
+pub async fn rename_conversation(
+    instance_id: Option<String>,
+    conversation_id: String,
+    new_title: String,
+) -> Result<(), AppError> {
+    let clean_title = new_title.trim();
+    if clean_title.is_empty() {
+        return Err(AppError::Config(
+            "Conversation title cannot be empty".to_string(),
+        ));
+    }
+    if conversation_id.trim().is_empty() {
+        return Err(AppError::Config(
+            "Conversation ID cannot be empty".to_string(),
+        ));
+    }
+
+    let resolved_inst = instance_id
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "default".to_string());
+    let title_owned = clean_title.to_string();
+
+    tokio::task::spawn_blocking(move || {
+        crate::modules::repo_db::sequences::rename_conversation_dual_store(
+            &resolved_inst,
+            &conversation_id,
+            &title_owned,
+        )
+    })
+    .await
+    .map_err(|e| AppError::Process(format!("Task execution failed: {e}")))?
 }

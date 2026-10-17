@@ -168,6 +168,25 @@ pub struct AgmConversationNode {
     pub tool_calls_summary: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub full_prompt_text: Option<String>,
+    /// Tier 3: Chronological list of all prompt turns dispatched to this conversation
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub prompts: Vec<AgmPromptTurnNode>,
+}
+
+/// Individual prompt turn within a conversation (Tier 3 of Prompt Tree)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgmPromptTurnNode {
+    pub turn_number: usize,
+    pub step_index: usize,
+    pub prompt_text: String,
+    pub preview_200w: String,
+    pub status: String,
+    pub is_running: bool,
+    pub is_queued: bool,
+    pub timestamp: String,
+    pub created_at: i64,
+    pub media_paths: Vec<String>,
+    pub media_thumbnails: Vec<String>,
 }
 
 /// Project node in the AGM Tree View (Project -> Conversation -> 200-Word Prompt)

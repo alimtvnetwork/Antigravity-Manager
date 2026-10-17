@@ -50,6 +50,49 @@ export function invalidatePromptTreeCache(targetInstanceId?: string): void {
     }
 }
 
+/**
+ * Optimistically update conversation title in the in-memory SWR cache across instances
+ */
+export function renameConversationOptimistic(
+    conversationId: string,
+    newTitle: string,
+    targetInstanceId?: string
+): void {
+    const keys = targetInstanceId
+        ? [targetInstanceId, ...(targetInstanceId === 'default' || targetInstanceId === '__default__' ? ['default', '__default__'] : [])]
+        : Array.from(promptTreeSwrCache.keys());
+
+    for (const key of keys) {
+        const entry = promptTreeSwrCache.get(key);
+        if (!entry) continue;
+
+        let modified = false;
+        const updatedProjects = entry.data.map((proj) => {
+            const hasConv = proj.conversations.some((c) => c.conversation_id === conversationId);
+            if (!hasConv) return proj;
+
+            modified = true;
+            return {
+                ...proj,
+                conversations: proj.conversations.map((conv) => {
+                    if (conv.conversation_id === conversationId) {
+                        return { ...conv, title: newTitle };
+                    }
+                    return conv;
+                }),
+            };
+        });
+
+        if (modified) {
+            promptTreeSwrCache.set(key, {
+                ...entry,
+                data: updatedProjects,
+            });
+        }
+    }
+}
+
+
 // Shared loading state emitter so TreePanel can observe initial load and render skeletons
 export const promptTreeLoadingEmitter = {
     isLoading: false,

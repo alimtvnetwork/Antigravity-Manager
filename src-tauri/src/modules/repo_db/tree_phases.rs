@@ -20,7 +20,7 @@ pub(crate) fn transition_stale_inflight_prompts(now: i64) {
                 "UPDATE active_prompts
              SET status = 'completed', updated_at = ?1
              WHERE status IN ('running', 'in_flight', 'dispatched')
-               AND (?1 - updated_at > 45)",
+               AND (?1 - updated_at > 600)",
                 rusqlite::params![now],
             ),
             "transition stale in-flight prompts to completed",
@@ -29,6 +29,9 @@ pub(crate) fn transition_stale_inflight_prompts(now: i64) {
 }
 
 pub(crate) fn query_tree_projects(target: Option<&str>) -> Vec<RunningProject> {
+    let inst_to_detect = target.unwrap_or("default");
+    let _ = super::detection::detect_running_projects(inst_to_detect);
+
     let all_projects: Vec<RunningProject> = list_running_projects()
         .unwrap_or_default()
         .into_iter()
@@ -116,7 +119,7 @@ pub(crate) fn discover_fallback_projects(
         };
         // Justification: busy_timeout on a third-party read-only database is a nicety; reads continue with the default
         crate::error::record_ignored(
-            s_conn.pragma_update(None, "busy_timeout", 3000),
+            s_conn.pragma_update(None, "busy_timeout", 5000),
             "set busy_timeout on Antigravity summaries database",
         );
         let sql = "SELECT workspace_uris, last_modified_time, status, not_fully_idle \

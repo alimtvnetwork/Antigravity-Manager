@@ -150,14 +150,21 @@ pub async fn switch_account_to_instance(
         None
     };
 
-    // 1.5. [Step 1/5] Snapshot and re-enqueue running prompts scoped to THIS target instance BEFORE closing IDE
-    let existing_backed_up = crate::modules::repo_db::count_backed_up_prompts(&instance.id);
-    let newly_backed_up = match crate::modules::repo_db::backup_running_prompts(&instance.id) {
+    // 1.5. [Step 1/5] Snapshot and re-enqueue running prompts scoped to the currently active instance BEFORE closing IDE
+    let source_instance_id = if !registry.active_instance_id.is_empty() {
+        registry.active_instance_id.clone()
+    } else {
+        instance.id.clone()
+    };
+
+    let existing_backed_up = crate::modules::repo_db::count_backed_up_prompts(&source_instance_id);
+    let newly_backed_up = match crate::modules::repo_db::backup_running_prompts(&source_instance_id)
+    {
         Ok(count) => count,
         Err(e) => {
             crate::modules::logger::log_warn(&format!(
-                "[INSTANCE_SWITCH] Failed to backup running prompts for '{}': {}",
-                instance.id, e
+                "[INSTANCE_SWITCH] Failed to backup running prompts for source '{}': {}",
+                source_instance_id, e
             ));
             0
         }
@@ -165,15 +172,33 @@ pub async fn switch_account_to_instance(
     let backed_up_count = newly_backed_up.max(existing_backed_up);
     // Justification: opportunistic prompt backup; re-attempted on the next switch
     crate::error::record_ignored(
-        crate::modules::backup_prompts_db::backup_active_running_prompts(Some(&instance.id), None),
+        crate::modules::backup_prompts_db::backup_active_running_prompts(
+            Some(&source_instance_id),
+            None,
+        ),
         "back up active prompts",
     );
 
+    // Re-attribute backed-up prompts from source instance to target instance prior to closing IDE
+    if source_instance_id != instance.id && backed_up_count > 0 {
+        if let Ok(conn) = crate::modules::repo_db::connect_db() {
+            let now = chrono::Utc::now().timestamp();
+            // Justification: prompt re-attribution to target instance during switch
+            crate::error::record_ignored(
+                conn.execute(
+                    "UPDATE active_prompts SET instance_id = ?1, updated_at = ?2 WHERE instance_id = ?3 AND status = 'backed_up'",
+                    rusqlite::params![&instance.id, now, &source_instance_id],
+                ),
+                "re-attribute active prompts to target instance",
+            );
+        }
+    }
+
     let workspace_paths = get_instance_workspace_folders(&instance.id, &instance.data_dir);
     crate::modules::logger::log_info(&format!(
-        "[INSTANCE_SWITCH:STAGE_1_SNAPSHOT] Backed up {} prompts across {} workspaces for instance '{}'",
+        "[INSTANCE_SWITCH:STAGE_1_SNAPSHOT] Backed up {} prompts from active source instance '{}' for target '{}'",
         backed_up_count,
-        workspace_paths.len(),
+        source_instance_id,
         instance.id
     ));
     let project_names: Vec<String> = workspace_paths

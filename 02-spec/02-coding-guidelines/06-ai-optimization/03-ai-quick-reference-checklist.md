@@ -24,10 +24,9 @@ Check every generated code block against these rules before outputting.
 
 ---
 
-### Critical Repository Rules (2 checks)
+### Critical Repository Rules (1 check)
 
 - [ ] NEVER output generated code files (`*.generated.*`, ORM models, etc.) or test artifacts for Git check-in. They belong in `.gitignore`.
-- [ ] Multi-Agent Concurrency: When orchestrating parent tasks, deploy `A = 3` concurrent autonomous subagents via `invoke_subagent`, each operating `H = 2` operational hands (total `A × H = 6` concurrent operations) across disjoint file boundaries with zero solo execution.
 
 ---
 

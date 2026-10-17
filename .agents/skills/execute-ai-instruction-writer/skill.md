@@ -17,24 +17,24 @@ description: >-
 
 ```text
 N = 200 (Total self-loop steps budget)
-A = 3   (Number of spawned autonomous subagents, default: 3)
+A = 2   (Number of spawned autonomous subagents, default: 2)
 H = 2   (Number of hands / parallel operations per agent, default: 2)
 ```
 
 N = total self-loop steps budget that the agents will perform.
-A = count of autonomous subagents running concurrently (default: 3).
+A = count of autonomous subagents running concurrently (default: 2).
 H = number of hands / parallel operations per agent (default: 2).
 
 ---
 
-### Multi-Agent Parallel Task Allocation & Orchestration (A = 3, H = 2)
+### Multi-Agent Parallel Task Allocation & Orchestration (A = 2, H = 2)
 
-When multiple autonomous agents are present (A >= 3, H >= 2):
+When multiple autonomous agents are present (A >= 2, H >= 2):
 1. **Single-Agent Unified Blueprint Mandate:**
    - The initial plan, instruction scoping, and lookahead roadmap MUST be authored by a single lead agent first as a unified blueprint before delegating work to subagents.
    - Never allow multiple agents to author disjoint or competing audit plans simultaneously. A single coherent architectural vision must lead.
 2. **Most Useful Parallel Tasks (Reading Files & Writing Modular Specs):**
-   - Once the unified blueprint is authored by the lead agent, the most effective parallel tasks for subagents (A = 3, H = 2) are:
+   - Once the unified blueprint is authored by the lead agent, the most effective parallel tasks for subagents (A = 2, H = 2) are:
      - **Reading Files:** Fast exploratory reading, scanning dependencies, mapping call sites, and inspecting codebase context in parallel using GitMap AUM (`gitmap find`, `gitmap lf`, `gitmap cat`, `gitmap search`) as primary and Python scripts (`03-ai-scripts/17-fast-file-reader.py`, `03-ai-scripts/11-fast-file-scanner.py`) as fallback.
      - **Writing Modular Specs & Lean Subtasks:** Authoring modular spec sections and subtasks in parallel adhering to the lead agent's blueprint.
 3. **Execution Mode (Disjoint Instruction Generation):**

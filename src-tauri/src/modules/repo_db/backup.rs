@@ -485,7 +485,11 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                                         | rusqlite::OpenFlags::SQLITE_OPEN_URI,
                                 ) {
                                     let mut stmt = ws_conn
-                                        .prepare("SELECT key, value FROM ItemTable WHERE key LIKE '%prompt%' OR key LIKE '%chat%' OR key LIKE '%task%'")
+                                        .prepare(
+                                            "SELECT key, value FROM ItemTable \
+                                             WHERE key IN ('workbench.action.chat.interactiveInputHistory', 'interactive.inputHistory') \
+                                                OR key LIKE 'workbench.panel.chat%input%'"
+                                        )
                                         .ok();
 
                                     if let Some(ref mut prepared) = stmt {
@@ -494,11 +498,33 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                                             let val: String = row.get(1)?;
                                             Ok((key, val))
                                         }) {
-                                            for item in rows.flatten() {
-                                                let content = item.1;
-                                                if !content.trim().is_empty() && content.len() > 10 {
-                                                    let (img_payload, _) = extract_image_payload_or_path(&content);
-                                                    extracted.push((content, img_payload));
+                                            for (_key, val) in rows.flatten() {
+                                                // Only extract validated interactive user prompt text from structured chat input history
+                                                if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&val) {
+                                                    if let Some(arr) = json_val.as_array() {
+                                                        if let Some(last_elem) = arr.last() {
+                                                            let candidate_txt = if let Some(s) = last_elem.as_str() {
+                                                                Some(s.to_string())
+                                                            } else if let Some(s) = last_elem.get("text").or_else(|| last_elem.get("content")).and_then(|v| v.as_str()) {
+                                                                Some(s.to_string())
+                                                            } else {
+                                                                None
+                                                            };
+                                                            if let Some(content) = candidate_txt {
+                                                                let trimmed = content.trim();
+                                                                if !trimmed.is_empty() && trimmed.len() > 10 && !trimmed.starts_with('{') {
+                                                                    let (img_payload, _) = extract_image_payload_or_path(trimmed);
+                                                                    extracted.push((trimmed.to_string(), img_payload));
+                                                                }
+                                                            }
+                                                        }
+                                                    } else if let Some(content) = json_val.get("text").or_else(|| json_val.get("content")).and_then(|v| v.as_str()) {
+                                                        let trimmed = content.trim();
+                                                        if !trimmed.is_empty() && trimmed.len() > 10 && !trimmed.starts_with('{') {
+                                                            let (img_payload, _) = extract_image_payload_or_path(trimmed);
+                                                            extracted.push((trimmed.to_string(), img_payload));
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -577,7 +603,7 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                      WHERE (repo_path = ?1 OR project_id = ?2 OR project_id LIKE ?3) \
                        AND status IN ('running', 'in_flight') \
                        AND (?4 = 'all' OR instance_id = ?4 OR (?4 IN ('default', '__default__') AND instance_id IN ('default', '__default__'))) \
-                     ORDER BY updated_at DESC LIMIT 1",
+                     ORDER BY created_at ASC, id ASC LIMIT 1",
                 )
                 .ok();
             if let Some(ref mut c_stmt) = check_stmt {

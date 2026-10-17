@@ -16,13 +16,14 @@ pub(crate) struct RawConvItem {
     pub(crate) latest_response: Option<String>,
     pub(crate) execution_results: Option<String>,
     pub(crate) tool_calls_summary: Option<String>,
+    pub(crate) prompts: Vec<AgmPromptTurnNode>,
 }
 
 use super::gemini_dirs::gemini_dirs_tagged;
-use super::models::ActivePrompt;
+use super::models::{ActivePrompt, AgmPromptTurnNode};
 use super::project_queries::list_all_prompts;
 use super::schema::connect_db;
-use super::transcript::{inspect_conversation_transcript, resolve_transcript_path};
+use super::transcript::{extract_conversation_prompt_turns, inspect_conversation_transcript, resolve_transcript_path};
 use crate::modules::repo_db::dispatch::parse_flexible_timestamp;
 use crate::modules::repo_db::failed_commands::decode_uri_to_path;
 use crate::modules::repo_db::project_queries::normalize_path_for_compare;
@@ -166,15 +167,18 @@ pub(crate) fn collect_tree_conversation_items(
 
                             let inspection = inspect_conversation_transcript(base, &cid);
 
-                            let is_conv_running = if is_explicit_idle || inspection.is_terminal_done {
-                                false
-                            } else if is_owning_inst_alive && not_fully_idle > 0 && is_recent {
+                            let is_conv_running = if is_owning_inst_alive && not_fully_idle > 0 && is_recent {
+                                // Invariant: Process is alive and SQLite reports active tasks: 100% RUNNING.
+                                // Static transcript heuristics MUST NOT override live runtime state!
                                 true
-                            } else if is_owning_inst_alive && inspection.is_recent_active && !has_idle_status {
+                            } else if is_explicit_idle {
+                                false
+                            } else if is_owning_inst_alive && inspection.is_recent_active && !has_idle_status && !inspection.is_terminal_done {
                                 true
                             } else {
                                 false
                             };
+                            let prompt_turns = extract_conversation_prompt_turns(base, &cid, is_conv_running);
                             let steps = inspection.step_count;
                             let effective_prompt = inspection
                                 .latest_prompt
@@ -283,6 +287,7 @@ pub(crate) fn collect_tree_conversation_items(
                                         latest_response: inspection.latest_response.clone(),
                                         execution_results: inspection.execution_results.clone(),
                                         tool_calls_summary: inspection.tool_calls_summary.clone(),
+                                        prompts: prompt_turns.clone(),
                                     });
                             }
                         }

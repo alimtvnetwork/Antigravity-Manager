@@ -111,7 +111,11 @@ pub fn restore_running_prompts_for_instance(
             model: Some("gemini-3.8-flash-high".to_string()),
             session_id: Some(rec.conversation_id.clone()),
             status: restored_status.to_string(),
-            created_at: now,
+            created_at: if rec.created_at > 0 {
+                rec.created_at
+            } else {
+                now
+            },
             updated_at: now,
             image_payload: rec.images_payload.clone(),
         };

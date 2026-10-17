@@ -1,4 +1,6 @@
 import { useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { isTauri } from '../../../utils/env';
 import {
     focusOrLaunchInstance,
     focusInstanceWorkspace,
@@ -17,6 +19,7 @@ import { copyPromptWithRichImages, extractPromptImages } from './clipboard';
 import {
     buildRichVerificationPrompt,
     buildRerunPrompt,
+    buildMultiPromptVerificationPrompt,
     parseVerificationTypeFromSuffix,
 } from './verificationTemplates';
 
@@ -103,6 +106,12 @@ export interface PromptTreePromptActions {
     handleFocusIde: () => Promise<void>;
     extractAssets: (text: string) => { images: string[]; files: string[] };
     openInspector: (conv: AgmConversationNode, repoPath: string) => void;
+    handleMultiPromptResend: (count: number | 'all') => Promise<{ sent: number; failed: number }>;
+    handleVerifyLastPrompts: (count?: number) => Promise<boolean>;
+    handleCloneAndCompact: () => Promise<string | null>;
+    handleExportConvJson: () => void;
+    handleExportConvYaml: () => void;
+    handleExportConvSqlite: () => Promise<void>;
 }
 
 interface UsePromptTreePromptActionsProps {
@@ -580,6 +589,106 @@ ${activePromptText}
         }
     }, [selectedProject, instanceId, setIsFocusing, setActionMsg, setError]);
 
+    const handleMultiPromptResend = useCallback(async (count: number | 'all') => {
+        const conv = selectedConversationRef.current || selectedConversation;
+        const proj = selectedProjectRef.current || selectedProject;
+        if (!conv) {
+            setError('No conversation selected for multi-prompt resend');
+            return { sent: 0, failed: 0 };
+        }
+        const prompts = extractConversationPromptsList(conv);
+        setActionMsg(`Resending ${count === 'all' ? 'all' : count} prompt(s)...`);
+        const res = await dispatchMultiPromptResend({
+            conversationId: conv.conversation_id,
+            instanceId: proj?.instance_id || instanceId || 'default',
+            repoPath: proj?.repo_path || '',
+            count,
+            prompts,
+        });
+        if (res.sent > 0) {
+            setActionMsg(`Successfully resent ${res.sent} prompt(s)!`);
+            setTimeout(() => setActionMsg(null), 3000);
+        } else if (res.failed > 0) {
+            setError(`Failed to resend prompts (${res.failed} error(s))`);
+        }
+        return res;
+    }, [selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef, instanceId, setActionMsg, setError]);
+
+    const handleVerifyLastPrompts = useCallback(async (count: number = 10) => {
+        const conv = selectedConversationRef.current || selectedConversation;
+        const proj = selectedProjectRef.current || selectedProject;
+        if (!conv) {
+            setError('No conversation selected to verify');
+            return false;
+        }
+        const prompts = extractConversationPromptsList(conv);
+        setActionMsg(`Synthesizing ${count}-prompt verification audit & enqueueing...`);
+        const ok = await handleVerifyLastPromptsAndEnqueue({
+            instanceId: proj?.instance_id || instanceId || 'default',
+            repoPath: proj?.repo_path || '',
+            conversationId: conv.conversation_id,
+            convTitle: conv.title || conv.short_id,
+            count,
+            prompts,
+        });
+        if (ok) {
+            setActionMsg(`Synthesized ${Math.min(count, prompts.length)}-prompt audit & enqueued to instance!`);
+            setTimeout(() => setActionMsg(null), 3500);
+        } else {
+            setError('Failed to enqueue verification audit');
+        }
+        return ok;
+    }, [selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef, instanceId, setActionMsg, setError]);
+
+    const handleCloneAndCompact = useCallback(async () => {
+        const conv = selectedConversationRef.current || selectedConversation;
+        const proj = selectedProjectRef.current || selectedProject;
+        if (!conv) {
+            setError('No conversation selected to clone and compact');
+            return null;
+        }
+        setActionMsg('Cloning conversation and compacting memory handoff...');
+        const newTitle = await handleCloneAndCompactConversation({
+            instanceId: proj?.instance_id || instanceId || 'default',
+            repoPath: proj?.repo_path || '',
+            sourceConv: conv,
+        });
+        if (newTitle) {
+            setActionMsg(`Cloned & compacted into fresh session '${newTitle}'!`);
+            setTimeout(() => setActionMsg(null), 3500);
+        } else {
+            setError('Failed to clone and compact conversation');
+        }
+        return newTitle;
+    }, [selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef, instanceId, setActionMsg, setError]);
+
+    const handleExportConvJson = useCallback(() => {
+        const conv = selectedConversationRef.current || selectedConversation;
+        const proj = selectedProjectRef.current || selectedProject;
+        if (!conv) return;
+        exportConversationAsJson(conv, proj?.repo_path);
+        setActionMsg('Exported conversation as JSON');
+        setTimeout(() => setActionMsg(null), 2500);
+    }, [selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef, setActionMsg]);
+
+    const handleExportConvYaml = useCallback(() => {
+        const conv = selectedConversationRef.current || selectedConversation;
+        const proj = selectedProjectRef.current || selectedProject;
+        if (!conv) return;
+        exportConversationAsYaml(conv, proj?.repo_path);
+        setActionMsg('Exported conversation as YAML');
+        setTimeout(() => setActionMsg(null), 2500);
+    }, [selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef, setActionMsg]);
+
+    const handleExportConvSqlite = useCallback(async () => {
+        const conv = selectedConversationRef.current || selectedConversation;
+        if (!conv) return;
+        setActionMsg('Exporting conversation as SQLite .db...');
+        await exportConversationAsSqlite(conv);
+        setActionMsg('Exported conversation as SQLite .db');
+        setTimeout(() => setActionMsg(null), 2500);
+    }, [selectedConversation, selectedConversationRef, setActionMsg]);
+
     return {
         handleCopyAllWithRichImages,
         handleCopyWithImagesRich,
@@ -593,6 +702,12 @@ ${activePromptText}
         handleFocusIde,
         extractAssets,
         openInspector,
+        handleMultiPromptResend,
+        handleVerifyLastPrompts,
+        handleCloneAndCompact,
+        handleExportConvJson,
+        handleExportConvYaml,
+        handleExportConvSqlite,
     };
 }
 
@@ -740,3 +855,364 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
     return result;
 }
 // END RERUN SECTION (Task-04)
+
+// ============================================================================
+// CONVERSATION ACTIONS SECTION (Task-03)
+// ----------------------------------------------------------------------------
+// Multi-prompt resend, verify last prompts & enqueue, clone & compact memory,
+// and per-conversation JSON/YAML/SQLite export utilities.
+// ============================================================================
+
+export function extractConversationPromptsList(conv: AgmConversationNode): string[] {
+    const list: string[] = [];
+    if (conv.sub_runs && conv.sub_runs.length > 0) {
+        for (const sub of conv.sub_runs) {
+            const body = (sub.full_prompt_text || sub.prompt_preview_200w || '').trim();
+            if (body && !list.includes(body)) {
+                list.push(body);
+            }
+        }
+    }
+    const mainBody = (conv.full_prompt_text || conv.prompt_preview_200w || '').trim();
+    if (mainBody && !list.includes(mainBody)) {
+        list.push(mainBody);
+    }
+    return list.length > 0 ? list : (mainBody ? [mainBody] : []);
+}
+
+export interface MultiPromptResendOptions {
+    conversationId: string;
+    instanceId: string;
+    repoPath: string;
+    count: number | 'all';
+    delayMs?: number;
+    prompts?: string[];
+}
+
+export async function dispatchMultiPromptResend(
+    options: MultiPromptResendOptions
+): Promise<{ sent: number; failed: number }> {
+    const delay = options.delayMs ?? 500;
+    const allPrompts = options.prompts ?? [];
+    const targetPrompts =
+        options.count === 'all'
+            ? allPrompts
+            : allPrompts.slice(-Math.max(1, Math.floor(Number(options.count))));
+
+    const result = { sent: 0, failed: 0 };
+    for (const prompt of targetPrompts) {
+        if (!prompt || !prompt.trim()) continue;
+        const { rewrittenPrompt } = extractPromptImages(prompt);
+        try {
+            await sendPromptNow(options.instanceId, options.repoPath, rewrittenPrompt, options.conversationId);
+            result.sent += 1;
+            await auditRecord({
+                actor: 'user',
+                methodName: 'prompt_tree_multi_resend',
+                uiTarget: 'ConversationContextMenu | ResendSubmenu',
+                trigger: 'click',
+                params: {
+                    conversationId: options.conversationId,
+                    instanceId: options.instanceId,
+                    promptCount: targetPrompts.length,
+                    prompt,
+                },
+                result: 'ok',
+            });
+        } catch (err) {
+            result.failed += 1;
+            persistClientCrash(err, 'usePromptTreePromptActions.dispatchMultiPromptResend');
+            useErrorStore.getState().trackWarning(err, {
+                source: 'usePromptTreePromptActions.dispatchMultiPromptResend',
+                triggerAction: 'multi_prompt_resend',
+            });
+        }
+        if (delay > 0) {
+            await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+    }
+    return result;
+}
+
+export interface VerifyLastPromptsOptions {
+    instanceId: string;
+    repoPath: string;
+    conversationId: string;
+    convTitle?: string;
+    count?: number;
+    prompts?: string[];
+}
+
+export async function handleVerifyLastPromptsAndEnqueue(
+    options: VerifyLastPromptsOptions
+): Promise<boolean> {
+    try {
+        const count = options.count ?? 10;
+        const allPrompts = options.prompts ?? [];
+        const subset = allPrompts.slice(-count);
+        const verificationPrompt = buildMultiPromptVerificationPrompt(
+            subset.length > 0 ? subset : ['Verify all completed tasks in this conversation and provide a full evidence scorecard.'],
+            options.convTitle || options.conversationId
+        );
+
+        const { rewrittenPrompt } = extractPromptImages(verificationPrompt);
+        await enqueuePrompt(options.instanceId, options.repoPath, rewrittenPrompt, options.conversationId);
+        try {
+            await copyPromptWithRichImages(verificationPrompt);
+        } catch (clipErr) {
+            useErrorStore.getState().trackWarning(clipErr, {
+                source: 'usePromptTreePromptActions.handleVerifyLastPromptsAndEnqueue',
+                triggerAction: 'copy_verify_prompt_clipboard',
+            });
+        }
+        await auditRecord({
+            actor: 'user',
+            methodName: 'prompt_tree_verify_last_prompts_enqueue',
+            uiTarget: 'ConversationContextMenu | VerifyLastPrompts',
+            trigger: 'click',
+            params: {
+                conversationId: options.conversationId,
+                instanceId: options.instanceId,
+                auditedCount: subset.length,
+            },
+            result: 'ok',
+        });
+        return true;
+    } catch (err) {
+        persistClientCrash(err, 'usePromptTreePromptActions.handleVerifyLastPromptsAndEnqueue');
+        useErrorStore.getState().captureException(
+            err instanceof Error ? err : new Error(String(err)),
+            {
+                source: 'usePromptTreePromptActions.handleVerifyLastPromptsAndEnqueue',
+                triggerAction: 'enqueue_verify_prompts',
+            }
+        );
+        return false;
+    }
+}
+
+export interface CloneAndCompactOptions {
+    instanceId: string;
+    repoPath: string;
+    sourceConv: AgmConversationNode;
+    prompts?: string[];
+}
+
+export async function handleCloneAndCompactConversation(
+    options: CloneAndCompactOptions
+): Promise<string | null> {
+    try {
+        const { sourceConv, instanceId, repoPath } = options;
+        const allPrompts = options.prompts ?? extractConversationPromptsList(sourceConv);
+        const compactTitle = `[Compacted] ${sourceConv.title || sourceConv.short_id || 'Conversation'}`;
+
+        const summaryGoals = allPrompts
+            .slice(0, 5)
+            .map((p, idx) => `${idx + 1}. ${p.slice(0, 150).replace(/\n/g, ' ')}`)
+            .join('\n');
+
+        const compactContext = [
+            '# 📦 SESSION HANDOFF & COMPACTED MEMORY CONTEXT',
+            '',
+            `> **Source Conversation:** ${sourceConv.title || sourceConv.short_id} (\`${sourceConv.conversation_id}\`)`,
+            `> **Previous Steps Completed:** ${sourceConv.step_count || 1}`,
+            `> **Timestamp:** ${new Date().toISOString()}`,
+            '',
+            '### 1. Predecessor Goals & Instructions Summary:',
+            summaryGoals || 'No prior prompt history found.',
+            '',
+            sourceConv.latest_response ? `### 2. Latest AI Response Outcome:\n${sourceConv.latest_response.slice(0, 800)}\n` : '',
+            sourceConv.execution_results ? `### 3. Key Execution Results:\n${sourceConv.execution_results.slice(0, 800)}\n` : '',
+            '',
+            '### 4. Continuous Execution Handoff Directive:',
+            'You are resuming work from a compacted predecessor session in a fresh clean session context.',
+            'Review the verified state above and continue seamlessly toward task completion.',
+        ].filter(Boolean).join('\n');
+
+        const { rewrittenPrompt } = extractPromptImages(compactContext);
+        await enqueuePrompt(instanceId, repoPath, rewrittenPrompt, compactTitle);
+
+        try {
+            await copyPromptWithRichImages(compactContext);
+        } catch (clipErr) {
+            useErrorStore.getState().trackWarning(clipErr, {
+                source: 'usePromptTreePromptActions.handleCloneAndCompactConversation',
+                triggerAction: 'copy_compacted_context',
+            });
+        }
+
+        await auditRecord({
+            actor: 'user',
+            methodName: 'prompt_tree_clone_and_compact',
+            uiTarget: 'ConversationContextMenu | CloneCompact',
+            trigger: 'click',
+            params: {
+                sourceConvId: sourceConv.conversation_id,
+                targetTitle: compactTitle,
+                instanceId,
+            },
+            result: 'ok',
+        });
+
+        return compactTitle;
+    } catch (err) {
+        persistClientCrash(err, 'usePromptTreePromptActions.handleCloneAndCompactConversation');
+        useErrorStore.getState().captureException(
+            err instanceof Error ? err : new Error(String(err)),
+            {
+                source: 'usePromptTreePromptActions.handleCloneAndCompactConversation',
+                triggerAction: 'clone_compact_conversation',
+            }
+        );
+        return null;
+    }
+}
+
+export function exportConversationAsJson(conv: AgmConversationNode, repoPath?: string): void {
+    try {
+        const baseName = (conv.title || conv.short_id || 'conversation')
+            .replace(/[^a-zA-Z0-9_\-\s]/g, '')
+            .trim()
+            .replace(/\s+/g, '_')
+            .slice(0, 40) || 'conversation';
+
+        const data = {
+            conversation_id: conv.conversation_id,
+            seq_code: conv.seq_code,
+            title: conv.title,
+            short_id: conv.short_id,
+            status: conv.status,
+            is_running: conv.is_running,
+            step_count: conv.step_count,
+            repo_path: repoPath ?? '',
+            full_prompt_text: conv.full_prompt_text ?? '',
+            prompt_preview_200w: conv.prompt_preview_200w ?? '',
+            latest_response: conv.latest_response ?? '',
+            execution_results: conv.execution_results ?? '',
+            sub_runs: conv.sub_runs ?? [],
+            exported_at: new Date().toISOString(),
+        };
+
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${baseName}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        useErrorStore.getState().captureException(
+            err instanceof Error ? err : new Error(String(err)),
+            {
+                source: 'usePromptTreePromptActions.exportConversationAsJson',
+                triggerAction: 'export_conv_json',
+            }
+        );
+    }
+}
+
+function escapeYaml(val: unknown): string {
+    if (val === null || val === undefined) return '""';
+    const s = String(val);
+    if (s.includes('\n') || s.includes('"') || s.includes(':') || s.includes('#')) {
+        return `|-\n    ${s.split('\n').join('\n    ')}`;
+    }
+    return `"${s.replace(/"/g, '\\"')}"`;
+}
+
+export function exportConversationAsYaml(conv: AgmConversationNode, repoPath?: string): void {
+    try {
+        const baseName = (conv.title || conv.short_id || 'conversation')
+            .replace(/[^a-zA-Z0-9_\-\s]/g, '')
+            .trim()
+            .replace(/\s+/g, '_')
+            .slice(0, 40) || 'conversation';
+
+        const lines = [
+            `conversation_id: ${escapeYaml(conv.conversation_id)}`,
+            `seq_code: ${escapeYaml(conv.seq_code)}`,
+            `title: ${escapeYaml(conv.title)}`,
+            `short_id: ${escapeYaml(conv.short_id)}`,
+            `status: ${escapeYaml(conv.status)}`,
+            `is_running: ${Boolean(conv.is_running)}`,
+            `step_count: ${conv.step_count || 1}`,
+            `repo_path: ${escapeYaml(repoPath || '')}`,
+            `exported_at: ${escapeYaml(new Date().toISOString())}`,
+            `prompt_text: ${escapeYaml(conv.full_prompt_text || conv.prompt_preview_200w || '')}`,
+            `latest_response: ${escapeYaml(conv.latest_response || '')}`,
+            `execution_results: ${escapeYaml(conv.execution_results || '')}`,
+        ];
+
+        if (conv.sub_runs && conv.sub_runs.length > 0) {
+            lines.push('sub_runs:');
+            for (const sub of conv.sub_runs) {
+                lines.push(`  - id: ${escapeYaml(sub.conversation_id)}`);
+                lines.push(`    title: ${escapeYaml(sub.title)}`);
+                lines.push(`    prompt: ${escapeYaml(sub.full_prompt_text || sub.prompt_preview_200w || '')}`);
+            }
+        }
+
+        const blob = new Blob([lines.join('\n')], { type: 'text/yaml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${baseName}.yaml`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        useErrorStore.getState().captureException(
+            err instanceof Error ? err : new Error(String(err)),
+            {
+                source: 'usePromptTreePromptActions.exportConversationAsYaml',
+                triggerAction: 'export_conv_yaml',
+            }
+        );
+    }
+}
+
+export async function exportConversationAsSqlite(conv: AgmConversationNode): Promise<void> {
+    try {
+        const baseName = (conv.title || conv.short_id || 'conversation')
+            .replace(/[^a-zA-Z0-9_\-\s]/g, '')
+            .trim()
+            .replace(/\s+/g, '_')
+            .slice(0, 40) || 'conversation';
+        const fileName = `${baseName}-${Date.now()}.db`;
+
+        if (!isTauri()) {
+            const data = JSON.stringify(conv, null, 2);
+            const blob = new Blob([data], { type: 'application/x-sqlite3' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            return;
+        }
+
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        const selected = await save({
+            defaultPath: fileName,
+            filters: [{ name: 'SQLite Database', extensions: ['db', 'sqlite'] }],
+        });
+        if (!selected) return;
+
+        await invoke('export_prompt_tree_sqlite', { path: selected });
+    } catch (err) {
+        useErrorStore.getState().captureException(
+            err instanceof Error ? err : new Error(String(err)),
+            {
+                source: 'usePromptTreePromptActions.exportConversationAsSqlite',
+                triggerAction: 'export_conv_sqlite',
+            }
+        );
+    }
+}
+

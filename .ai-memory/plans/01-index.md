@@ -9,6 +9,7 @@ Master directory of architectural and execution plans.
 - [11-code-red-refactor-remediation.md](pending/11-code-red-refactor-remediation.md): Remediate Code Red enum, boolean, and query wrapper violations across the codebase.
 - [12-cicd-rustfmt-and-compile-errors.md](pending/12-cicd-rustfmt-and-compile-errors.md): Resolve rustfmt drift in iterative codec and compilation errors in email watcher and command queue.
 - [73-two-bar-installer-and-dwm-blank-ui-fix.md](subtasks/73-two-bar-installer-and-dwm-blank-ui-fix/01-installer-version-resolution-and-workflow-stamping.md): Two-Bar Release Installation & DWM Blank UI Fix.
+- [prompt-tree-subtree-and-import-export.md](prompt-tree-subtree-and-import-export.md): Prompt Tree Subtree Hierarchy, Accurate Running State, Section Import/Export with Base64 Images, and Typography Overhaul.
 
 ## Archived Plans
 

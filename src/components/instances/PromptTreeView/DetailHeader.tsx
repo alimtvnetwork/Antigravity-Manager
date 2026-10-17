@@ -1,5 +1,6 @@
 import { copyToClipboard } from '../../../utils/clipboard';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import type { AgmConversationNode } from './types';
@@ -9,7 +10,8 @@ import { classifyPromptTier } from './tierClassification';
 import { isGhostConversation } from './conversationGuards';
 import { persistClientCrash } from '../../../lib/error-listener';
 import { useErrorStore } from '../../../stores/error-store';
-import { VERIFICATION_OPTIONS, parseVerificationTypeFromSuffix } from './verificationTemplates';
+import { VERIFICATION_OPTIONS, parseVerificationTypeFromSuffix, getCustomSuffixTemplates, type SuffixTemplate } from './verificationTemplates';
+import { SuffixTemplateModal } from './SuffixTemplateModal';
 
 function DispatchFieldHint({ id, text }: { id: string; text: string }) {
     return (
@@ -132,6 +134,58 @@ export function DetailHeader(props: DetailHeaderProps) {
     const isSendMenuOpen = propIsSendMenuOpen ?? propIsEnqueueMenuOpen ?? localIsSendMenuOpen;
     const setIsSendMenuOpen = propSetIsSendMenuOpen ?? propSetIsEnqueueMenuOpen ?? setLocalIsSendMenuOpen;
 
+    // Double-click inline title editing state
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [editedTitle, setEditedTitle] = useState(selectedConversation.title || selectedConversation.short_id || '');
+
+    useEffect(() => {
+        setEditedTitle(selectedConversation.title || selectedConversation.short_id || '');
+        setIsEditingTitle(false);
+    }, [selectedConversation.conversation_id, selectedConversation.title, selectedConversation.short_id]);
+
+    const handleCommitTitle = async () => {
+        const trimmed = editedTitle.trim();
+        setIsEditingTitle(false);
+        if (!trimmed || trimmed === (selectedConversation.title || selectedConversation.short_id)) {
+            setEditedTitle(selectedConversation.title || selectedConversation.short_id || '');
+            return;
+        }
+        try {
+            await invoke('rename_conversation', {
+                instanceId: selectedConversation.instance_id || 'default',
+                conversationId: selectedConversation.conversation_id,
+                newTitle: trimmed,
+            });
+            selectedConversation.title = trimmed;
+        } catch (err) {
+            reportPromptActionError(err, 'DetailHeader.renameConversation');
+        }
+    };
+
+    const [isTitleCopied, setIsTitleCopied] = useState(false);
+
+    const handleCopyConversationTitle = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        const titleToCopy = selectedConversation.title || selectedConversation.short_id || '';
+        if (!titleToCopy) return;
+        try {
+            await copyToClipboard(titleToCopy);
+            setIsTitleCopied(true);
+            setTimeout(() => setIsTitleCopied(false), 2000);
+        } catch (err) {
+            reportPromptActionError(err, 'DetailHeader.copyConversationTitle');
+        }
+    };
+
+    // Suffix Template Library & Popover state
+    const [isSuffixPopoverOpen, setIsSuffixPopoverOpen] = useState(false);
+    const [isSuffixModalOpen, setIsSuffixModalOpen] = useState(false);
+    const [customTemplates, setCustomTemplates] = useState<SuffixTemplate[]>([]);
+
+    useEffect(() => {
+        setCustomTemplates(getCustomSuffixTemplates());
+    }, [isSendMenuOpen, confirmationSuffix]);
+
     // RERUN SECTION (Task-04): state + dispatch handler for the rerun capsule.
     const [isRerunMenuOpen, setIsRerunMenuOpen] = useState(false);
     const [rerunCount, setRerunCount] = useState<number>(RERUN_DEFAULT_COUNT);
@@ -208,7 +262,10 @@ export function DetailHeader(props: DetailHeaderProps) {
                         const seqDisplay = formatSeqBadge(rawSeq, 'C001');
                         const tierInfo = classifyPromptTier(activePromptText, selectedConversation.title);
                         return (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20" title={`${tierInfo.tier}`}>
+                            <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20 cursor-help"
+                                title={`Conversation #${rawSeq.replace(/^C/i, '') || '001'} (Sequential AGM Index) · ${tierInfo.tier}`}
+                            >
                                 {tierInfo.tier === 'USER_PROMPT' && <User className="w-2.5 h-2.5 text-sky-500 shrink-0" />}
                                 {tierInfo.tier === 'SUBAGENT_INSTRUCTION' && <Bot className="w-2.5 h-2.5 text-purple-500 shrink-0" />}
                                 {tierInfo.tier === 'SYSTEM_MESSAGE' && <Terminal className="w-2.5 h-2.5 text-slate-500 shrink-0" />}
@@ -237,10 +294,57 @@ export function DetailHeader(props: DetailHeaderProps) {
                         </span>
                     )}
 
-                    {/* Title */}
-                    <h3 className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[200px] md:max-w-xs" title={selectedConversation.title || selectedConversation.short_id}>
-                        {selectedConversation.title || selectedConversation.short_id}
-                    </h3>
+                    {/* Title with Double-Click Inline Rename and 1-Click Header Copy Button */}
+                    {isEditingTitle ? (
+                        <input
+                            type="text"
+                            autoFocus
+                            value={editedTitle}
+                            onChange={(e) => setEditedTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    void handleCommitTitle();
+                                } else if (e.key === 'Escape') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setEditedTitle(selectedConversation.title || selectedConversation.short_id || '');
+                                    setIsEditingTitle(false);
+                                }
+                            }}
+                            onBlur={() => void handleCommitTitle()}
+                            onClick={(e) => e.stopPropagation()}
+                            onDoubleClick={(e) => e.stopPropagation()}
+                            className="px-1.5 py-0.5 text-xs font-bold font-ubuntu rounded bg-white dark:bg-[#120a1f] border border-purple-500/50 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500 max-w-[200px] md:max-w-xs shadow-inner"
+                        />
+                    ) : (
+                        <div className="flex items-center gap-1.5 min-w-0">
+                            <h3
+                                onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsEditingTitle(true);
+                                }}
+                                className="text-xs font-bold font-ubuntu text-slate-900 dark:text-white truncate max-w-[200px] md:max-w-xs cursor-pointer hover:text-purple-600 dark:hover:text-purple-300 transition-colors"
+                                title={`${selectedConversation.title || selectedConversation.short_id} (Double-click to rename)`}
+                            >
+                                {selectedConversation.title || selectedConversation.short_id}
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={handleCopyConversationTitle}
+                                data-ui-name="header-copy-title-btn"
+                                className="p-1 rounded-md text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 active:scale-95 transition-all cursor-pointer shrink-0"
+                                title="Copy conversation title"
+                            >
+                                {isTitleCopied ? (
+                                    <Check className="w-3.5 h-3.5 text-emerald-500 animate-in zoom-in-75 duration-150" />
+                                ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                )}
+                            </button>
+                        </div>
+                    )}
 
                     {/* Subtle Instance Context (Breadcrumb style) */}
                     <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate" title={`Instance #${instanceSeqNum} · ${instanceExeName} (${instanceNameDisplay})`}>
@@ -332,10 +436,47 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 onClick={() => setIsSendMenuOpen((prev) => !prev)}
                                 data-ui-name="prompt-dispatch-options-btn"
                                 data-ui-id={`prompt-dispatch-options-${selectedConversation.conversation_id}`}
-                                className="flex items-center justify-center px-1.5 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                className="flex items-center justify-center px-1.5 py-1 rounded-none text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title="Unified dispatch configuration popover"
                             >
                                 <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isSendMenuOpen && "rotate-180")} />
+                            </button>
+                        </div>
+
+                        {/* Segment 3: Rerun Split Button [ Rerun xN | v ] */}
+                        <div className="flex items-center divide-x divide-slate-200/70 dark:divide-purple-500/20">
+                            {/* Main Button: Quick Rerun (with N count badge) */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    void handleRerun().catch((err) => {
+                                        reportPromptActionError(err, 'DetailHeader.rerunSection');
+                                    });
+                                }}
+                                disabled={isRerunning}
+                                data-ui-name="prompt-rerun-btn"
+                                data-ui-id={`prompt-rerun-${selectedConversation.conversation_id}`}
+                                className="flex items-center gap-1.5 px-3 py-1 rounded-none text-sky-700 dark:text-sky-300 hover:bg-sky-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                                title={`Dispatch the chosen rerun nudge ${rerunCount} time(s) to the running instance`}
+                            >
+                                {rerunFlash ? (
+                                    <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                                ) : (
+                                    <Repeat className={cn('w-3 h-3 text-sky-500 shrink-0', isRerunning && 'animate-spin')} />
+                                )}
+                                <span>{isRerunning ? 'Rerunning…' : rerunFlash ?? `Rerun ×${rerunCount}`}</span>
+                            </button>
+
+                            {/* Split ChevronDown: Rerun Configuration Flyout */}
+                            <button
+                                type="button"
+                                onClick={() => setIsRerunMenuOpen((prev) => !prev)}
+                                data-ui-name="prompt-rerun-options-btn"
+                                data-ui-id={`prompt-rerun-options-${selectedConversation.conversation_id}`}
+                                className="flex items-center justify-center px-1.5 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                title="Rerun configuration: count and message"
+                            >
+                                <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isRerunMenuOpen && "rotate-180")} />
                             </button>
                         </div>
 
@@ -578,28 +719,109 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     </div>
                                 )}
 
-                                {/* Suffix presets */}
-                                <div className="group/field relative flex items-center justify-between px-2 py-1 text-xs">
-                                    <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
-                                        Suffix:
-                                    </span>
-                                    <select
-                                        value={parseVerificationTypeFromSuffix(confirmationSuffix)}
-                                        onChange={(e) => {
-                                            const nextVal = e.target.value;
-                                            setConfirmationSuffix(nextVal === 'none' ? 'None (Send as is)' : nextVal);
-                                        }}
-                                        className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:ring-0 focus:outline-none cursor-pointer py-0.5 text-right max-w-[140px] truncate"
-                                        aria-describedby="dispatch-suffix-hint"
-                                    >
-                                        {VERIFICATION_OPTIONS.map((opt) => (
-                                            <option key={opt.value} value={opt.value} className="bg-white dark:bg-[#171025]">
-                                                {opt.dropdownLabel || opt.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <DispatchFieldHint id="dispatch-suffix-hint" text="Confirmation suffix appended on dispatch" />
-                                </div>
+                                {/* Suffix presets with custom dark-glass popover */}
+                                {(() => {
+                                    const parsedType = parseVerificationTypeFromSuffix(confirmationSuffix);
+                                    const matchedBuiltin = VERIFICATION_OPTIONS.find((o) => o.value === parsedType);
+                                    const matchedCustom = customTemplates.find((c) => c.id === confirmationSuffix);
+                                    const currentSuffixLabel = matchedCustom ? matchedCustom.name : (matchedBuiltin?.dropdownLabel || matchedBuiltin?.label || 'None');
+
+                                    return (
+                                        <div className="group/field relative flex items-center justify-between px-2 py-1 text-xs">
+                                            <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
+                                                Suffix:
+                                            </span>
+                                            <div className="relative">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsSuffixPopoverOpen((prev) => !prev)}
+                                                    className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-purple-950/40 border border-slate-200/80 dark:border-purple-500/20 text-slate-800 dark:text-slate-200 text-xs font-semibold hover:bg-slate-200/80 dark:hover:bg-purple-900/50 transition-colors cursor-pointer max-w-[140px]"
+                                                    title="Select confirmation suffix or verification template"
+                                                >
+                                                    <span className="truncate">{currentSuffixLabel}</span>
+                                                    <ChevronDown className={cn("w-3 h-3 text-slate-400 shrink-0 transition-transform duration-150", isSuffixPopoverOpen && "rotate-180")} />
+                                                </button>
+
+                                                {isSuffixPopoverOpen && (
+                                                    <div
+                                                        className="absolute right-0 top-full mt-1.5 z-50 w-64 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-2xl p-1.5 space-y-1 backdrop-blur-md max-h-72 overflow-y-auto animate-in fade-in zoom-in-95 duration-100"
+                                                        onMouseLeave={() => setIsSuffixPopoverOpen(false)}
+                                                    >
+                                                        <div className="px-2 py-0.5 text-[9.5px] font-mono uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-[#40285e]/60">
+                                                            Built-in Presets
+                                                        </div>
+                                                        {VERIFICATION_OPTIONS.map((opt) => {
+                                                            const isSelected = parsedType === opt.value && !matchedCustom;
+                                                            return (
+                                                                <button
+                                                                    key={opt.value}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setConfirmationSuffix(opt.value === 'none' ? 'None (Send as is)' : opt.value);
+                                                                        setIsSuffixPopoverOpen(false);
+                                                                    }}
+                                                                    className={cn(
+                                                                        "w-full flex items-center justify-between px-2 py-1 rounded-lg text-left text-xs transition-colors cursor-pointer",
+                                                                        isSelected
+                                                                            ? "bg-purple-500/15 text-purple-700 dark:text-purple-300 font-semibold"
+                                                                            : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#40285e]"
+                                                                    )}
+                                                                >
+                                                                    <span className="truncate">{opt.dropdownLabel || opt.label}</span>
+                                                                    {isSelected && <Check className="w-3.5 h-3.5 text-purple-500 shrink-0" />}
+                                                                </button>
+                                                            );
+                                                        })}
+
+                                                        {customTemplates.length > 0 && (
+                                                            <>
+                                                                <div className="px-2 pt-1.5 pb-0.5 text-[9.5px] font-mono uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-[#40285e]/60 mt-1">
+                                                                    Custom Templates
+                                                                </div>
+                                                                {customTemplates.map((ct) => {
+                                                                    const isSelected = confirmationSuffix === ct.id;
+                                                                    return (
+                                                                        <button
+                                                                            key={ct.id}
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setConfirmationSuffix(ct.id);
+                                                                                setIsSuffixPopoverOpen(false);
+                                                                            }}
+                                                                            className={cn(
+                                                                                "w-full flex items-center justify-between px-2 py-1 rounded-lg text-left text-xs transition-colors cursor-pointer",
+                                                                                isSelected
+                                                                                    ? "bg-purple-500/15 text-purple-700 dark:text-purple-300 font-semibold"
+                                                                                    : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#40285e]"
+                                                                            )}
+                                                                        >
+                                                                            <span className="truncate">{ct.name}</span>
+                                                                            {isSelected && <Check className="w-3.5 h-3.5 text-purple-500 shrink-0" />}
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </>
+                                                        )}
+
+                                                        <div className="pt-1 border-t border-slate-100 dark:border-[#40285e]/60">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setIsSuffixPopoverOpen(false);
+                                                                    setIsSuffixModalOpen(true);
+                                                                }}
+                                                                className="w-full flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition-colors cursor-pointer"
+                                                            >
+                                                                <span>+ Manage Suffix Templates...</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <DispatchFieldHint id="dispatch-suffix-hint" text="Confirmation suffix appended on dispatch" />
+                                        </div>
+                                    );
+                                })()}
 
                                 <div className="border-t border-slate-100 dark:border-[#40285e]/60 my-1" />
 
@@ -677,47 +899,8 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 </div>
                             </div>
                         )}
-                    </div>
 
-                    {/* RERUN SECTION (Task-04): rerun capsule adjacent to the Send capsule.
-                        Dispatches a follow-up nudge message N times through the canonical
-                        sendPromptNow path (see usePromptTreePromptActions.dispatchRerunMessages). */}
-                    <div className="relative flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0 ml-1.5">
-                        {/* Main Button: Quick Rerun (with N count badge) */}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                void handleRerun().catch((err) => {
-                                    reportPromptActionError(err, 'DetailHeader.rerunSection');
-                                });
-                            }}
-                            disabled={isRerunning}
-                            data-ui-name="prompt-rerun-btn"
-                            data-ui-id={`prompt-rerun-${selectedConversation.conversation_id}`}
-                            className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-sky-700 dark:text-sky-300 hover:bg-sky-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                            title={`Dispatch the chosen rerun nudge ${rerunCount} time(s) to the running instance`}
-                        >
-                            {rerunFlash ? (
-                                <Check className="w-3 h-3 text-emerald-500 shrink-0" />
-                            ) : (
-                                <Repeat className={cn('w-3 h-3 text-sky-500 shrink-0', isRerunning && 'animate-spin')} />
-                            )}
-                            <span>{isRerunning ? 'Rerunning…' : rerunFlash ?? `Rerun ×${rerunCount}`}</span>
-                        </button>
-
-                        {/* Split ChevronDown: Rerun Configuration Flyout */}
-                        <button
-                            type="button"
-                            onClick={() => setIsRerunMenuOpen((prev) => !prev)}
-                            data-ui-name="prompt-rerun-options-btn"
-                            data-ui-id={`prompt-rerun-options-${selectedConversation.conversation_id}`}
-                            className="flex items-center justify-center px-1.5 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                            title="Rerun configuration: count and message"
-                        >
-                            <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isRerunMenuOpen && "rotate-180")} />
-                        </button>
-
-                        {/* Rerun Flyout: count selector + message options */}
+                        {/* Flyout 3: Rerun Configuration Flyout */}
                         {isRerunMenuOpen && (
                             <div
                                 className="absolute right-0 top-full mt-1.5 z-50 w-72 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl p-2 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-1.5"
@@ -827,6 +1010,14 @@ export function DetailHeader(props: DetailHeaderProps) {
                     {/* END RERUN SECTION (Task-04) */}
                 </div>
             </div>
+
+            {/* Suffix Template Management Modal */}
+            <SuffixTemplateModal
+                isOpen={isSuffixModalOpen}
+                onClose={() => setIsSuffixModalOpen(false)}
+                onSelectTemplate={(tid) => setConfirmationSuffix(tid)}
+                activeTemplateId={confirmationSuffix}
+            />
         </div>
     );
 }

@@ -350,6 +350,127 @@ pub fn extract_prompt_tail_snippet(raw_text: &str, tail_word_count: usize) -> St
     }
 }
 
+/// Update conversation title across both instance conversation_summaries.db and AGM repo_prompts.db.
+/// Invalidates the prompt tree cache upon success.
+pub fn update_conversation_title(
+    instance_id: Option<&str>,
+    conversation_id: &str,
+    new_title: &str,
+) -> Result<(), crate::error::AppError> {
+    let clean_title = new_title.trim();
+    if clean_title.is_empty() {
+        return Err(crate::error::AppError::Config(
+            "Conversation title cannot be empty".to_string(),
+        ));
+    }
+    let clean_cid = conversation_id.trim();
+    if clean_cid.is_empty() {
+        return Err(crate::error::AppError::Config(
+            "Conversation ID cannot be empty".to_string(),
+        ));
+    }
+
+    let resolved_inst = instance_id
+        .filter(|s| !s.is_empty())
+        .map(|s| crate::modules::instance::resolve_instance_id(s).unwrap_or_else(|_| s.to_string()))
+        .unwrap_or_else(|| "default".to_string());
+
+    // 1. Locate instance's conversation_summaries.db and update
+    let candidate_dirs = super::gemini_dirs::gemini_dirs_for_instance(&resolved_inst);
+    let now_iso = Utc::now().to_rfc3339();
+
+    for dir in &candidate_dirs {
+        let db_candidates = [
+            dir.join("conversation_summaries.db"),
+            dir.join("antigravity").join("conversation_summaries.db"),
+        ];
+
+        for db_path in db_candidates {
+            if db_path.exists() {
+                if let Ok(conn) = Connection::open(&db_path) {
+                    crate::error::record_ignored(
+                        conn.pragma_update(None, "busy_timeout", 5000),
+                        "set busy_timeout on conversation_summaries.db",
+                    );
+                    crate::error::record_ignored(
+                        conn.pragma_update(None, "journal_mode", "WAL"),
+                        "set journal_mode WAL on conversation_summaries.db",
+                    );
+
+                    let count = conn
+                        .execute(
+                            "UPDATE conversation_summaries SET title = ?1, last_modified_time = ?2 WHERE conversation_id = ?3",
+                            params![clean_title, &now_iso, clean_cid],
+                        )
+                        .or_else(|_| {
+                            conn.execute(
+                                "UPDATE conversation_summaries SET title = ?1 WHERE conversation_id = ?2",
+                                params![clean_title, clean_cid],
+                            )
+                        })
+                        .unwrap_or(0);
+
+                    if count == 0 {
+                        let pattern = format!("%{}%", clean_cid);
+                        let _ = conn
+                            .execute(
+                                "UPDATE conversation_summaries SET title = ?1, last_modified_time = ?2 WHERE conversation_id LIKE ?3",
+                                params![clean_title, &now_iso, &pattern],
+                            )
+                            .or_else(|_| {
+                                conn.execute(
+                                    "UPDATE conversation_summaries SET title = ?1 WHERE conversation_id LIKE ?2",
+                                    params![clean_title, &pattern],
+                                )
+                            });
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Open repo_prompts.db, execute: UPDATE agm_conversation_sequences SET title = ?1, updated_at = ?2 WHERE conversation_id = ?3
+    let now_ts = Utc::now().timestamp();
+    if let Ok(repo_conn) = super::schema::connect_db() {
+        crate::error::record_ignored(
+            repo_conn.pragma_update(None, "busy_timeout", 5000),
+            "set busy_timeout on repo_prompts.db",
+        );
+        crate::error::record_ignored(
+            repo_conn.execute(
+                "UPDATE agm_conversation_sequences SET title = ?1, updated_at = ?2 WHERE conversation_id = ?3",
+                params![clean_title, now_ts, clean_cid],
+            ),
+            "update title in agm_conversation_sequences",
+        );
+        // Also update active_prompts if untitled
+        crate::error::record_ignored(
+            repo_conn.execute(
+                "UPDATE active_prompts SET preview_raw = ?1, preview_clean = ?1 WHERE session_id = ?2 AND (preview_raw IS NULL OR preview_raw = '' OR preview_raw LIKE 'Untitled%')",
+                params![clean_title, clean_cid],
+            ),
+            "update active_prompts preview if untitled",
+        );
+    }
+
+    // 3. Invalidate prompt tree cache
+    super::tree::invalidate_prompt_tree_cache(Some(&resolved_inst));
+    if resolved_inst != "all" {
+        super::tree::invalidate_prompt_tree_cache(Some("all"));
+    }
+
+    Ok(())
+}
+
+#[inline]
+pub fn rename_conversation_dual_store(
+    instance_id: &str,
+    conversation_id: &str,
+    new_title: &str,
+) -> Result<(), crate::error::AppError> {
+    update_conversation_title(Some(instance_id), conversation_id, new_title)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

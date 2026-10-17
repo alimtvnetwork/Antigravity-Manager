@@ -44,6 +44,7 @@ pub fn handle_prompts_subcommand(args: &[String], entry_cmd: &str) {
         "enqueue" | "queue" => execute_prompts_enqueue(sub_args),
         "backup" => execute_prompts_backup(sub_args),
         "restore" => execute_prompts_restore(sub_args),
+        "rename" => execute_prompts_rename(sub_args),
         _ => {
             eprintln!("Unknown prompts subcommand: {}", sub);
             eprintln!("Run 'antigravity-manager prompts help' for usage instructions.");
@@ -378,6 +379,70 @@ pub(crate) fn execute_prompts_restore(sub_args: &[String]) {
                 .print_and_exit();
             }
             eprintln!("[ERROR] Failed to restore prompts: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+pub(crate) fn execute_prompts_rename(sub_args: &[String]) {
+    let instance_opt = extract_flag_value(sub_args, &["--instance", "-i", "--profile"]);
+    let is_json = is_flag_present(sub_args, &["--json", "-j"]);
+
+    let positionals = extract_positional_args(sub_args);
+    if positionals.len() < 2 {
+        if is_json {
+            CliEnvelope::<()>::err(
+                "prompts rename",
+                instance_opt,
+                "MISSING_ARGUMENTS",
+                "Usage: agm prompts rename <conversation_id> \"<new_title>\" [--instance <id>]",
+            )
+            .print_and_exit();
+        }
+        eprintln!("Error: Missing required arguments.");
+        eprintln!("Usage: agm prompts rename <conversation_id> \"<new_title>\" [--instance <id>]");
+        std::process::exit(1);
+    }
+
+    let conversation_id = &positionals[0];
+    let new_title = &positionals[1];
+
+    let resolved_inst = instance_opt
+        .clone()
+        .unwrap_or_else(|| "default".to_string());
+
+    match repo_db::sequences::update_conversation_title(
+        Some(&resolved_inst),
+        conversation_id,
+        new_title,
+    ) {
+        Ok(_) => {
+            if is_json {
+                CliEnvelope::ok(
+                    "prompts rename",
+                    instance_opt,
+                    serde_json::json!({
+                        "renamed": true,
+                        "conversation_id": conversation_id,
+                        "new_title": new_title,
+                        "instance": resolved_inst
+                    }),
+                )
+                .print_and_exit();
+            }
+            println!(
+                "[AGM] Successfully renamed conversation '{}' to '{}' (instance: {})",
+                conversation_id, new_title, resolved_inst
+            );
+            std::process::exit(0);
+        }
+        Err(e) => {
+            let msg = e.to_string();
+            if is_json {
+                CliEnvelope::<()>::err("prompts rename", instance_opt, "RENAME_FAILED", &msg)
+                    .print_and_exit();
+            }
+            eprintln!("[AGM ERROR] Failed to rename conversation: {}", msg);
             std::process::exit(1);
         }
     }

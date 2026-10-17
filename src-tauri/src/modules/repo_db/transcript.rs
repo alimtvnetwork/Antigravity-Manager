@@ -1,6 +1,6 @@
 //! Repo DB: transcript
 
-use super::models::TranscriptInspection;
+use super::models::{AgmPromptTurnNode, TranscriptInspection};
 use super::text_utils::extract_clean_user_prompt;
 use chrono::Utc;
 use std::collections::HashMap;
@@ -264,6 +264,7 @@ pub(crate) fn inspect_conversation_transcript(
     // Check if the conversation turn has completed or is waiting for user.
     // Invariant: Differentiate step-level tool completion from turn-level assistant completion.
     let mut is_completed_or_waiting = false;
+    let mut checked_first_meaningful = false;
     for line in lines.iter().rev().take(25) {
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
             let s_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("");
@@ -291,31 +292,36 @@ pub(crate) fn inspect_conversation_transcript(
 
             let s_status = val.get("status").and_then(|v| v.as_str()).unwrap_or("");
 
-            // Explicit turn-level terminal completion: Planner/Model response with ZERO tool calls
-            if s_type == "PLANNER_RESPONSE" || s_source == "MODEL" {
-                let has_tool_calls = val
-                    .get("tool_calls")
-                    .and_then(|t| t.as_array())
-                    .map(|a| !a.is_empty())
-                    .unwrap_or(false);
-                if !has_tool_calls
-                    && (s_status.is_empty()
-                        || s_status.eq_ignore_ascii_case("done")
-                        || s_status.eq_ignore_ascii_case("completed")
-                        || s_status.eq_ignore_ascii_case("idle")
-                        || s_status.eq_ignore_ascii_case("error"))
+            if !checked_first_meaningful {
+                checked_first_meaningful = true;
+                // Explicit turn-level terminal completion: Planner/Model response with ZERO tool calls
+                if s_type == "PLANNER_RESPONSE" || s_source == "MODEL" {
+                    let has_tool_calls = val
+                        .get("tool_calls")
+                        .and_then(|t| t.as_array())
+                        .map(|a| !a.is_empty())
+                        .unwrap_or(false);
+                    if !has_tool_calls
+                        && (s_status.is_empty()
+                            || s_status.eq_ignore_ascii_case("done")
+                            || s_status.eq_ignore_ascii_case("completed")
+                            || s_status.eq_ignore_ascii_case("idle")
+                            || s_status.eq_ignore_ascii_case("error"))
+                    {
+                        is_completed_or_waiting = true;
+                        break;
+                    }
+                } else if s_type == "USER_INPUT" || s_source == "USER_EXPLICIT" {
+                    // If the most recent meaningful event is user input awaiting AI, turn is active (not completed)
+                    break;
+                } else if s_status.eq_ignore_ascii_case("completed")
+                    || s_status.eq_ignore_ascii_case("error")
+                    || s_status.eq_ignore_ascii_case("idle")
                 {
                     is_completed_or_waiting = true;
                     break;
                 }
-            } else if s_type == "USER_INPUT" || s_source == "USER_EXPLICIT" {
-                // If the most recent meaningful event is user input awaiting AI, turn is active (not completed)
-                break;
-            } else if s_status.eq_ignore_ascii_case("completed")
-                || s_status.eq_ignore_ascii_case("error")
-                || s_status.eq_ignore_ascii_case("idle")
-            {
-                is_completed_or_waiting = true;
+            } else {
                 break;
             }
         }
@@ -529,7 +535,10 @@ pub(crate) fn inspect_conversation_transcript(
                         || s_status.eq_ignore_ascii_case("COMPLETED")
                         || s_status.eq_ignore_ascii_case("IDLE")
                         || s_status.eq_ignore_ascii_case("ERROR");
-                    if is_explicit_done {
+                    // Guard: Intermediate planner turns without tool calls must NOT set is_terminal_done = true
+                    // when subsequent turns or steps exist in the transcript.
+                    // Only flag is_terminal_done if this step is at the very tail of the transcript.
+                    if is_explicit_done && (step_idx + 1 >= step_count as u64) {
                         is_terminal_done = true;
                     }
                 }
@@ -653,3 +662,227 @@ pub(crate) fn inspect_conversation_transcript(
         is_terminal_done: terminal_done,
     }
 }
+
+/// Extract all prompt turns (Tier 3) dispatched to a conversation from transcript_full.jsonl / transcript.jsonl.
+/// Accurately parses user prompts, image attachments, 200-word previews, and marks execution states
+/// (RUNNING, QUEUED, COMPLETED) based on whether the conversation is currently active.
+pub fn extract_conversation_prompt_turns(
+    base_dir: &Path,
+    cid: &str,
+    is_conv_running: bool,
+) -> Vec<AgmPromptTurnNode> {
+    let chosen_path = match resolve_transcript_path(base_dir, cid) {
+        Some(p) => p,
+        None => return Vec::new(),
+    };
+
+    use std::io::{BufRead, BufReader};
+    let file = match std::fs::File::open(&chosen_path) {
+        Ok(f) => f,
+        Err(_) => return Vec::new(),
+    };
+
+    let reader = BufReader::with_capacity(64 * 1024, file);
+
+    #[derive(Debug)]
+    struct RawTurnInfo {
+        step_index: usize,
+        prompt_text: String,
+        timestamp: String,
+        created_at: i64,
+        media_paths: Vec<String>,
+        media_thumbnails: Vec<String>,
+    }
+
+    let mut raw_turns: Vec<RawTurnInfo> = Vec::new();
+    let mut last_model_step_idx: Option<usize> = None;
+    let mut last_model_is_done = false;
+
+    for (line_idx, line_res) in reader.lines().enumerate() {
+        let line = match line_res {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        // Fast string probe before full JSON deserialization to skip huge tool output lines
+        let is_user_candidate = trimmed.contains("\"USER_INPUT\"")
+            || trimmed.contains("\"USER_EXPLICIT\"")
+            || trimmed.contains("\"source\":\"USER\"")
+            || trimmed.contains("\"source\": \"USER\"");
+        let is_model_candidate = trimmed.contains("\"PLANNER_RESPONSE\"")
+            || trimmed.contains("\"source\":\"MODEL\"")
+            || trimmed.contains("\"source\": \"MODEL\"");
+
+        if !is_user_candidate && !is_model_candidate {
+            continue;
+        }
+
+        let val: serde_json::Value = match serde_json::from_str(trimmed) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        let s_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("");
+        let s_source = val.get("source").and_then(|v| v.as_str()).unwrap_or("");
+        let step_idx = val
+            .get("step_index")
+            .and_then(|v| v.as_u64())
+            .map(|u| u as usize)
+            .unwrap_or(line_idx);
+
+        if s_type == "USER_INPUT" || s_source == "USER_EXPLICIT" || s_source == "USER" {
+            if let Some(c) = val.get("content").and_then(|v| v.as_str()) {
+                let c_trim = c.trim();
+                let is_internal = c_trim.starts_with("The following is a <SYSTEM_MESSAGE>")
+                    || c_trim.starts_with("[Message] timestamp=")
+                    || c_trim.starts_with("Task id ")
+                    || c_trim.starts_with("<SYSTEM_MESSAGE>");
+                if !is_internal {
+                    let clean = extract_clean_user_prompt(c);
+                    if !clean.trim().is_empty() {
+                        let ts = val
+                            .get("created_at")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+
+                        let created_at_ms = if !ts.is_empty() {
+                            chrono::DateTime::parse_from_rfc3339(&ts)
+                                .map(|dt| dt.timestamp_millis())
+                                .unwrap_or_else(|_| {
+                                    chrono::DateTime::parse_from_str(&ts, "%Y-%m-%d %H:%M:%S")
+                                        .map(|dt| dt.timestamp_millis())
+                                        .unwrap_or(0)
+                                })
+                        } else {
+                            0
+                        };
+
+                        let mut media_paths = Vec::new();
+                        let mut media_thumbnails = Vec::new();
+                        if let Some(media_arr) = val.get("media").and_then(|m| m.as_array()) {
+                            for m in media_arr {
+                                if let Some(uri) = m.get("uri").and_then(|u| u.as_str()) {
+                                    let clean_uri = uri.trim();
+                                    let file_path = if let Some(stripped) = clean_uri.strip_prefix("file:///") {
+                                        stripped.to_string()
+                                    } else if let Some(stripped) = clean_uri.strip_prefix("file://") {
+                                        stripped.to_string()
+                                    } else {
+                                        clean_uri.to_string()
+                                    };
+                                    let p = std::path::Path::new(&file_path);
+                                    let resolved_path = if p.exists() {
+                                        file_path.clone()
+                                    } else {
+                                        let fname = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                                        let cand1 = base_dir.join("brain").join(cid).join(".user_uploaded").join(fname);
+                                        let cand2 = base_dir.join("brain").join(cid).join(fname);
+                                        if cand1.exists() {
+                                            cand1.to_string_lossy().to_string()
+                                        } else if cand2.exists() {
+                                            cand2.to_string_lossy().to_string()
+                                        } else {
+                                            file_path.clone()
+                                        }
+                                    };
+                                    if !resolved_path.is_empty() && !media_paths.contains(&resolved_path) {
+                                        media_paths.push(resolved_path.clone());
+                                        media_thumbnails.push(resolved_path);
+                                    }
+                                }
+                            }
+                        }
+
+                        raw_turns.push(RawTurnInfo {
+                            step_index: step_idx,
+                            prompt_text: clean,
+                            timestamp: ts,
+                            created_at: created_at_ms,
+                            media_paths,
+                            media_thumbnails,
+                        });
+                    }
+                }
+            }
+        } else if s_type == "PLANNER_RESPONSE" || s_source == "MODEL" {
+            let tool_calls = val.get("tool_calls").and_then(|tc| tc.as_array());
+            let has_open_tools = tool_calls.map(|tc| !tc.is_empty()).unwrap_or(false);
+            let s_status = val.get("status").and_then(|v| v.as_str()).unwrap_or("");
+            let is_done = !has_open_tools
+                && (s_status.eq_ignore_ascii_case("DONE")
+                    || s_status.eq_ignore_ascii_case("COMPLETED")
+                    || s_status.eq_ignore_ascii_case("IDLE"));
+            last_model_step_idx = Some(step_idx);
+            last_model_is_done = is_done;
+        }
+    }
+
+    if raw_turns.is_empty() {
+        return Vec::new();
+    }
+
+    let n = raw_turns.len();
+
+    // Determine the active turn index if conversation is running
+    let active_turn_idx: Option<usize> = if is_conv_running {
+        if let Some(last_model_idx) = last_model_step_idx {
+            let mut matched_idx = 0;
+            for (idx, turn) in raw_turns.iter().enumerate() {
+                if turn.step_index <= last_model_idx {
+                    matched_idx = idx;
+                } else {
+                    break;
+                }
+            }
+            if last_model_is_done && matched_idx + 1 < n {
+                Some(matched_idx + 1)
+            } else {
+                Some(matched_idx)
+            }
+        } else {
+            Some(0)
+        }
+    } else {
+        None
+    };
+
+    let mut result = Vec::with_capacity(n);
+    for (idx, turn) in raw_turns.into_iter().enumerate() {
+        let (status, is_running, is_queued) = match active_turn_idx {
+            Some(act_idx) => {
+                if idx < act_idx {
+                    ("COMPLETED".to_string(), false, false)
+                } else if idx == act_idx {
+                    ("RUNNING".to_string(), true, false)
+                } else {
+                    ("QUEUED".to_string(), false, true)
+                }
+            }
+            None => ("COMPLETED".to_string(), false, false),
+        };
+
+        let (preview_200w, _) = super::sequences::extract_prompt_words_preview(&turn.prompt_text, 200);
+
+        result.push(AgmPromptTurnNode {
+            turn_number: idx + 1,
+            step_index: turn.step_index,
+            prompt_text: turn.prompt_text,
+            preview_200w,
+            status,
+            is_running,
+            is_queued,
+            timestamp: turn.timestamp,
+            created_at: turn.created_at,
+            media_paths: turn.media_paths,
+            media_thumbnails: turn.media_thumbnails,
+        });
+    }
+
+    result
+}
+

@@ -1,7 +1,7 @@
 //! Repo DB: tree conversation node builders
 
 use super::dispatch::parse_flexible_timestamp;
-use super::models::{ActivePrompt, AgmConversationNode, RunningProject};
+use super::models::{ActivePrompt, AgmConversationNode, AgmPromptTurnNode, RunningProject};
 use super::project_queries::normalize_path_for_compare;
 use super::sequences::{
     ensure_conversation_sequence_in_conn, extract_prompt_tail_snippet, extract_prompt_words_preview,
@@ -43,7 +43,7 @@ pub(crate) fn build_transcript_conv_nodes(
                 continue;
             }
 
-            let effective_is_run = is_inst_alive && item.is_running;
+            let effective_is_run = item.is_running || (is_inst_alive && item.status.contains("RUNNING"));
             if only_running && !effective_is_run {
                 continue;
             }
@@ -139,6 +139,7 @@ pub(crate) fn build_transcript_conv_nodes(
                 execution_results: item.execution_results.clone(),
                 tool_calls_summary: item.tool_calls_summary.clone(),
                 full_prompt_text: Some(item.prompt.clone()),
+                prompts: item.prompts.clone(),
             });
         }
     }
@@ -340,6 +341,28 @@ pub(crate) fn build_active_prompt_conv_nodes(
                 None
             };
 
+            let ap_turn = AgmPromptTurnNode {
+                turn_number: 1,
+                step_index: 0,
+                prompt_text: ap.prompt_content.clone(),
+                preview_200w: preview_200w.clone(),
+                status: if is_run {
+                    "RUNNING".to_string()
+                } else if is_ap_queued {
+                    "QUEUED".to_string()
+                } else {
+                    "COMPLETED".to_string()
+                },
+                is_running: is_run,
+                is_queued: is_ap_queued,
+                timestamp: chrono::DateTime::from_timestamp(ap.updated_at, 0)
+                    .map(|dt| dt.to_rfc3339())
+                    .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
+                created_at: ap.created_at,
+                media_paths: Vec::new(),
+                media_thumbnails: Vec::new(),
+            };
+
             conv_nodes.push(AgmConversationNode {
                 seq_id: c_seq,
                 seq_code: format!("C{:03}", c_seq),
@@ -380,6 +403,7 @@ pub(crate) fn build_active_prompt_conv_nodes(
                 execution_results: None,
                 tool_calls_summary: None,
                 full_prompt_text: Some(ap.prompt_content.clone()),
+                prompts: vec![ap_turn],
             });
         }
     }
