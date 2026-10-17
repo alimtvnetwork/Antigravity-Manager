@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.226.1] - 2026-10-17
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
 ## [v4.226.0] - 2026-10-18
 
 ### Fixed
@@ -595,21 +602,17 @@
         -   **[E9001 Sibling Isolation & UI Redesign] Error E9001 Root-Cause Resolution, Loop Throttling, Accounts Table Dark-Glass Redesign & 3D Riseup Yellow Switch (Thanks to @aukgit)**:
             -   **Description**: Resolved Error E9001 (`Cannot switch instance to account: Account is actively bound to running sibling instance`) by guarding running instances from being considered stale or stealable in `instances.rs`, excluding running sibling accounts in `manual.rs`, and shielding candidates in `selection.rs`; prevented infinite 5-second retry loops in `PromptQueueScheduler` (`queue.rs`) for missing workspace directories by setting status to `failed` with retry backoff; implemented adaptive L1 quota cache TTL (120s/180s/300s) and 5-minute Supabase heartbeat error backoff; redesigned Accounts Table UI by removing blinding stark white hovers, flattening idle action buttons, styling Switch with Riseup Yellow 3D gradient, reordering action buttons, and moving custom label Tag into More menu; added Prompt Tree "Reset Filters" button in `TreePanel.tsx`; upgraded Win32 updater console to 18pt Consolas (`font_family = 54`); and refactored magic status strings into strongly-typed domain enums with inverted guard clauses.
 
-
     *   **v4.225.0 (2026-10-17)**:
         -   **[System Broadcasting & 30s Interval Guard] Cross-System 30-Second Minimum Interval Guard & Broadcast Storm Suppression Across Antigravity Manager & GitMap (Thanks to @aukgit)**:
             -   **Description**: Enforced an architectural invariant across Antigravity Manager and GitMap mandating that all periodic background broadcasts, polling schedulers, worker tickers, and notification dispatchers operate at intervals of not less than 30 seconds (`>= 30s`) to prevent CPU spikes, database lock contention, and notification storms; clamped the detached prompt goal heartbeat worker loop in `goal_heartbeat.rs` to a strict 30-second minimum (`interval_secs.max(30)`, default 30s); expanded the duplicate switch notification broadcast suppression window in `channels.rs` from 5s to 30s (`(now_ts - guard.1).abs() <= 30`), completely preventing rapid notification storms across Email, Telegram, and Supabase; and aligned GitMap task synchronization defaults (`TaskMinInterval = 30`, `TaskDefaultInterval = 30` in `constants_task.go`), clamped async periodic monitors (`gitmap async -t`) to `>= 30s`, clamped macro runner intervals to `>= 30s`, and enforced minimum 30s cluster distribution heartbeat loops.
-
 
     *   **v4.224.0 (2026-10-17)**:
         -   **[Telegram Alerts & Collision Shielding] Compact Layout with Next-Line White Text Values, Step 2 Multi-Machine Deduplication, Node IP & Signal Attribution, and Action-Only Keyboards (Thanks to @aukgit)**:
             -   **Description**: Modernized all Telegram alert cards (Account Rotation, Post-Switch Liveness, Emergency Alerts, System Updates) to be ~40% more vertically compact with key values indented on the next line in high-contrast bright white text (`kv_block`, `kv_white`); removed duplicate header and workspace fields; clamped project lists to top-3; eliminated duplicate Step 2 prompt wizard dispatch via `node_label::is_current_machine()` destination matching and <3s debounce guard; enriched instance selectors with explicit node alias, IP, and signal indicators (`🏷️ {name} ({alias} • {ip})`) in single-column layout; and streamlined Account Rotation inline keyboards to functional action-only buttons.
 
-
     *   **v4.223.0 (2026-10-17)**:
         -   **[Prompt Tree & Telegram Shielding] Custom Right-Click Context Menu, Right-Aligned Navigation Tabs, Header Dead-Space Removal, Top Toolbar Copy All Consolidation, and Telegram Cluster Routing Shielding (Thanks to @aukgit)**:
             -   **Description**: Added right-click custom context menus to Project headers (`ProjectContextMenu.tsx`) with Import into Project, Export (JSON, SQLite DB, YAML), and Rerun (Queued or All) actions; wired context menus and keyboard accessibility to child subagents and prompt turns with active selection highlights (`bg-sky-500/10 border-l-2 border-sky-500 text-sky-400`); relocated primary navigation tabs (`[ Prompt Instruction | AI Results & Outputs ]`) to the right side of Row 2 in `DetailHeader.tsx` and eliminated the redundant 3rd row in `DetailTabs.tsx` to recover ~44px of vertical height; consolidated all copy operations into the top-level `[ Copy All | v ]` segmented capsule and removed redundant bottom copy buttons in `PromptInstructionView.tsx`; eliminated cluster-wide prompt broadcast storms by binding `target_node_id` in Supabase `command_queue` payloads across `injection.rs`, `open_shot.rs`, and `processing.rs`; unified current machine detection via `node_label::is_current_machine()`; deduplicated machine entries in Telegram picker; added native CLI support for `agm prompt <target> [flags] <prompt_text>`; and redesigned destination locked UX with expandable blockquotes for past prompts and clear instruction for direct prompt typing.
-
 
     *   **v4.222.0 (2026-10-17)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
