@@ -34,6 +34,8 @@ pub(crate) fn dispatch_instance_domain(subcommand: &str, args: &[String]) {
         "list" | "ls" => cmd_instances_list(args),
         "status" => cmd_instances_status(args),
         "create" | "add" | "new" => cmd_instances_create(args),
+        "create-test" | "add-test" | "new-test" => cmd_instances_create_test(args),
+        "rm-test" | "delete-test" => cmd_instances_rm_test(args),
         "start" | "launch" | "open" => cmd_instances_start(args),
         "open-ui" | "ui" => antigravity_tools_lib::modules::delegate_updater::open_ui(args),
         "tree" | "prompts" => crate::prompt_cmds::cmd_prompts_tree(args),
@@ -476,4 +478,313 @@ pub(crate) fn cmd_instances_logs(args: &[String]) {
         CliEnvelope::ok("instances logs", Some(target_instance), lines).print_and_exit();
     }
     crate::cache_cmds::cmd_logs(args);
+}
+
+pub(crate) fn cmd_instances_create_test(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let mut custom_name: Option<String> = None;
+    let mut i = 0;
+    while i < args.len() {
+        if (args[i] == "--name" || args[i] == "-n") && i + 1 < args.len() {
+            custom_name = Some(args[i + 1].clone());
+            break;
+        } else if let Some(val) = args[i].strip_prefix("--name=") {
+            custom_name = Some(val.to_string());
+            break;
+        }
+        i += 1;
+    }
+    if custom_name.is_none() {
+        if let Some(pos) = ctx.positional_args.first() {
+            if !pos.starts_with('-') {
+                custom_name = Some(pos.clone());
+            }
+        }
+    }
+
+    let mut registry = match instance::load_registry() {
+        Ok(reg) => reg,
+        Err(e) => {
+            if ctx.json_output {
+                CliEnvelope::<()>::err("instances create-test", None, "REGISTRY_ERROR", &e)
+                    .print_and_exit();
+            }
+            eprintln!("[ERROR] Failed to load registry: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    let now_millis = chrono::Utc::now().timestamp_millis();
+    let (id, display_name) = match custom_name {
+        Some(name) => {
+            let slug: String = name
+                .to_lowercase()
+                .chars()
+                .map(|c| if c.is_alphanumeric() { c } else { '-' })
+                .collect();
+            let slug = slug.trim_matches('-');
+            let base_id = if slug.starts_with("test-") {
+                slug.to_string()
+            } else {
+                format!("test-{}", slug)
+            };
+            let unique_id = if registry.instances.iter().any(|inst| inst.id == base_id) {
+                format!("{}-{}", base_id, now_millis % 10000)
+            } else {
+                base_id
+            };
+            (unique_id, name)
+        }
+        None => {
+            let auto_id = format!("test-{}", now_millis % 1000000);
+            (auto_id.clone(), auto_id)
+        }
+    };
+
+    let base_local = std::env::var("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .or_else(|_| {
+            dirs::data_local_dir().ok_or_else(|| "Failed to get local data dir".to_string())
+        })
+        .unwrap_or_else(|_| {
+            dirs::home_dir()
+                .map(|h| h.join(".local").join("share"))
+                .unwrap_or_else(|| PathBuf::from("."))
+        });
+
+    let data_dir = base_local.join("agm-instances").join(&id);
+    let user_dir = data_dir.join("User");
+
+    if let Err(e) = fs::create_dir_all(&user_dir) {
+        if ctx.json_output {
+            CliEnvelope::<()>::err(
+                "instances create-test",
+                Some(id),
+                "IO_ERROR",
+                &e.to_string(),
+            )
+            .print_and_exit();
+        }
+        eprintln!("[ERROR] Failed to create test instance directory: {e}");
+        std::process::exit(1);
+    }
+
+    let now = chrono::Utc::now().timestamp();
+    let next_seq = registry
+        .instances
+        .iter()
+        .filter_map(|i| i.seq_num)
+        .max()
+        .unwrap_or(0)
+        + 1;
+
+    let cfg = instance::InstanceConfig {
+        id: id.clone(),
+        name: display_name,
+        data_dir: data_dir.to_string_lossy().to_string(),
+        executable_path: None,
+        extensions_dir: None,
+        bound_account_id: None,
+        bound_email: None,
+        created_at: now,
+        last_used: now,
+        is_default: false,
+        pid: None,
+        seq_num: Some(next_seq),
+    };
+
+    registry.instances.push(cfg.clone());
+    if let Err(e) = instance::save_registry(&registry) {
+        if ctx.json_output {
+            CliEnvelope::<()>::err("instances create-test", Some(id), "SAVE_ERROR", &e)
+                .print_and_exit();
+        }
+        eprintln!("[ERROR] Failed to update registry: {e}");
+        std::process::exit(1);
+    }
+
+    if ctx.json_output {
+        let payload = serde_json::json!({
+            "id": cfg.id,
+            "name": cfg.name,
+            "data_dir": cfg.data_dir,
+            "config": cfg,
+        });
+        CliEnvelope::ok("instances create-test", Some(cfg.id.clone()), payload).print_and_exit();
+    }
+
+    println!("Created test instance '{}'", cfg.id);
+    println!("  ID: {}", cfg.id);
+    println!("  Data directory: {}", cfg.data_dir);
+}
+
+pub(crate) fn cmd_instances_rm_test(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let all = ctx.all_instances || args.iter().any(|a| a == "--all" || a == "-a");
+
+    let mut registry = match instance::load_registry() {
+        Ok(reg) => reg,
+        Err(e) => {
+            if ctx.json_output {
+                CliEnvelope::<()>::err("instances rm-test", None, "REGISTRY_ERROR", &e)
+                    .print_and_exit();
+            }
+            eprintln!("[ERROR] Failed to load registry: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    let base_local = std::env::var("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .or_else(|_| {
+            dirs::data_local_dir().ok_or_else(|| "Failed to get local data dir".to_string())
+        })
+        .unwrap_or_else(|_| {
+            dirs::home_dir()
+                .map(|h| h.join(".local").join("share"))
+                .unwrap_or_else(|| PathBuf::from("."))
+        });
+
+    let targets_to_remove: Vec<instance::InstanceConfig> = if all {
+        registry
+            .instances
+            .iter()
+            .filter(|inst| {
+                !inst.is_default
+                    && (inst.id.to_lowercase().starts_with("test-")
+                        || inst.name.to_lowercase().starts_with("test-"))
+            })
+            .cloned()
+            .collect()
+    } else {
+        let target_id = ctx.resolve_target_instance().ok().or_else(|| {
+            ctx.positional_args
+                .first()
+                .filter(|s| !s.starts_with('-'))
+                .cloned()
+        });
+
+        match target_id {
+            Some(target) => {
+                let resolved =
+                    instance::resolve_instance_id(&target).unwrap_or_else(|_| target.clone());
+                match registry
+                    .instances
+                    .iter()
+                    .find(|i| i.id == resolved || i.id == target)
+                    .cloned()
+                {
+                    Some(inst) => vec![inst],
+                    None => {
+                        let orphan_dir = base_local.join("agm-instances").join(&target);
+                        if orphan_dir.exists() {
+                            antigravity_tools_lib::error::record_ignored(
+                                fs::remove_dir_all(&orphan_dir),
+                                "remove orphaned test dir",
+                            ); // Justification: test cleanup; absence is safe
+                            if ctx.json_output {
+                                let payload = serde_json::json!({
+                                    "removed": vec![target.clone()],
+                                    "count": 1,
+                                    "unregistered": false,
+                                    "directory_deleted": true,
+                                });
+                                CliEnvelope::ok("instances rm-test", Some(target), payload)
+                                    .print_and_exit();
+                            }
+                            println!("Deleted orphaned test directory: {}", orphan_dir.display());
+                            return;
+                        }
+
+                        if ctx.json_output {
+                            CliEnvelope::<()>::err(
+                                "instances rm-test",
+                                Some(target.clone()),
+                                "NOT_FOUND",
+                                &format!("Test instance '{target}' not found"),
+                            )
+                            .print_and_exit();
+                        }
+                        eprintln!("[ERROR] Test instance '{}' not found", target);
+                        std::process::exit(1);
+                    }
+                }
+            }
+            None => {
+                if ctx.json_output {
+                    CliEnvelope::<()>::err(
+                        "instances rm-test",
+                        None,
+                        "MISSING_ARGUMENT",
+                        "Specify test instance ID or pass --all",
+                    )
+                    .print_and_exit();
+                }
+                eprintln!("[ERROR] Please specify a test instance ID or pass --all");
+                std::process::exit(1);
+            }
+        }
+    };
+
+    if targets_to_remove.is_empty() {
+        if ctx.json_output {
+            let payload = serde_json::json!({
+                "removed": Vec::<String>::new(),
+                "count": 0,
+            });
+            CliEnvelope::ok("instances rm-test", None, payload).print_and_exit();
+        }
+        println!("No test instances found to remove.");
+        return;
+    }
+
+    let mut removed_ids = Vec::new();
+    for inst in &targets_to_remove {
+        guard_caller_instance(&inst.id);
+
+        let _ = instance::close_instance_verified(&inst.id, std::time::Duration::from_millis(2500));
+
+        let dir = PathBuf::from(&inst.data_dir);
+        if dir.exists() {
+            antigravity_tools_lib::error::record_ignored(
+                fs::remove_dir_all(&dir),
+                "remove test instance dir",
+            ); // Justification: test cleanup; absence is safe
+        }
+        let fallback_dir = base_local.join("agm-instances").join(&inst.id);
+        if fallback_dir.exists() && fallback_dir != dir {
+            antigravity_tools_lib::error::record_ignored(
+                fs::remove_dir_all(&fallback_dir),
+                "remove test instance dir",
+            ); // Justification: test cleanup; absence is safe
+        }
+
+        registry.instances.retain(|i| i.id != inst.id);
+        if registry.active_instance_id == inst.id {
+            registry.active_instance_id = "default".to_string();
+        }
+
+        removed_ids.push(inst.id.clone());
+    }
+
+    if let Err(e) = instance::save_registry(&registry) {
+        if ctx.json_output {
+            CliEnvelope::<()>::err("instances rm-test", None, "SAVE_ERROR", &e).print_and_exit();
+        }
+        eprintln!("[ERROR] Failed to save updated registry: {e}");
+        std::process::exit(1);
+    }
+
+    if ctx.json_output {
+        let payload = serde_json::json!({
+            "removed": removed_ids,
+            "count": removed_ids.len(),
+        });
+        CliEnvelope::ok("instances rm-test", None, payload).print_and_exit();
+    }
+
+    for id in &removed_ids {
+        println!("Removed test instance '{}'", id);
+    }
+    println!("Cleaned {} test instance(s).", removed_ids.len());
 }

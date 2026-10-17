@@ -243,10 +243,12 @@ pub fn record_ignored<T, E: std::fmt::Display>(result: Result<T, E>, context: &s
     }
 }
 
-/// Idempotent SQLite migrations report "duplicate column name" on every open
-/// after the column exists. That is success, so it stays out of the console.
+/// Idempotent operations report expected errors on repeated calls.
+/// That is success/benign, so it stays out of the console at debug level.
 pub fn expected_best_effort(err: &str) -> bool {
     err.contains("duplicate column name")
+        || err.contains("already initialized")
+        || err.contains("SetGlobalDefaultError")
 }
 
 #[cfg(test)]
@@ -258,6 +260,9 @@ mod tests {
         assert!(expected_best_effort("duplicate column name: image_payload"));
         assert!(expected_best_effort(
             "db execute: duplicate column name: instance_id"
+        ));
+        assert!(expected_best_effort(
+            "attempted to set a logger after the logging system was already initialized"
         ));
         assert!(!expected_best_effort("database is locked"));
     }

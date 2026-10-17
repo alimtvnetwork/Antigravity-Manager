@@ -28,10 +28,16 @@ pub async fn switch_account(
     }
 
     let mut account = load_account(account_id)?;
+    let normalized_instance_id = match target_ide {
+        None | Some("antigravity") | Some("agy") | Some("ide") | Some("classic") | Some("") => {
+            Some("default")
+        }
+        other => other,
+    };
     let mut audit = crate::modules::task_history_db::AuditTask::start(
         crate::modules::audit_action::AuditAction::SwitchAccount,
         &account.email,
-        target_ide,
+        normalized_instance_id,
     );
     if account.disabled || account.proxy_disabled || account.validation_blocked {
         return Err(format!(

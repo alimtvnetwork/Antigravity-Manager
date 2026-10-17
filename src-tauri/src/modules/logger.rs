@@ -35,8 +35,16 @@ pub fn get_log_dir() -> Result<PathBuf, String> {
     Ok(log_dir)
 }
 
-/// Initialize the log system
+static LOGGER_INIT: std::sync::Once = std::sync::Once::new();
+
+/// Initialize the log system (idempotent, runs at most once per process)
 pub fn init_logger() {
+    LOGGER_INIT.call_once(|| {
+        init_logger_inner();
+    });
+}
+
+fn init_logger_inner() {
     // Capture log macro logs
     // Justification: best-effort call; failure logged without changing control flow
     crate::error::record_ignored(tracing_log::LogTracer::init(), "init");

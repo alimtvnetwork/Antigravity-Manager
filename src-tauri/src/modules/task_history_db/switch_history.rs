@@ -39,11 +39,15 @@ pub fn get_instance_switch_history(
     let index = open_index(&dir)?;
     let splits = load_splits(&index, &dir)?;
     let inst_id_trimmed = instance_id.trim();
+    let query_inst_id = match inst_id_trimmed {
+        "" | "default" | "antigravity" | "agy" | "ide" | "classic" => "default",
+        other => other,
+    };
 
     let mut total: usize = 0;
     let mut records: Vec<InstanceSwitchRecord> = Vec::new();
 
-    let instance_name = if inst_id_trimmed == "default" || inst_id_trimmed.is_empty() {
+    let instance_name = if query_inst_id == "default" {
         "Default Instance".to_string()
     } else {
         crate::modules::instance::load_registry()
@@ -51,21 +55,21 @@ pub fn get_instance_switch_history(
             .and_then(|reg| {
                 reg.instances
                     .into_iter()
-                    .find(|i| i.id == inst_id_trimmed)
+                    .find(|i| i.id == query_inst_id)
                     .map(|i| i.name)
             })
-            .unwrap_or_else(|| inst_id_trimmed.to_string())
+            .unwrap_or_else(|| query_inst_id.to_string())
     };
 
     let switch_cond = "
         WHERE (action_code = 3 OR action = 'SwitchAccount' OR action = 'switch_account')
-          AND (instance_id = ?1 OR (?1 = 'default' AND (instance_id = 'default' OR instance_id = '' OR instance_id IS NULL)))";
+          AND (instance_id = ?1 OR (?1 = 'default' AND (instance_id IN ('default', '', 'antigravity', 'agy', 'ide', 'classic') OR instance_id IS NULL)))";
 
     for split in &splits {
         let conn = open_split(Path::new(&split.file_path))?;
         let count_sql = format!("SELECT COUNT(*) FROM tasks {}", switch_cond);
         let split_count: i64 = conn
-            .query_row(&count_sql, params![inst_id_trimmed], |row| row.get(0))
+            .query_row(&count_sql, params![query_inst_id], |row| row.get(0))
             .unwrap_or(0);
         total += split_count as usize;
 
@@ -80,7 +84,7 @@ pub fn get_instance_switch_history(
             );
             let mut stmt = conn.prepare(&query_sql).map_err(|e| e.to_string())?;
             let rows = stmt
-                .query_map(params![inst_id_trimmed, need as i64], |row| {
+                .query_map(params![query_inst_id, need as i64], |row| {
                     let id: String = row.get(0)?;
                     let legacy: String = row.get(1)?;
                     let code: Option<i32> = row.get(2)?;
@@ -197,7 +201,7 @@ pub fn get_instance_switch_history(
     if total == 0 {
         let count_sql = format!("SELECT COUNT(*) FROM hot_tasks_cache {}", switch_cond);
         let hot_count: i64 = index
-            .query_row(&count_sql, params![inst_id_trimmed], |row| row.get(0))
+            .query_row(&count_sql, params![query_inst_id], |row| row.get(0))
             .unwrap_or(0);
         total = hot_count as usize;
 
@@ -211,7 +215,7 @@ pub fn get_instance_switch_history(
             );
             let mut stmt = index.prepare(&query_sql).map_err(|e| e.to_string())?;
             let rows = stmt
-                .query_map(params![inst_id_trimmed, limit as i64], |row| {
+                .query_map(params![query_inst_id, limit as i64], |row| {
                     let id: String = row.get(0)?;
                     let legacy: String = row.get(1)?;
                     let code: Option<i32> = row.get(2)?;
@@ -350,10 +354,14 @@ pub fn get_instance_audit_trail(
     let index = open_index(&dir)?;
     let splits = load_splits(&index, &dir)?;
     let inst_id_trimmed = instance_id.trim();
+    let query_inst_id = match inst_id_trimmed {
+        "" | "default" | "antigravity" | "agy" | "ide" | "classic" => "default",
+        other => other,
+    };
 
     let mut records: Vec<TaskRecord> = Vec::new();
     let cond = "
-        WHERE (instance_id = ?1 OR (?1 = 'default' AND (instance_id = 'default' OR instance_id = '' OR instance_id IS NULL)))";
+        WHERE (instance_id = ?1 OR (?1 = 'default' AND (instance_id IN ('default', '', 'antigravity', 'agy', 'ide', 'classic') OR instance_id IS NULL)))";
 
     for split in &splits {
         if records.len() >= limit {
@@ -370,7 +378,7 @@ pub fn get_instance_audit_trail(
         );
         let mut stmt = conn.prepare(&query_sql).map_err(|e| e.to_string())?;
         let rows = stmt
-            .query_map(params![inst_id_trimmed, need as i64], |row| {
+            .query_map(params![query_inst_id, need as i64], |row| {
                 let legacy: String = row.get(1)?;
                 let code: Option<i32> = row.get(2)?;
                 let (action_code, action, action_label) = resolve_action(code, &legacy);
@@ -407,7 +415,7 @@ pub fn get_instance_audit_trail(
         );
         let mut stmt = index.prepare(&query_sql).map_err(|e| e.to_string())?;
         let rows = stmt
-            .query_map(params![inst_id_trimmed, limit as i64], |row| {
+            .query_map(params![query_inst_id, limit as i64], |row| {
                 let legacy: String = row.get(1)?;
                 let code: Option<i32> = row.get(2)?;
                 let (action_code, action, action_label) = resolve_action(code, &legacy);

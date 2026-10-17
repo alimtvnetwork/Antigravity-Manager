@@ -565,11 +565,62 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn path_matches_dir(arg_dir: &str, inst_dir: &str) -> bool {
+    let norm1 = arg_dir
+        .replace('\\', "/")
+        .trim_end_matches('/')
+        .to_lowercase();
+    let norm2 = inst_dir
+        .replace('\\', "/")
+        .trim_end_matches('/')
+        .to_lowercase();
+    if norm1 == norm2 {
+        return true;
+    }
+    if let (Ok(c1), Ok(c2)) = (
+        std::fs::canonicalize(arg_dir),
+        std::fs::canonicalize(inst_dir),
+    ) {
+        let s1 = c1.to_string_lossy().replace('\\', "/").to_lowercase();
+        let s2 = c2.to_string_lossy().replace('\\', "/").to_lowercase();
+        let clean1 = s1
+            .trim_start_matches("//?/")
+            .trim_start_matches(r"\\?\")
+            .trim_end_matches('/');
+        let clean2 = s2
+            .trim_start_matches("//?/")
+            .trim_start_matches(r"\\?\")
+            .trim_end_matches('/');
+        if clean1 == clean2 {
+            return true;
+        }
+    }
+    false
+}
+
 /// Instance id whose process is an ancestor of this CLI, when the command was
 /// started from that IDE. Cursor and the manager process are not instances.
 pub fn detect_caller_instance_id() -> Option<String> {
+    // 1. Check environment variables ANTIGRAVITY_INSTANCE_ID and AGM_INSTANCE_ID
+    if let Ok(id) = std::env::var("ANTIGRAVITY_INSTANCE_ID") {
+        let trimmed = id.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
+    }
+    if let Ok(id) = std::env::var("AGM_INSTANCE_ID") {
+        let trimmed = id.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
+    }
+
+    let registry = load_registry().ok();
+
     let mut system = System::new();
-    let refresh_kind = sysinfo::ProcessRefreshKind::new().with_exe(sysinfo::UpdateKind::Always);
+    let refresh_kind = sysinfo::ProcessRefreshKind::new()
+        .with_cmd(sysinfo::UpdateKind::Always)
+        .with_exe(sysinfo::UpdateKind::Always);
     system.refresh_processes_specifics(sysinfo::ProcessesToUpdate::All, refresh_kind);
     let mut pid = std::process::id();
     let mut ancestor_pids = Vec::new();
@@ -582,26 +633,97 @@ pub fn detect_caller_instance_id() -> Option<String> {
         if let Some(exe) = proc.exe() {
             ancestor_exes.push(exe.to_string_lossy().to_lowercase().replace('\\', "/"));
         }
+
+        // Check ancestor PIDs against inst.pid in registry.instances
+        if let Some(ref reg) = registry {
+            for inst in &reg.instances {
+                if let Some(saved) = inst.pid {
+                    if saved == pid {
+                        return Some(inst.id.clone());
+                    }
+                }
+            }
+        }
+
+        // Check if process exe matches antigravity.exe or antigravity (case-insensitive)
+        let exe_name = proc
+            .exe()
+            .and_then(|p| p.file_name())
+            .map(|f| f.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        let proc_name = proc.name().to_string_lossy().to_lowercase();
+        let is_antigravity = exe_name == "antigravity.exe"
+            || exe_name == "antigravity"
+            || proc_name == "antigravity.exe"
+            || proc_name == "antigravity";
+
+        if is_antigravity {
+            // Inspect command-line arguments using proc.cmd()
+            let cmd: Vec<String> = proc
+                .cmd()
+                .iter()
+                .map(|s| s.to_string_lossy().to_string())
+                .collect();
+
+            let mut user_data_dir: Option<String> = None;
+            let mut idx = 0;
+            while idx < cmd.len() {
+                let arg = &cmd[idx];
+                if let Some(val) = arg
+                    .strip_prefix("--user-data-dir=")
+                    .or_else(|| arg.strip_prefix("-user-data-dir="))
+                {
+                    user_data_dir = Some(val.trim_matches('"').trim_matches('\'').to_string());
+                    break;
+                } else if (arg == "--user-data-dir" || arg == "-user-data-dir")
+                    && idx + 1 < cmd.len()
+                {
+                    user_data_dir = Some(
+                        cmd[idx + 1]
+                            .trim_matches('"')
+                            .trim_matches('\'')
+                            .to_string(),
+                    );
+                    break;
+                }
+                idx += 1;
+            }
+
+            if let Some(udd) = user_data_dir {
+                if let Some(ref reg) = registry {
+                    for inst in &reg.instances {
+                        if path_matches_dir(&udd, &inst.data_dir) {
+                            return Some(inst.id.clone());
+                        }
+                    }
+                }
+            } else {
+                return Some("default".to_string());
+            }
+        }
+
         match proc.parent().map(|parent| parent.as_u32()) {
             Some(parent) if parent != 0 && parent != pid => pid = parent,
             _ => break,
         }
     }
-    let registry = load_registry().ok()?;
-    for inst in &registry.instances {
-        if let Some(saved) = inst.pid {
-            if ancestor_pids.contains(&saved) {
-                return Some(inst.id.clone());
+
+    if let Some(ref reg) = registry {
+        for inst in &reg.instances {
+            if let Some(saved) = inst.pid {
+                if ancestor_pids.contains(&saved) {
+                    return Some(inst.id.clone());
+                }
             }
-        }
-        if let Some(exe) = &inst.executable_path {
-            let norm = exe.to_lowercase().replace('\\', "/");
-            let file = norm.rsplit('/').next().unwrap_or(&norm);
-            if ancestor_exes
-                .iter()
-                .any(|ancestor| ancestor == &norm || ancestor.ends_with(&format!("/{file}")))
-            {
-                return Some(inst.id.clone());
+            if let Some(exe) = &inst.executable_path {
+                let norm = exe.to_lowercase().replace('\\', "/");
+                let file = norm.rsplit('/').next().unwrap_or(&norm);
+                if ancestor_exes
+                    .iter()
+                    .any(|ancestor| ancestor == &norm || ancestor.ends_with(&format!("/{file}")))
+                {
+                    return Some(inst.id.clone());
+                }
             }
         }
     }
@@ -613,7 +735,7 @@ pub fn refuse_if_caller_instance(target_id: &str) -> Result<(), String> {
     if let Some(self_id) = detect_caller_instance_id() {
         if self_id == resolved || self_id == target_id {
             return Err(format!(
-                "Refusing to stop, switch, or delete instance '{self_id}' because this command is running inside it"
+                "Refusing to stop, switch, or delete instance '{self_id}' because this command is running inside its IDE process"
             ));
         }
     }

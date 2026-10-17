@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.217.0 (2026-10-17)**:
+        -   **[Instance Management & UI/UX Synchronization] Instance Audit Trail, Switch UI, CLI Caller Guard & Test Sandboxing (Thanks to @aukgit)**:
+            -   **Description**: Instance audit trail multi-source loading (switches + all operations), switch account dialog dark-glass styling & quota sorting, CLI caller IDE self-preservation guard, lightweight test instance lifecycle (`create-test`, `rm-test`), and automated E2E test suite.
+
     *   **v4.216.2 (2026-10-17)**:
         -   **[Build] Fix `append_entry` arity in `ui_cmds.rs` (Thanks to @aukgit)**:
             -   **Description**: `ui_cmds.rs` passed 8 arguments to `audit::append_entry` after the audit stack-trace change added a 9th `stack_trace` parameter (E0061 broke the v4.216.1 build); CLI path now passes `None`.

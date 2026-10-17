@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.217.0] - 2026-10-17
+
+### Added
+- **Instance Audit Trail Visibility**: Fixed issue where opening an instance audit trail yielded an empty view. Expanded backend SQL condition across split DBs and `hot_tasks_cache` to resolve default instance aliases (`'default'`, `''`, `NULL`, `'antigravity'`, `'agy'`, `'ide'`, `'classic'`). Added segmented pill control in `InstanceAuditTrailModal` for Switch Cycles vs All Operations with live counts, automatically defaulting to `All Operations` when switch records are not yet present. (Thanks to @aukgit)
+- **Switch Account Dialog UI/UX Consistency**: Overhauled `SwitchAccountDialog` with sleek dark-glass styling, top-right header 'X' dismiss button, smooth row hover transitions, distinct Current account checkmark badge, color-coded quota metrics (4h, Weekly, Total), and in-flight switch spinner. (Thanks to @aukgit)
+- **Active Caller IDE Detection & Self-Preservation Guard**: Enhanced `detect_caller_instance_id()` to trace ancestor processes, inspect `proc.cmd()` for `--user-data-dir` arguments against registered instances, and check `ANTIGRAVITY_INSTANCE_ID` / `AGM_INSTANCE_ID`. When running from an IDE terminal, commands like `agm instances stop` or `switch` refuse to stop or mutate the caller instance (exit code 2). (Thanks to @aukgit)
+- **Lightweight Test Instance Lifecycle**: Added `agm instances create-test` and `agm instances rm-test` CLI subcommands for rapid, transient sandbox creation and cleanup without binary duplication, keeping disk usage minimal and SQLite databases synchronized. (Thanks to @aukgit)
+- **Automated E2E Verification**: Added `scripts/test-instance-autoswitch-e2e.ps1` verifying caller detection, test instance creation, caller guard interception, and clean teardown. (Thanks to @aukgit)
+
+---
+
 ## [v4.216.2] - 2026-10-17
 
 ### Fixed
@@ -448,6 +459,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.217.0 (2026-10-17)**:
+        -   **[Instance Management & UI/UX Synchronization] Instance Audit Trail, Switch UI, CLI Caller Guard & Test Sandboxing**:
+            -   **Description**: Instance audit trail multi-source loading (switches + all operations), switch account dialog dark-glass styling & quota sorting, CLI caller IDE self-preservation guard, lightweight test instance lifecycle (`create-test`, `rm-test`), and automated E2E test suite. (Thanks to @aukgit)
+
+
     *   **v4.216.2 (2026-10-17)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
