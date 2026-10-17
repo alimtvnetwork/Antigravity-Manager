@@ -14,6 +14,17 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 use uuid::Uuid;
 
+pub const MIN_GOAL_HEARTBEAT_INTERVAL_SECS: u64 = 30;
+
+/// Clamp interval to at least MIN_GOAL_HEARTBEAT_INTERVAL_SECS (default 30s)
+pub fn clamp_heartbeat_interval(interval_secs: u64) -> u64 {
+    if interval_secs == 0 {
+        MIN_GOAL_HEARTBEAT_INTERVAL_SECS
+    } else {
+        interval_secs.max(MIN_GOAL_HEARTBEAT_INTERVAL_SECS)
+    }
+}
+
 /// Start an active prompt goal writing current date & time every 5 seconds to a specific file
 pub fn start_prompt_goal_heartbeat(
     instance_id: &str,
@@ -29,13 +40,12 @@ pub fn start_prompt_goal_heartbeat(
         crate::error::record_ignored(fs::create_dir_all(&ws_dir), "create workspace directory");
     }
 
-    let interval = if interval_secs == 0 {
-        30
-    } else {
-        interval_secs.max(30)
-    };
+    let interval = clamp_heartbeat_interval(interval_secs);
     let prompt_text = if prompt.trim().is_empty() {
-        "Continuous 30-second prompt goal heartbeat verification".to_string()
+        format!(
+            "Continuous {}-second prompt goal heartbeat verification",
+            interval
+        )
     } else {
         prompt.trim().to_string()
     };
@@ -175,11 +185,7 @@ pub fn run_prompt_goal_worker_loop(
 ) {
     let ws_dir = PathBuf::from(repo_path);
     let config_path = ws_dir.join(".antigravity_goal_heartbeat.json");
-    let interval = if interval_secs == 0 {
-        30
-    } else {
-        interval_secs.max(30)
-    };
+    let interval = clamp_heartbeat_interval(interval_secs);
     let my_pid = std::process::id();
 
     loop {

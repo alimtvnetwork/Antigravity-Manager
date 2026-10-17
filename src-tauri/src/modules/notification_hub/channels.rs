@@ -3,16 +3,20 @@ use crate::modules::logger;
 use super::telegram_alerts::dispatch_telegram_switch_alert;
 use super::*;
 
+pub const DUP_SWITCH_SUPPRESSION_SECS: i64 = 30;
+
 /// Dispatch rich notifications across Email and Telegram upon account/instance switch
 pub async fn notify_account_switched_details(mut details: SwitchNotificationDetails) -> String {
     let now_ts = chrono::Utc::now().timestamp();
     let selected_clean = details.selected_email.trim().to_string();
 
     if let Ok(mut guard) = LAST_SWITCH_DISPATCH.lock() {
-        if guard.0.eq_ignore_ascii_case(&selected_clean) && (now_ts - guard.1).abs() <= 30 {
+        if guard.0.eq_ignore_ascii_case(&selected_clean)
+            && (now_ts - guard.1).abs() <= DUP_SWITCH_SUPPRESSION_SECS
+        {
             let line = format!(
-                "[Notify] skipped duplicate switch to {} within 30s",
-                selected_clean
+                "[Notify] skipped duplicate switch to {} within {}s",
+                selected_clean, DUP_SWITCH_SUPPRESSION_SECS
             );
             logger::log_info(&line);
             println!("  [OK] {}", line);
