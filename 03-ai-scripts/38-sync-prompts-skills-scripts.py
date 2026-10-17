@@ -646,6 +646,20 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
                 except Exception:
                     pass
 
+        # Purge deprecated Muse prompts consolidated into 01-muse-master-prompt.md
+        for dep_muse in (
+            "01-prompts/27-muse-prompts/02-muse-execute-in-a-step.md",
+            "01-prompts/27-muse-prompts/03-muse-master-with-repos.md",
+            "01-prompts/27-muse-prompts/04-muse-master-with-repos-v2.md",
+            "01-prompts/27-muse-prompts/05-muse-master-prompt-v2.md",
+        ):
+            dep_path = target / dep_muse
+            if dep_path.exists():
+                try:
+                    dep_path.unlink()
+                except Exception:
+                    pass
+
     # 4. Mirror directories and conditional coding guidelines cleanly
     total_copied = 0
     total_removed = 0

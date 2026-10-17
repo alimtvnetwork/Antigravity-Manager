@@ -19,6 +19,8 @@ import {
 import { cn } from '../../../utils/cn';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
+import { invoke } from '@tauri-apps/api/core';
+import { isTauri } from '../../../utils/env';
 import {
     type SuffixTemplate,
     BUILTIN_SUFFIX_TEMPLATES,
@@ -95,13 +97,37 @@ export function SuffixTemplateModal({
     const [formError, setFormError] = useState<string | null>(null);
 
     // Load templates on modal open
-    useEffect(() => {
-        if (!isOpen) return;
+    const loadTemplates = async () => {
         try {
-            const list = getCustomSuffixTemplates();
+            let list: SuffixTemplate[] = [];
+            let defId = 'is-it-done';
+
+            if (isTauri()) {
+                try {
+                    const dbTemplates = await invoke<SuffixTemplate[]>('list_prompt_suffix_templates');
+                    if (Array.isArray(dbTemplates) && dbTemplates.length > 0) {
+                        const customOnly = dbTemplates.filter(
+                            (t) => !BUILTIN_SUFFIX_TEMPLATES.some((b) => b.id === t.id)
+                        );
+                        list = customOnly;
+                        const def = dbTemplates.find((t) => t.is_default);
+                        if (def) defId = def.id;
+                    }
+                } catch (ipcErr) {
+                    useErrorStore.getState().trackWarning(ipcErr, {
+                        source: 'SuffixTemplateModal.loadTemplates.ipc',
+                        triggerAction: 'list_prompt_suffix_templates',
+                    });
+                }
+            }
+
+            if (list.length === 0) {
+                list = getCustomSuffixTemplates();
+                defId = getDefaultSuffixTemplateId();
+            }
+
             setCustomTemplates(list);
-            const def = getDefaultSuffixTemplateId();
-            setDefaultId(def);
+            setDefaultId(defId);
 
             // Find initially selected template
             const all = [...BUILTIN_SUFFIX_TEMPLATES, ...list];
@@ -111,10 +137,15 @@ export function SuffixTemplateModal({
             setIsCreating(false);
         } catch (err) {
             useErrorStore.getState().trackWarning(err, {
-                source: 'SuffixTemplateModal.useEffect.init',
+                source: 'SuffixTemplateModal.loadTemplates',
                 triggerAction: 'load_templates',
             });
         }
+    };
+
+    useEffect(() => {
+        if (!isOpen) return;
+        loadTemplates();
     }, [isOpen, activeTemplateId]);
 
     // Handle ESC key
@@ -186,7 +217,7 @@ export function SuffixTemplateModal({
         setActiveTab('editor');
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         const cleanId = formId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
         if (!cleanId) {
             setFormError('Template ID is required (alphanumeric, dashes, underscores)');
@@ -216,9 +247,28 @@ export function SuffixTemplateModal({
                 template: formTemplate.trim(),
             };
 
+            if (isTauri()) {
+                try {
+                    await invoke('save_prompt_suffix_template', {
+                        input: {
+                            id: cleanId,
+                            name: formName.trim(),
+                            description: formDescription.trim(),
+                            category: formCategory,
+                            template: formTemplate.trim(),
+                            is_default: false,
+                        },
+                    });
+                } catch (ipcErr) {
+                    useErrorStore.getState().trackWarning(ipcErr, {
+                        source: 'SuffixTemplateModal.handleSave.ipc',
+                        triggerAction: 'save_prompt_suffix_template',
+                    });
+                }
+            }
+
             saveCustomSuffixTemplate(templateObj);
-            const updated = getCustomSuffixTemplates();
-            setCustomTemplates(updated);
+            await loadTemplates();
             setSelectedTemplate(templateObj);
             setIsEditing(false);
             setIsCreating(false);
@@ -234,12 +284,21 @@ export function SuffixTemplateModal({
         }
     };
 
-    const handleDelete = (id: string) => {
+    const handleDelete = async (id: string) => {
         if (!confirm(`Are you sure you want to delete custom template '${id}'?`)) return;
         try {
+            if (isTauri()) {
+                try {
+                    await invoke('delete_prompt_suffix_template', { id });
+                } catch (ipcErr) {
+                    useErrorStore.getState().trackWarning(ipcErr, {
+                        source: 'SuffixTemplateModal.handleDelete.ipc',
+                        triggerAction: 'delete_prompt_suffix_template',
+                    });
+                }
+            }
             deleteCustomSuffixTemplate(id);
-            const updated = getCustomSuffixTemplates();
-            setCustomTemplates(updated);
+            await loadTemplates();
             if (selectedTemplate?.id === id) {
                 setSelectedTemplate(BUILTIN_SUFFIX_TEMPLATES[0]);
             }
@@ -253,9 +312,26 @@ export function SuffixTemplateModal({
         }
     };
 
-    const handleSetDefault = (id: string) => {
-        setDefaultSuffixTemplateId(id);
-        setDefaultId(id);
+    const handleSetDefault = async (id: string) => {
+        try {
+            if (isTauri()) {
+                try {
+                    await invoke('set_default_prompt_suffix_template', { id });
+                } catch (ipcErr) {
+                    useErrorStore.getState().trackWarning(ipcErr, {
+                        source: 'SuffixTemplateModal.handleSetDefault.ipc',
+                        triggerAction: 'set_default_prompt_suffix_template',
+                    });
+                }
+            }
+            setDefaultSuffixTemplateId(id);
+            setDefaultId(id);
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'SuffixTemplateModal.handleSetDefault',
+                triggerAction: 'set_default_template',
+            });
+        }
     };
 
     const handleCopyTemplateText = async (text: string, id: string) => {

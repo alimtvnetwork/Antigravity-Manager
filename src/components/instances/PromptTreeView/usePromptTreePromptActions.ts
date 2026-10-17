@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { isTauri } from '../../../utils/env';
 import {
@@ -21,6 +21,9 @@ import {
     buildRerunPrompt,
     buildMultiPromptVerificationPrompt,
     parseVerificationTypeFromSuffix,
+    buildMultiRoundVerificationPrompts,
+    type MultiRoundVerificationOptions,
+    type VerificationWritingStyle,
 } from './verificationTemplates';
 
 export { copyPromptWithRichImages } from './clipboard';
@@ -112,6 +115,11 @@ export interface PromptTreePromptActions {
     handleExportConvJson: () => void;
     handleExportConvYaml: () => void;
     handleExportConvSqlite: () => Promise<void>;
+    handleOpenVerificationModal: (conversationId?: string | AgmConversationNode, defaultTurns?: number[]) => void;
+    isVerificationModalOpen: boolean;
+    setIsVerificationModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    verificationModalConv: AgmConversationNode | null;
+    enqueueVerificationRounds: (options: MultiRoundVerificationOptions) => Promise<boolean>;
 }
 
 interface UsePromptTreePromptActionsProps {
@@ -363,7 +371,7 @@ export function usePromptTreePromptActions({
                 source: 'PromptTreeViewModal.handleResendPrompt',
                 triggerAction: 'resolve_send_target',
             });
-            setError('Send failed: no conversation or project could be resolved — select a prompt first.');
+            setError('Send failed: no conversation or project could be resolved â€” select a prompt first.');
             return;
         }
 
@@ -422,7 +430,7 @@ export function usePromptTreePromptActions({
                 setTimeout(() => setActionMsg(null), 3000);
             } else {
                 const errorObj = dispatchErr instanceof Error ? dispatchErr : new Error(String(dispatchErr) || 'dispatch rejected');
-                setError(`Send failed: ${errorObj.message} — prompt copied to clipboard; paste it into the IDE manually.`);
+                setError(`Send failed: ${errorObj.message} â€” prompt copied to clipboard; paste it into the IDE manually.`);
             }
         } catch (err: unknown) {
             const errorObj = err instanceof Error ? err : new Error(String(err) || 'Failed to dispatch prompt');
@@ -508,7 +516,7 @@ ${activePromptText}
                 source: 'PromptTreeViewModal.handleEnqueuePrompt',
                 triggerAction: 'resolve_queue_target',
             });
-            setError('Queue failed: no conversation selected — select a prompt first.');
+            setError('Queue failed: no conversation selected â€” select a prompt first.');
             return;
         }
         try {
@@ -689,6 +697,114 @@ ${activePromptText}
         setTimeout(() => setActionMsg(null), 2500);
     }, [selectedConversation, selectedConversationRef, setActionMsg]);
 
+    const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
+    const [verificationModalConv, setVerificationModalConv] = useState<AgmConversationNode | null>(null);
+
+    const handleOpenVerificationModal = useCallback(
+        (conversationId?: string | AgmConversationNode, _defaultTurns?: number[]) => {
+            let targetConv: AgmConversationNode | null = null;
+            if (typeof conversationId === 'object' && conversationId !== null) {
+                targetConv = conversationId;
+            } else if (typeof conversationId === 'string' && conversationId.trim()) {
+                for (const proj of treeData) {
+                    const found = proj.conversations.find((c) => c.conversation_id === conversationId);
+                    if (found) {
+                        targetConv = found;
+                        break;
+                    }
+                }
+            }
+            if (!targetConv) {
+                targetConv = selectedConversationRef.current || selectedConversation;
+            }
+            if (!targetConv) {
+                setError('Please select a prompt or conversation to audit with verification rounds.');
+                return;
+            }
+            setVerificationModalConv(targetConv);
+            setIsVerificationModalOpen(true);
+        },
+        [treeData, selectedConversation, selectedConversationRef, setError]
+    );
+
+    const enqueueVerificationRounds = useCallback(
+        async (options: MultiRoundVerificationOptions): Promise<boolean> => {
+            try {
+                const prompts = buildMultiRoundVerificationPrompts(options);
+                if (prompts.length === 0) {
+                    setError('No verification prompts synthesized');
+                    return false;
+                }
+                setActionMsg(`Enqueueing ${prompts.length} verification round(s) to FIFO queue...`);
+
+                const targetInstId = options.instanceId || instanceId || 'default';
+                let enqueuedViaIpc = false;
+                if (isTauri()) {
+                    try {
+                        await invoke('enqueue_verification_rounds', {
+                            instanceId: targetInstId,
+                            prompts,
+                            sessionId: options.conversationId,
+                        });
+                        enqueuedViaIpc = true;
+                    } catch {
+                        enqueuedViaIpc = false;
+                    }
+                }
+
+                if (!enqueuedViaIpc) {
+                    for (let i = 0; i < prompts.length; i++) {
+                        await enqueuePrompt(targetInstId, options.repoPath || '', prompts[i], options.conversationId);
+                        if (i < prompts.length - 1) {
+                            await new Promise((resolve) => setTimeout(resolve, 500));
+                        }
+                    }
+                }
+
+                if (isTauri()) {
+                    try {
+                        await invoke('invalidate_prompt_tree_cache', { instanceId: targetInstId });
+                    } catch (cacheErr) {
+                        useErrorStore.getState().trackWarning(cacheErr, {
+                            source: 'usePromptTreePromptActions.enqueueVerificationRounds',
+                            triggerAction: 'invalidate_cache',
+                        });
+                    }
+                }
+
+                await auditRecord({
+                    actor: 'user',
+                    methodName: 'prompt_tree_verification_rounds_enqueued',
+                    uiTarget: 'VerificationModal | EnqueueRounds',
+                    trigger: 'click',
+                    params: {
+                        conversationId: options.conversationId,
+                        instanceId: targetInstId,
+                        roundsCount: prompts.length,
+                        writingStyle: options.writingStyle || options.style,
+                    },
+                    result: 'ok',
+                });
+
+                setActionMsg(`Successfully enqueued ${prompts.length} verification round(s)!`);
+                setTimeout(() => setActionMsg(null), 3500);
+                return true;
+            } catch (err) {
+                persistClientCrash(err, 'usePromptTreePromptActions.enqueueVerificationRounds');
+                useErrorStore.getState().captureException(
+                    err instanceof Error ? err : new Error(String(err)),
+                    {
+                        source: 'usePromptTreePromptActions.enqueueVerificationRounds',
+                        triggerAction: 'enqueue_verification_rounds',
+                    }
+                );
+                setError('Failed to enqueue verification rounds');
+                return false;
+            }
+        },
+        [instanceId, setActionMsg, setError]
+    );
+
     return {
         handleCopyAllWithRichImages,
         handleCopyWithImagesRich,
@@ -708,20 +824,25 @@ ${activePromptText}
         handleExportConvJson,
         handleExportConvYaml,
         handleExportConvSqlite,
+        handleOpenVerificationModal,
+        isVerificationModalOpen,
+        setIsVerificationModalOpen,
+        verificationModalConv,
+        enqueueVerificationRounds,
     };
 }
 
 export { IMAGE_EXTENSIONS };
 
 // ============================================================================
-// RERUN SECTION (Task-04) — appended at END of file per task ownership.
+// RERUN SECTION (Task-04) â€” appended at END of file per task ownership.
 // ----------------------------------------------------------------------------
 // Rerun support: dispatches a follow-up nudge message N times through the SAME
-// canonical dispatch path as handleResendPrompt (`sendPromptNow`) — no forked
+// canonical dispatch path as handleResendPrompt (`sendPromptNow`) â€” no forked
 // logic, no new backend endpoint. Each individual rerun is audit-logged via
 // `auditRecord`; dispatch failures are routed into the error module (via
 // sendPromptNow's captureError + persistClientCrash) and recorded in the audit
-// entry as `result: 'error'`, so failures are always visible — no silent errors.
+// entry as `result: 'error'`, so failures are always visible â€” no silent errors.
 // ============================================================================
 
 /** Message choice offered by the rerun UI picker. */
@@ -740,11 +861,11 @@ export const RERUN_MESSAGE_OPTIONS: ReadonlyArray<{ value: RerunMessageOption; l
 
 /** Small built-in set of follow-up nudges used by the "randomized" option. */
 export const RERUN_RANDOM_MESSAGE_SET: ReadonlyArray<string> = [
-    'Quick status check — is it done yet?',
+    'Quick status check â€” is it done yet?',
     'Please continue where you left off and confirm when finished.',
     'Give me a brief progress update.',
     'Are you finished? Summarize the result.',
-    'Keep going — ping me when it is published.',
+    'Keep going â€” ping me when it is published.',
 ];
 
 export const RERUN_FIXED_MESSAGES: Record<Exclude<RerunMessageOption, 'randomized'>, string> = {
@@ -791,7 +912,7 @@ export interface RerunDispatchResult {
  * Dispatch the chosen rerun message N times through the canonical `sendPromptNow`
  * path (the same function handleResendPrompt uses). Each rerun is audit-logged
  * individually; a failed rerun is audit-logged as `result: 'error'` and routed
- * into the error module — failures are never silent.
+ * into the error module â€” failures are never silent.
  */
 export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<RerunDispatchResult> {
     const requested = Math.min(
@@ -812,7 +933,7 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
         const message = richPrompt || rawMessage;
         const { rewrittenPrompt } = extractPromptImages(message);
         try {
-            // Canonical dispatch path — identical call handleResendPrompt makes.
+            // Canonical dispatch path â€” identical call handleResendPrompt makes.
             await sendPromptNow(ctx.targetInstId, ctx.repoPath, rewrittenPrompt, ctx.convId);
             result.dispatched += 1;
             await auditRecord({
@@ -1012,7 +1133,7 @@ export async function handleCloneAndCompactConversation(
             .join('\n');
 
         const compactContext = [
-            '# 📦 SESSION HANDOFF & COMPACTED MEMORY CONTEXT',
+            '# ðŸ“¦ SESSION HANDOFF & COMPACTED MEMORY CONTEXT',
             '',
             `> **Source Conversation:** ${sourceConv.title || sourceConv.short_id} (\`${sourceConv.conversation_id}\`)`,
             `> **Previous Steps Completed:** ${sourceConv.step_count || 1}`,

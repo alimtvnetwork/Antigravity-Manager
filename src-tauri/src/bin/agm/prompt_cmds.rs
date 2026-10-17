@@ -15,6 +15,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
+#[path = "../../modules/suffix_templates.rs"]
+pub(crate) mod suffix_templates;
+
 pub(crate) fn dispatch_prompt_domain_from_args(args: &[String]) {
     if args.is_empty() {
         cmd_prompts_list(&[]);
@@ -53,6 +56,8 @@ pub(crate) fn dispatch_prompt_domain(subcommand: &str, args: &[String]) {
         }
         "copy" | "cp" => cmd_prompts_copy(args),
         "purge" | "clean" => cmd_prompts_purge(args),
+        "template" | "templates" | "suffix" => cmd_prompts_template(args),
+        "resend-as" | "resend-titles" => cmd_prompts_resend_as(args),
         "help" | "--help" | "-h" => cmd_prompts_help(args),
         _ => crate::common::handle_unknown_domain_command("prompts", subcommand, args),
     }
@@ -73,6 +78,10 @@ pub(crate) fn cmd_prompts_help(_args: &[String]) {
     println!("  agm prompt restore                    Restore and re-enqueue in-flight prompts");
     println!("  agm prompt resend-queued              Re-send all enqueued prompts in FIFO order");
     println!("  agm prompt inspect                    Observe prompt goals and liveness");
+    println!("  agm prompt template list              List configured verification suffix templates");
+    println!("  agm prompt template add <id> ...      Add or update verification suffix template");
+    println!("  agm prompt resend-as list             List configured 'Resend As' title presets");
+    println!("  agm prompt resend-as add <id> ...     Add or update 'Resend As' title preset");
 }
 
 pub(crate) fn cmd_prompts_list(args: &[String]) {
@@ -768,3 +777,514 @@ fn copy_text_to_system_clipboard(text: &str) -> bool {
         false
     }
 }
+
+// ---------------------------------------------------------------------------
+// Suffix Templates CLI Subcommands (`agm prompt template ...`)
+// ---------------------------------------------------------------------------
+
+pub(crate) fn cmd_prompts_template(args: &[String]) {
+    let sub = args
+        .first()
+        .map(|s| s.trim_start_matches('/').trim_start_matches('-').to_lowercase())
+        .unwrap_or_else(|| "list".to_string());
+
+    let json_output = args.iter().any(|a| a == "--json" || a == "-j");
+    let rest = if !args.is_empty() { &args[1..] } else { &[] };
+
+    match sub.as_str() {
+        "list" | "ls" => {
+            let templates = match suffix_templates::list_suffix_templates() {
+                Ok(t) => t,
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to list suffix templates: {e}");
+                    std::process::exit(1);
+                }
+            };
+
+            if json_output {
+                CliEnvelope::ok("prompt template list", None, templates).print_and_exit();
+            }
+
+            println!("[AGM:TEMPLATES] {} Suffix Templates Configured:", templates.len());
+            for t in templates {
+                let default_badge = if t.is_default { "(DEFAULT) " } else { "" };
+                let cat_badge = format!("[{}]", t.category);
+                println!(
+                    "  • {:<22} {:<15} {}{}",
+                    t.id, cat_badge, default_badge, t.name
+                );
+            }
+        }
+        "get" | "show" => {
+            let id = rest
+                .iter()
+                .find(|a| !a.starts_with('-'))
+                .map(|s| s.as_str())
+                .unwrap_or_else(|| {
+                    eprintln!("[ERROR] Template ID required. Usage: agm prompt template get <id>");
+                    std::process::exit(1);
+                });
+
+            match suffix_templates::get_suffix_template(id) {
+                Ok(Some(t)) => {
+                    if json_output {
+                        CliEnvelope::ok("prompt template get", None, t).print_and_exit();
+                    }
+                    println!("[AGM:TEMPLATES] Suffix Template '{}':", t.id);
+                    println!("  Name:        {}", t.name);
+                    println!("  Category:    {}", t.category);
+                    println!("  Default:     {}", t.is_default);
+                    if let Some(ref d) = t.description {
+                        println!("  Description: {}", d);
+                    }
+                    println!("  Created:     {}", t.created_at);
+                    println!("  Updated:     {}", t.updated_at);
+                    println!("\n--- Template Body ---\n{}", t.template);
+                }
+                Ok(None) => {
+                    eprintln!("[ERROR] Suffix template '{id}' not found.");
+                    std::process::exit(1);
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to get suffix template '{id}': {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        "add" | "create" | "save" => {
+            let mut id: Option<String> = None;
+            let mut name: Option<String> = None;
+            let mut category: Option<String> = None;
+            let mut description: Option<String> = None;
+            let mut template_body: Option<String> = None;
+            let mut file_path: Option<String> = None;
+            let mut is_default = false;
+
+            let mut i = 0;
+            while i < rest.len() {
+                let arg = &rest[i];
+                if arg == "--name" || arg == "-n" {
+                    if i + 1 < rest.len() {
+                        name = Some(rest[i + 1].clone());
+                        i += 2;
+                        continue;
+                    }
+                } else if arg == "--category" || arg == "-c" {
+                    if i + 1 < rest.len() {
+                        category = Some(rest[i + 1].clone());
+                        i += 2;
+                        continue;
+                    }
+                } else if arg == "--description" || arg == "--desc" || arg == "-d" {
+                    if i + 1 < rest.len() {
+                        description = Some(rest[i + 1].clone());
+                        i += 2;
+                        continue;
+                    }
+                } else if arg == "--file" || arg == "-f" {
+                    if i + 1 < rest.len() {
+                        file_path = Some(rest[i + 1].clone());
+                        i += 2;
+                        continue;
+                    }
+                } else if arg == "--template" || arg == "-t" {
+                    if i + 1 < rest.len() {
+                        template_body = Some(rest[i + 1].clone());
+                        i += 2;
+                        continue;
+                    }
+                } else if arg == "--default" {
+                    is_default = true;
+                    i += 1;
+                    continue;
+                } else if arg == "--json" || arg == "-j" {
+                    i += 1;
+                    continue;
+                } else if !arg.starts_with('-') {
+                    if id.is_none() {
+                        id = Some(arg.clone());
+                    } else if template_body.is_none() && file_path.is_none() {
+                        template_body = Some(arg.clone());
+                    }
+                }
+                i += 1;
+            }
+
+            let final_id = id.unwrap_or_else(|| {
+                eprintln!("[ERROR] Template ID is required. Usage: agm prompt template add <id> --name \"<name>\" (--file <path> | \"<template>\")");
+                std::process::exit(1);
+            });
+
+            let final_name = name.unwrap_or_else(|| final_id.clone());
+
+            let final_template = if let Some(ref fp) = file_path {
+                match fs::read_to_string(fp) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        eprintln!("[ERROR] Failed to read template file '{fp}': {e}");
+                        std::process::exit(1);
+                    }
+                }
+            } else if let Some(tb) = template_body {
+                tb
+            } else {
+                eprintln!("[ERROR] Template content required. Provide either --file <path> or inline \"<template>\".");
+                std::process::exit(1);
+            };
+
+            println!("[AGM:TEMPLATES] Validating template '{}'...", final_id);
+            let input = suffix_templates::CreateSuffixTemplateInput {
+                id: final_id.clone(),
+                name: final_name,
+                description,
+                category,
+                template: final_template,
+                is_default: Some(is_default),
+            };
+
+            println!("[AGM:TEMPLATES] Writing to repo_prompts.db...");
+            match suffix_templates::save_suffix_template(&input) {
+                Ok(saved) => {
+                    println!("[AGM:TEMPLATES] Read-back verification... VERIFIED");
+                    if json_output {
+                        CliEnvelope::ok("prompt template add", None, saved).print_and_exit();
+                    }
+                    println!(
+                        "[SUCCESS] Suffix template '{}' successfully saved and verified.",
+                        saved.id
+                    );
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to save suffix template: {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        "remove" | "delete" | "rm" => {
+            let id = rest
+                .iter()
+                .find(|a| !a.starts_with('-'))
+                .map(|s| s.as_str())
+                .unwrap_or_else(|| {
+                    eprintln!("[ERROR] Template ID required. Usage: agm prompt template remove <id>");
+                    std::process::exit(1);
+                });
+
+            match suffix_templates::delete_suffix_template(id) {
+                Ok(true) => {
+                    if json_output {
+                        CliEnvelope::ok(
+                            "prompt template remove",
+                            None,
+                            serde_json::json!({ "id": id, "removed": true }),
+                        )
+                        .print_and_exit();
+                    }
+                    println!("[SUCCESS] Suffix template '{id}' successfully removed.");
+                }
+                Ok(false) => {
+                    eprintln!("[ERROR] Suffix template '{id}' not found.");
+                    std::process::exit(1);
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to delete suffix template '{id}': {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        "set-default" | "default" => {
+            let id = rest
+                .iter()
+                .find(|a| !a.starts_with('-'))
+                .map(|s| s.as_str())
+                .unwrap_or_else(|| {
+                    eprintln!("[ERROR] Template ID required. Usage: agm prompt template set-default <id>");
+                    std::process::exit(1);
+                });
+
+            match suffix_templates::set_default_suffix_template(id) {
+                Ok(()) => {
+                    if json_output {
+                        CliEnvelope::ok(
+                            "prompt template set-default",
+                            None,
+                            serde_json::json!({ "id": id, "default": true }),
+                        )
+                        .print_and_exit();
+                    }
+                    println!("[SUCCESS] Suffix template '{id}' marked as default.");
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to set default suffix template '{id}': {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        _ => {
+            eprintln!(
+                "[ERROR] Unknown template subcommand '{sub}'. Available: list, get, add, remove, set-default"
+            );
+            std::process::exit(1);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// "Resend As" Title Presets CLI Subcommands (`agm prompt resend-as ...`)
+// ---------------------------------------------------------------------------
+
+pub(crate) fn cmd_prompts_resend_as(args: &[String]) {
+    let sub = args
+        .first()
+        .map(|s| s.trim_start_matches('/').trim_start_matches('-').to_lowercase())
+        .unwrap_or_else(|| "list".to_string());
+
+    let json_output = args.iter().any(|a| a == "--json" || a == "-j");
+    let rest = if !args.is_empty() { &args[1..] } else { &[] };
+
+    match sub.as_str() {
+        "list" | "ls" => {
+            let presets = match suffix_templates::list_resend_as_templates() {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to list resend-as title presets: {e}");
+                    std::process::exit(1);
+                }
+            };
+
+            if json_output {
+                CliEnvelope::ok("prompt resend-as list", None, presets).print_and_exit();
+            }
+
+            println!("[AGM:RESEND-AS] {} Title Presets Configured:", presets.len());
+            for p in presets {
+                let default_badge = if p.is_default { " (DEFAULT)" } else { "" };
+                let suffix_info = p.suffix_id.as_deref().unwrap_or("none");
+                println!(
+                    "  • {:<12} {:<24} Target: {:<8} Suffix: {:<18}{}",
+                    p.id, p.title_pattern, p.target_mode, suffix_info, default_badge
+                );
+            }
+        }
+        "get" | "show" => {
+            let id = rest
+                .iter()
+                .find(|a| !a.starts_with('-'))
+                .map(|s| s.as_str())
+                .unwrap_or_else(|| {
+                    eprintln!("[ERROR] Preset ID required. Usage: agm prompt resend-as get <id>");
+                    std::process::exit(1);
+                });
+
+            match suffix_templates::get_resend_as_template(id) {
+                Ok(Some(p)) => {
+                    if json_output {
+                        CliEnvelope::ok("prompt resend-as get", None, p).print_and_exit();
+                    }
+                    println!("[AGM:RESEND-AS] Title Preset '{}':", p.id);
+                    println!("  Name:          {}", p.name);
+                    println!("  Title Pattern: {}", p.title_pattern);
+                    println!("  Target Mode:   {}", p.target_mode);
+                    println!(
+                        "  Suffix ID:     {}",
+                        p.suffix_id.as_deref().unwrap_or("none")
+                    );
+                    println!("  Default:       {}", p.is_default);
+                    println!("  Created:       {}", p.created_at);
+                    println!("  Updated:       {}", p.updated_at);
+                }
+                Ok(None) => {
+                    eprintln!("[ERROR] Resend-As preset '{id}' not found.");
+                    std::process::exit(1);
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to get resend-as preset '{id}': {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        "add" | "create" | "save" => {
+            let mut id: Option<String> = None;
+            let mut name: Option<String> = None;
+            let mut pattern: Option<String> = None;
+            let mut mode: Option<String> = None;
+            let mut suffix_id: Option<String> = None;
+            let mut is_default = false;
+
+            let mut i = 0;
+            while i < rest.len() {
+                let arg = &rest[i];
+                if arg == "--name" || arg == "-n" {
+                    if i + 1 < rest.len() {
+                        name = Some(rest[i + 1].clone());
+                        i += 2;
+                        continue;
+                    }
+                } else if arg == "--pattern" || arg == "-p" {
+                    if i + 1 < rest.len() {
+                        pattern = Some(rest[i + 1].clone());
+                        i += 2;
+                        continue;
+                    }
+                } else if arg == "--mode" || arg == "-m" {
+                    if i + 1 < rest.len() {
+                        mode = Some(rest[i + 1].clone());
+                        i += 2;
+                        continue;
+                    }
+                } else if arg == "--suffix" || arg == "-s" {
+                    if i + 1 < rest.len() {
+                        suffix_id = Some(rest[i + 1].clone());
+                        i += 2;
+                        continue;
+                    }
+                } else if arg == "--default" {
+                    is_default = true;
+                    i += 1;
+                    continue;
+                } else if arg == "--json" || arg == "-j" {
+                    i += 1;
+                    continue;
+                } else if !arg.starts_with('-') {
+                    if id.is_none() {
+                        id = Some(arg.clone());
+                    } else if pattern.is_none() {
+                        pattern = Some(arg.clone());
+                    }
+                }
+                i += 1;
+            }
+
+            let final_id = id.unwrap_or_else(|| {
+                eprintln!("[ERROR] Preset ID is required. Usage: agm prompt resend-as add <id> --name \"<name>\" --pattern \"<pattern>\"");
+                std::process::exit(1);
+            });
+
+            let final_name = name.unwrap_or_else(|| final_id.clone());
+            let final_pattern = pattern.unwrap_or_else(|| {
+                eprintln!("[ERROR] Title pattern is required (--pattern \"[Tag] {{title}}\")");
+                std::process::exit(1);
+            });
+
+            println!("[AGM:RESEND-AS] Validating pattern '{}'...", final_pattern);
+            let input = suffix_templates::CreateResendAsTemplateInput {
+                id: final_id.clone(),
+                name: final_name,
+                title_pattern: final_pattern,
+                target_mode: mode,
+                suffix_id,
+                is_default: Some(is_default),
+            };
+
+            println!("[AGM:RESEND-AS] Writing to repo_prompts.db...");
+            match suffix_templates::save_resend_as_template(&input) {
+                Ok(saved) => {
+                    println!("[AGM:RESEND-AS] Read-back verification... VERIFIED");
+                    if json_output {
+                        CliEnvelope::ok("prompt resend-as add", None, saved).print_and_exit();
+                    }
+                    println!(
+                        "[SUCCESS] Resend-As preset '{}' successfully saved and verified.",
+                        saved.id
+                    );
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to save resend-as preset: {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        "remove" | "delete" | "rm" => {
+            let id = rest
+                .iter()
+                .find(|a| !a.starts_with('-'))
+                .map(|s| s.as_str())
+                .unwrap_or_else(|| {
+                    eprintln!("[ERROR] Preset ID required. Usage: agm prompt resend-as remove <id>");
+                    std::process::exit(1);
+                });
+
+            match suffix_templates::delete_resend_as_template(id) {
+                Ok(true) => {
+                    if json_output {
+                        CliEnvelope::ok(
+                            "prompt resend-as remove",
+                            None,
+                            serde_json::json!({ "id": id, "removed": true }),
+                        )
+                        .print_and_exit();
+                    }
+                    println!("[SUCCESS] Resend-As preset '{id}' successfully removed.");
+                }
+                Ok(false) => {
+                    eprintln!("[ERROR] Resend-As preset '{id}' not found.");
+                    std::process::exit(1);
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to delete resend-as preset '{id}': {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        "set-default" | "default" => {
+            let id = rest
+                .iter()
+                .find(|a| !a.starts_with('-'))
+                .map(|s| s.as_str())
+                .unwrap_or_else(|| {
+                    eprintln!("[ERROR] Preset ID required. Usage: agm prompt resend-as set-default <id>");
+                    std::process::exit(1);
+                });
+
+            match suffix_templates::set_default_resend_as_template(id) {
+                Ok(()) => {
+                    if json_output {
+                        CliEnvelope::ok(
+                            "prompt resend-as set-default",
+                            None,
+                            serde_json::json!({ "id": id, "default": true }),
+                        )
+                        .print_and_exit();
+                    }
+                    println!("[SUCCESS] Resend-As preset '{id}' marked as default.");
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to set default resend-as preset '{id}': {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        "test" | "interpolate" => {
+            if rest.is_empty() {
+                eprintln!("[ERROR] Usage: agm prompt resend-as test \"<pattern>\" \"<title>\" [--date <date>] [--seq <seq>]");
+                std::process::exit(1);
+            }
+            let pattern = &rest[0];
+            let title = rest.get(1).map(|s| s.as_str()).unwrap_or("Sample Task");
+            let date = rest.windows(2).find(|w| w[0] == "--date").map(|w| w[1].as_str());
+            let seq = rest.windows(2).find(|w| w[0] == "--seq").and_then(|w| w[1].parse::<u64>().ok());
+
+            let result = suffix_templates::apply_title_pattern(pattern, title, date, seq);
+            if json_output {
+                CliEnvelope::ok(
+                    "prompt resend-as test",
+                    None,
+                    serde_json::json!({
+                        "pattern": pattern,
+                        "title": title,
+                        "interpolated": result,
+                    }),
+                )
+                .print_and_exit();
+            }
+            println!("{result}");
+        }
+        _ => {
+            eprintln!(
+                "[ERROR] Unknown resend-as subcommand '{sub}'. Available: list, get, add, remove, set-default, test"
+            );
+            std::process::exit(1);
+        }
+    }
+}
+

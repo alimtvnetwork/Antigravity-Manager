@@ -38,6 +38,7 @@ pub mod tree_node_liveness;
 pub mod tree_nodes;
 pub mod tree_phases;
 pub mod tree_text;
+pub mod verification;
 
 // ---- models ----
 pub use models::{
@@ -133,6 +134,8 @@ pub use goal_heartbeat::{
 };
 // ---- clone_rows ----
 pub use clone_rows::clone_instance_repo_rows;
+// ---- verification ----
+pub use verification::*;
 
 // ---- pub(crate) items (internal cross-module + test access) ----
 pub(crate) use clone_rows::clone_repo_rows_on;

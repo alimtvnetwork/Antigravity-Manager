@@ -9,6 +9,14 @@ use crate::modules::repo_db::sqlite_export::{
 };
 use std::path::PathBuf;
 
+#[path = "../modules/suffix_templates.rs"]
+pub mod suffix_templates;
+
+pub use suffix_templates::{
+    CreateResendAsTemplateInput, CreateSuffixTemplateInput, ResendAsTemplateRecord,
+    ResendAsTemplateRow, SuffixTemplateRecord, SuffixTemplateRow,
+};
+
 #[tauri::command]
 pub async fn rename_conversation(
     instance_id: Option<String>,
@@ -177,3 +185,171 @@ pub async fn import_prompt_tree_section(
     .await
     .map_err(|e| AppError::Process(format!("Task execution failed: {e}")))?
 }
+
+// ---------------------------------------------------------------------------
+// Suffix Templates & Resend As Tauri IPC Commands
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn list_suffix_templates() -> Result<Vec<SuffixTemplateRow>, AppError> {
+    tokio::task::spawn_blocking(suffix_templates::list_suffix_templates)
+        .await
+        .map_err(|e| AppError::Process(format!("Task execution failed: {e}")))?
+        .map_err(AppError::Database)
+}
+
+#[tauri::command]
+pub async fn list_prompt_suffix_templates() -> Result<Vec<SuffixTemplateRow>, AppError> {
+    list_suffix_templates().await
+}
+
+#[tauri::command]
+pub async fn get_prompt_suffix_template(id: String) -> Result<Option<SuffixTemplateRow>, AppError> {
+    tokio::task::spawn_blocking(move || suffix_templates::get_suffix_template(&id))
+        .await
+        .map_err(|e| AppError::Process(format!("Task execution failed: {e}")))?
+        .map_err(AppError::Database)
+}
+
+#[tauri::command]
+pub async fn save_suffix_template(template: SuffixTemplateRow) -> Result<(), AppError> {
+    let input = CreateSuffixTemplateInput {
+        id: template.id,
+        name: template.name,
+        description: template.description,
+        category: Some(template.category),
+        template: template.template,
+        is_default: Some(template.is_default),
+    };
+    tokio::task::spawn_blocking(move || suffix_templates::save_suffix_template(&input))
+        .await
+        .map_err(|e| AppError::Process(format!("Task execution failed: {e}")))?
+        .map_err(AppError::Database)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn save_prompt_suffix_template(
+    input: CreateSuffixTemplateInput,
+) -> Result<SuffixTemplateRow, AppError> {
+    tokio::task::spawn_blocking(move || suffix_templates::save_suffix_template(&input))
+        .await
+        .map_err(|e| AppError::Process(format!("Task execution failed: {e}")))?
+        .map_err(AppError::Database)
+}
+
+#[tauri::command]
+pub async fn delete_suffix_template(id: String) -> Result<bool, AppError> {
+    tokio::task::spawn_blocking(move || suffix_templates::delete_suffix_template(&id))
+        .await
+        .map_err(|e| AppError::Process(format!("Task execution failed: {e}")))?
+        .map_err(AppError::Database)
+}
+
+#[tauri::command]
+pub async fn delete_prompt_suffix_template(id: String) -> Result<bool, AppError> {
+    delete_suffix_template(id).await
+}
+
+#[tauri::command]
+pub async fn set_default_suffix_template(id: String) -> Result<(), AppError> {
+    tokio::task::spawn_blocking(move || suffix_templates::set_default_suffix_template(&id))
+        .await
+        .map_err(|e| AppError::Process(format!("Task execution failed: {e}")))?
+        .map_err(AppError::Database)
+}
+
+#[tauri::command]
+pub async fn set_default_prompt_suffix_template(id: String) -> Result<(), AppError> {
+    set_default_suffix_template(id).await
+}
+
+#[tauri::command]
+pub async fn list_resend_as_templates() -> Result<Vec<ResendAsTemplateRow>, AppError> {
+    tokio::task::spawn_blocking(suffix_templates::list_resend_as_templates)
+        .await
+        .map_err(|e| AppError::Process(format!("Task execution failed: {e}")))?
+        .map_err(AppError::Database)
+}
+
+#[tauri::command]
+pub async fn list_prompt_resend_as_templates() -> Result<Vec<ResendAsTemplateRow>, AppError> {
+    list_resend_as_templates().await
+}
+
+#[tauri::command]
+pub async fn get_prompt_resend_as_template(
+    id: String,
+) -> Result<Option<ResendAsTemplateRow>, AppError> {
+    tokio::task::spawn_blocking(move || suffix_templates::get_resend_as_template(&id))
+        .await
+        .map_err(|e| AppError::Process(format!("Task execution failed: {e}")))?
+        .map_err(AppError::Database)
+}
+
+#[tauri::command]
+pub async fn save_resend_as_template(template: ResendAsTemplateRow) -> Result<(), AppError> {
+    let input = CreateResendAsTemplateInput {
+        id: template.id,
+        name: template.name,
+        title_pattern: template.title_pattern,
+        target_mode: Some(template.target_mode),
+        suffix_id: template.suffix_id,
+        is_default: Some(template.is_default),
+    };
+    tokio::task::spawn_blocking(move || suffix_templates::save_resend_as_template(&input))
+        .await
+        .map_err(|e| AppError::Process(format!("Task execution failed: {e}")))?
+        .map_err(AppError::Database)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn save_prompt_resend_as_template(
+    input: CreateResendAsTemplateInput,
+) -> Result<ResendAsTemplateRow, AppError> {
+    tokio::task::spawn_blocking(move || suffix_templates::save_resend_as_template(&input))
+        .await
+        .map_err(|e| AppError::Process(format!("Task execution failed: {e}")))?
+        .map_err(AppError::Database)
+}
+
+#[tauri::command]
+pub async fn delete_resend_as_template(id: String) -> Result<bool, AppError> {
+    tokio::task::spawn_blocking(move || suffix_templates::delete_resend_as_template(&id))
+        .await
+        .map_err(|e| AppError::Process(format!("Task execution failed: {e}")))?
+        .map_err(AppError::Database)
+}
+
+#[tauri::command]
+pub async fn delete_prompt_resend_as_template(id: String) -> Result<bool, AppError> {
+    delete_resend_as_template(id).await
+}
+
+#[tauri::command]
+pub async fn set_default_resend_as_template(id: String) -> Result<(), AppError> {
+    tokio::task::spawn_blocking(move || suffix_templates::set_default_resend_as_template(&id))
+        .await
+        .map_err(|e| AppError::Process(format!("Task execution failed: {e}")))?
+        .map_err(AppError::Database)
+}
+
+#[tauri::command]
+pub async fn set_default_prompt_resend_as_template(id: String) -> Result<(), AppError> {
+    set_default_resend_as_template(id).await
+}
+
+#[tauri::command]
+pub async fn interpolate_resend_title(
+    pattern: String,
+    title: String,
+) -> Result<String, AppError> {
+    let clean_pattern = pattern.trim();
+    if clean_pattern.is_empty() {
+        return Err(AppError::Config("Pattern cannot be empty".to_string()));
+    }
+    let res = suffix_templates::apply_title_pattern(clean_pattern, &title, None, None);
+    Ok(res)
+}
+

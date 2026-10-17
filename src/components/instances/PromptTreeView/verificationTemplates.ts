@@ -993,3 +993,426 @@ export function buildMultiPromptVerificationPrompt(
     }
 }
 
+// ============================================================================
+// MULTI-ROUND VERIFICATION ENGINE & WRITING STYLES (Task-02)
+// ----------------------------------------------------------------------------
+// Implements 4 specialized verification writing styles and multi-round repetition
+// (1x, 2x, 3x progressive escalation) to eliminate superficial affirmation.
+// ============================================================================
+
+export type VerificationWritingStyle =
+    | 'root-cause-auditor'
+    | 'socratic-skeptic'
+    | 'spec-gatekeeper'
+    | 'release-blocker';
+
+export interface MultiRoundVerificationOptions {
+    conversationId: string;
+    conversationTitle: string;
+    instanceId: string;
+    selectedTurnNumbers?: number[];
+    roundsCount?: 1 | 2 | 3;
+    rounds?: 1 | 2 | 3;
+    writingStyle?: VerificationWritingStyle;
+    style?: VerificationWritingStyle;
+    prompts?: string[];
+    turns?: string[];
+    repoPath?: string;
+    customDirectives?: string;
+}
+
+export interface WritingStyleDescriptor {
+    id: VerificationWritingStyle;
+    title: string;
+    subtitle: string;
+    description: string;
+    iconName: string;
+    badge: string;
+    color: string;
+}
+
+export const WRITING_STYLES: ReadonlyArray<WritingStyleDescriptor> = [
+    {
+        id: 'root-cause-auditor',
+        title: 'Root-Cause Auditor',
+        subtitle: 'Failure Forensics & Invariants',
+        description: 'Demands 4-part RCA, reproduction traces, surgical minimal fixes, and prevention invariants.',
+        iconName: 'Search',
+        badge: 'RCA',
+        color: 'purple',
+    },
+    {
+        id: 'socratic-skeptic',
+        title: 'Socratic Skeptic',
+        subtitle: "Devil's Advocate & Stress Probe",
+        description: 'Aggressively challenges success claims; probes edge cases, race conditions, nulls, and timeouts.',
+        iconName: 'Zap',
+        badge: 'Adversary',
+        color: 'amber',
+    },
+    {
+        id: 'spec-gatekeeper',
+        title: 'Spec Gatekeeper',
+        subtitle: '1:1 Acceptance Compliance',
+        description: 'Demands line-by-line verification against specification checkboxes and verbatim user instructions.',
+        iconName: 'CheckSquare',
+        badge: 'Gatekeeper',
+        color: 'emerald',
+    },
+    {
+        id: 'release-blocker',
+        title: 'Release Blocker',
+        subtitle: 'Production Readiness & Gates',
+        description: 'Enforces 14-location SemVer sync, strict @aukgit attribution, pre-flight checks, and error visibility.',
+        iconName: 'ShieldAlert',
+        badge: 'Blocker',
+        color: 'rose',
+    },
+];
+
+/**
+ * Builds the chapter content for 'root-cause-auditor' style across rounds 1..3
+ */
+function buildRootCauseAuditorChapters(round: number, totalRounds: number): string {
+    if (round === 1) {
+        return [
+            '## 🚨 VERIFICATION AUDIT: STRICT ROOT-CAUSE ANALYSIS & FAILURE FORENSICS',
+            `> **Writing Style:** \`root-cause-auditor\` | **Round:** 1 of ${totalRounds}`,
+            '',
+            '### Mandatory 4-Part RCA Contract:',
+            'Every touched module or resolved defect MUST be audited against the following 4-part schema:',
+            '1. **Problem Statement:** Cite exact symptoms, error logs, and stack traces.',
+            '2. **Root Cause Analysis:** Explain the exact physical mechanism of failure (unhandled branch, race condition, type coercion).',
+            '3. **Surgical Remediation:** Confirm that only minimal, necessary lines were changed.',
+            '4. **Architectural Prevention Invariant:** Formulate an explicit invariant preventing regression.',
+            '',
+            '| Defect / Touched Module | Root Cause Diagnosis | Minimal Surgical Fix | Prevention Invariant | Status |',
+            '| :--- | :--- | :--- | :--- | :---: |',
+            '| `src/...#L1-L50` | Grounded flaw explanation | Line-level fix citation | Invariant I-X | PASS/FAIL |',
+            '',
+            '### Physical Source File Inspections:',
+            '- Verify that every file cited was actually inspected on disk.',
+            '- Zero speculative assumptions; cite real file paths relative to repo root (`src/...`, `src-tauri/...`).',
+        ].join('\n');
+    }
+
+    if (round === 2) {
+        return [
+            '## 🔬 DEEP FORENSIC PROBE: REPRODUCTION TRACE & REGRESSION INVARIANTS',
+            `> **Writing Style:** \`root-cause-auditor\` | **Round:** 2 of ${totalRounds}`,
+            '',
+            '### Reproduction & Flaw Isolation:',
+            '1. **Reproduction Mechanism:** State the exact physical CLI command, payload, or unit test that triggers the defect before fix.',
+            '2. **Secondary Regression Check:** Did the surgical fix perturb any adjacent data structures, schemas, or IPC calls?',
+            '3. **No Symptom Masking:** Verify that error handling does not suppress root errors (`catch {}` or silent `.ok()` are forbidden).',
+            '',
+            '| Module Tested | Reproduction Trace | Regression Guard | Physical Proof | Verdict |',
+            '| :--- | :--- | :--- | :--- | :---: |',
+            '| `src/...` | Bounded repro trace | Tested against regression | Unit test / CLI output | VERIFIED |',
+        ].join('\n');
+    }
+
+    return [
+        '## 🏁 FORENSIC SIGN-OFF: PREVENTION INVARIANT ENFORCEMENT & ARCHITECTURAL IMMUNITY',
+        `> **Writing Style:** \`root-cause-auditor\` | **Round:** 3 of ${totalRounds}`,
+        '',
+        '### Long-Term Immunity Invariant:',
+        '1. **Structural Prevention:** Is the fix architecturally enforced so the entire class of problem is physically impossible in future code?',
+        '2. **Memory & Plan Synchronization:** Are all plans under `.ai-memory/plans/` updated and marked COMPLETED?',
+        '3. **Audit Ledger Verification:** Confirm root-cause evidence is recorded in SQLite task history or agent-task.db.',
+        '',
+        '| Invariant ID | Rule Definition | Automated Test / Gate | Final Sign-off |',
+        '| :--- | :--- | :--- | :---: |',
+        '| INV-ROOT-01 | Invariant description | Linter / compiler / test | CERTIFIED |',
+    ].join('\n');
+}
+
+/**
+ * Builds the chapter content for 'socratic-skeptic' style across rounds 1..3
+ */
+function buildSocraticSkepticChapters(round: number, totalRounds: number): string {
+    if (round === 1) {
+        return [
+            '## ⚡ ADVERSARIAL VERIFICATION: SOCRATIC SKEPTIC AUDIT',
+            `> **Writing Style:** \`socratic-skeptic\` | **Round:** 1 of ${totalRounds}`,
+            '',
+            '### Skeptic Stance & Null-Hypothesis:',
+            'Do NOT affirm success. Treat every claim of completion as guilty until proven innocent:',
+            '1. **Unsubstantiated Claims:** What claims were made without providing terminal output or file citations?',
+            '2. **Assumption Auditing:** What assumptions did the implementation rely on that were never explicitly verified?',
+            '3. **Failure Visibility:** Are errors swallowed or hidden behind fake success toasts?',
+            '',
+            '| Claimed Feature | Purported Proof | Socratic Challenge | Verified Reality | Verdict |',
+            '| :--- | :--- | :--- | :--- | :---: |',
+            '| Feature Implementation | "Works cleanly" | Was edge case tested? | Physical file check | SCRUTINIZED |',
+        ].join('\n');
+    }
+
+    if (round === 2) {
+        return [
+            '## 🌪️ BOUNDARY STRESS PROBE: RACE CONDITIONS, NULLS & FAULT INJECTION',
+            `> **Writing Style:** \`socratic-skeptic\` | **Round:** 2 of ${totalRounds}`,
+            '',
+            '### Adversarial Stress Scenarios:',
+            '1. **Boundary Values:** How does the system handle 0-length strings, negative numbers, 10MB payloads, or emoji floods?',
+            '2. **Concurrency Hazards:** What happens if the user rapidly double-clicks dispatch within 50ms? Are debounces or locks active?',
+            '3. **Process & Storage Faults:** What happens if SQLite is locked (`SQLITE_BUSY`), the filesystem is read-only, or network sockets drop?',
+            '',
+            '| Adversarial Scenario | Stress Mechanism | Expected Safe Behavior | Physical Evidence | Verdict |',
+            '| :--- | :--- | :--- | :--- | :---: |',
+            '| Empty / Malformed Payload | `prompts = []` | Graceful error toast | Error modal / AppError | IMMUNE |',
+            '| Rapid Double Click | Clicks spaced 30ms | Guard locks second action | Button disabled / loading | IMMUNE |',
+            '| File Write Collision | Simultaneous rounds | 500ms safety sleep | FIFO queue sequencing | IMMUNE |',
+        ].join('\n');
+    }
+
+    return [
+        '## 🛡️ RESILIENCE SIGN-OFF: GRACEFUL DEGRADATION & IMMUNITY CERTIFICATION',
+        `> **Writing Style:** \`socratic-skeptic\` | **Round:** 3 of ${totalRounds}`,
+        '',
+        '### Adversarial Resilience Verdict:',
+        '1. Has the implementation withstood all stress probes without throwing unhandled exceptions or crashing?',
+        '2. Are all error cases routed through `AppError` (backend) and `useErrorStore` (frontend)?',
+        '3. Can this code be safely exposed to malicious or erratic inputs in production?',
+        '',
+        '| Stress Category | Maximum Tolerance Observed | Recovery Mechanism | Resilience Sign-off |',
+        '| :--- | :--- | :--- | :---: |',
+        '| Boundary Inputs | 0 to 100k chars | Guard clamp / graceful return | CERTIFIED |',
+        '| Concurrency Races | 50 concurrent requests | Mutex / FIFO queue serialized | CERTIFIED |',
+    ].join('\n');
+}
+
+/**
+ * Builds the chapter content for 'spec-gatekeeper' style across rounds 1..3
+ */
+function buildSpecGatekeeperChapters(round: number, totalRounds: number): string {
+    if (round === 1) {
+        return [
+            '## 📋 SPECIFICATION GATEKEEPER: 1:1 ACCEPTANCE CRITERIA AUDIT',
+            `> **Writing Style:** \`spec-gatekeeper\` | **Round:** 1 of ${totalRounds}`,
+            '',
+            '### Strict Specification Verification Contract:',
+            'Audit the implemented code against every line item of the parent specification:',
+            '- Every `- [ ]` checkbox must be either verified as `- [x]` with file citations or reported as FAILED.',
+            '- All UI component names, props, and Tauri IPC command signatures must match specification types verbatim.',
+            '',
+            '| Spec Item ID | Specification Directive | Physical Code Location | Line-by-Line Evidence | Compliance |',
+            '| :--- | :--- | :--- | :--- | :---: |',
+            '| SPEC-2.1 | 4 Writing Styles Defined | `verificationTemplates.ts` | Lines 50-120 | 100% PASS |',
+            '| SPEC-2.2 | 500ms Safety Throttling | `verification.rs` | Lines 85-92 | 100% PASS |',
+        ].join('\n');
+    }
+
+    if (round === 2) {
+        return [
+            '## 🔍 NEGATIVE SPECIFICATION AUDIT: BOUNDARY CONSTRAINTS & BANNED PATTERNS',
+            `> **Writing Style:** \`spec-gatekeeper\` | **Round:** 2 of ${totalRounds}`,
+            '',
+            '### Negative Specification Directives:',
+            '1. **Zero Git Commands:** Verify that no prohibited git commands (`git add`, `git commit`, `git push`, `git status`) were executed.',
+            '2. **Search Discipline:** Verify that search strictly used `gitmap` and zero banned tools (`grep`, `rg`, `findstr`).',
+            '3. **Disjoint Ownership:** Verify that only assigned owned files were edited; zero collateral changes.',
+            '4. **Strict Relative Paths:** All paths must be relative (`src/...`, `src-tauri/...`), never machine-absolute.',
+            '',
+            '| Guard Rule | Restriction Scope | Compliance Audit | Status |',
+            '| :--- | :--- | :--- | :---: |',
+            '| Git Command Ban | Whole session | Zero git calls in transcript | COMPLIANT |',
+            '| Search Tool Ban | Whole session | Gitmap used exclusively | COMPLIANT |',
+            '| Relative Paths | All files & templates | Zero absolute paths found | COMPLIANT |',
+        ].join('\n');
+    }
+
+    return [
+        '## 🏆 SPECIFICATION CERTIFICATION: 100% DELIVERABLE SIGN-OFF',
+        `> **Writing Style:** \`spec-gatekeeper\` | **Round:** 3 of ${totalRounds}`,
+        '',
+        '### Acceptance Certification:',
+        '- Are all parent spec requirements (`02-spec/...`) satisfied with zero orphaned items?',
+        '- Is the subtask ledger in `.ai-memory/temp-agents/...` updated to COMPLETED?',
+        '- Final Compliance Verdict: [100% PASS / REJECTED]',
+        '',
+        '| Milestone | Deliverable Scope | Completion Evidence | Final Status |',
+        '| :--- | :--- | :--- | :---: |',
+        '| Subtask 02 Deliverables | Engine, Styles, Modal, Backend | All 5 files verified | CERTIFIED 100% |',
+    ].join('\n');
+}
+
+/**
+ * Builds the chapter content for 'release-blocker' style across rounds 1..3
+ */
+function buildReleaseBlockerChapters(round: number, totalRounds: number): string {
+    if (round === 1) {
+        return [
+            '## 🛑 PRODUCTION RELEASE BLOCKER: GOVERNANCE & QUALITY GATES INSPECTION',
+            `> **Writing Style:** \`release-blocker\` | **Round:** 1 of ${totalRounds}`,
+            '',
+            '### Non-Negotiable Release Gates:',
+            'Before certifying release readiness, the following gates MUST pass without exception:',
+            '1. **Atomic Version Sync:** Check all 14 version manifest locations for `vX.Y.Z` parity.',
+            '2. **Strict Attribution Invariant:** Verify that ONLY `@aukgit` is credited in changelogs.',
+            '3. **Pre-flight Quality Gates:** Run `cargo fmt`, `cargo clippy`, and `npm run build`.',
+            '4. **Error Visibility Invariant:** Confirm all fallible operations route into `AppError` or `useErrorStore`.',
+            '',
+            '| Release Gate | Verification Command | Gate Criteria | Result | Blocker Status |',
+            '| :--- | :--- | :--- | :---: | :---: |',
+            '| Rust Formatting | `cargo fmt -- --check` | Exit code 0 | PASS | CLEAR |',
+            '| Rust Clippy | `cargo clippy --all-features` | Zero warnings | PASS | CLEAR |',
+            '| Frontend Build | `npm run build` | Clean bundle, zero TS errors | PASS | CLEAR |',
+            '| Error Visibility | Static inspection | Zero bare `catch {}` | PASS | CLEAR |',
+        ].join('\n');
+    }
+
+    if (round === 2) {
+        return [
+            '## 🚨 DEEP GOVERNANCE AUDIT: ATTRIBUTION, CHANGELOGS & CHANNEL SEPARATION',
+            `> **Writing Style:** \`release-blocker\` | **Round:** 2 of ${totalRounds}`,
+            '',
+            '### Release Channel & Attribution Integrity:',
+            '1. **Channel Separation:** Confirm branch aligns with release channel (`main` for production, `beta` for preview).',
+            '2. **Exclusive Attribution:** Verify `changelog.md` and `changelog_en.md` attribute strictly `(Thanks to @aukgit)`. Zero other handles allowed.',
+            '3. **README Sync:** Ensure root `README.md` ("## 📝 更新日志") and `README_EN.md` ("## 📝 Changelog") are in sync.',
+            '4. **Thinking Cache Toggle:** Verify `SUGGESTION_DELETE_THINKING_STORE` in `SuggestionDeleteThinkingModal.tsx`.',
+            '',
+            '| Governance Item | Expected Invariant | Verified Reality | Status |',
+            '| :--- | :--- | :--- | :---: |',
+            '| Attribution | `@aukgit` exclusive | Verified via changelog | PASS |',
+            '| README Sync | README + README_EN matching | Verified update logs | PASS |',
+            '| Channel Tag | `vX.Y.Z` matching heading | Tag gate alignment | PASS |',
+        ].join('\n');
+    }
+
+    return [
+        '## 🚀 FINAL RELEASE CLEARANCE: PRODUCTION DEPLOYMENT PERMISSION',
+        `> **Writing Style:** \`release-blocker\` | **Round:** 3 of ${totalRounds}`,
+        '',
+        '### Final Release Gate Verdict:',
+        '- **ALL_GATES_PASSED:** `[TRUE | FALSE]`',
+        '- **BLOCKING_DEFECTS:** `[None | Describe blocking issues]`',
+        '- **RELEASE_AUTHORIZATION:** `[AUTHORIZED | BLOCKED]`',
+        '',
+        '| Release Checkpoint | Criteria | Verification Evidence | Sign-off |',
+        '| :--- | :--- | :--- | :---: |',
+        '| SemVer Atomic Sync | 14 manifests identical | Validated via bump script | APPROVED |',
+        '| Strict @aukgit | Exclusively aukgit in logs | Verified zero other tags | APPROVED |',
+        '| Clean Compiles | cargo clippy + npm build | Exit code 0 | APPROVED |',
+    ].join('\n');
+}
+
+/**
+ * Builds structured multi-round verification prompts.
+ * Generates an array of N Markdown prompts for rounds 1..N.
+ *
+ * Supports both signatures:
+ * - buildMultiRoundVerificationPrompts(options)
+ * - buildMultiRoundVerificationPrompts(turns, options)
+ */
+export function buildMultiRoundVerificationPrompts(
+    turnsOrOptions: string[] | MultiRoundVerificationOptions,
+    maybeOptions?: Partial<MultiRoundVerificationOptions>
+): string[] {
+    try {
+        let prompts: string[] = [];
+        let opts: Partial<MultiRoundVerificationOptions> = {};
+
+        if (Array.isArray(turnsOrOptions)) {
+            prompts = turnsOrOptions;
+            opts = maybeOptions || {};
+        } else if (typeof turnsOrOptions === 'object' && turnsOrOptions !== null) {
+            opts = turnsOrOptions;
+            prompts = turnsOrOptions.prompts || turnsOrOptions.turns || [];
+        }
+
+        const rawStyle = opts.writingStyle || opts.style || 'root-cause-auditor';
+        const style: VerificationWritingStyle =
+            rawStyle === 'socratic-skeptic' ||
+            rawStyle === 'spec-gatekeeper' ||
+            rawStyle === 'release-blocker'
+                ? rawStyle
+                : 'root-cause-auditor';
+
+        const rawRounds = opts.roundsCount ?? opts.rounds ?? 1;
+        const totalRounds = Math.max(1, Math.min(3, Math.floor(rawRounds))) as 1 | 2 | 3;
+        const conversationId = opts.conversationId || 'default-session';
+        const conversationTitle = opts.conversationTitle || conversationId || 'Current Task';
+        const customDirectives = (opts.customDirectives || '').trim();
+
+        const cleanPrompts = prompts
+            .map((p) => (typeof p === 'string' ? p.trim() : ''))
+            .filter((p) => p.length > 0);
+
+        const results: string[] = [];
+
+        for (let r = 1; r <= totalRounds; r++) {
+            const banner = [
+                `# 🛡️ VERIFICATION ROUND ${r} OF ${totalRounds}: [${style.toUpperCase()}]`,
+                '',
+                '> [!IMPORTANT]',
+                `> **Verification Escalation Directive (Round ${r} of ${totalRounds}):**`,
+                `> You are executing Round ${r} of an automated ${totalRounds}-round verification cycle.`,
+                `> Conversation: **${conversationTitle}** (\`${conversationId}\`)`,
+                r === 1 ? '> **Round 1 Focus:** Baseline audit, directive compliance, and direct requirement verification.' : '',
+                r === 2 ? '> **Round 2 Focus:** Adversarial edge cases, stress testing, concurrency hazards, and regression verification.' : '',
+                r === 3 ? '> **Round 3 Focus:** Production sign-off, SemVer parity, @aukgit attribution, and quality gate clearance.' : '',
+                '> Focus your cognitive effort strictly on the designated depth for this round.',
+            ].filter(Boolean).join('\n');
+
+            let styleChapters = '';
+            switch (style) {
+                case 'root-cause-auditor':
+                    styleChapters = buildRootCauseAuditorChapters(r, totalRounds);
+                    break;
+                case 'socratic-skeptic':
+                    styleChapters = buildSocraticSkepticChapters(r, totalRounds);
+                    break;
+                case 'spec-gatekeeper':
+                    styleChapters = buildSpecGatekeeperChapters(r, totalRounds);
+                    break;
+                case 'release-blocker':
+                    styleChapters = buildReleaseBlockerChapters(r, totalRounds);
+                    break;
+            }
+
+            const customSection = customDirectives
+                ? [
+                      '',
+                      '### Operator Custom Directives:',
+                      `> ${customDirectives}`,
+                  ].join('\n')
+                : '';
+
+            const promptInventory = [
+                '### Audited Instruction Turns:',
+                '<<<AUDITED_USER_PROMPT_START>>>',
+                cleanPrompts.length > 0
+                    ? cleanPrompts.map((p, idx) => `[Turn ${idx + 1}]:\n${p}`).join('\n\n---\n\n')
+                    : 'Verify all completed operations and code modifications for this conversation.',
+                '<<<AUDITED_USER_PROMPT_END>>>',
+            ].join('\n');
+
+            const conclusion = [
+                '### Concluding Evidence Contract:',
+                'Complete the verification tables above with physical line-numbered file references and verifiable outputs.',
+                'If any check fails, immediately fix the underlying code, re-run tests until green, and report the successful final state.',
+            ].join('\n');
+
+            results.push(
+                [banner, '', styleChapters, customSection, '', promptInventory, '', conclusion]
+                    .filter((s) => s.length > 0)
+                    .join('\n')
+            );
+        }
+
+        return results;
+    } catch (err) {
+        useErrorStore.getState().trackWarning(err, {
+            source: 'verificationTemplates.buildMultiRoundVerificationPrompts',
+            triggerAction: 'buildMultiRoundVerificationPrompts',
+        });
+        const fallback = Array.isArray(turnsOrOptions)
+            ? turnsOrOptions
+            : (turnsOrOptions && (turnsOrOptions.prompts || turnsOrOptions.turns)) || [];
+        return [fallback.join('\n\n---\n\n')];
+    }
+}
+
+

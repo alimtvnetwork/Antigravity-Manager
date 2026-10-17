@@ -49,6 +49,11 @@ pub(crate) fn is_prompt_subcommand(sub: &str) -> bool {
             | "purge"
             | "clean"
             | "help"
+            | "template"
+            | "templates"
+            | "suffix"
+            | "resend-as"
+            | "resend-titles"
     )
 }
 
