@@ -93,10 +93,21 @@ function lastTwoCallerFrames(
     stackTrace: unknown,
 ): CallerFrame[] {
     const stored = params.stack_frames ?? params.stackFrames;
-    if (Array.isArray(stored)) {
-        return stored.map(frameFromUnknown).filter((frame): frame is CallerFrame => frame !== null).slice(0, 2);
+    if (Array.isArray(stored) && stored.length > 0) {
+        const parsed = stored.map(frameFromUnknown).filter((frame): frame is CallerFrame => frame !== null).slice(0, 2);
+        if (parsed.length > 0) return parsed;
     }
-    return framesFromStackText(String(stackTrace || ''));
+    const fromText = framesFromStackText(String(stackTrace || ''));
+    if (fromText.length > 0) return fromText;
+    const caller = String(params.callerInfo || params.caller || (params.metadata as Record<string, unknown> | undefined)?.callerInfo || '').trim();
+    if (caller) {
+        const parts = caller.split(/\s+/);
+        if (parts.length >= 2) {
+            return [{ function: parts[0], location: parts.slice(1).join(' ') }];
+        }
+        return [{ function: caller, location: 'caller' }];
+    }
+    return [];
 }
 
 function formatTimestamp(timestamp: AuditEntry['timestamp']): string {
@@ -222,6 +233,18 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
             {expanded && (
                 <tr className="border-b border-slate-700/40 bg-slate-900/60">
                     <td colSpan={7} className="px-3 py-3 space-y-2">
+                        {Boolean(params.machine_name || params.node_alias || params.agm_version) && (
+                            <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-cyan-300 bg-cyan-950/40 px-2.5 py-1.5 rounded-md border border-cyan-500/20">
+                                <Terminal className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                                <span className="font-semibold text-cyan-400">Node Telemetry:</span>
+                                {Boolean(params.machine_name) && <span>🖥️ {String(params.machine_name)}</span>}
+                                {Boolean(params.local_ip) && <span className="text-slate-400">({String(params.local_ip)})</span>}
+                                {Boolean(params.node_alias) && <span>🏷️ {String(params.node_alias)}</span>}
+                                {Boolean(params.agm_version) && <span className="text-slate-400">📦 {String(params.agm_version)}</span>}
+                                {Boolean(params.switch_mode) && <span className="text-emerald-400 uppercase font-bold">[{String(params.switch_mode)}]</span>}
+                                {Boolean(params.condition) && <span className="text-amber-400 font-semibold">{String(params.condition)}</span>}
+                            </div>
+                        )}
                         {Boolean(callerInfo) && (
                             <div className="flex items-center gap-2 text-[11px] font-mono text-sky-300 bg-sky-950/40 px-2.5 py-1.5 rounded-md border border-sky-500/20">
                                 <Terminal className="w-3.5 h-3.5 text-sky-400 shrink-0" />
@@ -235,7 +258,7 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
                                 Stack trace{traceFrames.length > 0 ? ` (${traceFrames.length} frame${traceFrames.length === 1 ? '' : 's'})` : ''}
                             </h5>
                             {traceFrames.length === 0 ? (
-                                <p className="font-mono text-[10px] text-slate-500">Stack trace unavailable for this entry (recorded before trace capture).</p>
+                                <p className="font-mono text-[10px] text-slate-500">Stack trace unavailable for this entry.</p>
                             ) : (
                                 <ol className="font-mono text-[10px] text-sky-200/90 bg-slate-950/80 p-2.5 rounded-lg border border-sky-500/20 space-y-1">
                                     {traceFrames.map((frame, index) => (

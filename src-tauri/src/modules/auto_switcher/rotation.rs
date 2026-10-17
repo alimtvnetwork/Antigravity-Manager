@@ -67,35 +67,12 @@ pub async fn execute_profile_rotation_with_context(
         );
     }
 
-    logger::log_info(&format!(
-        "[AutoSwitcher] Rotating instance '{}' to account '{}' (email: {}, quota: {:.1}%). Reason: {}",
-        inst_id,
-        target.account_id,
-        crate::modules::logger::mask_email(&target.email),
-        target.quota_percent,
-        reason
-    ));
+    // Step 2: Extract identity, quotas, predictions, and project context (Email Parity)
+    let (node_alias, _) = crate::modules::email_sender::get_local_node_identity();
+    let m_name = crate::modules::email_watcher::detect_machine_name();
+    let m_ip = crate::modules::email_watcher::detect_local_ip();
+    let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
 
-    crate::modules::audit::record_if_active(
-        "system",
-        "programmatic",
-        "auto_switcher::execute_rotation",
-        "instances | auto_switcher | rotation_executor",
-        serde_json::json!({
-            "instance_id": inst_id,
-            "from_account": ctx.as_ref().and_then(|c| c.previous_email.as_deref()).map(crate::modules::logger::mask_email),
-            "to_account": crate::modules::logger::mask_email(&target.email),
-            "previous_quota_4h": ctx.as_ref().and_then(|c| c.previous_quota_4h),
-            "target_quota_4h": target.quota_percent,
-            "backed_up_prompts": backed_up_count,
-            "auto_resume": has_auto_resume,
-            "reason": reason
-        }),
-        "ok",
-        "",
-    );
-
-    // Step 2: Trigger unified Email and Telegram notifications before switch
     let prev_email = ctx
         .as_ref()
         .and_then(|c| c.previous_email.clone())
@@ -171,6 +148,67 @@ pub async fn execute_profile_rotation_with_context(
         .filter(|n| !n.is_empty() && seen_projs.insert(n.clone()))
         .collect();
     let backup_count_opt = backup_res.as_ref().ok().copied();
+
+    let condition = if reason.to_lowercase().contains("critical") {
+        "critical_quota"
+    } else if reason.to_lowercase().contains("depleted") {
+        "depleted_before_finish"
+    } else if reason.to_lowercase().contains("force") {
+        "forced_rotation"
+    } else if reason.to_lowercase().contains("manual") {
+        "manual_rotation"
+    } else {
+        "low_quota_threshold"
+    };
+
+    logger::log_info(&format!(
+        "[AutoSwitcher] [{} | {} | {}] Rotating instance '{}' (mode: auto, condition: {}, reason: {}) from '{}' ({:.1}%) -> '{}' ({:.1}%). Backed up: {} prompts, auto-resume: {}",
+        pkg_ver,
+        m_name,
+        node_alias,
+        inst_id,
+        condition,
+        reason,
+        prev_email.as_deref().map(crate::modules::logger::mask_email).unwrap_or_else(|| "(none)".to_string()),
+        prev_q_4h.unwrap_or(0.0),
+        crate::modules::logger::mask_email(&target.email),
+        target.quota_percent,
+        backed_up_count,
+        has_auto_resume,
+    ));
+
+    crate::modules::audit::record_if_active(
+        "system",
+        "programmatic",
+        "auto_switcher::execute_rotation",
+        "instances | auto_switcher | rotation_executor",
+        serde_json::json!({
+            "agm_version": pkg_ver,
+            "machine_name": m_name,
+            "node_alias": node_alias,
+            "local_ip": m_ip,
+            "instance_id": inst_id,
+            "instance_name": inst_id,
+            "switch_mode": "auto",
+            "condition": condition,
+            "from_account": prev_email.as_deref().map(crate::modules::logger::mask_email),
+            "to_account": crate::modules::logger::mask_email(&target.email),
+            "predicted_next_account": predicted_opt.as_deref().map(crate::modules::logger::mask_email),
+            "previous_quota_4h": prev_q_4h,
+            "previous_quota_weekly": prev_q_weekly,
+            "target_quota_4h": target_q_4h,
+            "target_quota_weekly": target_q_weekly,
+            "credit_before_switch": credit_before,
+            "threshold_activated": thresh,
+            "backed_up_prompts": backed_up_count,
+            "backed_up_projects": proj_names,
+            "auto_resume": has_auto_resume,
+            "reason": reason,
+            "timestamp": chrono::Utc::now().timestamp_millis(),
+        }),
+        "ok",
+        "",
+    );
 
     let notify_details = crate::modules::notification_hub::SwitchNotificationDetails {
         previous_email: prev_email,

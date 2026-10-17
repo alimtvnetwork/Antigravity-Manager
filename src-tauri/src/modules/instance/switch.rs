@@ -479,6 +479,41 @@ pub async fn switch_account_to_instance(
         let unique_projs = crate::modules::notification_hub::deduplicate_names(
             running_projs.into_iter().map(|p| p.repo_name),
         );
+        let (node_alias, _) = crate::modules::email_sender::get_local_node_identity();
+        let m_name = crate::modules::email_watcher::detect_machine_name();
+        let m_ip = crate::modules::email_watcher::detect_local_ip();
+        let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
+        crate::modules::audit::record_if_active(
+            "user",
+            "click",
+            "instance::switch_account",
+            &format!("instances | instance_table | switch_dialog | {followup_instance_id}"),
+            serde_json::json!({
+                "agm_version": pkg_ver,
+                "machine_name": m_name,
+                "node_alias": node_alias,
+                "local_ip": m_ip,
+                "instance_id": followup_instance_id,
+                "instance_name": followup_instance_name,
+                "switch_mode": "manual",
+                "condition": "manual_switch",
+                "from_account": followup_prev.as_deref().map(crate::modules::logger::mask_email),
+                "to_account": crate::modules::logger::mask_email(&followup_email),
+                "predicted_next_account": predicted_next_email.as_deref().map(crate::modules::logger::mask_email),
+                "previous_quota_4h": prev_4h,
+                "previous_quota_weekly": prev_weekly,
+                "target_quota_4h": target_4h,
+                "target_quota_weekly": target_weekly,
+                "credit_before_switch": prev_4h,
+                "backed_up_prompts": backed_up_count,
+                "backed_up_projects": unique_projs,
+                "auto_resume": backed_up_count > 0,
+                "reason": "Smart Rotator / Instance Account Switch",
+                "timestamp": chrono::Utc::now().timestamp_millis(),
+            }),
+            "ok",
+            "",
+        );
         crate::error::record_ignored(
             Ok::<String, String>(
                 crate::modules::notification_hub::notify_account_switched_details(

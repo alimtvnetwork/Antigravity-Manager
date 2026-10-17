@@ -396,6 +396,10 @@ pub async fn select_and_verify_next_best_profile(
 
     let mut best_fallback: Option<ProfileCandidate> = None;
     let mut highest_fallback_quota: f64 = 0.0;
+    let (node_alias, _) = crate::modules::email_sender::get_local_node_identity();
+    let m_name = crate::modules::email_watcher::detect_machine_name();
+    let m_ip = crate::modules::email_watcher::detect_local_ip();
+    let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
 
     for candidate in candidates {
         let masked_email = crate::modules::logger::mask_email(&candidate.email);
@@ -438,6 +442,10 @@ pub async fn select_and_verify_next_best_profile(
                 "auto_switcher::cooldown_skip",
                 "instances | auto_switcher | cooldown_guard",
                 serde_json::json!({
+                    "agm_version": pkg_ver,
+                    "machine_name": m_name,
+                    "node_alias": node_alias,
+                    "local_ip": m_ip,
                     "account_id": cand_acc.id,
                     "account_email_masked": masked_email,
                     "cooldown_reason": "rate_limited",
@@ -510,13 +518,19 @@ pub async fn select_and_verify_next_best_profile(
                 "auto_switcher::candidate_evaluation",
                 &format!("instances | auto_switcher | candidate_evaluator | {current_instance_id}"),
                 serde_json::json!({
+                    "agm_version": pkg_ver,
+                    "machine_name": m_name,
+                    "node_alias": node_alias,
+                    "local_ip": m_ip,
                     "instance_id": current_instance_id,
                     "target_model": target_model,
                     "threshold_percent": threshold,
                     "selected_candidate": candidate.account_id,
                     "selected_email_masked": masked_email,
                     "quota_4h": fresh_4h_quota,
-                    "reason": "100% 4h window quota confirmed"
+                    "score": candidate.score,
+                    "reason": "100% 4h window quota confirmed",
+                    "timestamp": chrono::Utc::now().timestamp_millis(),
                 }),
                 "ok",
                 "",
@@ -558,13 +572,19 @@ pub async fn select_and_verify_next_best_profile(
             "auto_switcher::candidate_evaluation",
             &format!("instances | auto_switcher | candidate_evaluator | {current_instance_id}"),
             serde_json::json!({
+                "agm_version": pkg_ver,
+                "machine_name": m_name,
+                "node_alias": node_alias,
+                "local_ip": m_ip,
                 "instance_id": current_instance_id,
                 "target_model": target_model,
                 "threshold_percent": threshold,
                 "selected_candidate": fallback.account_id,
                 "selected_email_masked": fallback_masked,
                 "quota_4h": fallback.quota_percent,
-                "reason": "fallback best available candidate"
+                "score": fallback.score,
+                "reason": "fallback best available candidate",
+                "timestamp": chrono::Utc::now().timestamp_millis(),
             }),
             "ok",
             "",
@@ -578,11 +598,16 @@ pub async fn select_and_verify_next_best_profile(
         "auto_switcher::candidate_evaluation",
         &format!("instances | auto_switcher | candidate_evaluator | {current_instance_id}"),
         serde_json::json!({
+            "agm_version": pkg_ver,
+            "machine_name": m_name,
+            "node_alias": node_alias,
+            "local_ip": m_ip,
             "instance_id": current_instance_id,
             "target_model": target_model,
             "threshold_percent": threshold,
             "selected_candidate": serde_json::Value::Null,
-            "reason": "no usable quota profile found"
+            "reason": "no usable quota profile found",
+            "timestamp": chrono::Utc::now().timestamp_millis(),
         }),
         "ok",
         "",
