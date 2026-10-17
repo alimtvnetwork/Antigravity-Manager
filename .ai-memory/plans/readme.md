@@ -4,6 +4,7 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
+| [accounts-table-delete-hover-right-click-disable.md](./completed/accounts-table-delete-hover-right-click-disable.md) | `COMPLETED` | Fix single & batch Delete buttons via modal error-resilience and backend retry ladder, mounted right-click context menu (Disable/Enable, Delete, Switch), position-locked row hover color inversion with group-hover:!text-black, yellow highlighter Switch button, and red Remove button. |
 | [accounts-table-delete-hover-and-disable-sync.md](./completed/accounts-table-delete-hover-and-disable-sync.md) | `COMPLETED` | Fix single & batch Delete buttons via modal mounting, position-locked row hover color inversion, yellow highlighter Switch button, solid red Remove button, and account disable/enable lifecycle with auto-switch exclusion. |
 | [verify-recent-implementations.md](./completed/verify-recent-implementations.md) | `COMPLETED` | V6 Parent Task verification of Rust Audit Telemetry (compiler callsite retention, backtrace sanitization, email parity) and Frontend Prompt Tree (regex fix, dual-MIME clipboard, 5-chapter verification templates, AuditPanel fallback ladder). |
 | [prompt-tree-image-resend-and-status-templates.md](./completed/prompt-tree-image-resend-and-status-templates.md) | `COMPLETED` | Dual-MIME rich image extraction & relative attachment link rewriting, 5-chapter prompt verification architecture ('Is it done?', 'Is it released?', 'Are you confident?', 'Edge Cases & Tests'), and iteration-tracked rerun prompt preservation. |

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../../../../utils/cn';
 import { useAccountStore } from '../../../../stores/useAccountStore';
+import { useErrorStore } from '../../../../stores/error-store';
 import type { AccountRowContentProps } from '../types';
 import type { AccountRowState } from '../useAccountRowState';
 
@@ -34,6 +35,7 @@ interface ActionsCellProps extends Pick<AccountRowContentProps,
  */
 export function ActionsCell(props: ActionsCellProps) {
     const { account, selected, isCurrent, isFocused, isRefreshing, isSwitching, isDisabled } = props;
+    const isDeleting = Boolean((account as any)?.isDeleting || (props as any)?.isDeleting);
     const { onSwitch, onRefresh, onViewDevice, onViewDetails, onExport, onDelete, onToggleProxy, onWarmup, onUpdateLabel } = props;
     const {
         t,
@@ -70,7 +72,7 @@ export function ActionsCell(props: ActionsCellProps) {
                 "p-1 rounded-[5px] transition-all",
                 (isRefreshing || isDisabled)
                     ? "cursor-not-allowed text-gray-400 dark:text-gray-600"
-                    : "text-gray-600 dark:text-gray-400 group-hover:text-slate-800 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-slate-200/80 dark:hover:bg-slate-200/80"
+                    : "text-gray-600 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-800 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-slate-200/80 dark:hover:bg-slate-200/80"
             )}
             onClick={(event) => { event.stopPropagation(); onRefresh(); }}
             title={t('common.refresh')}
@@ -117,6 +119,7 @@ export function ActionsCell(props: ActionsCellProps) {
                         <button
                             type="button"
                             role="button"
+                            aria-label={`Switch to instance ${inst.config.name}`}
                             key={inst.config.id}
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -143,7 +146,7 @@ export function ActionsCell(props: ActionsCellProps) {
             type="button"
             role="button"
             aria-label={t('common.more', 'More actions')}
-            className="p-1 text-gray-600 dark:text-gray-400 group-hover:text-slate-800 hover:text-slate-950 hover:bg-slate-200/80 dark:hover:bg-slate-200/80 rounded-[5px] transition-all"
+            className="p-1 text-gray-600 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-800 hover:text-slate-950 hover:bg-slate-200/80 dark:hover:bg-slate-200/80 rounded-[5px] transition-all"
             onClick={(event) => {
                 event.stopPropagation();
                 if (showMoreMenu) {
@@ -184,7 +187,7 @@ export function ActionsCell(props: ActionsCellProps) {
                                 await store.fetchAccounts();
                             }
                         } catch (err) {
-                            console.error('Failed to toggle account disabled:', err);
+                            useErrorStore.getState().trackWarning(err, { source: 'ActionsCell.toggleAccountDisabled', triggerAction: 'toggle_account_disabled' });
                         }
                     }}
                 >
@@ -267,7 +270,7 @@ export function ActionsCell(props: ActionsCellProps) {
                     "hidden lg:inline-flex p-1 rounded-[5px] transition-all",
                     account.custom_label
                         ? "text-orange-500 hover:text-orange-600 hover:bg-orange-100/80"
-                        : "text-gray-500 dark:text-gray-400 group-hover:text-slate-700 hover:text-orange-500 hover:bg-orange-100/80"
+                        : "text-gray-500 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-800 hover:text-orange-500 hover:bg-slate-200/80 dark:hover:bg-slate-200/80"
                 )}
                 onClick={(e) => { e.stopPropagation(); setIsEditingLabel(true); }}
                 title={t('accounts.edit_label', 'Edit Label')}
@@ -285,7 +288,7 @@ export function ActionsCell(props: ActionsCellProps) {
                     "hidden xl:inline-flex p-1 rounded-[5px] transition-all",
                     (isRefreshing || isDisabled)
                         ? "bg-orange-50 dark:bg-orange-900/10 text-orange-600 cursor-not-allowed"
-                        : "text-gray-500 dark:text-gray-400 group-hover:text-slate-700 hover:text-orange-500 hover:bg-orange-100/80"
+                        : "text-gray-500 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-800 hover:text-orange-500 hover:bg-slate-200/80 dark:hover:bg-slate-200/80"
                 )}
                 onClick={(e) => { e.stopPropagation(); onWarmup(); }}
                 title={isDisabled ? t('accounts.disabled_tooltip') : (isRefreshing ? t('common.loading') : t('accounts.warmup_this', 'Warmup Account'))}
@@ -301,8 +304,8 @@ export function ActionsCell(props: ActionsCellProps) {
             className={cn(
                 "p-1 rounded-[5px] transition-all",
                 account.proxy_disabled
-                    ? "text-gray-500 dark:text-gray-400 group-hover:text-slate-700 hover:text-cyan-600 hover:bg-cyan-100/80"
-                    : "text-gray-500 dark:text-gray-400 group-hover:text-slate-700 hover:text-orange-600 hover:bg-orange-100/80"
+                    ? "text-gray-500 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-800 hover:text-cyan-600 hover:bg-slate-200/80 dark:hover:bg-slate-200/80"
+                    : "text-gray-500 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-800 hover:text-orange-600 hover:bg-slate-200/80 dark:hover:bg-slate-200/80"
             )}
             onClick={(e) => { e.stopPropagation(); onToggleProxy(); }}
             title={account.proxy_disabled ? t('accounts.enable_proxy') : t('accounts.disable_proxy')}
@@ -319,12 +322,13 @@ export function ActionsCell(props: ActionsCellProps) {
             aria-label={t('common.delete', 'Delete Account')}
             className={cn(
                 "p-1 rounded-[5px] transition-all font-medium shadow-sm active:scale-95 border inline-flex items-center justify-center",
-                isDisabled
+                isDeleting
                     ? "bg-red-300/60 text-white/70 border-red-400/60 cursor-not-allowed opacity-60"
                     : "bg-red-600 text-white border-red-700 hover:bg-red-700 hover:text-white hover:border-red-800"
             )}
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            onClick={(e) => { e.stopPropagation(); if (!isDeleting) onDelete(); }}
             title={t('common.delete')}
+            disabled={isDeleting}
         >
             <Trash2 className="w-3.5 h-3.5" />
         </button>

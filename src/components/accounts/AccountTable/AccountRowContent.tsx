@@ -63,12 +63,12 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     <span
                         className={cn(
-                        "font-medium text-xs break-all transition-colors cursor-pointer select-text",
-                        isFocused || selected
-                            ? "text-blue-950 dark:text-blue-200 font-bold"
-                            : isCurrent
-                            ? "text-blue-900 dark:text-amber-300 font-bold drop-shadow-xs"
-                            : "text-gray-900 dark:text-gray-100 group-hover:!text-black dark:group-hover:!text-black"
+                            "font-medium text-xs break-all transition-colors cursor-pointer select-text group-hover:!text-black dark:group-hover:!text-black",
+                            isFocused || selected
+                                ? "text-blue-950 dark:text-blue-200"
+                                : isCurrent
+                                ? "text-blue-900 dark:text-amber-300 drop-shadow-xs"
+                                : "text-gray-900 dark:text-gray-100"
                         )}
                         title={showAllEmails || showEmail || isHoverUnmasked ? account.email : maskEmail(account.email)}
                         onDoubleClick={(event) => {
@@ -177,12 +177,18 @@ export function AccountRowContent(props: AccountRowContentProps) {
                                     onClick={(e) => e.stopPropagation()}
                                 />
                                 <button
+                                    type="button"
+                                    role="button"
+                                    aria-label={t('common.save', 'Save')}
                                     className="p-0.5 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-[5px] transition-all"
                                     onClick={(e) => { e.stopPropagation(); handleSaveLabel(); }}
                                 >
                                     <Check className="w-3 h-3" />
                                 </button>
                                 <button
+                                    type="button"
+                                    role="button"
+                                    aria-label={t('common.cancel', 'Cancel')}
                                     className="p-0.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-[5px] transition-all"
                                     onClick={(e) => { e.stopPropagation(); handleCancelLabel(); }}
                                 >
@@ -195,31 +201,36 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 </div>
             </td>
 
-            <td className="px-2 py-px align-middle min-w-[185px] bg-slate-50/50 dark:bg-slate-900/40 group-hover:!bg-white dark:group-hover:!bg-white border-l border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90">
+            <td className="px-2 py-px align-middle min-w-[185px] bg-slate-50/50 dark:bg-slate-900/40 group-hover:!bg-white dark:group-hover:!bg-white border-l border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90 transition-colors">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <div className={cn(
-                        "flex items-center justify-center gap-1.5 py-0.5 px-2 rounded-md border group/error",
-                        account.validation_blocked ? "bg-amber-50/50 dark:bg-amber-900/10 border-amber-100/50 dark:border-amber-900/20" : "bg-red-50/50 dark:bg-red-900/10 border-red-100/50 dark:border-red-900/20"
+                        "flex items-center justify-center gap-1.5 py-0.5 px-2 rounded-md border group/error transition-colors",
+                        account.validation_blocked
+                            ? "bg-amber-50/50 dark:bg-amber-900/10 border-amber-100/50 dark:border-amber-900/20 group-hover:bg-amber-50 dark:group-hover:bg-amber-900/20"
+                            : "bg-red-50/50 dark:bg-red-900/10 border-red-100/50 dark:border-red-900/20 group-hover:bg-red-50 dark:group-hover:bg-red-900/20"
                     )}>
                         <div className={cn(
-                            "flex items-center gap-1",
-                            account.validation_blocked ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"
+                            "flex items-center gap-1 transition-colors",
+                            account.validation_blocked ? "text-amber-600 dark:text-amber-400 group-hover:!text-black dark:group-hover:!text-black" : "text-red-600 dark:text-red-400 group-hover:!text-black dark:group-hover:!text-black"
                         )}>
                             {account.validation_blocked ? <Clock className="w-2.5 h-2.5" /> : (account.quota?.is_forbidden ? <Lock className="w-2.5 h-2.5" /> : <Ban className="w-2.5 h-2.5" />)}
                             <span className={cn(
-                                "text-[9px] font-bold truncate max-w-[80px]",
-                                account.validation_blocked ? "text-amber-700/80 dark:text-amber-400" : "text-red-700/80 dark:text-red-400"
+                                "text-[9px] font-bold truncate max-w-[80px] transition-colors",
+                                account.validation_blocked ? "text-amber-700/80 dark:text-amber-400 group-hover:!text-black dark:group-hover:!text-black" : "text-red-700/80 dark:text-red-400 group-hover:!text-black dark:group-hover:!text-black"
                             )}>
                                 {account.validation_blocked ? validationBlockedLabel : (isDisabled ? t('accounts.status.disabled') : t('accounts.forbidden_msg'))}
                             </span>
                         </div>
                         <div className={cn(
-                            "w-px h-2.5",
+                            "w-px h-2.5 transition-colors",
                             account.validation_blocked ? "bg-amber-200 dark:bg-amber-800/50" : "bg-red-200 dark:bg-red-800/50"
                         )} />
                         <button
+                            type="button"
+                            role="button"
+                            aria-label={t('accounts.view_error')}
                             onClick={(e) => { e.stopPropagation(); onViewError(); }}
-                            className="text-[9px] font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center shrink-0"
+                            className="text-[9px] font-medium text-blue-600 dark:text-blue-400 group-hover:!text-black dark:group-hover:!text-black hover:underline flex items-center shrink-0 transition-colors"
                         >
                             {t('accounts.view_error')}
                         </button>
@@ -236,9 +247,9 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 )}
             </td>
 
-            <td className="px-2 py-px align-middle min-w-[185px] bg-slate-50/50 dark:bg-slate-900/40 group-hover:!bg-white dark:group-hover:!bg-white border-r border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90">
+            <td className="px-2 py-px align-middle min-w-[185px] bg-slate-50/50 dark:bg-slate-900/40 group-hover:!bg-white dark:group-hover:!bg-white border-r border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90 transition-colors">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
-                    <span className="text-[10px] text-gray-400 italic">--</span>
+                    <span className="text-[10px] text-gray-400 italic group-hover:!text-black dark:group-hover:!text-black transition-colors">--</span>
                 ) : (
                     <QuotaProgressBar
                         className="w-full"
@@ -250,8 +261,8 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 )}
             </td>
 
-            <td className="px-2.5 py-0.5 align-middle whitespace-nowrap w-[95px] border-b border-slate-200/90 dark:border-slate-800/90 group-hover:!bg-white dark:group-hover:!bg-white">
-                <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400 group-hover:!text-black dark:group-hover:!text-black font-mono" title={formatDateTime(account.last_used)}>
+            <td className="px-2.5 py-0.5 align-middle whitespace-nowrap w-[95px] border-b border-slate-200/90 dark:border-slate-800/90 group-hover:!bg-white dark:group-hover:!bg-white transition-colors">
+                <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400 group-hover:!text-black dark:group-hover:!text-black font-mono transition-colors" title={formatDateTime(account.last_used)}>
                     {formatDateTimeShort(account.last_used)}
                 </span>
             </td>

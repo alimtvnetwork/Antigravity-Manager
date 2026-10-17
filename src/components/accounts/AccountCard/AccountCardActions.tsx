@@ -53,6 +53,7 @@ export function AccountCardActions({
     handleKeyDown,
 }: AccountCardActionsProps) {
     const { t } = useTranslation();
+    const isDeleting = Boolean((account as any)?.isDeleting);
 
     return (
 <div className="flex-none flex items-center justify-center pt-2 pb-1 border-t border-slate-200/80 dark:border-slate-800/80">
@@ -277,12 +278,13 @@ export function AccountCardActions({
             aria-label={t('common.delete', 'Delete Account')}
             className={cn(
                 "p-1.5 rounded-[5px] transition-all font-medium shadow-sm active:scale-95 border inline-flex items-center justify-center",
-                isDisabled
+                isDeleting
                     ? "bg-red-300/60 text-white/70 border-red-400/60 cursor-not-allowed opacity-60"
                     : "bg-red-600 text-white border-red-700 hover:bg-red-700 hover:text-white hover:border-red-800"
             )}
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            onClick={(e) => { e.stopPropagation(); if (!isDeleting) onDelete(); }}
             title={t('common.delete')}
+            disabled={isDeleting}
         >
             <Trash2 className="w-3.5 h-3.5" />
         </button>

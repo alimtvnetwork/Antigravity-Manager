@@ -177,7 +177,6 @@ export function useAccountsHandlers(state: AccountsState) {
       setSelectedIds(new Set());
       console.log("[Accounts] Batch delete success");
       showToast(t("common.success"), "success");
-      setIsBatchDelete(false);
     } catch (error) {
       console.error("[Accounts] Batch delete failed:", error);
       useErrorStore.getState().trackWarning(error, {
@@ -187,6 +186,7 @@ export function useAccountsHandlers(state: AccountsState) {
       showToast(`${t("common.error")}: ${error}`, "error");
     } finally {
       setIsDeleting(false);
+      setIsBatchDelete(false);
     }
   };
 
@@ -206,7 +206,6 @@ export function useAccountsHandlers(state: AccountsState) {
       await deleteAccount(idToDelete);
       console.log("[Accounts] Delete success");
       showToast(t("common.success"), "success");
-      setDeleteConfirmId(null);
     } catch (error) {
       console.error("[Accounts] Delete failed:", error);
       useErrorStore.getState().trackWarning(error, {
@@ -216,6 +215,7 @@ export function useAccountsHandlers(state: AccountsState) {
       showToast(`${t("common.error")}: ${error}`, "error");
     } finally {
       setIsDeleting(false);
+      setDeleteConfirmId(null);
     }
   };
 

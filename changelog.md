@@ -495,6 +495,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.221.0 (2026-10-17)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.220.0 (2026-10-17)**:
         -   **[Accounts Management & UI Overhaul] Delete Remediation, Position-Locked Hover Inversion, Yellow Switch & Red Remove Buttons, and Disable Lifecycle (Thanks to @aukgit)**:
             -   **Description**: Resolved non-responsive single and batch Delete buttons by mounting dedicated destructive `ModalDialog` components in `AccountsDialogs.tsx`; implemented table row color inversion to white background and black text with static geometry to eliminate layout jitter; styled Switch button with prominent yellow highlighter theme and styled Remove button with solid red background and white icon; added account disable/enable lifecycle via selection toolbar and action menu with auto-switcher candidate exclusion.

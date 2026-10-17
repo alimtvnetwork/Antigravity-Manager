@@ -264,8 +264,29 @@ pub fn delete_account(account_id: &str) -> Result<(), String> {
     let account_path = accounts_dir.join(format!("{}.json", account_id));
 
     if account_path.exists() {
-        fs::remove_file(&account_path)
-            .map_err(|e| format!("failed_to_delete_account_file: {}", e))?;
+        let retry_delays = [
+            std::time::Duration::from_millis(25),
+            std::time::Duration::from_millis(50),
+            std::time::Duration::from_millis(100),
+        ];
+        let mut remove_res = fs::remove_file(&account_path);
+        for delay in retry_delays {
+            if remove_res.is_ok() {
+                break;
+            }
+            std::thread::sleep(delay);
+            remove_res = fs::remove_file(&account_path);
+        }
+
+        if let Err(e) = &remove_res {
+            tracing::warn!(
+                "[delete_account] Failed to delete account file {}: {}",
+                account_path.display(),
+                e
+            );
+            // Justification: best-effort cleanup; a leftover file is harmless
+            crate::error::record_ignored(remove_res, "remove_file");
+        }
     }
 
     // [FIX #1477] Trigger TokenManager cache cleanup signal

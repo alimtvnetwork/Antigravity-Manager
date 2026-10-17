@@ -55,6 +55,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
     const geminiProModel = findQuotaModel(account.quota?.models, 'gemini-pro');
     const geminiFlashModel = findQuotaModel(account.quota?.models, 'gemini-flash');
     const isDisabled = Boolean(account.disabled);
+    const isDeleting = Boolean((account as any)?.isDeleting);
 
     const rowRef = useRef<HTMLTableRowElement | null>(null);
 
@@ -85,15 +86,15 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* 邮箱 */}
-            <td className="px-4 py-0.5 group-hover:!bg-white dark:group-hover:!bg-white">
+            <td className="px-4 py-0.5 group-hover:!bg-white dark:group-hover:!bg-white transition-colors">
                 <div className="flex items-center gap-3">
                     <span className={cn(
-                        "font-medium text-sm truncate max-w-[180px] xl:max-w-none transition-colors",
+                        "font-medium text-sm truncate max-w-[180px] xl:max-w-none transition-colors group-hover:!text-black dark:group-hover:!text-black",
                         isFocused || selected
-                            ? "text-blue-950 dark:text-blue-200 font-bold"
+                            ? "text-blue-950 dark:text-blue-200"
                             : isCurrent
-                            ? "text-blue-900 dark:text-amber-300 font-bold"
-                            : "text-gray-900 dark:text-gray-100 group-hover:!text-black dark:group-hover:!text-black"
+                            ? "text-blue-900 dark:text-amber-300 drop-shadow-xs"
+                            : "text-gray-900 dark:text-gray-100"
                     )} title={account.email}>
                         {maskEmail(account.email)}
                     </span>
@@ -145,11 +146,11 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* 4H 模型配额 */}
-            <td className="px-2.5 py-0.5 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 group-hover:!bg-white dark:group-hover:!bg-white border-l border-slate-300 dark:border-[#40285e]">
+            <td className="px-2.5 py-0.5 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 group-hover:!bg-white dark:group-hover:!bg-white border-l border-slate-300 dark:border-[#40285e] transition-colors">
                 {account.quota?.is_forbidden ? (
-                    <div className="flex items-center gap-1.5 text-[10px] text-rose-600 dark:text-rose-400 bg-rose-500/10 p-1 rounded-[5px] border border-rose-400/20">
+                    <div className="flex items-center gap-1.5 text-[10px] text-rose-600 dark:text-rose-400 bg-rose-500/10 p-1 rounded-[5px] border border-rose-400/20 group-hover:!text-black dark:group-hover:!text-black transition-colors">
                         <Ban className="w-3 h-3 shrink-0" />
-                        <span className="truncate">{t('accounts.forbidden_msg')}</span>
+                        <span className="truncate group-hover:!text-black dark:group-hover:!text-black">{t('accounts.forbidden_msg')}</span>
                     </div>
                 ) : (
                     <QuotaProgressBar
@@ -162,9 +163,9 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* Weekly 配额 */}
-            <td className="px-2.5 py-0.5 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 group-hover:!bg-white dark:group-hover:!bg-white border-r border-slate-300 dark:border-[#40285e]">
+            <td className="px-2.5 py-0.5 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 group-hover:!bg-white dark:group-hover:!bg-white border-r border-slate-300 dark:border-[#40285e] transition-colors">
                 {account.quota?.is_forbidden ? (
-                    <span className="text-[10px] text-gray-400 italic">--</span>
+                    <span className="text-[10px] text-gray-400 italic group-hover:!text-black dark:group-hover:!text-black transition-colors">--</span>
                 ) : (
                     <QuotaProgressBar
                         compact
@@ -199,14 +200,14 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
             </td>
 
             {/* 最后使用 */}
-            <td className="px-2 py-0.5 align-middle whitespace-nowrap w-[95px] group-hover:!bg-white dark:group-hover:!bg-white">
-                <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400 group-hover:!text-black dark:group-hover:!text-black font-mono" title={formatDateTime(account.last_used)}>
+            <td className="px-2 py-0.5 align-middle whitespace-nowrap w-[95px] group-hover:!bg-white dark:group-hover:!bg-white transition-colors">
+                <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400 group-hover:!text-black dark:group-hover:!text-black font-mono transition-colors" title={formatDateTime(account.last_used)}>
                     {formatDateOnly(account.last_used)}
                 </span>
             </td>
 
             {/* 操作 */}
-            <td className="px-4 py-0.5 group-hover:!bg-white dark:group-hover:!bg-white">
+            <td className="px-4 py-0.5 group-hover:!bg-white dark:group-hover:!bg-white transition-colors">
                 <div className="flex items-center gap-0.5 opacity-80 group-hover:opacity-100 transition-opacity">
                     {/* 1. Refresh button (first) */}
                     <button
@@ -217,7 +218,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                             "p-1.5 rounded-[5px] transition-all",
                             (isRefreshing || isDisabled)
                                 ? "bg-slate-100 dark:bg-slate-800/50 text-slate-400 cursor-not-allowed"
-                                : "text-gray-500 dark:text-gray-400 group-hover:text-slate-800 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-200/80 dark:hover:bg-slate-200/80"
+                                : "text-gray-500 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-800 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-200/80 dark:hover:bg-slate-200/80"
                         )}
                         onClick={(e) => { e.stopPropagation(); onRefresh(); }}
                         title={isDisabled ? t('accounts.disabled_tooltip') : (isRefreshing ? t('common.refreshing') : t('common.refresh'))}
@@ -265,6 +266,8 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                                 {instances.map((inst) => (
                                     <button
                                         type="button"
+                                        role="button"
+                                        aria-label={`Switch to instance ${inst.config.name}`}
                                         key={inst.config.id}
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -291,7 +294,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                         type="button"
                         role="button"
                         aria-label={t('common.details', 'Details')}
-                        className="p-1.5 text-gray-500 dark:text-gray-400 group-hover:text-slate-800 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-slate-200/80 dark:hover:bg-slate-200/80 rounded-[5px] transition-all"
+                        className="p-1.5 text-gray-500 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-800 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-slate-200/80 dark:hover:bg-slate-200/80 rounded-[5px] transition-all"
                         onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
                         title={t('common.details')}
                     >
@@ -301,7 +304,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                         type="button"
                         role="button"
                         aria-label={t('accounts.device_fingerprint', 'Device Fingerprint')}
-                        className="p-1.5 text-gray-500 dark:text-gray-400 group-hover:text-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-200/80 dark:hover:bg-slate-200/80 rounded-[5px] transition-all"
+                        className="p-1.5 text-gray-500 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-200/80 dark:hover:bg-slate-200/80 rounded-[5px] transition-all"
                         onClick={(e) => { e.stopPropagation(); onViewDevice(); }}
                         title={t('accounts.device_fingerprint')}
                     >
@@ -311,7 +314,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                         type="button"
                         role="button"
                         aria-label={t('common.export', 'Export')}
-                        className="p-1.5 text-gray-500 dark:text-gray-400 group-hover:text-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-200/80 dark:hover:bg-slate-200/80 rounded-[5px] transition-all"
+                        className="p-1.5 text-gray-500 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-200/80 dark:hover:bg-slate-200/80 rounded-[5px] transition-all"
                         onClick={(e) => { e.stopPropagation(); onExport(); }}
                         title={t('common.export')}
                     >
@@ -324,8 +327,8 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                         className={cn(
                             "p-1.5 rounded-[5px] transition-all",
                             account.proxy_disabled
-                                ? "text-gray-500 dark:text-gray-400 group-hover:text-slate-800 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30"
-                                : "text-gray-500 dark:text-gray-400 group-hover:text-slate-800 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30"
+                                ? "text-gray-500 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-800 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-slate-200/80 dark:hover:bg-slate-200/80"
+                                : "text-gray-500 dark:text-gray-400 group-hover:text-slate-800 dark:group-hover:text-slate-800 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-slate-200/80 dark:hover:bg-slate-200/80"
                         )}
                         onClick={(e) => { e.stopPropagation(); onToggleProxy(); }}
                         title={account.proxy_disabled ? t('accounts.enable_proxy') : t('accounts.disable_proxy')}
@@ -342,12 +345,13 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                         aria-label={t('common.delete', 'Delete Account')}
                         className={cn(
                             "p-1.5 rounded-[5px] transition-all font-medium shadow-sm active:scale-95 border inline-flex items-center justify-center",
-                            isDisabled
+                            isDeleting
                                 ? "bg-red-300/60 text-white/70 border-red-400/60 cursor-not-allowed opacity-60"
                                 : "bg-red-600 text-white border-red-700 hover:bg-red-700 hover:text-white hover:border-red-800"
                         )}
-                        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                        onClick={(e) => { e.stopPropagation(); if (!isDeleting) onDelete(); }}
                         title={t('common.delete')}
+                        disabled={isDeleting}
                     >
                         <Trash2 className="w-3.5 h-3.5" />
                     </button>
