@@ -5,7 +5,7 @@
 > **Subtask Slug:** `tree-import-export-with-images`  
 > **Target Spec:** `02-spec/21-app/prompt-tree-subtree-and-import-export/02-import-export-and-refresh-spec.md`  
 > **Assigned Role:** `Worker 02`  
-> **Status:** `PENDING`  
+> **Status:** `COMPLETED`  
 > **Target Files Owned:**  
 > - `src-tauri/src/modules/repo_db/sqlite_export.rs`  
 > - `src-tauri/src/modules/repo_db/export.rs`  

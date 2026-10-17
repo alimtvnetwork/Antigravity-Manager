@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, Component, type ErrorInfo, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, useRef, Component, type ErrorInfo, type ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { createPortal } from 'react-dom';
 import { AlertTriangle } from 'lucide-react';
@@ -22,6 +22,10 @@ import { ResultsView } from './ResultsView';
 import { DetailEmptyState } from './DetailEmptyState';
 import { InspectorModal } from './InspectorModal';
 import { DetailsModal } from './DetailsModal';
+import { PromptTreeExportModal } from './PromptTreeExportModal';
+import { PromptTreeImportModal } from './PromptTreeImportModal';
+import { ProjectContextMenu } from './ProjectContextMenu';
+import type { AgmProjectTreeNode } from './types';
 
 function formatDuration(secs: number): string {
     if (!Number.isFinite(secs) || isNaN(secs) || secs < 0) return '0s';
@@ -166,6 +170,34 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         instanceId,
         selectConversation,
     });
+
+    const [projectContextMenu, setProjectContextMenu] = useState<{
+        x: number;
+        y: number;
+        project: AgmProjectTreeNode;
+    } | null>(null);
+
+    const handleTreeContextMenu = (e: React.MouseEvent) => {
+        const target = e.target as HTMLElement | null;
+        if (!target) return;
+
+        const projectElement = target.closest<HTMLElement>('[title^="Project: "]');
+        if (projectElement) {
+            e.preventDefault();
+            e.stopPropagation();
+            const title = projectElement.getAttribute('title') || '';
+            const match = treeData.find(
+                (p) => title.startsWith(`Project: ${p.repo_name} `) || title === `Project: ${p.repo_name}`
+            );
+            if (match) {
+                setProjectContextMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    project: match,
+                });
+            }
+        }
+    };
 
     const currentInstance = useMemo(() => {
         const targetId = selectedProject?.instance_id || instanceId || 'default';
@@ -490,13 +522,13 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                     setSyncInterval={setSyncInterval}
                     restoreFileInputRef={restoreFileInputRef}
                     onClose={onClose}
-                    onBackup={coreActions.handleBackup}
-                    onRestore={coreActions.handleRestore}
-                    onExportSqlite={coreActions.handleExportSqlite}
-                    onImportSqlite={coreActions.handleImportSqlite}
+                    onBackup={() => coreActions.handleOpenExportModal({ target_type: 'full_tree' }, 'json')}
+                    onRestore={coreActions.handleOpenImportModal}
+                    onExportSqlite={() => coreActions.handleOpenExportModal({ target_type: 'full_tree' }, 'sqlite')}
+                    onImportSqlite={coreActions.handleOpenImportModal}
                     onCopyAllTreePrompts={coreActions.handleCopyAllTreePrompts}
                     onFileRestore={coreActions.handleFileRestore}
-                    onRefreshAll={() => loadTree(true, true)}
+                    onRefreshAll={() => loadTree(false, true)}
                     onResetTree={() => {
                         void invoke('reset_prompt_tree_cache', { instanceId: instanceId || null })
                             .catch((err) => {
@@ -506,7 +538,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                 );
                             })
                             .finally(() => {
-                                loadTree(true, true);
+                                loadTree(false, true);
                             });
                     }}
                 />
@@ -532,7 +564,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                 )}
 
                 {/* Main Split View */}
-                <div className="flex flex-1 overflow-hidden">
+                <div className="flex flex-1 overflow-hidden" onContextMenu={handleTreeContextMenu}>
                     <TreePanel
                         treeData={treeData}
                         activeProjects={activeProjects}
@@ -748,6 +780,76 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                 copiedField={copiedField}
                 setCopiedField={setCopiedField}
                 instanceId={instanceId}
+            />
+
+            {/* Project Right-Click Context Menu */}
+            {projectContextMenu && (
+                <ProjectContextMenu
+                    x={projectContextMenu.x}
+                    y={projectContextMenu.y}
+                    projectId={projectContextMenu.project.project_id}
+                    projectName={projectContextMenu.project.repo_name}
+                    isPinned={pinnedProjectIds.includes(projectContextMenu.project.project_id)}
+                    isArchived={archivedProjectIds.includes(projectContextMenu.project.project_id)}
+                    onClose={() => setProjectContextMenu(null)}
+                    onRefresh={() => {
+                        const fakeEvent = { stopPropagation: () => {} } as React.MouseEvent;
+                        void coreActions.handleRefreshSingleProject(projectContextMenu.project.project_id, fakeEvent);
+                    }}
+                    onTogglePin={() => {
+                        const fakeEvent = { stopPropagation: () => {} } as React.MouseEvent;
+                        coreActions.togglePinProject(projectContextMenu.project.project_id, fakeEvent);
+                    }}
+                    onToggleArchive={() => {
+                        const fakeEvent = { stopPropagation: () => {} } as React.MouseEvent;
+                        coreActions.toggleArchiveProject(projectContextMenu.project.project_id, fakeEvent);
+                    }}
+                    onExportJson={() => {
+                        coreActions.handleOpenExportModal({
+                            target_type: 'project',
+                            project_id: projectContextMenu.project.project_id,
+                            project_name: projectContextMenu.project.repo_name,
+                        }, 'json');
+                    }}
+                    onExportSqlite={() => {
+                        coreActions.handleOpenExportModal({
+                            target_type: 'project',
+                            project_id: projectContextMenu.project.project_id,
+                            project_name: projectContextMenu.project.repo_name,
+                        }, 'sqlite');
+                    }}
+                    onExportYaml={() => {
+                        coreActions.handleOpenExportModal({
+                            target_type: 'project',
+                            project_id: projectContextMenu.project.project_id,
+                            project_name: projectContextMenu.project.repo_name,
+                        }, 'yaml');
+                    }}
+                />
+            )}
+
+            {/* Scoped Section Export Modal */}
+            <PromptTreeExportModal
+                isOpen={coreActions.isExportModalOpen}
+                onClose={coreActions.handleCloseExportModal}
+                preselectedScope={coreActions.exportScopeTarget}
+                initialFormat={coreActions.exportInitialFormat}
+                treeData={treeData}
+                selectedProject={selectedProject || undefined}
+                selectedConversation={selectedConversation || undefined}
+                onExecuteExport={coreActions.executeSectionExport}
+            />
+
+            {/* Scoped Section Import Modal */}
+            <PromptTreeImportModal
+                isOpen={coreActions.isImportModalOpen}
+                onClose={coreActions.handleCloseImportModal}
+                instanceId={instanceId || 'default'}
+                instanceName={instanceName || 'Default Instance'}
+                onExecuteImport={coreActions.executeSectionImport}
+                onImportComplete={() => {
+                    void loadTree(false, true);
+                }}
             />
 
             {isAutoSyncing && (

@@ -8,6 +8,7 @@ import { isTauri } from '../../../utils/env';
 import { copyPromptWithRichImages } from './clipboard';
 import type { AgmProjectTreeNode } from './types';
 import type { PromptTreeState } from './usePromptTreeState';
+import type { ExportScopeParams } from './PromptTreeExportModal';
 
 export interface PromptTreeCoreActions {
     togglePinProject: (projectId: string, e: React.MouseEvent) => void;
@@ -23,6 +24,33 @@ export interface PromptTreeCoreActions {
     handleExportQueuedJson: () => Promise<void>;
     handleResendQueued: () => Promise<void>;
     isResendingQueued: boolean;
+
+    // Scoped Export / Import Modal Handlers
+    isExportModalOpen: boolean;
+    setIsExportModalOpen: (open: boolean) => void;
+    exportScopeTarget?: ExportScopeParams;
+    setExportScopeTarget: (scope?: ExportScopeParams) => void;
+    exportInitialFormat: 'json' | 'sqlite' | 'yaml';
+    setExportInitialFormat: (format: 'json' | 'sqlite' | 'yaml') => void;
+    handleOpenExportModal: (scope?: ExportScopeParams, initialFormat?: 'json' | 'sqlite' | 'yaml') => void;
+    handleCloseExportModal: () => void;
+    executeSectionExport: (params: {
+        scope: ExportScopeParams;
+        format: 'json' | 'sqlite' | 'yaml';
+        embed_images: boolean;
+    }) => Promise<void>;
+
+    isImportModalOpen: boolean;
+    setIsImportModalOpen: (open: boolean) => void;
+    handleOpenImportModal: () => void;
+    handleCloseImportModal: () => void;
+    executeSectionImport: (params: {
+        filePath?: string;
+        dataB64?: string;
+        conflictMode: 'merge' | 'replace';
+        materializeImages: boolean;
+        targetInstanceId?: string;
+    }) => Promise<number>;
 }
 
 interface ResendQueuedOutcome {
@@ -714,6 +742,156 @@ export function usePromptTreeCoreActions({
         }
     }, [instanceId, isResendingQueued, loadTree, setActionMsg, setError]);
 
+    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+    const [exportScopeTarget, setExportScopeTarget] = useState<ExportScopeParams | undefined>(undefined);
+    const [exportInitialFormat, setExportInitialFormat] = useState<'json' | 'sqlite' | 'yaml'>('json');
+
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+    const handleOpenExportModal = useCallback((scope?: ExportScopeParams, initialFormat?: 'json' | 'sqlite' | 'yaml') => {
+        setExportScopeTarget(scope);
+        if (initialFormat) {
+            setExportInitialFormat(initialFormat);
+        }
+        setIsExportModalOpen(true);
+    }, []);
+
+    const handleCloseExportModal = useCallback(() => {
+        setIsExportModalOpen(false);
+    }, []);
+
+    const handleOpenImportModal = useCallback(() => {
+        setIsImportModalOpen(true);
+    }, []);
+
+    const handleCloseImportModal = useCallback(() => {
+        setIsImportModalOpen(false);
+    }, []);
+
+    const executeSectionExport = useCallback(
+        async (params: {
+            scope: ExportScopeParams;
+            format: 'json' | 'sqlite' | 'yaml';
+            embed_images: boolean;
+        }) => {
+            const { scope, format, embed_images } = params;
+            const ext = format === 'sqlite' ? 'db' : format === 'yaml' ? 'yaml' : 'json';
+            const targetSlug = scope.project_name || scope.project_id || scope.conversation_id || scope.target_type;
+            const fileName = `prompt-tree-${targetSlug}-${Date.now()}.${ext}`;
+
+            try {
+                if (!isTauri()) {
+                    setActionMsg(`Exporting section as ${format.toUpperCase()}...`);
+                    const [dataB64, returnedFileName, stats] = await invoke<[string, string, TreeExportStats]>('export_prompt_tree_section_bytes', {
+                        scope,
+                        format,
+                        options: {
+                            format,
+                            embed_images,
+                        },
+                    });
+                    const binary = atob(dataB64);
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++) {
+                        bytes[i] = binary.charCodeAt(i);
+                    }
+                    const mimeType = format === 'sqlite' ? 'application/x-sqlite3' : format === 'yaml' ? 'text/yaml' : 'application/json';
+                    const blob = new Blob([bytes], { type: mimeType });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = returnedFileName || fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+
+                    setActionMsg(`Exported ${stats.prompt_count} prompt(s) (${stats.project_count} projects) as ${format.toUpperCase()}`);
+                    setTimeout(() => setActionMsg(null), 4000);
+                    return;
+                }
+
+                const { save } = await import('@tauri-apps/plugin-dialog');
+                const filters = format === 'sqlite'
+                    ? [{ name: 'SQLite Database', extensions: ['db', 'sqlite'] }]
+                    : format === 'yaml'
+                    ? [{ name: 'YAML Document', extensions: ['yaml', 'yml'] }]
+                    : [{ name: 'JSON Envelope v2.0', extensions: ['json'] }];
+
+                const selected = await save({
+                    defaultPath: fileName,
+                    filters,
+                });
+                if (!selected) {
+                    return;
+                }
+
+                setActionMsg(`Exporting section to ${selected}...`);
+                const stats = await invoke<TreeExportStats>('export_prompt_tree_section', {
+                    scope,
+                    format,
+                    options: {
+                        format,
+                        embed_images,
+                    },
+                    destinationPath: selected,
+                });
+
+                setActionMsg(`Exported ${stats.prompt_count} prompt(s) across ${stats.project_count} project(s) to ${stats.path || selected}`);
+                setTimeout(() => setActionMsg(null), 4000);
+            } catch (err: unknown) {
+                useErrorStore.getState().captureError(err, {
+                    source: 'PromptTreeViewModal.executeSectionExport',
+                    triggerAction: 'export_prompt_tree_section',
+                });
+                setError(err instanceof Error ? err.message : String(err) || 'Failed to export prompt tree section');
+                setActionMsg(null);
+                throw err;
+            }
+        },
+        [setActionMsg, setError]
+    );
+
+    const executeSectionImport = useCallback(
+        async (params: {
+            filePath?: string;
+            dataB64?: string;
+            conflictMode: 'merge' | 'replace';
+            materializeImages: boolean;
+            targetInstanceId?: string;
+        }): Promise<number> => {
+            try {
+                setActionMsg('Importing prompt tree section...');
+                const res = await invoke<{ success: boolean; imported_count: number; materialized_images_count: number; message: string } | number>('import_prompt_tree_section', {
+                    filePath: params.filePath || null,
+                    sourcePath: params.filePath || null,
+                    dataB64: params.dataB64 || null,
+                    options: {
+                        conflict_mode: params.conflictMode,
+                        materialize_images: params.materializeImages,
+                        target_instance_id: params.targetInstanceId || instanceId || null,
+                    },
+                });
+
+                const count = typeof res === 'number' ? res : (res.imported_count ?? 0);
+                const imgCount = typeof res === 'object' && res.materialized_images_count ? res.materialized_images_count : 0;
+                setActionMsg(`Imported ${count} prompt(s) with ${imgCount} materialized image(s).`);
+                await loadTree(false, true);
+                setTimeout(() => setActionMsg(null), 5000);
+                return count;
+            } catch (err: unknown) {
+                useErrorStore.getState().captureError(err, {
+                    source: 'PromptTreeViewModal.executeSectionImport',
+                    triggerAction: 'import_prompt_tree_section',
+                });
+                setError(err instanceof Error ? err.message : String(err) || 'Failed to import prompt tree section');
+                setActionMsg(null);
+                throw err;
+            }
+        },
+        [instanceId, loadTree, setActionMsg, setError]
+    );
+
     return {
         togglePinProject,
         toggleArchiveProject,
@@ -728,5 +906,19 @@ export function usePromptTreeCoreActions({
         handleExportQueuedJson,
         handleResendQueued,
         isResendingQueued,
+        isExportModalOpen,
+        setIsExportModalOpen,
+        exportScopeTarget,
+        setExportScopeTarget,
+        exportInitialFormat,
+        setExportInitialFormat,
+        handleOpenExportModal,
+        handleCloseExportModal,
+        executeSectionExport,
+        isImportModalOpen,
+        setIsImportModalOpen,
+        handleOpenImportModal,
+        handleCloseImportModal,
+        executeSectionImport,
     };
 }

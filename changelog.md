@@ -1,5 +1,17 @@
 # Changelog
 
+## [v4.222.0] - 2026-10-17
+
+### Added
+- **3-Tier Prompt Subtree Hierarchy (`Project` → `Conversation` → `Prompts List`)**: Expanded the AGM prompt tree from 2 tiers to 3 full tiers; conversations now expand with interactive chevrons to display individual prompt turns (`Turn 1, Turn 2, ..., Turn N`), their timestamps, 200-word Poppins previews, attached image indicators, and deterministic execution states. (Thanks to @aukgit)
+- **Active Task Running Symbol & False IDLE Root Cause Remediation**: Resolved false IDLE status on running IDE tasks by enforcing live runtime process liveness precedence over static transcript heuristics (`is_owning_inst_alive && not_fully_idle > 0 && is_recent`); eliminated intermediate planner turn short-circuits (`is_terminal_done`) and premature IDLE mutations in `tree_collect.rs` and `tree_node_conv.rs`; added pulsing emerald badges for `RUNNING` turns and amber badges for `QUEUED` turns. (Thanks to @aukgit)
+- **Section-Level Import / Export (JSON, SQLite DB, YAML) with Embedded Base64 Images**: Added right-click context menu triggers (`ProjectContextMenu.tsx`, `ConversationContextMenu.tsx`) and top-level modals (`PromptTreeExportModal.tsx`, `PromptTreeImportModal.tsx`) to export and import arbitrary scopes (Full Tree, Single Project, Single Conversation, Prompt Subtree); embedded all local image attachments as Base64 data URIs (`agm-asset://`) in exports and materialized them back into `./.antigravity/attachments/` on import for 100% cross-machine portability with zero broken links. (Thanks to @aukgit)
+- **Refresh Button 4-Point RCA Fix**: Eliminated selection whiplash by calling `loadTree(false, true)` to preserve active project and conversation selection; bound proactive `detect_running_projects` workspace discovery; eradicated SQLite `immutable=1` WAL bypass with 5000ms `busy_timeout`; raised in-flight timeout cutoff to 600s in `tree_phases.rs`. (Thanks to @aukgit)
+- **Poppins & Ubuntu Typography & 1-Click Header Copy**: Enforced Ubuntu font (`font-ubuntu`) for all headers/titles and Poppins font (`font-poppins`) for body, prompts, and badges; mounted a 1-click Copy button directly beside the conversation title `<h3>` in `DetailHeader.tsx` with copy toast feedback; added informative hover tooltips explaining `Conversation #226 (Sequential AGM Index)` and `Project #003 (Sequential Project Index)`. (Thanks to @aukgit)
+- **Conversation Actions & Autonomous Verification**: Integrated triple-trigger conversation renaming (inline double-click, `F2` keyboard hotkey, and right-click menu item); added multi-prompt resend submenu (Resend All, Last 5, Last 10, Custom N); implemented autonomous 5-chapter "Verify Last 10 Prompts" synthesis enqueued to the IDE; and added "Clone Conversation & Compact Memory" session handoff. (Thanks to @aukgit)
+
+---
+
 ## [v4.221.1] - 2026-10-17
 
 ### Added
@@ -512,6 +524,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.222.0 (2026-10-17)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.221.0 (2026-10-17)**:
         -   **[Multi-Machine Fleet & UI Overhaul] Fleet Sync Recovery, W2 TCP Retry Ladder, Dynamic IP Resolution, and Settings UI Overhaul (Thanks to @aukgit)**:
             -   **Description**: Extended TCP probe timeout to 1500ms with a 2-stage retry ladder to resolve false-offline W2 machine status; normalized `${adminUser}` to `Administrator` and `${linuxUser}` to `root` across SSH connection imports and envelopes; eliminated empty `()` bug in Multi-Machine Matrix by serializing both `machine_ip` and `ip_address`; overhauled Settings SSH & GitMap actions with a contiguous segmented pill capsule, sleek metadata badges replacing raw path dumps, and active copy feedback for terminal installer commands; upgraded autonomous multi-agent concurrency capacity to A = 3, H = 2 (6 concurrent operations) across skills and coding guidelines.

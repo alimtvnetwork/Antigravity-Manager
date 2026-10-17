@@ -768,9 +768,12 @@ pub fn extract_conversation_prompt_turns(
                             for m in media_arr {
                                 if let Some(uri) = m.get("uri").and_then(|u| u.as_str()) {
                                     let clean_uri = uri.trim();
-                                    let file_path = if let Some(stripped) = clean_uri.strip_prefix("file:///") {
+                                    let file_path = if let Some(stripped) =
+                                        clean_uri.strip_prefix("file:///")
+                                    {
                                         stripped.to_string()
-                                    } else if let Some(stripped) = clean_uri.strip_prefix("file://") {
+                                    } else if let Some(stripped) = clean_uri.strip_prefix("file://")
+                                    {
                                         stripped.to_string()
                                     } else {
                                         clean_uri.to_string()
@@ -779,8 +782,13 @@ pub fn extract_conversation_prompt_turns(
                                     let resolved_path = if p.exists() {
                                         file_path.clone()
                                     } else {
-                                        let fname = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                                        let cand1 = base_dir.join("brain").join(cid).join(".user_uploaded").join(fname);
+                                        let fname =
+                                            p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                                        let cand1 = base_dir
+                                            .join("brain")
+                                            .join(cid)
+                                            .join(".user_uploaded")
+                                            .join(fname);
                                         let cand2 = base_dir.join("brain").join(cid).join(fname);
                                         if cand1.exists() {
                                             cand1.to_string_lossy().to_string()
@@ -790,7 +798,9 @@ pub fn extract_conversation_prompt_turns(
                                             file_path.clone()
                                         }
                                     };
-                                    if !resolved_path.is_empty() && !media_paths.contains(&resolved_path) {
+                                    if !resolved_path.is_empty()
+                                        && !media_paths.contains(&resolved_path)
+                                    {
                                         media_paths.push(resolved_path.clone());
                                         media_thumbnails.push(resolved_path);
                                     }
@@ -866,7 +876,8 @@ pub fn extract_conversation_prompt_turns(
             None => ("COMPLETED".to_string(), false, false),
         };
 
-        let (preview_200w, _) = super::sequences::extract_prompt_words_preview(&turn.prompt_text, 200);
+        let (preview_200w, _) =
+            super::sequences::extract_prompt_words_preview(&turn.prompt_text, 200);
 
         result.push(AgmPromptTurnNode {
             turn_number: idx + 1,
@@ -885,4 +896,3 @@ pub fn extract_conversation_prompt_turns(
 
     result
 }
-

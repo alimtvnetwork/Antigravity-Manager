@@ -12,15 +12,11 @@ import {
     Sparkles,
     Terminal,
     Wrench,
-    Clock,
     User,
     Bot,
     ChevronDown,
     ChevronRight,
     Columns,
-    Layers,
-    Layout,
-    ExternalLink,
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { copyToClipboard } from '../../../utils/clipboard';
@@ -195,7 +191,7 @@ export function InspectorModal({
                             {tierInfo.tier === 'SUBAGENT_INSTRUCTION' && <Bot className="w-3.5 h-3.5 text-purple-500" />}
                             {tierInfo.tier === 'SYSTEM_MESSAGE' && <Terminal className="w-3.5 h-3.5 text-zinc-500" />}
                             {tierInfo.tier === 'TOOL_OUTPUT' && <Wrench className="w-3.5 h-3.5 text-amber-500" />}
-                            <span>{formatSeqBadge((inspectorPrompt as any).seq_code || 'C001')}</span>
+                            <span>{formatSeqBadge((inspectorPrompt as any).seq_code, 'C001')}</span>
                         </span>
 
                         <div className="min-w-0">

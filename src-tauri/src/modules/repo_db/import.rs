@@ -3,9 +3,10 @@
 //! Handles universal format probing (JSON, SQLite DB, YAML), integrity validation,
 //! Base64 image materialization onto disk, and strict FIFO database merging.
 
-use crate::error::AppError;
 use super::export::ExportEnvelope;
+use crate::error::AppError;
 use base64::Engine;
+use chrono::Utc;
 use rusqlite::{params, Connection, OpenFlags};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -64,11 +65,17 @@ pub struct ImportResult {
 pub fn resolve_attachments_dir(target_instance: Option<&str>) -> PathBuf {
     let inst_name = target_instance.unwrap_or("default");
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    
+
     // Check if instance registry exists and has a specific data_dir
     if let Ok(reg) = crate::modules::instance::registry::load_registry() {
-        if let Some(inst) = reg.instances.iter().find(|i| i.id == inst_name || i.name == inst_name) {
-            let inst_dir = PathBuf::from(&inst.data_dir).join(".antigravity").join("attachments");
+        if let Some(inst) = reg
+            .instances
+            .iter()
+            .find(|i| i.id == inst_name || i.name == inst_name)
+        {
+            let inst_dir = PathBuf::from(&inst.data_dir)
+                .join(".antigravity")
+                .join("attachments");
             return inst_dir;
         }
     }
@@ -118,7 +125,10 @@ pub fn materialize_embedded_images(
         let Some((meta, b64_payload)) = data_uri.split_once(',') else {
             continue;
         };
-        let mime = meta.strip_prefix("data:").and_then(|m| m.strip_suffix(";base64")).unwrap_or("image/png");
+        let mime = meta
+            .strip_prefix("data:")
+            .and_then(|m| m.strip_suffix(";base64"))
+            .unwrap_or("image/png");
         let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(b64_payload.trim()) else {
             continue;
         };
@@ -143,7 +153,9 @@ pub fn validate_import_source(
         let metadata = fs::metadata(path)
             .map_err(|e| AppError::Config(format!("Cannot read import file {path:?}: {e}")))?;
         if !metadata.is_file() {
-            return Err(AppError::Config(format!("Import path is not a file: {path:?}")));
+            return Err(AppError::Config(format!(
+                "Import path is not a file: {path:?}"
+            )));
         }
 
         if metadata.len() >= 16 {
@@ -165,7 +177,8 @@ pub fn validate_import_source(
             .decode(b64.trim())
             .map_err(|e| AppError::Config(format!("Invalid base64 payload: {e}")))?;
         if bytes.len() >= 16 && &bytes[..16] == b"SQLite format 3\0" {
-            let tmp = std::env::temp_dir().join(format!("agm-probe-{}.db", Utc::now().timestamp_millis()));
+            let tmp = std::env::temp_dir()
+                .join(format!("agm-probe-{}.db", Utc::now().timestamp_millis()));
             fs::write(&tmp, &bytes).map_err(AppError::from)?;
             let res = probe_sqlite_export(&tmp);
             // Justification: Best effort temp cleanup
@@ -173,7 +186,8 @@ pub fn validate_import_source(
             return res;
         }
 
-        let content = String::from_utf8(bytes).map_err(|e| AppError::Config(format!("Payload is not UTF-8: {e}")))?;
+        let content = String::from_utf8(bytes)
+            .map_err(|e| AppError::Config(format!("Payload is not UTF-8: {e}")))?;
         return probe_text_export(&content);
     }
 
@@ -207,7 +221,11 @@ fn probe_sqlite_export(path: &Path) -> Result<ValidationResult, AppError> {
         .unwrap_or((0, 0));
 
     let scope: String = probe
-        .query_row("SELECT target_type FROM meta ORDER BY id DESC LIMIT 1", [], |r| r.get(0))
+        .query_row(
+            "SELECT target_type FROM meta ORDER BY id DESC LIMIT 1",
+            [],
+            |r| r.get(0),
+        )
         .unwrap_or_else(|_| "full_tree".to_string());
 
     Ok(ValidationResult {
@@ -238,7 +256,10 @@ fn probe_text_export(content: &str) -> Result<ValidationResult, AppError> {
             total_image_bytes: env.stats.total_image_bytes,
             message: format!(
                 "Valid JSON envelope (v{}): {} project(s), {} prompt(s), {} image(s)",
-                env.schema_version, env.stats.project_count, env.stats.prompt_count, env.stats.image_count
+                env.schema_version,
+                env.stats.project_count,
+                env.stats.prompt_count,
+                env.stats.image_count
             ),
         });
     }
@@ -246,8 +267,15 @@ fn probe_text_export(content: &str) -> Result<ValidationResult, AppError> {
     // Try parsing basic JSON fallback or YAML
     if content.trim_start().starts_with('{') {
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(content) {
-            let projects = val.get("projects").and_then(|p| p.as_array()).map_or(0, |a| a.len());
-            let prompts = val.get("activePrompts").or_else(|| val.get("prompts")).and_then(|p| p.as_array()).map_or(0, |a| a.len());
+            let projects = val
+                .get("projects")
+                .and_then(|p| p.as_array())
+                .map_or(0, |a| a.len());
+            let prompts = val
+                .get("activePrompts")
+                .or_else(|| val.get("prompts"))
+                .and_then(|p| p.as_array())
+                .map_or(0, |a| a.len());
             return Ok(ValidationResult {
                 is_valid: true,
                 format: "json".to_string(),
@@ -257,7 +285,9 @@ fn probe_text_export(content: &str) -> Result<ValidationResult, AppError> {
                 prompt_count: prompts,
                 image_count: 0,
                 total_image_bytes: 0,
-                message: format!("Legacy JSON prompt backup: {projects} project(s), {prompts} prompt(s)"),
+                message: format!(
+                    "Legacy JSON prompt backup: {projects} project(s), {prompts} prompt(s)"
+                ),
             });
         }
     }
@@ -292,11 +322,15 @@ fn probe_text_export(content: &str) -> Result<ValidationResult, AppError> {
             prompt_count,
             image_count,
             total_image_bytes: total_bytes,
-            message: format!("Valid YAML prompt tree export: {prompt_count} prompt(s), {image_count} image(s)"),
+            message: format!(
+                "Valid YAML prompt tree export: {prompt_count} prompt(s), {image_count} image(s)"
+            ),
         });
     }
 
-    Err(AppError::Config("Unrecognized file format: neither valid AGM JSON, SQLite DB, nor YAML".to_string()))
+    Err(AppError::Config(
+        "Unrecognized file format: neither valid AGM JSON, SQLite DB, nor YAML".to_string(),
+    ))
 }
 
 /// Imports prompt tree data into the live database with image materialization and strict FIFO ordering.
@@ -311,7 +345,7 @@ pub fn import_prompt_tree_from_source(
         if let Ok(mut f) = fs::File::open(path) {
             let mut header = [0u8; 16];
             if f.read_exact(&mut header).is_ok() && &header == b"SQLite format 3\0" {
-                return super::sqlite_export::import_scoped_prompt_tree_db(
+                return crate::modules::repo_db::sqlite_export::import_scoped_prompt_tree_db(
                     path,
                     target_instance,
                     conflict_mode,
@@ -332,7 +366,7 @@ pub fn import_prompt_tree_from_source(
             let stamp = Utc::now().timestamp_millis();
             let tmp = std::env::temp_dir().join(format!("agm-tree-import-{stamp}.db"));
             fs::write(&tmp, &bytes).map_err(AppError::from)?;
-            let res = super::sqlite_export::import_scoped_prompt_tree_db(
+            let res = crate::modules::repo_db::sqlite_export::import_scoped_prompt_tree_db(
                 &tmp,
                 target_instance,
                 conflict_mode,
@@ -343,7 +377,8 @@ pub fn import_prompt_tree_from_source(
             return res;
         }
 
-        let content = String::from_utf8(bytes).map_err(|e| AppError::Config(format!("Payload is not UTF-8: {e}")))?;
+        let content = String::from_utf8(bytes)
+            .map_err(|e| AppError::Config(format!("Payload is not UTF-8: {e}")))?;
         return import_from_text(&content, target_instance, conflict_mode, materialize_images);
     }
 
@@ -356,9 +391,8 @@ fn import_from_text(
     _conflict_mode: &str,
     materialize_images: bool,
 ) -> Result<ImportResult, AppError> {
-    let mut envelope = serde_json::from_str::<ExportEnvelope>(content).map_err(|e| {
-        AppError::Config(format!("Failed to parse JSON export envelope: {e}"))
-    })?;
+    let mut envelope = serde_json::from_str::<ExportEnvelope>(content)
+        .map_err(|e| AppError::Config(format!("Failed to parse JSON export envelope: {e}")))?;
 
     let mut materialized_count = 0;
     let mut materialized_map = HashMap::new();
@@ -368,7 +402,7 @@ fn import_from_text(
         materialized_count = materialized_map.len();
     }
 
-    let mut conn = super::schema::connect_db().map_err(AppError::Config)?;
+    let mut conn = crate::modules::repo_db::schema::connect_db().map_err(AppError::Config)?;
     let tx = conn.transaction().map_err(AppError::from)?;
 
     let target_inst = target_instance.unwrap_or("default");
@@ -472,7 +506,7 @@ fn import_from_text(
 
     tx.commit().map_err(AppError::from)?;
 
-    super::tree::invalidate_prompt_tree_cache(target_instance);
+    crate::modules::repo_db::tree::invalidate_prompt_tree_cache(target_instance);
 
     Ok(ImportResult {
         success: true,

@@ -145,7 +145,12 @@ pub fn detect_mime_type(path: &Path, bytes: &[u8]) -> &'static str {
             return "image/svg+xml";
         }
     }
-    match path.extension().and_then(|s| s.to_str()).map(|s| s.to_lowercase()).as_deref() {
+    match path
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_lowercase())
+        .as_deref()
+    {
         Some("png") => "image/png",
         Some("jpg") | Some("jpeg") => "image/jpeg",
         Some("webp") => "image/webp",
@@ -283,7 +288,7 @@ pub fn harvest_and_embed_images(
 /// Executes scoped SQLite queries against `repo_prompts.db` enforcing strict FIFO ordering:
 /// `ORDER BY created_at ASC, id ASC`.
 pub fn query_scoped_export_data(scope: &ExportScope) -> Result<ExportData, AppError> {
-    let conn = super::schema::connect_db().map_err(AppError::Config)?;
+    let conn = crate::modules::repo_db::schema::connect_db().map_err(AppError::Config)?;
 
     let mut projects = Vec::new();
     let mut prompts = Vec::new();
@@ -724,7 +729,14 @@ fn format_yaml_scalar(val: &serde_json::Value) -> String {
                     out.push('\n');
                 }
                 out
-            } else if s.contains(':') || s.contains('#') || s.contains('{') || s.contains('[') || s.starts_with('"') || s.starts_with('\'') || s.is_empty() {
+            } else if s.contains(':')
+                || s.contains('#')
+                || s.contains('{')
+                || s.contains('[')
+                || s.starts_with('"')
+                || s.starts_with('\'')
+                || s.is_empty()
+            {
                 format!("{:?}", s)
             } else {
                 s.clone()
@@ -769,7 +781,10 @@ fn format_yaml_recursive(val: &serde_json::Value, indent: usize, out: &mut Strin
                                 out.push_str(&format!("{spaces}- {k}:\n"));
                                 format_yaml_recursive(v, indent + 4, out);
                             } else {
-                                out.push_str(&format!("{spaces}- {k}: {}\n", format_yaml_scalar(v)));
+                                out.push_str(&format!(
+                                    "{spaces}- {k}: {}\n",
+                                    format_yaml_scalar(v)
+                                ));
                             }
                             first = false;
                         } else if v.is_object() || v.is_array() {
@@ -791,7 +806,8 @@ fn format_yaml_recursive(val: &serde_json::Value, indent: usize, out: &mut Strin
 }
 
 pub fn serialize_to_yaml(env: &ExportEnvelope) -> Result<String, AppError> {
-    let val = serde_json::to_value(env).map_err(|e| AppError::Config(format!("JSON serialization error: {e}")))?;
+    let val = serde_json::to_value(env)
+        .map_err(|e| AppError::Config(format!("JSON serialization error: {e}")))?;
     let mut out = String::new();
     format_yaml_recursive(&val, 0, &mut out);
     Ok(out)
@@ -810,20 +826,27 @@ pub fn export_prompt_tree_to_file(
     }
 
     let is_sqlite = options.format.eq_ignore_ascii_case("sqlite")
-        || dest_path.extension().map_or(false, |ext| ext.eq_ignore_ascii_case("db") || ext.eq_ignore_ascii_case("sqlite"));
+        || dest_path.extension().map_or(false, |ext| {
+            ext.eq_ignore_ascii_case("db") || ext.eq_ignore_ascii_case("sqlite")
+        });
     let is_yaml = options.format.eq_ignore_ascii_case("yaml")
         || options.format.eq_ignore_ascii_case("yml")
-        || dest_path.extension().map_or(false, |ext| ext.eq_ignore_ascii_case("yaml") || ext.eq_ignore_ascii_case("yml"));
+        || dest_path.extension().map_or(false, |ext| {
+            ext.eq_ignore_ascii_case("yaml") || ext.eq_ignore_ascii_case("yml")
+        });
 
     if is_sqlite {
-        super::sqlite_export::write_scoped_prompt_tree_db(dest_path, scope, options)
+        crate::modules::repo_db::sqlite_export::write_scoped_prompt_tree_db(
+            dest_path, scope, options,
+        )
     } else {
         let envelope = build_scoped_export_envelope(scope, options, &dest_path.to_string_lossy())?;
         if is_yaml {
             let yaml_str = serialize_to_yaml(&envelope)?;
             std::fs::write(dest_path, yaml_str.as_bytes()).map_err(AppError::from)?;
         } else {
-            let json_str = serde_json::to_string_pretty(&envelope).map_err(|e| AppError::Config(e.to_string()))?;
+            let json_str = serde_json::to_string_pretty(&envelope)
+                .map_err(|e| AppError::Config(e.to_string()))?;
             std::fs::write(dest_path, json_str.as_bytes()).map_err(AppError::from)?;
         }
 

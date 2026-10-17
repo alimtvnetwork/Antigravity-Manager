@@ -14,8 +14,8 @@ pub mod import;
 
 pub use export::{
     build_scoped_export_envelope, export_prompt_tree_to_bytes, export_prompt_tree_to_file,
-    harvest_and_embed_images, ExportData, ExportEnvelope, ExportOptions, ExportResult,
-    ExportScope, ExportStats, EXPORT_KIND_SECTION, EXPORT_SCHEMA_VERSION_2,
+    harvest_and_embed_images, ExportData, ExportEnvelope, ExportOptions, ExportResult, ExportScope,
+    ExportStats, EXPORT_KIND_SECTION, EXPORT_SCHEMA_VERSION_2,
 };
 pub use import::{
     import_prompt_tree_from_source, materialize_embedded_images, validate_import_source,
@@ -181,7 +181,7 @@ pub fn write_scoped_prompt_tree_db(
         fs::remove_file(path).map_err(AppError::from)?;
     }
 
-    let mut dst = Connection::open(path)
+    let dst = Connection::open(path)
         .map_err(|e| AppError::Config(format!("Failed to create export database {path:?}: {e}")))?;
     init_tree_export_schema(&dst)?;
 
@@ -276,21 +276,23 @@ pub fn write_scoped_prompt_tree_db(
         let mut prompts_to_scan = Vec::new();
         {
             let mut stmt = tx.prepare("SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload FROM active_prompts").map_err(AppError::from)?;
-            let rows = stmt.query_map([], |r| {
-                Ok(super::models::ActivePrompt {
-                    id: r.get(0)?,
-                    project_id: r.get(1)?,
-                    instance_id: r.get(2)?,
-                    repo_path: r.get(3)?,
-                    prompt_content: r.get(4)?,
-                    model: r.get(5)?,
-                    session_id: r.get(6)?,
-                    status: r.get(7)?,
-                    created_at: r.get(8)?,
-                    updated_at: r.get(9)?,
-                    image_payload: r.get(10)?,
+            let rows = stmt
+                .query_map([], |r| {
+                    Ok(super::models::ActivePrompt {
+                        id: r.get(0)?,
+                        project_id: r.get(1)?,
+                        instance_id: r.get(2)?,
+                        repo_path: r.get(3)?,
+                        prompt_content: r.get(4)?,
+                        model: r.get(5)?,
+                        session_id: r.get(6)?,
+                        status: r.get(7)?,
+                        created_at: r.get(8)?,
+                        updated_at: r.get(9)?,
+                        image_payload: r.get(10)?,
+                    })
                 })
-            }).map_err(AppError::from)?;
+                .map_err(AppError::from)?;
             for p in rows.flatten() {
                 prompts_to_scan.push(p);
             }
@@ -301,9 +303,16 @@ pub fn write_scoped_prompt_tree_db(
         image_count = cnt;
         total_image_bytes = bytes;
 
-        let now_sec = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
+        let now_sec = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
         for (key, data_uri) in &embedded_map {
-            let mime = data_uri.split(';').next().and_then(|s| s.strip_prefix("data:")).unwrap_or("image/png");
+            let mime = data_uri
+                .split(';')
+                .next()
+                .and_then(|s| s.strip_prefix("data:"))
+                .unwrap_or("image/png");
             tx.execute(
                 "INSERT OR REPLACE INTO embedded_images (image_key, mime_type, base64_data, byte_size, original_rel_path, created_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -315,11 +324,15 @@ pub fn write_scoped_prompt_tree_db(
             tx.execute(
                 "UPDATE active_prompts SET prompt_content = ?1, image_payload = ?2 WHERE id = ?3",
                 params![p.prompt_content, p.image_payload, p.id],
-            ).map_err(AppError::from)?;
+            )
+            .map_err(AppError::from)?;
         }
     }
 
-    let target_id = scope.project_id.as_deref().or(scope.conversation_id.as_deref());
+    let target_id = scope
+        .project_id
+        .as_deref()
+        .or(scope.conversation_id.as_deref());
     tx.execute(
         "INSERT INTO meta (schema_version, kind, target_type, target_id, created_at, agm_version, notes)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -338,7 +351,8 @@ pub fn write_scoped_prompt_tree_db(
     ).map_err(AppError::from)?;
 
     tx.commit().map_err(AppError::from)?;
-    dst.execute("DETACH DATABASE srcdb", []).map_err(AppError::from)?;
+    dst.execute("DETACH DATABASE srcdb", [])
+        .map_err(AppError::from)?;
 
     Ok(ExportResult {
         success: true,

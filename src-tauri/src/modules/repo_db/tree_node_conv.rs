@@ -43,7 +43,8 @@ pub(crate) fn build_transcript_conv_nodes(
                 continue;
             }
 
-            let effective_is_run = item.is_running || (is_inst_alive && item.status.contains("RUNNING"));
+            let effective_is_run =
+                item.is_running || (is_inst_alive && item.status.contains("RUNNING"));
             if only_running && !effective_is_run {
                 continue;
             }

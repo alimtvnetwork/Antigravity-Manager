@@ -386,12 +386,14 @@ export function PromptMarkdownPreview({
             // Truncation callout
             const truncMatch = line.match(/^<truncated\s+(\d+)\s+(bytes|lines)>$/i);
             if (truncMatch) {
+                const count = parseInt(truncMatch[1], 10);
+                const isBytes = truncMatch[2].toLowerCase() === 'bytes';
                 elements.push(
                     <TruncatedContextCallout
                         key={`trunc-callout-${i}`}
-                        omittedCount={parseInt(truncMatch[1], 10)}
-                        omittedUnit={truncMatch[2].toLowerCase() as 'bytes' | 'lines'}
-                        onInspect={onToggleExpand}
+                        omittedBytes={isBytes ? count : undefined}
+                        omittedLines={!isBytes ? count : undefined}
+                        onExpandFull={onToggleExpand}
                     />
                 );
                 continue;
