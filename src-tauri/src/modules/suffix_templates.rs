@@ -187,11 +187,9 @@ pub fn ensure_templates_tables(conn: &Connection) -> Result<(), String> {
 
 fn seed_default_templates_if_empty(conn: &Connection) -> Result<(), String> {
     let count: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM prompt_suffix_templates",
-            [],
-            |row| row.get(0),
-        )
+        .query_row("SELECT COUNT(*) FROM prompt_suffix_templates", [], |row| {
+            row.get(0)
+        })
         .map_err(|e| format!("Failed to count prompt_suffix_templates: {e}"))?;
 
     if count > 0 {
@@ -371,7 +369,9 @@ fn validate_id(id: &str) -> Result<(), String> {
 // ---------------------------------------------------------------------------
 
 /// List all suffix templates ordered strictly by created_at ASC, id ASC (FIFO order).
-pub fn list_suffix_templates_with_conn(conn: &Connection) -> Result<Vec<SuffixTemplateRow>, String> {
+pub fn list_suffix_templates_with_conn(
+    conn: &Connection,
+) -> Result<Vec<SuffixTemplateRow>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, name, description, category, template, is_default, created_at, updated_at 
@@ -494,7 +494,9 @@ pub fn save_suffix_template_with_conn(
 
     // Stage 2: Atomic SQLite Transaction with Retry / Exclusivity Guard
     let existing = get_suffix_template_with_conn(conn, &clean_id)?;
-    let created_at = existing.map(|e| e.created_at).unwrap_or_else(|| now.clone());
+    let created_at = existing
+        .map(|e| e.created_at)
+        .unwrap_or_else(|| now.clone());
 
     let tx = conn
         .transaction()
@@ -535,8 +537,9 @@ pub fn save_suffix_template_with_conn(
         .map_err(|e| format!("Failed to commit suffix template transaction: {e}"))?;
 
     // Stage 3: Immediate Read-Back Integrity Verification (Write-Then-Verify Invariant)
-    let verified = get_suffix_template_with_conn(conn, &clean_id)?
-        .ok_or_else(|| format!("Post-write verification failed: template '{clean_id}' not found after commit"))?;
+    let verified = get_suffix_template_with_conn(conn, &clean_id)?.ok_or_else(|| {
+        format!("Post-write verification failed: template '{clean_id}' not found after commit")
+    })?;
 
     if verified.name != clean_name {
         return Err(format!(
@@ -563,7 +566,9 @@ pub fn save_suffix_template_with_conn(
     Ok(verified)
 }
 
-pub fn save_suffix_template(input: &CreateSuffixTemplateInput) -> Result<SuffixTemplateRow, String> {
+pub fn save_suffix_template(
+    input: &CreateSuffixTemplateInput,
+) -> Result<SuffixTemplateRow, String> {
     let mut conn = connect_db()?;
     save_suffix_template_with_conn(&mut conn, input)
 }
@@ -587,10 +592,14 @@ pub fn delete_suffix_template(id: &str) -> Result<bool, String> {
 }
 
 /// Mark a specific suffix template as the default.
-pub fn set_default_suffix_template_with_conn(conn: &mut Connection, id: &str) -> Result<(), String> {
+pub fn set_default_suffix_template_with_conn(
+    conn: &mut Connection,
+    id: &str,
+) -> Result<(), String> {
     let clean_id = id.trim();
-    let _existing = get_suffix_template_with_conn(conn, clean_id)?
-        .ok_or_else(|| format!("Cannot set default: suffix template '{clean_id}' does not exist"))?;
+    let _existing = get_suffix_template_with_conn(conn, clean_id)?.ok_or_else(|| {
+        format!("Cannot set default: suffix template '{clean_id}' does not exist")
+    })?;
 
     let tx = conn
         .transaction()
@@ -615,7 +624,9 @@ pub fn set_default_suffix_template_with_conn(conn: &mut Connection, id: &str) ->
     let verified = get_suffix_template_with_conn(conn, clean_id)?
         .ok_or_else(|| format!("Read-back verification failed for '{clean_id}'"))?;
     if !verified.is_default {
-        return Err(format!("Post-write verification failed: template '{clean_id}' is_default is not true"));
+        return Err(format!(
+            "Post-write verification failed: template '{clean_id}' is_default is not true"
+        ));
     }
 
     Ok(())
@@ -758,7 +769,9 @@ pub fn save_resend_as_template_with_conn(
 
     // Stage 2: Atomic SQLite Transaction with Retry Guard
     let existing = get_resend_as_template_with_conn(conn, &clean_id)?;
-    let created_at = existing.map(|e| e.created_at).unwrap_or_else(|| now.clone());
+    let created_at = existing
+        .map(|e| e.created_at)
+        .unwrap_or_else(|| now.clone());
 
     let tx = conn
         .transaction()
@@ -799,8 +812,9 @@ pub fn save_resend_as_template_with_conn(
         .map_err(|e| format!("Failed to commit resend-as template transaction: {e}"))?;
 
     // Stage 3: Immediate Read-Back Integrity Verification
-    let verified = get_resend_as_template_with_conn(conn, &clean_id)?
-        .ok_or_else(|| format!("Post-write verification failed: preset '{clean_id}' not found after commit"))?;
+    let verified = get_resend_as_template_with_conn(conn, &clean_id)?.ok_or_else(|| {
+        format!("Post-write verification failed: preset '{clean_id}' not found after commit")
+    })?;
 
     if verified.name != clean_name {
         return Err(format!(
@@ -864,12 +878,13 @@ pub fn set_default_resend_as_template_with_conn(
     id: &str,
 ) -> Result<(), String> {
     let clean_id = id.trim();
-    let _existing = get_resend_as_template_with_conn(conn, clean_id)?
-        .ok_or_else(|| format!("Cannot set default: resend-as preset '{clean_id}' does not exist"))?;
+    let _existing = get_resend_as_template_with_conn(conn, clean_id)?.ok_or_else(|| {
+        format!("Cannot set default: resend-as preset '{clean_id}' does not exist")
+    })?;
 
-    let tx = conn
-        .transaction()
-        .map_err(|e| format!("Failed to begin transaction for set_default_resend_as_template: {e}"))?;
+    let tx = conn.transaction().map_err(|e| {
+        format!("Failed to begin transaction for set_default_resend_as_template: {e}")
+    })?;
 
     tx.execute(
         "UPDATE prompt_resend_as_templates SET is_default = 0 WHERE is_default = 1",
@@ -889,7 +904,9 @@ pub fn set_default_resend_as_template_with_conn(
     let verified = get_resend_as_template_with_conn(conn, clean_id)?
         .ok_or_else(|| format!("Read-back verification failed for '{clean_id}'"))?;
     if !verified.is_default {
-        return Err(format!("Post-write verification failed: preset '{clean_id}' is_default is not true"));
+        return Err(format!(
+            "Post-write verification failed: preset '{clean_id}' is_default is not true"
+        ));
     }
 
     Ok(())
@@ -1083,12 +1100,8 @@ mod tests {
         );
         assert_eq!(res_date, "[2026-10-17] #042 Task Alpha");
 
-        let res_no_placeholder = apply_title_pattern(
-            "[Audit]",
-            "Security Scan",
-            Some("2026-10-17"),
-            None,
-        );
+        let res_no_placeholder =
+            apply_title_pattern("[Audit]", "Security Scan", Some("2026-10-17"), None);
         assert_eq!(res_no_placeholder, "[Audit] - Security Scan");
     }
 }

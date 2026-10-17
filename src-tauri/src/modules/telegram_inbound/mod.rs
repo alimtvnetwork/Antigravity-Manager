@@ -41,5 +41,6 @@ pub use reports_a::*;
 pub use reports_b::*;
 pub use reports_cluster_a::*;
 pub use reports_cluster_b::*;
+pub use send_flow::*;
 pub use tests::*;
 pub use types::*;

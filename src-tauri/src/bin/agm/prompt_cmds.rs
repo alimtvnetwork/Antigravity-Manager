@@ -78,7 +78,9 @@ pub(crate) fn cmd_prompts_help(_args: &[String]) {
     println!("  agm prompt restore                    Restore and re-enqueue in-flight prompts");
     println!("  agm prompt resend-queued              Re-send all enqueued prompts in FIFO order");
     println!("  agm prompt inspect                    Observe prompt goals and liveness");
-    println!("  agm prompt template list              List configured verification suffix templates");
+    println!(
+        "  agm prompt template list              List configured verification suffix templates"
+    );
     println!("  agm prompt template add <id> ...      Add or update verification suffix template");
     println!("  agm prompt resend-as list             List configured 'Resend As' title presets");
     println!("  agm prompt resend-as add <id> ...     Add or update 'Resend As' title preset");
@@ -785,7 +787,11 @@ fn copy_text_to_system_clipboard(text: &str) -> bool {
 pub(crate) fn cmd_prompts_template(args: &[String]) {
     let sub = args
         .first()
-        .map(|s| s.trim_start_matches('/').trim_start_matches('-').to_lowercase())
+        .map(|s| {
+            s.trim_start_matches('/')
+                .trim_start_matches('-')
+                .to_lowercase()
+        })
         .unwrap_or_else(|| "list".to_string());
 
     let json_output = args.iter().any(|a| a == "--json" || a == "-j");
@@ -805,7 +811,10 @@ pub(crate) fn cmd_prompts_template(args: &[String]) {
                 CliEnvelope::ok("prompt template list", None, templates).print_and_exit();
             }
 
-            println!("[AGM:TEMPLATES] {} Suffix Templates Configured:", templates.len());
+            println!(
+                "[AGM:TEMPLATES] {} Suffix Templates Configured:",
+                templates.len()
+            );
             for t in templates {
                 let default_badge = if t.is_default { "(DEFAULT) " } else { "" };
                 let cat_badge = format!("[{}]", t.category);
@@ -966,7 +975,9 @@ pub(crate) fn cmd_prompts_template(args: &[String]) {
                 .find(|a| !a.starts_with('-'))
                 .map(|s| s.as_str())
                 .unwrap_or_else(|| {
-                    eprintln!("[ERROR] Template ID required. Usage: agm prompt template remove <id>");
+                    eprintln!(
+                        "[ERROR] Template ID required. Usage: agm prompt template remove <id>"
+                    );
                     std::process::exit(1);
                 });
 
@@ -998,7 +1009,9 @@ pub(crate) fn cmd_prompts_template(args: &[String]) {
                 .find(|a| !a.starts_with('-'))
                 .map(|s| s.as_str())
                 .unwrap_or_else(|| {
-                    eprintln!("[ERROR] Template ID required. Usage: agm prompt template set-default <id>");
+                    eprintln!(
+                        "[ERROR] Template ID required. Usage: agm prompt template set-default <id>"
+                    );
                     std::process::exit(1);
                 });
 
@@ -1036,7 +1049,11 @@ pub(crate) fn cmd_prompts_template(args: &[String]) {
 pub(crate) fn cmd_prompts_resend_as(args: &[String]) {
     let sub = args
         .first()
-        .map(|s| s.trim_start_matches('/').trim_start_matches('-').to_lowercase())
+        .map(|s| {
+            s.trim_start_matches('/')
+                .trim_start_matches('-')
+                .to_lowercase()
+        })
         .unwrap_or_else(|| "list".to_string());
 
     let json_output = args.iter().any(|a| a == "--json" || a == "-j");
@@ -1056,7 +1073,10 @@ pub(crate) fn cmd_prompts_resend_as(args: &[String]) {
                 CliEnvelope::ok("prompt resend-as list", None, presets).print_and_exit();
             }
 
-            println!("[AGM:RESEND-AS] {} Title Presets Configured:", presets.len());
+            println!(
+                "[AGM:RESEND-AS] {} Title Presets Configured:",
+                presets.len()
+            );
             for p in presets {
                 let default_badge = if p.is_default { " (DEFAULT)" } else { "" };
                 let suffix_info = p.suffix_id.as_deref().unwrap_or("none");
@@ -1200,7 +1220,9 @@ pub(crate) fn cmd_prompts_resend_as(args: &[String]) {
                 .find(|a| !a.starts_with('-'))
                 .map(|s| s.as_str())
                 .unwrap_or_else(|| {
-                    eprintln!("[ERROR] Preset ID required. Usage: agm prompt resend-as remove <id>");
+                    eprintln!(
+                        "[ERROR] Preset ID required. Usage: agm prompt resend-as remove <id>"
+                    );
                     std::process::exit(1);
                 });
 
@@ -1232,7 +1254,9 @@ pub(crate) fn cmd_prompts_resend_as(args: &[String]) {
                 .find(|a| !a.starts_with('-'))
                 .map(|s| s.as_str())
                 .unwrap_or_else(|| {
-                    eprintln!("[ERROR] Preset ID required. Usage: agm prompt resend-as set-default <id>");
+                    eprintln!(
+                        "[ERROR] Preset ID required. Usage: agm prompt resend-as set-default <id>"
+                    );
                     std::process::exit(1);
                 });
 
@@ -1261,8 +1285,14 @@ pub(crate) fn cmd_prompts_resend_as(args: &[String]) {
             }
             let pattern = &rest[0];
             let title = rest.get(1).map(|s| s.as_str()).unwrap_or("Sample Task");
-            let date = rest.windows(2).find(|w| w[0] == "--date").map(|w| w[1].as_str());
-            let seq = rest.windows(2).find(|w| w[0] == "--seq").and_then(|w| w[1].parse::<u64>().ok());
+            let date = rest
+                .windows(2)
+                .find(|w| w[0] == "--date")
+                .map(|w| w[1].as_str());
+            let seq = rest
+                .windows(2)
+                .find(|w| w[0] == "--seq")
+                .and_then(|w| w[1].parse::<u64>().ok());
 
             let result = suffix_templates::apply_title_pattern(pattern, title, date, seq);
             if json_output {
@@ -1287,4 +1317,3 @@ pub(crate) fn cmd_prompts_resend_as(args: &[String]) {
         }
     }
 }
-

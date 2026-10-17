@@ -109,9 +109,9 @@ pub async fn export_prompt_tree_section(
         resolved_options.format = fmt;
     }
 
-    let target_path_str = destination_path
-        .or(file_path)
-        .ok_or_else(|| AppError::Config("Destination path is required for section export".to_string()))?;
+    let target_path_str = destination_path.or(file_path).ok_or_else(|| {
+        AppError::Config("Destination path is required for section export".to_string())
+    })?;
     let path = PathBuf::from(target_path_str);
 
     tokio::task::spawn_blocking(move || {
@@ -341,10 +341,7 @@ pub async fn set_default_prompt_resend_as_template(id: String) -> Result<(), App
 }
 
 #[tauri::command]
-pub async fn interpolate_resend_title(
-    pattern: String,
-    title: String,
-) -> Result<String, AppError> {
+pub async fn interpolate_resend_title(pattern: String, title: String) -> Result<String, AppError> {
     let clean_pattern = pattern.trim();
     if clean_pattern.is_empty() {
         return Err(AppError::Config("Pattern cannot be empty".to_string()));
@@ -352,4 +349,3 @@ pub async fn interpolate_resend_title(
     let res = suffix_templates::apply_title_pattern(clean_pattern, &title, None, None);
     Ok(res)
 }
-

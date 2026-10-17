@@ -694,7 +694,251 @@ pub async fn handle_send_callback(chat_id: i64, data: &str) -> (String, Option<V
     if let Some(id8) = payload.strip_prefix("r:") {
         return super::prompt_history::rerun_prompt_by_id(id8).await;
     }
+    // Turn Rerun: send:t:<cid8>:<turn>
+    if let Some(rest) = payload.strip_prefix("t:") {
+        return handle_turn_rerun_callback(chat_id, rest, false).await;
+    }
+    // Turn Verification: send:v:<cid8>:<turn>
+    if let Some(rest) = payload.strip_prefix("v:") {
+        return handle_turn_rerun_callback(chat_id, rest, true).await;
+    }
     (send_unknown(), None)
+}
+
+/// Handle turn rerun or turn verification callbacks (`send:t:<cid8>:<turn>` / `send:v:<cid8>:<turn>`)
+pub async fn handle_turn_rerun_callback(
+    _chat_id: i64,
+    payload: &str,
+    is_verify: bool,
+) -> (String, Option<Value>) {
+    // Invariant 2: 60-byte callback payload budget (RCA 15)
+    let full_cb = format!("send:{}:{}", if is_verify { "v" } else { "t" }, payload);
+    if !callback_fits(&full_cb) {
+        return (
+            format!(
+                "⚠️ Callback payload exceeds safe budget of {} bytes: <code>{}</code>",
+                MAX_CALLBACK_BYTES,
+                clean_for_telegram_html(&full_cb, 80)
+            ),
+            None,
+        );
+    }
+
+    let (cid8, turn_str) = match payload.split_once(':') {
+        Some((c, t)) => (c.trim(), t.trim()),
+        None => (payload.trim(), "1"),
+    };
+
+    let turn_num = turn_str.parse::<usize>().unwrap_or(1);
+    if cid8.is_empty() {
+        return (send_unknown(), None);
+    }
+
+    // Lookup conversation across active instances and prompt sequences
+    let tree = crate::modules::repo_db::get_project_conversation_tree(200, false);
+    let mut matched_target = None;
+
+    for proj in &tree {
+        for conv in &proj.conversations {
+            if conv.short_id.eq_ignore_ascii_case(cid8)
+                || conv
+                    .conversation_id
+                    .to_lowercase()
+                    .starts_with(&cid8.to_lowercase())
+                || conv.seq_code.eq_ignore_ascii_case(cid8)
+            {
+                matched_target = Some((proj.clone(), conv.clone()));
+                break;
+            }
+        }
+        if matched_target.is_some() {
+            break;
+        }
+    }
+
+    let (proj, conv) = match matched_target {
+        Some(m) => m,
+        None => {
+            // Fallback: check sequence resolution directly
+            if let Some(res) =
+                crate::modules::repo_db::tree_format::resolve_agm_sequence_target(cid8)
+            {
+                let full_cid = res.conversation_id.unwrap_or_else(|| cid8.to_string());
+                let inst_id = if res.instance_id.is_empty() {
+                    "default".to_string()
+                } else {
+                    res.instance_id
+                };
+                return dispatch_turn_rerun_execution(
+                    cid8,
+                    &full_cid,
+                    &inst_id,
+                    &res.repo_path,
+                    &res.seq_code,
+                    &res.gitmap_seq_code,
+                    turn_num,
+                    is_verify,
+                    None,
+                )
+                .await;
+            } else {
+                return (
+                    format!(
+                        "⚠️ <b>Conversation Not Found:</b> No active conversation matching <code>{}</code> in registry.\n💡 Send <code>/seek</code> to list available conversations.",
+                        clean_for_telegram_html(cid8, 24)
+                    ),
+                    None,
+                );
+            }
+        }
+    };
+
+    let full_cid = conv.conversation_id.clone();
+    let instance_id = if conv.instance_id.is_empty() {
+        if proj.instance_id.is_empty() {
+            "default".to_string()
+        } else {
+            proj.instance_id.clone()
+        }
+    } else {
+        conv.instance_id.clone()
+    };
+    let repo_path = proj.repo_path.clone();
+    let seq_code = conv.seq_code.clone();
+    let gitmap_seq_code = conv.gitmap_seq_code.clone();
+
+    // Look for prompt text for targeted turn
+    let mut raw_prompt_opt = None;
+
+    // 1. Try transcript extract_conversation_prompt_turns
+    let base_dirs = crate::modules::repo_db::gemini_dirs_for_instance(&instance_id);
+    for base in &base_dirs {
+        let turns = crate::modules::repo_db::transcript::extract_conversation_prompt_turns(
+            base,
+            &full_cid,
+            conv.is_running,
+        );
+        if let Some(target) = turns.iter().find(|t| t.turn_number == turn_num) {
+            if !target.prompt_text.trim().is_empty() {
+                raw_prompt_opt = Some(target.prompt_text.clone());
+                break;
+            }
+        }
+    }
+
+    // 2. Try conv.prompts
+    if raw_prompt_opt.is_none() {
+        if let Some(target) = conv.prompts.iter().find(|t| t.turn_number == turn_num) {
+            if !target.prompt_text.trim().is_empty() {
+                raw_prompt_opt = Some(target.prompt_text.clone());
+            }
+        }
+    }
+
+    // 3. Fallback to full_prompt_text or preview
+    let raw_prompt = raw_prompt_opt
+        .or(conv.full_prompt_text.clone())
+        .filter(|p| !p.trim().is_empty())
+        .unwrap_or(conv.prompt_preview_200w.clone());
+
+    dispatch_turn_rerun_execution(
+        cid8,
+        &full_cid,
+        &instance_id,
+        &repo_path,
+        &seq_code,
+        &gitmap_seq_code,
+        turn_num,
+        is_verify,
+        Some(raw_prompt),
+    )
+    .await
+}
+
+async fn dispatch_turn_rerun_execution(
+    cid8: &str,
+    full_cid: &str,
+    instance_id: &str,
+    repo_path: &str,
+    seq_code: &str,
+    gitmap_seq_code: &str,
+    turn_num: usize,
+    is_verify: bool,
+    prompt_content_opt: Option<String>,
+) -> (String, Option<Value>) {
+    let raw_prompt = prompt_content_opt
+        .unwrap_or_else(|| "Continue current task and verify outcomes".to_string());
+    if raw_prompt.trim().is_empty() {
+        return (
+            format!(
+                "⚠️ Conversation <code>{}</code> turn #{} has empty prompt content.",
+                clean_for_telegram_html(cid8, 16),
+                turn_num
+            ),
+            None,
+        );
+    }
+
+    let injected_text = if is_verify {
+        format!(
+            "Review, verify, and run regression tests for the following implementation:\n{}",
+            raw_prompt
+        )
+    } else {
+        raw_prompt.clone()
+    };
+
+    let args = format!("{} --instance {} {}", full_cid, instance_id, injected_text);
+    let injected = execute_prompt_injection(&args).await;
+
+    // Trigger direct CDP submission for instance
+    let _cdp_ok = crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
+        instance_id,
+        &injected_text,
+    );
+
+    // Capture visual proof of delivery
+    let proof = super::open_shot::capture_and_send_proof_shot(&OpenShotTarget::Local).await;
+
+    let (preview_200w, word_count) =
+        crate::modules::repo_db::extract_prompt_words_preview(&injected_text, 200);
+
+    let reply = format!(
+        "{icon} <b>Prompt {action} Dispatched</b>\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        • <b>Target:</b> <code>[AGM:{seq} | {gm}]</code> · <code>#{c_seq}</code> (<code>{cid8}</code>)\n\
+        • <b>Instance:</b> <code>{inst}</code> · <b>Workspace:</b> <code>{ws}</code>\n\
+        • <b>Turn:</b> #{turn} ({words} words)\n\
+        • <b>Mode:</b> {mode}\n\n\
+        <b>Dispatched Prompt:</b>\n\
+        <blockquote expandable><pre><code class=\"language-markdown\">{preview}</code></pre></blockquote>\n\n\
+        {injected}\n\n\
+        {proof}",
+        icon = if is_verify { "🛡️" } else { "🔁" },
+        action = if is_verify {
+            "Verification"
+        } else {
+            "Turn Rerun"
+        },
+        seq = clean_for_telegram_html(seq_code, 16),
+        gm = clean_for_telegram_html(gitmap_seq_code, 24),
+        c_seq = clean_for_telegram_html(seq_code, 16),
+        cid8 = clean_for_telegram_html(cid8, 12),
+        inst = clean_for_telegram_html(instance_id, 32),
+        ws = clean_for_telegram_html(repo_path, 64),
+        turn = turn_num,
+        words = word_count,
+        mode = if is_verify {
+            "🛡️ Verification &amp; Regression Test"
+        } else {
+            "🔁 Verbatim Turn Rerun"
+        },
+        preview = clean_for_telegram_html(&preview_200w, 2000),
+        injected = injected,
+        proof = proof,
+    );
+
+    (reply, None)
 }
 
 /// Dispatch the prompt through the existing prompt-injection path and confirm
@@ -1082,5 +1326,40 @@ mod tests {
         assert!(text.contains("default-copy-5597"));
         assert!(!text.contains(":\\"));
         assert!(!text.contains("/home/"));
+    }
+
+    #[tokio::test]
+    async fn test_turn_callback_payload_bounds() {
+        // Enforce 60-byte limit on turn callback data (RCA 15)
+        let cid8 = "d58c5517";
+        let turn = 1;
+        let rerun_payload = format!("send:t:{}:{}", cid8, turn);
+        let verify_payload = format!("send:v:{}:{}", cid8, turn);
+        assert!(callback_fits(&rerun_payload));
+        assert!(callback_fits(&verify_payload));
+        assert!(rerun_payload.len() <= MAX_CALLBACK_BYTES);
+        assert!(verify_payload.len() <= MAX_CALLBACK_BYTES);
+    }
+
+    #[tokio::test]
+    async fn test_handle_turn_rerun_callback_safe_bounds() {
+        let chat_id: i64 = -9_001_345;
+        // Nonexistent CID returns graceful not-found message without panicking
+        let (reply, markup) = handle_send_callback(chat_id, "send:t:nonexist:1").await;
+        assert!(
+            reply.contains("Conversation Not Found")
+                || reply.contains("No active conversation")
+                || reply.contains("No prompt was sent")
+        );
+        assert!(markup.is_none());
+
+        // Oversized callback rejected
+        let oversized = format!("send:t:{}:1", "x".repeat(70));
+        let (oversized_reply, _) = handle_send_callback(chat_id, &oversized).await;
+        assert!(
+            oversized_reply.contains("exceeds safe budget")
+                || oversized_reply.contains("expired")
+                || oversized_reply.contains("isn't recognized")
+        );
     }
 }

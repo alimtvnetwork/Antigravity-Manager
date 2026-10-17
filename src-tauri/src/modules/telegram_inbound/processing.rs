@@ -37,6 +37,11 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
         "open" => Some(commands::execute_open_command(rest).await),
         "screenshot" => Some(commands::execute_screenshot_command(rest).await),
         "send" => Some(super::send_flow::start_send_flow(rest)),
+        "seek" | "conversations" | "convs" | "turns" => Some(
+            super::reports_b::format_seek_conversations_report(rest)
+                .await
+                .0,
+        ),
         "fleet" | "whoami" => Some(format_fleet_identity_report()),
         "instances" | "inst" => Some(format_instances_report()),
         "accounts" | "acc" => Some(format_accounts_report()),
@@ -225,6 +230,19 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                     .unwrap_or("")
                     .trim();
                 Some(format_prompts_query_report(term))
+            } else if sub.starts_with("seek") {
+                let term = sub["seek".len()..].trim();
+                Some(
+                    super::reports_b::format_seek_conversations_report(term)
+                        .await
+                        .0,
+                )
+            } else if sub == "conversations" || sub == "convs" || sub == "turns" {
+                Some(
+                    super::reports_b::format_seek_conversations_report("")
+                        .await
+                        .0,
+                )
             } else if sub == "all" || sub == "db" {
                 Some(format_prompts_list())
             } else if sub.starts_with("expand") {

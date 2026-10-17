@@ -23,7 +23,6 @@ import {
     parseVerificationTypeFromSuffix,
     buildMultiRoundVerificationPrompts,
     type MultiRoundVerificationOptions,
-    type VerificationWritingStyle,
 } from './verificationTemplates';
 
 export { copyPromptWithRichImages } from './clipboard';
