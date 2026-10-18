@@ -54,15 +54,19 @@ export function PromptImagePreviewModal({
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
                 e.preventDefault();
+                e.stopPropagation();
                 onClose();
             } else if (e.key === '+' || e.key === '=') {
                 e.preventDefault();
+                e.stopPropagation();
                 handleZoomIn();
-            } else if (e.key === '-') {
+            } else if (e.key === '-' || e.key === '_') {
                 e.preventDefault();
+                e.stopPropagation();
                 handleZoomOut();
             } else if (e.key === '0') {
                 e.preventDefault();
+                e.stopPropagation();
                 handleResetZoom();
             }
         };

@@ -121,12 +121,12 @@ export function ResultsView(props: ResultsViewProps) {
                     <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                         Latest AI Response & Execution Output
                     </span>
-                    <div className="relative flex items-center rounded-lg bg-slate-100 dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] divide-x divide-slate-200 dark:divide-[#40285e]">
+                    <div className="relative flex items-center rounded-full bg-slate-100 dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] divide-x divide-slate-200 dark:divide-[#40285e] p-0.5 shadow-2xs">
                         <button
                             type="button"
                             onClick={handleCopyResults}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-l-md text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
-                            title="Copy AI execution results to clipboard"
+                            className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
+                            aria-label="Copy AI execution results to clipboard"
                         >
                             {isCopiedResults ? (
                                 <>
@@ -143,8 +143,8 @@ export function ResultsView(props: ResultsViewProps) {
                         <button
                             type="button"
                             onClick={() => setIsAiCopyMenuOpen((prev) => !prev)}
-                            className="flex items-center justify-center px-2 py-1.5 rounded-r-md text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
-                            title="Copy AI results as JSON, or prompt and AI results as text or markdown"
+                            className="flex items-center justify-center px-2 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
+                            aria-label="More copy options"
                         >
                             <ChevronDown className={cn('w-3.5 h-3.5 text-slate-400 transition-transform', isAiCopyMenuOpen && 'rotate-180')} />
                         </button>

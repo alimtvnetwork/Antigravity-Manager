@@ -540,7 +540,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 data-ui-name="prompt-copy-all-btn"
                                 data-ui-id={`prompt-copy-all-${selectedConversation.conversation_id}`}
                                 className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                                title="Copy prompt text and all embedded images (rich HTML + binary PNG)"
+                                aria-label="Copy prompt text and all embedded images (rich HTML + binary PNG)"
                             >
                                 {isCopiedAllActive ? (
                                     <Check className="w-3 h-3 text-emerald-500 shrink-0" />
@@ -557,7 +557,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 data-ui-name="prompt-copy-options-btn"
                                 data-ui-id={`prompt-copy-options-${selectedConversation.conversation_id}`}
                                 className="flex items-center justify-center px-1.5 py-1 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                                title="More copy and export options"
+                                aria-label="More copy and export options"
                             >
                                 <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isCopyMenuOpen && "rotate-180")} />
                             </button>
@@ -578,7 +578,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     data-ui-name="prompt-enqueue-btn"
                                     data-ui-id={`prompt-enqueue-${selectedConversation.conversation_id}`}
                                     className="flex items-center gap-1.5 px-3 py-1 text-amber-800 dark:text-amber-300 hover:bg-amber-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                                    title="Enqueue prompt into FIFO background scheduler queue"
+                                    aria-label="Enqueue prompt into FIFO background scheduler queue"
                                 >
                                     <ListPlus className={cn('w-3 h-3 text-amber-500 dark:text-amber-400', isEnqueueing && 'animate-pulse')} />
                                     <span>Enqueue</span>
@@ -595,7 +595,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     data-ui-name="prompt-send-btn"
                                     data-ui-id={`prompt-send-${selectedConversation.conversation_id}`}
                                     className="flex items-center gap-1.5 px-3 py-1 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                                    title="Immediately inject prompt to running instance (Hotkey: N)"
+                                    aria-label="Immediately inject prompt to running instance (Hotkey: N)"
                                 >
                                     <RotateCw className={cn('w-3 h-3 text-emerald-500', isResending && 'animate-spin')} />
                                     <span>Send</span>
@@ -610,7 +610,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 data-ui-name="prompt-dispatch-options-btn"
                                 data-ui-id={`prompt-dispatch-options-${selectedConversation.conversation_id}`}
                                 className="flex items-center justify-center px-1.5 py-1 rounded-none text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                                title="Unified dispatch configuration popover"
+                                aria-label="Unified dispatch configuration popover"
                             >
                                 <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isSendMenuOpen && "rotate-180")} />
                             </button>
@@ -630,7 +630,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 data-ui-name="prompt-rerun-btn"
                                 data-ui-id={`prompt-rerun-${selectedConversation.conversation_id}`}
                                 className="flex items-center gap-1.5 px-3 py-1 rounded-none text-sky-700 dark:text-sky-300 hover:bg-sky-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                                title={`Dispatch the chosen rerun nudge ${rerunCount} time(s) to the running instance`}
+                                aria-label={`Dispatch the chosen rerun nudge ${rerunCount} time(s) to the running instance`}
                             >
                                 {rerunFlash ? (
                                     <Check className="w-3 h-3 text-emerald-500 shrink-0" />
@@ -650,7 +650,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     "flex items-center justify-center px-1.5 py-1 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
                                     !setIsDetailsModalOpen && "rounded-r-full"
                                 )}
-                                title="Rerun configuration: count and message"
+                                aria-label="Rerun configuration: count and message"
                             >
                                 <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isRerunMenuOpen && "rotate-180")} />
                             </button>
@@ -664,7 +664,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 data-ui-name="prompt-details-btn"
                                 data-ui-id={`prompt-details-${selectedConversation.conversation_id}`}
                                 className="flex items-center gap-1.5 px-3 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                                title="Open Conversation & Instance Details (Target IDE, PID, executable path, process status)"
+                                aria-label="Open Conversation & Instance Details"
                             >
                                 <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                                 <span>Details</span>

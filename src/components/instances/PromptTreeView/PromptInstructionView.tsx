@@ -93,6 +93,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         : (selectedConversation.selected_turn_number ?? null);
 
     const [activeTurnPreview, setActiveTurnPreview] = useState<number | null>(null);
+    const [isSessionSummaryExpanded, setIsSessionSummaryExpanded] = useState(false);
 
     const [previewImage, setPreviewImage] = useState<{ src: string; alt?: string } | null>(null);
     const [contextMenu, setContextMenu] = useState<{
@@ -229,74 +230,96 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
 
             {/* Conversation Session Summary Dashboard (Rendered when selectedTurnNumber === null) */}
             {selectedTurnNumber === null && (
-                <div className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-gradient-to-br from-slate-50 via-white to-purple-50/20 dark:from-[#171025] dark:via-[#120a1f] dark:to-[#1a0e2e] p-4 shadow-xs space-y-3 font-poppins">
-                    {/* Header: Title and Overall Status */}
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-200/60 dark:border-[#2b1b42]">
+                <div className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-gradient-to-br from-slate-50 via-white to-purple-50/20 dark:from-[#171025] dark:via-[#120a1f] dark:to-[#1a0e2e] p-3 shadow-xs space-y-2.5 font-poppins">
+                    {/* Header: Title, Status, and Overview Details Toggle */}
+                    <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-200/60 dark:border-[#2b1b42]">
                         <div className="flex items-center gap-2 min-w-0">
                             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold border border-purple-200 dark:border-purple-800/40 shrink-0">
                                 {selectedConversation.seq_code || 'CONV'}
                             </span>
-                            <div className="min-w-0">
+                            <div className="min-w-0 flex items-center gap-2">
                                 <h3 className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
                                     {selectedConversation.title || selectedConversation.short_id || 'Conversation Session'}
                                 </h3>
-                                <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate font-mono">
-                                    ID: {selectedConversation.conversation_id}
-                                </p>
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono hidden sm:inline">
+                                    · {totalTurns} {totalTurns === 1 ? 'turn' : 'turns'}
+                                </span>
+                                {durationDisplay && durationDisplay !== '0s' && (
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono hidden md:inline">
+                                        · {durationDisplay}
+                                    </span>
+                                )}
                             </div>
                         </div>
 
-                        {/* Status Pill */}
-                        <div className="shrink-0">
+                        {/* Status Pill & Collapsible Details Toggle Capsule */}
+                        <div className="flex items-center gap-2 shrink-0">
                             {isRunning ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-2xs">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-2xs">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
                                     <span>RUNNING</span>
                                 </span>
                             ) : isQueued ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs">
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs">
                                     <Clock className="w-3 h-3 text-amber-500" />
                                     <span>QUEUED</span>
                                 </span>
                             ) : (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-200/80 dark:bg-[#251b3a] text-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-[#40285e] shadow-2xs">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-200/80 dark:bg-[#251b3a] text-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-[#40285e] shadow-2xs">
                                     <Check className="w-3 h-3 text-emerald-500" />
-                                    <span>IDLE / COMPLETED</span>
+                                    <span>IDLE</span>
                                 </span>
                             )}
+
+                            <button
+                                type="button"
+                                onClick={() => setIsSessionSummaryExpanded((prev) => !prev)}
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:text-purple-600 dark:hover:text-purple-300 hover:bg-slate-100 dark:hover:bg-[#25173e] border border-slate-200/80 dark:border-[#40285e] transition-all cursor-pointer shadow-2xs"
+                                aria-label={isSessionSummaryExpanded ? 'Collapse session metrics' : 'Expand session metrics'}
+                            >
+                                <span>{isSessionSummaryExpanded ? 'Hide Details' : 'Overview Details'}</span>
+                                <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-150", isSessionSummaryExpanded && "rotate-180")} />
+                            </button>
                         </div>
                     </div>
 
-                    {/* Metrics Grid: Total Turns, Status, Timestamp Range, Duration */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                        <div className="p-2 rounded-lg bg-white/80 dark:bg-[#1a1228]/80 border border-slate-200/60 dark:border-[#382352]/60">
-                            <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">Total Turns</span>
-                            <span className="text-sm font-bold text-slate-800 dark:text-slate-100 font-mono">
-                                {totalTurns} {totalTurns === 1 ? 'turn' : 'turns'}
-                            </span>
+                    {/* Metrics Grid: Total Turns, Status, Timestamp Range, Duration (Shown when expanded) */}
+                    {isSessionSummaryExpanded && (
+                        <div className="space-y-2 pt-0.5 animate-in fade-in duration-150">
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate font-mono">
+                                ID: {selectedConversation.conversation_id}
+                            </p>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                                <div className="p-2 rounded-lg bg-white/80 dark:bg-[#1a1228]/80 border border-slate-200/60 dark:border-[#382352]/60">
+                                    <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">Total Turns</span>
+                                    <span className="text-sm font-bold text-slate-800 dark:text-slate-100 font-mono">
+                                        {totalTurns} {totalTurns === 1 ? 'turn' : 'turns'}
+                                    </span>
+                                </div>
+                                <div className="p-2 rounded-lg bg-white/80 dark:bg-[#1a1228]/80 border border-slate-200/60 dark:border-[#382352]/60">
+                                    <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">Session Status</span>
+                                    <span className={cn(
+                                        "text-sm font-bold font-mono",
+                                        isRunning ? "text-emerald-600 dark:text-emerald-400" : isQueued ? "text-amber-600 dark:text-amber-400" : "text-slate-700 dark:text-slate-300"
+                                    )}>
+                                        {statusLabel}
+                                    </span>
+                                </div>
+                                <div className="p-2 rounded-lg bg-white/80 dark:bg-[#1a1228]/80 border border-slate-200/60 dark:border-[#382352]/60">
+                                    <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">Time Range</span>
+                                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 font-mono truncate block">
+                                        {timestampRange}
+                                    </span>
+                                </div>
+                                <div className="p-2 rounded-lg bg-white/80 dark:bg-[#1a1228]/80 border border-slate-200/60 dark:border-[#382352]/60">
+                                    <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">Duration</span>
+                                    <span className="text-sm font-bold text-slate-800 dark:text-slate-100 font-mono">
+                                        {durationDisplay}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
-                        <div className="p-2 rounded-lg bg-white/80 dark:bg-[#1a1228]/80 border border-slate-200/60 dark:border-[#382352]/60">
-                            <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">Session Status</span>
-                            <span className={cn(
-                                "text-sm font-bold font-mono",
-                                isRunning ? "text-emerald-600 dark:text-emerald-400" : isQueued ? "text-amber-600 dark:text-amber-400" : "text-slate-700 dark:text-slate-300"
-                            )}>
-                                {statusLabel}
-                            </span>
-                        </div>
-                        <div className="p-2 rounded-lg bg-white/80 dark:bg-[#1a1228]/80 border border-slate-200/60 dark:border-[#382352]/60">
-                            <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">Time Range</span>
-                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 font-mono truncate block" title={timestampRange}>
-                                {timestampRange}
-                            </span>
-                        </div>
-                        <div className="p-2 rounded-lg bg-white/80 dark:bg-[#1a1228]/80 border border-slate-200/60 dark:border-[#382352]/60">
-                            <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">Duration</span>
-                            <span className="text-sm font-bold text-slate-800 dark:text-slate-100 font-mono">
-                                {durationDisplay}
-                            </span>
-                        </div>
-                    </div>
+                    )}
 
                     {/* Enqueued Prompts Section (listing pending queued turns with badges) */}
                     {enqueuedTurns.length > 0 && (
@@ -323,7 +346,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                             }
                                         }}
                                         className="flex items-center justify-between p-1.5 rounded-md bg-white/90 dark:bg-[#1a1228]/90 border border-amber-200/60 dark:border-amber-800/30 text-xs hover:border-amber-400 dark:hover:border-amber-600 transition-colors cursor-pointer"
-                                        title="Click to view this queued prompt instruction"
+                                        aria-label={`View queued prompt turn T${turn.turn_number}`}
                                     >
                                         <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
                                             <span className="font-mono text-[9px] px-1 py-0.2 rounded-xs bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-bold shrink-0">
@@ -351,7 +374,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
 
                     {/* Chronological turn navigation chips (T1, T2, T3...) */}
                     {turns.length > 1 && (
-                        <div className="space-y-1.5 pt-1">
+                        <div className="space-y-1.5 pt-1 border-t border-slate-200/40 dark:border-[#2b1b42]/60">
                             <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-medium">
                                 <span>Chronological Prompt Turns:</span>
                                 <span className="text-[10px] font-mono text-slate-400">
@@ -385,7 +408,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                                     ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30 hover:bg-amber-500/20"
                                                     : "bg-white dark:bg-[#1a1228] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#382352] hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-300"
                                             )}
-                                            title={`Turn ${turn.turn_number}: ${turn.status || 'COMPLETED'}\n${turn.preview_200w || turn.prompt_text?.slice(0, 100) || ''}`}
+                                            aria-label={`Turn T${turn.turn_number} - ${turn.status || 'COMPLETED'}`}
                                         >
                                             <span className={cn(
                                                 "w-1.5 h-1.5 rounded-full shrink-0",
