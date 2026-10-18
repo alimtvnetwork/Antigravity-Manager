@@ -132,6 +132,14 @@ function getActionBadgeStyle(code: number, actionName: string): { bg: string; te
             border: 'border-rose-300/50 dark:border-rose-700/50',
         };
     }
+    // 14: SyncInstance / SyncPID / SyncQuota
+    if (code === 14 || act.includes('sync')) {
+        return {
+            bg: 'bg-violet-50 dark:bg-violet-950/40',
+            text: 'text-violet-700 dark:text-violet-300',
+            border: 'border-violet-300/50 dark:border-violet-700/40',
+        };
+    }
     if (act.includes('backup') || act.includes('restore') || act.includes('prompt')) {
         return {
             bg: 'bg-indigo-50 dark:bg-[#201633]',
@@ -144,6 +152,42 @@ function getActionBadgeStyle(code: number, actionName: string): { bg: string; te
         text: 'text-slate-700 dark:text-slate-300',
         border: 'border-slate-300/50 dark:border-[#40285e]',
     };
+}
+
+function getActionDisplayName(code: number, legacyName: string): string {
+    const act = (legacyName || '').trim();
+    switch (code) {
+        case 1:
+            return 'Add Account';
+        case 2:
+            return 'Update Account';
+        case 3:
+            return 'Switch Account';
+        case 4:
+            return 'Schedule Prompt';
+        case 5:
+            return 'Requeue Conversation';
+        case 6:
+            return 'Launch Instance';
+        case 7:
+            return 'Stop Instance';
+        case 8:
+            return 'Restart Instance';
+        case 9:
+            return 'Kill Instance';
+        case 10:
+            return 'Create Instance';
+        case 11:
+            return 'Delete Instance';
+        case 12:
+            return 'Clone Instance';
+        case 13:
+            return 'Instance Error';
+        case 14:
+            return 'Sync PID & Quota';
+        default:
+            return act || 'Operation';
+    }
 }
 
 export default function InstanceAuditTrailModal({
@@ -325,17 +369,7 @@ export default function InstanceAuditTrailModal({
                                 )}
                             >
                                 <History className="w-3.5 h-3.5" />
-                                <span>Switch Cycles</span>
-                                {recentSwitches.length > 0 && (
-                                    <span className={cn(
-                                        "text-[10px] px-1.5 py-0.2 rounded-full font-mono",
-                                        activeTab === 'switches'
-                                            ? "bg-amber-600 text-white"
-                                            : "bg-slate-300/80 dark:bg-[#40285e] text-slate-700 dark:text-slate-300"
-                                    )}>
-                                        {totalSwitches}
-                                    </span>
-                                )}
+                                <span>Switch Cycles ({totalSwitches})</span>
                             </button>
                             <button
                                 type="button"
@@ -348,17 +382,7 @@ export default function InstanceAuditTrailModal({
                                 )}
                             >
                                 <Activity className="w-3.5 h-3.5" />
-                                <span>All Operations</span>
-                                {totalOperations > 0 && (
-                                    <span className={cn(
-                                        "text-[10px] px-1.5 py-0.2 rounded-full font-mono",
-                                        activeTab === 'operations'
-                                            ? "bg-amber-600 text-white"
-                                            : "bg-slate-300/80 dark:bg-[#40285e] text-slate-700 dark:text-slate-300"
-                                    )}>
-                                        {totalOperations}
-                                    </span>
-                                )}
+                                <span>All Operations ({totalOperations})</span>
                             </button>
                         </div>
 
@@ -493,7 +517,8 @@ export default function InstanceAuditTrailModal({
 
                                 {auditTrail.map((record) => {
                                     const isExpanded = Boolean(expandedOps[record.id]);
-                                    const badgeStyle = getActionBadgeStyle(record.action_code, record.action_label || record.action);
+                                    const actionLabel = record.action_label || getActionDisplayName(record.action_code, record.action);
+                                    const badgeStyle = getActionBadgeStyle(record.action_code, actionLabel);
                                     const isSuccess = record.status.toLowerCase() === 'ok' || record.status.toLowerCase() === 'success';
                                     const isFailed = record.status.toLowerCase() === 'fail' || record.status.toLowerCase() === 'error';
                                     const durationSec = record.finished_at && record.finished_at >= record.created_at
@@ -529,7 +554,7 @@ export default function InstanceAuditTrailModal({
                                                         badgeStyle.text,
                                                         badgeStyle.border
                                                     )}>
-                                                        {record.action_label || record.action}
+                                                        {actionLabel}
                                                     </span>
 
                                                     {/* Subject / Detail preview */}

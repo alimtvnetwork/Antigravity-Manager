@@ -14,8 +14,21 @@ pub(crate) fn refuse_if_caller(args: &[String], target_id: &str, is_json: bool) 
             instance::resolve_instance_id(target_id).unwrap_or_else(|_| target_id.to_string());
         let mut matched_caller: Option<String> = None;
         if let Some(caller_id) = instance::close::detect_caller_instance_id() {
+            let is_default_alias = |id: &str| {
+                matches!(
+                    id.trim().to_ascii_lowercase().as_str(),
+                    "" | "null"
+                        | "default"
+                        | "__default__"
+                        | "antigravity"
+                        | "agy"
+                        | "ide"
+                        | "classic"
+                )
+            };
             if caller_id.eq_ignore_ascii_case(&resolved)
                 || caller_id.eq_ignore_ascii_case(target_id)
+                || (is_default_alias(&caller_id) && is_default_alias(target_id))
             {
                 matched_caller = Some(caller_id);
             }
@@ -138,9 +151,30 @@ pub(crate) fn route_instances_rm(args: &[String], non_flag_args: &[String], is_j
         refuse_if_caller(args, &resolved_id, is_json);
 
         match instance::delete_instance(&resolved_id) {
-            Ok(_) => println!("[SUCCESS] Deleted instance '{}'.", resolved_id),
+            Ok(_) => {
+                if is_json {
+                    let res = serde_json::json!({
+                        "success": true,
+                        "instance": resolved_id,
+                        "id": resolved_id,
+                        "message": format!("Deleted instance '{resolved_id}'.")
+                    });
+                    println!("{}", serde_json::to_string(&res).unwrap_or_default());
+                } else {
+                    println!("[SUCCESS] Deleted instance '{}'.", resolved_id);
+                }
+            }
             Err(e) => {
-                eprintln!("[ERROR] Failed to delete instance '{}': {}", resolved_id, e);
+                if is_json {
+                    let err = serde_json::json!({
+                        "success": false,
+                        "error": e,
+                        "instance": resolved_id
+                    });
+                    println!("{}", serde_json::to_string(&err).unwrap_or_default());
+                } else {
+                    eprintln!("[ERROR] Failed to delete instance '{}': {}", resolved_id, e);
+                }
                 std::process::exit(1);
             }
         }
@@ -847,6 +881,22 @@ pub(crate) fn route_instances_test_lifecycle(
                 }
                 Err(e) => {
                     eprintln!("  [!] Failed to delete test instance '{}': {}", inst.id, e);
+                }
+            }
+        }
+
+        if targets_to_clean.is_empty() {
+            if let Some(ref target) = target_spec {
+                if let Ok(instances_root) = instance::get_instances_dir() {
+                    let candidate = instances_root.join(target);
+                    if candidate.is_dir() && !target.eq_ignore_ascii_case("default") {
+                        antigravity_tools_lib::error::record_ignored(
+                            std::fs::remove_dir_all(&candidate),
+                            "remove targeted test instance directory",
+                        ); // Justification: test cleanup; absence is safe
+                        cleaned_count += 1;
+                        cleaned_ids.push(target.clone());
+                    }
                 }
             }
         }

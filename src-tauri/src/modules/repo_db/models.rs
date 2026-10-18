@@ -508,6 +508,105 @@ impl FromStr for PromptAuditCriteriaType {
     }
 }
 
+/// Represents the execution run status of a conversation or turn from Antigravity Cascade engine summaries
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CascadeRunStatusType {
+    Running,
+    Idle,
+    Completed,
+    Failed,
+    Cancelled,
+    Aborted,
+    Unknown,
+}
+
+impl CascadeRunStatusType {
+    /// Parse from raw Antigravity/Cascade status string (case-insensitive substring/prefix matching)
+    pub fn from_status_str(status: &str) -> Self {
+        let upper = status.trim().to_uppercase();
+        if upper.contains("CASCADE_RUN_STATUS_IDLE") || upper == "IDLE" {
+            Self::Idle
+        } else if upper.contains("CASCADE_RUN_STATUS_COMPLETED")
+            || upper.contains("COMPLETED")
+            || upper == "DONE"
+        {
+            Self::Completed
+        } else if upper.contains("CASCADE_RUN_STATUS_FAILED")
+            || upper.contains("FAILED")
+            || upper == "ERROR"
+        {
+            Self::Failed
+        } else if upper.contains("CASCADE_RUN_STATUS_CANCELLED")
+            || upper.contains("CANCELLED")
+            || upper.contains("CANCELED")
+        {
+            Self::Cancelled
+        } else if upper.contains("CASCADE_RUN_STATUS_ABORTED") || upper.contains("ABORTED") {
+            Self::Aborted
+        } else if upper.contains("CASCADE_RUN_STATUS_RUNNING")
+            || upper.contains("RUNNING")
+            || upper == "IN_FLIGHT"
+        {
+            Self::Running
+        } else if upper.contains("IDLE") {
+            Self::Idle
+        } else {
+            Self::Unknown
+        }
+    }
+
+    /// Check if the status indicates an explicit terminal completion.
+    #[inline]
+    pub const fn is_terminal(&self) -> bool {
+        matches!(
+            self,
+            Self::Completed | Self::Failed | Self::Cancelled | Self::Aborted
+        )
+    }
+
+    /// Check if the status indicates an idle or terminal state (Explicit Idle Supremacy).
+    #[inline]
+    pub const fn is_idle_or_terminal(&self) -> bool {
+        matches!(
+            self,
+            Self::Idle | Self::Completed | Self::Failed | Self::Cancelled | Self::Aborted
+        )
+    }
+
+    /// Check if the status indicates active execution.
+    #[inline]
+    pub const fn is_running(&self) -> bool {
+        matches!(self, Self::Running)
+    }
+
+    /// Canonical string identifier
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Running => "CASCADE_RUN_STATUS_RUNNING",
+            Self::Idle => "CASCADE_RUN_STATUS_IDLE",
+            Self::Completed => "CASCADE_RUN_STATUS_COMPLETED",
+            Self::Failed => "CASCADE_RUN_STATUS_FAILED",
+            Self::Cancelled => "CASCADE_RUN_STATUS_CANCELLED",
+            Self::Aborted => "CASCADE_RUN_STATUS_ABORTED",
+            Self::Unknown => "CASCADE_RUN_STATUS_UNKNOWN",
+        }
+    }
+}
+
+impl fmt::Display for CascadeRunStatusType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl FromStr for CascadeRunStatusType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self::from_status_str(s))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -695,5 +794,40 @@ mod tests {
         assert!("Unknown Criteria"
             .parse::<PromptAuditCriteriaType>()
             .is_err());
+    }
+
+    #[test]
+    fn test_cascade_run_status_type_variants_and_predicates() {
+        assert!(
+            CascadeRunStatusType::from_status_str("CASCADE_RUN_STATUS_IDLE").is_idle_or_terminal()
+        );
+        assert!(!CascadeRunStatusType::from_status_str("CASCADE_RUN_STATUS_IDLE").is_running());
+        assert!(!CascadeRunStatusType::from_status_str("CASCADE_RUN_STATUS_IDLE").is_terminal());
+
+        assert!(CascadeRunStatusType::from_status_str("IDLE").is_idle_or_terminal());
+        assert!(
+            CascadeRunStatusType::from_status_str("CASCADE_RUN_STATUS_COMPLETED").is_terminal()
+        );
+        assert!(
+            CascadeRunStatusType::from_status_str("CASCADE_RUN_STATUS_COMPLETED")
+                .is_idle_or_terminal()
+        );
+        assert!(CascadeRunStatusType::from_status_str("COMPLETED").is_terminal());
+
+        assert!(CascadeRunStatusType::from_status_str("FAILED").is_terminal());
+        assert!(CascadeRunStatusType::from_status_str("CANCELLED").is_terminal());
+        assert!(CascadeRunStatusType::from_status_str("ABORTED").is_terminal());
+
+        assert!(CascadeRunStatusType::from_status_str("CASCADE_RUN_STATUS_RUNNING").is_running());
+        assert!(
+            !CascadeRunStatusType::from_status_str("CASCADE_RUN_STATUS_RUNNING")
+                .is_idle_or_terminal()
+        );
+        assert!(CascadeRunStatusType::from_status_str("RUNNING").is_running());
+
+        assert_eq!(
+            CascadeRunStatusType::from_status_str("something_else"),
+            CascadeRunStatusType::Unknown
+        );
     }
 }

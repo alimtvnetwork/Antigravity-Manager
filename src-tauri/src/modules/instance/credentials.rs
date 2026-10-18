@@ -137,55 +137,42 @@ pub(crate) fn inject_account_credentials(
 
     // Retry the primary token injection: the dying IDE may still hold the
     // SQLite lock on state.vscdb for a moment after the kill.
-    let mut inject_result = inject_token_once(&db_path, account, None);
-    for retry in 1..=3 {
-        if inject_result.is_ok() {
-            break;
-        }
-        crate::modules::logger::log_warn(&format!(
-            "[CREDENTIALS] Token injection attempt {} failed ({}); retrying after lock release",
-            retry,
-            inject_result
-                .as_ref()
-                .err()
-                .map(|e| e.as_str())
-                .unwrap_or("unknown"),
-        ));
-        std::thread::sleep(std::time::Duration::from_millis(400));
-        inject_result = inject_token_once(&db_path, account, None);
-    }
-    inject_result?;
+    inject_token_with_retry(&db_path, account, None)?;
 
-    if let Some(ref profile) = account.device_profile {
-        // Justification: device-identity bookkeeping; the existing identity persists if this fails
-        crate::error::record_ignored(
-            crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id),
-            "write machine id",
-        );
-        let storage_path = db_dir.join("storage.json");
-        // Justification: device-profile bookkeeping; the existing profile persists if this fails
-        crate::error::record_ignored(
-            crate::modules::device::write_profile(&storage_path, profile),
-            "write device profile",
-        );
-    }
+    let profile = account
+        .device_profile
+        .clone()
+        .unwrap_or_else(crate::modules::device::generate_profile);
+
+    // Update storage.json and write service machine id
+    let storage_path = db_dir.join("storage.json");
+    crate::error::record_ignored(
+        update_device_profile_storage(&storage_path, &profile),
+        "update device profile in storage.json",
+    );
+    crate::error::record_ignored(
+        crate::modules::db::write_service_machine_id(&db_path, &profile.mac_machine_id),
+        "write machine id",
+    );
 
     #[cfg(target_os = "windows")]
     if !is_default {
-        inject_windows_appdata_credentials(&target_data_path, inst_home_opt.as_deref(), account);
+        inject_windows_appdata_credentials(
+            &target_data_path,
+            inst_home_opt.as_deref(),
+            account,
+            &profile,
+        );
     }
 
     if !options.launch_mode && is_default {
         // Only sync profile & token to global IDE storage when switching the default instance!
         for target_hint in [None, Some("ide")] {
             if let Ok(storage_path) = crate::modules::device::get_storage_path(target_hint) {
-                if let Some(ref profile) = account.device_profile {
-                    // Justification: device-profile bookkeeping; the existing profile persists if this fails
-                    crate::error::record_ignored(
-                        crate::modules::device::write_profile(&storage_path, profile),
-                        "write device profile",
-                    );
-                }
+                crate::error::record_ignored(
+                    update_device_profile_storage(&storage_path, &profile),
+                    "write device profile",
+                );
             }
             if let Ok(global_db_path) = crate::modules::db::get_db_path(target_hint) {
                 if global_db_path != db_path
@@ -193,19 +180,16 @@ pub(crate) fn inject_account_credentials(
                 {
                     // Justification: best-effort token injection; auth state is re-injected on the next launch
                     crate::error::record_ignored(
-                        inject_token_once(&global_db_path, account, target_hint),
+                        inject_token_with_retry(&global_db_path, account, target_hint),
                         "inject token into db",
                     );
-                    if let Some(ref profile) = account.device_profile {
-                        // Justification: device-identity bookkeeping; the existing identity persists if this fails
-                        crate::error::record_ignored(
-                            crate::modules::db::write_service_machine_id(
-                                &global_db_path,
-                                &profile.mac_machine_id,
-                            ),
-                            "write machine id",
-                        );
-                    }
+                    crate::error::record_ignored(
+                        crate::modules::db::write_service_machine_id(
+                            &global_db_path,
+                            &profile.mac_machine_id,
+                        ),
+                        "write machine id",
+                    );
                 }
             }
         }

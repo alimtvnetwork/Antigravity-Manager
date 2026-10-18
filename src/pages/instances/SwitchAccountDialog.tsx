@@ -88,6 +88,13 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
     const isSwitching = actionState[targetId] === 'switch' || switchingAccountId !== null;
     const isAnySwitching = isSwitching || isLoading;
 
+    const boundAccount = accounts.find((a) => {
+        if (switchTargetInstance.config.bound_account_id) return a.id === switchTargetInstance.config.bound_account_id;
+        if (switchTargetInstance.config.bound_email) return a.email.toLowerCase() === switchTargetInstance.config.bound_email.toLowerCase();
+        return false;
+    });
+    const boundQuota = boundAccount ? accountQuotaScores(boundAccount) : null;
+
     const close = useCallback(() => {
         if (isAnySwitching) return;
         setSwitchTargetInstance(null);
@@ -151,49 +158,73 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
             }}
         >
             <div
-                className="backdrop-blur-md bg-white/95 dark:bg-[#171025]/95 border border-slate-200/90 dark:border-[#40285e] shadow-2xl rounded-2xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col"
+                className="backdrop-blur-md bg-white/95 dark:bg-[var(--ui-surface-1)]/95 border border-slate-200/90 dark:border-[var(--ui-border-subtle)] shadow-2xl rounded-2xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between pb-3.5 border-b border-slate-200/90 dark:border-[#40285e]">
+                <div className="flex items-center justify-between pb-3.5 border-b border-slate-200/90 dark:border-[var(--ui-border-subtle)]">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 shadow-2xs">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600 dark:text-[var(--ui-interactive)] border border-purple-500/20 shadow-2xs">
                             <ArrowRightLeft className="w-5 h-5" />
                         </div>
                         <div>
                             <h3 id="switch-account-modal-title" className="font-bold text-base text-slate-900 dark:text-white">
                                 Switch Account for {switchTargetInstance.config.name}
                             </h3>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                Currently bound:{' '}
-                                <span className="font-mono font-medium text-slate-700 dark:text-slate-200">
-                                    {switchTargetInstance.config.bound_email
-                                        ? (showAllEmails
-                                            ? switchTargetInstance.config.bound_email
-                                            : maskEmail(switchTargetInstance.config.bound_email))
-                                        : 'None'}
-                                </span>
-                            </p>
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    Currently bound:{' '}
+                                    <span className="font-mono font-medium text-slate-700 dark:text-slate-200">
+                                        {switchTargetInstance.config.bound_email
+                                            ? (showAllEmails
+                                                ? switchTargetInstance.config.bound_email
+                                                : maskEmail(switchTargetInstance.config.bound_email))
+                                            : 'None'}
+                                    </span>
+                                </p>
+                                {boundQuota && (boundQuota.fourH !== null || boundQuota.weekly !== null) && (
+                                    <div className="inline-flex items-center rounded-full border border-slate-200/90 dark:border-[var(--ui-border-subtle)] bg-slate-100/80 dark:bg-[var(--ui-canvas)]/80 backdrop-blur-xs px-2 py-0.5 text-[9px] font-mono shadow-2xs text-slate-600 dark:text-[var(--ui-text-secondary)]">
+                                        <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-[var(--ui-text-primary)]">
+                                            <span className="text-slate-400 dark:text-[var(--ui-text-muted)] font-normal">4H:</span>
+                                            <span>{boundQuota.fourH !== null ? `${Math.round(boundQuota.fourH)}%` : '—'}</span>
+                                        </span>
+                                        <span className="w-px h-2 bg-slate-200 dark:bg-[var(--ui-border-subtle)] mx-1 shrink-0" />
+                                        <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-[var(--ui-text-primary)]">
+                                            <span className="text-slate-400 dark:text-[var(--ui-text-muted)] font-normal">Weekly:</span>
+                                            <span>{boundQuota.weekly !== null ? `${Math.round(boundQuota.weekly)}%` : '—'}</span>
+                                        </span>
+                                        <span className="w-px h-2 bg-slate-200 dark:bg-[var(--ui-border-subtle)] mx-1 shrink-0" />
+                                        <span className="flex items-center gap-1 font-semibold text-purple-700 dark:text-[var(--ui-interactive)]">
+                                            <span className="text-slate-400 dark:text-[var(--ui-text-muted)] font-normal">Total:</span>
+                                            <span className="font-bold">
+                                                {(boundQuota.fourH !== null && boundQuota.weekly !== null)
+                                                    ? `${Math.round((boundQuota.fourH + boundQuota.weekly) / 2)}%`
+                                                    : (boundQuota.fourH !== null ? `${Math.round(boundQuota.fourH)}%` : (boundQuota.weekly !== null ? `${Math.round(boundQuota.weekly)}%` : '—'))}
+                                            </span>
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
                     {/* Header Action Segmented Capsule */}
-                    <div className="inline-flex items-center rounded-full border border-slate-200/90 dark:border-[#40285e] bg-slate-100/80 dark:bg-[#090611] p-0.5 backdrop-blur-xs shadow-2xs">
+                    <div className="inline-flex items-center rounded-full border border-slate-200/90 dark:border-[var(--ui-border-subtle)] bg-slate-100/80 dark:bg-[var(--ui-canvas)] p-0.5 backdrop-blur-xs shadow-2xs">
                         <button
                             type="button"
                             onClick={() => setShowAllEmails((prev) => !prev)}
-                            className="p-1.5 rounded-l-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-[#40285e] transition-colors duration-200 cursor-pointer"
+                            className="p-1.5 rounded-l-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-[var(--ui-surface-hover)] transition-colors duration-200 cursor-pointer"
                             title={showAllEmails ? 'Mask emails' : 'Reveal emails'}
                             aria-label={showAllEmails ? 'Mask emails' : 'Reveal emails'}
                         >
                             {showAllEmails ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
-                        <span className="w-px h-3.5 bg-slate-200 dark:bg-[#40285e] shrink-0" />
+                        <span className="w-px h-3.5 bg-slate-200 dark:bg-[var(--ui-border-subtle)] shrink-0" />
                         <button
                             type="button"
                             onClick={close}
                             disabled={isAnySwitching}
-                            className="p-1.5 rounded-r-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-[#40285e] transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="p-1.5 rounded-r-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-[var(--ui-surface-hover)] transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Close dialog (Esc)"
                             aria-label="Close dialog"
                         >
@@ -212,7 +243,7 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                             onChange={(e) => setAccountSearchQuery(e.target.value)}
                             disabled={isAnySwitching}
                             placeholder="Filter accounts by email or ID..."
-                            className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50/80 dark:bg-[#090611] border border-slate-200/90 dark:border-[#40285e] rounded-full focus:outline-none focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400/60 text-slate-900 dark:text-slate-100 disabled:opacity-50 transition-colors"
+                            className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50/80 dark:bg-[var(--ui-canvas)] border border-slate-200/90 dark:border-[var(--ui-border-subtle)] rounded-full focus:outline-none focus:ring-1 focus:ring-[var(--ui-focus-ring)] text-slate-900 dark:text-slate-100 disabled:opacity-50 transition-colors"
                         />
                         {accountSearchQuery && (
                             <button

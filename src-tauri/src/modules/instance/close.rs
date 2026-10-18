@@ -294,10 +294,10 @@ pub fn close_instance_verified(
         force_refresh_process_cache();
         let mut pids = find_pids_for_data_dir(&data_dir, is_default)
             .into_iter()
-            .filter(|&pid| is_pid_alive_targeted(pid))
+            .filter(|&pid| is_pid_active_checked(pid))
             .collect::<Vec<u32>>();
         if let Some(pid) = saved_pid {
-            if is_pid_alive_targeted(pid) && !pids.contains(&pid) {
+            if is_pid_active_checked(pid) && !pids.contains(&pid) {
                 let mut system = System::new();
                 let refresh_kind = sysinfo::ProcessRefreshKind::new()
                     .with_cmd(sysinfo::UpdateKind::Always)
@@ -340,7 +340,7 @@ pub fn close_instance_verified(
             let is_default = instance_id == "default" || instance_id == "__default__";
             let wpid = find_pids_for_data_dir(&data_dir, is_default)
                 .into_iter()
-                .find(|&pid| is_pid_alive_targeted(pid) && saved_pid_matches(pid));
+                .find(|&pid| is_pid_active_checked(pid) && saved_pid_matches(pid));
             if let Some(wpid) = wpid {
                 if !pids.contains(&wpid) {
                     pids.push(wpid);
@@ -392,6 +392,8 @@ pub fn close_instance_verified(
                 invalidate_instance_process_cache(instance_id);
                 force_refresh_process_cache();
                 crate::modules::repo_db::invalidate_prompt_tree_cache(Some(instance_id));
+                let target_data_path = PathBuf::from(&data_dir);
+                clear_stale_instance_lockfiles(&target_data_path);
                 // Settle delay allowing Windows kernel & NTFS file handles to release
                 std::thread::sleep(std::time::Duration::from_millis(200));
                 return Ok(true);
@@ -432,6 +434,9 @@ pub fn close_instance_verified(
     invalidate_instance_process_cache(instance_id);
     force_refresh_process_cache();
     crate::modules::repo_db::invalidate_prompt_tree_cache(Some(instance_id));
+    let target_data_path = PathBuf::from(&data_dir);
+    clear_stale_instance_lockfiles(&target_data_path);
+    std::thread::sleep(std::time::Duration::from_millis(200));
     Ok(false)
 }
 
@@ -453,6 +458,47 @@ pub fn force_terminate_pid_win32(pid: u32) -> bool {
         CloseHandle(handle);
         ok != 0
     }
+}
+
+#[cfg(target_os = "windows")]
+pub fn is_pid_active_win32(pid: u32) -> bool {
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn OpenProcess(access: u32, inherit: i32, pid: u32) -> *mut std::ffi::c_void;
+        fn GetExitCodeProcess(handle: *mut std::ffi::c_void, code: *mut u32) -> i32;
+        fn CloseHandle(handle: *mut std::ffi::c_void) -> i32;
+    }
+    const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
+    const STILL_ACTIVE: u32 = 259;
+    if pid == 0 {
+        return false;
+    }
+    unsafe {
+        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if handle.is_null() {
+            return false;
+        }
+        let mut code = 0u32;
+        let ok = GetExitCodeProcess(handle, &mut code);
+        CloseHandle(handle);
+        ok != 0 && code == STILL_ACTIVE
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn is_pid_active_win32(pid: u32) -> bool {
+    is_pid_alive_targeted(pid)
+}
+
+#[inline]
+pub(crate) fn is_pid_active_checked(pid: u32) -> bool {
+    #[cfg(test)]
+    if let Ok(guard) = MOCK_PID_ALIVE.read() {
+        if let Some(set) = guard.as_ref() {
+            return set.contains(&pid);
+        }
+    }
+    is_pid_active_win32(pid)
 }
 
 /// Close only the process associated with this instance
@@ -779,21 +825,24 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     }
 
     if pids.is_empty() {
+        let target_data_path = PathBuf::from(&config.data_dir);
+        clear_stale_instance_lockfiles(&target_data_path);
         // Justification: registry flag update; live state is re-derived from the OS on next refresh
         crate::error::record_ignored(mark_instance_stopped(instance_id), "mark instance stopped");
         audit.succeed(&format!(
             "Instance {} was already stopped (no active PIDs)",
             instance_id
         ));
+        std::thread::sleep(std::time::Duration::from_millis(200));
         return Ok(());
     }
 
     // Ensure descendant child processes (renderers, helpers, utility) are gathered and terminated
-    let current_pids_set: std::collections::HashSet<u32> = pids.iter().copied().collect();
+    let root_pids_set: std::collections::HashSet<u32> = pids.iter().copied().collect();
     let mut descendant_pids = Vec::new();
     for (spid, sproc) in system.processes() {
         let cand_pid = spid.as_u32();
-        if current_pids_set.contains(&cand_pid) {
+        if root_pids_set.contains(&cand_pid) {
             continue;
         }
         let p_name = sproc.name().to_string_lossy().to_lowercase();
@@ -818,7 +867,7 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
                 .and_then(|pr| pr.parent())
                 .map(|pp| pp.as_u32())
             {
-                if current_pids_set.contains(&parent) {
+                if root_pids_set.contains(&parent) {
                     descendant_pids.push(cand_pid);
                     break;
                 }
@@ -828,21 +877,22 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
             }
         }
     }
-    for dpid in descendant_pids {
-        if !pids.contains(&dpid) {
+    for dpid in &descendant_pids {
+        if !pids.contains(dpid) {
             crate::modules::logger::log_info(&format!(
                 "[Instance] Including descendant child process PID {} (renderer/helper/utility) for termination",
                 dpid
             ));
-            pids.push(dpid);
+            pids.push(*dpid);
         }
     }
 
     crate::modules::logger::log_info(&format!(
-        "[Instance] Terminating {} process(es) for instance '{}' (PIDs: {:?})",
+        "[Instance] Terminating {} process(es) for instance '{}' (Root PIDs: {:?}, Descendants: {:?})",
         pids.len(),
         instance_id,
-        pids
+        root_pids_set,
+        descendant_pids
     ));
 
     for pid in &pids {
@@ -875,7 +925,7 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     let max_graceful = std::time::Duration::from_millis(1500);
 
     loop {
-        let has_alive = pids.iter().any(|&pid| is_pid_alive_targeted(pid));
+        let has_alive = pids.iter().any(|&pid| is_pid_active_checked(pid));
 
         if !has_alive {
             crate::modules::logger::log_info(&format!(
@@ -889,7 +939,7 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
             let still: Vec<u32> = pids
                 .iter()
                 .copied()
-                .filter(|&pid| is_pid_alive_targeted(pid))
+                .filter(|&pid| is_pid_active_checked(pid))
                 .collect();
 
             if !still.is_empty() {
@@ -911,7 +961,8 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
                 for pid in &still {
                     #[cfg(target_os = "windows")]
                     {
-                        if !force_terminate_pid_win32(*pid) {
+                        force_terminate_pid_win32(*pid);
+                        if is_pid_active_checked(*pid) {
                             // Justification: powershell Stop-Process fallback when Win32 TerminateProcess fails
                             crate::error::record_ignored(
                                 Command::new("powershell")
@@ -936,10 +987,10 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
                     }
                 }
 
-                // Stage 3: Bounded wait polling (up to 1000ms additional)
+                // Stage 3: Bounded wait polling (up to 1000ms additional, 50ms interval)
                 let force_wait_start = std::time::Instant::now();
                 while force_wait_start.elapsed() < std::time::Duration::from_millis(1000) {
-                    if !still.iter().any(|&pid| is_pid_alive_targeted(pid)) {
+                    if !still.iter().any(|&pid| is_pid_active_checked(pid)) {
                         break;
                     }
                     std::thread::sleep(std::time::Duration::from_millis(50));
@@ -949,7 +1000,7 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
             let lingering: Vec<u32> = pids
                 .iter()
                 .copied()
-                .filter(|&pid| is_pid_alive_targeted(pid))
+                .filter(|&pid| is_pid_active_checked(pid))
                 .collect();
 
             if !lingering.is_empty() {
@@ -961,7 +1012,7 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
             break;
         }
 
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        std::thread::sleep(std::time::Duration::from_millis(50));
     }
 
     // Clean any orphaned lock files in data_dir
@@ -979,8 +1030,8 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     invalidate_instance_process_cache(instance_id);
     crate::modules::repo_db::invalidate_prompt_tree_cache(Some(instance_id));
 
-    // Small settle delay to ensure OS flushes file handles and SQLite locks
-    std::thread::sleep(std::time::Duration::from_millis(150));
+    // Mandatory 200ms kernel settle delay allowing Windows kernel & NTFS file handles to release
+    std::thread::sleep(std::time::Duration::from_millis(200));
 
     let payload = serde_json::json!({
         "instance_id": instance_id,
@@ -1039,6 +1090,21 @@ pub fn kill_instance(instance_id: &str) -> Result<(), String> {
                 "taskkill process tree",
             );
             force_terminate_pid_win32(*pid);
+            if is_pid_active_checked(*pid) {
+                // Justification: powershell Stop-Process fallback when Win32 TerminateProcess fails
+                crate::error::record_ignored(
+                    Command::new("powershell")
+                        .args([
+                            "-NoProfile",
+                            "-NonInteractive",
+                            "-Command",
+                            &format!("Stop-Process -Id {} -Force", pid),
+                        ])
+                        .creation_flags(0x08000000)
+                        .output(),
+                    "powershell Stop-Process fallback",
+                );
+            }
         }
         #[cfg(not(target_os = "windows"))]
         {

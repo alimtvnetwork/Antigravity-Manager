@@ -6,7 +6,7 @@ import { cn } from '../../../utils/cn';
 import { maskEmail } from '../../../utils/maskEmail';
 import type { Account } from '../../../types/account';
 import { QuotaProgressBar } from '../../accounts/QuotaProgressBar';
-import { formatPathEnding, getActionLabel, resolveDataDir } from './instanceTableUtils';
+import { formatPathEnding, formatShortPath, getActionLabel, resolveDataDir } from './instanceTableUtils';
 import type { InstanceActionType } from './instanceTableTypes';
 import type { InstanceStatus } from '../../../services/instanceService';
 
@@ -248,6 +248,120 @@ export function QuotaCell({ data }: { data: RowCellData }) {
             ) : (
                 <span className="text-slate-400 italic text-[11px]">—</span>
             )}
+        </td>
+    );
+}
+
+
+
+export interface StatusProcessEnvCellProps {
+    inst: InstanceStatus;
+    data: RowCellData;
+    isCopied: boolean;
+    onCopy: () => void;
+}
+
+export function StatusProcessEnvCell({ inst, data, isCopied, onCopy }: StatusProcessEnvCellProps) {
+    const [isExeCopied, setIsExeCopied] = useState(false);
+    const fullPath = resolveDataDir(inst);
+    const exeFull = inst.config.executable_path || '';
+    const exeTail = exeFull
+        ? (formatShortPath(exeFull) || formatPathEnding(exeFull))
+        : (inst.config.is_default || inst.config.id === 'default' ? '.../Antigravity.exe' : 'Default IDE');
+    const exeEnding = exeTail;
+    const dataEnding = fullPath ? (formatShortPath(fullPath) || formatPathEnding(fullPath)) : '—';
+
+    const handleCopyExe = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        try {
+            await copyToClipboard(exeFull || exeEnding);
+            setIsExeCopied(true);
+            setTimeout(() => setIsExeCopied(false), 1500);
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'InstanceRowCells.StatusProcessEnvCell',
+                triggerAction: 'copy_exe_path',
+            });
+        }
+    };
+
+    return (
+        <td
+            className="px-2 py-1 whitespace-nowrap min-w-[340px] w-[40%]"
+            title={`Status: ${data.isBusy ? getActionLabel(data.currentAction) : inst.is_running ? (inst.pid ? `Running (PID: ${inst.pid})` : 'Running') : 'Idle'}\nIDE Executable: ${exeFull || exeEnding}\nData Directory: ${fullPath}`}
+        >
+            <div className="flex items-center justify-between gap-1.5 text-[11px] font-mono whitespace-nowrap flex-nowrap w-full">
+                <div className="flex items-center gap-1.5 min-w-0 font-mono text-[11px] truncate flex-1 whitespace-nowrap flex-nowrap">
+                    {/* Status Pill */}
+                    {data.isBusy ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50/90 text-blue-700 dark:bg-cyan-950/60 dark:text-cyan-300 border border-blue-300/60 dark:border-cyan-500/40 backdrop-blur-xs animate-pulse shadow-2xs shrink-0 whitespace-nowrap">
+                            <RotateCw className="w-2.5 h-2.5 animate-spin text-blue-500 dark:text-cyan-400 shrink-0" />
+                            <span>{getActionLabel(data.currentAction)}</span>
+                        </span>
+                    ) : inst.is_running ? (
+                        <span
+                            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-[#1af18d] border border-emerald-500/30 backdrop-blur-xs shadow-2xs font-mono shrink-0 whitespace-nowrap"
+                            title={inst.pid ? `Process ID (PID): ${inst.pid} — Active and Running` : 'Process ID (PID): Active and Running'}
+                        >
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-[#1af18d] animate-pulse shrink-0" />
+                            <span>{inst.pid ? `PID: ${inst.pid}` : 'Running'}</span>
+                        </span>
+                    ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100/90 text-slate-600 dark:bg-[#090611]/90 dark:text-slate-400 border border-slate-200 dark:border-[#40285e] backdrop-blur-xs shrink-0 whitespace-nowrap">
+                            Idle
+                        </span>
+                    )}
+
+                    {/* Separator */}
+                    <span className="text-slate-400 dark:text-slate-500 shrink-0 select-none text-[10px]">·</span>
+
+                    {/* Exe Path Ending */}
+                    <div
+                        className="flex items-center gap-1 min-w-0 shrink-0 text-slate-700 dark:text-slate-200 font-semibold truncate max-w-[140px] whitespace-nowrap flex-nowrap"
+                        title={`IDE: ${exeFull || exeEnding}`}
+                    >
+                        <Terminal className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate whitespace-nowrap">{exeEnding}</span>
+                    </div>
+
+                    {/* Separator */}
+                    <span className="text-slate-400 dark:text-slate-500 shrink-0 select-none text-[10px]">·</span>
+
+                    {/* Data Dir Ending */}
+                    <div
+                        className="flex items-center gap-1 min-w-0 text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[150px] whitespace-nowrap flex-nowrap"
+                        title={`Data: ${fullPath}`}
+                    >
+                        <Folder className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate whitespace-nowrap">{dataEnding}</span>
+                    </div>
+                </div>
+
+                {/* Right side: Segmented pill capsule with copy buttons */}
+                <div className="inline-flex items-center rounded-full border border-slate-200 dark:border-[#40285e] bg-slate-100/80 dark:bg-[#090611]/80 backdrop-blur-xs p-0.5 shrink-0 ml-1 shadow-2xs whitespace-nowrap flex-nowrap">
+                    <button
+                        type="button"
+                        onClick={handleCopyExe}
+                        data-ui-name="copy-exe-btn"
+                        data-ui-id={`copy-exe-${inst.config.id}`}
+                        className="px-1.5 py-0.5 rounded-l-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
+                        title={isExeCopied ? 'Copied executable path!' : 'Copy executable path'}
+                    >
+                        {isExeCopied ? <Check className="w-3 h-3 text-emerald-500" /> : <Terminal className="w-3 h-3" />}
+                    </button>
+                    <span className="w-px h-2.5 bg-slate-200 dark:bg-[#40285e] shrink-0" />
+                    <button
+                        type="button"
+                        onClick={onCopy}
+                        data-ui-name="copy-path-btn"
+                        data-ui-id={`copy-path-${inst.config.id}`}
+                        className="px-1.5 py-0.5 rounded-r-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
+                        title={isCopied ? 'Copied data path!' : 'Copy full data path'}
+                    >
+                        {isCopied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                </div>
+            </div>
         </td>
     );
 }

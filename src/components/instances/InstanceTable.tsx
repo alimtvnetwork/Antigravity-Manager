@@ -4,7 +4,7 @@ import { cn } from '../../utils/cn';
 import { useAccountStore } from '../../stores/useAccountStore';
 import { useErrorStore } from '../../stores/error-store';
 import type { InstanceTableProps } from './table/instanceTableTypes';
-import { buildRowCellData, ProfileCell, QuotaCell, StatusCell, IdeExeAndDataCell } from './table/InstanceRowCells';
+import { buildRowCellData, ProfileCell, QuotaCell, StatusProcessEnvCell } from './table/InstanceRowCells';
 import { ActionsCell, MoreMenuPortal } from './table/InstanceRowActions';
 import { resolveDataDir } from './table/instanceTableUtils';
 
@@ -91,8 +91,7 @@ export default function InstanceTable({
                         <tr className="border-b border-slate-200/90 dark:border-slate-800/90 bg-slate-50/80 dark:bg-[#090611] text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                             <th className="px-2 py-1.5 w-[20%] min-w-[150px]">Profile & Account</th>
                             <th className="px-2 py-1.5 w-[26%] min-w-[190px]">Model & Weekly Quota</th>
-                            <th className="px-2 py-1.5 w-[14%] min-w-[125px]">Status & PID</th>
-                            <th className="px-2 py-1.5 w-[26%] min-w-[220px]">IDE EXE & DATA</th>
+                            <th className="px-2 py-1.5 w-[40%] min-w-[340px]">Status, Process & Environment</th>
                             <th className="px-2 py-1.5 text-right w-[14%] min-w-[150px]">Actions</th>
                         </tr>
                     </thead>
@@ -126,9 +125,9 @@ export default function InstanceTable({
                                         onSetDefault={onSetDefault ? () => onSetDefault(inst.config.id) : undefined}
                                     />
                                     <QuotaCell data={data} />
-                                    <StatusCell inst={inst} data={data} />
-                                    <IdeExeAndDataCell
+                                    <StatusProcessEnvCell
                                         inst={inst}
+                                        data={data}
                                         isCopied={copiedPathId === inst.config.id}
                                         onCopy={() => handleCopyPath(inst.config.id, resolveDataDir(inst))}
                                     />

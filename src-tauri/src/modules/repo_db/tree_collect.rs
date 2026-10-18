@@ -20,7 +20,7 @@ pub(crate) struct RawConvItem {
 }
 
 use super::gemini_dirs::gemini_dirs_tagged;
-use super::models::{ActivePrompt, AgmPromptTurnNode};
+use super::models::{ActivePrompt, AgmPromptTurnNode, CascadeRunStatusType};
 use super::project_queries::list_all_prompts;
 use super::schema::connect_db;
 use super::transcript::{
@@ -164,15 +164,8 @@ pub(crate) fn collect_tree_conversation_items(
             let conv_ts = parse_flexible_timestamp(&last_time_str);
             let is_recent = conv_ts > 0 && (now - conv_ts <= 600);
 
-            let status_upper = status.to_uppercase();
-            let has_terminal_status = status_upper.contains("COMPLETED")
-                || status_upper.contains("FAILED")
-                || status_upper.contains("CANCELLED")
-                || status_upper.contains("ABORTED");
-            let has_idle_status = status_upper.contains("IDLE")
-                || status_upper.contains("CASCADE_RUN_STATUS_IDLE")
-                || has_terminal_status;
-            let is_explicit_idle = has_idle_status;
+            let cascade_status = CascadeRunStatusType::from_status_str(&status);
+            let is_explicit_idle = cascade_status.is_idle_or_terminal();
 
             let inspection = inspect_conversation_transcript(base, &cid);
 
@@ -285,7 +278,7 @@ pub(crate) fn collect_tree_conversation_items(
                             "QUEUED".to_string()
                         } else if inspection.is_terminal_done
                             || is_explicit_idle
-                            || status_upper.contains("RUNNING")
+                            || cascade_status.is_running()
                         {
                             "IDLE".to_string()
                         } else {

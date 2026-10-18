@@ -367,11 +367,41 @@ pub fn stop_instance(instance_id: &str) -> Result<(), String> {
         ));
     }
 
+    // Update SQLite database instance_processes marking stopped state (is_active = 0, pid = NULL)
+    if let Ok(conn) = open_instance_db() {
+        // Justification: non-critical sqlite bookkeeping write; read paths tolerate stale data
+        crate::error::record_ignored(
+            conn.execute(
+                "UPDATE instance_processes SET is_active = 0, pid = NULL WHERE instance_id = ?1 OR instance_id = ?2",
+                rusqlite::params![resolved, instance_id],
+            ),
+            "update instance_processes stopped state",
+        );
+    }
+
     // Only mark stopped in registry/DB after termination is confirmed
     // Justification: mark instance stopped in DB and registry; best effort cleanup
     crate::error::record_ignored(mark_instance_stopped(&resolved), "mark instance stopped");
     invalidate_instance_process_cache(&resolved);
+    if instance_id != resolved {
+        invalidate_instance_process_cache(instance_id);
+    }
     crate::modules::repo_db::invalidate_prompt_tree_cache(Some(&resolved));
+
+    // Emit Tauri IPC events instances://refreshed and accounts://refreshed
+    if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
+        use tauri::Emitter;
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("instances://refreshed", ()),
+            "emit instances://refreshed",
+        );
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("accounts://refreshed", ()),
+            "emit accounts://refreshed",
+        );
+    }
 
     crate::modules::task_history_db::record(
         crate::modules::audit_action::AuditAction::StopInstance,

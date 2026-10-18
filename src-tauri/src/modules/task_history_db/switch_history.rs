@@ -41,7 +41,9 @@ pub fn get_instance_switch_history(
     let inst_id_trimmed = instance_id.trim();
     let inst_id_folded = inst_id_trimmed.to_ascii_lowercase();
     let query_inst_id = match inst_id_folded.as_str() {
-        "" | "default" | "__default__" | "antigravity" | "agy" | "ide" | "classic" => "default",
+        "" | "null" | "default" | "__default__" | "antigravity" | "agy" | "ide" | "classic" => {
+            "default"
+        }
         _ => inst_id_trimmed,
     };
 
@@ -63,8 +65,8 @@ pub fn get_instance_switch_history(
     };
 
     let switch_cond = "
-        WHERE (action_code = 3 OR action = 'SwitchAccount' OR action = 'switch_account')
-          AND (LOWER(instance_id) = LOWER(?1) OR LOWER(subject) = LOWER(?1) OR (?1 = 'default' AND (LOWER(instance_id) IN ('default', '__default__', '', 'antigravity', 'agy', 'ide', 'classic') OR LOWER(subject) IN ('default', '__default__', '', 'antigravity', 'agy', 'ide', 'classic') OR instance_id IS NULL)))";
+        WHERE (action_code = 3 OR action = 'SwitchAccount' OR action = 'switch_account' OR LOWER(action) LIKE '%switch%')
+          AND (LOWER(instance_id) = LOWER(?1) OR LOWER(subject) = LOWER(?1) OR (?1 = 'default' AND (LOWER(instance_id) IN ('default', '__default__', '', 'null', 'antigravity', 'agy', 'ide', 'classic') OR LOWER(subject) IN ('default', '__default__', '', 'null', 'antigravity', 'agy', 'ide', 'classic') OR instance_id IS NULL)))";
 
     for split in &splits {
         let conn = open_split(Path::new(&split.file_path))?;
@@ -357,7 +359,9 @@ pub fn get_instance_audit_trail(
     let inst_id_trimmed = instance_id.trim();
     let inst_id_folded = inst_id_trimmed.to_ascii_lowercase();
     let query_inst_id = match inst_id_folded.as_str() {
-        "" | "default" | "__default__" | "antigravity" | "agy" | "ide" | "classic" => "default",
+        "" | "null" | "default" | "__default__" | "antigravity" | "agy" | "ide" | "classic" => {
+            "default"
+        }
         _ => inst_id_trimmed,
     };
 
@@ -368,9 +372,9 @@ pub fn get_instance_audit_trail(
         WHERE (LOWER(instance_id) = LOWER(?1)
            OR LOWER(subject) = LOWER(?1)
            OR (?1 = 'default' AND (
-                LOWER(instance_id) IN ('default', '__default__', 'antigravity', 'agy', 'ide', 'classic')
-                OR LOWER(subject) IN ('default', '__default__', 'antigravity', 'agy', 'ide', 'classic')
-                OR ((instance_id IS NULL OR instance_id = '') AND action_code >= 3 AND action_code <= 14)
+                LOWER(instance_id) IN ('default', '__default__', '', 'null', 'antigravity', 'agy', 'ide', 'classic')
+                OR LOWER(subject) IN ('default', '__default__', '', 'null', 'antigravity', 'agy', 'ide', 'classic')
+                OR ((instance_id IS NULL OR instance_id = '' OR LOWER(instance_id) = 'null') AND ((action_code >= 3 AND action_code <= 14) OR LOWER(action) LIKE '%instance%' OR LOWER(action) LIKE '%switch%'))
               ))
         )";
 

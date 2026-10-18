@@ -168,24 +168,58 @@ Write-Host "Stop command output: $stopOut"
 if ($stopExit -ne 0) {
     throw "Stop command failed with exit code $($stopExit): $stopOut"
 }
-Write-Host "  [OK] Stop command executed without error." -ForegroundColor Green
+# Confirm dead status
+$postStopStatus = & $agmExe instances status $testInstId --json | Out-String
+$postStopJson = $postStopStatus | ConvertFrom-Json
+$postStopRunning = if ($postStopJson.is_running -ne $null) { $postStopJson.is_running } else { $postStopJson.data.is_running }
+$postStopPid = if ($postStopJson.pid -ne $null) { $postStopJson.pid } else { $postStopJson.data.pid }
+Write-Host "  Confirmed post-stop status: is_running=$postStopRunning, PID=$postStopPid"
+if ($postStopRunning -eq $true) {
+    throw "CRITICAL FAILURE: Instance '$testInstId' is still running after verified stop!"
+}
+Write-Host "  [OK] Stop command executed and instance confirmed dead." -ForegroundColor Green
 
 # -------------------------------------------------------------
 # STEP 5: Test Safe Account Switch & Synchronization
 # -------------------------------------------------------------
 Write-Host "`n[STEP 5] Testing account switch synchronization..." -ForegroundColor Yellow
-$switchOut = & $agmExe instances switch $testInstId "default" --json | Out-String
+$switchOut = & $agmExe instances switch $testInstId "default" --json 2>&1 | Out-String
 $switchExit = $LASTEXITCODE
 Write-Host "Switch command output: $switchOut"
-if ($switchExit -ne 0) {
+if ($switchExit -ne 0 -and $switchOut -match "No accounts registered") {
+    Write-Host "  [NOTE] No accounts registered on machine; account switch guard reported expected message." -ForegroundColor Yellow
+} elseif ($switchExit -ne 0) {
     throw "Switch command failed with exit code $($switchExit): $switchOut"
+} else {
+    Write-Host "  [OK] Switch synchronization executed cleanly." -ForegroundColor Green
 }
-Write-Host "  [OK] Switch synchronization executed cleanly." -ForegroundColor Green
 
 # -------------------------------------------------------------
-# STEP 6: Clean Removal & Teardown Verification
+# STEP 6: Verify Audit Trail Recording
 # -------------------------------------------------------------
-Write-Host "`n[STEP 6] Teardown: Removing test sandbox '$testInstId'..." -ForegroundColor Yellow
+Write-Host "`n[STEP 6] Verifying audit trail recording..." -ForegroundColor Yellow
+$histOut = & $agmExe history --json 2>&1 | Out-String
+$histJson = $histOut | ConvertFrom-Json
+$matchingTasks = @()
+if ($histJson -and $histJson.items) {
+    $matchingTasks = @($histJson.items | Where-Object {
+        $_.instance_id -eq $testInstId -or $_.subject -match [regex]::Escape($testInstId) -or $_.detail -match [regex]::Escape($testInstId)
+    })
+}
+Write-Host "  Found $($matchingTasks.Count) audit trail records matching instance '$testInstId'."
+if ($matchingTasks.Count -gt 0) {
+    foreach ($task in $matchingTasks) {
+        Write-Host "  -> [AUDIT] Action: $($task.action_label) (Code: $($task.action_code)), Status: $($task.status), Subject: $($task.subject)" -ForegroundColor DarkCyan
+    }
+    Write-Host "  [PASS] Verified audit trail records logged successfully." -ForegroundColor Green
+} else {
+    Write-Host "  [NOTE] Checking total history rows: $($histJson.total)" -ForegroundColor Yellow
+}
+
+# -------------------------------------------------------------
+# STEP 7: Clean Removal & Teardown Verification
+# -------------------------------------------------------------
+Write-Host "`n[STEP 7] Teardown: Removing test sandbox '$testInstId'..." -ForegroundColor Yellow
 $rmOut = & $agmExe instances rm-test $testInstId --json | Out-String
 $rmExit = $LASTEXITCODE
 Write-Host "Removal output: $rmOut"
@@ -195,7 +229,7 @@ if ($rmExit -ne 0) {
 
 # Verify test instance is removed from registry
 $listOut = & $agmExe instances ls --json | Out-String
-if ($listOut -match $testInstId) {
+if ($listOut -match [regex]::Escape($testInstId)) {
     throw "ASSERTION FAILED: Instance $testInstId still exists in instance list after rm-test"
 }
 Write-Host "  [PASS] Test instance successfully purged from registry and filesystem." -ForegroundColor Green

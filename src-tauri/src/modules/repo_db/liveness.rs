@@ -3,7 +3,7 @@
 use super::dispatch::parse_flexible_timestamp;
 use super::failed_commands::decode_uri_to_path;
 use super::gemini_dirs::gemini_dirs_for_instance;
-use super::models::{ProjectAuditRationaleType, PromptAuditCriteriaType};
+use super::models::{CascadeRunStatusType, ProjectAuditRationaleType, PromptAuditCriteriaType};
 use super::project_queries::normalize_path_for_compare;
 use super::schema::connect_db;
 use super::sequences::extract_prompt_words_preview;
@@ -278,16 +278,8 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                         // Explicit Idle Supremacy rule:
                         // Terminal status or explicit IDLE status strings (e.g. CASCADE_RUN_STATUS_IDLE)
                         // must strictly override unreset not_fully_idle > 0 artifacts from IDE engine quirks.
-                        let status_upper = status.to_uppercase();
-                        let has_terminal_status = status_upper.contains("COMPLETED")
-                            || status_upper.contains("FAILED")
-                            || status_upper.contains("CANCELLED")
-                            || status_upper.contains("ABORTED");
-                        let has_idle_status = status_upper.contains("IDLE")
-                            || status_upper.contains("CASCADE_RUN_STATUS_IDLE")
-                            || has_terminal_status;
-
-                        if has_idle_status {
+                        let cascade_status = CascadeRunStatusType::from_status_str(&status);
+                        if cascade_status.is_idle_or_terminal() {
                             continue;
                         }
 
@@ -302,7 +294,7 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                             continue;
                         }
 
-                        let is_conv_running = if has_idle_status {
+                        let is_conv_running = if cascade_status.is_idle_or_terminal() {
                             false
                         } else {
                             not_fully_idle > 0
@@ -400,21 +392,13 @@ mod tests {
         // Test idle supremacy logic: unreset not_fully_idle = 1 must be overridden by idle/terminal status
         let not_fully_idle = 1;
         let status = "CASCADE_RUN_STATUS_IDLE";
-        let status_upper = status.to_uppercase();
-        let has_terminal_status = status_upper.contains("COMPLETED")
-            || status_upper.contains("FAILED")
-            || status_upper.contains("CANCELLED")
-            || status_upper.contains("ABORTED");
-        let has_idle_status = status_upper.contains("IDLE")
-            || status_upper.contains("CASCADE_RUN_STATUS_IDLE")
-            || has_terminal_status;
-        let is_explicit_idle = has_idle_status;
-        assert!(is_explicit_idle);
+        let cascade_status = CascadeRunStatusType::from_status_str(status);
+        assert!(cascade_status.is_idle_or_terminal());
 
-        let is_running = if is_explicit_idle {
+        let is_running = if cascade_status.is_idle_or_terminal() {
             false
         } else {
-            not_fully_idle != 0 && status_upper.contains("RUNNING")
+            not_fully_idle != 0 && cascade_status.is_running()
         };
         assert!(!is_running);
     }

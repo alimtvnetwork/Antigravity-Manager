@@ -1,20 +1,18 @@
-# Subtask 04: Switch Account Modal Modern UI/UX
+# Subtask 04: Switch Account Modal Royal Violet UI/UX Modernization
 
-- **Slug:** `instance-management-and-ui-ux-synchronization`
-- **Subtask ID:** `04-switch-account-modal-ui-ux`
-- **Parent Plan:** `.ai-memory/plans/instance-management-and-ui-ux-synchronization.md`
-- **Status:** `PENDING`
+## Objectives
+1. Modernize `src/pages/instances/SwitchAccountDialog.tsx` to align with the Royal Violet design system:
+   - Base modal container: `dark:bg-[var(--ui-surface-1)]/95` (`#171025`) and `dark:border-[var(--ui-border-subtle)]` (`#40285e`).
+   - Header accent: replace Sky blue with Royal Violet brand accent (`var(--ui-interactive)` / `#7c3aed`).
+   - Search input: focus ring `focus:ring-[var(--ui-focus-ring)]`.
+   - Card rows: `.ui-interactive-row` whole-card hover and focus states using `var(--ui-surface-hover)`.
+   - Current account badge: clean emerald styling with `var(--ui-success)` (`#1af18d`).
+   - Segmented quota visualization pill capsule: `4H: <val>% | Weekly: <val>% | Total: <val>%`.
+2. Keyboard accessibility: support `Escape` key safe dismissal and `Enter`/`Space` activation.
 
-## Objective
-Elevate the Switch Account modal to conform with the application's modern dark-glass UI/UX guidelines: eliminate mismatched controls, implement segmented capsule controls, clear account cards, accessible keyboard escape/focus management, and responsive dialog layouts.
-
-## Scope of Changes
-- Audit current switch account modal structure and identify outdated styling.
-- Align backdrop with `backdrop-blur-md bg-zinc-950/80` and dark-glass border treatment.
-- Render accounts as interactive segmented cards showing email, quota gauge, and status pill.
-- Provide smooth feedback during the switch sequence (stopping old instance -> updating credentials -> ready).
-- Ensure modal dismisses properly via Escape key, Backdrop click, and explicit close button.
+## Owned Files
+- `src/pages/instances/SwitchAccountDialog.tsx`
 
 ## Verification
-- Visually cohesive with main Antigravity-Manager theme.
-- Responsive, accessible, and clean interaction states.
+- Frontend builds with zero TypeScript/CSS errors.
+- Visual inspection shows unified dark-glass Royal Violet aesthetic.
