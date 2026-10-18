@@ -340,7 +340,7 @@ export function VerificationModal({
                                 <h2 className="text-base font-semibold text-slate-100">
                                     🛡️ Verification Segment & AI Auditor Studio
                                 </h2>
-                                <span className="px-2 py-0.5 text-xs font-mono font-medium rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                <span className="px-2 py-0.5 text-xs font-mono font-medium rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                                     [AGM:{seqCode}]
                                 </span>
                             </div>
@@ -449,12 +449,12 @@ export function VerificationModal({
                             <Layers className="w-3.5 h-3.5 text-indigo-400" />
                             <span>2. Verification Rounds Escalation</span>
                         </label>
-                        <div className="inline-flex p-1 rounded-full bg-slate-900/80 border border-slate-800 shadow-inner">
+                        <div className="inline-flex p-1 rounded-lg bg-slate-900/80 border border-slate-800 shadow-inner">
                             <button
                                 type="button"
                                 onClick={() => setRounds(1)}
                                 className={cn(
-                                    'px-4 py-1.5 text-xs font-medium rounded-full transition-all duration-200',
+                                    'px-4 py-1.5 text-xs font-medium rounded-md transition-all duration-200',
                                     rounds === 1
                                         ? 'bg-indigo-600 text-white shadow-md'
                                         : 'text-slate-400 hover:text-slate-200'
@@ -466,7 +466,7 @@ export function VerificationModal({
                                 type="button"
                                 onClick={() => setRounds(2)}
                                 className={cn(
-                                    'px-4 py-1.5 text-xs font-medium rounded-full transition-all duration-200',
+                                    'px-4 py-1.5 text-xs font-medium rounded-md transition-all duration-200',
                                     rounds === 2
                                         ? 'bg-indigo-600 text-white shadow-md'
                                         : 'text-slate-400 hover:text-slate-200'
@@ -478,7 +478,7 @@ export function VerificationModal({
                                 type="button"
                                 onClick={() => setRounds(3)}
                                 className={cn(
-                                    'px-4 py-1.5 text-xs font-medium rounded-full transition-all duration-200',
+                                    'px-4 py-1.5 text-xs font-medium rounded-md transition-all duration-200',
                                     rounds === 3
                                         ? 'bg-indigo-600 text-white shadow-md'
                                         : 'text-slate-400 hover:text-slate-200'

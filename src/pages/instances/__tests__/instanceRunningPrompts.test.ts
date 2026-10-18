@@ -14,6 +14,7 @@
 import {
     isNodeOwnedByInstance,
     isDefaultOwned,
+    isConversationOwnedByInstance,
 } from '../instancePageUtils';
 import {
     isGhostConversation,
@@ -131,6 +132,7 @@ function checkHasActiveTask(
             const hasGenuineRunningConv = (node.conversations || []).some(
                 (c) =>
                     Boolean(c.is_running) &&
+                    isConversationOwnedByInstance(c.instance_id, inst.config, c.instance_seq_num ?? node.instance_seq_num) &&
                     !isGhostConversation(c) &&
                     !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
             );
@@ -204,6 +206,30 @@ test('isNodeOwnedByInstance: rejects node with empty or whitespace instance_id',
     const defaultCfg = { id: 'default', is_default: true };
     assertFalse(isNodeOwnedByInstance(makeProject({ instance_id: '' }), defaultCfg));
     assertFalse(isNodeOwnedByInstance(makeProject({ instance_id: '   ' }), defaultCfg));
+});
+
+test('isConversationOwnedByInstance: default instance rejects empty/null/whitespace conversation instance_id', () => {
+    const defaultCfg = { id: 'default', is_default: true, seq_num: 1 };
+    assertFalse(isConversationOwnedByInstance('', defaultCfg));
+    assertFalse(isConversationOwnedByInstance(null, defaultCfg));
+    assertFalse(isConversationOwnedByInstance(undefined, defaultCfg));
+    assertFalse(isConversationOwnedByInstance('   ', defaultCfg));
+});
+
+test('isConversationOwnedByInstance: default instance matches default and __default__ aliases', () => {
+    const defaultCfg = { id: 'default', is_default: true, seq_num: 1 };
+    assertTrue(isConversationOwnedByInstance('default', defaultCfg));
+    assertTrue(isConversationOwnedByInstance('__default__', defaultCfg));
+    assertFalse(isConversationOwnedByInstance('cloned-worker-8159', defaultCfg));
+});
+
+test('isConversationOwnedByInstance: cloned instance rejects default aliases and matches exact ID or seq_num', () => {
+    const cloneCfg = { id: 'cloned-worker-8159', is_default: false, seq_num: 2 };
+    assertFalse(isConversationOwnedByInstance('default', cloneCfg));
+    assertFalse(isConversationOwnedByInstance('__default__', cloneCfg));
+    assertTrue(isConversationOwnedByInstance('cloned-worker-8159', cloneCfg));
+    assertTrue(isConversationOwnedByInstance('other-id', cloneCfg, 2));
+    assertFalse(isConversationOwnedByInstance('other-id', cloneCfg, 3));
 });
 
 // ===========================================================================
@@ -457,6 +483,34 @@ test('hasActiveTask: correctly resolves active task for cloned instance with mat
     });
 
     assertTrue(checkHasActiveTask(cloneInst, [cloneNode]));
+});
+
+test('hasActiveTask: Idle Supremacy - idle instance never falsely reports another instance\'s running prompt', () => {
+    const idleDefaultInst = {
+        is_running: true,
+        config: { id: 'default', is_default: true, seq_num: 1 },
+    };
+    const activeCloneInst = {
+        is_running: true,
+        config: { id: 'clone-worker-8159', is_default: false, seq_num: 2 },
+    };
+    const cloneRunningNode = makeProject({
+        instance_id: 'clone-worker-8159',
+        instance_seq_num: 2,
+        is_running: true,
+        conversations: [
+            makeConversation({
+                instance_id: 'clone-worker-8159',
+                instance_seq_num: 2,
+                is_running: true,
+                title: 'Clone heavy compile',
+                prompt_word_count: 8,
+                prompt_preview_200w: 'Heavy compilation task in progress',
+            }),
+        ],
+    });
+    assertFalse(checkHasActiveTask(idleDefaultInst, [cloneRunningNode]));
+    assertTrue(checkHasActiveTask(activeCloneInst, [cloneRunningNode]));
 });
 
 // ===========================================================================

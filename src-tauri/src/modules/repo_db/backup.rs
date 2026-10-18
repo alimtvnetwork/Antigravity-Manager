@@ -475,54 +475,56 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                     s.spawn(move || {
                         let mut extracted: Vec<(String, Option<String>)> = Vec::new();
 
-                        // Check workspace state.vscdb for active prompts / tasks
-                        if let Some(ref ws_storage) = project.workspace_storage_path {
-                            let ws_db_path = PathBuf::from(ws_storage).join("state.vscdb");
-                            if ws_db_path.exists() {
-                                if let Ok(ws_conn) = Connection::open_with_flags(
-                                    &ws_db_path,
-                                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
-                                        | rusqlite::OpenFlags::SQLITE_OPEN_URI,
-                                ) {
-                                    let mut stmt = ws_conn
-                                        .prepare(
-                                            "SELECT key, value FROM ItemTable \
-                                             WHERE key IN ('workbench.action.chat.interactiveInputHistory', 'interactive.inputHistory') \
-                                                OR key LIKE 'workbench.panel.chat%input%'"
-                                        )
-                                        .ok();
+                        // Check workspace state.vscdb for active prompts / tasks strictly if project is running
+                        if project.is_running {
+                            if let Some(ref ws_storage) = project.workspace_storage_path {
+                                let ws_db_path = PathBuf::from(ws_storage).join("state.vscdb");
+                                if ws_db_path.exists() {
+                                    if let Ok(ws_conn) = Connection::open_with_flags(
+                                        &ws_db_path,
+                                        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                                            | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+                                    ) {
+                                        let mut stmt = ws_conn
+                                            .prepare(
+                                                "SELECT key, value FROM ItemTable \
+                                                 WHERE key IN ('workbench.action.chat.interactiveInputHistory', 'interactive.inputHistory') \
+                                                    OR key LIKE 'workbench.panel.chat%input%'"
+                                            )
+                                            .ok();
 
-                                    if let Some(ref mut prepared) = stmt {
-                                        if let Ok(rows) = prepared.query_map([], |row| {
-                                            let key: String = row.get(0)?;
-                                            let val: String = row.get(1)?;
-                                            Ok((key, val))
-                                        }) {
-                                            for (_key, val) in rows.flatten() {
-                                                // Only extract validated interactive user prompt text from structured chat input history
-                                                if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&val) {
-                                                    if let Some(arr) = json_val.as_array() {
-                                                        if let Some(last_elem) = arr.last() {
-                                                            let candidate_txt = if let Some(s) = last_elem.as_str() {
-                                                                Some(s.to_string())
-                                                            } else if let Some(s) = last_elem.get("text").or_else(|| last_elem.get("content")).and_then(|v| v.as_str()) {
-                                                                Some(s.to_string())
-                                                            } else {
-                                                                None
-                                                            };
-                                                            if let Some(content) = candidate_txt {
-                                                                let trimmed = content.trim();
-                                                                if !trimmed.is_empty() && trimmed.len() > 10 && !trimmed.starts_with('{') {
-                                                                    let (img_payload, _) = extract_image_payload_or_path(trimmed);
-                                                                    extracted.push((trimmed.to_string(), img_payload));
+                                        if let Some(ref mut prepared) = stmt {
+                                            if let Ok(rows) = prepared.query_map([], |row| {
+                                                let key: String = row.get(0)?;
+                                                let val: String = row.get(1)?;
+                                                Ok((key, val))
+                                            }) {
+                                                for (_key, val) in rows.flatten() {
+                                                    // Only extract validated interactive user prompt text from structured chat input history
+                                                    if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&val) {
+                                                        if let Some(arr) = json_val.as_array() {
+                                                            if let Some(last_elem) = arr.last() {
+                                                                let candidate_txt = if let Some(s) = last_elem.as_str() {
+                                                                    Some(s.to_string())
+                                                                } else if let Some(s) = last_elem.get("text").or_else(|| last_elem.get("content")).and_then(|v| v.as_str()) {
+                                                                    Some(s.to_string())
+                                                                } else {
+                                                                    None
+                                                                };
+                                                                if let Some(content) = candidate_txt {
+                                                                    let trimmed = content.trim();
+                                                                    if !trimmed.is_empty() && trimmed.len() > 10 && !trimmed.starts_with('{') {
+                                                                        let (img_payload, _) = extract_image_payload_or_path(trimmed);
+                                                                        extracted.push((trimmed.to_string(), img_payload));
+                                                                    }
                                                                 }
                                                             }
-                                                        }
-                                                    } else if let Some(content) = json_val.get("text").or_else(|| json_val.get("content")).and_then(|v| v.as_str()) {
-                                                        let trimmed = content.trim();
-                                                        if !trimmed.is_empty() && trimmed.len() > 10 && !trimmed.starts_with('{') {
-                                                            let (img_payload, _) = extract_image_payload_or_path(trimmed);
-                                                            extracted.push((trimmed.to_string(), img_payload));
+                                                        } else if let Some(content) = json_val.get("text").or_else(|| json_val.get("content")).and_then(|v| v.as_str()) {
+                                                            let trimmed = content.trim();
+                                                            if !trimmed.is_empty() && trimmed.len() > 10 && !trimmed.starts_with('{') {
+                                                                let (img_payload, _) = extract_image_payload_or_path(trimmed);
+                                                                extracted.push((trimmed.to_string(), img_payload));
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -554,20 +556,22 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                                             .or_else(|| v.get("created_at"))
                                             .and_then(|t| t.as_i64())
                                             .unwrap_or(0);
-                                        let inst_matches = instance_id == "all"
-                                            || file_inst.is_empty()
-                                            || file_inst == instance_id
-                                            || ((instance_id == "default"
-                                                || instance_id == "__default__")
-                                                && (file_inst == "default"
-                                                    || file_inst == "__default__"));
-                                        let is_active_task = (file_status == "running"
+                                        let is_default_target = instance_id == "default"
+                                            || instance_id == "__default__";
+                                        let is_default_file = file_inst.is_empty()
+                                            || file_inst == "default"
+                                            || file_inst == "__default__";
+                                        let is_instance_matched = instance_id == "all"
+                                            || (is_default_target && is_default_file)
+                                            || (!file_inst.is_empty() && file_inst == instance_id);
+                                        let is_fresh_timestamp = file_ts > 0 && file_ts >= now - 600;
+                                        let is_active_status = file_status == "running"
                                             || file_status == "in_flight"
                                             || file_status == "backed_up"
                                             || (file_status == "dispatched"
-                                                && file_ts >= recent_dispatched_cutoff))
-                                            && (file_ts == 0 || file_ts >= now - 600);
-                                        if inst_matches && is_active_task {
+                                                && file_ts >= recent_dispatched_cutoff);
+                                        let is_active_task = is_active_status && is_fresh_timestamp;
+                                        if is_instance_matched && is_active_task {
                                             if let Some(txt) =
                                                 v.get("prompt_content").and_then(|t| t.as_str())
                                             {

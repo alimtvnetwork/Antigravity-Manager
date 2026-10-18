@@ -154,6 +154,7 @@ pub fn spawn_delegated_update_cli(
     if let Some(ver) = target_version {
         if !ver.trim().is_empty() {
             cmd.arg("--version").arg(ver.trim());
+            cmd.arg("-isPinned");
         }
     }
 

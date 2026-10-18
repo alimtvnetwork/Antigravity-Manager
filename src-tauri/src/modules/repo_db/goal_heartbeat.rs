@@ -352,6 +352,73 @@ pub fn stop_prompt_goal_workers_for_instance(instance_id: &str, data_dir: &str) 
         }
     }
 
+    // Retire active prompts for this instance to 'completed' in repo_prompts.db
+    let now = Utc::now().timestamp();
+    if let Ok(conn) = super::schema::connect_db() {
+        let is_default = instance_id == "default" || instance_id == "__default__";
+        let update_res = if is_default {
+            conn.execute(
+                "UPDATE active_prompts SET status = 'completed', updated_at = ?1 \
+                 WHERE (instance_id = 'default' OR instance_id = '__default__' OR instance_id = '') \
+                   AND status IN ('running', 'in_flight')",
+                rusqlite::params![now],
+            )
+        } else if instance_id == "all" {
+            conn.execute(
+                "UPDATE active_prompts SET status = 'completed', updated_at = ?1 \
+                 WHERE status IN ('running', 'in_flight')",
+                rusqlite::params![now],
+            )
+        } else {
+            conn.execute(
+                "UPDATE active_prompts SET status = 'completed', updated_at = ?1 \
+                 WHERE instance_id = ?2 AND status IN ('running', 'in_flight')",
+                rusqlite::params![now, instance_id],
+            )
+        };
+        // Justification: retiring active prompts is auxiliary to worker process termination
+        crate::error::record_ignored(
+            update_res,
+            "retire active_prompts in stop_prompt_goal_workers_for_instance",
+        );
+    }
+
+    // Update AGM_INSTANCE_STATUS.md to STOPPED in all workspace folders for this instance
+    let workspaces = if let Ok(registry) = crate::modules::instance::load_registry() {
+        if let Some(inst) = registry
+            .instances
+            .iter()
+            .find(|i| i.id == instance_id || (instance_id == "default" && i.is_default))
+        {
+            crate::modules::instance::get_instance_workspace_folders(instance_id, &inst.data_dir)
+        } else {
+            Vec::new()
+        }
+    } else {
+        Vec::new()
+    };
+    for ws in &workspaces {
+        let ws_dir = Path::new(ws);
+        let cfg_path = ws_dir.join(".antigravity_goal_heartbeat.json");
+        let (prompt_text, hb_file, email) = if let Ok(c) = fs::read_to_string(&cfg_path) {
+            if let Ok(cfg) = serde_json::from_str::<PromptGoalHeartbeatConfig>(&c) {
+                (cfg.prompt_content, cfg.heartbeat_file, cfg.account_email)
+            } else {
+                ("".to_string(), "".to_string(), "".to_string())
+            }
+        } else {
+            ("".to_string(), "".to_string(), "".to_string())
+        };
+        update_workspace_status_file(
+            ws_dir,
+            instance_id,
+            &email,
+            &prompt_text,
+            &hb_file,
+            "STOPPED",
+        );
+    }
+
     crate::modules::logger::log_info(&format!(
         "[PromptGoal] Stopped {} prompt goal worker(s) for instance '{}'",
         stopped, instance_id
@@ -393,7 +460,7 @@ fn check_heartbeat_freshness(
 
 /// Inspect prompt goal status across workspaces for an instance
 pub fn inspect_prompt_goal_status(
-    _instance_id: &str,
+    instance_id: &str,
     workspaces: &[String],
 ) -> (bool, Option<String>, Option<String>) {
     let now = Utc::now().timestamp();
@@ -409,9 +476,48 @@ pub fn inspect_prompt_goal_status(
         let Ok(cfg) = serde_json::from_str::<PromptGoalHeartbeatConfig>(&c) else {
             continue;
         };
-        let (is_fresh, last_line) =
+
+        let is_default_target = instance_id == "default" || instance_id == "__default__";
+        let is_default_cfg = cfg.instance_id == "default"
+            || cfg.instance_id == "__default__"
+            || cfg.instance_id.is_empty();
+        let is_inst_match = instance_id == "all"
+            || (is_default_target && is_default_cfg)
+            || (!cfg.instance_id.is_empty() && cfg.instance_id == instance_id);
+        if !is_inst_match {
+            continue;
+        }
+
+        let is_pid_alive = cfg
+            .worker_pid
+            .map(crate::modules::instance::is_pid_alive_os)
+            .unwrap_or(false);
+
+        let (mut is_fresh, last_line) =
             check_heartbeat_freshness(&cfg.heartbeat_file, cfg.interval_secs, now);
-        return (is_fresh, Some(cfg.heartbeat_file), last_line);
+
+        // Inspect .antigravity_goal_prompt.log / heartbeat line instance tags
+        if is_fresh {
+            if let Some(ref line) = last_line {
+                if line.contains("instance=") {
+                    let is_matching_tag = if is_default_target {
+                        line.contains("instance=default")
+                            || line.contains("instance=__default__")
+                            || line.contains("instance= ")
+                    } else {
+                        line.contains(&format!("instance={}", instance_id))
+                    };
+                    if !is_matching_tag && instance_id != "all" {
+                        is_fresh = false;
+                    }
+                }
+            }
+        }
+
+        let is_fully_active = is_fresh && is_pid_alive;
+        if is_fully_active {
+            return (true, Some(cfg.heartbeat_file), last_line);
+        }
     }
     (false, None, None)
 }
@@ -420,7 +526,11 @@ pub fn inspect_prompt_goal_status(
 pub fn ensure_prompt_goals_running_for_instance(instance_id: &str) -> usize {
     let mut reinvoked = 0;
     let workspaces = if let Ok(registry) = crate::modules::instance::load_registry() {
-        if let Some(inst) = registry.instances.iter().find(|i| i.id == instance_id) {
+        if let Some(inst) = registry
+            .instances
+            .iter()
+            .find(|i| i.id == instance_id || (instance_id == "default" && i.is_default))
+        {
             crate::modules::instance::get_instance_workspace_folders(instance_id, &inst.data_dir)
         } else {
             Vec::new()
@@ -442,14 +552,36 @@ pub fn ensure_prompt_goals_running_for_instance(instance_id: &str) -> usize {
         let Ok(cfg) = serde_json::from_str::<PromptGoalHeartbeatConfig>(&c) else {
             continue;
         };
-        let (is_alive, _) = check_heartbeat_freshness(&cfg.heartbeat_file, cfg.interval_secs, now);
+
+        let is_default_target = instance_id == "default" || instance_id == "__default__";
+        let is_default_cfg = cfg.instance_id == "default"
+            || cfg.instance_id == "__default__"
+            || cfg.instance_id.is_empty();
+        let is_inst_match = instance_id == "all"
+            || (is_default_target && is_default_cfg)
+            || (!cfg.instance_id.is_empty() && cfg.instance_id == instance_id);
+        if !is_inst_match {
+            continue;
+        }
+
+        let is_pid_alive = cfg
+            .worker_pid
+            .map(crate::modules::instance::is_pid_alive_os)
+            .unwrap_or(false);
+        let (is_fresh, _) = check_heartbeat_freshness(&cfg.heartbeat_file, cfg.interval_secs, now);
+        let is_alive = is_fresh && is_pid_alive;
+
         if !is_alive {
             crate::modules::logger::log_info(&format!(
                 "[PromptGoal] Prompt goal heartbeat stopped in '{}', auto-reinvoking for instance '{}'...",
                 ws, instance_id
             ));
             if let Ok(registry) = crate::modules::instance::load_registry() {
-                if let Some(inst) = registry.instances.iter().find(|i| i.id == instance_id) {
+                if let Some(inst) = registry
+                    .instances
+                    .iter()
+                    .find(|i| i.id == instance_id || (instance_id == "default" && i.is_default))
+                {
                     if let Ok(_) = start_prompt_goal_heartbeat(
                         instance_id,
                         &inst.data_dir,

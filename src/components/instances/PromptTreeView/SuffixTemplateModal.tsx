@@ -352,7 +352,7 @@ export function SuffixTemplateModal({
                         <div>
                             <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 <span>Suffix Template Library</span>
-                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20">
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20">
                                     {allTemplates.length} Presets & Templates
                                 </span>
                             </h2>
@@ -569,11 +569,11 @@ export function SuffixTemplateModal({
                                                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
                                                     {selectedTemplate.name}
                                                 </h3>
-                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20">
+                                                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20">
                                                     {selectedTemplate.category}
                                                 </span>
                                                 {defaultTemplateId === selectedTemplate.id && (
-                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
                                                         DEFAULT
                                                     </span>
                                                 )}

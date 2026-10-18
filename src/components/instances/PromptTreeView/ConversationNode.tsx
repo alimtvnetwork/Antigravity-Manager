@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Bot, User, Terminal, Wrench, Clock, ChevronRight, ChevronDown } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../../utils/cn';
+import { PromptOriginTier } from './types';
 import type { AgmConversationNode, AgmProjectTreeNode, TierClassificationResult } from './types';
 import { isGhostConversation } from './conversationGuards';
 import { classifyPromptTier } from './tierClassification';
@@ -32,11 +33,11 @@ export function getConversationStatus(conv: AgmConversationNode): { isRunning: b
 }
 
 export function getTierIcon(tier: TierClassificationResult['tier']) {
-    return tier === 'SUBAGENT_INSTRUCTION'
+    return tier === PromptOriginTier.SubagentInstruction
         ? Bot
-        : tier === 'SYSTEM_MESSAGE'
+        : tier === PromptOriginTier.SystemMessage
           ? Terminal
-          : tier === 'TOOL_OUTPUT'
+          : tier === PromptOriginTier.ToolOutput
             ? Wrench
             : User;
 }
@@ -163,7 +164,7 @@ export function ConversationNode({
                     )}
                     <span title={promptCategory.roleBadge || promptCategory.tier} className="shrink-0 flex items-center">
                         <IconComponent
-                            className={cn('h-3.5 w-3.5 shrink-0', isSelected ? 'text-white' : (promptCategory.tier === 'SUBAGENT_INSTRUCTION' ? 'text-purple-500' : promptCategory.tier === 'SYSTEM_MESSAGE' ? 'text-zinc-500' : promptCategory.tier === 'TOOL_OUTPUT' ? 'text-amber-500' : 'text-sky-500'))}
+                            className={cn('h-3.5 w-3.5 shrink-0', isSelected ? 'text-white' : (promptCategory.tier === PromptOriginTier.SubagentInstruction ? 'text-purple-500' : promptCategory.tier === PromptOriginTier.SystemMessage ? 'text-zinc-500' : promptCategory.tier === PromptOriginTier.ToolOutput ? 'text-amber-500' : 'text-sky-500'))}
                         />
                     </span>
                     <span

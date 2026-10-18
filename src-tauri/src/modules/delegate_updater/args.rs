@@ -76,6 +76,7 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
         install_dir: None,
         target_version: None,
         is_delegated_worker: false,
+        is_pinned: false,
     };
 
     let mut i = 0;
@@ -117,6 +118,9 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
             }
             "--delegated-worker" => {
                 opts.is_delegated_worker = true;
+            }
+            "-isPinned" | "--is-pinned" | "-ispinned" => {
+                opts.is_pinned = true;
             }
             arg if arg.starts_with("--version=") || arg.starts_with("-v=") => {
                 let prefix = if arg.starts_with("--version=") {
@@ -189,6 +193,10 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
             }
         }
         i += 1;
+    }
+
+    if opts.target_version.is_some() {
+        opts.is_pinned = true;
     }
 
     opts

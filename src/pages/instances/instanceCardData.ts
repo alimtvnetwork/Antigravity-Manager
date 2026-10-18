@@ -5,9 +5,11 @@ import type { InstanceStatus } from '../../services/instanceService';
 import { findQuotaModel } from '../../config/modelConfig';
 import { isGhostConversation } from '../../components/instances/PromptTreeViewModal';
 import type { AgmProjectTreeNode } from '../../components/instances/PromptTreeViewModal';
-import { isNodeOwnedByInstance } from './instancePageUtils';
+import { isNodeOwnedByInstance, isConversationOwnedByInstance } from './instancePageUtils';
 import type { InstanceActionType } from './instancePageUtils';
 import type { Account } from '../../types/account';
+
+export { isConversationOwnedByInstance };
 
 export interface InstanceCardData {
     boundAccount: Account | null;
@@ -18,21 +20,6 @@ export interface InstanceCardData {
     effectiveExePath: string | null;
     currentAction: InstanceActionType;
     isBusy: boolean;
-}
-
-export function isConversationOwnedByInstance(
-    convInstId: string | undefined | null,
-    instConfig: { id: string; is_default?: boolean }
-): boolean {
-    const isDefaultInst = Boolean(instConfig.is_default || instConfig.id === 'default' || instConfig.id === '__default__');
-    if (!convInstId || convInstId.trim() === '') {
-        return isDefaultInst;
-    }
-    const isConvDefault = convInstId === 'default' || convInstId === '__default__';
-    if (isConvDefault) {
-        return isDefaultInst;
-    }
-    return convInstId === instConfig.id;
 }
 
 export function useInstanceCardData(
@@ -95,7 +82,7 @@ export function useInstanceCardData(
             const hasGenuineRunningConv = (node.conversations || []).some(
                 (c) =>
                     Boolean(c.is_running) &&
-                    isConversationOwnedByInstance(c.instance_id, inst.config) &&
+                    isConversationOwnedByInstance(c.instance_id, inst.config, c.instance_seq_num ?? node.instance_seq_num) &&
                     !isGhostConversation(c) &&
                     !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
             );

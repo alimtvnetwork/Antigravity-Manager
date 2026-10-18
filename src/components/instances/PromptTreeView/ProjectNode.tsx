@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { useErrorStore } from '../../../stores/error-store';
-import type { AgmConversationNode, AgmProjectTreeNode } from './types';
+import { PromptOriginTier, type AgmConversationNode, type AgmProjectTreeNode } from './types';
 import { isGhostConversation, isStaleOrEmptyConversation } from './conversationGuards';
 import { classifyPromptTier, assembleConversationHierarchy } from './tierClassification';
 import { formatSeqBadge } from './formatters';
@@ -357,11 +357,11 @@ export function ProjectNode(props: ProjectNodeProps) {
         if (categoryFilter === 'all') {
             if (cat.isNonPrompt && !searchQuery.trim()) return;
         } else if (categoryFilter === 'user') {
-            if (cat.tier !== 'USER_PROMPT') return;
+            if (cat.tier !== PromptOriginTier.UserPrompt) return;
         } else if (categoryFilter === 'subagent') {
-            if (cat.tier !== 'SUBAGENT_INSTRUCTION') return;
+            if (cat.tier !== PromptOriginTier.SubagentInstruction) return;
         } else if (categoryFilter === 'system') {
-            if (cat.tier !== 'SYSTEM_MESSAGE' && cat.tier !== 'TOOL_OUTPUT') return;
+            if (cat.tier !== PromptOriginTier.SystemMessage && cat.tier !== PromptOriginTier.ToolOutput) return;
         }
         if (activeFilter === 'running' && !conv.is_running) {
             return;

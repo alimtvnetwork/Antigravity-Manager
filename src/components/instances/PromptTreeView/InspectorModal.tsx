@@ -432,12 +432,12 @@ export function InspectorModal({
 
                                     {/* Status Capsule */}
                                     {(inspectorPrompt as any).is_running ? (
-                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border border-emerald-500/40 animate-pulse">
+                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border border-emerald-500/40 animate-pulse">
                                             <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] animate-pulse" />
                                             <span>RUNNING</span>
                                         </span>
                                     ) : (
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20">
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20">
                                             <span>COMPLETED</span>
                                         </span>
                                     )}
@@ -566,7 +566,7 @@ export function InspectorModal({
                 >
                     {/* Lightbox Controls Bar */}
                     <div
-                        className="absolute top-4 right-4 flex items-center gap-2 bg-slate-900/80 border border-slate-700 rounded-full px-3 py-1.5 z-10"
+                        className="absolute top-4 right-4 flex items-center gap-2 bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-1.5 z-10"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <button

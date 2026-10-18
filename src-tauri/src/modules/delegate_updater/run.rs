@@ -325,6 +325,12 @@ pub fn run(args: &[String]) {
             .unwrap_or_else(|| "agm-update-cli".to_string())
     );
 
+    let is_pinned = opts.is_pinned
+        || opts.target_version.is_some()
+        || args
+            .iter()
+            .any(|a| a.eq_ignore_ascii_case("-isPinned") || a.eq_ignore_ascii_case("--is-pinned"));
+
     let mut update_args = vec![
         "--force".to_string(),
         "--no-launch".to_string(),
@@ -335,6 +341,9 @@ pub fn run(args: &[String]) {
         let norm_ver = normalize_version_string(ver);
         update_args.push("--version".to_string());
         update_args.push(norm_ver);
+    }
+    if is_pinned {
+        update_args.push("-isPinned".to_string());
     }
 
     let update_status = Command::new(&current_exe)
@@ -433,13 +442,13 @@ pub fn run_cli_update(args: &[String]) -> bool {
             .map(|v| format!("-Version \"{}\"", v))
             .unwrap_or_default();
 
-        let is_pinned_arg = if normalized_target_version.is_some()
-            || args.iter().any(|a| a == "-isPinned" || a == "--is-pinned")
-        {
-            "-isPinned"
-        } else {
-            ""
-        };
+        let is_pinned = opts.is_pinned
+            || normalized_target_version.is_some()
+            || args.iter().any(|a| {
+                a.eq_ignore_ascii_case("-isPinned") || a.eq_ignore_ascii_case("--is-pinned")
+            });
+
+        let is_pinned_arg = if is_pinned { "-isPinned" } else { "" };
 
         let local_script = resolved_install_dir.join("install.ps1");
         let cwd_script = Path::new("install.ps1");

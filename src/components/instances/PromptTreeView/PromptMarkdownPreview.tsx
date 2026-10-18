@@ -129,7 +129,7 @@ function parseInlineMarkdown(
             <span
                 key="oversized-trunc-notice"
                 onClick={onToggleExpand}
-                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 my-1 rounded-full text-[10px] font-mono font-medium bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30 shadow-2xs cursor-pointer hover:bg-amber-500/25 transition-all"
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 my-1 rounded-md text-[10px] font-mono font-medium bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30 shadow-2xs cursor-pointer hover:bg-amber-500/25 transition-all"
                 title={`Omitted ${text.length - 2000} bytes of context - Click to inspect/expand`}
             >
                 <span className="text-amber-500 font-bold">⚡</span>
@@ -178,7 +178,7 @@ function parseInlineMarkdown(
                 <span
                     key={`trunc-${match.index}`}
                     onClick={onToggleExpand}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 my-0.5 rounded-full text-[10px] font-mono font-medium bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30 shadow-2xs cursor-pointer hover:bg-amber-500/25 transition-all"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 my-0.5 rounded-md text-[10px] font-mono font-medium bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30 shadow-2xs cursor-pointer hover:bg-amber-500/25 transition-all"
                     title={`Omitted ${truncCount} ${truncUnit} - Click to inspect/expand`}
                 >
                     <span className="text-amber-500 font-bold">⚡</span>

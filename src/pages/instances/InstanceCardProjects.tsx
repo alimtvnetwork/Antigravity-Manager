@@ -11,7 +11,7 @@ export function isProjectRunningForInstance(proj: AgmProjectTreeNode, inst: Inst
     return (proj.conversations || []).some(
         (c) =>
             Boolean(c.is_running) &&
-            isConversationOwnedByInstance(c.instance_id, inst.config) &&
+            isConversationOwnedByInstance(c.instance_id, inst.config, c.instance_seq_num ?? proj.instance_seq_num) &&
             !isGhostConversation(c) &&
             !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
     );
@@ -55,11 +55,10 @@ export function InstanceCardProjects({ api, inst }: { api: InstancePageApi; inst
                     {displayedProjects.map((proj) => {
                         const isProjRunning = isProjectRunningForInstance(proj, inst);
                         const instanceConvs = (proj.conversations || []).filter((c) =>
-                            isConversationOwnedByInstance(c.instance_id, inst.config)
+                            isConversationOwnedByInstance(c.instance_id, inst.config, c.instance_seq_num ?? proj.instance_seq_num)
                         );
-                        const relevantConvs = instanceConvs.length > 0 ? instanceConvs : (proj.conversations || []);
                         const totalTurns =
-                            relevantConvs.reduce((sum, c) => sum + Math.max(c.step_count || 1, 1), 0);
+                            instanceConvs.reduce((sum, c) => sum + Math.max(c.step_count || 1, 1), 0);
 
                         return (
                             <div

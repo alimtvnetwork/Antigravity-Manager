@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import type { SyncInterval } from '../../../services/instanceService';
 import { getPromptTreeSyncInterval } from '../../../services/instanceService';
 import { getArchivedProjectsForInstance } from '../../../services/instanceService';
-import type { AgmConversationNode, AgmProjectTreeNode, ViewMode } from './types';
+import { PromptViewMode, type AgmConversationNode, type AgmProjectTreeNode, type ViewMode } from './types';
 
 export interface InspectorPrompt {
     title: string;
@@ -154,7 +154,7 @@ export function usePromptTreeState(instanceId: string): PromptTreeState {
     const [selectedConversation, setSelectedConversation] = useState<AgmConversationNode | null>(null);
     const [activePromptText, setActivePromptText] = useState<string>('');
     const [editedPromptText, setEditedPromptText] = useState<string>('');
-    const [viewMode, setViewMode] = useState<ViewMode>('preview');
+    const [viewMode, setViewMode] = useState<ViewMode>(PromptViewMode.Preview);
     const [showAllWords, setShowAllWords] = useState<boolean>(false);
     const [previewTab, setPreviewTab] = useState<'instruction' | 'results'>('instruction');
     const [isCopiedResults, setIsCopiedResults] = useState(false);

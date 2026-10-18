@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Check, RotateCcw, ChevronUp, ChevronDown, Clock } from 'lucide-react';
 import { cn } from '../../../utils/cn';
-import type { AgmConversationNode, AgmProjectTreeNode, ViewMode } from './types';
+import { PromptViewMode, type AgmConversationNode, type AgmProjectTreeNode, type ViewMode } from './types';
 import { RichMarkdownRenderer } from './markdown';
 import { countWords, formatPromptForMarkdown } from './formatters';
 import { PromptImagePreviewModal } from './PromptImagePreviewModal';
@@ -440,7 +440,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
             )}
 
             {/* Preview Mode (Rich Markdown) */}
-            {viewMode === 'preview' && (
+            {viewMode === PromptViewMode.Preview && (
                 <div className="space-y-3">
                     <div
                         onDoubleClick={() => openInspector(selectedConversation, selectedProject?.repo_path || '')}
@@ -505,7 +505,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
             )}
 
             {/* Tab 2: Raw Mode (Monospace Clean Text with Explicit <br /> Line Gaps) */}
-            {viewMode === 'raw' && (
+            {viewMode === PromptViewMode.Raw && (
                 <div className="space-y-3">
                     <div className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#090611] p-5 font-mono text-xs text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap break-words max-h-[460px] overflow-y-auto select-text shadow-inner">
                         {activePromptText ? (
@@ -523,7 +523,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
             )}
 
             {/* Tab 3: Edit Mode (Editable Textarea) */}
-            {viewMode === 'edit' && (
+            {viewMode === PromptViewMode.Edit && (
                 <div className="space-y-3">
                     <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-mono">
                         <span>Modify prompt instruction directly:</span>

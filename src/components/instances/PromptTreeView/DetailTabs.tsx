@@ -1,10 +1,11 @@
 import { Eye, Code, Edit3, ChevronUp, ChevronDown, FileText, MessageSquare, Terminal } from 'lucide-react';
 import { cn } from '../../../utils/cn';
+import { PromptViewMode, type AgmConversationNode, type ViewMode } from './types';
 
 export interface DetailTabsProps {
     previewTab: 'instruction' | 'results';
     setPreviewTab?: (v: 'instruction' | 'results') => void;
-    selectedConversation?: import('./types').AgmConversationNode;
+    selectedConversation?: AgmConversationNode;
     activeWordCount: number;
     activeByteCount: number;
     formatByteSize: (bytes: number) => string;
@@ -12,8 +13,8 @@ export interface DetailTabsProps {
     activePromptText: string;
     showAllWords: boolean;
     setShowAllWords: (v: boolean | ((prev: boolean) => boolean)) => void;
-    viewMode: import('./types').ViewMode;
-    setViewMode: (v: import('./types').ViewMode) => void;
+    viewMode: ViewMode;
+    setViewMode: (v: ViewMode) => void;
     setIsDetailsModalOpen: (v: boolean) => void;
 }
 
@@ -48,10 +49,10 @@ export function DetailTabs(props: DetailTabsProps) {
                 <div className="inline-flex items-center rounded-lg bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
                     <button
                         type="button"
-                        onClick={() => setViewMode('preview')}
+                        onClick={() => setViewMode(PromptViewMode.Preview)}
                         className={cn(
                             'p-1.5 rounded-l-md transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer',
-                            viewMode === 'preview'
+                            viewMode === PromptViewMode.Preview
                                 ? 'bg-blue-600 text-white shadow-2xs'
                                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60'
                         )}
@@ -62,10 +63,10 @@ export function DetailTabs(props: DetailTabsProps) {
                     </button>
                     <button
                         type="button"
-                        onClick={() => setViewMode('raw')}
+                        onClick={() => setViewMode(PromptViewMode.Raw)}
                         className={cn(
                             'p-1.5 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer',
-                            viewMode === 'raw'
+                            viewMode === PromptViewMode.Raw
                                 ? 'bg-blue-600 text-white shadow-2xs'
                                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60'
                         )}
@@ -76,10 +77,10 @@ export function DetailTabs(props: DetailTabsProps) {
                     </button>
                     <button
                         type="button"
-                        onClick={() => setViewMode('edit')}
+                        onClick={() => setViewMode(PromptViewMode.Edit)}
                         className={cn(
                             'p-1.5 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer',
-                            viewMode === 'edit'
+                            viewMode === PromptViewMode.Edit
                                 ? 'bg-blue-600 text-white shadow-2xs'
                                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60'
                         )}

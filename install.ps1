@@ -951,35 +951,100 @@ if ($Uninstall) {
 }
 
 function Get-InstalledVersion {
-    # Stage 0: Direct CLI check via active agm.exe / agm-ui.exe binary
+    # Stage 0: Direct CLI check via active agm.exe / agm-ui.exe / agm-alim.exe binary
+    $cliCandidates = [System.Collections.Generic.List[string]]::new()
     try {
-        $agmCmd = Get-Command agm.exe, agm-ui.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($agmCmd -and $agmCmd.Source -and (Test-Path $agmCmd.Source)) {
-            $cliOut = & $agmCmd.Source --version 2>$null
-            if ($cliOut -match '(?i)agm\s+v?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?(?:#.*)?)') {
-                return $matches[1].Trim()
+        $agmCmds = Get-Command agm.exe, agm-ui.exe, agm-alim.exe -All -ErrorAction SilentlyContinue
+        if ($agmCmds) {
+            foreach ($cmd in $agmCmds) {
+                if ($cmd.Source -and (Test-Path $cmd.Source)) {
+                    if (-not $cliCandidates.Contains($cmd.Source)) {
+                        $cliCandidates.Add($cmd.Source)
+                    }
+                }
             }
         }
     } catch {}
+
+    $directCliPaths = @(
+        (Join-Path $cliDir "agm.exe"),
+        (Join-Path $InstallDir "agm.exe"),
+        (Join-Path $InstallDir "agm-ui.exe"),
+        (Join-Path $InstallDir "agm-alim.exe")
+    )
+    foreach ($p in $directCliPaths) {
+        if ((Test-Path $p) -and (-not $cliCandidates.Contains($p))) {
+            $cliCandidates.Add($p)
+        }
+    }
+
+    $cliVersions = [System.Collections.Generic.List[string]]::new()
+    foreach ($cand in $cliCandidates) {
+        try {
+            $leaf = Split-Path -Leaf $cand
+            # Strictly match AGM binaries only (agm-alim, agm-ui, agm) and avoid Google Antigravity.exe
+            if ($leaf -notmatch '(?i)^(agm-alim|agm-ui|agm)\.exe$') {
+                continue
+            }
+            if ($cand -match '(?i)Google\s*Antigravity') {
+                continue
+            }
+            $cliOut = & $cand --version 2>$null
+            if ($cliOut) {
+                foreach ($line in ($cliOut -split "`r?`n")) {
+                    if ($line -match '(?i)(?:agm(?:-ui|-alim)?|antigravity-manager)\s+v?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?(?:#.*)?)' -or
+                        $line -match '(?i)^v?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)$') {
+                        $ver = $matches[1].Trim()
+                        $cleanVer = ($ver -replace '^v', '').Trim()
+                        # Avoid matching Google Antigravity.exe (v2.24)
+                        if ($cleanVer -notmatch '^2\.24' -and (-not $cliVersions.Contains($cleanVer))) {
+                            $cliVersions.Add($cleanVer)
+                        }
+                    }
+                }
+            }
+            # Fallback to PE VersionInfo if --version produced no stdout (e.g. GUI subsystem)
+            $fvi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cand)
+            $peVer = if ($fvi.ProductVersion) { $fvi.ProductVersion } else { $fvi.FileVersion }
+            if ($peVer) {
+                $cleanPe = ($peVer -replace '^v', '').Trim()
+                if ($cleanPe -notmatch '^2\.24' -and (-not $cliVersions.Contains($cleanPe))) {
+                    $cliVersions.Add($cleanPe)
+                }
+            }
+        } catch {}
+    }
+
+    if ($cliVersions.Count -gt 0) {
+        # Sort descending by SemVer so it never reports v4.190 when v4.227 is installed
+        $sortedCli = @($cliVersions | Sort-Object -Descending -Property { Convert-ToSemVer $_ })
+        return $sortedCli[0]
+    }
 
     # Stage 1: Inspect Live Running Process Executables via PE Header
     $runningVersions = [System.Collections.Generic.List[string]]::new()
     try {
         $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
-            $_.Name -match '(?i)^(agm-alim|agm-ui|agm|antigravity-manager.*|antigravity-tools.*)\.exe$'
+            $_.Name -match '(?i)^(agm-alim|agm-ui|agm)\.exe$'
         }
         foreach ($proc in $procs) {
             $pPath = $proc.ExecutablePath
             if ($pPath -and (Test-Path $pPath)) {
+                if ($pPath -match '(?i)Google\s*Antigravity') { continue }
                 $fvi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($pPath)
                 $ver = if ($fvi.ProductVersion) { $fvi.ProductVersion } else { $fvi.FileVersion }
-                if ($ver) { $runningVersions.Add(($ver -replace '^v', '').Trim()) }
+                if ($ver) {
+                    $clean = ($ver -replace '^v', '').Trim()
+                    if ($clean -notmatch '^2\.24' -and (-not $runningVersions.Contains($clean))) {
+                        $runningVersions.Add($clean)
+                    }
+                }
             }
         }
     } catch {}
 
     try {
-        $runningProcs = Get-Process "agm-alim", "Antigravity Tools", "antigravity-tools", "Antigravity Manager Tools", "AGM by Alim", "agm-ui", "agm" -ErrorAction SilentlyContinue
+        $runningProcs = Get-Process "agm-alim", "Antigravity Manager Tools", "AGM by Alim", "agm-ui", "agm" -ErrorAction SilentlyContinue
         foreach ($p in $runningProcs) {
             $pPath = $null
             try { $pPath = $p.Path } catch {}
@@ -987,9 +1052,15 @@ function Get-InstalledVersion {
                 try { $pPath = $p.MainModule.FileName } catch {}
             }
             if ($pPath -and (Test-Path $pPath)) {
+                if ($pPath -match '(?i)Google\s*Antigravity') { continue }
                 $fvi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($pPath)
                 $ver = if ($fvi.ProductVersion) { $fvi.ProductVersion } else { $fvi.FileVersion }
-                if ($ver) { $runningVersions.Add(($ver -replace '^v', '').Trim()) }
+                if ($ver) {
+                    $clean = ($ver -replace '^v', '').Trim()
+                    if ($clean -notmatch '^2\.24' -and (-not $runningVersions.Contains($clean))) {
+                        $runningVersions.Add($clean)
+                    }
+                }
             }
         }
     } catch {}
@@ -1003,11 +1074,9 @@ function Get-InstalledVersion {
     $candidateExes = @(
         (Join-Path $InstallDir $BinaryName),
         (Join-Path $InstallDir "agm-alim.exe"),
+        (Join-Path $InstallDir "agm-ui.exe"),
         (Join-Path $InstallDir "Antigravity Manager Tools.exe"),
-        (Join-Path $InstallDir "Antigravity Tools.exe"),
         (Join-Path $InstallDir "AGM by Alim.exe"),
-        (Join-Path $InstallDir "Anti-Gravity Tools by Alim.exe"),
-        (Join-Path $InstallDir "antigravity-tools.exe"),
         (Join-Path $InstallDir "agm.exe"),
         (Join-Path $env:LOCALAPPDATA "agm-cli\agm.exe")
     )
@@ -1015,9 +1084,15 @@ function Get-InstalledVersion {
     foreach ($exe in $candidateExes) {
         if (Test-Path $exe) {
             try {
+                if ($exe -match '(?i)Google\s*Antigravity') { continue }
                 $fvi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
                 $ver = if ($fvi.ProductVersion) { $fvi.ProductVersion } else { $fvi.FileVersion }
-                if ($ver) { $diskVersions.Add(($ver -replace '^v', '').Trim()) }
+                if ($ver) {
+                    $clean = ($ver -replace '^v', '').Trim()
+                    if ($clean -notmatch '^2\.24' -and (-not $diskVersions.Contains($clean))) {
+                        $diskVersions.Add($clean)
+                    }
+                }
             } catch {}
         }
     }
@@ -1042,12 +1117,19 @@ function Get-InstalledVersion {
     )
     foreach ($dir in $prevDirs) {
         if (Test-Path $dir) {
-            $foundExes = Get-ChildItem -Path $dir -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*uninstall*" -and $_.Name -notlike "*setup*" }
+            $foundExes = Get-ChildItem -Path $dir -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue | Where-Object {
+                $_.Name -notlike "*uninstall*" -and $_.Name -notlike "*setup*" -and $_.Name -match '(?i)^(agm-alim|agm-ui|agm|Antigravity Manager Tools|AGM by Alim)\.exe$' -and $_.FullName -notmatch '(?i)Google\s*Antigravity'
+            }
             foreach ($foundExe in $foundExes) {
                 try {
                     $fvi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($foundExe.FullName)
                     $ver = if ($fvi.ProductVersion) { $fvi.ProductVersion } else { $fvi.FileVersion }
-                    if ($ver) { $diskVersions.Add(($ver -replace '^v', '').Trim()) }
+                    if ($ver) {
+                        $clean = ($ver -replace '^v', '').Trim()
+                        if ($clean -notmatch '^2\.24' -and (-not $diskVersions.Contains($clean))) {
+                            $diskVersions.Add($clean)
+                        }
+                    }
                 } catch {}
             }
         }
@@ -1067,11 +1149,14 @@ function Get-InstalledVersion {
     $regVersions = [System.Collections.Generic.List[string]]::new()
     foreach ($regPath in $regPaths) {
         $entries = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue | Where-Object {
-            $_.DisplayName -match '(?i)(Antigravity Manager Tools|agm-alim|AGM by Alim|Antigravity Tools)'
+            $_.DisplayName -match '(?i)(Antigravity Manager Tools|agm-alim|AGM by Alim|Antigravity Tools)' -and $_.DisplayName -notmatch '(?i)Google\s*Antigravity'
         }
         foreach ($entry in $entries) {
             if ($entry.DisplayVersion) {
-                $regVersions.Add(($entry.DisplayVersion -replace '^v', '').Trim())
+                $clean = ($entry.DisplayVersion -replace '^v', '').Trim()
+                if ($clean -notmatch '^2\.24' -and (-not $regVersions.Contains($clean))) {
+                    $regVersions.Add($clean)
+                }
             }
         }
     }
@@ -1428,7 +1513,7 @@ if (-not $Version) {
     }
 }
 
-$isPinned = $false
+$isPinned = [bool]($isPinned -or $global:isPinned -or $Version)
 $cleanPinned = $null
 if ($Version) {
     $cleanPinned = ($Version -replace "^v", "").Trim()
@@ -1442,7 +1527,9 @@ if ($Version) {
             $cleanPinned = "$cleanPinned.0"
         }
     }
-    $candidateVersions.Add($cleanPinned)
+    if (-not $candidateVersions.Contains($cleanPinned)) {
+        $candidateVersions.Add($cleanPinned)
+    }
     $isPinned = $true
     Write-Step "Respecting pinned release version: v$cleanPinned"
 }
@@ -1605,22 +1692,40 @@ if (-not $isPinned -and (-not $manifestLoaded -or $candidateVersions.Count -lt 5
     # Tier 1.5: Rate-limit-free GitHub Releases expanded_assets HTML scrape fallback
     if (-not $manifestAssetUrlMap.ContainsKey($cleanPinned)) {
         try {
-            $expUrl = "https://github.com/$Repo/releases/expanded_assets/v$cleanPinned"
-            $expHtml = $null
-            $curlCmd = Get-Command curl.exe -ErrorAction SilentlyContinue
-            if ($curlCmd) {
-                $expHtml = & $curlCmd.Source -fsSL --connect-timeout 4 --max-time 8 $expUrl 2>$null
-            } else {
-                $expHtml = (Invoke-WebRequest -Uri $expUrl -TimeoutSec 6 -Headers @{ "User-Agent" = "Mozilla/5.0" }).Content
+            $expUrls = @(
+                "https://github.com/$Repo/releases/expanded_assets/v$cleanPinned"
+            )
+            if ($cleanPinned -match '^(\d+\.\d+)\.0$') {
+                $expUrls += "https://github.com/$Repo/releases/expanded_assets/v$($Matches[1])"
             }
-            if ($expHtml) {
-                $matches = [regex]::Matches($expHtml, 'href="([^"]*releases/download/v[^"]+)"')
-                foreach ($m in $matches) {
-                    $relUrl = $m.Groups[1].Value
-                    $fullUrl = if ($relUrl -match '^https?:') { $relUrl } else { "https://github.com$relUrl" }
-                    if ($fullUrl -match '(?i)(agm-alim.*windows_x64\.zip|windows.*zip|agm-alim-setup\.exe|.*setup\.exe)$') {
-                        $manifestAssetUrlMap[$cleanPinned] = $fullUrl
-                        Write-Step "Discovered pinned release asset via rate-limit-free expanded assets: $fullUrl"
+            foreach ($expUrl in $expUrls) {
+                $expHtml = $null
+                $curlCmd = Get-Command curl.exe -ErrorAction SilentlyContinue
+                if ($curlCmd) {
+                    $expHtml = & $curlCmd.Source -fsSL --connect-timeout 4 --max-time 8 $expUrl 2>$null
+                } else {
+                    $expHtml = (Invoke-WebRequest -Uri $expUrl -TimeoutSec 6 -Headers @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }).Content
+                }
+                if ($expHtml) {
+                    $matches = [regex]::Matches($expHtml, 'href="([^"]*/releases/download/[^"]+)"')
+                    foreach ($m in $matches) {
+                        $relUrl = $m.Groups[1].Value
+                        $fullUrl = if ($relUrl -match '^https?:') { $relUrl } else { "https://github.com$relUrl" }
+                        if ($Arch -eq "arm64") {
+                            if ($fullUrl -match '(?i)(agm-alim.*arm64\.zip|windows.*arm64.*zip|agm-alim.*arm64.*setup\.exe|.*arm64.*setup\.exe)$') {
+                                $manifestAssetUrlMap[$cleanPinned] = $fullUrl
+                                Write-Step "Discovered pinned release asset via rate-limit-free expanded assets: $fullUrl"
+                                break
+                            }
+                        } else {
+                            if ($fullUrl -match '(?i)(agm-alim.*(x64|x86_64)\.zip|windows.*(x64|x86_64).*zip|agm-alim-setup\.exe|.*x64.*setup\.exe)$') {
+                                $manifestAssetUrlMap[$cleanPinned] = $fullUrl
+                                Write-Step "Discovered pinned release asset via rate-limit-free expanded assets: $fullUrl"
+                                break
+                            }
+                        }
+                    }
+                    if ($manifestAssetUrlMap.ContainsKey($cleanPinned)) {
                         break
                     }
                 }

@@ -43,6 +43,51 @@ pub fn check_tcp_liveness(host: &str, port: u16, timeout_ms: u64) -> bool {
     false
 }
 
+/// Canonical GitMap cluster node descriptors (alias, ip, default_user, os)
+pub const GITMAP_CLUSTER_NODES: &[(&str, &str, &str, &str)] = &[
+    ("w2", "192.168.1.7", "Administrator", "windows"),
+    ("w1", "192.168.1.3", "Administrator", "windows"),
+    ("w3", "192.168.1.12", "Administrator", "windows"),
+    ("w4", "192.168.1.13", "Administrator", "linux"),
+    ("u1", "192.168.1.22", "root", "linux"),
+    ("main", "192.168.1.20", "Administrator", "windows"),
+];
+
+/// Resolve a GitMap cluster node fallback from alias or IP
+pub fn resolve_gitmap_cluster_fallback(token: &str) -> Option<SshConnectionRecord> {
+    let clean = token.trim();
+    if clean.is_empty() {
+        return None;
+    }
+    let host_part = if let Some((_, h)) = clean.rsplit_once('@') {
+        h.trim()
+    } else {
+        clean
+    };
+    for &(alias, ip, user, os) in GITMAP_CLUSTER_NODES {
+        let is_alias_match = host_part.eq_ignore_ascii_case(alias);
+        let is_ip_match = host_part == ip;
+        if is_alias_match || is_ip_match {
+            return Some(SshConnectionRecord {
+                alias: alias.to_string(),
+                ip_address: ip.to_string(),
+                username: user.to_string(),
+                port: 22,
+                encrypted_password: String::new(),
+                encryption_algo: "RSA-2048".to_string(),
+                key_path: resolve_usable_key_path(""),
+                os: os.to_string(),
+                os_group: None,
+                os_version: None,
+                build_version: None,
+                first_run_at: None,
+                created_at: None,
+            });
+        }
+    }
+    None
+}
+
 /// Resolve target string (`all`, `w1,w2`, `w1`, `user@ip`, or `ip`) into concrete `SshConnectionRecord`s
 pub fn resolve_target_nodes(
     target: &str,
@@ -78,7 +123,9 @@ pub fn resolve_target_nodes(
                 .cloned()
                 .collect();
             if matched.is_empty() {
-                if let Some(adhoc) = parse_adhoc_connection(tok) {
+                if let Some(gm_node) = resolve_gitmap_cluster_fallback(tok) {
+                    resolved.push(gm_node);
+                } else if let Some(adhoc) = parse_adhoc_connection(tok) {
                     resolved.push(adhoc);
                 }
                 continue;
@@ -102,7 +149,8 @@ pub fn resolve_target_nodes(
             let is_alias_excluded = exclusions.contains(&c.alias.to_lowercase());
             let is_ip_excluded = exclusions.contains(&c.ip_address.to_lowercase());
             let is_excluded = is_alias_excluded || is_ip_excluded;
-            !is_excluded
+            let is_retained = !is_excluded;
+            is_retained
         });
     }
 
@@ -119,8 +167,20 @@ pub(crate) fn is_connection_target_match(c: &SshConnectionRecord, token: &str) -
         return true;
     }
     if let Some((_, host_part)) = token.rsplit_once('@') {
-        return c.alias.eq_ignore_ascii_case(host_part)
-            || c.ip_address.eq_ignore_ascii_case(host_part);
+        if c.alias.eq_ignore_ascii_case(host_part) || c.ip_address.eq_ignore_ascii_case(host_part) {
+            return true;
+        }
+    }
+    for &(alias, ip, _, _) in GITMAP_CLUSTER_NODES {
+        let is_token_alias = token.eq_ignore_ascii_case(alias);
+        let is_token_ip = token == ip;
+        let is_conn_alias = c.alias.eq_ignore_ascii_case(alias);
+        let is_conn_ip = c.ip_address == ip;
+        if (is_token_alias && (is_conn_alias || is_conn_ip))
+            || (is_token_ip && (is_conn_alias || is_conn_ip))
+        {
+            return true;
+        }
     }
     false
 }
@@ -231,8 +291,9 @@ pub fn exec_ssh_command(
                     let is_w2 =
                         node.alias.eq_ignore_ascii_case("w2") || node.ip_address == "192.168.1.7";
                     let mut is_tcp_online = check_tcp_liveness(&node.ip_address, port, 2500);
+                    let is_gitmap_available = resolve_gitmap_bin().is_some();
 
-                    if !is_tcp_online && resolve_gitmap_bin().is_some() {
+                    if !is_tcp_online && is_gitmap_available {
                         if let Ok((is_gm_online, _)) = check_node_via_gitmap(&node.alias) {
                             if is_gm_online {
                                 is_tcp_online = true;
@@ -245,11 +306,11 @@ pub fn exec_ssh_command(
                         if let Ok((gm_code, gm_out, gm_err)) =
                             exec_via_gitmap_ssh(&node.alias, &cmd_str)
                         {
-                            if gm_code == 0
+                            let is_gm_success = gm_code == 0
                                 && !gm_out.contains("machine is off")
                                 && !gm_out.contains("All target machines are currently off")
-                                && !gm_out.to_lowercase().contains("connection timed out")
-                            {
+                                && !gm_out.to_lowercase().contains("connection timed out");
+                            if is_gm_success {
                                 return SshExecNodeResult {
                                     alias: node.alias.clone(),
                                     target: format!("{}@{}", node.username, node.ip_address),
@@ -298,7 +359,8 @@ pub fn exec_ssh_command(
                             let stdout_str = String::from_utf8_lossy(&out.stdout).to_string();
                             let stderr_str = String::from_utf8_lossy(&out.stderr).to_string();
 
-                            let is_auth_failure = !out.status.success()
+                            let is_exit_success = out.status.success();
+                            let is_auth_failure = !is_exit_success
                                 && (code == 255
                                     || stderr_str.to_lowercase().contains("permission denied")
                                     || stderr_str.to_lowercase().contains("authentication failed")
@@ -309,11 +371,12 @@ pub fn exec_ssh_command(
                                 if let Ok((gm_code, gm_out, gm_err)) =
                                     exec_via_gitmap_ssh(&node.alias, &cmd_str)
                                 {
-                                    if gm_code == 0
+                                    let is_gm_success = gm_code == 0
                                         && !gm_out.contains("machine is off")
-                                        && !gm_out.contains("All target machines are currently off")
-                                        && !gm_out.to_lowercase().contains("connection timed out")
-                                    {
+                                        && !gm_out
+                                            .contains("All target machines are currently off")
+                                        && !gm_out.to_lowercase().contains("connection timed out");
+                                    if is_gm_success {
                                         return SshExecNodeResult {
                                             alias: node.alias.clone(),
                                             target: format!(
@@ -377,12 +440,12 @@ pub fn exec_ssh_command(
                                         if let Ok((r_gm_code, r_gm_out, r_gm_err)) =
                                             exec_via_gitmap_ssh(&node.alias, &cmd_str)
                                         {
-                                            if r_gm_code == 0
+                                            let is_retry_gm_success = r_gm_code == 0
                                                 && !r_gm_out.contains("machine is off")
                                                 && !r_gm_out
                                                     .to_lowercase()
-                                                    .contains("connection timed out")
-                                            {
+                                                    .contains("connection timed out");
+                                            if is_retry_gm_success {
                                                 return SshExecNodeResult {
                                                     alias: node.alias.clone(),
                                                     target: format!(
@@ -421,7 +484,9 @@ pub fn exec_ssh_command(
                             if let Ok((gm_code, gm_out, gm_err)) =
                                 exec_via_gitmap_ssh(&node.alias, &cmd_str)
                             {
-                                if gm_code == 0 && !gm_out.contains("machine is off") {
+                                let is_gm_success =
+                                    gm_code == 0 && !gm_out.contains("machine is off");
+                                if is_gm_success {
                                     return SshExecNodeResult {
                                         alias: node.alias.clone(),
                                         target: format!("{}@{}", node.username, node.ip_address),
@@ -869,10 +934,11 @@ pub async fn send_remote_ssh_prompt(
     };
 
     let reply = crate::modules::telegram_inbound::execute_prompt_injection(&cmd_str).await;
-    let success = !reply.contains("❌") && !reply.contains("⚠️ <b>Missing");
+    let is_error_reply = reply.contains("❌") || reply.contains("⚠️ <b>Missing");
+    let is_send_success = !is_error_reply;
 
     Ok(RemotePromptDispatchResult {
-        success,
+        success: is_send_success,
         node_alias,
         instance_name: inst_name,
         dispatch_route: if is_local {

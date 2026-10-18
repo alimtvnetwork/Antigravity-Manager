@@ -453,7 +453,7 @@ export function ResendAsModal({
                         <div>
                             <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 <span>&quot;Resend As&quot; Title Presets</span>
-                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20">
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20">
                                     {allPresets.length} Presets
                                 </span>
                             </h2>
@@ -747,11 +747,11 @@ export function ResendAsModal({
                                                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
                                                     {selectedPreset.name}
                                                 </h3>
-                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/20">
+                                                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/20">
                                                     target: {selectedPreset.target_mode}
                                                 </span>
                                                 {defaultPresetId === selectedPreset.id && (
-                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
                                                         DEFAULT
                                                     </span>
                                                 )}

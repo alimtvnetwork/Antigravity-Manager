@@ -92,4 +92,48 @@ Host *
         assert_eq!(hosts[0].username, "Administrator");
         assert_eq!(hosts[0].port, 2222);
     }
+
+    #[test]
+    pub(crate) fn test_gitmap_cluster_node_fallback_resolution() {
+        use super::exec::{
+            is_connection_target_match, resolve_gitmap_cluster_fallback, resolve_target_nodes,
+            GITMAP_CLUSTER_NODES,
+        };
+
+        // Invariant: w2 maps to 192.168.1.7 with Administrator on Windows
+        let w2_opt = resolve_gitmap_cluster_fallback("w2");
+        assert!(w2_opt.is_some());
+        let w2 = w2_opt.unwrap();
+        assert_eq!(w2.alias, "w2");
+        assert_eq!(w2.ip_address, "192.168.1.7");
+        assert_eq!(w2.username, "Administrator");
+        assert_eq!(w2.os, "windows");
+
+        // Case-insensitive alias matching
+        let w2_upper = resolve_gitmap_cluster_fallback("W2").unwrap();
+        assert_eq!(w2_upper.ip_address, "192.168.1.7");
+
+        // IP address fallback resolution
+        let ip_node = resolve_gitmap_cluster_fallback("192.168.1.7").unwrap();
+        assert_eq!(ip_node.alias, "w2");
+        assert_eq!(ip_node.ip_address, "192.168.1.7");
+
+        // User@host resolution
+        let user_host_node = resolve_gitmap_cluster_fallback("Administrator@192.168.1.7").unwrap();
+        assert_eq!(user_host_node.alias, "w2");
+
+        // Cross-match parity with SshConnectionRecord
+        assert!(is_connection_target_match(&w2, "w2"));
+        assert!(is_connection_target_match(&w2, "192.168.1.7"));
+        assert!(is_connection_target_match(&w2, "Administrator@192.168.1.7"));
+        assert!(is_connection_target_match(&w2, "Administrator@w2"));
+
+        // All 6 GitMap cluster nodes present
+        assert_eq!(GITMAP_CLUSTER_NODES.len(), 6);
+
+        // Target nodes resolution fallback
+        let resolved = resolve_target_nodes("w2", None).unwrap();
+        assert!(!resolved.is_empty());
+        assert_eq!(resolved[0].ip_address, "192.168.1.7");
+    }
 }

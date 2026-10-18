@@ -319,7 +319,7 @@ export function PromptTreeImportModal({
                                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                                 <span>Verified AGM Export ({validation.format.toUpperCase()})</span>
                             </div>
-                            <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold">
+                            <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold">
                                 {validation.scope}
                             </span>
                         </div>

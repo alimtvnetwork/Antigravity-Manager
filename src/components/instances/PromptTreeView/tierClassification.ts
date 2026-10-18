@@ -1,3 +1,4 @@
+import { PromptOriginTier } from './types';
 import type { AgmConversationNode, TierClassificationResult, HierarchicalConversationNode } from './types';
 
 export function classifyPromptTier(
@@ -19,8 +20,8 @@ export function classifyPromptTier(
 
     if (isToolOutput) {
         return {
-            tier: 'TOOL_OUTPUT',
-            category: 'TOOL_OUTPUT',
+            tier: PromptOriginTier.ToolOutput,
+            category: PromptOriginTier.ToolOutput,
             label: 'Tool Output',
             roleBadge: 'TOOL',
             badgeStyle: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-400/30',
@@ -42,8 +43,8 @@ export function classifyPromptTier(
 
     if (isSystemMessage && !raw.includes('invoked by a caller agent') && !raw.includes('You are')) {
         return {
-            tier: 'SYSTEM_MESSAGE',
-            category: 'SYSTEM_MESSAGE',
+            tier: PromptOriginTier.SystemMessage,
+            category: PromptOriginTier.SystemMessage,
             label: 'System Message',
             roleBadge: 'SYSTEM',
             badgeStyle: 'bg-zinc-500/15 text-zinc-700 dark:text-zinc-300 border-zinc-400/30',
@@ -113,8 +114,8 @@ export function classifyPromptTier(
         }
 
         return {
-            tier: 'SUBAGENT_INSTRUCTION',
-            category: 'SUBAGENT_INSTRUCTION',
+            tier: PromptOriginTier.SubagentInstruction,
+            category: PromptOriginTier.SubagentInstruction,
             label: 'AI Subagent Instruction',
             roleBadge: detectedRole,
             badgeStyle: 'text-purple-900 dark:text-amber-200 bg-purple-500/20 border-purple-400/40',
@@ -130,8 +131,8 @@ export function classifyPromptTier(
 
     // 4. Default: USER_PROMPT (Direct Human Request)
     return {
-        tier: 'USER_PROMPT',
-        category: 'USER_PROMPT',
+        tier: PromptOriginTier.UserPrompt,
+        category: PromptOriginTier.UserPrompt,
         label: 'User Prompt',
         roleBadge: 'USER',
         badgeStyle: 'bg-sky-500/15 text-sky-700 dark:text-cyan-300 border-sky-400/30',
@@ -175,7 +176,7 @@ export function assembleConversationHierarchy(
             isExpanded: true,
         };
 
-        if (classification.tier === 'SUBAGENT_INSTRUCTION') {
+        if (classification.tier === PromptOriginTier.SubagentInstruction) {
             if (currentRoot) {
                 // Attach as child sub-point to active root prompt
                 currentRoot.subagents.push(node);
@@ -186,7 +187,7 @@ export function assembleConversationHierarchy(
         } else {
             // New User Prompt, System Message or Tool Output becomes new root
             rootNodes.push(node);
-            if (classification.tier === 'USER_PROMPT') {
+            if (classification.tier === PromptOriginTier.UserPrompt) {
                 currentRoot = node;
             }
         }

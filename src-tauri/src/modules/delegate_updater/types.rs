@@ -10,4 +10,5 @@ pub struct DelegateUpdateOptions {
     pub install_dir: Option<PathBuf>,
     pub target_version: Option<String>,
     pub is_delegated_worker: bool,
+    pub is_pinned: bool,
 }

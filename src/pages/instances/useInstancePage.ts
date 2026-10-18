@@ -16,6 +16,7 @@ import { isTauri } from '../../utils/env';
 import type { AgmProjectTreeNode } from '../../components/instances/PromptTreeViewModal';
 import { isGhostConversation } from '../../components/instances/PromptTreeViewModal';
 import { isNodeOwnedByInstance } from './instancePageUtils';
+import { isConversationOwnedByInstance } from './instanceCardData';
 import type { InstanceActionType } from './instancePageUtils';
 import type { InstancePageApi } from './instancePageTypes';
 import { createPageActions } from './instancePageActions';
@@ -280,6 +281,7 @@ export function useInstancePage(): InstancePageApi {
                 const hasGenuineRunningConv = (node.conversations || []).some(
                     (c) =>
                         Boolean(c.is_running) &&
+                        isConversationOwnedByInstance(c.instance_id, inst.config, c.instance_seq_num ?? node.instance_seq_num) &&
                         !isGhostConversation(c) &&
                         !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
                 );

@@ -145,35 +145,250 @@ pub(crate) fn extract_target_version(args: &[String]) -> Option<String> {
     None
 }
 
+use antigravity_tools_lib::modules::update_checker::UpdateChannel;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UpdateExecutionMode {
+    CheckOnly,
+    Execute,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UpdateTargetScope {
+    Standard,
+    All,
+    Gitmap,
+    SshFleet,
+    ExportZip,
+    Help,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum OutputFormat {
+    Interactive,
+    Json,
+}
+
+#[derive(Debug, Clone)]
+struct ReleaseMeta {
+    tag_name: String,
+    release_html_url: String,
+    release_name: String,
+}
+
+fn query_tag_api(client: &reqwest::blocking::Client, cand_tag: &str) -> Option<ReleaseMeta> {
+    let api_url = format!(
+        "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases/tags/{}",
+        cand_tag
+    );
+    let resp = client.get(&api_url).send().ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let json = resp.json::<serde_json::Value>().ok()?;
+    let tag = json["tag_name"]
+        .as_str()
+        .unwrap_or("")
+        .trim_start_matches(['v', 'V'])
+        .to_string();
+    if tag.is_empty() {
+        return None;
+    }
+    let html_url = json["html_url"]
+        .as_str()
+        .unwrap_or("https://github.com/alimtvnetwork/Antigravity-Manager/releases")
+        .to_string();
+    let name = json["name"].as_str().unwrap_or("").to_string();
+    Some(ReleaseMeta {
+        tag_name: tag,
+        release_html_url: html_url,
+        release_name: name,
+    })
+}
+
+fn query_cdn_updater(client: &reqwest::blocking::Client, cand_tag: &str) -> Option<ReleaseMeta> {
+    let cdn_url = format!(
+        "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/{}/updater.json",
+        cand_tag
+    );
+    let resp = client.get(&cdn_url).send().ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let json = resp.json::<serde_json::Value>().ok()?;
+    let tag = json["version"]
+        .as_str()
+        .unwrap_or("")
+        .trim_start_matches(['v', 'V'])
+        .to_string();
+    if tag.is_empty() {
+        return None;
+    }
+    Some(ReleaseMeta {
+        tag_name: tag,
+        release_html_url: format!(
+            "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/{}",
+            cand_tag
+        ),
+        release_name: cand_tag.to_string(),
+    })
+}
+
+fn query_releases_list(client: &reqwest::blocking::Client, target: &str) -> Option<ReleaseMeta> {
+    let list_url =
+        "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases?per_page=100";
+    let resp = client.get(list_url).send().ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let releases = resp.json::<Vec<serde_json::Value>>().ok()?;
+    let target_short = target.strip_suffix(".0");
+    for rel in releases {
+        let rel_tag = rel["tag_name"]
+            .as_str()
+            .unwrap_or("")
+            .trim_start_matches(['v', 'V']);
+        let is_match = rel_tag == target
+            || target_short.map(|s| rel_tag == s).unwrap_or(false)
+            || rel_tag.starts_with(target);
+        if is_match {
+            let html_url = rel["html_url"]
+                .as_str()
+                .unwrap_or("https://github.com/alimtvnetwork/Antigravity-Manager/releases")
+                .to_string();
+            let name = rel["name"].as_str().unwrap_or("").to_string();
+            return Some(ReleaseMeta {
+                tag_name: rel_tag.to_string(),
+                release_html_url: html_url,
+                release_name: name,
+            });
+        }
+    }
+    None
+}
+
+fn query_latest_release(
+    client: &reqwest::blocking::Client,
+    channel: UpdateChannel,
+) -> Option<ReleaseMeta> {
+    let api_url = "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases/latest";
+    if let Ok(resp) = client.get(api_url).send() {
+        if resp.status().is_success() {
+            if let Ok(json) = resp.json::<serde_json::Value>() {
+                let tag = json["tag_name"]
+                    .as_str()
+                    .unwrap_or("")
+                    .trim_start_matches(['v', 'V'])
+                    .to_string();
+                if !tag.is_empty() {
+                    let html_url = json["html_url"]
+                        .as_str()
+                        .unwrap_or("https://github.com/alimtvnetwork/Antigravity-Manager/releases")
+                        .to_string();
+                    let name = json["name"].as_str().unwrap_or("").to_string();
+                    return Some(ReleaseMeta {
+                        tag_name: tag,
+                        release_html_url: html_url,
+                        release_name: name,
+                    });
+                }
+            }
+        }
+    }
+
+    let updater_cdn_url = match channel {
+        UpdateChannel::Beta => {
+            "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/preview/updater.json"
+        }
+        UpdateChannel::Stable => {
+            "https://github.com/alimtvnetwork/Antigravity-Manager/releases/latest/download/updater.json"
+        }
+    };
+    let resp = client.get(updater_cdn_url).send().ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let json = resp.json::<serde_json::Value>().ok()?;
+    let tag = json["version"]
+        .as_str()
+        .unwrap_or("")
+        .trim_start_matches(['v', 'V'])
+        .to_string();
+    if tag.is_empty() {
+        return None;
+    }
+    Some(ReleaseMeta {
+        tag_name: tag.clone(),
+        release_html_url: format!(
+            "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v{}",
+            tag
+        ),
+        release_name: format!("v{}", tag),
+    })
+}
+
 pub(crate) fn cmd_update(args: &[String]) {
-    let is_json = args.iter().any(|a| a == "--json" || a == "-j");
-    let is_interactive = !is_json;
-    let is_help = args
+    let output_format = if args.iter().any(|a| a == "--json" || a == "-j") {
+        OutputFormat::Json
+    } else {
+        OutputFormat::Interactive
+    };
+    let is_json = output_format == OutputFormat::Json;
+    let is_interactive = output_format == OutputFormat::Interactive;
+
+    let execution_mode = if args.iter().any(|a| a == "--check" || a == "-c") {
+        UpdateExecutionMode::CheckOnly
+    } else {
+        UpdateExecutionMode::Execute
+    };
+    let is_execute_mode = execution_mode == UpdateExecutionMode::Execute;
+
+    let target_scope = if args
         .iter()
-        .any(|a| a == "--help" || a == "-h" || a == "help");
-    let is_all = args.iter().any(|a| a == "all" || a == "--all" || a == "-a")
-        || env::args().any(|a| a == "update-all" || a == "ua");
-    let is_gitmap = args
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        UpdateTargetScope::Help
+    } else if args
         .iter()
-        .any(|a| a.eq_ignore_ascii_case("gitmap") || a.eq_ignore_ascii_case("gm"));
-    let is_ssh_fleet = args.iter().any(|a| a.eq_ignore_ascii_case("ssh"));
-    let is_check = args.iter().any(|a| a == "--check" || a == "-c");
-    let is_execute_mode = !is_check;
-    let is_specialized_target = is_help || is_gitmap || is_ssh_fleet;
+        .any(|a| a == "export-zip" || a == "--export-zip")
+    {
+        UpdateTargetScope::ExportZip
+    } else if args
+        .iter()
+        .any(|a| a.eq_ignore_ascii_case("gitmap") || a.eq_ignore_ascii_case("gm"))
+    {
+        UpdateTargetScope::Gitmap
+    } else if args.iter().any(|a| a.eq_ignore_ascii_case("ssh")) {
+        UpdateTargetScope::SshFleet
+    } else if args.iter().any(|a| a == "all" || a == "--all" || a == "-a")
+        || env::args().any(|a| a == "update-all" || a == "ua")
+    {
+        UpdateTargetScope::All
+    } else {
+        UpdateTargetScope::Standard
+    };
+
+    let is_all = target_scope == UpdateTargetScope::All;
     let is_force = args.iter().any(|a| a == "--force" || a == "-f");
-    let is_export_zip = args
-        .iter()
-        .any(|a| a == "export-zip" || a == "--export-zip");
     let requested_version = extract_target_version(args);
     let has_explicit_target = requested_version.is_some();
     let is_implicit_target = requested_version.is_none();
 
-    if is_export_zip {
+    let channel = if args
+        .iter()
+        .any(|a| a == "--beta" || a == "-b" || a == "beta")
+    {
+        UpdateChannel::Beta
+    } else {
+        UpdateChannel::default()
+    };
+
+    if target_scope == UpdateTargetScope::ExportZip {
         crate::update_helpers::cmd_update_export_zip(args);
         return;
     }
 
-    if is_help {
+    if target_scope == UpdateTargetScope::Help {
         if is_json {
             let help_obj = serde_json::json!({
                 "command": "update",
@@ -218,7 +433,7 @@ pub(crate) fn cmd_update(args: &[String]) {
         return;
     }
 
-    if is_gitmap && !is_all {
+    if target_scope == UpdateTargetScope::Gitmap {
         println!("[*] Updating GitMap CLI via 'gitmap self-update'...");
         // Justification: interactive gitmap self-update inherits stdio; spawn failure is non-fatal to caller
         antigravity_tools_lib::error::record_ignored(
@@ -233,7 +448,7 @@ pub(crate) fn cmd_update(args: &[String]) {
         return;
     }
 
-    if is_ssh_fleet {
+    if target_scope == UpdateTargetScope::SshFleet {
         println!("[*] Updating AGM across SSH cluster machines via 'gitmap ssh update agm'...");
         // Justification: interactive gitmap ssh update inherits stdio; spawn failure is non-fatal to caller
         antigravity_tools_lib::error::record_ignored(
@@ -294,7 +509,11 @@ pub(crate) fn cmd_update(args: &[String]) {
             || a == "--delegated-worker"
             || a == "--install-dir"
     });
-    if is_delegated_stage2 && is_interactive && is_execute_mode && !is_specialized_target {
+    if is_delegated_stage2
+        && is_interactive
+        && is_execute_mode
+        && target_scope == UpdateTargetScope::Standard
+    {
         let ok = antigravity_tools_lib::modules::delegate_updater::run_cli_update(args);
         std::process::exit(if ok { 0 } else { 1 });
     }
@@ -309,155 +528,49 @@ pub(crate) fn cmd_update(args: &[String]) {
         }
     }
 
-    let mut tag_name = String::new();
-    let mut release_html_url =
-        "https://github.com/alimtvnetwork/Antigravity-Manager/releases".to_string();
-    let mut release_name = String::new();
-
-    if let Some(ref target) = requested_version {
+    let release_meta = if let Some(ref target) = requested_version {
         // Tier 1: Direct GitHub Release API Tag Query
+        let mut found = None;
         for cand_tag in &candidate_tags {
-            let api_url = format!(
-                "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases/tags/{}",
-                cand_tag
-            );
-            if let Ok(resp) = client.get(&api_url).send() {
-                if resp.status().is_success() {
-                    if let Ok(json) = resp.json::<serde_json::Value>() {
-                        tag_name = json["tag_name"]
-                            .as_str()
-                            .unwrap_or("")
-                            .trim_start_matches(['v', 'V'])
-                            .to_string();
-                        if let Some(u) = json["html_url"].as_str() {
-                            release_html_url = u.to_string();
-                        }
-                        if let Some(n) = json["name"].as_str() {
-                            release_name = n.to_string();
-                        }
-                        if !tag_name.is_empty() {
-                            break;
-                        }
-                    }
-                }
+            if let Some(meta) = query_tag_api(&client, cand_tag) {
+                found = Some(meta);
+                break;
             }
         }
-
         // Tier 2: Release Asset CDN updater.json Query
-        if tag_name.is_empty() {
+        if found.is_none() {
             for cand_tag in &candidate_tags {
-                let cdn_url = format!(
-                    "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/{}/updater.json",
-                    cand_tag
-                );
-                if let Ok(resp) = client.get(&cdn_url).send() {
-                    if resp.status().is_success() {
-                        if let Ok(json) = resp.json::<serde_json::Value>() {
-                            tag_name = json["version"]
-                                .as_str()
-                                .unwrap_or("")
-                                .trim_start_matches(['v', 'V'])
-                                .to_string();
-                            if !tag_name.is_empty() {
-                                release_html_url = format!(
-                                    "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/{}",
-                                    cand_tag
-                                );
-                                release_name = cand_tag.clone();
-                                break;
-                            }
-                        }
-                    }
+                if let Some(meta) = query_cdn_updater(&client, cand_tag) {
+                    found = Some(meta);
+                    break;
                 }
             }
         }
-
         // Tier 3: Releases Index Pagination Fallback
-        if tag_name.is_empty() {
-            let list_url =
-                "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases?per_page=100";
-            if let Ok(resp) = client.get(list_url).send() {
-                if resp.status().is_success() {
-                    if let Ok(releases) = resp.json::<Vec<serde_json::Value>>() {
-                        let target_short = target.strip_suffix(".0");
-                        for rel in releases {
-                            let rel_tag = rel["tag_name"]
-                                .as_str()
-                                .unwrap_or("")
-                                .trim_start_matches(['v', 'V']);
-                            let is_match = rel_tag == target
-                                || target_short.map(|s| rel_tag == s).unwrap_or(false)
-                                || rel_tag.starts_with(target);
-                            if is_match {
-                                tag_name = rel_tag.to_string();
-                                if let Some(u) = rel["html_url"].as_str() {
-                                    release_html_url = u.to_string();
-                                }
-                                if let Some(n) = rel["name"].as_str() {
-                                    release_name = n.to_string();
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
+        if found.is_none() {
+            found = query_releases_list(&client, target);
         }
-
         // Tier 4: Direct fallback to normalized requested version if network queries were rate-limited
-        if tag_name.is_empty() {
-            tag_name = target.clone();
-            release_html_url = format!(
+        found.unwrap_or_else(|| ReleaseMeta {
+            tag_name: target.clone(),
+            release_html_url: format!(
                 "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v{}",
                 target
-            );
-            release_name = format!("v{}", target);
-        }
+            ),
+            release_name: format!("v{}", target),
+        })
     } else {
-        let api_url =
-            "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases/latest";
-        let updater_cdn_url =
-            "https://github.com/alimtvnetwork/Antigravity-Manager/releases/latest/download/updater.json";
+        query_latest_release(&client, channel).unwrap_or_else(|| ReleaseMeta {
+            tag_name: String::new(),
+            release_html_url: "https://github.com/alimtvnetwork/Antigravity-Manager/releases"
+                .to_string(),
+            release_name: String::new(),
+        })
+    };
 
-        if let Ok(resp) = client.get(api_url).send() {
-            if resp.status().is_success() {
-                if let Ok(json) = resp.json::<serde_json::Value>() {
-                    tag_name = json["tag_name"]
-                        .as_str()
-                        .unwrap_or("")
-                        .trim_start_matches(['v', 'V'])
-                        .to_string();
-                    if let Some(u) = json["html_url"].as_str() {
-                        release_html_url = u.to_string();
-                    }
-                    if let Some(n) = json["name"].as_str() {
-                        release_name = n.to_string();
-                    }
-                }
-            }
-        }
-
-        if tag_name.is_empty() {
-            if let Ok(resp) = client.get(updater_cdn_url).send() {
-                if resp.status().is_success() {
-                    if let Ok(json) = resp.json::<serde_json::Value>() {
-                        tag_name = json["version"]
-                            .as_str()
-                            .unwrap_or("")
-                            .trim_start_matches(['v', 'V'])
-                            .to_string();
-                        if !tag_name.is_empty() {
-                            release_html_url = format!(
-                                "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v{}",
-                                tag_name
-                            );
-                            release_name = format!("v{}", tag_name);
-                        }
-                    }
-                }
-            }
-        }
-    }
+    let tag_name = release_meta.tag_name;
+    let release_html_url = release_meta.release_html_url;
+    let release_name = release_meta.release_name;
 
     if tag_name.is_empty() {
         if is_json {
@@ -512,7 +625,7 @@ pub(crate) fn cmd_update(args: &[String]) {
     }
 
     // Binary update if needed
-    let needs_update = !is_up_to_date || is_force || has_explicit_target;
+    let needs_update = is_version_different || is_force || has_explicit_target;
     let should_proceed_update = needs_update && is_execute_mode;
     if should_proceed_update {
         let export_path = crate::update_helpers::default_update_export_path();
@@ -557,7 +670,8 @@ pub(crate) fn cmd_update(args: &[String]) {
             let current_exe = std::env::current_exe().unwrap_or_default();
             let exe_str = current_exe.to_string_lossy().to_lowercase();
             let is_isolated_temp = exe_str.contains("agm-updater");
-            if !is_isolated_temp && is_interactive {
+            let is_host_binary = !is_isolated_temp;
+            if is_host_binary && is_interactive {
                 println!(
                     "[*] Windows executable lock guard: Self-delegating to isolated updater in %TEMP%..."
                 );
@@ -668,21 +782,19 @@ pub(crate) fn cmd_update(args: &[String]) {
         println!("    ● Binary Target:     agm (Antigravity-Manager)");
         println!("    ● Current Version:   v{}", crate::common::VERSION);
         println!("    ● Latest Release:    v{}", tag_name);
-        println!(
-            "    ● Update Status:     {}",
-            if is_downgrade && updated {
-                format!(
-                    "[REVERTED/DOWNGRADED] (Successfully downgraded to v{})",
-                    tag_name
-                )
-            } else if is_up_to_date && is_implicit_target {
-                "[UP TO DATE] (System is currently running the latest release)".to_string()
-            } else if updated {
-                format!("[UPDATED] (Successfully updated to v{})", tag_name)
-            } else {
-                format!("[AVAILABLE] (v{} is available for installation)", tag_name)
-            }
-        );
+        let update_status_desc = if is_downgrade && updated {
+            format!(
+                "[REVERTED/DOWNGRADED] (Successfully downgraded to v{})",
+                tag_name
+            )
+        } else if is_up_to_date && is_implicit_target {
+            "[UP TO DATE] (System is currently running the latest release)".to_string()
+        } else if updated {
+            format!("[UPDATED] (Successfully updated to v{})", tag_name)
+        } else {
+            format!("[AVAILABLE] (v{} is available for installation)", tag_name)
+        };
+        println!("    ● Update Status:     {}", update_status_desc);
         println!("    ● Release URL:       {}", release_html_url);
         if is_all {
             println!(

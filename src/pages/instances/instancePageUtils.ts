@@ -68,6 +68,31 @@ export const isNodeOwnedByInstance = (
     return false;
 };
 
+export function isConversationOwnedByInstance(
+    convInstId: string | undefined | null,
+    instConfig: { id: string; is_default?: boolean; seq_num?: number },
+    convInstSeqNum?: number
+): boolean {
+    const hasSeqNum = typeof instConfig.seq_num === 'number' && instConfig.seq_num > 1;
+    if (hasSeqNum && convInstSeqNum === instConfig.seq_num) {
+        return true;
+    }
+    if (!convInstId || convInstId.trim() === '') {
+        return false;
+    }
+    const isDefaultInst = Boolean(instConfig.is_default || instConfig.id === 'default' || instConfig.id === '__default__');
+    if (isDefaultInst) {
+        return isDefaultOwned(convInstId, instConfig.id);
+    }
+    if (convInstId === 'default' || convInstId === '__default__') {
+        return false;
+    }
+    if (convInstId === instConfig.id) {
+        return true;
+    }
+    return false;
+}
+
 export interface InstanceTheme {
     name: string;
     accentBar: string;

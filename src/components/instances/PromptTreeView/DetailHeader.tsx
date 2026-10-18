@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat } from 'lucide-react';
 import { cn } from '../../../utils/cn';
-import type { AgmConversationNode } from './types';
+import { PromptOriginTier, CopyFormat, type AgmConversationNode } from './types';
 import { formatSeqBadge, stripImagesFromPrompt } from './formatters';
 import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, RERUN_MESSAGE_OPTIONS, RERUN_RANDOM_MESSAGE_SET, RERUN_DEFAULT_COUNT, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
 import { classifyPromptTier } from './tierClassification';
@@ -280,6 +280,20 @@ export function DetailHeader(props: DetailHeaderProps) {
         }
     };
 
+    const handleCopyByFormat = (format: CopyFormat) => {
+        switch (format) {
+            case CopyFormat.RichMedia:
+                handleCopyAll();
+                break;
+            case CopyFormat.CleanText:
+                handleCopyCleanText();
+                break;
+            case CopyFormat.Json:
+                onExport('json');
+                break;
+        }
+    };
+
     const activeTurnNumber = selectedTurnNumber ?? selectedConversation.selected_turn_number ?? null;
     const enqueuedCount = selectedConversation.prompts?.filter((p) => p.is_queued || p.status === 'QUEUED').length || (selectedConversation.is_queued ? 1 : 0);
 
@@ -327,10 +341,10 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     });
                                 }}
                             >
-                                {tierInfo.tier === 'USER_PROMPT' && <User className="w-2.5 h-2.5 text-sky-500 shrink-0" />}
-                                {tierInfo.tier === 'SUBAGENT_INSTRUCTION' && <Bot className="w-2.5 h-2.5 text-purple-500 shrink-0" />}
-                                {tierInfo.tier === 'SYSTEM_MESSAGE' && <Terminal className="w-2.5 h-2.5 text-slate-500 shrink-0" />}
-                                {tierInfo.tier === 'TOOL_OUTPUT' && <Wrench className="w-2.5 h-2.5 text-amber-500 shrink-0" />}
+                                {tierInfo.tier === PromptOriginTier.UserPrompt && <User className="w-2.5 h-2.5 text-sky-500 shrink-0" />}
+                                {tierInfo.tier === PromptOriginTier.SubagentInstruction && <Bot className="w-2.5 h-2.5 text-purple-500 shrink-0" />}
+                                {tierInfo.tier === PromptOriginTier.SystemMessage && <Terminal className="w-2.5 h-2.5 text-slate-500 shrink-0" />}
+                                {tierInfo.tier === PromptOriginTier.ToolOutput && <Wrench className="w-2.5 h-2.5 text-amber-500 shrink-0" />}
                                 <span>{isTurnSelected ? `Turn T${activeTurnNumber} · ${seqDisplay}` : `Session ${seqDisplay}`}</span>
                             </span>
                         );
@@ -596,7 +610,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        handleCopyAll();
+                                        handleCopyByFormat(CopyFormat.RichMedia);
                                         setIsCopyMenuOpen(false);
                                     }}
                                     data-ui-name="prompt-menu-copy-full-text-btn"
@@ -614,7 +628,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        handleCopyCleanText();
+                                        handleCopyByFormat(CopyFormat.CleanText);
                                         setIsCopyMenuOpen(false);
                                     }}
                                     data-ui-name="prompt-menu-copy-clean-text-btn"
