@@ -241,17 +241,29 @@ export async function writeNativeImageToClipboard(
             throw new Error('Failed to convert image to PNG binary blob');
         }
         ensureDocumentFocus();
-        if (navigator.clipboard && typeof ClipboardItem !== 'undefined') {
-            const item = new ClipboardItem({
-                'image/png': pngBlob,
-            });
-            await navigator.clipboard.write([item]);
-            const msg = 'Image copied to clipboard as native PNG!';
+        const hasFocus = typeof document !== 'undefined' && typeof document.hasFocus === 'function' ? document.hasFocus() : true;
+        if (hasFocus && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+            try {
+                const item = new ClipboardItem({
+                    'image/png': pngBlob,
+                });
+                await navigator.clipboard.write([item]);
+                const msg = 'Image copied to clipboard as native PNG!';
+                onSuccess?.(msg);
+                showToast({ message: msg, type: 'success' });
+                return true;
+            } catch {
+                // Focus was lost or binary write rejected; fall through to copyToClipboard
+            }
+        }
+        const fallbackOk = await copyToClipboard(imageUri);
+        if (fallbackOk) {
+            const msg = 'Copied image URI to clipboard!';
             onSuccess?.(msg);
-            showToast({ message: msg, type: 'success' });
+            showToast({ message: msg, type: 'info' });
             return true;
         }
-        throw new Error('Clipboard API unavailable in this environment');
+        return false;
     } catch (err) {
         // Fallback to copying image URI / reference via multi-stage clipboard
         const fallbackOk = await copyToClipboard(imageUri);
@@ -333,34 +345,52 @@ export async function copyPromptWithRichImages(
 
         let isWritten = false;
         ensureDocumentFocus();
-        if (pngBlob) {
-            try {
-                const item = new ClipboardItem({
-                    'image/png': pngBlob,
-                    'text/html': htmlBlob,
-                    'text/plain': textBlob,
-                });
-                await navigator.clipboard.write([item]);
-                isWritten = true;
-            } catch {
-                // Triple MIME write failed (some browser versions reject mixed binary + rich HTML items)
-                // Fall through to dual HTML/plain-text item
+        const hasFocus = typeof document !== 'undefined' && typeof document.hasFocus === 'function' ? document.hasFocus() : true;
+        if (hasFocus && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+            if (pngBlob) {
+                try {
+                    const item = new ClipboardItem({
+                        'image/png': pngBlob,
+                        'text/html': htmlBlob,
+                        'text/plain': textBlob,
+                    });
+                    await navigator.clipboard.write([item]);
+                    isWritten = true;
+                } catch {
+                    // Triple MIME write failed (some browser versions reject mixed binary + rich HTML items)
+                    // Fall through to dual HTML/plain-text item
+                }
+            }
+
+            if (!isWritten) {
+                try {
+                    const item = new ClipboardItem({
+                        'text/html': htmlBlob,
+                        'text/plain': textBlob,
+                    });
+                    await navigator.clipboard.write([item]);
+                    isWritten = true;
+                } catch {
+                    // Binary clipboard write failed or document focus was lost
+                }
             }
         }
 
-        if (!isWritten) {
-            ensureDocumentFocus();
-            const item = new ClipboardItem({
-                'text/html': htmlBlob,
-                'text/plain': textBlob,
-            });
-            await navigator.clipboard.write([item]);
+        if (isWritten) {
+            const successMsg = 'Copied full prompt with embedded rich images to clipboard!';
+            onSuccess?.(successMsg);
+            showToast({ message: successMsg, type: 'success' });
+            return true;
         }
 
-        const successMsg = 'Copied full prompt with embedded rich images to clipboard!';
-        onSuccess?.(successMsg);
-        showToast({ message: successMsg, type: 'success' });
-        return true;
+        const fallbackOk = await copyToClipboard(markdownText);
+        if (fallbackOk) {
+            const msg = 'Copied clean prompt text to clipboard (rich media unsupported in current context)';
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'info' });
+            return true;
+        }
+        return false;
     } catch (err) {
         // Fallback to resilient text copy ladder (Clipboard API -> execCommand -> native helper)
         const fallbackOk = await copyToClipboard(markdownText);
@@ -440,18 +470,23 @@ export async function copyAllImagesAsRichHtml(
 
     try {
         ensureDocumentFocus();
-        if (navigator.clipboard && typeof ClipboardItem !== 'undefined') {
-            const htmlBlob = new Blob([fullHtml], { type: 'text/html' });
-            const textBlob = new Blob([plainText], { type: 'text/plain' });
-            const item = new ClipboardItem({
-                'text/html': htmlBlob,
-                'text/plain': textBlob,
-            });
-            await navigator.clipboard.write([item]);
-            const msg = `Copied ${cleanImages.length} image(s) as rich HTML to clipboard!`;
-            onSuccess?.(msg);
-            showToast({ message: msg, type: 'success' });
-            return true;
+        const hasFocus = typeof document !== 'undefined' && typeof document.hasFocus === 'function' ? document.hasFocus() : true;
+        if (hasFocus && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+            try {
+                const htmlBlob = new Blob([fullHtml], { type: 'text/html' });
+                const textBlob = new Blob([plainText], { type: 'text/plain' });
+                const item = new ClipboardItem({
+                    'text/html': htmlBlob,
+                    'text/plain': textBlob,
+                });
+                await navigator.clipboard.write([item]);
+                const msg = `Copied ${cleanImages.length} image(s) as rich HTML to clipboard!`;
+                onSuccess?.(msg);
+                showToast({ message: msg, type: 'success' });
+                return true;
+            } catch {
+                // Focus was lost or rich HTML item rejected; fall through to copyToClipboard
+            }
         }
 
         const success = await copyToClipboard(plainText);

@@ -87,10 +87,28 @@ export interface TreePanelProps {
 }
 
 
+export enum PromptOriginTier {
+    UserPrompt = 'USER_PROMPT',
+    SubagentInstruction = 'SUBAGENT_INSTRUCTION',
+    SystemMessage = 'SYSTEM_MESSAGE',
+    ToolOutput = 'TOOL_OUTPUT',
+}
+
+export enum PromptViewMode {
+    Preview = 'preview',
+    Raw = 'raw',
+    Edit = 'edit',
+}
+
+export enum CopyFormat {
+    RichMedia = 'rich_media',
+    CleanText = 'clean_text',
+    Json = 'json',
+}
+
 export type ViewMode = 'preview' | 'raw' | 'edit';
 
-export type PromptTier = 'USER_PROMPT' | 'SUBAGENT_INSTRUCTION' | 'SYSTEM_MESSAGE' | 'TOOL_OUTPUT';
-export type PromptOriginTier = PromptTier;
+export type PromptTier = PromptOriginTier | 'USER_PROMPT' | 'SUBAGENT_INSTRUCTION' | 'SYSTEM_MESSAGE' | 'TOOL_OUTPUT';
 
 export interface TierClassificationResult {
     tier: PromptTier;

@@ -1,8 +1,8 @@
 # Master Plan: UI and Functionality Enhancement Instructions
 
 Request slug: `ui-and-functionality-enhancement-instructions`
-Status: ACTIVE
-Phase: 2
+Status: COMPLETED
+Phase: 3
 Capacity: A = 3 agents × H = 2 hands = 6 concurrent operations
 
 ## User Request (Verbatim)
@@ -18,12 +18,12 @@ So far the work is good. I want you to do now, the first step should be actually
 | Task-ID | Title | Owner | Status | Target Files |
 |---|---|---|---|---|
 | Task-01 | Setup, Preflight, Specs & Plans | Lead | DONE | `02-spec/21-app/ui-and-functionality-enhancement-instructions/` |
-| Task-02 | Coding Guidelines Refactoring (Boolean, Naming, Enums, CLI Help, Functions) | Worker 01 | PENDING | `src-tauri/src/bin/agm/update_cmds.rs`, `install.ps1`, `src-tauri/src/modules/` |
-| Task-03 | Instance Prompt Isolation & Idle Supremacy | Worker 02 | PENDING | `src-tauri/src/modules/repo_db/`, `src/pages/instances/instanceCardData.ts` |
-| Task-04 | SSH Cluster & Node W2 Parity | Worker 03 | PENDING | `src-tauri/src/modules/ssh_manager/`, `src-tauri/src/modules/supabase_sync/`, `useFleetMachines.ts` |
-| Task-05 | Prompt Tree Context Menus, z-Index, Conversation View & Enqueued Prompts | Worker 01 | PENDING | `ConversationContextMenu.tsx`, `ProjectContextMenu.tsx`, `PromptInstructionView.tsx` |
-| Task-06 | Markdown View, Compact Toolbar, Reduced Rounding & Details Modal | Worker 02 | PENDING | `DetailHeader.tsx`, `DetailsModal.tsx`, `PromptTreeViewModal.tsx` |
-| Task-07 | Image Preview, Context Menu & Dual Copy Buttons ("With Image" vs "Without Image") | Worker 03 | PENDING | `PromptImageContextMenu.tsx`, `PromptImagePreviewModal.tsx`, `clipboard.ts` |
-| Task-08 | Standalone JSON Import / Export & Overlay Isolation | Worker 01 | PENDING | `PromptTreeExportModal.tsx`, `PromptTreeImportModal.tsx`, `prompt_export.rs` |
-| Task-09 | Updater Version Detection Fix & Pinned Version Execution | Worker 02 | PENDING | `install.ps1`, `src-tauri/src/bin/agm/update_cmds.rs` |
-| Task-10 | End-to-End Verification, Documentation & GitMap Atomic Commit | Lead | PENDING | Repository test gate and atomic GitMap commit |
+| Task-02 | Coding Guidelines Refactoring (Boolean, Naming, Enums, CLI Help, Functions) | Worker 01 | DONE | `src-tauri/src/bin/agm/update_cmds.rs`, `install.ps1`, `src-tauri/src/modules/` |
+| Task-03 | Instance Prompt Isolation & Idle Supremacy | Worker 02 | DONE | `src-tauri/src/modules/repo_db/`, `src/pages/instances/instanceCardData.ts` |
+| Task-04 | SSH Cluster & Node W2 Parity | Worker 03 | DONE | `src-tauri/src/modules/ssh_manager/`, `src-tauri/src/modules/supabase_sync/`, `useFleetMachines.ts` |
+| Task-05 | Prompt Tree Context Menus, z-Index, Conversation View & Enqueued Prompts | Worker 01 | DONE | `ConversationContextMenu.tsx`, `ProjectContextMenu.tsx`, `PromptInstructionView.tsx` |
+| Task-06 | Markdown View, Compact Toolbar, Reduced Rounding & Details Modal | Worker 02 | DONE | `DetailHeader.tsx`, `DetailsModal.tsx`, `PromptTreeViewModal.tsx` |
+| Task-07 | Image Preview, Context Menu & Dual Copy Buttons ("With Image" vs "Without Image") | Worker 03 | DONE | `PromptImageContextMenu.tsx`, `PromptImagePreviewModal.tsx`, `clipboard.ts` |
+| Task-08 | Standalone JSON Import / Export & Overlay Isolation | Worker 01 | DONE | `PromptTreeExportModal.tsx`, `PromptTreeImportModal.tsx`, `prompt_export.rs` |
+| Task-09 | Updater Version Detection Fix & Pinned Version Execution | Worker 02 | DONE | `install.ps1`, `src-tauri/src/bin/agm/update_cmds.rs`, `run.rs` |
+| Task-10 | End-to-End Verification, Documentation & GitMap Atomic Commit | Lead | DONE | Repository test gate and atomic GitMap commit |

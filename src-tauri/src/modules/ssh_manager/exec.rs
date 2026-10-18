@@ -77,24 +77,32 @@ pub fn resolve_target_nodes(
                 .filter(|c| is_connection_target_match(c, tok))
                 .cloned()
                 .collect();
-            if !matched.is_empty() {
-                for m in matched {
-                    if !resolved.iter().any(|r: &SshConnectionRecord| {
-                        r.ip_address == m.ip_address && r.alias == m.alias
-                    }) {
-                        resolved.push(m);
-                    }
+            if matched.is_empty() {
+                if let Some(adhoc) = parse_adhoc_connection(tok) {
+                    resolved.push(adhoc);
                 }
-            } else if let Some(adhoc) = parse_adhoc_connection(tok) {
-                resolved.push(adhoc);
+                continue;
+            }
+
+            for m in matched {
+                let is_already_resolved = resolved.iter().any(|r: &SshConnectionRecord| {
+                    r.ip_address == m.ip_address && r.alias == m.alias
+                });
+                if is_already_resolved {
+                    continue;
+                }
+                resolved.push(m);
             }
         }
     }
 
-    if !exclusions.is_empty() {
+    let has_exclusions = !exclusions.is_empty();
+    if has_exclusions {
         resolved.retain(|c| {
-            !exclusions.contains(&c.alias.to_lowercase())
-                && !exclusions.contains(&c.ip_address.to_lowercase())
+            let is_alias_excluded = exclusions.contains(&c.alias.to_lowercase());
+            let is_ip_excluded = exclusions.contains(&c.ip_address.to_lowercase());
+            let is_excluded = is_alias_excluded || is_ip_excluded;
+            !is_excluded
         });
     }
 

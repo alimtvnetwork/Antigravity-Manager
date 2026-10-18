@@ -570,6 +570,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                 position={contextMenu.position}
                 imageSrc={contextMenu.imageSrc}
                 altText={contextMenu.altText}
+                allImages={attachedImages.map((img) => resolveImageSrc(img.src))}
                 onClose={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}
                 onOpenPreview={handleOpenPreview}
             />

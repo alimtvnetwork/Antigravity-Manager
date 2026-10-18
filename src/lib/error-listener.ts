@@ -30,7 +30,8 @@ function isClipboardFocusError(reason: unknown): boolean {
     ? `${reason.message}\n${reason.stack ?? ''}`
     : String(reason ?? '');
   return text.includes('Document is not focused')
-    || text.includes("Failed to execute 'writeText'");
+    || text.includes("Failed to execute 'writeText'")
+    || text.includes("Failed to execute 'write'");
 }
 
 function replayPersistedClientError(): void {
@@ -40,10 +41,6 @@ function replayPersistedClientError(): void {
   }
   localStorage.removeItem(LAST_CLIENT_ERROR_KEY);
   if (isClipboardFocusError(raw)) {
-    useErrorStore.getState().trackWarning(new Error(raw), {
-      source: 'persisted-client-crash',
-      triggerAction: 'replay_clipboard_not_focused',
-    });
     return;
   }
   useErrorStore.getState().captureError(new Error(raw), {
@@ -143,10 +140,6 @@ function handleUnhandledRejection(event: PromiseRejectionEvent): void {
 
   if (isClipboardFocusError(reason)) {
     event.preventDefault();
-    useErrorStore.getState().trackWarning(reason, {
-      source: 'window.unhandledrejection',
-      triggerAction: 'clipboard_not_focused',
-    });
     return;
   }
 

@@ -69,6 +69,8 @@ export function ProjectContextMenu({
     const top = Math.max(8, Math.min(y, window.innerHeight - MENU_HEIGHT));
 
     useEffect(() => {
+        const mountTime = Date.now();
+
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
                 onClose();
@@ -76,12 +78,15 @@ export function ProjectContextMenu({
         };
 
         const handleClickOutside = (e: MouseEvent) => {
+            if (Date.now() - mountTime < 100) return;
             if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
                 onClose();
             }
         };
 
-        const handleScroll = () => {
+        const handleScroll = (e: Event) => {
+            if (Date.now() - mountTime < 150) return;
+            if (menuRef.current && menuRef.current.contains(e.target as Node)) return;
             onClose();
         };
 

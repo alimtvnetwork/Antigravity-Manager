@@ -539,6 +539,16 @@ export function PromptMarkdownPreview({
         return elements;
     }, [content, onToggleExpand, handleImageClick, handleImageContextMenu]);
 
+    const allMarkdownImages = useMemo(() => {
+        const matches: string[] = [];
+        const regex = /!\[(.*?)\]\((.*?)\)/g;
+        let m: RegExpExecArray | null;
+        while ((m = regex.exec(content)) !== null) {
+            if (m[2]) matches.push(m[2]);
+        }
+        return matches;
+    }, [content]);
+
     return (
         <div className={cn('prose prose-xs dark:prose-invert max-w-none font-sans', className)}>
             {renderedNodes}
@@ -567,6 +577,7 @@ export function PromptMarkdownPreview({
                     position={contextMenuPos}
                     imageSrc={contextMenuImageSrc}
                     altText={contextMenuAlt}
+                    allImages={allMarkdownImages}
                     onClose={() => setIsContextMenuOpen(false)}
                     onOpenPreview={(src, alt) => {
                         setPreviewImageSrc(src);

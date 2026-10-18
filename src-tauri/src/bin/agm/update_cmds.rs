@@ -134,10 +134,11 @@ pub(crate) fn extract_target_version(args: &[String]) -> Option<String> {
                 || clean.eq_ignore_ascii_case("export-zip")
                 || clean.eq_ignore_ascii_case("help");
 
-            if !is_special_cmd {
-                if let Some(ver) = extract_version_from_token(clean) {
-                    return Some(ver);
-                }
+            if is_special_cmd {
+                continue;
+            }
+            if let Some(ver) = extract_version_from_token(clean) {
+                return Some(ver);
             }
         }
     }
@@ -165,6 +166,7 @@ pub(crate) fn cmd_update(args: &[String]) {
         .any(|a| a == "export-zip" || a == "--export-zip");
     let requested_version = extract_target_version(args);
     let has_explicit_target = requested_version.is_some();
+    let is_implicit_target = requested_version.is_none();
 
     if is_export_zip {
         crate::update_helpers::cmd_update_export_zip(args);
@@ -476,7 +478,8 @@ pub(crate) fn cmd_update(args: &[String]) {
     }
 
     let is_up_to_date = tag_name == crate::common::VERSION;
-    let is_downgrade = has_explicit_target && !is_up_to_date;
+    let is_version_different = tag_name != crate::common::VERSION;
+    let is_downgrade = has_explicit_target && is_version_different;
     let mut updated = false;
 
     // Repo check if in workspace
@@ -672,7 +675,7 @@ pub(crate) fn cmd_update(args: &[String]) {
                     "[REVERTED/DOWNGRADED] (Successfully downgraded to v{})",
                     tag_name
                 )
-            } else if is_up_to_date && !has_explicit_target {
+            } else if is_up_to_date && is_implicit_target {
                 "[UP TO DATE] (System is currently running the latest release)".to_string()
             } else if updated {
                 format!("[UPDATED] (Successfully updated to v{})", tag_name)

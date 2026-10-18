@@ -44,8 +44,9 @@ async function copyWithNativeHelper(text: string): Promise<void> {
 export async function copyToClipboard(text: string): Promise<boolean> {
     ensureDocumentFocus();
 
-    // Stage 1: Modern Async Clipboard API
-    if (navigator.clipboard && window.isSecureContext && document.hasFocus()) {
+    // Stage 1: Modern Async Clipboard API (strictly require focused document)
+    const hasFocus = typeof document !== 'undefined' && typeof document.hasFocus === 'function' ? document.hasFocus() : false;
+    if (navigator.clipboard && window.isSecureContext && hasFocus) {
         try {
             await navigator.clipboard.writeText(text);
             return true;

@@ -107,6 +107,7 @@ export function DetailHeader(props: DetailHeaderProps) {
         onCopyAllWithRichImages, onCopyCleanText,
         onCopyWithImages, onSaveImages, onExport, onFocusIde, onResend, onEnqueue, rerunRepoPath, onOpenInspector,
         selectedTurnNumber,
+        setIsDetailsModalOpen,
     } = props;
 
     const [localNewConvTitle, setLocalNewConvTitle] = useState('');
@@ -560,12 +561,30 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 onClick={() => setIsRerunMenuOpen((prev) => !prev)}
                                 data-ui-name="prompt-rerun-options-btn"
                                 data-ui-id={`prompt-rerun-options-${selectedConversation.conversation_id}`}
-                                className="flex items-center justify-center px-1.5 py-1 rounded-r-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                className={cn(
+                                    "flex items-center justify-center px-1.5 py-1 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
+                                    !setIsDetailsModalOpen && "rounded-r-md"
+                                )}
                                 title="Rerun configuration: count and message"
                             >
                                 <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isRerunMenuOpen && "rotate-180")} />
                             </button>
                         </div>
+
+                        {/* Segment 4: Details Button */}
+                        {setIsDetailsModalOpen && (
+                            <button
+                                type="button"
+                                onClick={() => setIsDetailsModalOpen(true)}
+                                data-ui-name="prompt-details-btn"
+                                data-ui-id={`prompt-details-${selectedConversation.conversation_id}`}
+                                className="flex items-center gap-1.5 px-3 py-1 rounded-r-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                title="Open Conversation & Instance Details (Target IDE, PID, executable path, process status)"
+                            >
+                                <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                <span>Details</span>
+                            </button>
+                        )}
 
                         {/* Flyout 1: Copy Options Menu */}
                         {isCopyMenuOpen && (

@@ -433,25 +433,34 @@ pub fn run_cli_update(args: &[String]) -> bool {
             .map(|v| format!("-Version \"{}\"", v))
             .unwrap_or_default();
 
+        let is_pinned_arg = if normalized_target_version.is_some()
+            || args.iter().any(|a| a == "-isPinned" || a == "--is-pinned")
+        {
+            "-isPinned"
+        } else {
+            ""
+        };
+
         let local_script = resolved_install_dir.join("install.ps1");
         let cwd_script = Path::new("install.ps1");
 
         let ps_script = if local_script.exists() {
             format!(
-                "& \"{}\" -Update -Force -NoLaunch {} {}",
+                "& \"{}\" -Update -Force -NoLaunch {} {} {}",
                 local_script.display(),
                 dir_arg,
-                ver_arg
+                ver_arg,
+                is_pinned_arg
             )
         } else if cwd_script.exists() {
             format!(
-                ".\\install.ps1 -Update -Force -NoLaunch {} {}",
-                dir_arg, ver_arg
+                ".\\install.ps1 -Update -Force -NoLaunch {} {} {}",
+                dir_arg, ver_arg, is_pinned_arg
             )
         } else {
             format!(
-                "$s = irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1; & ([scriptblock]::Create($s)) -Update -Force -NoLaunch {} {}",
-                dir_arg, ver_arg
+                "$s = irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1; & ([scriptblock]::Create($s)) -Update -Force -NoLaunch {} {} {}",
+                dir_arg, ver_arg, is_pinned_arg
             )
         };
 

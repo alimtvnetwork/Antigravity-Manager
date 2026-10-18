@@ -32,7 +32,10 @@ export function PromptImageContextMenu({
     useEffect(() => {
         if (!isOpen) return;
 
+        const mountTime = Date.now();
+
         const handleClickOutside = (e: MouseEvent) => {
+            if (Date.now() - mountTime < 100) return;
             if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
                 onClose();
             }
@@ -45,11 +48,19 @@ export function PromptImageContextMenu({
             }
         };
 
+        const handleScroll = (e: Event) => {
+            if (Date.now() - mountTime < 150) return;
+            if (menuRef.current && menuRef.current.contains(e.target as Node)) return;
+            onClose();
+        };
+
         document.addEventListener('mousedown', handleClickOutside);
         document.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('scroll', handleScroll, true);
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
             document.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('scroll', handleScroll, true);
         };
     }, [isOpen, onClose]);
 
