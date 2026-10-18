@@ -347,6 +347,14 @@ def copy_single_file(
         if dst_file.exists():
             return 0
 
+    # Fast-Path: If destination exists and matches source size & bytes, skip immediately
+    if dst_file.exists():
+        try:
+            if src_file.stat().st_size == dst_file.stat().st_size and src_file.read_bytes() == dst_file.read_bytes():
+                return 0
+        except Exception:
+            pass
+
     # Boundary 2: Additive-Only AI Scripts with repo modification checks
     if is_additive_only:
         if dst_file.exists():
@@ -713,6 +721,10 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
         has_dry_changes = (total_copied + total_removed) > 0
         result["changed"] = has_dry_changes
         result["release_tag"] = f"v{bump_patch_version(current_ver)}" if has_dry_changes else pre_tag
+        print(
+            f"[DRY-RUN] {target.name:<30} | Pre: {pre_tag:<9} | Post: {result['release_tag']:<9} | +{total_copied}/-{total_removed}",
+            flush=True,
+        )
 
         return result
 
@@ -731,7 +743,7 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
     # 6. Commit changes on base branch and push
     run_cmd("git add -A", target)
     commit_msg = (
-        "feat(sync) - sync canonical prompts, skills, gitmap agent standards, and purge deprecated 46 task manager"
+        "feat(sync) - sync canonical v6 execute suite, gitmap heatmap telemetry, skills, and prompts"
     )
     code, out, err = run_cmd(f'git commit -m "{commit_msg}"', target)
 
@@ -826,7 +838,8 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
             result["error"] = f"Push failed: {p_err or p_out}"
 
     print(
-        f"[OK] {target.name:<32} | Pre: {pre_tag:<9} | Post: {release_tag:<9} | +{total_copied}/-{total_removed}"
+        f"[OK] {target.name:<32} | Pre: {pre_tag:<9} | Post: {release_tag:<9} | +{total_copied}/-{total_removed}",
+        flush=True,
     )
 
     return result
