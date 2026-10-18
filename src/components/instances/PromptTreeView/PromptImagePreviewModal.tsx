@@ -47,27 +47,25 @@ export function PromptImagePreviewModal({
         }
     }, [isOpen, imageSrc, handleResetZoom]);
 
-    // Handle Escape key and keyboard shortcuts
+    // Handle Escape key and keyboard shortcuts via Map dispatch table
     useEffect(() => {
         if (!isOpen) return;
 
+        const keyActionMap = new Map<string, () => void>([
+            ['Escape', onClose],
+            ['+', handleZoomIn],
+            ['=', handleZoomIn],
+            ['-', handleZoomOut],
+            ['_', handleZoomOut],
+            ['0', handleResetZoom],
+        ]);
+
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
+            const action = keyActionMap.get(e.key);
+            if (action) {
                 e.preventDefault();
                 e.stopPropagation();
-                onClose();
-            } else if (e.key === '+' || e.key === '=') {
-                e.preventDefault();
-                e.stopPropagation();
-                handleZoomIn();
-            } else if (e.key === '-' || e.key === '_') {
-                e.preventDefault();
-                e.stopPropagation();
-                handleZoomOut();
-            } else if (e.key === '0') {
-                e.preventDefault();
-                e.stopPropagation();
-                handleResetZoom();
+                action();
             }
         };
 
