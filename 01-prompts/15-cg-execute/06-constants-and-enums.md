@@ -20,7 +20,7 @@ WAVES = ceil(subtasks / (A x H))
 > **Top-Instruction Priority Mandate (Above Precedence / Preamble Precedence):**
 > Whatever directives, constraints, checklists, or user instructions are given ABOVE this prompt (including in the user preamble, header blocks, or incoming user request above) are HIGHEST PRIORITY and MUST BE FOLLOWED as strictly NON-NEGOTIABLE. They supersede and strictly override any conflicting general advice, default conventions, or lower-level guidelines below. The agent MUST inspect and follow the instructions above with absolute precedence.
 
-[/goal](slashCommand;goal) Autonomously scan, plan, refactor, and fix all constants, enums, magic string literals, raw character/rune literals (`rune(10)`), and magic number violations across the codebase, modifying source files directly to enforce the `*Type` enum suffix, extract magic numbers/strings into dedicated constant files, and use typed enums and traits: FIRST showcase and list out the given task in visible chat during Turn 1 with the 5 Mandatory Pillars and 4-part verification schema, capture it verbatim, plan it in the repo, spawn autonomous subagents via `invoke_subagent` (A = 3, H = 2, Capacity = 6; solo execution without calling `invoke_subagent` is an auto-reject failure) in disjoint file boxes using GitMap high-speed commands as primary, prove every single claim with concrete evidence, enforce coding guidelines to 100%, and finish with one atomic GitMap commit (`gitmap cpf "<module> - <summary>"` / `gitmap cpb "<module> - <summary>"`) using hyphen format (no colons in GitMap arguments, as the colon is already provided by GitMap) that holds strictly this task's files.
+[/goal](slashCommand;goal) Autonomously scan, plan, refactor, and fix all constants, enums, MIME and media type magic literals (`MimeType` in Blob/Clipboard/Headers), magic string literals, raw character/rune literals (`rune(10)`), and magic number violations across the codebase, modifying source files directly to enforce the `*Type` enum suffix, extract magic numbers/strings into dedicated constant files, and use typed enums and traits: FIRST showcase and list out the given task in visible chat during Turn 1 with the 5 Mandatory Pillars and 4-part verification schema, capture it verbatim, plan it in the repo, spawn autonomous subagents via `invoke_subagent` (A = 3, H = 2, Capacity = 6; solo execution without calling `invoke_subagent` is an auto-reject failure) in disjoint file boxes using GitMap high-speed commands as primary, prove every single claim with concrete evidence, enforce coding guidelines to 100%, and finish with one atomic GitMap commit (`gitmap cpf "<module> - <summary>"` / `gitmap cpb "<module> - <summary>"`) using hyphen format (no colons in GitMap arguments, as the colon is already provided by GitMap) that holds strictly this task's files.
 
 [/learn](slashCommand;learn) Enforce the Top-Instruction Priority Mandate: whatever directives, custom requirements, checklists, or user instructions are provided ABOVE this prompt outrank everything below. Turn 1 MUST showcase the given task list in visible chat before any background execution. Each rule is stated once (R1 to R16) and cited by ID. Progress lives in the ledger and in `.ai-memory/plans/`, never only in chat.
 
@@ -218,6 +218,85 @@ GitMap is your **PRIMARY** acceleration engine. NEVER use `rg`, `ripgrep`, `grep
   - Search regex: `gitmap aum search -r "<regex>" [dir] [-e <.ext>]` (e.g. `gitmap aum search -r "("pas"|"pa")" cli/cmd -e .go`)
   - Case-insensitive: `gitmap aum search -i "<query>" [dir]`
 - **TOTAL BAN:** NEVER run `rg`, `ripgrep`, `grep`, `git grep`, `Select-String`, `Get-ChildItem -Recurse`, or `findstr`. Running raw grep, ripgrep, or slow shell search pipelines wastes execution steps, causes Windows process hangs, and violates GitMap primacy. Search exclusively through `gitmap aum search` or `gitmap find`.
+
+---
+
+## 4. Domain Focus: Constants, Enums & MIME/Media Type Architecture
+
+This CG execute prompt targets the elimination of magic numbers, magic strings, untyped enums, and raw MIME/media type literals across the repository.
+
+### 4.1 MIME & Media Type Enum Standards (Spec 36 Alignment)
+Raw string literals representing MIME and media types (e.g. `'text/html'`, `'text/plain'`, `'application/json'`, `'image/png'`) in:
+- Browser Blob constructors: `new Blob([htmlContent], { type: 'text/html' })`
+- ClipboardItem APIs: `new ClipboardItem({ 'text/html': htmlBlob, 'text/plain': textBlob })`
+- HTTP headers: `res.setHeader('Content-Type', 'application/json')`, `headers: { 'Accept': 'text/csv' }`
+- Backend streaming and content negotiation
+are STRICTLY PROHIBITED.
+
+#### The Canonical Refactoring:
+1. **Centralize Enum:** Create or import centralized `MimeType` enum object / typed constant dictionary:
+   - TypeScript (`src/constants/mimeType.ts`):
+     ```typescript
+     export const MimeType = {
+       TextPlain: 'text/plain',
+       TextHtml: 'text/html',
+       TextMarkdown: 'text/markdown',
+       TextCss: 'text/css',
+       TextCsv: 'text/csv',
+       ApplicationJson: 'application/json',
+       ApplicationXml: 'application/xml',
+       ApplicationPdf: 'application/pdf',
+       ApplicationOctetStream: 'application/octet-stream',
+       ImagePng: 'image/png',
+       ImageJpeg: 'image/jpeg',
+       ImageSvg: 'image/svg+xml',
+       MultipartFormData: 'multipart/form-data',
+     } as const;
+     export type MimeType = typeof MimeType[keyof typeof MimeType];
+     ```
+   - Go (`pkg/enum/mimetype/mimetype.go`):
+     ```go
+     type MimeType string
+     const (
+         TextPlain       MimeType = "text/plain"
+         TextHTML        MimeType = "text/html"
+         TextMarkdown    MimeType = "text/markdown"
+         ApplicationJSON MimeType = "application/json"
+         ImagePNG        MimeType = "image/png"
+     )
+     ```
+   - Python (`app/enums/mime_type.py`):
+     ```python
+     from enum import Enum
+     class MimeType(str, Enum):
+         TEXT_PLAIN = "text/plain"
+         TEXT_HTML = "text/html"
+         APPLICATION_JSON = "application/json"
+         IMAGE_PNG = "image/png"
+     ```
+2. **Refactor Call Sites:** Replace all inline magic strings with `MimeType.<Member>`:
+   ```typescript
+   // ✅ REFACTORED:
+   const htmlBlob = new Blob([htmlContent], { type: MimeType.TextHtml });
+   const textBlob = new Blob([mdText], { type: MimeType.TextPlain });
+   const clipboardItem = new ClipboardItem({
+     [MimeType.TextHtml]: htmlBlob,
+     [MimeType.TextPlain]: textBlob,
+   });
+   ```
+3. **Map Dispatch for Extension Resolution (Spec 35 Alignment):** Never use `if-else` cascades or `switch` statements to map extensions to MIME types. Use declarative, immutable lookup tables:
+   ```typescript
+   const EXTENSION_MIME_MAP: Readonly<Record<string, MimeType>> = {
+     '.html': MimeType.TextHtml,
+     '.md': MimeType.TextMarkdown,
+     '.json': MimeType.ApplicationJson,
+   };
+   ```
+
+### 4.2 General Constants and Enum Standards
+- **PascalCase Suffix:** Enforce `*Type` suffix for enum type names (e.g., `TaskStatusType`, `MimeType`, `UserRoleType`).
+- **No Raw Magic Numbers / Strings:** Extract configuration constants, timeout values, status tokens, and character runes into dedicated constant files.
+- **Value Semantics:** Small enums and constant definitions should use value receivers and immutable structures.
 
 ---
 
@@ -485,6 +564,7 @@ You are Worker <NN> for task nn-<slug>. You have no prior chat context; this bri
 7. Targeted Verification: Run only fast file-scoped linters (e.g. `python 03-ai-scripts/05-guideline-autofixer.py <folder> --check-only`). A check scanning 0 files is a FAIL.
 8. GitMap Search Primacy (TOTAL BAN on rg / ripgrep / Select-String / git grep): NEVER execute `rg`, `ripgrep`, `grep`, `git grep`, `Select-String`, `Get-ChildItem -Recurse`, or `findstr`. Always use `gitmap aum search "<pattern>" [dir] [-e <.ext>] [-r]` for live symbol/regex discovery.
 9. Mandatory Heatmap Telemetry: In multi-agent autonomous sessions, agents MUST record all file read/edit decisions with reasoning via gitmap heatmap log or gitmap agent log, and inspect active file leases and contention hotspots via gitmap agent heatmap (or gitmap heatmap status) before editing shared files.
+10. MIME & Media Type Enums (Spec 36 Alignment): Zero raw magic string literals for MIME or media types (e.g. `'text/html'`, `'text/plain'`, `'application/json'`, `'image/png'`). All MIME types used in Blob constructors (`new Blob([data], { type: MimeType.TextHtml })`), ClipboardItem APIs (`new ClipboardItem({ [MimeType.TextHtml]: htmlBlob })`), HTTP headers (`Content-Type`, `Accept`), or response writers MUST use centralized `MimeType` enum members or typed constant dictionaries. Extension-to-MIME lookups MUST use declarative map dispatch tables (`Record<string, MimeType>`) adhering to Spec 35.
 
 ### Concurrency-Safe SQLite Action Logging & Heatmap Telemetry (CRASH FORENSICS MANDATE):
 - Worker subtasks are tracked in the run database: `<databasePath>`.
@@ -663,6 +743,7 @@ Confirm scripts exist via harmless workspace call before invoking (R4). Run on c
 - **Markdown Link & Doc Path Linter:** `python 03-ai-scripts/22-doc-path-linter.py <folder>`
 - **Sequence Integrity Linter:** `python linter-scripts/check-sequence-integrity.py`
 - **Forbidden Strings Check:** `python linter-scripts/check-forbidden-strings.py`
+- **MIME & Media Type Literals Check:** `gitmap aum search -r "(?:'|\")(text|application|image|audio|video)\/(html|plain|json|xml|markdown|csv|png|jpeg|octet-stream)(?:'|\")" <folder>`
 
 ---
 
@@ -717,6 +798,7 @@ Confirm scripts exist via harmless workspace call before invoking (R4). Run on c
 - [ ] Line Endings & Encoding: Strictly Unix LF (`\n`) and UTF-8 without BOM.
 - [ ] Function Sizing: Functions <= 8 lines preferred (hard cap 15 lines).
 - [ ] Strict Relative Git Paths & Lowercase: Zero absolute paths (`/absolute/path/to/...`) or `file:///` URIs anywhere in the diff, ledger, plans, release notes, or release page; strictly relative paths and lowercase filenames.
+- [ ] MIME & Media Type Enums (Spec 36): All MIME and media types passed to Blob constructors, ClipboardItem APIs, HTTP headers, and API responses are extracted into centralized `MimeType` enums / typed constant dictionaries; zero raw magic strings like `'text/html'` or `'application/json'` at call sites, and extension lookups use map dispatch tables (Spec 35).
 
 ---
 
