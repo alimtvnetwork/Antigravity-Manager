@@ -371,6 +371,31 @@ def copy_single_file(
             else:
                 return 0
 
+    # Regression Protection for Skills & Prompts:
+    # If dst_file exists and is a markdown file, check if dst_file was modified in the target repo
+    # by a non-sync commit AND contains sections/headings that are missing in src_file.
+    # Never overwrite and destroy sections added by the target repository!
+    if dst_file.exists() and dst_file.suffix.lower() in (".md", ".markdown"):
+        if repo_root is not None:
+            try:
+                rel_to_repo = dst_file.relative_to(repo_root)
+                code_log, out_log, _ = run_cmd(["git", "log", "-n", "1", "--format=%s", "--", rel_to_repo.as_posix()], repo_root)
+
+                if code_log == 0 and out_log.strip():
+                    last_commit = out_log.strip().lower()
+
+                    if "sync" not in last_commit:
+                        dst_text = dst_file.read_text(encoding="utf-8", errors="replace")
+                        src_text = src_file.read_text(encoding="utf-8", errors="replace")
+                        dst_headings = {line.strip() for line in dst_text.splitlines() if re.match(r"^#{1,6}\s+", line.strip())}
+                        src_headings = {line.strip() for line in src_text.splitlines() if re.match(r"^#{1,6}\s+", line.strip())}
+                        missing_in_src = dst_headings - src_headings
+
+                        if missing_in_src:
+                            return 0
+            except Exception:
+                pass
+
     is_copy_needed = False
 
     if not dst_file.exists():
