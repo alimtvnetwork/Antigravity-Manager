@@ -89,6 +89,39 @@ pub(crate) fn route_instances_rm(args: &[String], non_flag_args: &[String], is_j
             }
         };
 
+        let has_force = args.iter().any(|a| a == "--force" || a == "-f");
+        if !has_force {
+            if let Some(caller_id) = instance::close::detect_caller_instance_id() {
+                if caller_id == resolved_id || caller_id == target_spec {
+                    if is_json {
+                        let err_res = serde_json::json!({
+                            "success": false,
+                            "error": format!("Target instance '{}' is your currently running IDE instance! Aborting to prevent terminating your own session. Pass --force to override.", resolved_id)
+                        });
+                        println!("{}", serde_json::to_string(&err_res).unwrap_or_default());
+                    }
+                    eprintln!(
+                        "[ERROR] Target instance '{}' is your currently running IDE instance! Aborting to prevent terminating your own session. Pass --force to override.",
+                        resolved_id
+                    );
+                    std::process::exit(2);
+                }
+            }
+            if let Err(err) = instance::refuse_if_caller_instance(&resolved_id) {
+                if is_json {
+                    let err_res = serde_json::json!({
+                        "success": false,
+                        "error": err
+                    });
+                    println!("{}", serde_json::to_string(&err_res).unwrap_or_default());
+                }
+                eprintln!("[ERROR] {err}");
+                std::process::exit(2);
+            }
+        } else {
+            std::env::set_var("AGM_FORCE_CALLER_OVERRIDE", "1");
+        }
+
         match instance::delete_instance(&resolved_id) {
             Ok(_) => println!("[SUCCESS] Deleted instance '{}'.", resolved_id),
             Err(e) => {
@@ -196,6 +229,17 @@ pub(crate) fn route_instances_switch(
 
                 let active_id =
                     instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string());
+                if let Err(err) = instance::refuse_if_caller_instance(&active_id) {
+                    if is_json {
+                        let err_res = serde_json::json!({
+                            "success": false,
+                            "error": err
+                        });
+                        println!("{}", serde_json::to_string(&err_res).unwrap_or_default());
+                    }
+                    eprintln!("[ERROR] {err}");
+                    std::process::exit(2);
+                }
                 let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
                 match rt.block_on(instance::switch_account_to_instance(
                     &target_acc.id,
@@ -279,6 +323,18 @@ pub(crate) fn route_instances_switch(
                 std::process::exit(1);
             }
         };
+
+        if let Err(err) = instance::refuse_if_caller_instance(&resolved_id) {
+            if is_json {
+                let err_res = serde_json::json!({
+                    "success": false,
+                    "error": err
+                });
+                println!("{}", serde_json::to_string(&err_res).unwrap_or_default());
+            }
+            eprintln!("[ERROR] {err}");
+            std::process::exit(2);
+        }
         let index = match account::load_account_index() {
             Ok(idx) => idx,
             Err(e) => {
@@ -406,6 +462,18 @@ pub(crate) fn route_instances_ff(args: &[String], non_flag_args: &[String], is_j
                     std::process::exit(1);
                 }
             };
+
+            if let Err(err) = instance::refuse_if_caller_instance(&resolved_id) {
+                if is_json {
+                    let err_res = serde_json::json!({
+                        "success": false,
+                        "error": err
+                    });
+                    println!("{}", serde_json::to_string(&err_res).unwrap_or_default());
+                }
+                eprintln!("[ERROR] {err}");
+                std::process::exit(2);
+            }
             let prev_email = instance::load_registry()
                 .ok()
                 .and_then(|r| r.instances.into_iter().find(|i| i.id == resolved_id))
@@ -471,5 +539,303 @@ pub(crate) fn route_instances_ff(args: &[String], non_flag_args: &[String], is_j
             return true;
         }
     }
+    false
+}
+
+pub(crate) fn route_instances_self(
+    args: &[String],
+    non_flag_args: &[String],
+    is_json: bool,
+) -> bool {
+    let _ = args;
+    if non_flag_args.is_empty() {
+        return false;
+    }
+    let sub = non_flag_args[0].to_lowercase();
+    if sub != "self" && sub != "current" && sub != "whoami" && sub != "which-self" {
+        return false;
+    }
+
+    let detected = instance::close::detect_caller_instance_id();
+    match detected {
+        Some(caller_id) => {
+            let (name, pid, data_dir, bound_email) =
+                if let Ok(instances) = instance::list_instances() {
+                    if let Some(inst) = instances.iter().find(|i| i.config.id == caller_id) {
+                        (
+                            inst.config.name.clone(),
+                            inst.pid.or(inst.config.pid),
+                            inst.config.data_dir.clone(),
+                            inst.config.bound_email.clone(),
+                        )
+                    } else {
+                        (caller_id.clone(), None, String::new(), None)
+                    }
+                } else {
+                    (caller_id.clone(), None, String::new(), None)
+                };
+
+            if is_json {
+                let out = serde_json::json!({
+                    "detected": true,
+                    "id": caller_id,
+                    "instance_id": caller_id,
+                    "name": name,
+                    "pid": pid,
+                    "data_dir": data_dir,
+                    "bound_email": bound_email,
+                });
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&out).unwrap_or_else(|_| "{}".to_string())
+                );
+            } else {
+                println!("[INFO] Caller Instance Profile:");
+                println!("  ID:        {}", caller_id);
+                println!("  Name:      {}", name);
+                if let Some(p) = pid {
+                    println!("  PID:       {}", p);
+                } else {
+                    println!("  PID:       -");
+                }
+                println!("  Data Dir:  {}", data_dir);
+                if let Some(email) = bound_email {
+                    println!("  Account:   {}", email);
+                }
+            }
+        }
+        None => {
+            if is_json {
+                let out = serde_json::json!({
+                    "detected": false,
+                    "instance_id": null,
+                    "message": "Running in standalone terminal (no active IDE instance detected)"
+                });
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&out).unwrap_or_else(|_| "{}".to_string())
+                );
+            } else {
+                println!("Running in standalone terminal (no active IDE instance detected)");
+            }
+        }
+    }
+    true
+}
+
+pub(crate) fn route_instances_test_lifecycle(
+    args: &[String],
+    non_flag_args: &[String],
+    is_json: bool,
+) -> bool {
+    if non_flag_args.is_empty() {
+        return false;
+    }
+
+    let is_test_create = non_flag_args[0].eq_ignore_ascii_case("test-create")
+        || non_flag_args[0].eq_ignore_ascii_case("create-test")
+        || (non_flag_args.len() >= 2
+            && non_flag_args[0].eq_ignore_ascii_case("test")
+            && (non_flag_args[1].eq_ignore_ascii_case("create")
+                || non_flag_args[1].eq_ignore_ascii_case("new")
+                || non_flag_args[1].eq_ignore_ascii_case("add")));
+
+    if is_test_create {
+        let mut custom_name: Option<String> = None;
+        let mut idx = 0;
+        while idx < args.len() {
+            if (args[idx] == "--name" || args[idx] == "-n") && idx + 1 < args.len() {
+                custom_name = Some(args[idx + 1].clone());
+                break;
+            } else if let Some(val) = args[idx].strip_prefix("--name=") {
+                custom_name = Some(val.to_string());
+                break;
+            }
+            idx += 1;
+        }
+
+        if custom_name.is_none() {
+            if non_flag_args[0].eq_ignore_ascii_case("test") {
+                if non_flag_args.len() > 2 {
+                    custom_name = Some(non_flag_args[2].clone());
+                }
+            } else if non_flag_args.len() > 1 {
+                custom_name = Some(non_flag_args[1].clone());
+            }
+        }
+
+        let timestamp = chrono::Utc::now().timestamp();
+        let gen_name = match custom_name {
+            Some(ref n) => {
+                let clean = n.trim().trim_start_matches("test-");
+                format!("test-{}-{}", clean, timestamp)
+            }
+            None => format!("test-{}", timestamp),
+        };
+
+        match instance::create_instance_with_account(gen_name, None) {
+            Ok(cfg) => {
+                if is_json {
+                    let res = serde_json::json!({
+                        "success": true,
+                        "id": cfg.id,
+                        "name": cfg.name,
+                        "data_dir": cfg.data_dir,
+                        "config": cfg,
+                    });
+                    println!("{}", serde_json::to_string_pretty(&res).unwrap_or_default());
+                } else {
+                    println!(
+                        "[SUCCESS] Created test instance '{}' (ID: {}).",
+                        cfg.name, cfg.id
+                    );
+                    println!("  Data directory: {}", cfg.data_dir);
+                }
+            }
+            Err(e) => {
+                if is_json {
+                    let err_res = serde_json::json!({
+                        "success": false,
+                        "error": format!("Failed to create test instance: {}", e)
+                    });
+                    println!("{}", serde_json::to_string(&err_res).unwrap_or_default());
+                }
+                eprintln!("[ERROR] Failed to create test instance: {}", e);
+                std::process::exit(1);
+            }
+        }
+        return true;
+    }
+
+    let is_test_clean = non_flag_args[0].eq_ignore_ascii_case("test-clean")
+        || non_flag_args[0].eq_ignore_ascii_case("test-destroy")
+        || non_flag_args[0].eq_ignore_ascii_case("clean-test")
+        || non_flag_args[0].eq_ignore_ascii_case("destroy-test")
+        || non_flag_args[0].eq_ignore_ascii_case("rm-test")
+        || (non_flag_args.len() >= 2
+            && non_flag_args[0].eq_ignore_ascii_case("test")
+            && (non_flag_args[1].eq_ignore_ascii_case("clean")
+                || non_flag_args[1].eq_ignore_ascii_case("destroy")
+                || non_flag_args[1].eq_ignore_ascii_case("rm")
+                || non_flag_args[1].eq_ignore_ascii_case("delete")
+                || non_flag_args[1].eq_ignore_ascii_case("purge")));
+
+    if is_test_clean {
+        let target_spec: Option<String> = if non_flag_args[0].eq_ignore_ascii_case("test") {
+            if non_flag_args.len() > 2 {
+                Some(non_flag_args[2].clone())
+            } else {
+                None
+            }
+        } else if non_flag_args.len() > 1 {
+            Some(non_flag_args[1].clone())
+        } else {
+            None
+        };
+
+        let registry = match instance::load_registry() {
+            Ok(reg) => reg,
+            Err(e) => {
+                if is_json {
+                    let err_res = serde_json::json!({
+                        "success": false,
+                        "error": format!("Failed to load registry: {}", e)
+                    });
+                    println!("{}", serde_json::to_string(&err_res).unwrap_or_default());
+                }
+                eprintln!("[ERROR] Failed to load registry: {}", e);
+                std::process::exit(1);
+            }
+        };
+
+        let targets_to_clean: Vec<instance::InstanceConfig> = if let Some(ref target) = target_spec
+        {
+            let resolved = instance::resolve_instance_id(target).unwrap_or_else(|_| target.clone());
+            registry
+                .instances
+                .iter()
+                .filter(|inst| {
+                    !inst.is_default
+                        && (inst.id == resolved
+                            || inst.id == *target
+                            || inst.name.eq_ignore_ascii_case(target))
+                })
+                .cloned()
+                .collect()
+        } else {
+            registry
+                .instances
+                .iter()
+                .filter(|inst| {
+                    !inst.is_default
+                        && (inst.id.to_lowercase().starts_with("test-")
+                            || inst.name.to_lowercase().starts_with("test-"))
+                })
+                .cloned()
+                .collect()
+        };
+
+        let mut cleaned_count = 0usize;
+        let mut cleaned_ids = Vec::new();
+
+        for inst in targets_to_clean {
+            if let Err(err) = instance::refuse_if_caller_instance(&inst.id) {
+                eprintln!("[ERROR] {err}");
+                std::process::exit(2);
+            }
+            antigravity_tools_lib::error::record_ignored(
+                instance::stop_instance(&inst.id),
+                "stop test instance before deletion",
+            ); // Justification: best-effort stop before deleting instance directory
+            match instance::delete_instance(&inst.id) {
+                Ok(_) => {
+                    if !is_json {
+                        println!("  [✓] Purged test instance '{}' ({})", inst.name, inst.id);
+                    }
+                    cleaned_count += 1;
+                    cleaned_ids.push(inst.id);
+                }
+                Err(e) => {
+                    eprintln!("  [!] Failed to delete test instance '{}': {}", inst.id, e);
+                }
+            }
+        }
+
+        // Clean any orphaned test directories on disk
+        if target_spec.is_none() {
+            if let Ok(instances_root) = instance::get_instances_dir() {
+                if let Ok(entries) = std::fs::read_dir(&instances_root) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if path.is_dir() {
+                            if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                                if file_name.to_lowercase().starts_with("test-")
+                                    && !cleaned_ids.iter().any(|id| id == file_name)
+                                {
+                                    antigravity_tools_lib::error::record_ignored(
+                                        std::fs::remove_dir_all(&path),
+                                        "remove orphaned test instance directory",
+                                    ); // Justification: test cleanup; absence is safe
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if is_json {
+            let res = serde_json::json!({
+                "success": true,
+                "cleaned_count": cleaned_count,
+                "cleaned_ids": cleaned_ids,
+            });
+            println!("{}", serde_json::to_string_pretty(&res).unwrap_or_default());
+        } else {
+            println!("[SUCCESS] Purged {} test instance(s).", cleaned_count);
+        }
+        return true;
+    }
+
     false
 }

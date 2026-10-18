@@ -113,6 +113,8 @@ pub use clone_helpers::{
     sanitize_cloned_instance_summaries, GEMINI_CLONE_DIRS, REQUIRED_IDE_REL_PATHS,
 };
 pub(crate) use close::clear_stale_instance_lockfiles;
+#[cfg(target_os = "windows")]
+pub use close::force_terminate_pid_win32;
 pub use close::{
     close_instance, close_instance_verified, detect_caller_instance_id, refuse_if_caller_instance,
 };

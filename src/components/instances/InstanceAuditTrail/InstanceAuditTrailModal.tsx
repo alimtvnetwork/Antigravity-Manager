@@ -63,6 +63,63 @@ function getActionBadgeStyle(code: number, actionName: string): { bg: string; te
             border: 'border-blue-300/50 dark:border-blue-700/50',
         };
     }
+    // Action codes 6–13
+    if (code === 6 || act.includes('launch') || act.includes('start')) {
+        return {
+            bg: 'bg-emerald-100 dark:bg-emerald-950/60',
+            text: 'text-emerald-800 dark:text-emerald-300',
+            border: 'border-emerald-300/50 dark:border-emerald-700/50',
+        };
+    }
+    if (code === 7 || act.includes('stop') || act.includes('close')) {
+        return {
+            bg: 'bg-amber-100 dark:bg-amber-950/60',
+            text: 'text-amber-800 dark:text-amber-300',
+            border: 'border-amber-300/50 dark:border-amber-700/50',
+        };
+    }
+    if (code === 8 || act.includes('restart')) {
+        return {
+            bg: 'bg-indigo-100 dark:bg-indigo-950/60',
+            text: 'text-indigo-800 dark:text-indigo-300',
+            border: 'border-indigo-300/50 dark:border-indigo-700/50',
+        };
+    }
+    if (code === 9 || act.includes('kill')) {
+        return {
+            bg: 'bg-rose-100 dark:bg-rose-950/60',
+            text: 'text-rose-800 dark:text-rose-300',
+            border: 'border-rose-300/50 dark:border-rose-700/50',
+        };
+    }
+    if (code === 10 || act.includes('create')) {
+        return {
+            bg: 'bg-teal-100 dark:bg-teal-950/60',
+            text: 'text-teal-800 dark:text-teal-300',
+            border: 'border-teal-300/50 dark:border-teal-700/50',
+        };
+    }
+    if (code === 11 || act.includes('delete') || act.includes('remove')) {
+        return {
+            bg: 'bg-red-100 dark:bg-red-950/60',
+            text: 'text-red-800 dark:text-red-300',
+            border: 'border-red-300/50 dark:border-red-700/50',
+        };
+    }
+    if (code === 12 || act.includes('clone') || act.includes('copy')) {
+        return {
+            bg: 'bg-sky-100 dark:bg-sky-950/60',
+            text: 'text-sky-800 dark:text-sky-300',
+            border: 'border-sky-300/50 dark:border-sky-700/50',
+        };
+    }
+    if (code === 13 || act.includes('error') || act.includes('fail')) {
+        return {
+            bg: 'bg-rose-100 dark:bg-rose-950/60',
+            text: 'text-rose-800 dark:text-rose-300',
+            border: 'border-rose-300/50 dark:border-rose-700/50',
+        };
+    }
     if (act.includes('backup') || act.includes('restore') || act.includes('prompt')) {
         return {
             bg: 'bg-indigo-100 dark:bg-indigo-950/60',
@@ -117,9 +174,8 @@ export default function InstanceAuditTrailModal({
             });
             setExpandedCards(initialExpanded);
 
-            // If recentSwitches.length === 0 but general audit trail entries exist,
-            // automatically default to the 'All Operations' tab so users see real events
-            if (loaded.length === 0 && trailRes && trailRes.length > 0) {
+            // If recentSwitches.length === 0, automatically default to the 'operations' tab so users see real events
+            if (loaded.length === 0) {
                 setActiveTab('operations');
             } else {
                 setActiveTab('switches');
@@ -147,6 +203,16 @@ export default function InstanceAuditTrailModal({
             setActiveTab('switches');
         }
     }, [isOpen, instance?.id, loadAuditHistory]);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isOpen) {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose]);
 
     if (!isOpen || !instance) return null;
 
@@ -185,6 +251,9 @@ export default function InstanceAuditTrailModal({
 
     return (
         <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="audit-trail-dialog-title"
             className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 sm:p-6 overflow-y-auto animate-in fade-in duration-200"
             onClick={(e) => {
                 if (e.target === e.currentTarget) {
@@ -204,7 +273,7 @@ export default function InstanceAuditTrailModal({
                         </div>
                         <div>
                             <div className="flex items-center gap-2.5">
-                                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                                <h2 id="audit-trail-dialog-title" className="text-base font-bold text-slate-900 dark:text-white">
                                     Audit Trail: {instance.name}
                                 </h2>
                                 <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300/40 shadow-2xs">
@@ -280,8 +349,8 @@ export default function InstanceAuditTrailModal({
                             </button>
                         </div>
 
-                        {/* Action Buttons */}
-                        <div className="flex items-center rounded-full bg-slate-100 dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] p-0.5 shadow-2xs">
+                        {/* Action Buttons: Contiguous Segmented Capsule */}
+                        <div className="inline-flex items-center rounded-full bg-slate-100 dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] p-0.5 shadow-2xs">
                             <button
                                 type="button"
                                 onClick={loadAuditHistory}
@@ -292,16 +361,17 @@ export default function InstanceAuditTrailModal({
                                 <RotateCw className={cn("w-3.5 h-3.5 text-amber-500", isLoading && "animate-spin")} />
                                 <span>Refresh</span>
                             </button>
+                            <span className="w-px h-4 bg-slate-300 dark:bg-[#40285e] my-auto mx-0.5" />
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
+                                title="Close modal (Esc)"
+                                aria-label="Close modal"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
                         </div>
-
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
-                            title="Close modal"
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
                     </div>
                 </div>
 
@@ -568,13 +638,15 @@ export default function InstanceAuditTrailModal({
                         <History className="w-3.5 h-3.5 text-amber-500" />
                         <span>All account rotation cycles, process restarts, and PID verifications are audited.</span>
                     </span>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="px-4 py-1.5 rounded-full bg-slate-200 hover:bg-slate-300 dark:bg-[#40285e] dark:hover:bg-[#1d4366] text-slate-700 dark:text-slate-200 font-semibold transition-colors cursor-pointer"
-                    >
-                        Close
-                    </button>
+                    <div className="inline-flex rounded-full border border-slate-200 dark:border-[#40285e] bg-slate-100/80 dark:bg-[#120d1d] p-0.5 backdrop-blur-xs shadow-2xs">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-4 py-1.5 rounded-full text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-[#40285e] transition-colors cursor-pointer"
+                        >
+                            Close
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

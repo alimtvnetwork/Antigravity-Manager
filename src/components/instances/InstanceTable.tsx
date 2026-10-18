@@ -89,11 +89,11 @@ export default function InstanceTable({
                 <table className="w-full max-w-full table-fixed text-left text-xs">
                     <thead>
                         <tr className="border-b border-slate-200/90 dark:border-slate-800/90 bg-slate-50/80 dark:bg-[#090611] text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            <th className="px-2 py-1.5 w-[22%] min-w-[150px]">Profile & Account</th>
-                            <th className="px-2 py-1.5 w-[30%] min-w-[200px]">Model & Weekly Quota</th>
-                            <th className="px-2 py-1.5 w-[14%] min-w-[110px]">Status & PID</th>
-                            <th className="px-2 py-1.5 w-[20%] min-w-[160px]">IDE EXE & DATA</th>
-                            <th className="px-2 py-1.5 text-right w-[14%] min-w-[140px]">Actions</th>
+                            <th className="px-2 py-1.5 w-[20%] min-w-[150px]">Profile & Account</th>
+                            <th className="px-2 py-1.5 w-[26%] min-w-[190px]">Model & Weekly Quota</th>
+                            <th className="px-2 py-1.5 w-[14%] min-w-[125px]">Status & PID</th>
+                            <th className="px-2 py-1.5 w-[26%] min-w-[220px]">IDE EXE & DATA</th>
+                            <th className="px-2 py-1.5 text-right w-[14%] min-w-[150px]">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="font-medium">
@@ -143,6 +143,7 @@ export default function InstanceTable({
                                         onSwitch={() => onSwitch(inst.config.id)}
                                         onFastForward={() => onFastForward(inst.config.id)}
                                         onOpenPromptTree={() => onOpenPromptTree(inst.config.id)}
+                                        onAudit={onAudit ? () => onAudit(inst.config.id, inst.config.name) : undefined}
                                         onToggleMore={(anchor) => handleToggleMore(inst.config.id, anchor)}
                                     />
                                 </tr>

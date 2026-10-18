@@ -73,6 +73,42 @@ pub(crate) fn clear_stale_instance_lockfiles(target_data_path: &Path) {
     }
 }
 
+#[cfg(target_os = "windows")]
+fn get_8_3_short_path(path: &str) -> Option<String> {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+    extern "system" {
+        fn GetShortPathNameW(
+            lpszLongPath: *const u16,
+            lpszShortPath: *mut u16,
+            cchBuffer: u32,
+        ) -> u32;
+    }
+    let wide: Vec<u16> = OsStr::new(path)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    let mut buf = vec![0u16; 512];
+    let len = unsafe { GetShortPathNameW(wide.as_ptr(), buf.as_mut_ptr(), buf.len() as u32) };
+    if len > 0 && (len as usize) < buf.len() {
+        let short = String::from_utf16_lossy(&buf[..len as usize]);
+        Some(
+            short
+                .to_lowercase()
+                .replace('\\', "/")
+                .trim_end_matches('/')
+                .to_string(),
+        )
+    } else {
+        None
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn get_8_3_short_path(_path: &str) -> Option<String> {
+    None
+}
+
 fn saved_pid_belongs_to_instance(
     instance_id: &str,
     is_default: bool,
@@ -82,6 +118,7 @@ fn saved_pid_belongs_to_instance(
     exe: &str,
     name: &str,
     args_str: &str,
+    current_pid: Option<u32>,
 ) -> bool {
     let id = instance_id.to_lowercase();
     let exe_l = exe.to_lowercase().replace('\\', "/");
@@ -91,6 +128,8 @@ fn saved_pid_belongs_to_instance(
         || exe_l.contains("cursor")
         || name_l.contains("agm")
         || exe_l.contains("agm-alim")
+        || name_l.contains("antigravity-manager")
+        || exe_l.contains("antigravity-manager")
     {
         return false;
     }
@@ -110,12 +149,32 @@ fn saved_pid_belongs_to_instance(
             return true;
         }
     }
-    if !clean_data.is_empty() && args.contains(clean_data) {
+    if !clean_data.is_empty()
+        && (args.contains(clean_data) || args.contains(&clean_data.replace('/', "\\")))
+    {
         return true;
     }
     if let Some(canonical) = canonical_data {
         let canon = canonical.to_lowercase();
-        if !canon.is_empty() && args.contains(&canon) {
+        if !canon.is_empty() && (args.contains(&canon) || args.contains(&canon.replace('/', "\\")))
+        {
+            return true;
+        }
+    }
+    if let Some(short) = get_8_3_short_path(clean_data) {
+        if !short.is_empty() && (args.contains(&short) || args.contains(&short.replace('/', "\\")))
+        {
+            return true;
+        }
+    }
+    if clean_data.contains("administrator") {
+        let alt = clean_data.replace("administrator", "admini~1");
+        if args.contains(&alt) || args.contains(&alt.replace('/', "\\")) {
+            return true;
+        }
+    } else if clean_data.contains("admini~1") {
+        let alt = clean_data.replace("admini~1", "administrator");
+        if args.contains(&alt) || args.contains(&alt.replace('/', "\\")) {
             return true;
         }
     }
@@ -123,13 +182,58 @@ fn saved_pid_belongs_to_instance(
     if exe_l.contains(&marker)
         || name_l.contains(&marker)
         || args.contains(&format!("/instances/{id}"))
+        || args.contains(&format!("\\instances\\{id}"))
     {
         return true;
     }
     if is_default || id == "default" {
         let file = exe_l.rsplit('/').next().unwrap_or(&exe_l);
-        return file == "antigravity.exe";
+        if file == "antigravity.exe" {
+            return true;
+        }
     }
+
+    #[cfg(target_os = "windows")]
+    {
+        let is_antigravity = name_l.contains("antigravity")
+            || exe_l.contains("antigravity")
+            || exe_l.ends_with("/apprun")
+            || name_l == "apprun"
+            || name_l.starts_with("code");
+
+        if (args.is_empty() || !args.contains("--user-data-dir")) && is_antigravity {
+            let recorded_pid = get_instance_saved_pid(instance_id).or_else(|| {
+                load_registry().ok().and_then(|r| {
+                    r.instances
+                        .into_iter()
+                        .find(|i| i.id == instance_id)
+                        .and_then(|i| i.pid)
+                })
+            });
+
+            let pid_matches = match (current_pid, recorded_pid) {
+                (Some(c), Some(r)) => c == r,
+                (None, Some(_)) => true,
+                _ => false,
+            };
+
+            if pid_matches {
+                let target_pid = current_pid.or(recorded_pid).unwrap_or(0);
+                let (protected_pids, markers) = other_instance_protection(instance_id);
+                if !should_spare_pid(
+                    target_pid,
+                    &args,
+                    &exe_l,
+                    &name_l,
+                    &protected_pids,
+                    &markers,
+                ) {
+                    return true;
+                }
+            }
+        }
+    }
+
     false
 }
 
@@ -188,6 +292,7 @@ pub fn close_instance_verified(
                         &proc_exe,
                         &proc_name,
                         &args_str,
+                        Some(pid),
                     ) {
                         pids.push(pid);
                     }
@@ -204,11 +309,27 @@ pub fn close_instance_verified(
             "[CLOSE_JOURNAL] instance='{}' stage=kill_pass attempt={} pids={:?}",
             instance_id, attempt, targeted
         ));
+        if attempt > 0 && !targeted.is_empty() {
+            let mut kill_audit = crate::modules::task_history_db::AuditTask::start(
+                crate::modules::audit_action::AuditAction::KillInstance,
+                &format!("Force kill stragglers for instance {}", instance_id),
+                Some(instance_id),
+            );
+            kill_audit.succeed(&format!(
+                "Dispatched force-close pass for instance '{}' (PIDs: {:?})",
+                instance_id, targeted
+            ));
+        }
         // close_instance only errors on registry/instance problems (both
         // validated above); the kill itself is best-effort per pass and the
         // verification poll below is what decides success.
-        close_instance(instance_id)?;
-        let effective_timeout = timeout.min(std::time::Duration::from_millis(2500));
+        if let Err(e) = close_instance(instance_id) {
+            crate::modules::logger::log_warn(&format!(
+                "[CLOSE_JOURNAL] instance='{}' stage=kill_error attempt={} error='{}'",
+                instance_id, attempt, e
+            ));
+        }
+        let effective_timeout = (timeout / 2).max(std::time::Duration::from_millis(2500));
         let deadline = std::time::Instant::now() + effective_timeout;
         let mut last_poll_log = std::time::Instant::now();
         let mut first_poll = true;
@@ -222,6 +343,9 @@ pub fn close_instance_verified(
                 ));
                 invalidate_instance_process_cache(instance_id);
                 force_refresh_process_cache();
+                crate::modules::repo_db::invalidate_prompt_tree_cache(Some(instance_id));
+                // Settle delay allowing Windows kernel & NTFS file handles to release
+                std::thread::sleep(std::time::Duration::from_millis(200));
                 return Ok(true);
             }
             // Log the first poll immediately, then at most once per second to bound output.
@@ -259,7 +383,28 @@ pub fn close_instance_verified(
     ));
     invalidate_instance_process_cache(instance_id);
     force_refresh_process_cache();
+    crate::modules::repo_db::invalidate_prompt_tree_cache(Some(instance_id));
     Ok(false)
+}
+
+#[cfg(target_os = "windows")]
+pub fn force_terminate_pid_win32(pid: u32) -> bool {
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn OpenProcess(access: u32, inherit: i32, pid: u32) -> *mut std::ffi::c_void;
+        fn TerminateProcess(handle: *mut std::ffi::c_void, exit_code: u32) -> i32;
+        fn CloseHandle(handle: *mut std::ffi::c_void) -> i32;
+    }
+    const PROCESS_TERMINATE: u32 = 0x0001;
+    unsafe {
+        let handle = OpenProcess(PROCESS_TERMINATE, 0, pid);
+        if handle.is_null() {
+            return false;
+        }
+        let ok = TerminateProcess(handle, 1);
+        CloseHandle(handle);
+        ok != 0
+    }
 }
 
 /// Close only the process associated with this instance
@@ -271,6 +416,12 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
         .iter()
         .find(|i| i.id == instance_id)
         .ok_or_else(|| format!("Instance {} not found", instance_id))?;
+
+    let mut audit = crate::modules::task_history_db::AuditTask::start(
+        crate::modules::audit_action::AuditAction::StopInstance,
+        &format!("Stop instance {}", instance_id),
+        Some(instance_id),
+    );
 
     let mut system = System::new();
     let refresh_kind = sysinfo::ProcessRefreshKind::new()
@@ -290,8 +441,18 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
             .trim_end_matches('/')
             .to_string()
     });
+    let short_data = get_8_3_short_path(&config.data_dir);
+    let admin_alt = if clean_data.contains("administrator") {
+        Some(clean_data.replace("administrator", "admini~1"))
+    } else if clean_data.contains("admini~1") {
+        Some(clean_data.replace("admini~1", "administrator"))
+    } else {
+        None
+    };
 
-    if let Some(saved_pid) = config.pid.or_else(|| get_instance_saved_pid(instance_id)) {
+    let (protected_pids, markers) = other_instance_protection(instance_id);
+    let saved_pid_opt = config.pid.or_else(|| get_instance_saved_pid(instance_id));
+    if let Some(saved_pid) = saved_pid_opt {
         if let Some(proc) = system.process(sysinfo::Pid::from_u32(saved_pid)) {
             let proc_name = proc.name().to_string_lossy().to_lowercase();
             let proc_exe = proc
@@ -307,21 +468,20 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
                     .map(|a| a.to_string_lossy().to_lowercase().replace('\\', "/"))
                     .collect::<Vec<String>>()
                     .join(" ");
-                if saved_pid_belongs_to_instance(
-                    instance_id,
-                    is_default_inst,
-                    clean_data,
-                    canonical_data.as_deref(),
-                    config.executable_path.as_deref(),
+                let is_protected = should_spare_pid(
+                    saved_pid,
+                    &args_str,
                     &proc_exe,
                     &proc_name,
-                    &args_str,
-                ) {
+                    &protected_pids,
+                    &markers,
+                );
+                if !is_protected {
                     pids.push(saved_pid);
                 } else {
                     crate::modules::logger::log_warn(&format!(
-                        "[Instance] Saved PID {} does not match data_dir '{}' (args: {}), skipping to protect running sessions",
-                        saved_pid, config.data_dir, args_str
+                        "[Instance] Saved PID {} matches another instance's protected markers, skipping to protect other sessions",
+                        saved_pid
                     ));
                 }
             }
@@ -334,17 +494,32 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
         let inst_marker_bslash = format!("instances\\{}", inst_id_lower);
 
         let matches_instance = |args: &str, exe_path: &str, p_name: &str| -> bool {
-            args.contains(clean_data)
-                || canonical_data
-                    .as_ref()
-                    .map_or(false, |c| !c.is_empty() && args.contains(c))
+            let norm_args = args.to_lowercase().replace('\\', "/");
+            let norm_exe = exe_path.to_lowercase().replace('\\', "/");
+            let norm_name = p_name.to_lowercase();
+
+            norm_args.contains(clean_data)
+                || canonical_data.as_ref().map_or(false, |c| {
+                    !c.is_empty() && (norm_args.contains(c) || args.contains(&c.replace('/', "\\")))
+                })
+                || short_data.as_ref().map_or(false, |s| {
+                    !s.is_empty() && (norm_args.contains(s) || args.contains(&s.replace('/', "\\")))
+                })
+                || admin_alt.as_ref().map_or(false, |a| {
+                    !a.is_empty() && (norm_args.contains(a) || args.contains(&a.replace('/', "\\")))
+                })
+                || norm_args.contains(&inst_marker_slash)
+                || norm_args.contains(&inst_marker_bslash)
                 || args.contains(&inst_marker_slash)
                 || args.contains(&inst_marker_bslash)
-                || exe_path.contains(&inst_id_lower)
-                || p_name.contains(&inst_id_lower)
+                || norm_exe.contains(&inst_id_lower)
+                || norm_name.contains(&inst_id_lower)
         };
 
         pids.retain(|&pid| {
+            if Some(pid) == saved_pid_opt {
+                return true;
+            }
             if let Some(proc) = system.process(sysinfo::Pid::from_u32(pid)) {
                 let p_name = proc.name().to_string_lossy().to_lowercase();
                 let p_exe = proc
@@ -434,6 +609,7 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
             &exe,
             &name,
             &args_str,
+            Some(pid),
         );
         if !owned_by_this_instance
             && should_spare_pid(pid, &args_str, &exe, &name, &protected_pids, &markers)
@@ -459,8 +635,47 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     });
 
     if pids.is_empty() {
+        let fallback_pid = config.pid.or_else(|| get_instance_saved_pid(instance_id));
+        if let Some(fpid) = fallback_pid {
+            if is_pid_alive_targeted(fpid) {
+                let mut f_sys = System::new();
+                f_sys.refresh_processes_specifics(
+                    sysinfo::ProcessesToUpdate::Some(&[sysinfo::Pid::from_u32(fpid)]),
+                    sysinfo::ProcessRefreshKind::new()
+                        .with_cmd(sysinfo::UpdateKind::Always)
+                        .with_exe(sysinfo::UpdateKind::Always),
+                );
+                if let Some(proc) = f_sys.process(sysinfo::Pid::from_u32(fpid)) {
+                    let name = proc.name().to_string_lossy().to_lowercase();
+                    let exe = proc
+                        .exe()
+                        .map(|p| p.to_string_lossy().to_lowercase())
+                        .unwrap_or_default();
+                    let is_editor_or_manager = name.contains("cursor")
+                        || exe.contains("cursor")
+                        || name.contains("agm")
+                        || exe.contains("agm-alim")
+                        || name.contains("antigravity-manager")
+                        || exe.contains("antigravity-manager");
+                    if !is_editor_or_manager {
+                        crate::modules::logger::log_warn(&format!(
+                            "[Instance] Conscious kill: candidate list was empty but saved/cached PID {} for instance '{}' is alive. Enqueuing for tree termination.",
+                            fpid, instance_id
+                        ));
+                        pids.push(fpid);
+                    }
+                }
+            }
+        }
+    }
+
+    if pids.is_empty() {
         // Justification: registry flag update; live state is re-derived from the OS on next refresh
         crate::error::record_ignored(mark_instance_stopped(instance_id), "mark instance stopped");
+        audit.succeed(&format!(
+            "Instance {} was already stopped (no active PIDs)",
+            instance_id
+        ));
         return Ok(());
     }
 
@@ -498,7 +713,7 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
 
     // Synchronously wait for processes to exit to prevent SQLite locks and state overwrite
     let start_wait = std::time::Instant::now();
-    let max_graceful = std::time::Duration::from_millis(3000);
+    let max_graceful = std::time::Duration::from_millis(1500);
 
     loop {
         let has_alive = pids.iter().any(|&pid| is_pid_alive_targeted(pid));
@@ -517,27 +732,72 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
                 .copied()
                 .filter(|&pid| is_pid_alive_targeted(pid))
                 .collect();
+
             if !still.is_empty() {
-                return Err(format!(
-                    "Instance '{instance_id}' PID(s) {still:?} stayed alive after taskkill"
-                ));
-            }
-            #[cfg(not(target_os = "windows"))]
-            {
                 crate::modules::logger::log_warn(&format!(
-                    "[Instance] Graceful exit timed out for instance '{}', sending SIGKILL to remaining processes...",
-                    instance_id
+                    "[Instance] Graceful termination pending for '{}', executing direct force kill on surviving PIDs: {:?}",
+                    instance_id, still
                 ));
-                for pid in &pids {
-                    if system.process(sysinfo::Pid::from_u32(*pid)).is_some() {
-                        // Justification: process termination is best-effort; the liveness check re-verifies
+
+                let mut kill_audit = crate::modules::task_history_db::AuditTask::start(
+                    crate::modules::audit_action::AuditAction::KillInstance,
+                    &format!("Direct kernel kill for instance {}", instance_id),
+                    Some(instance_id),
+                );
+                kill_audit.succeed(&format!(
+                    "Executed direct kernel force kill on lingering PIDs: {:?}",
+                    still
+                ));
+
+                for pid in &still {
+                    #[cfg(target_os = "windows")]
+                    {
+                        if !force_terminate_pid_win32(*pid) {
+                            // Justification: powershell Stop-Process fallback when Win32 TerminateProcess fails
+                            crate::error::record_ignored(
+                                Command::new("powershell")
+                                    .args([
+                                        "-NoProfile",
+                                        "-NonInteractive",
+                                        "-Command",
+                                        &format!("Stop-Process -Id {} -Force", pid),
+                                    ])
+                                    .creation_flags(0x08000000)
+                                    .output(),
+                                "powershell Stop-Process fallback",
+                            );
+                        }
+                    }
+                    #[cfg(not(target_os = "windows"))]
+                    {
                         crate::error::record_ignored(
                             Command::new("kill").args(["-9", &pid.to_string()]).output(),
-                            "kill process",
+                            "kill -9 fallback",
                         );
                     }
                 }
-                std::thread::sleep(std::time::Duration::from_millis(300));
+
+                // Stage 3: Bounded wait polling (up to 1000ms additional)
+                let force_wait_start = std::time::Instant::now();
+                while force_wait_start.elapsed() < std::time::Duration::from_millis(1000) {
+                    if !still.iter().any(|&pid| is_pid_alive_targeted(pid)) {
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+            }
+
+            let lingering: Vec<u32> = pids
+                .iter()
+                .copied()
+                .filter(|&pid| is_pid_alive_targeted(pid))
+                .collect();
+
+            if !lingering.is_empty() {
+                crate::modules::logger::log_warn(&format!(
+                    "[CLOSE_JOURNAL] instance='{}' stage=lingering_stragglers pids={:?}",
+                    instance_id, lingering
+                ));
             }
             break;
         }
@@ -562,6 +822,88 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     // Small settle delay to ensure OS flushes file handles and SQLite locks
     std::thread::sleep(std::time::Duration::from_millis(150));
 
+    let payload = serde_json::json!({
+        "instance_id": instance_id,
+        "terminated_pids": pids,
+        "data_dir": config.data_dir,
+    })
+    .to_string();
+    audit.succeed_with_payload(
+        &format!("Instance {} closed successfully", instance_id),
+        &payload,
+    );
+
+    Ok(())
+}
+
+/// Force kill all processes associated with this instance
+pub fn kill_instance(instance_id: &str) -> Result<(), String> {
+    refuse_if_caller_instance(instance_id)?;
+    force_refresh_process_cache();
+    let registry = load_registry()?;
+    let config = registry
+        .instances
+        .iter()
+        .find(|i| i.id == instance_id)
+        .ok_or_else(|| format!("Instance {} not found", instance_id))?;
+
+    let mut audit = crate::modules::task_history_db::AuditTask::start(
+        crate::modules::audit_action::AuditAction::KillInstance,
+        &format!("Kill instance {}", instance_id),
+        Some(instance_id),
+    );
+
+    let is_default_inst = config.is_default || instance_id == "default";
+    let mut pids = find_pids_for_data_dir(&config.data_dir, is_default_inst);
+    if let Some(saved) = config.pid.or_else(|| get_instance_saved_pid(instance_id)) {
+        if is_pid_alive_targeted(saved) && !pids.contains(&saved) {
+            pids.push(saved);
+        }
+    }
+
+    crate::modules::logger::log_info(&format!(
+        "[Instance] Force killing {} process(es) for instance '{}' (PIDs: {:?})",
+        pids.len(),
+        instance_id,
+        pids
+    ));
+
+    for pid in &pids {
+        #[cfg(target_os = "windows")]
+        {
+            crate::error::record_ignored(
+                Command::new("taskkill")
+                    .args(["/F", "/T", "/PID", &pid.to_string()])
+                    .creation_flags(0x08000000)
+                    .output(),
+                "taskkill process tree",
+            );
+            force_terminate_pid_win32(*pid);
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            crate::error::record_ignored(
+                Command::new("kill").args(["-9", &pid.to_string()]).output(),
+                "kill process",
+            );
+        }
+    }
+
+    let target_data_path = PathBuf::from(&config.data_dir);
+    clear_stale_instance_lockfiles(&target_data_path);
+    crate::error::record_ignored(mark_instance_stopped(instance_id), "mark instance stopped");
+    invalidate_instance_process_cache(instance_id);
+    crate::modules::repo_db::invalidate_prompt_tree_cache(Some(instance_id));
+    std::thread::sleep(std::time::Duration::from_millis(200));
+
+    let payload = serde_json::json!({
+        "instance_id": instance_id,
+        "killed_pids": pids,
+        "data_dir": config.data_dir,
+    })
+    .to_string();
+    audit.succeed_with_payload(&format!("Instance {} killed", instance_id), &payload);
+
     Ok(())
 }
 
@@ -576,6 +918,14 @@ fn path_matches_dir(arg_dir: &str, inst_dir: &str) -> bool {
         .to_lowercase();
     if norm1 == norm2 {
         return true;
+    }
+    if norm1.replace("admini~1", "administrator") == norm2.replace("admini~1", "administrator") {
+        return true;
+    }
+    if let (Some(s1), Some(s2)) = (get_8_3_short_path(arg_dir), get_8_3_short_path(inst_dir)) {
+        if s1 == s2 {
+            return true;
+        }
     }
     if let (Ok(c1), Ok(c2)) = (
         std::fs::canonicalize(arg_dir),
@@ -614,6 +964,50 @@ pub fn detect_caller_instance_id() -> Option<String> {
             return Some(trimmed.to_string());
         }
     }
+    if let Ok(dir) = std::env::var("ANTIGRAVITY_APP_DATA_DIR") {
+        let trimmed = dir.trim();
+        if !trimmed.is_empty() {
+            if let Ok(ref reg) = load_registry() {
+                for inst in &reg.instances {
+                    if path_matches_dir(&trimmed, &inst.data_dir) {
+                        return Some(inst.id.clone());
+                    }
+                }
+            }
+        }
+    }
+    if let Ok(dir) = std::env::var("ANTIGRAVITY_APP_DIR") {
+        let trimmed = dir.trim();
+        if !trimmed.is_empty() {
+            if let Ok(ref reg) = load_registry() {
+                for inst in &reg.instances {
+                    if path_matches_dir(&trimmed, &inst.data_dir) {
+                        return Some(inst.id.clone());
+                    }
+                }
+            }
+        }
+    }
+    if let Ok(vpid_str) = std::env::var("VSCODE_PID") {
+        if let Ok(vpid) = vpid_str.trim().parse::<u32>() {
+            if let Ok(ref reg) = load_registry() {
+                for inst in &reg.instances {
+                    if inst.pid == Some(vpid) {
+                        return Some(inst.id.clone());
+                    }
+                }
+            }
+            if let Ok(conn) = open_instance_db() {
+                if let Ok(inst_id) = conn.query_row(
+                    "SELECT instance_id FROM instance_processes WHERE pid = ?1 AND is_active = 1",
+                    rusqlite::params![vpid as i64],
+                    |row| row.get::<_, String>(0),
+                ) {
+                    return Some(inst_id);
+                }
+            }
+        }
+    }
 
     let registry = load_registry().ok();
 
@@ -645,17 +1039,21 @@ pub fn detect_caller_instance_id() -> Option<String> {
             }
         }
 
-        // Check if process exe matches antigravity.exe or antigravity (case-insensitive)
+        // Check if process exe matches antigravity.exe, antigravity, or cloned binaries
         let exe_name = proc
             .exe()
             .and_then(|p| p.file_name())
             .map(|f| f.to_string_lossy().to_lowercase())
             .unwrap_or_default();
         let proc_name = proc.name().to_string_lossy().to_lowercase();
-        let is_antigravity = exe_name == "antigravity.exe"
-            || exe_name == "antigravity"
-            || proc_name == "antigravity.exe"
-            || proc_name == "antigravity";
+        let is_manager = exe_name.starts_with("antigravity-manager")
+            || proc_name.starts_with("antigravity-manager")
+            || exe_name.contains("agm")
+            || proc_name.contains("agm")
+            || exe_name.contains("cursor")
+            || proc_name.contains("cursor");
+        let is_antigravity = !is_manager
+            && (exe_name.starts_with("antigravity") || proc_name.starts_with("antigravity"));
 
         if is_antigravity {
             // Inspect command-line arguments using proc.cmd()
@@ -698,6 +1096,14 @@ pub fn detect_caller_instance_id() -> Option<String> {
                     }
                 }
             } else {
+                if let Some(ref reg) = registry {
+                    for inst in &reg.instances {
+                        let marker = format!("antigravity-{}", inst.id.to_lowercase());
+                        if exe_name.contains(&marker) || proc_name.contains(&marker) {
+                            return Some(inst.id.clone());
+                        }
+                    }
+                }
                 return Some("default".to_string());
             }
         }
@@ -731,6 +1137,12 @@ pub fn detect_caller_instance_id() -> Option<String> {
 }
 
 pub fn refuse_if_caller_instance(target_id: &str) -> Result<(), String> {
+    if std::env::var("AGM_FORCE_CALLER_OVERRIDE")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
+    {
+        return Ok(());
+    }
     let resolved = resolve_instance_id(target_id).unwrap_or_else(|_| target_id.to_string());
     if let Some(self_id) = detect_caller_instance_id() {
         if self_id == resolved || self_id == target_id {

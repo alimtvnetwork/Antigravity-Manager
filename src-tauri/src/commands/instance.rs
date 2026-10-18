@@ -52,7 +52,21 @@ pub fn create_instance(
 
 #[tauri::command]
 pub fn stop_instance(instance_id: String) -> Result<(), String> {
-    instance::stop_instance(&instance_id)
+    instance::stop_instance(&instance_id)?;
+    if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
+        use tauri::Emitter;
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("instances://refreshed", ()),
+            "emit instances://refreshed",
+        );
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("accounts://refreshed", ()),
+            "emit accounts://refreshed",
+        );
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -206,7 +220,21 @@ pub fn set_instance_executable(
 
 #[tauri::command]
 pub fn close_instance(instance_id: String) -> Result<(), String> {
-    instance::close_instance(&instance_id)
+    instance::close_instance(&instance_id)?;
+    if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
+        use tauri::Emitter;
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("instances://refreshed", ()),
+            "emit instances://refreshed",
+        );
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("accounts://refreshed", ()),
+            "emit accounts://refreshed",
+        );
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -232,6 +260,21 @@ pub async fn switch_account_to_instance(
     let res = instance::switch_account_to_instance(&account_id, instance_id.as_deref())
         .await
         .map_err(crate::error::AppError::Process);
+    if res.is_ok() {
+        if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
+            use tauri::Emitter;
+            // Justification: best-effort UI event emission; UI state is re-derived on poll
+            crate::error::record_ignored(
+                handle.emit("instances://refreshed", ()),
+                "emit instances://refreshed",
+            );
+            // Justification: best-effort UI event emission; UI state is re-derived on poll
+            crate::error::record_ignored(
+                handle.emit("accounts://refreshed", ()),
+                "emit accounts://refreshed",
+            );
+        }
+    }
     // Justification: UI audit recording is observability; never block account switch on it.
     crate::error::record_ignored(
         crate::modules::audit::record_interaction(crate::modules::audit::RecordInteractionInput {

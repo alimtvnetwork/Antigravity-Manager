@@ -111,13 +111,54 @@ impl SystemIntegration for DesktopIntegration {
         crate::modules::logger::log_info(
             "[Desktop] [Step 2/5] Closing running Antigravity IDE processes...",
         );
-        crate::error::record_ignored(
-            crate::modules::instance::close_instance_verified(
-                "default",
-                std::time::Duration::from_millis(5000),
-            ),
-            "close Antigravity IDE verified before account switch",
-        ); // Justification: verified IDE close ensures dying process exits before credential injection
+        let close_res = crate::modules::instance::close_instance_verified(
+            "default",
+            std::time::Duration::from_millis(5000),
+        );
+        let closed = match close_res {
+            Ok(c) => c,
+            Err(e) => {
+                let err_msg = format!("Failed to close default instance: {}", e);
+                crate::modules::logger::log_error(&format!("[Desktop][ERROR] {}", err_msg));
+                return Err(err_msg);
+            }
+        };
+        if !closed {
+            #[cfg(target_os = "windows")]
+            {
+                let def_dir = crate::modules::instance::get_default_antigravity_data_dir();
+                let stragglers = crate::modules::instance::find_pids_for_data_dir(
+                    &def_dir.to_string_lossy(),
+                    true,
+                );
+                for spid in stragglers {
+                    crate::modules::instance::force_terminate_pid_win32(spid);
+                }
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            }
+            let def_dir = crate::modules::instance::get_default_antigravity_data_dir();
+            let remaining =
+                crate::modules::instance::find_pids_for_data_dir(&def_dir.to_string_lossy(), true);
+            if remaining
+                .iter()
+                .any(|&p| crate::modules::instance::is_pid_alive_targeted(p))
+            {
+                let err_msg = "Default instance is still running after verified close; stopping account switch before credentials are rewritten".to_string();
+                crate::modules::logger::log_error(&format!("[Desktop][ERROR] {}", err_msg));
+                return Err(err_msg);
+            }
+        }
+        if let Ok(reg) = crate::modules::instance::load_registry() {
+            if let Some(def_inst) = reg
+                .instances
+                .iter()
+                .find(|i| i.is_default || i.id == "default")
+            {
+                crate::modules::instance::clear_stale_instance_lockfiles(std::path::Path::new(
+                    &def_inst.data_dir,
+                ));
+            }
+        }
 
         // =========================================================================
         // STEP 3: Switch the Account Credentials (OS Keyring + state.vscdb + storage.json)

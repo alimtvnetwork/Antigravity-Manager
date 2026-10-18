@@ -39,9 +39,10 @@ pub fn get_instance_switch_history(
     let index = open_index(&dir)?;
     let splits = load_splits(&index, &dir)?;
     let inst_id_trimmed = instance_id.trim();
-    let query_inst_id = match inst_id_trimmed {
-        "" | "default" | "antigravity" | "agy" | "ide" | "classic" => "default",
-        other => other,
+    let inst_id_folded = inst_id_trimmed.to_ascii_lowercase();
+    let query_inst_id = match inst_id_folded.as_str() {
+        "" | "default" | "__default__" | "antigravity" | "agy" | "ide" | "classic" => "default",
+        _ => inst_id_trimmed,
     };
 
     let mut total: usize = 0;
@@ -55,7 +56,7 @@ pub fn get_instance_switch_history(
             .and_then(|reg| {
                 reg.instances
                     .into_iter()
-                    .find(|i| i.id == query_inst_id)
+                    .find(|i| i.id.eq_ignore_ascii_case(query_inst_id))
                     .map(|i| i.name)
             })
             .unwrap_or_else(|| query_inst_id.to_string())
@@ -63,7 +64,7 @@ pub fn get_instance_switch_history(
 
     let switch_cond = "
         WHERE (action_code = 3 OR action = 'SwitchAccount' OR action = 'switch_account')
-          AND (instance_id = ?1 OR (?1 = 'default' AND (instance_id IN ('default', '', 'antigravity', 'agy', 'ide', 'classic') OR instance_id IS NULL)))";
+          AND (LOWER(instance_id) = LOWER(?1) OR (?1 = 'default' AND (LOWER(instance_id) IN ('default', '__default__', '', 'antigravity', 'agy', 'ide', 'classic') OR instance_id IS NULL)))";
 
     for split in &splits {
         let conn = open_split(Path::new(&split.file_path))?;
@@ -354,93 +355,140 @@ pub fn get_instance_audit_trail(
     let index = open_index(&dir)?;
     let splits = load_splits(&index, &dir)?;
     let inst_id_trimmed = instance_id.trim();
-    let query_inst_id = match inst_id_trimmed {
-        "" | "default" | "antigravity" | "agy" | "ide" | "classic" => "default",
-        other => other,
+    let inst_id_folded = inst_id_trimmed.to_ascii_lowercase();
+    let query_inst_id = match inst_id_folded.as_str() {
+        "" | "default" | "__default__" | "antigravity" | "agy" | "ide" | "classic" => "default",
+        _ => inst_id_trimmed,
     };
 
     let mut records: Vec<TaskRecord> = Vec::new();
+    let mut seen_ids = std::collections::HashSet::new();
+
     let cond = "
-        WHERE (instance_id = ?1 OR (?1 = 'default' AND (instance_id IN ('default', '', 'antigravity', 'agy', 'ide', 'classic') OR instance_id IS NULL)))";
+        WHERE (LOWER(instance_id) = LOWER(?1) OR (?1 = 'default' AND (LOWER(instance_id) IN ('default', '__default__', '', 'antigravity', 'agy', 'ide', 'classic') OR instance_id IS NULL)))";
 
-    for split in &splits {
-        if records.len() >= limit {
-            break;
-        }
-        let need = limit - records.len();
-        let conn = open_split(Path::new(&split.file_path))?;
-        let query_sql = format!(
-            "SELECT id, action, action_code, status, subject, detail, instance_id, created_at, finished_at,
-                    COALESCE(from_email, ''), COALESCE(to_email, '')
-             FROM tasks {}
-             ORDER BY created_at DESC LIMIT ?2",
-            cond
-        );
-        let mut stmt = conn.prepare(&query_sql).map_err(|e| e.to_string())?;
-        let rows = stmt
-            .query_map(params![query_inst_id, need as i64], |row| {
-                let legacy: String = row.get(1)?;
-                let code: Option<i32> = row.get(2)?;
-                let (action_code, action, action_label) = resolve_action(code, &legacy);
-                Ok(TaskRecord {
-                    id: row.get(0)?,
-                    action_code,
-                    action,
-                    action_label,
-                    status: row.get(3)?,
-                    subject: row.get(4)?,
-                    detail: row.get(5)?,
-                    instance_id: row.get(6)?,
-                    split_path: split.file_path.clone(),
-                    created_at: row.get(7)?,
-                    finished_at: row.get(8)?,
-                    from_email: row.get(9)?,
-                    to_email: row.get(10)?,
-                })
+    // 1. First consult hot_tasks_cache for recent in-memory/hot items
+    let query_hot_sql = format!(
+        "SELECT id, action, action_code, status, subject, detail, instance_id, split_path, created_at, finished_at,
+                COALESCE(from_email, ''), COALESCE(to_email, '')
+         FROM hot_tasks_cache {}
+         ORDER BY created_at DESC LIMIT ?2",
+        cond
+    );
+    if let Ok(mut stmt) = index.prepare(&query_hot_sql) {
+        if let Ok(rows) = stmt.query_map(params![query_inst_id, limit as i64], |row| {
+            let legacy: String = row.get(1)?;
+            let code: Option<i32> = row.get(2)?;
+            let (action_code, action, action_label) = resolve_action(code, &legacy);
+            Ok(TaskRecord {
+                id: row.get(0)?,
+                action_code,
+                action,
+                action_label,
+                status: row.get(3)?,
+                subject: row.get(4)?,
+                detail: row.get(5)?,
+                instance_id: row.get(6)?,
+                split_path: row.get(7)?,
+                created_at: row.get(8)?,
+                finished_at: row.get(9)?,
+                from_email: row.get(10)?,
+                to_email: row.get(11)?,
             })
-            .map_err(|e| e.to_string())?;
-
-        for r in rows {
-            records.push(r.map_err(|e| e.to_string())?);
+        }) {
+            for r in rows.flatten() {
+                if seen_ids.insert(r.id.clone()) {
+                    records.push(r);
+                }
+            }
         }
     }
 
-    if records.is_empty() {
-        let query_sql = format!(
-            "SELECT id, action, action_code, status, subject, detail, instance_id, split_path, created_at, finished_at,
-                    COALESCE(from_email, ''), COALESCE(to_email, '')
-             FROM hot_tasks_cache {}
-             ORDER BY created_at DESC LIMIT ?2",
-            cond
-        );
-        let mut stmt = index.prepare(&query_sql).map_err(|e| e.to_string())?;
-        let rows = stmt
-            .query_map(params![query_inst_id, limit as i64], |row| {
-                let legacy: String = row.get(1)?;
-                let code: Option<i32> = row.get(2)?;
-                let (action_code, action, action_label) = resolve_action(code, &legacy);
-                Ok(TaskRecord {
-                    id: row.get(0)?,
-                    action_code,
-                    action,
-                    action_label,
-                    status: row.get(3)?,
-                    subject: row.get(4)?,
-                    detail: row.get(5)?,
-                    instance_id: row.get(6)?,
-                    split_path: row.get(7)?,
-                    created_at: row.get(8)?,
-                    finished_at: row.get(9)?,
-                    from_email: row.get(10)?,
-                    to_email: row.get(11)?,
-                })
-            })
-            .map_err(|e| e.to_string())?;
-
-        for r in rows {
-            records.push(r.map_err(|e| e.to_string())?);
+    // 2. If limit not reached, scan historical split files
+    if records.len() < limit {
+        for split in &splits {
+            if records.len() >= limit {
+                break;
+            }
+            let need = limit - records.len();
+            let conn = match open_split(Path::new(&split.file_path)) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            let query_sql = format!(
+                "SELECT id, action, action_code, status, subject, detail, instance_id, created_at, finished_at,
+                        COALESCE(from_email, ''), COALESCE(to_email, '')
+                 FROM tasks {}
+                 ORDER BY created_at DESC LIMIT ?2",
+                cond
+            );
+            if let Ok(mut stmt) = conn.prepare(&query_sql) {
+                if let Ok(rows) = stmt.query_map(params![query_inst_id, need as i64], |row| {
+                    let legacy: String = row.get(1)?;
+                    let code: Option<i32> = row.get(2)?;
+                    let (action_code, action, action_label) = resolve_action(code, &legacy);
+                    Ok(TaskRecord {
+                        id: row.get(0)?,
+                        action_code,
+                        action,
+                        action_label,
+                        status: row.get(3)?,
+                        subject: row.get(4)?,
+                        detail: row.get(5)?,
+                        instance_id: row.get(6)?,
+                        split_path: split.file_path.clone(),
+                        created_at: row.get(7)?,
+                        finished_at: row.get(8)?,
+                        from_email: row.get(9)?,
+                        to_email: row.get(10)?,
+                    })
+                }) {
+                    for r in rows.flatten() {
+                        if seen_ids.insert(r.id.clone()) {
+                            records.push(r);
+                        }
+                    }
+                }
+            };
         }
+    }
+
+    // Sort strictly descending by created_at, then ID
+    records.sort_by(|a, b| {
+        b.created_at
+            .cmp(&a.created_at)
+            .then_with(|| b.id.cmp(&a.id))
+    });
+    if records.len() > limit {
+        records.truncate(limit);
     }
 
     Ok(records)
+}
+
+/// Helper to record an instance lifecycle event with Succeeded status in task history.
+pub fn record_instance_lifecycle_event(
+    action: AuditAction,
+    instance_id: Option<&str>,
+    subject: &str,
+    detail: &str,
+) {
+    record_task(
+        action,
+        subject,
+        AuditTaskStatus::Succeeded,
+        detail,
+        instance_id,
+    );
+}
+
+/// Helper to record an instance lifecycle event with an explicit status in task history.
+pub fn record_instance_lifecycle_event_with_status(
+    action: AuditAction,
+    instance_id: Option<&str>,
+    subject: &str,
+    status: AuditTaskStatus,
+    detail: &str,
+) {
+    record_task(action, subject, status, detail, instance_id);
 }

@@ -29,6 +29,7 @@ interface ActionsCellProps {
     onSwitch: () => void;
     onFastForward: () => void;
     onOpenPromptTree: () => void;
+    onAudit?: () => void;
     onToggleMore: (anchor: HTMLElement) => void;
 }
 
@@ -43,20 +44,21 @@ export function ActionsCell({
     onSwitch,
     onFastForward,
     onOpenPromptTree,
+    onAudit,
     onToggleMore,
 }: ActionsCellProps) {
     return (
-        <td className="px-2 py-1 text-right whitespace-nowrap w-[150px]">
-            <div className="inline-flex items-center rounded-[5px] overflow-hidden bg-slate-100 dark:bg-[#090611] border border-slate-200/80 dark:border-[#40285e] p-0.5 divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs">
+        <td className="px-2 py-1 text-right whitespace-nowrap min-w-[150px]">
+            <div className="inline-flex items-center rounded-full overflow-hidden bg-slate-100 dark:bg-[#090611] border border-slate-200/80 dark:border-[#40285e] p-0.5 divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs backdrop-blur-xs">
                 {inst.is_running ? (
-                    <div className="inline-flex items-center rounded-l-[5px] overflow-hidden">
+                    <div className="inline-flex items-center rounded-l-full overflow-hidden">
                         <button
                             type="button"
                             disabled={isBusy}
                             onClick={onStop}
                             data-ui-name="instance-stop-btn"
                             data-ui-id={`instance-stop-${inst.config.id}`}
-                            className="px-2 py-1 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer disabled:opacity-50"
+                            className="px-2 py-1 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-l-full transition-colors cursor-pointer disabled:opacity-50"
                             title="Stop Instance"
                         >
                             {currentAction === 'stop' ? (
@@ -89,7 +91,7 @@ export function ActionsCell({
                         onClick={onLaunch}
                         data-ui-name="instance-launch-btn"
                         data-ui-id={`instance-launch-${inst.config.id}`}
-                        className="px-2 py-1 text-teal-600 dark:text-teal-400 hover:bg-slate-200 dark:hover:bg-[#40285e] rounded-l-[5px] transition-colors cursor-pointer disabled:opacity-50"
+                        className="px-2 py-1 text-teal-600 dark:text-teal-400 hover:bg-slate-200 dark:hover:bg-[#40285e] rounded-l-full transition-colors cursor-pointer disabled:opacity-50"
                         title="Launch Instance"
                     >
                         {currentAction === 'launch' ? (
@@ -132,7 +134,7 @@ export function ActionsCell({
                     )}
                 </button>
 
-                {/* Primary Prompts Button moved outside the overflow menu */}
+                {/* Primary Prompts Button */}
                 <button
                     type="button"
                     disabled={isBusy}
@@ -145,6 +147,21 @@ export function ActionsCell({
                     <Layers className="w-3 h-3" />
                 </button>
 
+                {/* Explicit Audit Trail Button */}
+                {onAudit && (
+                    <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={onAudit}
+                        data-ui-name="instance-audit-btn"
+                        data-ui-id={`instance-audit-${inst.config.id}`}
+                        className="px-2 py-1 text-amber-600 dark:text-amber-400 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50"
+                        title="Audit Trail & Switch History"
+                    >
+                        <History className="w-3 h-3" />
+                    </button>
+                )}
+
                 <button
                     type="button"
                     disabled={isBusy}
@@ -155,7 +172,7 @@ export function ActionsCell({
                     data-ui-name="instance-more-btn"
                     data-ui-id={`instance-more-${inst.config.id}`}
                     className={cn(
-                        'px-2 py-1 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#40285e] rounded-r-[5px] transition-colors cursor-pointer',
+                        'px-2 py-1 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#40285e] rounded-r-full transition-colors cursor-pointer',
                         isMoreOpen && 'bg-slate-200 dark:bg-[#40285e]'
                     )}
                     title="More Actions (Prompts, Audit, Sync, Settings, Clone, Delete)"

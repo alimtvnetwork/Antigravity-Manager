@@ -246,7 +246,32 @@ pub async fn switch_account_to_instance(
                 instance.id, e
             )
         })?;
-    if !closed {
+
+    #[cfg(target_os = "windows")]
+    {
+        let stragglers = find_pids_for_data_dir(&instance.data_dir, is_default_inst);
+        for spid in stragglers {
+            if is_pid_alive_targeted(spid) {
+                crate::modules::logger::log_warn(&format!(
+                    "[INSTANCE_SWITCH] Found straggler PID {} before credential rewrite; force terminating via Win32",
+                    spid
+                ));
+                force_terminate_pid_win32(spid);
+            }
+        }
+    }
+
+    let target_data_path = std::path::PathBuf::from(&instance.data_dir);
+    clear_stale_instance_lockfiles(&target_data_path);
+    std::thread::sleep(std::time::Duration::from_millis(200));
+
+    let final_live = find_pids_for_data_dir(&instance.data_dir, is_default_inst);
+    let any_alive = final_live.iter().any(|&p| is_pid_alive_targeted(p));
+    let saved_pid_alive = instance
+        .pid
+        .or_else(|| get_instance_saved_pid(&instance.id))
+        .map_or(false, is_pid_alive_targeted);
+    if !closed || any_alive || saved_pid_alive {
         let err = format!(
             "Instance '{}' is still running after close; account switch stopped before credentials were rewritten",
             instance.id
@@ -415,6 +440,45 @@ pub async fn switch_account_to_instance(
             );
         }
     });
+
+    // Stage 6: Sync Live PID & Broadcast Events
+    let fresh_pid = {
+        let mut detected = None;
+        let start = std::time::Instant::now();
+        while start.elapsed() < std::time::Duration::from_millis(3000) {
+            let pids = find_pids_for_data_dir(&instance.data_dir, is_default_inst);
+            if let Some(&first) = pids.first() {
+                if is_pid_alive_targeted(first) {
+                    detected = Some(first);
+                    break;
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        detected
+    };
+
+    if let Some(pid) = fresh_pid {
+        // Justification: recording live PID in DB and registry after relaunch
+        crate::error::record_ignored(
+            record_instance_pid(&instance.id, pid, &instance.data_dir),
+            "record live pid after switch",
+        );
+    }
+
+    if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
+        use tauri::Emitter;
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("instances://refreshed", ()),
+            "emit instances://refreshed",
+        );
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("accounts://refreshed", ()),
+            "emit accounts://refreshed",
+        );
+    }
 
     let target_inst_id = instance.id.clone();
     let channel_wait = crate::modules::repo_db::needs_prompt_channel_wait(backed_up_count);
@@ -600,5 +664,18 @@ pub async fn switch_account_to_instance(
         "[INSTANCE_SWITCH:SUCCESS] Switch completed successfully for instance '{}' to account '{}'",
         instance.id, account.email
     ));
+    if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
+        use tauri::Emitter;
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("instances://refreshed", ()),
+            "emit instances://refreshed",
+        );
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("accounts://refreshed", ()),
+            "emit accounts://refreshed",
+        );
+    }
     Ok(())
 }

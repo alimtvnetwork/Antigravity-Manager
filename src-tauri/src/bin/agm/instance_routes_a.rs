@@ -411,9 +411,23 @@ pub(crate) fn route_instances_stop(
             }
         };
 
-        if let Err(err) = instance::refuse_if_caller_instance(&resolved_id) {
-            eprintln!("[ERROR] {err}");
-            std::process::exit(2);
+        let has_force = args.iter().any(|a| a == "--force" || a == "-f");
+        if !has_force {
+            if let Some(caller_id) = instance::close::detect_caller_instance_id() {
+                if caller_id == resolved_id || caller_id == target_spec {
+                    eprintln!(
+                        "[ERROR] Target instance '{}' is your currently running IDE instance! Aborting to prevent terminating your own session. Pass --force to override.",
+                        resolved_id
+                    );
+                    std::process::exit(2);
+                }
+            }
+            if let Err(err) = instance::refuse_if_caller_instance(&resolved_id) {
+                eprintln!("[ERROR] {err}");
+                std::process::exit(2);
+            }
+        } else {
+            std::env::set_var("AGM_FORCE_CALLER_OVERRIDE", "1");
         }
         println!(
             "[*] Stopping instance '{}' (resolved from '{}')...",

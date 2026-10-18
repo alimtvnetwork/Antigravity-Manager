@@ -314,6 +314,14 @@ pub fn create_instance_with_account(
     );
     sync_instance_ide_parity(&instance_id).map_err(|e| e.to_string())?;
 
+    crate::modules::task_history_db::record(
+        crate::modules::audit_action::AuditAction::CreateInstance,
+        trimmed_name,
+        "ok",
+        &format!("Created instance profile {}", instance_id),
+        Some(&instance_id),
+    );
+
     Ok(config)
 }
 
@@ -325,9 +333,42 @@ pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
 /// Stop an instance process and confirm the PID is gone.
 pub fn stop_instance(instance_id: &str) -> Result<(), String> {
     let resolved = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
-    let closed = close_instance_verified(&resolved, std::time::Duration::from_millis(5000))?;
-    if !closed {
-        return Err(format!("Instance '{resolved}' is still running after stop"));
+    let closed = close_instance_verified(&resolved, std::time::Duration::from_millis(5000))
+        .map_err(|e| format!("Error closing instance '{resolved}': {e}"))?;
+
+    // Unconditional post-stop cleanup
+    if let Ok(reg) = load_registry() {
+        if let Some(inst) = reg.instances.iter().find(|i| i.id == resolved) {
+            let data_path = std::path::PathBuf::from(&inst.data_dir);
+            clear_stale_instance_lockfiles(&data_path);
+        }
     }
+    // Justification: mark instance stopped in DB and registry; best effort cleanup
+    crate::error::record_ignored(mark_instance_stopped(&resolved), "mark instance stopped");
+    invalidate_instance_process_cache(&resolved);
+    crate::modules::repo_db::invalidate_prompt_tree_cache(Some(&resolved));
+
+    if !closed {
+        let remaining = get_instance_saved_pid(&resolved);
+        if let Some(pid) = remaining {
+            if is_pid_alive_targeted(pid) {
+                return Err(format!(
+                    "Instance '{resolved}' primary PID {pid} stayed alive after stop"
+                ));
+            }
+        }
+        crate::modules::logger::log_warn(&format!(
+            "[Instance] Stop completed for '{}' with helper stragglers; locks and DB cleaned",
+            resolved
+        ));
+    }
+
+    crate::modules::task_history_db::record(
+        crate::modules::audit_action::AuditAction::StopInstance,
+        &resolved,
+        "ok",
+        "Stopped instance processes",
+        Some(&resolved),
+    );
     Ok(())
 }

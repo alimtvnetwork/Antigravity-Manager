@@ -331,9 +331,18 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                     <div className="space-y-1.5 py-2 border-t border-gray-100 dark:border-[#40285e]/80 text-xs">
                         <div className="flex items-center justify-between gap-1.5 flex-wrap">
                             {inst.is_running ? (
-                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[5px] text-[10px] font-semibold bg-[#1af18d]/10 text-emerald-700 dark:text-[#1af18d] border border-[#1af18d]/30 shadow-2xs">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] shadow-[0_0_4px_rgba(26,241,141,0.9)] animate-pulse" />
-                                    Running {inst.pid ? `(${inst.pid})` : ''}
+                                <span
+                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#1af18d]/10 text-emerald-700 dark:text-[#1af18d] border border-[#1af18d]/30 shadow-2xs font-mono backdrop-blur-xs"
+                                    title={inst.pid ? `Process ID (PID): ${inst.pid}` : 'Process ID (PID): Active'}
+                                >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] shadow-[0_0_4px_rgba(26,241,141,0.9)] animate-pulse shrink-0" />
+                                    <span>Running</span>
+                                    {inst.pid ? (
+                                        <>
+                                            <span className="text-emerald-500/50 dark:text-[#1af18d]/50 font-sans select-none">·</span>
+                                            <span>PID: {inst.pid}</span>
+                                        </>
+                                    ) : null}
                                 </span>
                             ) : (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-medium bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-400/20">

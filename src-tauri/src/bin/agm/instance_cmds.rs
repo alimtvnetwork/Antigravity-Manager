@@ -34,12 +34,16 @@ pub(crate) fn dispatch_instance_domain(subcommand: &str, args: &[String]) {
         "list" | "ls" => cmd_instances_list(args),
         "status" => cmd_instances_status(args),
         "create" | "add" | "new" => cmd_instances_create(args),
-        "create-test" | "add-test" | "new-test" => cmd_instances_create_test(args),
-        "rm-test" | "delete-test" => cmd_instances_rm_test(args),
+        "create-test" | "add-test" | "new-test" | "test-create" => cmd_instances_create_test(args),
+        "rm-test" | "delete-test" | "test-clean" | "test-destroy" | "clean-test" => {
+            cmd_instances_rm_test(args)
+        }
         "start" | "launch" | "open" => cmd_instances_start(args),
         "open-ui" | "ui" => antigravity_tools_lib::modules::delegate_updater::open_ui(args),
         "tree" | "prompts" => crate::prompt_cmds::cmd_prompts_tree(args),
-        "current" | "self" | "which-self" => cmd_instances_current(args),
+        "whoami" | "detect-caller" | "caller" | "current" | "self" | "which-self" => {
+            cmd_instances_current(args)
+        }
         "stop" | "kill" | "close" => cmd_instances_stop(args),
         "restart" => cmd_instances_restart(args),
         "switch" | "use" => cmd_instances_switch(args),
@@ -225,7 +229,11 @@ pub(crate) fn cmd_instances_create(args: &[String]) {
         match instance::create_instance(name.clone()) {
             Ok(cfg) => {
                 let home_dir = PathBuf::from(&cfg.data_dir).join("home");
-                let _ = fs::create_dir_all(&home_dir);
+                // Justification: home directory creation is best-effort; instance startup handles missing folder
+                antigravity_tools_lib::error::record_ignored(
+                    fs::create_dir_all(&home_dir),
+                    "create instance home dir",
+                );
                 CliEnvelope::ok("instances create", Some(cfg.id.clone()), cfg).print_and_exit();
             }
             Err(e) => {
@@ -260,7 +268,11 @@ pub(crate) fn cmd_instances_start(args: &[String]) {
                 }
             }
         }
-        let _ = instance::launch_instance(&target_instance);
+        // Justification: CLI start launches in background; status envelope reports triggered state
+        antigravity_tools_lib::error::record_ignored(
+            instance::launch_instance(&target_instance),
+            "launch instance",
+        );
         let data = serde_json::json!({ "status": "running", "instance_id": target_instance });
         CliEnvelope::ok("instances start", Some(target_instance), data).print_and_exit();
     }
@@ -272,36 +284,49 @@ pub(crate) fn cmd_instances_start(args: &[String]) {
 }
 
 pub(crate) fn cmd_instances_current(args: &[String]) {
-    let ctx = CliContext::parse(args);
-    let current = instance::detect_caller_instance_id();
-    if ctx.json_output {
-        CliEnvelope::ok(
-            "instances current",
-            current.clone(),
-            serde_json::json!({ "instance_id": current }),
-        )
-        .print_and_exit();
-    }
-    match current {
-        Some(id) => println!("{id}"),
-        None => println!("none"),
-    }
-    let _ = args;
+    let mut forward_args = vec!["self".to_string()];
+    forward_args.extend_from_slice(args);
+    crate::instance_dispatch::cmd_instances(&forward_args);
 }
 
-fn guard_caller_instance(target_instance: &str) {
-    if let Err(err) = instance::refuse_if_caller_instance(target_instance) {
-        eprintln!("[ERROR] {err}");
-        std::process::exit(2);
+fn resolve_target_instance_arg(ctx: &CliContext) -> String {
+    if let Some(ref id) = ctx.instance_id {
+        return id.clone();
+    }
+    if let Some(pos) = ctx.positional_args.first().filter(|s| !s.starts_with('-')) {
+        return pos.clone();
+    }
+    ctx.resolve_target_instance()
+        .unwrap_or_else(|_| "default".to_string())
+}
+
+fn guard_caller_instance(args: &[String], target_instance: &str) {
+    let has_force = args.iter().any(|a| a == "--force" || a == "-f");
+    if !has_force {
+        if let Some(caller_id) = instance::detect_caller_instance_id() {
+            let resolved = instance::resolve_instance_id(target_instance)
+                .unwrap_or_else(|_| target_instance.to_string());
+            if caller_id == resolved || caller_id == target_instance {
+                eprintln!(
+                    "[ERROR] Refusing to stop, switch, or delete instance '{}' because this command is running inside its IDE process",
+                    caller_id
+                );
+                std::process::exit(2);
+            }
+        }
+        if let Err(err) = instance::refuse_if_caller_instance(target_instance) {
+            eprintln!("[ERROR] {err}");
+            std::process::exit(2);
+        }
+    } else {
+        std::env::set_var("AGM_FORCE_CALLER_OVERRIDE", "1");
     }
 }
 
 pub(crate) fn cmd_instances_stop(args: &[String]) {
     let ctx = CliContext::parse(args);
-    let target_instance = ctx
-        .resolve_target_instance()
-        .unwrap_or_else(|_| "default".to_string());
-    guard_caller_instance(&target_instance);
+    let target_instance = resolve_target_instance_arg(&ctx);
+    guard_caller_instance(args, &target_instance);
     if ctx.json_output {
         if is_daemon_running() {
             let path = format!("/instances/{}/stop", target_instance);
@@ -318,19 +343,29 @@ pub(crate) fn cmd_instances_stop(args: &[String]) {
             eprintln!("[ERROR] {err}");
             std::process::exit(1);
         }
+        antigravity_tools_lib::modules::task_history_db::record_instance_lifecycle_event(
+            antigravity_tools_lib::modules::audit_action::AuditAction::StopInstance,
+            Some(&target_instance),
+            &format!("Stop instance {}", target_instance),
+            "CLI stop command executed",
+        );
         let data = serde_json::json!({ "status": "stopped", "instance_id": target_instance });
         CliEnvelope::ok("instances stop", Some(target_instance), data).print_and_exit();
     }
+    antigravity_tools_lib::modules::task_history_db::record_instance_lifecycle_event(
+        antigravity_tools_lib::modules::audit_action::AuditAction::StopInstance,
+        Some(&target_instance),
+        &format!("Stop instance {}", target_instance),
+        "CLI stop command executed",
+    );
     let forward_args = vec!["stop".to_string(), target_instance];
     crate::instance_dispatch::cmd_instances(&forward_args);
 }
 
 pub(crate) fn cmd_instances_restart(args: &[String]) {
     let ctx = CliContext::parse(args);
-    let target_instance = ctx
-        .resolve_target_instance()
-        .unwrap_or_else(|_| "default".to_string());
-    guard_caller_instance(&target_instance);
+    let target_instance = resolve_target_instance_arg(&ctx);
+    guard_caller_instance(args, &target_instance);
     if ctx.json_output {
         if is_daemon_running() {
             let path = format!("/instances/{}/restart", target_instance);
@@ -343,20 +378,37 @@ pub(crate) fn cmd_instances_restart(args: &[String]) {
                 }
             }
         }
-        let _ = instance::restart_instance(&target_instance);
+        // Justification: CLI restart runs asynchronously; envelope communicates triggered state
+        antigravity_tools_lib::error::record_ignored(
+            instance::restart_instance(&target_instance),
+            "restart instance",
+        );
+        antigravity_tools_lib::modules::task_history_db::record_instance_lifecycle_event(
+            antigravity_tools_lib::modules::audit_action::AuditAction::RestartInstance,
+            Some(&target_instance),
+            &format!("Restart instance {}", target_instance),
+            "CLI restart command executed",
+        );
         let data = serde_json::json!({ "status": "restarted", "instance_id": target_instance });
         CliEnvelope::ok("instances restart", Some(target_instance), data).print_and_exit();
     }
     println!("[*] Restarting instance '{}'...", target_instance);
-    let _ = instance::restart_instance(&target_instance);
+    // Justification: best-effort CLI restart execution
+    antigravity_tools_lib::error::record_ignored(
+        instance::restart_instance(&target_instance),
+        "restart instance",
+    );
+    antigravity_tools_lib::modules::task_history_db::record_instance_lifecycle_event(
+        antigravity_tools_lib::modules::audit_action::AuditAction::RestartInstance,
+        Some(&target_instance),
+        &format!("Restart instance {}", target_instance),
+        "CLI restart command executed",
+    );
     println!("[SUCCESS] Restarted instance '{}'.", target_instance);
 }
 
 pub(crate) fn cmd_instances_switch(args: &[String]) {
     let ctx = CliContext::parse(args);
-    let target_instance = ctx
-        .resolve_target_instance()
-        .unwrap_or_else(|_| "default".to_string());
     let mut account_query = None;
     let mut i = 0;
     while i < args.len() {
@@ -366,17 +418,32 @@ pub(crate) fn cmd_instances_switch(args: &[String]) {
         }
         i += 1;
     }
-    if account_query.is_none() {
-        if let Some(pos) = ctx.positional_args.first() {
-            if pos != &target_instance && instance::resolve_instance_id(pos).is_err() {
-                account_query = Some(pos.clone());
-            } else if ctx.positional_args.len() > 1 {
-                account_query = Some(ctx.positional_args[1].clone());
+
+    let mut target_instance = ctx.instance_id.clone().unwrap_or_default();
+    if target_instance.is_empty() {
+        if let Some(first) = ctx.positional_args.first().filter(|s| !s.starts_with('-')) {
+            if first.contains('@') {
+                target_instance = ctx
+                    .resolve_target_instance()
+                    .unwrap_or_else(|_| "default".to_string());
+                if account_query.is_none() {
+                    account_query = Some(first.clone());
+                }
+            } else {
+                target_instance = first.clone();
             }
+        } else {
+            target_instance = ctx
+                .resolve_target_instance()
+                .unwrap_or_else(|_| "default".to_string());
         }
     }
 
-    guard_caller_instance(&target_instance);
+    if account_query.is_none() && ctx.positional_args.len() > 1 {
+        account_query = Some(ctx.positional_args[1].clone());
+    }
+
+    guard_caller_instance(args, &target_instance);
     if account_query.is_none() {
         let forward_args = vec!["switch".to_string(), target_instance];
         crate::instance_dispatch::cmd_instances(&forward_args);
@@ -393,9 +460,13 @@ pub(crate) fn cmd_instances_switch(args: &[String]) {
             "account": acc,
             "switched_at": chrono::Utc::now().to_rfc3339(),
         });
-        let _ = fs::write(
-            resume_file,
-            serde_json::to_string_pretty(&payload).unwrap_or_default(),
+        // Justification: best-effort test resume payload persistence
+        antigravity_tools_lib::error::record_ignored(
+            fs::write(
+                resume_file,
+                serde_json::to_string_pretty(&payload).unwrap_or_default(),
+            ),
+            "write resume task",
         );
     }
 
@@ -433,10 +504,8 @@ pub(crate) fn cmd_instances_copy(args: &[String]) {
 
 pub(crate) fn cmd_instances_delete(args: &[String]) {
     let ctx = CliContext::parse(args);
-    let target_instance = ctx
-        .resolve_target_instance()
-        .unwrap_or_else(|_| "default".to_string());
-    guard_caller_instance(&target_instance);
+    let target_instance = resolve_target_instance_arg(&ctx);
+    guard_caller_instance(args, &target_instance);
     if ctx.json_output {
         if is_daemon_running() {
             let path = format!("/instances/{}", target_instance);
@@ -449,10 +518,26 @@ pub(crate) fn cmd_instances_delete(args: &[String]) {
                 }
             }
         }
-        let _ = instance::delete_instance(&target_instance);
+        // Justification: CLI delete executes deletion ladder; envelope communicates deleted status
+        antigravity_tools_lib::error::record_ignored(
+            instance::delete_instance(&target_instance),
+            "delete instance",
+        );
+        antigravity_tools_lib::modules::task_history_db::record_instance_lifecycle_event(
+            antigravity_tools_lib::modules::audit_action::AuditAction::DeleteInstance,
+            Some(&target_instance),
+            &format!("Delete instance {}", target_instance),
+            "CLI delete command executed",
+        );
         let data = serde_json::json!({ "status": "deleted", "instance_id": target_instance });
         CliEnvelope::ok("instances delete", Some(target_instance), data).print_and_exit();
     }
+    antigravity_tools_lib::modules::task_history_db::record_instance_lifecycle_event(
+        antigravity_tools_lib::modules::audit_action::AuditAction::DeleteInstance,
+        Some(&target_instance),
+        &format!("Delete instance {}", target_instance),
+        "CLI delete command executed",
+    );
     let forward_args = vec!["rm".to_string(), target_instance];
     crate::instance_dispatch::cmd_instances(&forward_args);
 }
@@ -481,310 +566,13 @@ pub(crate) fn cmd_instances_logs(args: &[String]) {
 }
 
 pub(crate) fn cmd_instances_create_test(args: &[String]) {
-    let ctx = CliContext::parse(args);
-    let mut custom_name: Option<String> = None;
-    let mut i = 0;
-    while i < args.len() {
-        if (args[i] == "--name" || args[i] == "-n") && i + 1 < args.len() {
-            custom_name = Some(args[i + 1].clone());
-            break;
-        } else if let Some(val) = args[i].strip_prefix("--name=") {
-            custom_name = Some(val.to_string());
-            break;
-        }
-        i += 1;
-    }
-    if custom_name.is_none() {
-        if let Some(pos) = ctx.positional_args.first() {
-            if !pos.starts_with('-') {
-                custom_name = Some(pos.clone());
-            }
-        }
-    }
-
-    let mut registry = match instance::load_registry() {
-        Ok(reg) => reg,
-        Err(e) => {
-            if ctx.json_output {
-                CliEnvelope::<()>::err("instances create-test", None, "REGISTRY_ERROR", &e)
-                    .print_and_exit();
-            }
-            eprintln!("[ERROR] Failed to load registry: {e}");
-            std::process::exit(1);
-        }
-    };
-
-    let now_millis = chrono::Utc::now().timestamp_millis();
-    let (id, display_name) = match custom_name {
-        Some(name) => {
-            let slug: String = name
-                .to_lowercase()
-                .chars()
-                .map(|c| if c.is_alphanumeric() { c } else { '-' })
-                .collect();
-            let slug = slug.trim_matches('-');
-            let base_id = if slug.starts_with("test-") {
-                slug.to_string()
-            } else {
-                format!("test-{}", slug)
-            };
-            let unique_id = if registry.instances.iter().any(|inst| inst.id == base_id) {
-                format!("{}-{}", base_id, now_millis % 10000)
-            } else {
-                base_id
-            };
-            (unique_id, name)
-        }
-        None => {
-            let auto_id = format!("test-{}", now_millis % 1000000);
-            (auto_id.clone(), auto_id)
-        }
-    };
-
-    let base_local = std::env::var("LOCALAPPDATA")
-        .map(PathBuf::from)
-        .or_else(|_| {
-            dirs::data_local_dir().ok_or_else(|| "Failed to get local data dir".to_string())
-        })
-        .unwrap_or_else(|_| {
-            dirs::home_dir()
-                .map(|h| h.join(".local").join("share"))
-                .unwrap_or_else(|| PathBuf::from("."))
-        });
-
-    let data_dir = base_local.join("agm-instances").join(&id);
-    let user_dir = data_dir.join("User");
-
-    if let Err(e) = fs::create_dir_all(&user_dir) {
-        if ctx.json_output {
-            CliEnvelope::<()>::err(
-                "instances create-test",
-                Some(id),
-                "IO_ERROR",
-                &e.to_string(),
-            )
-            .print_and_exit();
-        }
-        eprintln!("[ERROR] Failed to create test instance directory: {e}");
-        std::process::exit(1);
-    }
-
-    let now = chrono::Utc::now().timestamp();
-    let next_seq = registry
-        .instances
-        .iter()
-        .filter_map(|i| i.seq_num)
-        .max()
-        .unwrap_or(0)
-        + 1;
-
-    let cfg = instance::InstanceConfig {
-        id: id.clone(),
-        name: display_name,
-        data_dir: data_dir.to_string_lossy().to_string(),
-        executable_path: None,
-        extensions_dir: None,
-        bound_account_id: None,
-        bound_email: None,
-        created_at: now,
-        last_used: now,
-        is_default: false,
-        pid: None,
-        seq_num: Some(next_seq),
-    };
-
-    registry.instances.push(cfg.clone());
-    if let Err(e) = instance::save_registry(&registry) {
-        if ctx.json_output {
-            CliEnvelope::<()>::err("instances create-test", Some(id), "SAVE_ERROR", &e)
-                .print_and_exit();
-        }
-        eprintln!("[ERROR] Failed to update registry: {e}");
-        std::process::exit(1);
-    }
-
-    if ctx.json_output {
-        let payload = serde_json::json!({
-            "id": cfg.id,
-            "name": cfg.name,
-            "data_dir": cfg.data_dir,
-            "config": cfg,
-        });
-        CliEnvelope::ok("instances create-test", Some(cfg.id.clone()), payload).print_and_exit();
-    }
-
-    println!("Created test instance '{}'", cfg.id);
-    println!("  ID: {}", cfg.id);
-    println!("  Data directory: {}", cfg.data_dir);
+    let mut forward_args = vec!["test-create".to_string()];
+    forward_args.extend_from_slice(args);
+    crate::instance_dispatch::cmd_instances(&forward_args);
 }
 
 pub(crate) fn cmd_instances_rm_test(args: &[String]) {
-    let ctx = CliContext::parse(args);
-    let all = ctx.all_instances || args.iter().any(|a| a == "--all" || a == "-a");
-
-    let mut registry = match instance::load_registry() {
-        Ok(reg) => reg,
-        Err(e) => {
-            if ctx.json_output {
-                CliEnvelope::<()>::err("instances rm-test", None, "REGISTRY_ERROR", &e)
-                    .print_and_exit();
-            }
-            eprintln!("[ERROR] Failed to load registry: {e}");
-            std::process::exit(1);
-        }
-    };
-
-    let base_local = std::env::var("LOCALAPPDATA")
-        .map(PathBuf::from)
-        .or_else(|_| {
-            dirs::data_local_dir().ok_or_else(|| "Failed to get local data dir".to_string())
-        })
-        .unwrap_or_else(|_| {
-            dirs::home_dir()
-                .map(|h| h.join(".local").join("share"))
-                .unwrap_or_else(|| PathBuf::from("."))
-        });
-
-    let targets_to_remove: Vec<instance::InstanceConfig> = if all {
-        registry
-            .instances
-            .iter()
-            .filter(|inst| {
-                !inst.is_default
-                    && (inst.id.to_lowercase().starts_with("test-")
-                        || inst.name.to_lowercase().starts_with("test-"))
-            })
-            .cloned()
-            .collect()
-    } else {
-        let target_id = ctx.resolve_target_instance().ok().or_else(|| {
-            ctx.positional_args
-                .first()
-                .filter(|s| !s.starts_with('-'))
-                .cloned()
-        });
-
-        match target_id {
-            Some(target) => {
-                let resolved =
-                    instance::resolve_instance_id(&target).unwrap_or_else(|_| target.clone());
-                match registry
-                    .instances
-                    .iter()
-                    .find(|i| i.id == resolved || i.id == target)
-                    .cloned()
-                {
-                    Some(inst) => vec![inst],
-                    None => {
-                        let orphan_dir = base_local.join("agm-instances").join(&target);
-                        if orphan_dir.exists() {
-                            antigravity_tools_lib::error::record_ignored(
-                                fs::remove_dir_all(&orphan_dir),
-                                "remove orphaned test dir",
-                            ); // Justification: test cleanup; absence is safe
-                            if ctx.json_output {
-                                let payload = serde_json::json!({
-                                    "removed": vec![target.clone()],
-                                    "count": 1,
-                                    "unregistered": false,
-                                    "directory_deleted": true,
-                                });
-                                CliEnvelope::ok("instances rm-test", Some(target), payload)
-                                    .print_and_exit();
-                            }
-                            println!("Deleted orphaned test directory: {}", orphan_dir.display());
-                            return;
-                        }
-
-                        if ctx.json_output {
-                            CliEnvelope::<()>::err(
-                                "instances rm-test",
-                                Some(target.clone()),
-                                "NOT_FOUND",
-                                &format!("Test instance '{target}' not found"),
-                            )
-                            .print_and_exit();
-                        }
-                        eprintln!("[ERROR] Test instance '{}' not found", target);
-                        std::process::exit(1);
-                    }
-                }
-            }
-            None => {
-                if ctx.json_output {
-                    CliEnvelope::<()>::err(
-                        "instances rm-test",
-                        None,
-                        "MISSING_ARGUMENT",
-                        "Specify test instance ID or pass --all",
-                    )
-                    .print_and_exit();
-                }
-                eprintln!("[ERROR] Please specify a test instance ID or pass --all");
-                std::process::exit(1);
-            }
-        }
-    };
-
-    if targets_to_remove.is_empty() {
-        if ctx.json_output {
-            let payload = serde_json::json!({
-                "removed": Vec::<String>::new(),
-                "count": 0,
-            });
-            CliEnvelope::ok("instances rm-test", None, payload).print_and_exit();
-        }
-        println!("No test instances found to remove.");
-        return;
-    }
-
-    let mut removed_ids = Vec::new();
-    for inst in &targets_to_remove {
-        guard_caller_instance(&inst.id);
-
-        let _ = instance::close_instance_verified(&inst.id, std::time::Duration::from_millis(2500));
-
-        let dir = PathBuf::from(&inst.data_dir);
-        if dir.exists() {
-            antigravity_tools_lib::error::record_ignored(
-                fs::remove_dir_all(&dir),
-                "remove test instance dir",
-            ); // Justification: test cleanup; absence is safe
-        }
-        let fallback_dir = base_local.join("agm-instances").join(&inst.id);
-        if fallback_dir.exists() && fallback_dir != dir {
-            antigravity_tools_lib::error::record_ignored(
-                fs::remove_dir_all(&fallback_dir),
-                "remove test instance dir",
-            ); // Justification: test cleanup; absence is safe
-        }
-
-        registry.instances.retain(|i| i.id != inst.id);
-        if registry.active_instance_id == inst.id {
-            registry.active_instance_id = "default".to_string();
-        }
-
-        removed_ids.push(inst.id.clone());
-    }
-
-    if let Err(e) = instance::save_registry(&registry) {
-        if ctx.json_output {
-            CliEnvelope::<()>::err("instances rm-test", None, "SAVE_ERROR", &e).print_and_exit();
-        }
-        eprintln!("[ERROR] Failed to save updated registry: {e}");
-        std::process::exit(1);
-    }
-
-    if ctx.json_output {
-        let payload = serde_json::json!({
-            "removed": removed_ids,
-            "count": removed_ids.len(),
-        });
-        CliEnvelope::ok("instances rm-test", None, payload).print_and_exit();
-    }
-
-    for id in &removed_ids {
-        println!("Removed test instance '{}'", id);
-    }
-    println!("Cleaned {} test instance(s).", removed_ids.len());
+    let mut forward_args = vec!["test-clean".to_string()];
+    forward_args.extend_from_slice(args);
+    crate::instance_dispatch::cmd_instances(&forward_args);
 }

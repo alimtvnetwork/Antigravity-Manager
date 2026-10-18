@@ -12,9 +12,14 @@ pub fn delete_instance(instance_id: &str) -> Result<(), String> {
         return Err("Cannot delete the default instance".to_string());
     }
 
-    // Automatically close the instance if it is running so delete never fails
+    refuse_if_caller_instance(instance_id)?;
+
+    // Automatically close the instance verified if it is running so delete never fails
     // Justification: best-effort close; close is idempotent and re-attempted on the next action
-    crate::error::record_ignored(close_instance(instance_id), "close instance");
+    crate::error::record_ignored(
+        close_instance_verified(instance_id, std::time::Duration::from_millis(3000)),
+        "close instance verified before delete",
+    );
     std::thread::sleep(std::time::Duration::from_millis(200));
 
     let mut registry = load_registry()?;
@@ -75,6 +80,25 @@ pub fn delete_instance(instance_id: &str) -> Result<(), String> {
             crate::error::record_ignored(fs::remove_file(custom_exe), "remove file");
         }
     }
+
+    if let Ok(conn) = open_instance_db() {
+        // Justification: cleanup of stale process state for deleted instance
+        crate::error::record_ignored(
+            conn.execute(
+                "DELETE FROM instance_processes WHERE instance_id = ?1",
+                rusqlite::params![instance_id],
+            ),
+            "delete from instance_processes",
+        );
+    }
+
+    crate::modules::task_history_db::record(
+        crate::modules::audit_action::AuditAction::DeleteInstance,
+        instance_id,
+        "ok",
+        "Deleted instance profile",
+        Some(instance_id),
+    );
 
     Ok(())
 }
