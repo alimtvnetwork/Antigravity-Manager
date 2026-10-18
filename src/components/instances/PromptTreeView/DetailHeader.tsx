@@ -1,5 +1,5 @@
 import { copyToClipboard } from '../../../utils/clipboard';
-import { copyImageAsMarkdownText } from './clipboard';
+import { copyImageAsMarkdownText, copySingleImageForOneNoteOrIde, writeNativeImageToClipboard, copyPromptWithRichImages, extractAssets } from './clipboard';
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat } from 'lucide-react';
@@ -77,6 +77,8 @@ export interface DetailHeaderProps {
     onCopyAllWithRichImages?: () => void;
     onCopyCleanText?: () => void;
     onCopyImageAsText?: () => void;
+    onCopyImageForOneNoteOrIde?: () => void;
+    onCopySingleImagePng?: () => void;
     onCopyWithImages: () => void;
     onSaveImages: () => void;
     onExport: (format: 'md' | 'json') => void;
@@ -107,6 +109,7 @@ export function DetailHeader(props: DetailHeaderProps) {
         hasImages, instancePid, instanceSeqNum, instanceExeName, instanceNameDisplay,
         formatDuration, elapsedSeconds,
         onCopyAllWithRichImages, onCopyCleanText, onCopyImageAsText,
+        onCopyImageForOneNoteOrIde, onCopySingleImagePng,
         onCopyWithImages, onSaveImages, onExport, onFocusIde, onResend, onEnqueue, rerunRepoPath, onOpenInspector,
         selectedTurnNumber,
         setIsDetailsModalOpen,
@@ -283,6 +286,8 @@ export function DetailHeader(props: DetailHeaderProps) {
     };
 
     const [localCopiedImageText, setLocalCopiedImageText] = useState(false);
+    const [localCopiedOneNote, setLocalCopiedOneNote] = useState(false);
+    const [localCopiedSinglePng, setLocalCopiedSinglePng] = useState(false);
 
     const handleCopyImageAsText = async () => {
         try {
@@ -298,6 +303,48 @@ export function DetailHeader(props: DetailHeaderProps) {
             }, 2000);
         } catch (err) {
             reportPromptActionError(err, 'DetailHeader.onCopyImageAsText');
+        }
+    };
+
+    const handleCopyImageForOneNote = async () => {
+        try {
+            if (onCopyImageForOneNoteOrIde) {
+                onCopyImageForOneNoteOrIde();
+            } else {
+                const promptText = activePromptText || selectedConversation?.full_prompt_text || selectedConversation?.prompt_preview_200w || '';
+                const { images } = extractAssets(promptText);
+                if (images.length > 0) {
+                    await copySingleImageForOneNoteOrIde(images[0], 'Prompt Image');
+                } else {
+                    await copyPromptWithRichImages(promptText);
+                }
+            }
+            setLocalCopiedOneNote(true);
+            setTimeout(() => {
+                setLocalCopiedOneNote(false);
+            }, 2000);
+        } catch (err) {
+            reportPromptActionError(err, 'DetailHeader.onCopyImageForOneNote');
+        }
+    };
+
+    const handleCopySingleImagePng = async () => {
+        try {
+            if (onCopySingleImagePng) {
+                onCopySingleImagePng();
+            } else {
+                const promptText = activePromptText || selectedConversation?.full_prompt_text || selectedConversation?.prompt_preview_200w || '';
+                const { images } = extractAssets(promptText);
+                if (images.length > 0) {
+                    await writeNativeImageToClipboard(images[0]);
+                }
+            }
+            setLocalCopiedSinglePng(true);
+            setTimeout(() => {
+                setLocalCopiedSinglePng(false);
+            }, 2000);
+        } catch (err) {
+            reportPromptActionError(err, 'DetailHeader.onCopySingleImagePng');
         }
     };
 
@@ -680,9 +727,49 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     >
                                         <div className="flex items-center gap-2">
                                             {localCopiedImageText ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <FileText className="w-3.5 h-3.5 text-sky-400" />}
-                                            <span>{localCopiedImageText ? 'Copied image as text!' : 'Copy Image as Text'}</span>
+                                            <span>{localCopiedImageText ? 'Copied image as text!' : 'Copy Image as Text (Markdown)'}</span>
                                         </div>
                                         <span className="text-[10px] text-sky-600 dark:text-sky-300 font-mono px-1.5 py-0.2 rounded-md bg-sky-500/10 border border-sky-500/20">Markdown</span>
+                                    </button>
+                                )}
+
+                                {/* Option 4: Copy Image for OneNote/IDE */}
+                                {hasImages && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            void handleCopyImageForOneNote();
+                                            setIsCopyMenuOpen(false);
+                                        }}
+                                        data-ui-name="prompt-menu-copy-onenote-btn"
+                                        data-ui-id={`prompt-menu-copy-onenote-${selectedConversation.conversation_id}`}
+                                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            {localCopiedOneNote ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <FileText className="w-3.5 h-3.5 text-indigo-400" />}
+                                            <span>{localCopiedOneNote ? 'Copied for OneNote/IDE!' : 'Copy Image for OneNote/IDE'}</span>
+                                        </div>
+                                        <span className="text-[10px] text-indigo-600 dark:text-indigo-300 font-mono px-1.5 py-0.2 rounded-md bg-indigo-500/10 border border-indigo-500/20">Rich/IDE</span>
+                                    </button>
+                                )}
+
+                                {/* Option 5: Copy Single Image (PNG) */}
+                                {hasImages && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            void handleCopySingleImagePng();
+                                            setIsCopyMenuOpen(false);
+                                        }}
+                                        data-ui-name="prompt-menu-copy-single-png-btn"
+                                        data-ui-id={`prompt-menu-copy-single-png-${selectedConversation.conversation_id}`}
+                                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            {localCopiedSinglePng ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-purple-400" />}
+                                            <span>{localCopiedSinglePng ? 'Copied Single Image!' : 'Copy Single Image (PNG)'}</span>
+                                        </div>
+                                        <span className="text-[10px] text-purple-600 dark:text-purple-300 font-mono px-1.5 py-0.2 rounded-md bg-purple-500/10 border border-purple-500/20">PNG</span>
                                     </button>
                                 )}
 
