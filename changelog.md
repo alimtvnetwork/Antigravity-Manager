@@ -1,5 +1,20 @@
 # Changelog
 
+## [v4.232.0] - 2026-10-18
+
+### Added
+- **UI/UX Session Overview Collapsible & State Memory**: Converted the session overview dashboard in `src/components/instances/PromptTreeView/PromptInstructionView.tsx` to be collapsed by default to save vertical viewport space; added subtle low-profile purple expander trigger (`ChevronDown`/`ChevronUp`); persisted collapse/expand state in `localStorage` (`agm_prompt_overview_expanded`) across sessions; compacted collapsed view into a single-line metadata bar. (Thanks to @aukgit)
+- **Standardized 24-Hour Date/Time & Relative Time Formatting**: Implemented centralized date formatting in `src/utils/date.ts` supporting `DD-MMM-YYYY HH:mm` (e.g. `18-Oct-2026 21:40`) in 24-hour clock using the local system timezone, with relative time indicators ("ran 5 minutes ago", "ran 1 day ago") and duration seconds suppression when hours or minutes exist; added user-configurable `date_format_mode` toggle (`24h` / `12h` / `iso`) in Settings. (Thanks to @aukgit)
+- **SSH Fleet Account & Instance Discovery with Remote Prompt Dispatch**: Upgraded `get_cluster_instances_and_balances` in `src-tauri/src/modules/ssh_manager/exec.rs` to query real multi-instances and bound Google account emails via SSH; elevated Account Email and Instance Name to primary columns in `FleetMachinesTable.tsx` and `SshGitmapSection.tsx` while demoting raw IP into an interactive hover badge; added dynamic instance `<select>` dropdown and 1-click remote prompt dispatching. (Thanks to @aukgit)
+
+### Fixed
+- **Persistent Expand Full Toggle across Input/Output Tabs**: Fixed UI bug in `src/components/instances/PromptTreeView/DetailTabs.tsx` where switching from the Input to Output tab hid the Expand Full / Fold toggle button; decoupled expand toggle from instruction tab so users can freely expand both input instructions and execution results. (Thanks to @aukgit)
+- **Header Deduplication & Detail Modal Clarification**: Removed redundant title, sequence badge (`C211`), and conversation ID repetitions from the overview card; clarified sequential conversation index (`C211` = Conversation #211) and interaction turns (`turns` = user/assistant request-response cycles) in `src/components/instances/PromptTreeView/DetailsModal.tsx`. (Thanks to @aukgit)
+- **Prompt Tree Image Rendering & Queued/Running Visibility Fix**: Added Tauri v2 `core:asset:default` capability in `src-tauri/capabilities/default.json` and resolved relative image paths against `repo_path` in `clipboard.ts` and `PromptMarkdownPreview.tsx`; protected queued prompts from stale conversation demotion in `conversationGuards.ts`; synthesized running/queued projects from `active_prompts` in `src-tauri/src/modules/repo_db/tree_phases.rs`, ensuring the left panel is never empty when prompts are in flight. (Thanks to @aukgit)
+- **Closed IDE Send Delivery Ladder**: Upgraded `src-tauri/src/modules/instance/smart_run.rs` and `src-tauri/src/modules/repo_db/agy.rs` with an adaptive 5-second process stabilization ladder and CDP retry mechanism for cold-started IDE instances, eliminating lost prompts when dispatching to closed IDEs. (Thanks to @aukgit)
+
+---
+
 ## [v4.231.1] - 2026-10-18
 
 ### Added
@@ -711,6 +726,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.232.0 (2026-10-18)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.231.0 (2026-10-18)**:
         -   **[Instance Management & UI/UX Synchronization] PID Inline List View Layout, Deterministic Process Termination Ladder, Account Switch Pre-Switch Eviction, Royal Violet Switch Account Modal & Sharded Audit Trail Visibility (Thanks to @aukgit)**:
             -   **Description**: Confirmed numeric status `1632` represents native OS Process ID (`PID`); merged separate `Status & PID` and `IDE EXE & DATA` table columns into a unified `Status, Process & Environment` cell in `src/components/instances/InstanceTable.tsx` and `src/components/instances/table/InstanceRowCells.tsx` with inline monospace PID badge, shortened executable tail, and shortened data directory tail separated by `·` with segmented copy action capsule; established 5-stage deterministic process termination ladder (`taskkill /F /T`, Win32 `TerminateProcess`, PowerShell `Stop-Process`, 200ms kernel settle delay, Chromium lockfile eviction) in `src-tauri/src/modules/instance/close.rs` and `create.rs`; enforced pre-switch PID eviction and 200ms settle delay in `switch.rs` and `credentials.rs` to eliminate Electron write-back race conditions; redesigned `SwitchAccountDialog.tsx` to 100% Royal Violet design tokens (`var(--ui-surface-1)`, `var(--ui-border-subtle)`, `var(--ui-interactive)`, `var(--ui-success)`) with segmented quota pill capsule; resolved empty audit trail in `switch_history.rs` and `InstanceAuditTrailModal.tsx` by expanding default instance aliases, guaranteeing response fields, and adding smart auto-tab fallback to operations; hardened caller IDE detection (`detect_caller_instance_id` walking 24 parent process generations) with exit code 2 immunity guard; and verified 100% green via `scripts/test-instance-lifecycle-e2e.ps1`.
