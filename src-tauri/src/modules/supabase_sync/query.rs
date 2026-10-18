@@ -12,7 +12,17 @@ pub(crate) fn build_ssh_mesh_machine_info(
     now: i64,
 ) -> FleetMachineInfo {
     let port = if conn.port == 0 { 22 } else { conn.port };
-    let is_online = crate::modules::ssh_manager::check_tcp_liveness(&conn.ip_address, port, 1500);
+    let mut is_online =
+        crate::modules::ssh_manager::check_tcp_liveness(&conn.ip_address, port, 1500);
+    if !is_online && crate::modules::ssh_manager::resolve_gitmap_bin().is_some() {
+        if let Ok((is_gm_online, _)) =
+            crate::modules::ssh_manager::check_node_via_gitmap(&conn.alias)
+        {
+            if is_gm_online {
+                is_online = true;
+            }
+        }
+    }
     let status = if is_online {
         "online".to_string()
     } else {

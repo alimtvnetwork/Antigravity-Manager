@@ -164,22 +164,26 @@ pub(crate) fn collect_tree_conversation_items(
             let conv_ts = parse_flexible_timestamp(&last_time_str);
             let is_recent = conv_ts > 0 && (now - conv_ts <= 600);
 
-            let has_terminal_status = status.contains("COMPLETED")
-                || status.contains("FAILED")
-                || status.contains("CANCELLED");
-            let has_idle_status = status.contains("IDLE") || has_terminal_status;
+            let status_upper = status.to_uppercase();
+            let has_terminal_status = status_upper.contains("COMPLETED")
+                || status_upper.contains("FAILED")
+                || status_upper.contains("CANCELLED")
+                || status_upper.contains("ABORTED");
+            let has_idle_status = status_upper.contains("IDLE")
+                || status_upper.contains("CASCADE_RUN_STATUS_IDLE")
+                || has_terminal_status;
             let is_explicit_idle = has_idle_status;
 
             let inspection = inspect_conversation_transcript(base, &cid);
 
-            let is_conv_running = if has_idle_status || inspection.is_terminal_done {
+            let is_conv_running = if is_explicit_idle || inspection.is_terminal_done {
                 // Explicit Idle Supremacy: unreset not_fully_idle artifacts must not override terminal status
                 false
             } else if is_owning_inst_alive && not_fully_idle > 0 && is_recent {
                 true
             } else if is_owning_inst_alive
                 && inspection.is_recent_active
-                && !has_idle_status
+                && !is_explicit_idle
                 && !inspection.is_terminal_done
             {
                 true
@@ -281,7 +285,7 @@ pub(crate) fn collect_tree_conversation_items(
                             "QUEUED".to_string()
                         } else if inspection.is_terminal_done
                             || is_explicit_idle
-                            || status.contains("RUNNING")
+                            || status_upper.contains("RUNNING")
                         {
                             "IDLE".to_string()
                         } else {

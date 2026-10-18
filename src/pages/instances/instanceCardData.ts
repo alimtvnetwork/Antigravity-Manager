@@ -24,14 +24,13 @@ export function isConversationOwnedByInstance(
     convInstId: string | undefined | null,
     instConfig: { id: string; is_default?: boolean }
 ): boolean {
-    const isDefaultInst = Boolean(instConfig.is_default || instConfig.id === 'default');
+    const isDefaultInst = Boolean(instConfig.is_default || instConfig.id === 'default' || instConfig.id === '__default__');
     if (!convInstId || convInstId.trim() === '') {
         return isDefaultInst;
     }
     const isConvDefault = convInstId === 'default' || convInstId === '__default__';
-    const isTargetDefault = instConfig.id === 'default' || instConfig.id === '__default__';
-    if (isConvDefault && isTargetDefault) {
-        return true;
+    if (isConvDefault) {
+        return isDefaultInst;
     }
     return convInstId === instConfig.id;
 }
@@ -96,7 +95,7 @@ export function useInstanceCardData(
             const hasGenuineRunningConv = (node.conversations || []).some(
                 (c) =>
                     Boolean(c.is_running) &&
-                    (c.instance_id === inst.config.id || (!c.instance_id && inst.config.id === 'default')) &&
+                    isConversationOwnedByInstance(c.instance_id, inst.config) &&
                     !isGhostConversation(c) &&
                     !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
             );

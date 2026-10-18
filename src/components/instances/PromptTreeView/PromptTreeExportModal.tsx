@@ -36,6 +36,7 @@ export interface PromptTreeExportModalProps {
         scope: ExportScopeParams;
         format: 'json' | 'sqlite' | 'yaml';
         embed_images: boolean;
+        export_mode?: 'standalone' | 'lean';
     }) => Promise<void>;
 }
 
@@ -127,6 +128,19 @@ export function PromptTreeExportModal({
 
     if (!isOpen) return null;
 
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose]);
+
     const handleExport = async () => {
         setIsExporting(true);
         try {
@@ -142,6 +156,7 @@ export function PromptTreeExportModal({
                 scope,
                 format,
                 embed_images: embedImages,
+                export_mode: embedImages ? 'standalone' : 'lean',
             });
 
             setExportSuccess(true);

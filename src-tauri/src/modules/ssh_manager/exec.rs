@@ -220,7 +220,43 @@ pub fn exec_ssh_command(
                 s.spawn(move || {
                     let start = Instant::now();
                     let port = port_override.unwrap_or(22);
-                    if !check_tcp_liveness(&node.ip_address, port, 2500) {
+                    let is_w2 =
+                        node.alias.eq_ignore_ascii_case("w2") || node.ip_address == "192.168.1.7";
+                    let mut is_tcp_online = check_tcp_liveness(&node.ip_address, port, 2500);
+
+                    if !is_tcp_online && resolve_gitmap_bin().is_some() {
+                        if let Ok((is_gm_online, _)) = check_node_via_gitmap(&node.alias) {
+                            if is_gm_online {
+                                is_tcp_online = true;
+                            }
+                        }
+                    }
+
+                    if !is_tcp_online {
+                        // Forward/fallback to gitmap ssh exec directly before declaring unreachable
+                        if let Ok((gm_code, gm_out, gm_err)) =
+                            exec_via_gitmap_ssh(&node.alias, &cmd_str)
+                        {
+                            if gm_code == 0
+                                && !gm_out.contains("machine is off")
+                                && !gm_out.contains("All target machines are currently off")
+                                && !gm_out.to_lowercase().contains("connection timed out")
+                            {
+                                return SshExecNodeResult {
+                                    alias: node.alias.clone(),
+                                    target: format!("{}@{}", node.username, node.ip_address),
+                                    ip_address: node.ip_address.clone(),
+                                    username: node.username.clone(),
+                                    port,
+                                    exit_code: 0,
+                                    stdout: gm_out,
+                                    stderr: gm_err,
+                                    duration_ms: start.elapsed().as_millis(),
+                                    success: true,
+                                };
+                            }
+                        }
+
                         return SshExecNodeResult {
                             alias: node.alias.clone(),
                             target: format!("{}@{}", node.username, node.ip_address),
@@ -257,7 +293,8 @@ pub fn exec_ssh_command(
                             let is_auth_failure = !out.status.success()
                                 && (code == 255
                                     || stderr_str.to_lowercase().contains("permission denied")
-                                    || stderr_str.to_lowercase().contains("authentication failed"));
+                                    || stderr_str.to_lowercase().contains("authentication failed")
+                                    || is_w2);
 
                             if is_auth_failure {
                                 // Stage 2: GitMap in-process Go SSH execution fallback
@@ -267,6 +304,7 @@ pub fn exec_ssh_command(
                                     if gm_code == 0
                                         && !gm_out.contains("machine is off")
                                         && !gm_out.contains("All target machines are currently off")
+                                        && !gm_out.to_lowercase().contains("connection timed out")
                                     {
                                         return SshExecNodeResult {
                                             alias: node.alias.clone(),
@@ -321,6 +359,34 @@ pub fn exec_ssh_command(
                                                         &retry_out.stderr,
                                                     )
                                                     .to_string(),
+                                                    duration_ms: start.elapsed().as_millis(),
+                                                    success: true,
+                                                };
+                                            }
+                                        }
+
+                                        // If native retry failed, retry gitmap ssh exec once more after key fix
+                                        if let Ok((r_gm_code, r_gm_out, r_gm_err)) =
+                                            exec_via_gitmap_ssh(&node.alias, &cmd_str)
+                                        {
+                                            if r_gm_code == 0
+                                                && !r_gm_out.contains("machine is off")
+                                                && !r_gm_out
+                                                    .to_lowercase()
+                                                    .contains("connection timed out")
+                                            {
+                                                return SshExecNodeResult {
+                                                    alias: node.alias.clone(),
+                                                    target: format!(
+                                                        "{}@{}",
+                                                        node.username, node.ip_address
+                                                    ),
+                                                    ip_address: node.ip_address.clone(),
+                                                    username: node.username.clone(),
+                                                    port,
+                                                    exit_code: 0,
+                                                    stdout: r_gm_out,
+                                                    stderr: r_gm_err,
                                                     duration_ms: start.elapsed().as_millis(),
                                                     success: true,
                                                 };
@@ -466,7 +532,10 @@ pub fn check_node_via_gitmap(target: &str) -> Result<(bool, String), String> {
         .output()
         .map_err(|e| format!("Failed to run gitmap ssh check: {}", e))?;
     let stdout = String::from_utf8_lossy(&out.stdout);
-    let is_online = stdout.contains("ONLINE") || stdout.contains("reachable");
+    let is_online = stdout.contains("ONLINE")
+        || stdout.contains("reachable")
+        || stdout.contains("ready")
+        || stdout.contains("●");
     Ok((is_online, stdout.trim().to_string()))
 }
 

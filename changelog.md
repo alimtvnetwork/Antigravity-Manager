@@ -1,5 +1,21 @@
 # Changelog
 
+## [v4.230.0] - 2026-10-18
+
+### Added
+- **Prompt Tree View Ergonomics & Compact Action Rows**: Compacted Input / Output indicators into a unified segmented capsule alongside Expand Full on the right-hand side of Row 2; streamlined View Modes (`Preview`, `Raw`, `Edit`, `Details`) into an icon-only capsule (`rounded-lg` container, `rounded-md` buttons) on the left-hand side with hover tooltips; elevated Copy, Send, and Rerun controls to Row 1 with dual rich copy options (`includes image` binary PNG + HTML vs `copy as text`). (Thanks to @aukgit)
+- **Prompt Image Previews & Native Multimodal Clipboard**: Added inline image resolution via Tauri asset URLs (`convertFileSrc`) preventing WebView2 image rendering failures; enabled right-click context menu and dual clipboard copy supporting rich HTML with raw PNG binary payloads. (Thanks to @aukgit)
+- **Conversation Session Dashboard & Queue Indicators**: Added comprehensive Conversation Session Summary Dashboard when viewing session roots (turn count, duration, timestamp range, enqueued prompts list) and breadcrumb badge (`↳ Turn X of Y`) on individual prompt turns; integrated `+N queued` counters in tree items and detail headers. (Thanks to @aukgit)
+- **Local Mesh Shared Cluster Display**: Restored the Shared Cluster view in instance management to discover and display local SSH mesh nodes (`w1`, `w2`, `w3`, `w4`, `u1`, `main`) with TCP liveness probing even when Supabase Cloud Sync is disabled. (Thanks to @aukgit)
+
+### Fixed
+- **Instance Prompt Bleeding & False Liveness**: Enforced Explicit Idle Supremacy in `tree_collect.rs` and `liveness.rs` where explicit idle statuses (`CASCADE_RUN_STATUS_IDLE`) override unreset `not_fully_idle` engine artifacts; restricted instance card active task indicators to genuine conversation owners (`c.instance_id === inst.config.id`). (Thanks to @aukgit)
+- **SSH Node W2 Reachability & GitMap Parity**: Fixed SSH connection failures to remote node `w2` (192.168.1.7:22) by falling back to GitMap Go in-process SSH engine and supporting vaulted credential delegation (`rtyrty123@`) via `gitmap ssh fix-auth` and `gitmap ssh exec`. (Thanks to @aukgit)
+- **Standalone JSON Import/Export & Modal Overlay**: Upgraded prompt tree JSON export to v2.0 envelope schema with portable base64 embedded images and relative `${workDir}` path normalization; elevated modal overlay z-index to `z-[100050]` so export/import dialogs are never trapped behind the main prompt tree modal. (Thanks to @aukgit)
+- **Updater Pinned Version Execution & Live Version Extraction**: Fixed updater script `install.ps1` to write `DisplayVersion` to Windows Registry branding (resolving false `v4.190` reports), inspect PE executable `ProductVersion` first, and enforce strict `-isPinned` contracts preventing silent fallback to unrequested versions. (Thanks to @aukgit)
+
+---
+
 ## [v4.229.0] - 2026-10-18
 
 ### Fixed
@@ -671,6 +687,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.230.0 (2026-10-18)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.229.0 (2026-10-18)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

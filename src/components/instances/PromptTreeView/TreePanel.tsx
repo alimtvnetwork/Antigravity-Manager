@@ -406,7 +406,7 @@ export function TreePanel(props: TreePanelProps) {
                         {activeProjects.length === 0 && archivedProjects.length === 0 ? (
                             treeData.length === 0 ? (
                                 <div className="py-16 text-center space-y-3 px-6">
-                                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-[#171025] flex items-center justify-center mx-auto text-slate-400">
+                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-[#171025] flex items-center justify-center mx-auto text-slate-400">
                                         <Folder className="w-6 h-6 text-slate-400" />
                                     </div>
                                     <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">

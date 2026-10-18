@@ -785,8 +785,10 @@ export function usePromptTreeCoreActions({
             const { scope, format, embed_images, export_mode } = params;
             const ext = format === 'sqlite' ? 'db' : format === 'yaml' ? 'yaml' : 'json';
             const targetSlug = scope.project_name || scope.project_id || scope.conversation_id || scope.target_type;
-            const fileName = `prompt-tree-${targetSlug}-${Date.now()}.${ext}`;
-            const modeLabel = export_mode === 'lean' || !embed_images ? 'Lean' : 'Standalone';
+            const mode = export_mode || (embed_images ? 'standalone' : 'lean');
+            const modeLabel = mode === 'standalone' ? 'Standalone' : 'Lean';
+            const modeSuffix = format === 'json' ? (mode === 'standalone' ? '-standalone' : '-lean') : '';
+            const fileName = `prompt-tree-${targetSlug}${modeSuffix}-${Date.now()}.${ext}`;
 
             try {
                 if (!isTauri()) {
@@ -796,7 +798,8 @@ export function usePromptTreeCoreActions({
                         format,
                         options: {
                             format,
-                            embed_images: modeLabel === 'Standalone',
+                            embed_images: mode === 'standalone',
+                            export_mode: mode,
                         },
                     });
                     const binary = atob(dataB64);
@@ -843,7 +846,8 @@ export function usePromptTreeCoreActions({
                     format,
                     options: {
                         format,
-                        embed_images: modeLabel === 'Standalone',
+                        embed_images: mode === 'standalone',
+                        export_mode: mode,
                     },
                     destinationPath: selected,
                 });

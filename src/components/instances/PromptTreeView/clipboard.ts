@@ -1,7 +1,51 @@
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 import { showToast } from '../../common/ToastContainer';
 import type { ExtractedPromptImage, PromptRewriteResult } from './types';
+
+/**
+ * Resolves an image source URI for safe WebView rendering.
+ * Handles data URIs, http(s) URLs, file:// protocols, and native absolute paths.
+ * Uses Tauri's convertFileSrc when in Tauri environment to bypass WebView CORS and local file restrictions.
+ */
+export function resolveImageSrc(src: string): string {
+    if (!src || !src.trim()) return '';
+    const trimmed = src.trim();
+
+    // Already a web url or data uri or blob uri
+    if (trimmed.startsWith('data:') || trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('blob:')) {
+        return trimmed;
+    }
+
+    // Handle file:/// or file://
+    let cleanPath = trimmed;
+    if (cleanPath.startsWith('file:///')) {
+        cleanPath = cleanPath.slice(7);
+        // On Windows with drive letter, e.g. '/C:/...' or '/D:/...', strip leading slash
+        if (/^\/[a-zA-Z]:[\\/]/.test(cleanPath)) {
+            cleanPath = cleanPath.slice(1);
+        }
+    } else if (cleanPath.startsWith('file://')) {
+        cleanPath = cleanPath.slice(7);
+    }
+
+    try {
+        cleanPath = decodeURIComponent(cleanPath);
+    } catch {
+        // Keep raw cleanPath if decoding fails
+    }
+
+    try {
+        if (typeof window !== 'undefined' && (window as unknown as { __TAURI_INTERNALS__?: { convertFileSrc?: unknown } }).__TAURI_INTERNALS__?.convertFileSrc) {
+            return convertFileSrc(cleanPath);
+        }
+    } catch {
+        // Fallback to original or cleanPath
+    }
+
+    return cleanPath;
+}
 
 /**
  * Computes a fast deterministic 8-character hex hash for image data URI deduplication and filenames.
@@ -145,6 +189,8 @@ export async function convertImageUriToPngBlob(imageUri: string): Promise<Blob |
             return base64ToBlob(base64, 'image/png');
         }
 
+        const resolvedSrc = resolveImageSrc(cleanUri);
+
         // 2. Offscreen rendering to HTMLCanvasElement to guarantee standard PNG binary encoding
         return await new Promise<Blob | null>((resolve) => {
             const img = new Image();
@@ -170,7 +216,7 @@ export async function convertImageUriToPngBlob(imageUri: string): Promise<Blob |
             img.onerror = () => {
                 resolve(null);
             };
-            img.src = cleanUri;
+            img.src = resolvedSrc;
         });
     } catch {
         return null;

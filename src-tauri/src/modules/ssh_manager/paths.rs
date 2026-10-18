@@ -52,13 +52,38 @@ pub(crate) fn candidate_seed_node_paths() -> Vec<PathBuf> {
         PathBuf::from("../../repo-secrets/gitmap-ssh-nodes.json"),
         PathBuf::from("../../repo-secrets/01-gitmap/04-ssh-nodes.json"),
         PathBuf::from("D:/work/repo-secrets/gitmap-ssh-nodes.json"),
+        PathBuf::from("D:/work/repo-secrets/04-ssh-nodes.json"),
+        PathBuf::from("D:/work/repo-secrets/01-gitmap/gitmap-ssh-nodes.json"),
         PathBuf::from("D:/work/repo-secrets/01-gitmap/04-ssh-nodes.json"),
+        PathBuf::from("D:/work/Antigravity-Manager/gitmap-ssh-nodes.json"),
+        PathBuf::from("D:/work/Antigravity-Manager/04-ssh-nodes.json"),
     ];
     if let Some(home) = dirs::home_dir() {
         paths.push(home.join(".gitmap").join("gitmap-ssh-nodes.json"));
         paths.push(home.join(".gitmap").join("04-ssh-nodes.json"));
         paths.push(home.join(".gitmap").join("ssh-nodes.json"));
         paths.push(home.join("gitmap-ssh-nodes.json"));
+        paths.push(
+            home.join("work")
+                .join("Antigravity-Manager")
+                .join("gitmap-ssh-nodes.json"),
+        );
+        paths.push(
+            home.join("work")
+                .join("Antigravity-Manager")
+                .join("04-ssh-nodes.json"),
+        );
+        paths.push(
+            home.join("work")
+                .join("repo-secrets")
+                .join("gitmap-ssh-nodes.json"),
+        );
+        paths.push(
+            home.join("work")
+                .join("repo-secrets")
+                .join("01-gitmap")
+                .join("04-ssh-nodes.json"),
+        );
     }
     if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
         paths.push(
@@ -73,6 +98,16 @@ pub(crate) fn candidate_seed_node_paths() -> Vec<PathBuf> {
                 .join("data")
                 .join("04-ssh-nodes.json"),
         );
+    }
+    if let Ok(curr_exe) = std::env::current_exe() {
+        if let Some(parent) = curr_exe.parent() {
+            paths.push(parent.join("gitmap-ssh-nodes.json"));
+            paths.push(parent.join("04-ssh-nodes.json"));
+            paths.push(parent.join("..").join("gitmap-ssh-nodes.json"));
+            paths.push(parent.join("..").join("04-ssh-nodes.json"));
+            paths.push(parent.join("..").join("..").join("gitmap-ssh-nodes.json"));
+            paths.push(parent.join("..").join("..").join("04-ssh-nodes.json"));
+        }
     }
     paths
 }
@@ -89,12 +124,33 @@ pub(crate) fn candidate_vmpass_paths() -> Vec<PathBuf> {
         PathBuf::from("../../repo-secrets/vmpass.json"),
         PathBuf::from("../../repo-secrets/01-gitmap/06-vmpass.json"),
         PathBuf::from("D:/work/repo-secrets/vmpass.json"),
+        PathBuf::from("D:/work/repo-secrets/06-vmpass.json"),
+        PathBuf::from("D:/work/repo-secrets/01-gitmap/vmpass.json"),
         PathBuf::from("D:/work/repo-secrets/01-gitmap/06-vmpass.json"),
+        PathBuf::from("D:/work/Antigravity-Manager/vmpass.json"),
+        PathBuf::from("D:/work/Antigravity-Manager/06-vmpass.json"),
     ];
     if let Some(home) = dirs::home_dir() {
         paths.push(home.join(".gitmap").join("vmpass.json"));
         paths.push(home.join(".gitmap").join("06-vmpass.json"));
         paths.push(home.join("vmpass.json"));
+        paths.push(
+            home.join("work")
+                .join("Antigravity-Manager")
+                .join("vmpass.json"),
+        );
+        paths.push(
+            home.join("work")
+                .join("Antigravity-Manager")
+                .join("06-vmpass.json"),
+        );
+        paths.push(home.join("work").join("repo-secrets").join("vmpass.json"));
+        paths.push(
+            home.join("work")
+                .join("repo-secrets")
+                .join("01-gitmap")
+                .join("06-vmpass.json"),
+        );
     }
     if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
         paths.push(
@@ -109,6 +165,16 @@ pub(crate) fn candidate_vmpass_paths() -> Vec<PathBuf> {
                 .join("data")
                 .join("06-vmpass.json"),
         );
+    }
+    if let Ok(curr_exe) = std::env::current_exe() {
+        if let Some(parent) = curr_exe.parent() {
+            paths.push(parent.join("vmpass.json"));
+            paths.push(parent.join("06-vmpass.json"));
+            paths.push(parent.join("..").join("vmpass.json"));
+            paths.push(parent.join("..").join("06-vmpass.json"));
+            paths.push(parent.join("..").join("..").join("vmpass.json"));
+            paths.push(parent.join("..").join("..").join("06-vmpass.json"));
+        }
     }
     paths
 }

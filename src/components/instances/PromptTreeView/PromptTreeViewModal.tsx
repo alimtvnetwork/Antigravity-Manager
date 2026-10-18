@@ -10,7 +10,7 @@ import type { PromptTreeViewModalProps } from './types';
 import { usePromptTreeState } from './usePromptTreeState';
 import { usePromptTreeData } from './usePromptTreeData';
 import { usePromptTreeCoreActions } from './usePromptTreeCoreActions';
-import { usePromptTreePromptActions } from './usePromptTreePromptActions';
+import { usePromptTreePromptActions, dispatchRerunMessages, type RerunMessageOption } from './usePromptTreePromptActions';
 import { isGhostConversation, isStaleOrEmptyConversation } from './conversationGuards';
 import { classifyPromptTier } from './tierClassification';
 import { ModalHeader } from './ModalHeader';
@@ -110,6 +110,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
     const state = usePromptTreeState(instanceId);
     const {
         treeData,
+        setTreeData,
         isLoading,
         isAutoSyncing,
         syncInterval, setSyncInterval,
@@ -177,26 +178,56 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         project: AgmProjectTreeNode;
     } | null>(null);
 
-    const handleTreeContextMenu = (e: React.MouseEvent) => {
-        const target = e.target as HTMLElement | null;
-        if (!target) return;
-
-        const projectElement = target.closest<HTMLElement>('[title^="Project: "]');
-        if (projectElement) {
-            e.preventDefault();
-            e.stopPropagation();
-            const title = projectElement.getAttribute('title') || '';
-            const match = treeData.find(
-                (p) => title.startsWith(`Project: ${p.repo_name} `) || title === `Project: ${p.repo_name}`
-            );
-            if (match) {
-                setProjectContextMenu({
-                    x: e.clientX,
-                    y: e.clientY,
-                    project: match,
-                });
-            }
+    const handleProjectContextMenu = (e: React.MouseEvent, repoName: string, project?: AgmProjectTreeNode) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const proj = project || treeData.find((p) => p.repo_name === repoName);
+        if (proj) {
+            setProjectContextMenu({
+                x: e.clientX,
+                y: e.clientY,
+                project: proj,
+            });
         }
+    };
+
+    const handleRenameConversation = async (conversationId: string, newTitle: string) => {
+        const targetInst = selectedProject?.instance_id || instanceId || 'default';
+        await invoke('rename_conversation', {
+            instanceId: targetInst,
+            conversationId,
+            newTitle,
+        });
+        setTreeData((prev) =>
+            prev.map((p) => ({
+                ...p,
+                conversations: p.conversations.map((c) =>
+                    c.conversation_id === conversationId ? { ...c, title: newTitle } : c
+                ),
+            }))
+        );
+    };
+
+    const handleResendPrompts = () => {
+        void promptActions.handleResendPrompt();
+    };
+
+    const handleEnqueue = () => {
+        void promptActions.handleEnqueuePrompt();
+    };
+
+    const handleRerunConversation = (convoId: string, nudgeType: string) => {
+        const targetInstId = selectedProject?.instance_id || instanceId || 'default';
+        const targetRepoPath = selectedProject?.repo_path || '';
+        const msgOption: RerunMessageOption = nudgeType === 'is-it-published' ? 'is-it-published' : 'is-it-done';
+        void dispatchRerunMessages({
+            targetInstId,
+            repoPath: targetRepoPath,
+            convId: convoId,
+            count: 1,
+            messageOption: msgOption,
+            source: 'PromptTreeViewModal.onRerunConversation',
+        });
     };
 
     const currentInstance = useMemo(() => {
@@ -598,7 +629,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                 )}
 
                 {/* Main Split View */}
-                <div className="flex flex-1 overflow-hidden" onContextMenu={handleTreeContextMenu}>
+                <div className="flex flex-1 overflow-hidden">
                     <TreePanel
                         treeData={treeData}
                         activeProjects={activeProjects}
@@ -636,6 +667,11 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                         onToggleArchive={coreActions.toggleArchiveProject}
                         onResendQueued={coreActions.handleResendQueued}
                         isResendingQueued={coreActions.isResendingQueued}
+                        onProjectContextMenu={handleProjectContextMenu}
+                        onRenameConversation={handleRenameConversation}
+                        onResendPrompts={handleResendPrompts}
+                        onEnqueue={handleEnqueue}
+                        onRerunConversation={handleRerunConversation}
                     />
 
                     {/* Right Panel: Prompt Details */}
@@ -757,10 +793,10 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                         <div className="flex items-center justify-between gap-3">
                                             <div className="flex items-center gap-2 flex-1">
                                                 <div className="h-5 w-16 bg-blue-500/15 rounded-[5px]" />
-                                                <div className="h-5 w-24 bg-slate-200 dark:bg-[#211631] rounded-full" />
+                                                <div className="h-5 w-24 bg-slate-200 dark:bg-[#211631] rounded-md" />
                                                 <div className="h-5 w-44 bg-slate-200 dark:bg-[#211631] rounded-md" />
                                             </div>
-                                            <div className="h-7 w-28 bg-slate-200 dark:bg-[#211631] rounded-full" />
+                                            <div className="h-7 w-28 bg-slate-200 dark:bg-[#211631] rounded-md" />
                                         </div>
                                     </div>
                                     {/* Skeleton Tabs */}
@@ -900,7 +936,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             />
 
             {isAutoSyncing && (
-                <div className="absolute bottom-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs text-blue-600 dark:text-cyan-400">
+                <div className="absolute bottom-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-xs text-blue-600 dark:text-cyan-400">
                     <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                     Syncing...
                 </div>

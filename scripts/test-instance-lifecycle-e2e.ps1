@@ -68,6 +68,9 @@ if (-not $callerId) {
 if ($callerId) {
     Write-Host "  -> Verifying self-termination guard on active caller ($callerId)..." -ForegroundColor Yellow
 
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+
     # 1. Stop guard
     $stopErr = & $agmExe instances stop $callerId 2>&1 | Out-String
     $stopCode = $LASTEXITCODE
@@ -75,6 +78,7 @@ if ($callerId) {
     if ($stopCode -eq 2 -and ($stopErr -match "Refusing to stop" -or $stopErr -match "currently running IDE instance")) {
         Write-Host "  [PASS] Self-preservation guard successfully blocked stopping caller instance with exit code 2!" -ForegroundColor Green
     } else {
+        $ErrorActionPreference = $prevEAP
         throw "CRITICAL FAILURE: Self-preservation guard did NOT block stopping active caller instance with code 2: $stopErr (ExitCode: $stopCode)"
     }
 
@@ -85,6 +89,7 @@ if ($callerId) {
     if ($switchCode -eq 2 -and ($switchErr -match "Refusing to stop" -or $switchErr -match "currently running IDE instance")) {
         Write-Host "  [PASS] Self-preservation guard successfully blocked switching caller instance with exit code 2!" -ForegroundColor Green
     } else {
+        $ErrorActionPreference = $prevEAP
         throw "CRITICAL FAILURE: Self-preservation guard did NOT block switching active caller instance with code 2: $switchErr (ExitCode: $switchCode)"
     }
 
@@ -95,6 +100,7 @@ if ($callerId) {
     if ($restartCode -eq 2 -and ($restartErr -match "Refusing to stop" -or $restartErr -match "currently running IDE instance")) {
         Write-Host "  [PASS] Self-preservation guard successfully blocked restarting caller instance with exit code 2!" -ForegroundColor Green
     } else {
+        $ErrorActionPreference = $prevEAP
         throw "CRITICAL FAILURE: Self-preservation guard did NOT block restarting active caller instance with code 2: $restartErr (ExitCode: $restartCode)"
     }
 
@@ -105,8 +111,11 @@ if ($callerId) {
     if ($delCode -eq 2 -and ($delErr -match "Refusing to stop" -or $delErr -match "currently running IDE instance")) {
         Write-Host "  [PASS] Self-preservation guard successfully blocked deleting caller instance with exit code 2!" -ForegroundColor Green
     } else {
+        $ErrorActionPreference = $prevEAP
         throw "CRITICAL FAILURE: Self-preservation guard did NOT block deleting active caller instance with code 2: $delErr (ExitCode: $delCode)"
     }
+
+    $ErrorActionPreference = $prevEAP
 
     if ($simulatedCaller) {
         Remove-Item Env:\AGM_INSTANCE_ID

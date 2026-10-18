@@ -6,6 +6,7 @@ import { RichMarkdownRenderer } from './markdown';
 import { countWords, formatPromptForMarkdown } from './formatters';
 import { PromptImagePreviewModal } from './PromptImagePreviewModal';
 import { PromptImageContextMenu } from './PromptImageContextMenu';
+import { resolveImageSrc } from './clipboard';
 
 export interface ExtractedImage {
     src: string;
@@ -194,6 +195,38 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
 
     return (
         <div className="space-y-3">
+            {/* Single Prompt Turn View Scope Banner */}
+            {selectedTurnNumber !== null && (
+                <div className="flex items-center justify-between p-2.5 rounded-lg border border-sky-300/60 dark:border-sky-800/40 bg-sky-50/70 dark:bg-sky-950/20 text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono text-[10px] px-2 py-0.5 rounded-md bg-sky-200/80 dark:bg-sky-900/60 text-sky-800 dark:text-sky-200 font-bold shrink-0">
+                            TURN T{selectedTurnNumber}
+                        </span>
+                        <span className="text-sky-900 dark:text-sky-100 font-medium truncate">
+                            Inspecting single prompt turn {selectedTurnNumber} of {totalTurns}
+                        </span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            selectedConversation.selected_turn_number = null;
+                            const fullText = selectedConversation.full_prompt_text || selectedConversation.prompts?.[0]?.prompt_text || '';
+                            if (fullText) {
+                                setActivePromptText(fullText);
+                            }
+                            setActiveTurnPreview(null);
+                            setActionMsg?.('Switched to Full Conversation Session View');
+                            setTimeout(() => setActionMsg?.(null), 2000);
+                        }}
+                        className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-cyan-400 hover:underline shrink-0 cursor-pointer ml-2"
+                        title="Switch back to complete conversation session dashboard"
+                    >
+                        <span>View Full Session Summary</span>
+                        <span>&rarr;</span>
+                    </button>
+                </div>
+            )}
+
             {/* Conversation Session Summary Dashboard (Rendered when selectedTurnNumber === null) */}
             {selectedTurnNumber === null && (
                 <div className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-gradient-to-br from-slate-50 via-white to-purple-50/20 dark:from-[#171025] dark:via-[#120a1f] dark:to-[#1a0e2e] p-4 shadow-xs space-y-3 font-poppins">
@@ -216,17 +249,17 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                         {/* Status Pill */}
                         <div className="shrink-0">
                             {isRunning ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-2xs">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-2xs">
                                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
                                     <span>RUNNING</span>
                                 </span>
                             ) : isQueued ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs">
                                     <Clock className="w-3 h-3 text-amber-500" />
                                     <span>QUEUED</span>
                                 </span>
                             ) : (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-200/80 dark:bg-[#251b3a] text-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-[#40285e] shadow-2xs">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-200/80 dark:bg-[#251b3a] text-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-[#40285e] shadow-2xs">
                                     <Check className="w-3 h-3 text-emerald-500" />
                                     <span>IDLE / COMPLETED</span>
                                 </span>
@@ -273,7 +306,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                     <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                                     <span>Enqueued Prompts ({enqueuedTurns.length} pending in FIFO queue)</span>
                                 </div>
-                                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-amber-200/70 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 font-semibold">
+                                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-md bg-amber-200/70 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 font-semibold">
                                     FIFO Priority
                                 </span>
                             </div>
@@ -388,10 +421,10 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                 className="relative group shrink-0"
                             >
                                 <img
-                                    src={img.src}
+                                    src={resolveImageSrc(img.src)}
                                     alt={img.alt}
-                                    onClick={() => handleOpenPreview(img.src, img.alt)}
-                                    onContextMenu={(e) => handleImageContextMenu(e, img.src, img.alt)}
+                                    onClick={() => handleOpenPreview(resolveImageSrc(img.src), img.alt)}
+                                    onContextMenu={(e) => handleImageContextMenu(e, resolveImageSrc(img.src), img.alt)}
                                     className="h-16 w-24 object-cover rounded-md border border-slate-200 dark:border-[#40285e] hover:border-blue-500 dark:hover:border-blue-400 cursor-pointer shadow-2xs transition-all hover:scale-102 bg-slate-100 dark:bg-[#090611]"
                                     onError={(e) => {
                                         (e.target as HTMLElement).style.display = 'none';

@@ -156,10 +156,19 @@ pub(crate) fn discover_fallback_projects(
             }) {
                 for item in rows.flatten() {
                     let (ws_uris_raw, last_time_str, status, not_fully_idle) = item;
+                    let status_upper = status.to_uppercase();
+                    let has_terminal_status = status_upper.contains("COMPLETED")
+                        || status_upper.contains("FAILED")
+                        || status_upper.contains("CANCELLED")
+                        || status_upper.contains("ABORTED");
+                    let has_idle_status = status_upper.contains("IDLE")
+                        || status_upper.contains("CASCADE_RUN_STATUS_IDLE")
+                        || has_terminal_status;
                     let last_time_epoch = parse_flexible_timestamp(&last_time_str);
                     let is_recent = last_time_epoch > 0 && (now_fb - last_time_epoch <= 120);
-                    let is_running = is_owning_inst_alive
-                        && status.contains("RUNNING")
+                    let is_running = !has_idle_status
+                        && is_owning_inst_alive
+                        && status_upper.contains("RUNNING")
                         && not_fully_idle > 0
                         && is_recent;
                     let uris: Vec<String> = serde_json::from_str(&ws_uris_raw).unwrap_or_default();

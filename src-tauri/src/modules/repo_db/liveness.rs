@@ -278,10 +278,14 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                         // Explicit Idle Supremacy rule:
                         // Terminal status or explicit IDLE status strings (e.g. CASCADE_RUN_STATUS_IDLE)
                         // must strictly override unreset not_fully_idle > 0 artifacts from IDE engine quirks.
-                        let has_terminal_status = status.contains("COMPLETED")
-                            || status.contains("FAILED")
-                            || status.contains("CANCELLED");
-                        let has_idle_status = status.contains("IDLE") || has_terminal_status;
+                        let status_upper = status.to_uppercase();
+                        let has_terminal_status = status_upper.contains("COMPLETED")
+                            || status_upper.contains("FAILED")
+                            || status_upper.contains("CANCELLED")
+                            || status_upper.contains("ABORTED");
+                        let has_idle_status = status_upper.contains("IDLE")
+                            || status_upper.contains("CASCADE_RUN_STATUS_IDLE")
+                            || has_terminal_status;
 
                         if has_idle_status {
                             continue;
@@ -396,17 +400,21 @@ mod tests {
         // Test idle supremacy logic: unreset not_fully_idle = 1 must be overridden by idle/terminal status
         let not_fully_idle = 1;
         let status = "CASCADE_RUN_STATUS_IDLE";
-        let has_terminal_status = status.contains("COMPLETED")
-            || status.contains("FAILED")
-            || status.contains("CANCELLED");
-        let has_idle_status = status.contains("IDLE") || has_terminal_status;
+        let status_upper = status.to_uppercase();
+        let has_terminal_status = status_upper.contains("COMPLETED")
+            || status_upper.contains("FAILED")
+            || status_upper.contains("CANCELLED")
+            || status_upper.contains("ABORTED");
+        let has_idle_status = status_upper.contains("IDLE")
+            || status_upper.contains("CASCADE_RUN_STATUS_IDLE")
+            || has_terminal_status;
         let is_explicit_idle = has_idle_status;
         assert!(is_explicit_idle);
 
         let is_running = if is_explicit_idle {
             false
         } else {
-            not_fully_idle != 0 && status.contains("RUNNING")
+            not_fully_idle != 0 && status_upper.contains("RUNNING")
         };
         assert!(!is_running);
     }

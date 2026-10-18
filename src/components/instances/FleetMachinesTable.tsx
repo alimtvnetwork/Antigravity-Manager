@@ -47,7 +47,7 @@ export function FleetMachinesTable() {
                     <div>
                         <div className="flex items-center gap-2">
                             <h3 className="font-semibold text-sm text-slate-100">
-                                Other Machines / Fleet Nodes
+                                Shared Cluster / Fleet Nodes
                             </h3>
                             <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
                                 {machines.length}

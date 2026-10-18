@@ -46,7 +46,8 @@ param(
     [switch]$CheckUpdate,
     [switch]$Update,
     [switch]$NoLaunch,
-    [switch]$Force
+    [switch]$Force,
+    [switch]$isPinned
 )
 
 $ErrorActionPreference = "Stop"

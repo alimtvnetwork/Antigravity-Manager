@@ -4,6 +4,7 @@ import type React from 'react';
 import { Check, Copy } from 'lucide-react';
 import { TruncatedContextCallout } from './TruncatedContextCallout';
 import { formatPromptForMarkdown } from './formatters';
+import { resolveImageSrc } from './clipboard';
 
 // Hoisted static regular expression with explicit character exclusions to eliminate catastrophic backtracking
 const TOKEN_REGEX =
@@ -66,17 +67,18 @@ function parseInlineMarkdown(
                 </span>
             );
         } else if (imgSrc !== undefined) {
+            const resolvedImgSrc = resolveImageSrc(imgSrc);
             rawNodes.push(
                 <img
                     key={`img-${match.index}`}
-                    src={imgSrc}
+                    src={resolvedImgSrc}
                     alt={imgAlt || ''}
-                    onClick={() => onImageClick?.(imgSrc, imgAlt)}
+                    onClick={() => onImageClick?.(resolvedImgSrc, imgAlt)}
                     onContextMenu={(e) => {
                         if (onImageContextMenu) {
                             e.preventDefault();
                             e.stopPropagation();
-                            onImageContextMenu(e, imgSrc, imgAlt);
+                            onImageContextMenu(e, resolvedImgSrc, imgAlt);
                         }
                     }}
                     className={`inline-block max-h-48 max-w-full my-1 rounded-md border border-slate-200 dark:border-[#40285e] ${onImageClick ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}`}
@@ -413,17 +415,18 @@ export function RichMarkdownRenderer({
         if (singleImgMatch) {
             const imgSrc = singleImgMatch[2];
             const imgAlt = singleImgMatch[1] || '';
+            const resolvedImgSrc = resolveImageSrc(imgSrc);
             elements.push(
                 <div key={`imgline-${i}`} className="my-2">
                     <img
-                        src={imgSrc}
+                        src={resolvedImgSrc}
                         alt={imgAlt}
-                        onClick={() => onImageClick?.(imgSrc, imgAlt)}
+                        onClick={() => onImageClick?.(resolvedImgSrc, imgAlt)}
                         onContextMenu={(e) => {
                             if (onImageContextMenu) {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                onImageContextMenu(e, imgSrc, imgAlt);
+                                onImageContextMenu(e, resolvedImgSrc, imgAlt);
                             }
                         }}
                         className={`max-h-60 max-w-full rounded-md border border-slate-200 dark:border-[#40285e] object-contain bg-slate-100 dark:bg-[#090611] ${onImageClick ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}`}

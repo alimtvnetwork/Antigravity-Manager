@@ -78,8 +78,38 @@ pub fn deploy_auth_key_to_target(
     let mut reports = Vec::new();
 
     for node in nodes {
-        let online = check_tcp_liveness(&node.ip_address, 22, 2500);
+        let mut online = check_tcp_liveness(&node.ip_address, 22, 2500);
+        if !online && resolve_gitmap_bin().is_some() {
+            if let Ok((is_gm_online, _)) = check_node_via_gitmap(&node.alias) {
+                if is_gm_online {
+                    online = true;
+                }
+            }
+        }
         if !online {
+            // Check if gitmap fix-auth can reach it anyway (e.g. w2 via password vault)
+            if let Ok(fix_out) = fix_node_auth_via_gitmap(&node.alias) {
+                if fix_out.contains("successfully")
+                    || fix_out.contains("✓")
+                    || fix_out.contains("DEPLOYED")
+                {
+                    reports.push(KeyDeployNodeReport {
+                        alias: node.alias.clone(),
+                        ip_address: node.ip_address.clone(),
+                        username: node.username.clone(),
+                        os: node.os.clone(),
+                        online: true,
+                        keys_deployed: 1,
+                        batch_auth_verified: true,
+                        status: "AUTHORIZED".to_string(),
+                        detail: format!(
+                            "GitMap fix-auth: {}",
+                            fix_out.lines().next().unwrap_or(&fix_out)
+                        ),
+                    });
+                    continue;
+                }
+            }
             reports.push(KeyDeployNodeReport {
                 alias: node.alias.clone(),
                 ip_address: node.ip_address.clone(),

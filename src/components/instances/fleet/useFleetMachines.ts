@@ -73,7 +73,11 @@ export function useFleetMachines(): FleetMachinesState {
                 }
 
                 const data = await fetchFleetMachinesApi();
-                const filtered = data.filter((m) => m.node_id !== effectiveLocalId);
+                const filtered = data.filter(
+                    (m) =>
+                        !(m as { is_local?: boolean }).is_local &&
+                        (effectiveLocalId ? m.node_id !== effectiveLocalId : true)
+                );
                 setMachines(filtered);
             } catch (err) {
                 // Tracked in the error module; stale list kept, retried on next refresh.
@@ -113,7 +117,11 @@ export function useFleetMachines(): FleetMachinesState {
 
                 const data = await fetchFleetMachinesApi();
                 if (isMounted) {
-                    const filtered = data.filter((m) => m.node_id !== localId);
+                    const filtered = data.filter(
+                        (m) =>
+                            !(m as { is_local?: boolean }).is_local &&
+                            (localId ? m.node_id !== localId : true)
+                    );
                     setMachines(filtered);
                 }
             } catch (err) {

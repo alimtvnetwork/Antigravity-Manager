@@ -568,6 +568,9 @@ pub(crate) fn cmd_update(args: &[String]) {
                 if is_force || has_explicit_target {
                     delegate_args.push("--force".to_string());
                 }
+                if has_explicit_target {
+                    delegate_args.push("-isPinned".to_string());
+                }
                 antigravity_tools_lib::modules::delegate_updater::run(&delegate_args);
                 std::process::exit(0);
             }
@@ -592,11 +595,14 @@ pub(crate) fn cmd_update(args: &[String]) {
             if is_force || has_explicit_target {
                 delegate_args.push("--force".to_string());
             }
+            if has_explicit_target {
+                delegate_args.push("-isPinned".to_string());
+            }
             antigravity_tools_lib::modules::delegate_updater::run(&delegate_args);
             return;
         }
 
-        let cli_update_args = vec![
+        let mut cli_update_args = vec![
             "--force".to_string(),
             "--no-launch".to_string(),
             "--version".to_string(),
@@ -604,6 +610,9 @@ pub(crate) fn cmd_update(args: &[String]) {
             "--install-dir".to_string(),
             resolved_install_dir.to_string_lossy().to_string(),
         ];
+        if has_explicit_target {
+            cli_update_args.push("-isPinned".to_string());
+        }
         updated =
             antigravity_tools_lib::modules::delegate_updater::run_cli_update(&cli_update_args);
     }
