@@ -6,6 +6,7 @@ import {
     RefreshCw,
     PanelLeftClose,
     PanelLeftOpen,
+    ChevronDown,
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import type { SyncInterval } from '../../../services/instanceService';
@@ -101,13 +102,10 @@ export function ModalHeader(props: ModalHeaderProps) {
                 </div>
             </div>
 
-            {/* Top Right Header Controls: Two Independent Segmented Dark-Glass Capsules */}
-            <div className="flex items-center gap-1.5 shrink-0">
-                {/* Capsule 1: Data Operations Capsule */}
-                <div className="inline-flex items-center rounded-md bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#40285e]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#40285e]/80 shadow-2xs">
-                    {/* Unified Import / Export section: all tree-level data
-                        operations (Export SQLite, Export JSON, Import SQLite,
-                        Import JSON, Copy All Tree Prompts) in one entry point. */}
+            {/* Top Right Header Controls: Single Contiguous Segmented Dark-Glass Pill Capsule */}
+            <div className="flex items-center shrink-0">
+                <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#40285e]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#40285e]/80 shadow-2xs">
+                    {/* Segment 1: Unified Import / Export section */}
                     <ImportExportMenu
                         onExportSqlite={onExportSqlite}
                         onExportJson={onBackup}
@@ -117,31 +115,32 @@ export function ModalHeader(props: ModalHeaderProps) {
                         isLoading={isLoading}
                     />
 
+                    {/* Segment 2: Reset Button */}
                     <button
                         type="button"
                         onClick={onResetTree}
                         disabled={isLoading}
-                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                        title="Clear the prompt tree cache and reload. Running and queued prompts stay."
+                        className="flex items-center gap-1 h-7 px-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                        title="Clear the prompt tree cache and reload"
                     >
                         <span>Reset</span>
                     </button>
 
-                    {/* Refresh Button */}
+                    {/* Segment 3: Refresh Button */}
                     <button
                         type="button"
                         onClick={onRefreshAll}
                         disabled={isLoading}
-                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                        className="flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
                         title="Refresh all projects"
                     >
                         <RefreshCw className={cn("w-3.5 h-3.5 text-blue-500", isLoading && "animate-spin")} />
                         <span>Refresh</span>
                     </button>
 
-                    {/* Sync Interval Selector with Transparent Inline Styling */}
-                    <div className="flex items-center gap-1 px-2 py-1">
-                        <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">Sync:</span>
+                    {/* Segment 4: Sync Interval Selector with Transparent Inline Styling */}
+                    <div className="relative flex items-center h-7 px-2.5 gap-1">
+                        <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 select-none">Sync:</span>
                         <select
                             value={syncInterval}
                             onChange={(e) => {
@@ -149,33 +148,24 @@ export function ModalHeader(props: ModalHeaderProps) {
                                 setSyncInterval(val);
                                 setPromptTreeSyncInterval(val);
                             }}
-                            className="bg-transparent border-0 focus:ring-0 focus:outline-none text-[11px] font-semibold text-slate-700 dark:text-slate-200 cursor-pointer"
-                            title="Auto-sync interval"
+                            className="appearance-none bg-transparent border-0 focus:ring-0 focus:outline-none text-[11px] font-semibold text-slate-700 dark:text-slate-200 cursor-pointer pr-3.5 py-0"
+                            aria-label="Auto-sync interval"
                         >
                             {SYNC_INTERVALS.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
+                                <option key={opt.value} value={opt.value} className="bg-white dark:bg-[#171025] text-slate-700 dark:text-slate-200">
                                     {opt.label}
                                 </option>
                             ))}
                         </select>
+                        <ChevronDown className="w-3 h-3 text-slate-400 pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2" />
                     </div>
-                    <input
-                        type="file"
-                        ref={restoreFileInputRef}
-                        accept=".json,.db,.sqlite"
-                        onChange={onFileRestore}
-                        style={{ display: 'none' }}
-                    />
-                </div>
 
-                {/* Capsule 2: Window Controls Capsule */}
-                <div className="inline-flex items-center rounded-md bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#40285e]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#40285e]/80 shadow-2xs">
-                    {/* Tree View Collapse / Expand Toggle */}
+                    {/* Segment 5: Tree View Collapse / Expand Toggle */}
                     {onToggleTree && (
                         <button
                             type="button"
                             onClick={onToggleTree}
-                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-l-md text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-colors cursor-pointer"
+                            className="flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-colors cursor-pointer"
                             title={isTreeCollapsed ? "Show Prompt Tree Panel" : "Hide Prompt Tree Panel"}
                         >
                             {isTreeCollapsed ? (
@@ -187,30 +177,38 @@ export function ModalHeader(props: ModalHeaderProps) {
                         </button>
                     )}
 
-                    {/* Fullscreen Toggle */}
+                    {/* Segment 6: Fullscreen Toggle */}
                     <button
                         type="button"
                         onClick={() => setIsFullscreen(!isFullscreen)}
-                        className={cn("p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-colors cursor-pointer", !onToggleTree && "rounded-l-md")}
+                        className="flex items-center justify-center w-7 h-7 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-colors cursor-pointer"
                         title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
                     >
                         {isFullscreen ? (
-                            <Minimize2 className="w-4 h-4" />
+                            <Minimize2 className="w-3.5 h-3.5" />
                         ) : (
-                            <Maximize2 className="w-4 h-4" />
+                            <Maximize2 className="w-3.5 h-3.5" />
                         )}
                     </button>
 
-                    {/* Close Button with Rose Dark-Glass Hover */}
+                    {/* Segment 7: Close Button with Rose Dark-Glass Hover */}
                     <button
                         type="button"
                         onClick={onClose}
-                        className="p-1.5 rounded-r-md text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-100/80 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                        className="flex items-center justify-center w-7 h-7 rounded-r-full text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-100/80 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
                         title="Close"
                     >
-                        <X className="w-4 h-4" />
+                        <X className="w-3.5 h-3.5" />
                     </button>
                 </div>
+
+                <input
+                    type="file"
+                    ref={restoreFileInputRef}
+                    accept=".json,.db,.sqlite"
+                    onChange={onFileRestore}
+                    style={{ display: 'none' }}
+                />
             </div>
         </div>
     );

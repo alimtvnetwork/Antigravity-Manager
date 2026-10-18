@@ -530,7 +530,7 @@ export function DetailHeader(props: DetailHeaderProps) {
 
                 {/* Right: The Unified Segmented Dark-Glass Action Capsule */}
                 <div className="flex items-center shrink-0 ml-auto">
-                    <div className="relative flex items-center rounded-lg bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
+                    <div className="relative flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
                         {/* Segment 1: Copy Split Button [ Copy All | v ] */}
                         <div className="flex items-center divide-x divide-slate-200/70 dark:divide-purple-500/20">
                             {/* Primary Button: Copy with images (Rich HTML + binary PNG) */}
@@ -539,7 +539,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 onClick={handleCopyAll}
                                 data-ui-name="prompt-copy-all-btn"
                                 data-ui-id={`prompt-copy-all-${selectedConversation.conversation_id}`}
-                                className="flex items-center gap-1.5 px-3 py-1 rounded-l-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title="Copy prompt text and all embedded images (rich HTML + binary PNG)"
                             >
                                 {isCopiedAllActive ? (
@@ -648,7 +648,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 data-ui-id={`prompt-rerun-options-${selectedConversation.conversation_id}`}
                                 className={cn(
                                     "flex items-center justify-center px-1.5 py-1 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
-                                    !setIsDetailsModalOpen && "rounded-r-md"
+                                    !setIsDetailsModalOpen && "rounded-r-full"
                                 )}
                                 title="Rerun configuration: count and message"
                             >
@@ -663,7 +663,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 onClick={() => setIsDetailsModalOpen(true)}
                                 data-ui-name="prompt-details-btn"
                                 data-ui-id={`prompt-details-${selectedConversation.conversation_id}`}
-                                className="flex items-center gap-1.5 px-3 py-1 rounded-r-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                className="flex items-center gap-1.5 px-3 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title="Open Conversation & Instance Details (Target IDE, PID, executable path, process status)"
                             >
                                 <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />

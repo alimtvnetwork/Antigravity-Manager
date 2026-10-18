@@ -77,14 +77,13 @@ export function ImportExportMenu(props: ImportExportMenuProps) {
                 type="button"
                 onClick={() => setIsOpen((prev) => !prev)}
                 disabled={isLoading}
-                className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 rounded-l-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                title="Unified import / export: tree SQLite, JSON backup, and copy all prompts"
+                className="flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 rounded-l-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
             >
-                <Database className="w-3.5 h-3.5 text-violet-500" />
+                <Database className="w-3.5 h-3.5 text-violet-500 shrink-0" />
                 <span>Import / Export</span>
                 <ChevronDown
                     className={cn(
-                        'w-3 h-3 text-slate-400 transition-transform duration-150',
+                        'w-3 h-3 text-slate-400 transition-transform duration-150 shrink-0',
                         isOpen && 'rotate-180'
                     )}
                 />
