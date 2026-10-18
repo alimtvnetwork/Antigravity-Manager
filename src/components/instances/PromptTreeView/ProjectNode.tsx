@@ -465,7 +465,7 @@ export function ProjectNode(props: ProjectNodeProps) {
                         )}
                         {/* Project Action Button Cluster - Hover Only */}
                         <div className={cn(
-                            "flex items-center gap-0.5 transition-opacity duration-150 shrink-0",
+                            "inline-flex items-center rounded-lg bg-slate-100/90 dark:bg-[#120a1f]/90 border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs transition-opacity duration-150 shrink-0",
                             isPinned || isArchived || isRefreshing
                                 ? "opacity-100"
                                 : "opacity-0 group-hover:opacity-100"

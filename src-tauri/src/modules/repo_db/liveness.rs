@@ -13,6 +13,65 @@ use rusqlite::params;
 use rusqlite::Connection;
 use std::path::Path;
 
+fn check_memory_prompts_running(
+    is_terminal_override: bool,
+    norm_inst: &str,
+    project_id: &str,
+    resolved_name: &str,
+    host_pid: Option<u32>,
+    now: i64,
+) -> bool {
+    if is_terminal_override {
+        return false;
+    }
+
+    let Ok(mut map) = get_memory_prompts_map().lock() else {
+        return false;
+    };
+
+    // Prune expired or terminal prompts from memory map (45s TTL)
+    map.retain(|_, p| {
+        let is_active_status = p.status == "running" || p.status == "dispatched";
+        let is_within_ttl = (now - p.updated_at) <= 45;
+        is_active_status && is_within_ttl
+    });
+
+    for p in map.values() {
+        let is_inst_match = if norm_inst == "default" {
+            p.instance_id == "default" || p.instance_id == "__default__"
+        } else {
+            p.instance_id == norm_inst
+        };
+        let is_proj_match = p.project_id == project_id || p.repo_path == project_id;
+        let is_matched = is_inst_match && is_proj_match;
+        if !is_matched {
+            continue;
+        }
+
+        let has_running_status = p.status == "running";
+        let is_fresh = (now - p.updated_at) <= 45;
+        let is_running_and_fresh = has_running_status && is_fresh;
+        if !is_running_and_fresh {
+            continue;
+        }
+
+        crate::modules::logger::log_instance_prompt_audit(
+            norm_inst,
+            resolved_name,
+            project_id,
+            &p.repo_path,
+            "memory_prompts_map",
+            host_pid,
+            PromptAuditCriteriaType::Gate1MemoryPromptsMap.as_str(),
+            true,
+            ProjectAuditRationaleType::ActivePromptMemory.as_str(),
+        );
+        return true;
+    }
+
+    false
+}
+
 /// Check if any prompt or task is currently actively executing for a project
 pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> bool {
     if project_id.trim().is_empty() {
@@ -84,41 +143,16 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
 
     // 1. Check in-memory active prompts map
     let is_terminal_override = has_terminal_transition;
-    if !is_terminal_override {
-        if let Ok(mut map) = get_memory_prompts_map().lock() {
-            // Prune expired or terminal prompts from memory map (45s TTL)
-            map.retain(|_, p| {
-                let is_active_status = p.status == "running" || p.status == "dispatched";
-                let is_within_ttl = (now - p.updated_at) <= 45;
-                is_active_status && is_within_ttl
-            });
-            for p in map.values() {
-                let matches_inst = if norm_inst == "default" {
-                    p.instance_id == "default" || p.instance_id == "__default__"
-                } else {
-                    p.instance_id == norm_inst
-                };
-                let matches_proj = p.project_id == project_id || p.repo_path == project_id;
-                if matches_inst && matches_proj {
-                    let has_running_status = p.status == "running";
-                    let is_fresh = (now - p.updated_at) <= 45;
-                    if has_running_status && is_fresh {
-                        crate::modules::logger::log_instance_prompt_audit(
-                            norm_inst,
-                            &resolved_name,
-                            project_id,
-                            &p.repo_path,
-                            "memory_prompts_map",
-                            host_pid,
-                            PromptAuditCriteriaType::Gate1MemoryPromptsMap.as_str(),
-                            true,
-                            ProjectAuditRationaleType::ActivePromptMemory.as_str(),
-                        );
-                        return true;
-                    }
-                }
-            }
-        }
+    let has_memory_running = check_memory_prompts_running(
+        is_terminal_override,
+        norm_inst,
+        project_id,
+        &resolved_name,
+        host_pid,
+        now,
+    );
+    if has_memory_running {
+        return true;
     }
 
     // 2. Check active workers map strictly scoped by instance_id

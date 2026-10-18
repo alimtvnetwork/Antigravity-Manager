@@ -1,7 +1,9 @@
 //! Repo DB: tree conversation node builders
 
 use super::dispatch::parse_flexible_timestamp;
-use super::models::{ActivePrompt, AgmConversationNode, AgmPromptTurnNode, RunningProject};
+use super::models::{
+    ActivePrompt, AgmConversationNode, AgmPromptTurnNode, CascadeRunStatusType, RunningProject,
+};
 use super::project_queries::normalize_path_for_compare;
 use super::sequences::{
     ensure_conversation_sequence_in_conn, extract_prompt_tail_snippet, extract_prompt_words_preview,
@@ -98,6 +100,19 @@ pub(crate) fn build_transcript_conv_nodes(
                 )
             };
 
+            let is_item_running = CascadeRunStatusType::from_status_str(&item.status).is_running();
+            let has_empty_status = item.status.trim().is_empty();
+            let is_idle_status = has_empty_status || is_item_running;
+            let conv_status = if effective_is_run {
+                "RUNNING".to_string()
+            } else if item.is_queued {
+                "QUEUED".to_string()
+            } else if is_idle_status {
+                "IDLE".to_string()
+            } else {
+                item.status.clone()
+            };
+
             conv_nodes.push(AgmConversationNode {
                 seq_id: c_seq,
                 seq_code: format!("C{:03}", c_seq),
@@ -109,15 +124,7 @@ pub(crate) fn build_transcript_conv_nodes(
                 } else {
                     item.title.clone()
                 },
-                status: if effective_is_run {
-                    "RUNNING".to_string()
-                } else if item.is_queued {
-                    "QUEUED".to_string()
-                } else if item.status.trim().is_empty() || item.status.contains("RUNNING") {
-                    "IDLE".to_string()
-                } else {
-                    item.status.clone()
-                },
+                status: conv_status,
                 is_running: effective_is_run,
                 step_count: item.steps,
                 instance_id: item.conv_inst_id.clone(),
@@ -283,14 +290,13 @@ pub(crate) fn build_active_prompt_conv_nodes(
                                         Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
                                     })
                                 {
-                                    let has_idle_marker = sum_status.contains("IDLE")
-                                        || sum_status.contains("COMPLETED")
-                                        || sum_status.contains("FAILED")
-                                        || sum_status.contains("CANCELLED");
-                                    if sum_status.contains("RUNNING")
-                                        && not_idle > 0
-                                        && !has_idle_marker
-                                    {
+                                    let cascade_status =
+                                        CascadeRunStatusType::from_status_str(&sum_status);
+                                    let has_idle_marker = cascade_status.is_idle_or_terminal();
+                                    let is_cascade_running = cascade_status.is_running();
+                                    let is_active_turn =
+                                        is_cascade_running && not_idle > 0 && !has_idle_marker;
+                                    if is_active_turn {
                                         is_non_idle = true;
                                         break;
                                     }

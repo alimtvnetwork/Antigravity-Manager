@@ -61,6 +61,11 @@ export function FleetMachineRow({
                                     OFFLINE
                                 </span>
                             )}
+                            {(machine as { source?: string }).source === 'ssh-mesh' && (
+                                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                                    Mesh
+                                </span>
+                            )}
                         </div>
                         <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5 font-mono">
                             {machine.os_info && (

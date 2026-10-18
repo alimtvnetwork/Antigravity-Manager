@@ -90,6 +90,7 @@ export interface TreePanelProps {
 export type ViewMode = 'preview' | 'raw' | 'edit';
 
 export type PromptTier = 'USER_PROMPT' | 'SUBAGENT_INSTRUCTION' | 'SYSTEM_MESSAGE' | 'TOOL_OUTPUT';
+export type PromptOriginTier = PromptTier;
 
 export interface TierClassificationResult {
     tier: PromptTier;
