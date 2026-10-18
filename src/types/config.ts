@@ -171,12 +171,19 @@ export interface CircuitBreakerConfig {
     lock_on_zero_quota?: boolean;
 }
 
-export type DateFormatMode = '24h' | '12h' | 'iso';
+/** Date & Time format display mode enum */
+export enum DateFormatModeType {
+    TwentyFourHour = '24h',
+    TwelveHour = '12h',
+    Iso = 'iso',
+}
+
+export type DateFormatMode = DateFormatModeType | '24h' | '12h' | 'iso';
 
 export interface AppConfig {
     language: string;
     theme: string;
-    date_format_mode?: DateFormatMode; // [NEW] 全局时间日期格式偏好 ('24h' | '12h' | 'iso')
+    date_format_mode?: DateFormatMode; // [NEW] 全局时间日期格式偏好 (DateFormatModeType)
     time_format_preference?: DateFormatMode; // [NEW] 别名兼容
     auto_refresh: boolean;
     refresh_interval: number;

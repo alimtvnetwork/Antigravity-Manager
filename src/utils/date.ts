@@ -3,7 +3,10 @@
  * Standard format: DD-MMM-YYYY HH:mm (e.g., 18-Oct-2026 21:40) in 24-hour clock
  */
 
-export type DateFormatMode = '24h' | '12h' | 'iso';
+import { DateFormatModeType, type DateFormatMode } from '../types/config';
+
+export { DateFormatModeType };
+export type { DateFormatMode };
 
 const MONTH_NAMES = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -42,7 +45,7 @@ function parseToMs(value?: number | string | Date | null): number | null {
  */
 export function formatDateTime(
     value?: number | string | Date | null,
-    formatMode: DateFormatMode = '24h'
+    formatMode: DateFormatMode = DateFormatModeType.TwentyFourHour
 ): string {
     const ms = parseToMs(value);
     if (ms === null) return '-';
@@ -52,7 +55,7 @@ export function formatDateTime(
     const month = MONTH_NAMES[d.getMonth()] || 'Jan';
     const year = d.getFullYear();
 
-    if (formatMode === 'iso') {
+    if (formatMode === DateFormatModeType.Iso) {
         const monthNum = String(d.getMonth() + 1).padStart(2, '0');
         const dayNum = day;
         const hours = String(d.getHours()).padStart(2, '0');
@@ -61,7 +64,7 @@ export function formatDateTime(
         return `${year}-${monthNum}-${dayNum} ${hours}:${minutes}:${seconds}`;
     }
 
-    if (formatMode === '12h') {
+    if (formatMode === DateFormatModeType.TwelveHour) {
         let hours = d.getHours();
         const ampm = hours >= 12 ? 'PM' : 'AM';
         hours = hours % 12;

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Clock, Calendar } from 'lucide-react';
 import { useConfigStore } from '../../stores/useConfigStore';
-import { formatDateTime, type DateFormatMode } from '../../utils/date';
+import { formatDateTime, DateFormatModeType, type DateFormatMode } from '../../utils/date';
 import { showToast } from '../common/ToastContainer';
 import { useErrorStore } from '../../stores/error-store';
 
@@ -12,7 +12,7 @@ interface DateTimeFormatSectionProps {
 
 export function DateTimeFormatSection({ value, onChange }: DateTimeFormatSectionProps) {
     const { config, saveConfig } = useConfigStore();
-    const currentMode: DateFormatMode = value || config?.date_format_mode || '24h';
+    const currentMode: DateFormatMode = value || config?.date_format_mode || DateFormatModeType.TwentyFourHour;
     const [now, setNow] = useState(() => new Date());
 
     useEffect(() => {
@@ -69,9 +69,9 @@ export function DateTimeFormatSection({ value, onChange }: DateTimeFormatSection
             <div className="flex flex-wrap items-center gap-2 pt-1">
                 {(
                     [
-                        { id: '24h', label: '24-Hour Clock (e.g. 18-Oct-2026 21:40)', badge: 'Default' },
-                        { id: '12h', label: '12-Hour Clock (e.g. 18-Oct-2026 09:40 PM)' },
-                        { id: 'iso', label: 'ISO 8601 (e.g. 2026-10-18 21:40:00)' },
+                        { id: DateFormatModeType.TwentyFourHour, label: '24-Hour Clock (e.g. 18-Oct-2026 21:40)', badge: 'Default' },
+                        { id: DateFormatModeType.TwelveHour, label: '12-Hour Clock (e.g. 18-Oct-2026 09:40 PM)' },
+                        { id: DateFormatModeType.Iso, label: 'ISO 8601 (e.g. 2026-10-18 21:40:00)' },
                     ] as const
                 ).map((opt) => {
                     const isSelected = currentMode === opt.id;
