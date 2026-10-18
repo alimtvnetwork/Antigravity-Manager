@@ -663,33 +663,36 @@ pub fn send_prompt_now_for_instance(
         .unwrap_or_else(|_| clean_inst.to_string());
 
     // 1. Ensure instance is running with smart process cache and adaptive cold-start stabilization
-    let was_cold_started = match crate::modules::instance::smart_run::ensure_instance_running_smart_detailed(
-        &canonical_inst,
-        Some(repo_path),
-    ) {
-        Ok(res) => {
-            if res.was_cold_started {
-                crate::modules::logger::log_info(&format!(
-                    "[ColdStartDispatch] Instance '{}' was cold-started (stabilized in {}ms, pid: {:?}). Waiting 1500ms settlement buffer for IDE window/extension initialization...",
-                    canonical_inst, res.stabilization_ms, res.pid
-                ));
-                std::thread::sleep(std::time::Duration::from_millis(1500));
-                let (still_running, _, pids) =
-                    crate::modules::instance::is_instance_process_running_smart(&canonical_inst);
-                if still_running {
-                    crate::modules::instance::focus_running_instance(&pids, Some(repo_path));
+    let was_cold_started =
+        match crate::modules::instance::smart_run::ensure_instance_running_smart_detailed(
+            &canonical_inst,
+            Some(repo_path),
+        ) {
+            Ok(res) => {
+                if res.was_cold_started {
+                    crate::modules::logger::log_info(&format!(
+                        "[ColdStartDispatch] Instance '{}' was cold-started (stabilized in {}ms, pid: {:?}). Waiting 1500ms settlement buffer for IDE window/extension initialization...",
+                        canonical_inst, res.stabilization_ms, res.pid
+                    ));
+                    std::thread::sleep(std::time::Duration::from_millis(1500));
+                    let (still_running, _, pids) =
+                        crate::modules::instance::is_instance_process_running_smart(
+                            &canonical_inst,
+                        );
+                    if still_running {
+                        crate::modules::instance::focus_running_instance(&pids, Some(repo_path));
+                    }
                 }
+                res.was_cold_started
             }
-            res.was_cold_started
-        }
-        Err(e) => {
-            crate::modules::logger::log_warn(&format!(
-                "[RepoDB] ensure_instance_running_smart_detailed warning for '{}': {}",
-                canonical_inst, e
-            ));
-            false
-        }
-    };
+            Err(e) => {
+                crate::modules::logger::log_warn(&format!(
+                    "[RepoDB] ensure_instance_running_smart_detailed warning for '{}': {}",
+                    canonical_inst, e
+                ));
+                false
+            }
+        };
 
     // 2. Generate prompt ID and record in DB
     let prompt_id = format!("p-{}", &uuid::Uuid::new_v4().to_string()[..8]);

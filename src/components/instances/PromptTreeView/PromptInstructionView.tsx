@@ -94,7 +94,6 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         : (selectedConversation.selected_turn_number ?? null);
 
     const [activeTurnPreview, setActiveTurnPreview] = useState<number | null>(null);
-    const [isSessionSummaryExpanded, setIsSessionSummaryExpanded] = useState(true);
     const [isOverviewExpanded, setIsOverviewExpanded] = useState<boolean>(() => {
         try {
             const saved = localStorage.getItem('agm_prompt_overview_expanded');
@@ -325,42 +324,40 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                         </div>
 
                     {/* Metrics Grid: Total Turns, Status, Timestamp Range, Duration (Shown when expanded) */}
-                    {isSessionSummaryExpanded && (
-                        <div className="space-y-2 pt-0.5 animate-in fade-in duration-150">
-                            <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate font-mono">
-                                ID: {selectedConversation.conversation_id}
-                            </p>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                                <div className="p-2 rounded-lg bg-white/80 dark:bg-[#1a1228]/80 border border-slate-200/60 dark:border-[#382352]/60">
-                                    <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">Total Turns</span>
-                                    <span className="text-sm font-bold text-slate-800 dark:text-slate-100 font-mono">
-                                        {totalTurns} {totalTurns === 1 ? 'turn' : 'turns'}
-                                    </span>
-                                </div>
-                                <div className="p-2 rounded-lg bg-white/80 dark:bg-[#1a1228]/80 border border-slate-200/60 dark:border-[#382352]/60">
-                                    <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">Session Status</span>
-                                    <span className={cn(
-                                        "text-sm font-bold font-mono",
-                                        isRunning ? "text-emerald-600 dark:text-emerald-400" : isQueued ? "text-amber-600 dark:text-amber-400" : "text-slate-700 dark:text-slate-300"
-                                    )}>
-                                        {statusLabel}
-                                    </span>
-                                </div>
-                                <div className="p-2 rounded-lg bg-white/80 dark:bg-[#1a1228]/80 border border-slate-200/60 dark:border-[#382352]/60">
-                                    <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">Time Range</span>
-                                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 font-mono truncate block">
-                                        {timestampRange}
-                                    </span>
-                                </div>
-                                <div className="p-2 rounded-lg bg-white/80 dark:bg-[#1a1228]/80 border border-slate-200/60 dark:border-[#382352]/60">
-                                    <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">Duration</span>
-                                    <span className="text-sm font-bold text-slate-800 dark:text-slate-100 font-mono">
-                                        {durationDisplay}
-                                    </span>
-                                </div>
+                    <div className="space-y-2 pt-0.5 animate-in fade-in duration-150">
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate font-mono">
+                            ID: {selectedConversation.conversation_id}
+                        </p>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                            <div className="p-2 rounded-lg bg-white/80 dark:bg-[#1a1228]/80 border border-slate-200/60 dark:border-[#382352]/60">
+                                <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">Total Turns</span>
+                                <span className="text-sm font-bold text-slate-800 dark:text-slate-100 font-mono">
+                                    {totalTurns} {totalTurns === 1 ? 'turn' : 'turns'}
+                                </span>
+                            </div>
+                            <div className="p-2 rounded-lg bg-white/80 dark:bg-[#1a1228]/80 border border-slate-200/60 dark:border-[#382352]/60">
+                                <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">Session Status</span>
+                                <span className={cn(
+                                    "text-sm font-bold font-mono",
+                                    isRunning ? "text-emerald-600 dark:text-emerald-400" : isQueued ? "text-amber-600 dark:text-amber-400" : "text-slate-700 dark:text-slate-300"
+                                )}>
+                                    {statusLabel}
+                                </span>
+                            </div>
+                            <div className="p-2 rounded-lg bg-white/80 dark:bg-[#1a1228]/80 border border-slate-200/60 dark:border-[#382352]/60">
+                                <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">Time Range</span>
+                                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 font-mono truncate block">
+                                    {timestampRange}
+                                </span>
+                            </div>
+                            <div className="p-2 rounded-lg bg-white/80 dark:bg-[#1a1228]/80 border border-slate-200/60 dark:border-[#382352]/60">
+                                <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">Duration</span>
+                                <span className="text-sm font-bold text-slate-800 dark:text-slate-100 font-mono">
+                                    {durationDisplay}
+                                </span>
                             </div>
                         </div>
-                    )}
+                    </div>
 
                     {/* Enqueued Prompts Section (listing pending queued turns with badges) */}
                     {enqueuedTurns.length > 0 && (

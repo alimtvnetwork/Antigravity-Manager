@@ -262,11 +262,7 @@ pub(crate) fn discover_fallback_projects(
                         repo_path: raw_repo_path,
                         workspace_storage_path: None,
                         is_running: status == "running" || status == "in_flight",
-                        last_detected_at: if updated_at > 0 {
-                            updated_at
-                        } else {
-                            now_fb
-                        },
+                        last_detected_at: if updated_at > 0 { updated_at } else { now_fb },
                     });
                 }
             } else {

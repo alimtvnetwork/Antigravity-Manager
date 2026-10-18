@@ -852,7 +852,9 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
     let ssh_conns = load_ssh_connections().unwrap_or_default();
     let remote_conns: Vec<SshConnectionRecord> = ssh_conns
         .into_iter()
-        .filter(|conn| conn.ip_address != local_ip && !conn.alias.eq_ignore_ascii_case(&local_machine))
+        .filter(|conn| {
+            conn.ip_address != local_ip && !conn.alias.eq_ignore_ascii_case(&local_machine)
+        })
         .collect();
 
     let remote_items: Vec<Vec<ClusterInstanceBalanceItem>> = std::thread::scope(|s| {
@@ -898,10 +900,15 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
                         "list".to_string(),
                         "--json".to_string(),
                     ];
-                    let exec_res = exec_ssh_command(&conn.alias, &remote_cmd, Some(port), None, None);
+                    let exec_res =
+                        exec_ssh_command(&conn.alias, &remote_cmd, Some(port), None, None);
                     if let Ok(res_list) = exec_res {
-                        if let Some(res) = res_list.first().filter(|r| r.success && !r.stdout.is_empty()) {
-                            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&res.stdout) {
+                        if let Some(res) = res_list
+                            .first()
+                            .filter(|r| r.success && !r.stdout.is_empty())
+                        {
+                            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&res.stdout)
+                            {
                                 let raw_instances = val
                                     .get("data")
                                     .and_then(|d| d.as_array())

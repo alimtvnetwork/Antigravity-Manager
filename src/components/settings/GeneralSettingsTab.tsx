@@ -10,6 +10,18 @@ interface DateTimeFormatSectionProps {
     onChange?: (mode: DateFormatMode) => void;
 }
 
+interface DateFormatOption {
+    id: DateFormatModeType;
+    label: string;
+    badge?: string;
+}
+
+const DATE_FORMAT_OPTIONS: DateFormatOption[] = [
+    { id: DateFormatModeType.TwentyFourHour, label: '24-Hour Clock (e.g. 18-Oct-2026 21:40)', badge: 'Default' },
+    { id: DateFormatModeType.TwelveHour, label: '12-Hour Clock (e.g. 18-Oct-2026 09:40 PM)' },
+    { id: DateFormatModeType.Iso, label: 'ISO 8601 (e.g. 2026-10-18 21:40:00)' },
+];
+
 export function DateTimeFormatSection({ value, onChange }: DateTimeFormatSectionProps) {
     const { config, saveConfig } = useConfigStore();
     const currentMode: DateFormatMode = value || config?.date_format_mode || DateFormatModeType.TwentyFourHour;
@@ -26,6 +38,7 @@ export function DateTimeFormatSection({ value, onChange }: DateTimeFormatSection
         if (onChange) {
             onChange(newMode);
         }
+        if (!config) return;
         try {
             await saveConfig({
                 ...config,
@@ -67,13 +80,7 @@ export function DateTimeFormatSection({ value, onChange }: DateTimeFormatSection
 
             {/* Selector Options */}
             <div className="flex flex-wrap items-center gap-2 pt-1">
-                {(
-                    [
-                        { id: DateFormatModeType.TwentyFourHour, label: '24-Hour Clock (e.g. 18-Oct-2026 21:40)', badge: 'Default' },
-                        { id: DateFormatModeType.TwelveHour, label: '12-Hour Clock (e.g. 18-Oct-2026 09:40 PM)' },
-                        { id: DateFormatModeType.Iso, label: 'ISO 8601 (e.g. 2026-10-18 21:40:00)' },
-                    ] as const
-                ).map((opt) => {
+                {DATE_FORMAT_OPTIONS.map((opt) => {
                     const isSelected = currentMode === opt.id;
                     return (
                         <button
