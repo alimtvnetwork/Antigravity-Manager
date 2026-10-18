@@ -66,6 +66,27 @@ foreach ($dir in $cargoIncrementalDirs) {
     }
 }
 
+# Prune superseded duplicate compile hashes in target\debug\deps to prevent disk exhaustion
+$depsDir = Join-Path $RootDir "src-tauri\target\debug\deps"
+if (Test-Path $depsDir) {
+    $files = Get-ChildItem $depsDir -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in ".rmeta", ".rlib", ".d" }
+    $groups = $files | Group-Object { $_.BaseName -replace "-[0-9a-f]{16}$", "" }
+    $prunedCount = 0
+    foreach ($g in $groups) {
+        if ($g.Count -gt 1) {
+            $sorted = $g.Group | Sort-Object LastWriteTime -Descending
+            $toRemove = $sorted | Select-Object -Skip 1
+            foreach ($f in $toRemove) {
+                Remove-Item -Force $f.FullName -ErrorAction SilentlyContinue
+                $prunedCount++
+            }
+        }
+    }
+    if ($prunedCount -gt 0) {
+        Write-Host "  Pruned $prunedCount superseded duplicate artifact(s) from target\debug\deps." -ForegroundColor DarkGray
+    }
+}
+
 # Clean any demo build artifacts if present, strictly protecting tracked files
 $demoDirs = @(
     (Join-Path $RootDir "build-demo"),

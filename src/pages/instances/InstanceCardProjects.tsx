@@ -1,8 +1,21 @@
 import { Folder } from 'lucide-react';
 import type { InstanceStatus } from '../../services/instanceService';
 import type { AgmProjectTreeNode } from '../../components/instances/PromptTreeViewModal';
+import { isGhostConversation } from '../../components/instances/PromptTreeViewModal';
 import { isNodeOwnedByInstance } from './instancePageUtils';
+import { isConversationOwnedByInstance } from './instanceCardData';
 import type { InstancePageApi } from './instancePageTypes';
+
+export function isProjectRunningForInstance(proj: AgmProjectTreeNode, inst: InstanceStatus): boolean {
+    if (!inst.is_running) return false;
+    return (proj.conversations || []).some(
+        (c) =>
+            Boolean(c.is_running) &&
+            isConversationOwnedByInstance(c.instance_id, inst.config) &&
+            !isGhostConversation(c) &&
+            !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+    );
+}
 
 export function InstanceCardProjects({ api, inst }: { api: InstancePageApi; inst: InstanceStatus }) {
     const { config, projectTreeNodes, setPromptTreeInstance } = api;
@@ -12,8 +25,8 @@ export function InstanceCardProjects({ api, inst }: { api: InstancePageApi; inst
     );
 
     const sortedProjects = [...instanceProjects].sort((a, b) => {
-        const isARunning = Boolean(inst.is_running) && Boolean(a.is_running);
-        const isBRunning = Boolean(inst.is_running) && Boolean(b.is_running);
+        const isARunning = isProjectRunningForInstance(a, inst);
+        const isBRunning = isProjectRunningForInstance(b, inst);
         if (isARunning && !isBRunning) return -1;
         if (isBRunning && !isARunning) return 1;
         const aLatest = Math.max(0, ...(a.conversations || []).map((c) => new Date(c.last_modified).getTime() || 0));
@@ -40,9 +53,13 @@ export function InstanceCardProjects({ api, inst }: { api: InstancePageApi; inst
             {displayedProjects.length > 0 ? (
                 <div className="space-y-1">
                     {displayedProjects.map((proj) => {
-                        const isProjRunning = Boolean(inst.is_running) && Boolean(proj.is_running);
+                        const isProjRunning = isProjectRunningForInstance(proj, inst);
+                        const instanceConvs = (proj.conversations || []).filter((c) =>
+                            isConversationOwnedByInstance(c.instance_id, inst.config)
+                        );
+                        const relevantConvs = instanceConvs.length > 0 ? instanceConvs : (proj.conversations || []);
                         const totalTurns =
-                            proj.conversations?.reduce((sum, c) => sum + Math.max(c.step_count || 1, 1), 0) || 0;
+                            relevantConvs.reduce((sum, c) => sum + Math.max(c.step_count || 1, 1), 0);
 
                         return (
                             <div

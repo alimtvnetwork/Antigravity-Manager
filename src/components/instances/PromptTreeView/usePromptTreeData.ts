@@ -160,7 +160,27 @@ export function usePromptTreeData({
         (conv: AgmConversationNode, project: AgmProjectTreeNode) => {
             setSelectedProject(project);
             setSelectedConversation(conv);
-            const text = conv.full_prompt_text || conv.prompt_preview_200w || '';
+            let text = conv.full_prompt_text || conv.prompt_preview_200w || '';
+            if (conv.prompts && conv.prompts.length > 0) {
+                if (typeof conv.selected_turn_number === 'number') {
+                    const matchedTurn = conv.prompts.find((p) => p.turn_number === conv.selected_turn_number);
+                    if (matchedTurn?.prompt_text) {
+                        text = matchedTurn.prompt_text;
+                    }
+                } else {
+                    const runningTurn = conv.prompts.find((p) => p.is_running && p.prompt_text && p.prompt_text.trim());
+                    if (runningTurn?.prompt_text) {
+                        text = runningTurn.prompt_text;
+                    } else {
+                        const lastTurnWithText = [...conv.prompts]
+                            .reverse()
+                            .find((p) => p.prompt_text && p.prompt_text.trim().length > text.trim().length);
+                        if (lastTurnWithText?.prompt_text) {
+                            text = lastTurnWithText.prompt_text;
+                        }
+                    }
+                }
+            }
             setActivePromptText(text);
             setEditedPromptText(text);
             setShowAllWords(false);
