@@ -1,4 +1,4 @@
-import { Eye, Code, Edit3, ChevronUp, ChevronDown, FileText, MessageSquare, Terminal } from 'lucide-react';
+import { Eye, Code, Edit3, ChevronUp, ChevronDown, MessageSquare, Terminal } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { PromptViewMode, type AgmConversationNode, type ViewMode } from './types';
 
@@ -15,7 +15,7 @@ export interface DetailTabsProps {
     setShowAllWords: (v: boolean | ((prev: boolean) => boolean)) => void;
     viewMode: ViewMode;
     setViewMode: (v: ViewMode) => void;
-    setIsDetailsModalOpen: (v: boolean) => void;
+    setIsDetailsModalOpen?: (v: boolean) => void;
 }
 
 export function DetailTabs(props: DetailTabsProps) {
@@ -26,32 +26,22 @@ export function DetailTabs(props: DetailTabsProps) {
         activeWordCount,
         activeByteCount,
         formatByteSize,
-        isTruncated,
-        activePromptText,
         showAllWords,
         setShowAllWords,
         viewMode,
         setViewMode,
-        setIsDetailsModalOpen,
     } = props;
-
-    const hasExpandToggle = Boolean(
-        isTruncated ||
-        activePromptText.trim().endsWith('...') ||
-        activePromptText.trim().endsWith('…') ||
-        showAllWords
-    );
 
     return (
         <div className="flex items-center justify-between gap-2.5 flex-wrap py-0.5 min-h-[32px]">
-            {/* Left: View Mode Controls Capsule (Preview, Raw, Edit, Details) */}
+            {/* Left: View Mode Controls Capsule (Preview, Raw, Edit) */}
             <div className="flex items-center gap-2.5 shrink-0">
-                <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
+                <div className="inline-flex items-center rounded-md bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200 dark:border-[#40285e] p-0.5 divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs shrink-0">
                     <button
                         type="button"
                         onClick={() => setViewMode(PromptViewMode.Preview)}
                         className={cn(
-                            'p-1.5 px-2 rounded-l-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer',
+                            'p-1.5 px-2 rounded-l-md transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer',
                             viewMode === PromptViewMode.Preview
                                 ? 'bg-blue-600 text-white shadow-2xs'
                                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60'
@@ -77,7 +67,7 @@ export function DetailTabs(props: DetailTabsProps) {
                         type="button"
                         onClick={() => setViewMode(PromptViewMode.Edit)}
                         className={cn(
-                            'p-1.5 px-2 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer',
+                            'p-1.5 px-2 rounded-r-md transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer',
                             viewMode === PromptViewMode.Edit
                                 ? 'bg-blue-600 text-white shadow-2xs'
                                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60'
@@ -86,33 +76,25 @@ export function DetailTabs(props: DetailTabsProps) {
                     >
                         <Edit3 className="w-3.5 h-3.5" />
                     </button>
-                    <button
-                        type="button"
-                        onClick={() => setIsDetailsModalOpen(true)}
-                        className="p-1.5 px-2 rounded-r-full text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                        aria-label="Details"
-                    >
-                        <FileText className="w-3.5 h-3.5 text-blue-500" />
-                    </button>
                 </div>
             </div>
 
             {/* Right: Stats + Single Segmented Capsule ([Input] [Output] [Expand Full/Collapse]) */}
-            <div className="flex items-center gap-2 ml-auto shrink-0">
+            <div className="flex items-center gap-2.5 ml-auto shrink-0">
                 {previewTab === 'instruction' && (
                     <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 font-mono">
                         {activeWordCount} words · {formatByteSize(activeByteCount)}
                     </span>
                 )}
 
-                <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
+                <div className="inline-flex items-center rounded-md bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200 dark:border-[#40285e] p-0.5 divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs shrink-0">
                     {setPreviewTab && (
                         <>
                             <button
                                 type="button"
                                 onClick={() => setPreviewTab('instruction')}
                                 className={cn(
-                                    "flex items-center gap-1.5 px-3 py-1 rounded-l-full text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
+                                    "flex items-center gap-1.5 px-3 py-1 rounded-l-md text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
                                     previewTab === 'instruction'
                                         ? "bg-blue-600 text-white shadow-2xs"
                                         : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
@@ -127,8 +109,7 @@ export function DetailTabs(props: DetailTabsProps) {
                                 type="button"
                                 onClick={() => setPreviewTab('results')}
                                 className={cn(
-                                    "flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
-                                    hasExpandToggle ? "rounded-none" : "rounded-r-full",
+                                    "flex items-center gap-1.5 px-3 py-1 rounded-none text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
                                     previewTab === 'results'
                                         ? "bg-blue-600 text-white shadow-2xs"
                                         : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
@@ -151,32 +132,31 @@ export function DetailTabs(props: DetailTabsProps) {
                         </>
                     )}
 
-                    {hasExpandToggle && (
-                        <button
-                            type="button"
-                            onClick={() => setShowAllWords((prev) => !prev)}
-                            className={cn(
-                                "flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
-                                setPreviewTab ? "rounded-r-full" : "rounded-full",
-                                showAllWords
-                                    ? "bg-cyan-500/20 text-cyan-700 dark:text-cyan-300"
-                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60"
-                            )}
-                            aria-label={showAllWords ? 'Collapse full prompt text' : 'Expand full prompt text'}
-                        >
-                            {showAllWords ? (
-                                <>
-                                    <ChevronUp className="w-3 h-3" />
-                                    <span>Collapse</span>
-                                </>
-                            ) : (
-                                <>
-                                    <ChevronDown className="w-3 h-3" />
-                                    <span>Expand Full</span>
-                                </>
-                            )}
-                        </button>
-                    )}
+                    {/* Expand Full / Collapse button: always retained in the segmented capsule across input/output tab switching */}
+                    <button
+                        type="button"
+                        onClick={() => setShowAllWords((prev) => !prev)}
+                        className={cn(
+                            "flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
+                            setPreviewTab ? "rounded-r-md" : "rounded-md",
+                            showAllWords
+                                ? "bg-cyan-500/20 text-cyan-700 dark:text-cyan-300"
+                                : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60"
+                        )}
+                        aria-label={showAllWords ? 'Collapse full prompt text' : 'Expand full prompt text'}
+                    >
+                        {showAllWords ? (
+                            <>
+                                <ChevronUp className="w-3 h-3" />
+                                <span>Collapse</span>
+                            </>
+                        ) : (
+                            <>
+                                <ChevronDown className="w-3 h-3" />
+                                <span>Expand Full</span>
+                            </>
+                        )}
+                    </button>
                 </div>
             </div>
         </div>

@@ -79,6 +79,7 @@ export function ProjectContextMenu({
 
         const handleClickOutside = (e: MouseEvent) => {
             if (Date.now() - mountTime < 100) return;
+            if (e.button === 2) return;
             if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
                 onClose();
             }

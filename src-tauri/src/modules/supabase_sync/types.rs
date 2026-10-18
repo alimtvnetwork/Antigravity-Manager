@@ -4,7 +4,7 @@ use crate::modules::supabase_client::{normalize_supabase_url, SupabaseClient, Su
 use chrono::Utc;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 
 use super::*;
 
@@ -12,6 +12,78 @@ pub(crate) static PROCESS_START_TIME: Lazy<AtomicU64> =
     Lazy::new(|| AtomicU64::new(Utc::now().timestamp() as u64));
 
 pub(crate) static SYNC_RUNNING: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
+
+/// 5-minute (300 seconds) circuit breaker cooldown on Supabase transport/network errors
+pub const SUPABASE_CIRCUIT_BREAKER_COOLDOWN_SECS: i64 = 300;
+pub const SUPABASE_COOLDOWN_DURATION_SECS: i64 = 300;
+
+pub(crate) static LAST_SUPABASE_ERROR_TIMESTAMP: Lazy<AtomicI64> = Lazy::new(|| AtomicI64::new(0));
+
+/// Record a Supabase network/transport failure to open the 5-minute circuit breaker
+pub fn record_supabase_network_error() {
+    let now = Utc::now().timestamp();
+    LAST_SUPABASE_ERROR_TIMESTAMP.store(now, Ordering::Relaxed);
+    tracing::warn!(
+        target: "supabase_sync",
+        cooldown_secs = SUPABASE_CIRCUIT_BREAKER_COOLDOWN_SECS,
+        "Supabase network error recorded; circuit breaker active for 300 seconds (5 minutes)"
+    );
+}
+
+/// Alias for specification parity
+pub fn record_supabase_error() {
+    record_supabase_network_error();
+}
+
+/// Reset circuit breaker upon successful connection or user save/test configuration
+pub fn reset_supabase_circuit_breaker() {
+    LAST_SUPABASE_ERROR_TIMESTAMP.store(0, Ordering::Relaxed);
+    tracing::info!(
+        target: "supabase_sync",
+        "Supabase circuit breaker reset to normal closed state"
+    );
+}
+
+/// Alias for specification parity
+pub fn reset_supabase_cooldown() {
+    reset_supabase_circuit_breaker();
+}
+
+/// Check if the Supabase circuit breaker is currently open (under 5-minute cooldown)
+pub fn is_supabase_circuit_open() -> bool {
+    let last_err = LAST_SUPABASE_ERROR_TIMESTAMP.load(Ordering::Relaxed);
+    if last_err <= 0 {
+        return false;
+    }
+    let now = Utc::now().timestamp();
+    let elapsed = now - last_err;
+    if elapsed >= SUPABASE_CIRCUIT_BREAKER_COOLDOWN_SECS {
+        // Cooldown has expired, automatically reset
+        LAST_SUPABASE_ERROR_TIMESTAMP.store(0, Ordering::Relaxed);
+        false
+    } else {
+        true
+    }
+}
+
+/// Alias for specification parity
+pub fn is_supabase_in_cooldown() -> bool {
+    is_supabase_circuit_open()
+}
+
+/// Get remaining seconds on the Supabase circuit breaker cooldown
+pub fn get_supabase_cooldown_remaining_secs() -> i64 {
+    let last_err = LAST_SUPABASE_ERROR_TIMESTAMP.load(Ordering::Relaxed);
+    if last_err <= 0 {
+        return 0;
+    }
+    let elapsed = Utc::now().timestamp() - last_err;
+    if elapsed >= SUPABASE_CIRCUIT_BREAKER_COOLDOWN_SECS {
+        0
+    } else {
+        SUPABASE_CIRCUIT_BREAKER_COOLDOWN_SECS - elapsed
+    }
+}
 
 /// Supabase sync global configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]

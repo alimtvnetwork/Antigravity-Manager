@@ -4,11 +4,13 @@ import type { AgmProjectTreeNode } from '../../components/instances/PromptTreeVi
 export { type InstanceActionType };
 
 export function truncatePath(fullPath?: string | null): string {
-    if (!fullPath) return '';
+    const hasFullPath = Boolean(fullPath && fullPath.length > 0);
+    if (!hasFullPath || !fullPath) return '';
     const isWindows = fullPath.includes('\\') || /^[a-zA-Z]:/.test(fullPath);
     const sep = isWindows ? '\\' : '/';
     const parts = fullPath.split(/[\\/]/).filter(Boolean);
-    if (parts.length === 0) return fullPath;
+    const hasParts = parts.length > 0;
+    if (!hasParts) return fullPath;
     return `...${sep}${parts[parts.length - 1]}`;
 }
 
@@ -35,34 +37,52 @@ export function getActionLabel(action: InstanceActionType): string {
     }
 }
 
+export const DEFAULT_INSTANCE_ID = 'default';
+export const DEFAULT_INSTANCE_ALIAS = '__default__';
+
 export function isDefaultOwned(nodeInstId: string | undefined | null, cfgId: string): boolean {
-    if (!nodeInstId || nodeInstId.trim() === '') {
+    const hasNodeInstId = Boolean(nodeInstId && nodeInstId.trim().length > 0);
+    if (!hasNodeInstId) {
         return false;
     }
-    const isDefaultAlias = nodeInstId === 'default' || nodeInstId === '__default__';
-    const isIdMatch = Boolean(cfgId) && nodeInstId === cfgId;
-    return isDefaultAlias || isIdMatch;
+    const isIdMatch = Boolean(cfgId && nodeInstId === cfgId);
+    if (isIdMatch) {
+        return true;
+    }
+    const isDefaultAlias = nodeInstId === DEFAULT_INSTANCE_ID || nodeInstId === DEFAULT_INSTANCE_ALIAS;
+    return isDefaultAlias;
 }
 
 export const isNodeOwnedByInstance = (
     node: AgmProjectTreeNode,
     instConfig: { id: string; is_default?: boolean; seq_num?: number }
 ): boolean => {
-    if (!node.instance_id || node.instance_id.trim() === '') {
+    const hasNodeInstId = Boolean(node.instance_id && node.instance_id.trim().length > 0);
+    if (!hasNodeInstId) {
         return false;
     }
-    const isDefaultInstance = instConfig.is_default || instConfig.id === 'default';
+    const isExactIdMatch = node.instance_id === instConfig.id;
+    if (isExactIdMatch) {
+        return true;
+    }
+    const isDefaultInstance = Boolean(
+        instConfig.is_default ||
+        instConfig.id === DEFAULT_INSTANCE_ID ||
+        instConfig.id === DEFAULT_INSTANCE_ALIAS
+    );
     if (isDefaultInstance) {
         return isDefaultOwned(node.instance_id, instConfig.id);
     }
-    if (node.instance_id === 'default' || node.instance_id === '__default__') {
+    const isNodeDefaultAlias = node.instance_id === DEFAULT_INSTANCE_ID || node.instance_id === DEFAULT_INSTANCE_ALIAS;
+    if (isNodeDefaultAlias) {
         return false;
     }
-    if (node.instance_id === instConfig.id) {
-        return true;
-    }
-    const hasSeqNum = typeof instConfig.seq_num === 'number' && instConfig.seq_num > 1;
-    if (hasSeqNum && node.instance_seq_num === instConfig.seq_num) {
+    const hasMatchingSeqNum = Boolean(
+        typeof instConfig.seq_num === 'number' &&
+        instConfig.seq_num > 1 &&
+        node.instance_seq_num === instConfig.seq_num
+    );
+    if (hasMatchingSeqNum) {
         return true;
     }
     return false;
@@ -73,22 +93,33 @@ export function isConversationOwnedByInstance(
     instConfig: { id: string; is_default?: boolean; seq_num?: number },
     convInstSeqNum?: number
 ): boolean {
-    const hasSeqNum = typeof instConfig.seq_num === 'number' && instConfig.seq_num > 1;
-    if (hasSeqNum && convInstSeqNum === instConfig.seq_num) {
-        return true;
-    }
-    if (!convInstId || convInstId.trim() === '') {
+    const hasConvInstId = Boolean(convInstId && convInstId.trim().length > 0);
+    if (!hasConvInstId) {
         return false;
     }
-    const isDefaultInst = Boolean(instConfig.is_default || instConfig.id === 'default' || instConfig.id === '__default__');
+    const isExactIdMatch = convInstId === instConfig.id;
+    if (isExactIdMatch) {
+        return true;
+    }
+    const hasMatchingSeqNum = Boolean(
+        typeof instConfig.seq_num === 'number' &&
+        instConfig.seq_num > 1 &&
+        convInstSeqNum === instConfig.seq_num
+    );
+    if (hasMatchingSeqNum) {
+        return true;
+    }
+    const isDefaultInst = Boolean(
+        instConfig.is_default ||
+        instConfig.id === DEFAULT_INSTANCE_ID ||
+        instConfig.id === DEFAULT_INSTANCE_ALIAS
+    );
     if (isDefaultInst) {
         return isDefaultOwned(convInstId, instConfig.id);
     }
-    if (convInstId === 'default' || convInstId === '__default__') {
+    const isConvDefaultAlias = convInstId === DEFAULT_INSTANCE_ID || convInstId === DEFAULT_INSTANCE_ALIAS;
+    if (isConvDefaultAlias) {
         return false;
-    }
-    if (convInstId === instConfig.id) {
-        return true;
     }
     return false;
 }

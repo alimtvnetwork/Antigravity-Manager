@@ -101,6 +101,15 @@ pub fn build_local_and_ssh_fleet() -> Vec<FleetMachineInfo> {
 
 /// Query fleet machines aggregating nodes, instance profiles, and workspace leases across the cluster
 pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
+    if is_supabase_circuit_open() {
+        tracing::debug!(
+            target: "supabase_sync",
+            remaining_secs = get_supabase_cooldown_remaining_secs(),
+            "Supabase circuit breaker is open; returning local and SSH fleet without network requests"
+        );
+        return Ok(build_local_and_ssh_fleet());
+    }
+
     let config = match load_config() {
         Ok(c) => c,
         Err(e) => {
@@ -131,6 +140,7 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
                 "[Fleet] Failed to create Supabase client for fleet query: {}",
                 e
             );
+            record_supabase_network_error();
             return Ok(build_local_and_ssh_fleet());
         }
     };
@@ -142,12 +152,14 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
         Ok(val) => val,
         Err(e) => {
             tracing::warn!("[Fleet] Failed to query nodes from Supabase: {}", e);
+            record_supabase_network_error();
             return Ok(build_local_and_ssh_fleet());
         }
     };
 
     if let Some(msg) = postgrest_error_message(&nodes_val) {
         tracing::warn!("[Fleet] PostgREST error querying nodes: {}", msg);
+        record_supabase_network_error();
         return Ok(build_local_and_ssh_fleet());
     }
 
@@ -165,6 +177,7 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
                 error = %e,
                 "Failed to query instance_profiles table from Supabase"
             );
+            record_supabase_network_error();
             serde_json::Value::Array(Vec::new())
         }
     };

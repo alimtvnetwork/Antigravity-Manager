@@ -68,6 +68,140 @@ pub fn get_instance_switch_history(
         WHERE (action_code = 3 OR action = 'SwitchAccount' OR action = 'switch_account' OR LOWER(action) LIKE '%switch%')
           AND (LOWER(instance_id) = LOWER(?1) OR LOWER(subject) = LOWER(?1) OR (?1 = 'default' AND (LOWER(instance_id) IN ('default', '__default__', '', 'null', 'antigravity', 'agy', 'ide', 'classic') OR LOWER(subject) IN ('default', '__default__', '', 'null', 'antigravity', 'agy', 'ide', 'classic') OR instance_id IS NULL)))";
 
+    let mut seen_ids = std::collections::HashSet::new();
+
+    // 1. First consult hot_tasks_cache for recent switches
+    let count_hot_sql = format!("SELECT COUNT(*) FROM hot_tasks_cache {}", switch_cond);
+    if let Ok(mut count_stmt) = index.prepare(&count_hot_sql) {
+        let hot_count: i64 = count_stmt
+            .query_row(params![query_inst_id], |row| row.get(0))
+            .unwrap_or(0);
+        total += hot_count as usize;
+    }
+
+    let query_hot_sql = format!(
+        "SELECT id, action, action_code, status, subject, detail, instance_id, created_at, finished_at, payload_json,
+                COALESCE(from_email, ''), COALESCE(to_email, '')
+         FROM hot_tasks_cache {}
+         ORDER BY created_at DESC LIMIT ?2",
+        switch_cond
+    );
+    if let Ok(mut stmt) = index.prepare(&query_hot_sql) {
+        if let Ok(rows) = stmt.query_map(params![query_inst_id, limit as i64], |row| {
+            let id: String = row.get(0)?;
+            let legacy: String = row.get(1)?;
+            let code: Option<i32> = row.get(2)?;
+            let (action_code, action, action_label) = resolve_action(code, &legacy);
+            let status: String = row.get(3)?;
+            let subject: String = row.get(4)?;
+            let detail: String = row.get(5)?;
+            let inst_id: String = row.get(6)?;
+            let created_at: i64 = row.get(7)?;
+            let finished_at: Option<i64> = row.get(8)?;
+            let payload_json: String = row.get(9)?;
+            let from_email: String = row.get(10)?;
+            let to_email: String = row.get(11)?;
+
+            Ok((
+                id,
+                action_code,
+                action,
+                action_label,
+                status,
+                subject,
+                detail,
+                inst_id,
+                created_at,
+                finished_at,
+                payload_json,
+                from_email,
+                to_email,
+            ))
+        }) {
+            for r in rows.flatten() {
+                if !seen_ids.insert(r.0.clone()) {
+                    continue;
+                }
+                let (
+                    id,
+                    action_code,
+                    action,
+                    action_label,
+                    status,
+                    subject,
+                    detail,
+                    inst_id,
+                    created_at,
+                    finished_at,
+                    payload_json,
+                    mut from_email,
+                    mut to_email,
+                ) = r;
+
+                let parsed_val: Option<serde_json::Value> =
+                    serde_json::from_str(&payload_json).ok();
+                let steps = parsed_val
+                    .as_ref()
+                    .and_then(|v| v.get("steps"))
+                    .and_then(|s| serde_json::from_value::<SwitchAuditSteps>(s.clone()).ok());
+
+                if from_email.is_empty() {
+                    if let Some(ref v) = parsed_val {
+                        from_email = v
+                            .get("from_email")
+                            .and_then(|e| e.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                    }
+                }
+                if to_email.is_empty() {
+                    if let Some(ref v) = parsed_val {
+                        to_email = v
+                            .get("to_email")
+                            .and_then(|e| e.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                    }
+                }
+
+                let switch_reason = parsed_val
+                    .as_ref()
+                    .and_then(|v| v.get("switch_reason").or_else(|| v.get("reason")))
+                    .and_then(|r| r.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                let duration_ms = match (created_at, finished_at) {
+                    (c, Some(f)) if f >= c => (f - c) * 1000,
+                    _ => 0,
+                };
+
+                records.push(InstanceSwitchRecord {
+                    id,
+                    action_code,
+                    action,
+                    action_label,
+                    status,
+                    subject,
+                    detail,
+                    instance_id: inst_id,
+                    instance_name: instance_name.clone(),
+                    from_email: from_email.clone(),
+                    to_email: to_email.clone(),
+                    from_account_email: from_email,
+                    to_account_email: to_email,
+                    switch_reason,
+                    created_at,
+                    finished_at,
+                    duration_ms,
+                    steps,
+                    payload_json,
+                });
+            }
+        }
+    }
+
+    // 2. Scan split files
     for split in &splits {
         let conn = open_split(Path::new(&split.file_path))?;
         let count_sql = format!("SELECT COUNT(*) FROM tasks {}", switch_cond);
@@ -136,6 +270,10 @@ pub fn get_instance_switch_history(
                     mut from_email,
                     mut to_email,
                 ) = r.map_err(|e| e.to_string())?;
+
+                if !seen_ids.insert(id.clone()) {
+                    continue;
+                }
 
                 let parsed_val: Option<serde_json::Value> =
                     serde_json::from_str(&payload_json).ok();

@@ -1,29 +1,51 @@
-# Master Plan: UI and Functionality Enhancement Instructions
+# Master Execution Plan: UI and Functionality Enhancement Instructions
 
-Request slug: `ui-and-functionality-enhancement-instructions`
-Status: COMPLETED
-Phase: 3
-Capacity: A = 3 agents × H = 2 hands = 6 concurrent operations
+**Slug:** `ui-and-functionality-enhancement-instructions`  
+**Status:** `IN_PROGRESS`  
+**Author:** `@aukgit`
 
-## User Request (Verbatim)
-https://prnt.sc/PipJYddbJWAw
-https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v4.226.3
+---
 
-# UI and Functionality Enhancement Instructions: high priority instruction, non-negotiable task
+## 1. Executive Problem Summary & Core Remediation Tracks
 
-So far the work is good. I want you to do now, the first step should be actually many steps. That means you are going to run CG execute prompt. And that CG execute prompt is going to fix the if else condition parts. In most cases, you have a very complex if else, have negatives in the if else, so try to make it smoother. Inside the CG execute, I want you to execute the Boolean and complex conditions MD file or skills related to this skill. Execute that skill first. Then you execute the naming convention and Boolean prefixes skill. Then you are going to run the constants and enums. Then you are going to run the CLI commands and help. And function returns and return type , sequence 14. You must execute by the skill, not the prompt. The main problem that you have in cases, the SSH connection does not work at your end. You can check with `gitmap` nodes. `gitmap` can update itself via SSH. The W2 machine is connected. You just try with W2. W2 works with SSH everything. You don't have the proper configuration. You can check into the code how `gitmap` is using it, how the `gitmap` is communicating. You can also try to communicate via `gitmap` and try to achieve it. The shared cluster section in the instance does not work at all. The next part is the instance section. When we have the sending prompt or the... There is one issue that I do see, that you cannot get the running prompt for the specific IDE. In my screenshot, I'm giving you a screenshot. Here, you put in both cases the anti-gravity prompt is running, which is wrong, because actually prompt anti-gravity running is in one case, not in both. And that is in the second instance. It is running. But the first instance, there is nothing running. And I can give you the screenshot from the first instance. And in your instance section, it says the first instance is also running the same prompt. So try to find that root cause and try to fix it. The next thing is that the right-click button does not have anything. In the prompt tree view, in the left-hand side, we have the tree, right? Any tree item, if I right-click, there is nothing. So you need to fix that. I asked you to put the input and output into the right-hand side. You could compact this input/output to the right-hand side with the Expand Full button. In Expand Full will be compacted together with the input/output button. And also, it would be in the right-hand side with the similar way. Try not to have too much rounding in the buttons. You have too much rounding inside this prompt section, which is not appreciable. Please reduce the rounding on the buttons. The next thing about is the copy. The copy prompt does not include the images. Does not include the images, and for this reason, there was a Detail button. You took it out. There was a Detail button which it would have clicked. It would show me which IDE, which instance the prompt is running. Currently, I cannot do that. The images cannot be previewed yet. I do not see the enqueued prompts in your UI in the prompts tree view, which I requested previously. If a conversation has five different prompts, these are enqueued. It should list those out here as well. Our database should have the sync, it should also know that, and also it should be available when we go into the running prompt. In below, it will show how many prompts are enqueued. Currently, it is not doing that. That's incredibly wrong, and if you click on the conversation, the view should be a little bit different because I am a bit confused. Here, I have clicked on the conversation, and the UI looks same. I'm a bit confused, so make sure the UI is better looking. The right-hand side view of the prompt, i.e., prompt markdown view, I requested you to make it enhanced. You did not do that yet. The right-click button does not work. The next problem is the image. I don't see the images which are related to the prompt. It should be available when I go inside the prompt tree view and the prompt. It should be able to right-click copy images or multiple images all together into the memory. Also, in the copy button, the issue with the copy button that it does not, the first button should copy with image and everything. It does not copy with image. It should say right-hand side, includes image. The next one should be copy as a text, not as an image. Or the text would be copy without image. Same text, whole thing, copy without image. But these are not working. If I go inside the JSON, we see the JSON. The JSON is good. But can we make a standalone JSON? Currently, the JSON file that you have, it actually relates to so many files that is related to this machine. But the JSON copy, the idea is that I could copy it anywhere and paste it, and it would understand regardless of the machine. Try to follow with the related path if you, and also embedding everything together. Or you can have two versions. One is with embedding, the import/export. Another could be without the embedding. And also the import/export button, the overlay still has issues. The last but not least, very important factor is that the update. If I go to any one of the old version, I will give you the URL. So you go there, there is a pinned version, right? Try to execute that pinned version. You'll see that it does not update to that pinned version. One more thing. In this machine, it is saying every time it updates, it's updating from v4.190 to the latest one. How it is not getting the latest version that I'm using. Currently, I'm using the 4.227. Why it does not get it in the updated screen? So try to figure that out. Does this make sense? So here you have to understand the pinned version script does not work. When we update, it also says from the older version that from this to this, it is updating, it does not pick up the latest version. What is the root cause of it? Find the root cause and fix it. At the end, try to do all this end-to-end testing.
+1. **Track 1: Instance Prompt Isolation (`repo_db/liveness.rs`, `gemini_dirs.rs`, `tree_node_conv.rs`)**:
+   - Prevent `antigravity-cli` directories from polluting default GUI instance scope.
+   - Populate `instance_seq_num` across conversation nodes so sequence numbers match frontend expectations.
+   - Restrict empty instance IDs in `observe.rs` from defaulting to `default`.
+2. **Track 2: Prompt Tree View Ergonomics & Reduced Button Rounding (`PromptTreeView`)**:
+   - Refactor excessive `rounded-full` pill buttons to crisp `rounded-md` / `rounded-[5px]`.
+   - Compact `[Input | Output | Expand Full]` into right-hand header alongside word/byte counts.
+   - Implement right-click context menu on tree sidebar items.
+   - Display enqueued prompts in dedicated permanent FIFO queue section.
+   - Enhance active conversation styling for high visual contrast.
+3. **Track 3: Rich Multimodal Copy & Image Previews**:
+   - Split copy into "Copy with Images" (with visible badge) vs "Copy Text Only".
+   - Restore interactive Detail button showing Instance ID, Name, Seq #, PID, Path, and Liveness.
+   - Enable image preview and native PNG clipboard copying.
+4. **Track 4: Standalone Portable JSON & Overlay Fixes**:
+   - Add Standalone Export mode with base64 embedded images and `${workDir}` path normalization.
+   - Deconflict modal backdrop: remove `backdrop-blur-md` on child modals, bump z-index, fix outer scrollbar click dismissal.
+5. **Track 5: SSH Cluster & Node W2 Parity**:
+   - Update `gitmap-ssh-nodes.json` node `w2` to Windows.
+   - Render offline nodes in `FleetMachinesTable.tsx` rather than collapsing into disabled banner.
+   - Allow AGM to fall back to GitMap SSH execution.
+6. **Track 6: App Updater Pinned-Version & v4.190 Trap Remediation**:
+   - Update `install.ps1` to extract and shortcut to `agm-ui.exe` while maintaining `agm-alim.exe` compatibility.
+   - Parse SemVer from GitHub release URLs in `args.rs` and `install.ps1`.
+7. **Track 7: Coding Guidelines (CG) Refactoring**:
+   - Guard clause inversion, positive boolean prefixes (`is`/`has`), constants/enums normalization, and sequence-14 function return signatures.
 
-## Task Inventory & Status Matrix
+---
 
-| Task-ID | Title | Owner | Status | Target Files |
-|---|---|---|---|---|
-| Task-01 | Setup, Preflight, Specs & Plans | Lead | DONE | `02-spec/21-app/ui-and-functionality-enhancement-instructions/` |
-| Task-02 | Coding Guidelines Refactoring (Boolean, Naming, Enums, CLI Help, Functions) | Worker 01 | DONE | `src-tauri/src/bin/agm/update_cmds.rs`, `install.ps1`, `src-tauri/src/modules/` |
-| Task-03 | Instance Prompt Isolation & Idle Supremacy | Worker 02 | DONE | `src-tauri/src/modules/repo_db/`, `src/pages/instances/instanceCardData.ts` |
-| Task-04 | SSH Cluster & Node W2 Parity | Worker 03 | DONE | `src-tauri/src/modules/ssh_manager/`, `src-tauri/src/modules/supabase_sync/`, `useFleetMachines.ts` |
-| Task-05 | Prompt Tree Context Menus, z-Index, Conversation View & Enqueued Prompts | Worker 01 | DONE | `ConversationContextMenu.tsx`, `ProjectContextMenu.tsx`, `PromptInstructionView.tsx` |
-| Task-06 | Markdown View, Compact Toolbar, Reduced Rounding & Details Modal | Worker 02 | DONE | `DetailHeader.tsx`, `DetailsModal.tsx`, `PromptTreeViewModal.tsx` |
-| Task-07 | Image Preview, Context Menu & Dual Copy Buttons ("With Image" vs "Without Image") | Worker 03 | DONE | `PromptImageContextMenu.tsx`, `PromptImagePreviewModal.tsx`, `clipboard.ts` |
-| Task-08 | Standalone JSON Import / Export & Overlay Isolation | Worker 01 | DONE | `PromptTreeExportModal.tsx`, `PromptTreeImportModal.tsx`, `prompt_export.rs` |
-| Task-09 | Updater Version Detection Fix & Pinned Version Execution | Worker 02 | DONE | `install.ps1`, `src-tauri/src/bin/agm/update_cmds.rs`, `run.rs` |
-| Task-10 | End-to-End Verification, Documentation & GitMap Atomic Commit | Lead | DONE | Repository test gate and atomic GitMap commit |
+## 2. Subtask Breakdown & File Boundaries
+
+| Subtask ID | Title | Assigned Agent | Exclusive Owned Files |
+|---|---|---|---|
+| `Subtask-01` | CG Refactoring & Guard Clause Simplification | Worker 01 | Touched modules in `src/` and `src-tauri/` |
+| `Subtask-02` | Instance Running Prompt Isolation | Worker 02 | `src-tauri/src/modules/repo_db/gemini_dirs.rs`, `liveness.rs`, `tree_node_conv.rs`, `tree_collect.rs` |
+| `Subtask-03` | Prompt Tree View UI/UX & Button Rounding | Worker 01 | `src/components/instances/PromptTreeView/DetailHeader.tsx`, `DetailTabs.tsx`, `TreePanel.tsx`, `PromptInstructionView.tsx` |
+| `Subtask-04` | Image Clipboard Copy & Markdown Preview | Worker 01 | `src/components/instances/PromptTreeView/usePromptTreePromptActions.ts`, `clipboard.ts`, `PromptMarkdownView.tsx` |
+| `Subtask-05` | Standalone Portable JSON & Overlay Deconfliction | Worker 03 | `src/components/instances/PromptTreeView/PromptTreeExportModal.tsx`, `PromptTreeImportModal.tsx`, `src-tauri/src/modules/repo_db/export.rs` |
+| `Subtask-06` | SSH Cluster & Node W2 Parity | Worker 03 | `gitmap-ssh-nodes.json`, `src/pages/Instances/components/FleetMachinesTable.tsx`, `src-tauri/src/modules/ssh_manager/` |
+| `Subtask-07` | App Updater Pinned-Version & v4.190 Trap Fix | Worker 02 | `src-tauri/src/modules/delegate_updater/args.rs`, `install.ps1` |
+| `Subtask-08` | Verification & Release Ceremony | Lead | Quality gates, bump, changelog, atomic commit |

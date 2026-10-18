@@ -42,6 +42,16 @@ fn check_memory_prompts_running(
         } else {
             p.instance_id == norm_inst
         };
+        let proj_suffix = p.project_id.split("__").nth(1).unwrap_or("");
+        let is_suffix_mismatch = !proj_suffix.is_empty()
+            && if norm_inst == "default" {
+                proj_suffix != "default" && proj_suffix != "__default__"
+            } else {
+                proj_suffix != norm_inst
+            };
+        if is_suffix_mismatch {
+            continue;
+        }
         let is_proj_match = p.project_id == project_id || p.repo_path == project_id;
         let is_matched = is_inst_match && is_proj_match;
         if !is_matched {
@@ -116,6 +126,16 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
             } else {
                 p.instance_id == norm_inst
             };
+            let proj_suffix = p.project_id.split("__").nth(1).unwrap_or("");
+            let is_suffix_mismatch = !proj_suffix.is_empty()
+                && if norm_inst == "default" {
+                    proj_suffix != "default" && proj_suffix != "__default__"
+                } else {
+                    proj_suffix != norm_inst
+                };
+            if is_suffix_mismatch {
+                return false;
+            }
             matches_inst
                 && (p.project_id == project_id || p.repo_path == project_id)
                 && (p.status == "completed" || p.status == "failed")
@@ -127,8 +147,14 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
     let db_terminal = if let Ok(conn) = connect_db() {
         conn.query_row(
             "SELECT status FROM active_prompts 
-             WHERE (project_id = ?1 OR repo_path = ?1) 
-               AND (?2 = 'all' OR instance_id = ?2 OR (?2 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))
+             WHERE (project_id = ?1 OR repo_path = ?1 OR project_id LIKE ?1 || '__%') 
+               AND (
+                 ?2 = 'all' 
+                 OR (
+                   (?2 = 'default' AND (instance_id = 'default' OR instance_id = '__default__') AND (project_id NOT LIKE '%__%' OR project_id LIKE '%__default' OR project_id LIKE '%____default__'))
+                   OR (instance_id = ?2 AND (project_id NOT LIKE '%__%' OR project_id LIKE '%__' || ?2))
+                 )
+               )
              ORDER BY updated_at DESC, created_at DESC LIMIT 1",
             params![project_id, norm_inst],
             |r| r.get::<_, String>(0),
@@ -219,8 +245,14 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
         } else {
             conn.query_row(
                 "SELECT COUNT(*) FROM active_prompts 
-                 WHERE (project_id = ?1 OR repo_path = ?1) 
-                   AND (?2 = 'all' OR instance_id = ?2 OR (?2 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))
+                 WHERE (project_id = ?1 OR repo_path = ?1 OR project_id LIKE ?1 || '__%') 
+                   AND (
+                     ?2 = 'all' 
+                     OR (
+                       (?2 = 'default' AND (instance_id = 'default' OR instance_id = '__default__') AND (project_id NOT LIKE '%__%' OR project_id LIKE '%__default' OR project_id LIKE '%____default__'))
+                       OR (instance_id = ?2 AND (project_id NOT LIKE '%__%' OR project_id LIKE '%__' || ?2))
+                     )
+                   )
                    AND status = 'running'
                    AND updated_at >= ?3",
                 params![project_id, norm_inst, now - 45],

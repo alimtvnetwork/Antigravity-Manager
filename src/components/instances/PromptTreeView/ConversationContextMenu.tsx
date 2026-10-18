@@ -18,6 +18,9 @@ import {
     ListPlus,
     Pin,
     Trash2,
+    Info,
+    Image,
+    Download,
 } from 'lucide-react';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
@@ -34,6 +37,8 @@ import {
 } from './usePromptTreePromptActions';
 import { enqueuePrompt } from '../../../services/instanceService';
 import { cn } from '../../../utils/cn';
+import { DetailsModal } from './DetailsModal';
+import { copyPromptWithRichImages, writeNativeImageToClipboard } from './clipboard';
 
 export interface ConversationContextMenuProps {
     x: number;
@@ -43,6 +48,11 @@ export interface ConversationContextMenuProps {
     onClose: () => void;
     onRename?: () => void;
     onInspect: () => void;
+    onViewDetails?: () => void;
+    onCopyWithImages?: () => void;
+    onCopyWithoutImages?: () => void;
+    onCopyImageToClipboard?: () => void;
+    onExportConversation?: (convoId: string) => void;
     onResendPrompts?: (count: number | 'all') => void;
     onEnqueue?: () => void;
     onRerun?: () => void;
@@ -72,6 +82,11 @@ export function ConversationContextMenu({
     onClose,
     onRename,
     onInspect,
+    onViewDetails,
+    onCopyWithImages,
+    onCopyWithoutImages,
+    onCopyImageToClipboard,
+    onExportConversation,
     onResendPrompts,
     onEnqueue,
     onRerun,
@@ -95,6 +110,12 @@ export function ConversationContextMenu({
     const menuRef = useRef<HTMLDivElement>(null);
     const [isIdCopied, setIsIdCopied] = useState(false);
     const [isPromptCopied, setIsPromptCopied] = useState(false);
+    const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+    const [copiedField, setCopiedField] = useState<string | null>(null);
+    const [isCopyWithImagesDone, setIsCopyWithImagesDone] = useState(false);
+    const [isCopyWithoutImagesDone, setIsCopyWithoutImagesDone] = useState(false);
+    const [isCopyImageDone, setIsCopyImageDone] = useState(false);
+    const [isExportSubmenuOpen, setIsExportSubmenuOpen] = useState(false);
     const [isEnqueueing, setIsEnqueueing] = useState(false);
     const [isRerunning, setIsRerunning] = useState(false);
     const [isResendSubmenuOpen, setIsResendSubmenuOpen] = useState(false);
@@ -189,6 +210,7 @@ export function ConversationContextMenu({
 
         const handleClickOutside = (e: MouseEvent) => {
             if (Date.now() - mountTime < 100) return;
+            if (e.button === 2) return;
             if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
                 onClose();
             }
@@ -247,6 +269,130 @@ export function ConversationContextMenu({
                 }
             );
         }
+    };
+
+    const handleViewDetails = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onViewDetails) {
+            onViewDetails();
+            onClose();
+            return;
+        }
+        setIsDetailsModalOpen(true);
+    };
+
+    const handleCopyWithImages = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onCopyWithImages) {
+            onCopyWithImages();
+            setIsCopyWithImagesDone(true);
+            setTimeout(() => onClose(), 400);
+            return;
+        }
+        const textToCopy = conversationNode
+            ? (conversationNode.full_prompt_text || conversationNode.prompt_preview_200w || currentTitle)
+            : currentTitle;
+        if (!textToCopy) return;
+        try {
+            await copyPromptWithRichImages(textToCopy);
+            setIsCopyWithImagesDone(true);
+            setTimeout(() => onClose(), 400);
+        } catch (err) {
+            useErrorStore.getState().captureException(
+                err instanceof Error ? err : new Error(String(err)),
+                {
+                    source: 'ConversationContextMenu.handleCopyWithImages',
+                    triggerAction: 'copy_with_images',
+                }
+            );
+        }
+    };
+
+    const handleCopyWithoutImages = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onCopyWithoutImages) {
+            onCopyWithoutImages();
+            setIsCopyWithoutImagesDone(true);
+            setTimeout(() => onClose(), 400);
+            return;
+        }
+        const textToCopy = conversationNode
+            ? (conversationNode.full_prompt_text || conversationNode.prompt_preview_200w || currentTitle)
+            : currentTitle;
+        if (!textToCopy) return;
+        const textWithoutImages = textToCopy.replace(/!\[.*?\]\(.*?\)/g, '').trim();
+        try {
+            await copyToClipboard(textWithoutImages || textToCopy);
+            setIsCopyWithoutImagesDone(true);
+            setTimeout(() => onClose(), 400);
+        } catch (err) {
+            useErrorStore.getState().captureException(
+                err instanceof Error ? err : new Error(String(err)),
+                {
+                    source: 'ConversationContextMenu.handleCopyWithoutImages',
+                    triggerAction: 'copy_without_images',
+                }
+            );
+        }
+    };
+
+    const handleCopyImageToClipboard = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onCopyImageToClipboard) {
+            onCopyImageToClipboard();
+            setIsCopyImageDone(true);
+            setTimeout(() => onClose(), 400);
+            return;
+        }
+        let imageUri = '';
+        if (conversationNode?.prompts) {
+            for (const p of conversationNode.prompts) {
+                if (p.media_paths && p.media_paths.length > 0) {
+                    imageUri = p.media_paths[0];
+                    break;
+                }
+            }
+        }
+        if (!imageUri) {
+            const text = conversationNode
+                ? (conversationNode.full_prompt_text || conversationNode.prompt_preview_200w || '')
+                : '';
+            const match = /!\[.*?\]\((.*?)\)/.exec(text);
+            if (match && match[1]) {
+                imageUri = match[1];
+            }
+        }
+        if (!imageUri) {
+            useErrorStore.getState().trackWarning('No images found in conversation to copy', {
+                source: 'ConversationContextMenu.handleCopyImageToClipboard',
+                triggerAction: 'copy_image_to_clipboard',
+            });
+            onClose();
+            return;
+        }
+        try {
+            await writeNativeImageToClipboard(imageUri);
+            setIsCopyImageDone(true);
+            setTimeout(() => onClose(), 400);
+        } catch (err) {
+            useErrorStore.getState().captureException(
+                err instanceof Error ? err : new Error(String(err)),
+                {
+                    source: 'ConversationContextMenu.handleCopyImageToClipboard',
+                    triggerAction: 'copy_image_to_clipboard',
+                }
+            );
+        }
+    };
+
+    const handleExportConversation = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onExportConversation) {
+            onExportConversation(conversationId);
+            onClose();
+            return;
+        }
+        setIsExportSubmenuOpen((prev) => !prev);
     };
 
     const handleDoEnqueue = async (e: React.MouseEvent) => {
@@ -474,6 +620,26 @@ export function ConversationContextMenu({
         }
     };
 
+    if (isDetailsModalOpen) {
+        return (
+            <DetailsModal
+                isOpen={isDetailsModalOpen}
+                onClose={() => {
+                    setIsDetailsModalOpen(false);
+                    onClose();
+                }}
+                selectedConversation={conversationNode || null}
+                selectedProject={null}
+                copiedField={copiedField}
+                setCopiedField={setCopiedField}
+                instanceId={instanceId || conversationNode?.instance_id || 'default'}
+                instanceExeName={conversationNode?.instance_exe_name}
+                instanceNameDisplay={conversationNode?.instance_name}
+                instanceSeqNum={conversationNode?.instance_seq_num}
+            />
+        );
+    }
+
     return createPortal(
         <div
             ref={menuRef}
@@ -489,6 +655,20 @@ export function ConversationContextMenu({
             <div className="px-3 py-1 mb-1 border-b border-slate-100 dark:border-[#2b1b42] text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[240px] font-mono">
                 {currentTitle || conversationId.slice(0, 8)}
             </div>
+
+            {/* View Details Action */}
+            <button
+                type="button"
+                className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
+                onClick={handleViewDetails}
+                title="View full conversation details and parameters"
+            >
+                <div className="flex items-center gap-2.5">
+                    <Info className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <span className="font-medium">View Details</span>
+                </div>
+                <span className="text-[9px] font-mono text-blue-500 font-bold">Details</span>
+            </button>
 
             {/* Core Action 1: Inspect Transcript */}
             <button
@@ -665,6 +845,60 @@ export function ConversationContextMenu({
                 <span className="text-[9px] font-mono text-slate-400">UUID</span>
             </button>
 
+            {/* Copy (With Images) */}
+            <button
+                type="button"
+                className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-[#251b3a] cursor-pointer"
+                onClick={handleCopyWithImages}
+                title="Copy prompt text with rich embedded images to clipboard"
+            >
+                <div className="flex items-center gap-2.5">
+                    {isCopyWithImagesDone ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    ) : (
+                        <Copy className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                    )}
+                    <span>{isCopyWithImagesDone ? 'Copied Rich Content!' : 'Copy (With Images)'}</span>
+                </div>
+                <span className="text-[9px] font-mono text-indigo-400">Rich</span>
+            </button>
+
+            {/* Copy (Without Images) */}
+            <button
+                type="button"
+                className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-[#251b3a] cursor-pointer"
+                onClick={handleCopyWithoutImages}
+                title="Copy clean prompt text without embedded image tags"
+            >
+                <div className="flex items-center gap-2.5">
+                    {isCopyWithoutImagesDone ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    ) : (
+                        <Copy className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
+                    )}
+                    <span>{isCopyWithoutImagesDone ? 'Copied Plain Text!' : 'Copy (Without Images)'}</span>
+                </div>
+                <span className="text-[9px] font-mono text-slate-400">Plain</span>
+            </button>
+
+            {/* Copy Image to Clipboard */}
+            <button
+                type="button"
+                className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-[#251b3a] cursor-pointer"
+                onClick={handleCopyImageToClipboard}
+                title="Copy the first attached image to clipboard as native PNG"
+            >
+                <div className="flex items-center gap-2.5">
+                    {isCopyImageDone ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    ) : (
+                        <Image className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
+                    )}
+                    <span>{isCopyImageDone ? 'Copied Native PNG!' : 'Copy Image to Clipboard'}</span>
+                </div>
+                <span className="text-[9px] font-mono text-cyan-400">PNG</span>
+            </button>
+
             <div className="my-1 border-t border-slate-100 dark:border-[#2b1b42]" />
 
             {/* Pin / Unpin Conversation */}
@@ -753,6 +987,63 @@ export function ConversationContextMenu({
                     <span className="text-[9px] font-mono text-slate-400">Import</span>
                 </button>
             )}
+
+            {/* Export Conversation (All Formats Submenu / Trigger) */}
+            <div className="relative">
+                <button
+                    type="button"
+                    className="flex w-full items-center justify-between px-3 py-1 text-left transition-colors hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400 cursor-pointer"
+                    onClick={handleExportConversation}
+                    title="Export conversation in various formats"
+                >
+                    <div className="flex items-center gap-2.5">
+                        <Download className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <span className="font-medium">Export Conversation</span>
+                    </div>
+                    {isExportSubmenuOpen ? (
+                        <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                    ) : (
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                    )}
+                </button>
+                {isExportSubmenuOpen && (
+                    <div className="mx-2 my-1 pl-4 border-l-2 border-amber-500/30 space-y-0.5 animate-in fade-in duration-100">
+                        <button
+                            type="button"
+                            className="flex w-full items-center justify-between px-2 py-1 text-left rounded hover:bg-amber-500/10 text-[11px] cursor-pointer"
+                            onClick={handleDoExportJson}
+                        >
+                            <span className="flex items-center gap-1.5">
+                                <FileJson className="w-3 h-3 text-amber-500 shrink-0" />
+                                <span>Export as JSON</span>
+                            </span>
+                            <span className="text-[9px] font-mono text-slate-400">.json</span>
+                        </button>
+                        <button
+                            type="button"
+                            className="flex w-full items-center justify-between px-2 py-1 text-left rounded hover:bg-amber-500/10 text-[11px] cursor-pointer"
+                            onClick={() => void handleDoExportSqlite()}
+                        >
+                            <span className="flex items-center gap-1.5">
+                                <Database className="w-3 h-3 text-indigo-500 shrink-0" />
+                                <span>Export as SQLite .db</span>
+                            </span>
+                            <span className="text-[9px] font-mono text-slate-400">.db</span>
+                        </button>
+                        <button
+                            type="button"
+                            className="flex w-full items-center justify-between px-2 py-1 text-left rounded hover:bg-amber-500/10 text-[11px] cursor-pointer"
+                            onClick={handleDoExportYaml}
+                        >
+                            <span className="flex items-center gap-1.5">
+                                <FileText className="w-3 h-3 text-emerald-500 shrink-0" />
+                                <span>Export as YAML</span>
+                            </span>
+                            <span className="text-[9px] font-mono text-slate-400">.yaml</span>
+                        </button>
+                    </div>
+                )}
+            </div>
 
             <button
                 type="button"

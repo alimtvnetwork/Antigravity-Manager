@@ -34,6 +34,8 @@ export interface ModalHeaderProps {
     onResetTree: () => void;
     isTreeCollapsed?: boolean;
     onToggleTree?: () => void;
+    isAutoSyncing?: boolean;
+    isRefreshing?: boolean;
 }
 
 const SYNC_INTERVALS: { value: SyncInterval; label: string }[] = [
@@ -66,10 +68,12 @@ export function ModalHeader(props: ModalHeaderProps) {
         onResetTree,
         isTreeCollapsed,
         onToggleTree,
+        isAutoSyncing,
+        isRefreshing,
     } = props;
 
     return (
-        <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-[#40285e] px-4 py-2.5 bg-slate-50/80 dark:bg-[#090611] shrink-0">
+        <div className="relative z-40 flex items-center justify-between border-b border-slate-200/80 dark:border-[#40285e] px-4 py-2.5 bg-slate-50/80 dark:bg-[#090611] shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
                 <div className="flex h-8 w-8 items-center justify-center rounded-[5px] bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20 shrink-0">
                     <Layers className="h-4 w-4" />
@@ -134,7 +138,7 @@ export function ModalHeader(props: ModalHeaderProps) {
                         className="flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
                         title="Refresh all projects"
                     >
-                        <RefreshCw className={cn("w-3.5 h-3.5 text-blue-500", isLoading && "animate-spin")} />
+                        <RefreshCw className={cn("w-3.5 h-3.5 text-blue-500", (isLoading || isAutoSyncing || isRefreshing) && "animate-spin")} />
                         <span>Refresh</span>
                     </button>
 

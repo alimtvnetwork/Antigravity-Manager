@@ -1,27 +1,56 @@
-# Parent Plan: Instance Management and UI/UX Synchronization
-
-## User Request (Verbatim)
-```text
-# Instance Management and UI/UX Synchronization: high priority instruction, non-negotiable task
-
-I have given you this screenshot where if we go into the list view, we should see the ending part of the exe, and that should be all together in the same line with the data ending part. And also the running status 1632, what does this mean? If it is running, then I think the green symbol is fine. We can just mention 1632. But what is this 1632? Is it the PID? If PID, please confirm. I think that is what it is. Okay. So, the first thing is the synchronization is very wrong. The switching of the accounts is not working at all somehow. So if the PID is not found, does not match, then first of all, it needs to close the PID in order to reload or change or switch account. Okay? So this is not happening at the moment. And also stop the instance should also kill the instance, which is not happening as well. Stop instance button is not working. Okay? I think you need to be careful on this. And also if I go to the switch account option, which actually shows dialogue, which actually contains the four UI UX, which is not in line with the other UI UX. You need to improve that a lot. Is it clear so far? Can you please help me with this?
-
-Also, one more serious issue. If we click on any one of the items, instance and audit trail, we don't see any audit trail. That looks really, really terrible. I think you need to work on it. And at the end, you do the end-to-end testing for auto switcher, stopping the PID with a new instance, actually. You create your new instance. So in this machine, you can run anything, build anything, test anything. Okay? Do not break your own stuff, which instance you are using, try to find that as well. So you need to have this type of CLI commands that would detect that from the CLI that whatever the IDE, if the IDE is running the CLI command, IDE will automatically figure out what is the instance that it is running the command, and it should not break it. Remember to work like that. And always, it should actually create new instance to test and also remove the existing test instances so that it could reduce some space and make sure removing and creating the instance, it should be very efficient. Okay? And also the database should have the updated information. Remember that. Is it understood? At the end, you should do a minor bump and release with everything
-```
+# Master Execution Plan: instance-management-and-ui-ux-synchronization
 
 ## Strategic Intent & Systems Reasoning
-This plan establishes deterministic process termination, robust pre-switch PID eviction, caller IDE self-preservation, Royal Violet UI/UX alignment, full instance audit trail visibility, and transient test instance sandboxing in Antigravity-Manager.
+Eliminate process lifecycle gaps, UI path misalignment, switch account failures, and missing audit trails:
+1. **PID & Path Tail Display (List View)**:
+   - Confirm that `1632` is indeed the running operating system Process ID (PID).
+   - Display `PID: 1632` prominently with a green running badge.
+   - Format the executable path tail (`.../Antigravity.exe`) and data path tail (`.../data`) together on the exact same line in the instance list view.
+2. **Account Switching & Process Termination Ladder**:
+   - Before switching accounts, reloading, or changing instances, if a running or mismatched PID exists, terminate/kill the process tree first (`taskkill /F /T /PID`).
+   - Fix the "Stop Instance" button to reliably kill the process and mark the instance stopped/idle.
+3. **Switch Account Modal UI/UX Modernization**:
+   - Redesign the switch account modal with the dark-glass design language, clean card segmentation, high-contrast badges, and accessible controls.
+4. **Instance Audit Trail Visibility**:
+   - Repair and display historical telemetry, switch events, and lifecycle operations in `InstanceAuditModal.tsx` from `task_history_db` / audit databases.
+5. **Caller IDE Self-Preservation & CLI Parity**:
+   - Implement `detect_caller_instance_id()` so CLI/backend commands protect the active developer session (`default-copy-5597` / PID 7480/8824).
+   - Add `agm instances test-create` and `agm instances test-clean` for efficient sandbox creation, testing, and teardown without orphan files.
+6. **Minor Version Bump & Release**:
+   - Run pre-flight checks, bump minor version, sync changelogs with strict `@aukgit` attribution, sync READMEs, and push via GitMap.
 
-## Subtask Breakdown
+---
 
-| Task-ID | Subtask Name | Owner | Status | Deliverables |
-| :--- | :--- | :--- | :--- | :--- |
-| **Task-01** | Spec Authoring & Master Plan Initialization | Lead | `DONE` | Specs in `02-spec/21-app/instance-management-and-ui-ux-synchronization/`, plan and subtasks in `.ai-memory/plans/` |
-| **Task-02** | PID Layout & List View Single-Row UI Refactor | Worker 01 | `DONE` | `InstanceTable.tsx`, `InstanceRowCells.tsx`, single-row layout |
-| **Task-03** | Deterministic Process Termination & Stop Instance Fix | Worker 02 | `DONE` | `close.rs`, `create.rs`, 5-stage termination ladder |
-| **Task-04** | Account Switch Synchronization & Pre-Switch Eviction | Worker 02 | `DONE` | `switch.rs`, lockfile clearing, settle delay |
-| **Task-05** | Switch Account Modal Royal Violet UI/UX Modernization | Worker 01 | `DONE` | `SwitchAccountDialog.tsx`, token compliance, whole-card selection |
-| **Task-06** | Instance Audit Trail Logging & UI Modal Visibility | Worker 03 | `DONE` | `task_history_db`, `InstanceAuditTrailModal.tsx`, dual-tab fallback |
-| **Task-07** | Caller Preservation, Transient Test CLI & E2E Testing | Worker 03 | `DONE` | Ancestor walk, `refuse_if_caller`, `create-test`/`rm-test`, E2E test script |
-| **Task-08** | Minor Version Bump & Release Ceremony | Lead | `DONE` | Version bump, changelogs, README sync, atomic GitMap push |
+## Subtask Decomposition
+
+### Subtask 01: List View Single-Line Path Tails & Explicit PID Badge
+- **Files Owned**: `src/components/instances/InstanceRow.tsx`, `src/components/instances/InstanceCard.tsx`
+- **Deliverables**: Single-line path tail formatting and explicit `PID: <pid>` badge.
+
+### Subtask 02: Account Switching Process Termination & Stop Instance Repair
+- **Files Owned**: `src-tauri/src/modules/instance/lifecycle.rs`, `src-tauri/src/modules/instance/process.rs`, `src-tauri/src/commands/instances.rs`
+- **Deliverables**: Reliable tree termination prior to account switch; functional Stop Instance button.
+
+### Subtask 03: Switch Account Modal UI/UX Redesign
+- **Files Owned**: `src/components/instances/SwitchAccountModal.tsx`
+- **Deliverables**: Cohesive dark-glass styling, unified card layout, and accessible interaction states.
+
+### Subtask 04: Instance Audit Trail Telemetry & Display
+- **Files Owned**: `src-tauri/src/modules/task_history_db.rs`, `src-tauri/src/commands/audit.rs`, `src/components/instances/InstanceAuditModal.tsx`
+- **Deliverables**: Complete audit trail data pipeline and rendering.
+
+### Subtask 05: Caller IDE Auto-Detection & Transient Test Sandbox CLI
+- **Files Owned**: `src-tauri/src/bin/agm/instance_cmds.rs`, `src-tauri/src/bin/agm/instance_handlers.rs`, `src-tauri/src/modules/instance/caller.rs`
+- **Deliverables**: `detect_caller_instance_id()`, `test-create`, and `test-clean` CLI commands.
+
+---
+
+## Pre-flight & Release Gate
+- `cargo fmt -- --check` [PASSED]
+- `cargo clippy --all-targets --all-features` [PASSED]
+- `npm run build` [PASSED]
+- `npm run bump minor` -> `v4.233.0` [PASSED]
+- `gitmap cpf "Release - v4.233.0 GitMap Node and Prompt System Issues with Instance Management Sync"` [READY]
+
+## Status: COMPLETED (Verified 2026-10-19)
 

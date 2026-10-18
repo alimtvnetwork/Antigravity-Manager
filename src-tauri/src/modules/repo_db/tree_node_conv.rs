@@ -12,6 +12,46 @@ use super::state::get_active_agy_workers;
 use super::text_utils::extract_smart_prompt_summary;
 use rusqlite::Connection;
 
+pub(crate) fn resolve_instance_meta(
+    instance_id: &str,
+    registry: &crate::models::instance::InstanceRegistry,
+) -> (Option<u32>, String, String) {
+    if instance_id == "default" || instance_id == "__default__" {
+        (
+            Some(1),
+            "default".to_string(),
+            crate::modules::instance::resolve_instance_exe_name("default", None),
+        )
+    } else if let Some((idx, inst)) = registry
+        .instances
+        .iter()
+        .enumerate()
+        .find(|(_, i)| i.id == instance_id || i.name == instance_id)
+    {
+        let seq = inst.seq_num.or_else(|| {
+            if inst.is_default || inst.id == "default" || inst.id == "__default__" {
+                Some(1)
+            } else {
+                Some((idx as u32) + 1)
+            }
+        });
+        (
+            seq,
+            inst.name.clone(),
+            crate::modules::instance::resolve_instance_exe_name(
+                &inst.id,
+                inst.executable_path.as_deref(),
+            ),
+        )
+    } else {
+        (
+            None,
+            instance_id.to_string(),
+            crate::modules::instance::resolve_instance_exe_name(instance_id, None),
+        )
+    }
+}
+
 pub(crate) fn build_transcript_conv_nodes(
     ctx: &super::tree_nodes::TreeNodeCtx,
     proj: &RunningProject,
@@ -27,10 +67,8 @@ pub(crate) fn build_transcript_conv_nodes(
     let conn_opt = ctx.conn_opt;
     let registry = ctx.registry;
     // Instance identity for the current project (used when conv_inst_id matches proj.instance_id)
-    let instance_seq_num: Option<u32> = None;
-    let instance_name: String = proj.instance_id.clone();
-    let instance_exe_name: String =
-        crate::modules::instance::resolve_instance_exe_name(&proj.instance_id, None);
+    let (instance_seq_num, instance_name, instance_exe_name) =
+        resolve_instance_meta(&proj.instance_id, registry);
     if let Some(raw_convs) =
         convs_by_inst_and_path.get(&(norm_proj_inst.to_string(), norm_path.to_string()))
     {
@@ -73,31 +111,8 @@ pub(crate) fn build_transcript_conv_nodes(
                     instance_name.clone(),
                     instance_exe_name.clone(),
                 )
-            } else if item.conv_inst_id == "default" || item.conv_inst_id == "__default__" {
-                (
-                    Some(1),
-                    "default".to_string(),
-                    crate::modules::instance::resolve_instance_exe_name("default", None),
-                )
-            } else if let Some(inst) = registry
-                .instances
-                .iter()
-                .find(|i| i.id == item.conv_inst_id || i.name == item.conv_inst_id)
-            {
-                (
-                    inst.seq_num,
-                    inst.name.clone(),
-                    crate::modules::instance::resolve_instance_exe_name(
-                        &inst.id,
-                        inst.executable_path.as_deref(),
-                    ),
-                )
             } else {
-                (
-                    None,
-                    item.conv_inst_id.clone(),
-                    crate::modules::instance::resolve_instance_exe_name(&item.conv_inst_id, None),
-                )
+                resolve_instance_meta(&item.conv_inst_id, registry)
             };
 
             let is_item_running = CascadeRunStatusType::from_status_str(&item.status).is_running();
@@ -168,10 +183,8 @@ pub(crate) fn build_active_prompt_conv_nodes(
     let conn_opt = ctx.conn_opt;
     let registry = ctx.registry;
     let now = ctx.now;
-    let instance_seq_num: Option<u32> = None;
-    let instance_name: String = proj.instance_id.clone();
-    let instance_exe_name: String =
-        crate::modules::instance::resolve_instance_exe_name(&proj.instance_id, None);
+    let (instance_seq_num, instance_name, instance_exe_name) =
+        resolve_instance_meta(&proj.instance_id, registry);
     if let Some(aps) =
         active_prompts_by_inst_and_path.get(&(norm_proj_inst.to_string(), norm_path.to_string()))
     {
@@ -187,7 +200,9 @@ pub(crate) fn build_active_prompt_conv_nodes(
                 {
                     let is_queued =
                         ap_status_lower.contains("queue") || ap_status_lower.contains("pending");
+                    let is_fresh = (now - ap.updated_at) <= 600;
                     let is_ap_run = is_inst_alive
+                        && is_fresh
                         && (ap_status_lower.contains("running")
                             || ap_status_lower.contains("dispatched")
                             || ap_status_lower.contains("in_flight"));
@@ -207,7 +222,7 @@ pub(crate) fn build_active_prompt_conv_nodes(
                             "COMPLETED".to_string()
                         },
                         is_running: is_ap_run,
-                        is_queued: true,
+                        is_queued,
                         timestamp: chrono::DateTime::from_timestamp(ap.updated_at, 0)
                             .map(|dt| dt.to_rfc3339())
                             .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
@@ -216,11 +231,13 @@ pub(crate) fn build_active_prompt_conv_nodes(
                         media_thumbnails: Vec::new(),
                     };
                     target_conv.prompts.push(ap_turn);
-                    target_conv.is_queued = true;
+                    if is_queued {
+                        target_conv.is_queued = true;
+                    }
                     if is_ap_run {
                         target_conv.is_running = true;
                         target_conv.status = "RUNNING".to_string();
-                    } else if !target_conv.is_running {
+                    } else if is_queued && !target_conv.is_running {
                         target_conv.status = "QUEUED".to_string();
                     }
                 }
@@ -347,31 +364,8 @@ pub(crate) fn build_active_prompt_conv_nodes(
                     instance_name.clone(),
                     instance_exe_name.clone(),
                 )
-            } else if ap.instance_id == "default" || ap.instance_id == "__default__" {
-                (
-                    Some(1),
-                    "default".to_string(),
-                    crate::modules::instance::resolve_instance_exe_name("default", None),
-                )
-            } else if let Some(inst) = registry
-                .instances
-                .iter()
-                .find(|i| i.id == ap.instance_id || i.name == ap.instance_id)
-            {
-                (
-                    inst.seq_num,
-                    inst.name.clone(),
-                    crate::modules::instance::resolve_instance_exe_name(
-                        &inst.id,
-                        inst.executable_path.as_deref(),
-                    ),
-                )
             } else {
-                (
-                    None,
-                    ap.instance_id.clone(),
-                    crate::modules::instance::resolve_instance_exe_name(&ap.instance_id, None),
-                )
+                resolve_instance_meta(&ap.instance_id, registry)
             };
 
             let ap_category = {

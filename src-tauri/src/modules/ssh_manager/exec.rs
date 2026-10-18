@@ -1,14 +1,51 @@
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
-use std::collections::HashSet;
+use once_cell::sync::Lazy;
+use std::collections::{HashMap, HashSet};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::RwLock;
 use std::time::{Duration, Instant};
 
 use super::*;
 
-/// Check TCP port liveness for a host/IP with 1500ms minimum timeout and 2-stage retry ladder
+/// Thread-safe 10-second TTL liveness cache for SSH nodes, allowing offline nodes to fast-fail in <10ms
+pub static SSH_LIVENESS_CACHE: Lazy<RwLock<HashMap<String, (bool, Instant)>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
+/// Invalidate cached SSH liveness for a specific host or all nodes
+pub fn invalidate_ssh_liveness_cache(host: Option<&str>, port: Option<u16>) {
+    if let Ok(mut cache) = SSH_LIVENESS_CACHE.write() {
+        if let Some(h) = host {
+            let p = port.unwrap_or(22);
+            cache.remove(&format!("{}:{}", h.trim(), p));
+            for &(alias, ip, _, _) in GITMAP_CLUSTER_NODES {
+                if h.eq_ignore_ascii_case(alias) {
+                    cache.remove(&format!("{}:{}", ip, p));
+                } else if h == ip {
+                    cache.remove(&format!("{}:{}", alias, p));
+                }
+            }
+        } else {
+            cache.clear();
+        }
+    }
+}
+
+/// Check TCP port liveness for a host/IP with 10s TTL cache, 1500ms minimum timeout and 2-stage retry ladder
 pub fn check_tcp_liveness(host: &str, port: u16, timeout_ms: u64) -> bool {
+    let clean_host = host.trim();
+    let cache_key = format!("{}:{}", clean_host, port);
+
+    // Fast-fail check from 10s TTL cache (<10ms)
+    if let Ok(cache) = SSH_LIVENESS_CACHE.read() {
+        if let Some(&(is_alive, timestamp)) = cache.get(&cache_key) {
+            if timestamp.elapsed() < Duration::from_secs(10) {
+                return is_alive;
+            }
+        }
+    }
+
     let effective_timeout = if timeout_ms == 0 {
         1500
     } else {
@@ -16,12 +53,14 @@ pub fn check_tcp_liveness(host: &str, port: u16, timeout_ms: u64) -> bool {
     };
     let duration = Duration::from_millis(effective_timeout);
 
+    let mut is_connected = false;
+
     for attempt in 0..2 {
         if attempt > 0 {
             std::thread::sleep(Duration::from_millis(100));
         }
 
-        let addr_str = format!("{}:{}", host.trim(), port);
+        let addr_str = format!("{}:{}", clean_host, port);
         let mut connected = false;
 
         if let Ok(mut addrs) = addr_str.to_socket_addrs() {
@@ -36,11 +75,30 @@ pub fn check_tcp_liveness(host: &str, port: u16, timeout_ms: u64) -> bool {
         }
 
         if connected {
-            return true;
+            is_connected = true;
+            break;
         }
     }
 
-    false
+    // Populate 10s TTL cache with result
+    if let Ok(mut cache) = SSH_LIVENESS_CACHE.write() {
+        cache.insert(cache_key, (is_connected, Instant::now()));
+        // If this host is in GITMAP_CLUSTER_NODES, also populate its counterpart (alias or IP)
+        for &(alias, ip, _, _) in GITMAP_CLUSTER_NODES {
+            if clean_host.eq_ignore_ascii_case(alias) {
+                cache.insert(format!("{}:{}", ip, port), (is_connected, Instant::now()));
+                break;
+            } else if clean_host == ip {
+                cache.insert(
+                    format!("{}:{}", alias, port),
+                    (is_connected, Instant::now()),
+                );
+                break;
+            }
+        }
+    }
+
+    is_connected
 }
 
 /// Canonical GitMap cluster node descriptors (alias, ip, default_user, os)
@@ -231,7 +289,9 @@ pub(crate) fn build_ssh_args_for_node(
         "-o".to_string(),
         "StrictHostKeyChecking=accept-new".to_string(),
         "-o".to_string(),
-        "ConnectTimeout=6".to_string(),
+        "PubkeyAcceptedKeyTypes=+ssh-rsa".to_string(),
+        "-o".to_string(),
+        "ConnectTimeout=3".to_string(),
     ];
     if batch_mode {
         args.push("-o".to_string());
@@ -303,26 +363,34 @@ pub fn exec_ssh_command(
 
                     if !is_tcp_online {
                         // Forward/fallback to gitmap ssh exec directly before declaring unreachable
-                        if let Ok((gm_code, gm_out, gm_err)) =
-                            exec_via_gitmap_ssh(&node.alias, &cmd_str)
+                        let candidate_targets = if node.alias.eq_ignore_ascii_case(&node.ip_address)
                         {
-                            let is_gm_success = gm_code == 0
-                                && !gm_out.contains("machine is off")
-                                && !gm_out.contains("All target machines are currently off")
-                                && !gm_out.to_lowercase().contains("connection timed out");
-                            if is_gm_success {
-                                return SshExecNodeResult {
-                                    alias: node.alias.clone(),
-                                    target: format!("{}@{}", node.username, node.ip_address),
-                                    ip_address: node.ip_address.clone(),
-                                    username: node.username.clone(),
-                                    port,
-                                    exit_code: 0,
-                                    stdout: gm_out,
-                                    stderr: gm_err,
-                                    duration_ms: start.elapsed().as_millis(),
-                                    success: true,
-                                };
+                            vec![node.alias.as_str()]
+                        } else {
+                            vec![node.alias.as_str(), node.ip_address.as_str()]
+                        };
+                        for target_id in &candidate_targets {
+                            if let Ok((gm_code, gm_out, gm_err)) =
+                                exec_via_gitmap_ssh(target_id, &cmd_str)
+                            {
+                                let is_gm_success = gm_code == 0
+                                    && !gm_out.contains("machine is off")
+                                    && !gm_out.contains("All target machines are currently off")
+                                    && !gm_out.to_lowercase().contains("connection timed out");
+                                if is_gm_success {
+                                    return SshExecNodeResult {
+                                        alias: node.alias.clone(),
+                                        target: format!("{}@{}", node.username, node.ip_address),
+                                        ip_address: node.ip_address.clone(),
+                                        username: node.username.clone(),
+                                        port,
+                                        exit_code: 0,
+                                        stdout: gm_out,
+                                        stderr: gm_err,
+                                        duration_ms: start.elapsed().as_millis(),
+                                        success: true,
+                                    };
+                                }
                             }
                         }
 
@@ -367,39 +435,53 @@ pub fn exec_ssh_command(
                                     || is_w2);
 
                             if is_auth_failure {
-                                // Stage 2: GitMap in-process Go SSH execution fallback
-                                if let Ok((gm_code, gm_out, gm_err)) =
-                                    exec_via_gitmap_ssh(&node.alias, &cmd_str)
-                                {
-                                    let is_gm_success = gm_code == 0
-                                        && !gm_out.contains("machine is off")
-                                        && !gm_out
-                                            .contains("All target machines are currently off")
-                                        && !gm_out.to_lowercase().contains("connection timed out");
-                                    if is_gm_success {
-                                        return SshExecNodeResult {
-                                            alias: node.alias.clone(),
-                                            target: format!(
-                                                "{}@{}",
-                                                node.username, node.ip_address
-                                            ),
-                                            ip_address: node.ip_address.clone(),
-                                            username: node.username.clone(),
-                                            port,
-                                            exit_code: 0,
-                                            stdout: gm_out,
-                                            stderr: gm_err,
-                                            duration_ms: start.elapsed().as_millis(),
-                                            success: true,
-                                        };
-                                    }
+                                // Fallback execution branch to delegate to GitMap:
+                                // gitmap ssh exec <node_alias_or_ip> "<command>"
+                                let candidate_targets =
+                                    if node.alias.eq_ignore_ascii_case(&node.ip_address) {
+                                        vec![node.alias.as_str()]
+                                    } else {
+                                        vec![node.alias.as_str(), node.ip_address.as_str()]
+                                    };
 
-                                    // Stage 3: Auto-repair via GitMap fix-auth if target is authorized via password vault
-                                    if let Ok(fix_msg) = fix_node_auth_via_gitmap(&node.alias) {
+                                for target_id in &candidate_targets {
+                                    if let Ok((gm_code, gm_out, gm_err)) =
+                                        exec_via_gitmap_ssh(target_id, &cmd_str)
+                                    {
+                                        let is_gm_success = gm_code == 0
+                                            && !gm_out.contains("machine is off")
+                                            && !gm_out
+                                                .contains("All target machines are currently off")
+                                            && !gm_out
+                                                .to_lowercase()
+                                                .contains("connection timed out");
+                                        if is_gm_success {
+                                            return SshExecNodeResult {
+                                                alias: node.alias.clone(),
+                                                target: format!(
+                                                    "{}@{}",
+                                                    node.username, node.ip_address
+                                                ),
+                                                ip_address: node.ip_address.clone(),
+                                                username: node.username.clone(),
+                                                port,
+                                                exit_code: 0,
+                                                stdout: gm_out,
+                                                stderr: gm_err,
+                                                duration_ms: start.elapsed().as_millis(),
+                                                success: true,
+                                            };
+                                        }
+                                    }
+                                }
+
+                                // Stage 3: Auto-repair via GitMap fix-auth if target is authorized via password vault
+                                for target_id in &candidate_targets {
+                                    if let Ok(fix_msg) = fix_node_auth_via_gitmap(target_id, None) {
                                         tracing::info!(
                                             target: "ssh_manager",
                                             "Auto-repaired auth via GitMap for {}: {}",
-                                            node.alias,
+                                            target_id,
                                             fix_msg
                                         );
                                         // Retry native OpenSSH once after key deployment
@@ -438,7 +520,7 @@ pub fn exec_ssh_command(
 
                                         // If native retry failed, retry gitmap ssh exec once more after key fix
                                         if let Ok((r_gm_code, r_gm_out, r_gm_err)) =
-                                            exec_via_gitmap_ssh(&node.alias, &cmd_str)
+                                            exec_via_gitmap_ssh(target_id, &cmd_str)
                                         {
                                             let is_retry_gm_success = r_gm_code == 0
                                                 && !r_gm_out.contains("machine is off")
@@ -463,6 +545,7 @@ pub fn exec_ssh_command(
                                                 };
                                             }
                                         }
+                                        break;
                                     }
                                 }
                             }
@@ -481,24 +564,35 @@ pub fn exec_ssh_command(
                             }
                         }
                         Err(e) => {
-                            if let Ok((gm_code, gm_out, gm_err)) =
-                                exec_via_gitmap_ssh(&node.alias, &cmd_str)
-                            {
-                                let is_gm_success =
-                                    gm_code == 0 && !gm_out.contains("machine is off");
-                                if is_gm_success {
-                                    return SshExecNodeResult {
-                                        alias: node.alias.clone(),
-                                        target: format!("{}@{}", node.username, node.ip_address),
-                                        ip_address: node.ip_address.clone(),
-                                        username: node.username.clone(),
-                                        port,
-                                        exit_code: 0,
-                                        stdout: gm_out,
-                                        stderr: gm_err,
-                                        duration_ms: start.elapsed().as_millis(),
-                                        success: true,
-                                    };
+                            let candidate_targets =
+                                if node.alias.eq_ignore_ascii_case(&node.ip_address) {
+                                    vec![node.alias.as_str()]
+                                } else {
+                                    vec![node.alias.as_str(), node.ip_address.as_str()]
+                                };
+                            for target_id in &candidate_targets {
+                                if let Ok((gm_code, gm_out, gm_err)) =
+                                    exec_via_gitmap_ssh(target_id, &cmd_str)
+                                {
+                                    let is_gm_success =
+                                        gm_code == 0 && !gm_out.contains("machine is off");
+                                    if is_gm_success {
+                                        return SshExecNodeResult {
+                                            alias: node.alias.clone(),
+                                            target: format!(
+                                                "{}@{}",
+                                                node.username, node.ip_address
+                                            ),
+                                            ip_address: node.ip_address.clone(),
+                                            username: node.username.clone(),
+                                            port,
+                                            exit_code: 0,
+                                            stdout: gm_out,
+                                            stderr: gm_err,
+                                            duration_ms: start.elapsed().as_millis(),
+                                            success: true,
+                                        };
+                                    }
                                 }
                             }
                             SshExecNodeResult {
@@ -526,7 +620,7 @@ pub fn exec_ssh_command(
 }
 
 /// Invoke `gitmap ssh fix-auth <target>` to automatically deploy keys using vaulted password credentials
-pub fn fix_node_auth_via_gitmap(target: &str) -> Result<String, String> {
+pub fn fix_node_auth_via_gitmap(target: &str, pubkey_path: Option<&str>) -> Result<String, String> {
     let gitmap_bin = resolve_gitmap_bin()
         .ok_or_else(|| "GitMap CLI is not installed or detected in PATH".to_string())?;
 
@@ -538,6 +632,9 @@ pub fn fix_node_auth_via_gitmap(target: &str) -> Result<String, String> {
     }
 
     cmd.args(["ssh", "fix-auth", target.trim()]);
+    if let Some(pk) = pubkey_path.map(str::trim).filter(|s| !s.is_empty()) {
+        cmd.args(["-i", pk]);
+    }
     let out = cmd
         .output()
         .map_err(|e| format!("Failed to spawn gitmap ssh fix-auth: {}", e))?;
@@ -893,80 +990,194 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
                         return node_items;
                     }
 
-                    // Node reachable: query real instances via SSH
+                    // Node reachable: query real instances via SSH with gitmap fallback
                     let remote_cmd = vec![
                         "agm".to_string(),
                         "instances".to_string(),
                         "list".to_string(),
                         "--json".to_string(),
                     ];
-                    let exec_res =
-                        exec_ssh_command(&conn.alias, &remote_cmd, Some(port), None, None);
-                    if let Ok(res_list) = exec_res {
+                    let mut raw_stdout = String::new();
+                    if let Ok(res_list) =
+                        exec_ssh_command(&conn.alias, &remote_cmd, Some(port), None, None)
+                    {
                         if let Some(res) = res_list
                             .first()
                             .filter(|r| r.success && !r.stdout.is_empty())
                         {
-                            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&res.stdout)
+                            raw_stdout = res.stdout.clone();
+                        }
+                    }
+                    if raw_stdout.is_empty() {
+                        let candidate_targets = if conn.alias.eq_ignore_ascii_case(&conn.ip_address)
+                        {
+                            vec![conn.alias.as_str()]
+                        } else {
+                            vec![conn.alias.as_str(), conn.ip_address.as_str()]
+                        };
+                        for target_id in candidate_targets {
+                            if let Ok((code, gm_out, _)) =
+                                exec_via_gitmap_ssh(target_id, "agm instances list --json")
                             {
-                                let raw_instances = val
-                                    .get("data")
-                                    .and_then(|d| d.as_array())
-                                    .or_else(|| val.as_array());
-                                if let Some(inst_array) = raw_instances {
-                                    for inst_val in inst_array {
-                                        let inst_id = inst_val
-                                            .get("id")
-                                            .and_then(|v| v.as_str())
-                                            .unwrap_or("default")
-                                            .to_string();
-                                        let inst_name = inst_val
-                                            .get("name")
-                                            .and_then(|v| v.as_str())
-                                            .unwrap_or(&inst_id)
-                                            .to_string();
-                                        let is_running = inst_val
-                                            .get("is_running")
-                                            .and_then(|v| v.as_bool())
-                                            .unwrap_or(false);
-                                        let raw_email = inst_val
-                                            .get("bound_email")
-                                            .and_then(|v| v.as_str())
-                                            .unwrap_or("")
-                                            .to_string();
-                                        let clean_email = if raw_email.is_empty()
-                                            || raw_email.contains("Administrator")
-                                            || raw_email.contains("root")
-                                            || raw_email.contains("${adminUser}")
-                                            || raw_email.contains("${linuxUser}")
-                                        {
-                                            "(unbound)".to_string()
-                                        } else {
-                                            raw_email
-                                        };
+                                if code == 0 && !gm_out.is_empty() {
+                                    raw_stdout = gm_out;
+                                    break;
+                                }
+                            }
+                        }
+                    }
 
-                                        node_items.push(ClusterInstanceBalanceItem {
-                                            machine_alias: conn.alias.clone(),
-                                            machine_ip: conn.ip_address.clone(),
-                                            ip_address: Some(conn.ip_address.clone()),
-                                            error_message: None,
-                                            latency_ms: Some(elapsed_ms),
-                                            is_local: false,
-                                            instance_id: inst_id,
-                                            instance_name: inst_name,
-                                            running: is_running,
-                                            bound_email: clean_email,
-                                            tier: "PRO".to_string(),
-                                            quota_4h_pct: 100.0,
-                                            quota_weekly_pct: 100.0,
-                                            active_model: target_model.clone(),
-                                            status_label: if is_running {
-                                                "running".to_string()
-                                            } else {
-                                                "idle".to_string()
-                                            },
-                                        });
+                    // Query remote accounts to extract real quota balances
+                    let mut remote_accounts_json = String::new();
+                    let acc_cmd = vec![
+                        "agm".to_string(),
+                        "accounts".to_string(),
+                        "list".to_string(),
+                        "--json".to_string(),
+                    ];
+                    if let Ok(res_list) =
+                        exec_ssh_command(&conn.alias, &acc_cmd, Some(port), None, None)
+                    {
+                        if let Some(res) = res_list
+                            .first()
+                            .filter(|r| r.success && !r.stdout.is_empty())
+                        {
+                            remote_accounts_json = res.stdout.clone();
+                        }
+                    }
+                    if remote_accounts_json.is_empty() {
+                        let candidate_targets = if conn.alias.eq_ignore_ascii_case(&conn.ip_address)
+                        {
+                            vec![conn.alias.as_str()]
+                        } else {
+                            vec![conn.alias.as_str(), conn.ip_address.as_str()]
+                        };
+                        for target_id in candidate_targets {
+                            if let Ok((code, gm_acc_out, _)) =
+                                exec_via_gitmap_ssh(target_id, "agm accounts list --json")
+                            {
+                                if code == 0 && !gm_acc_out.is_empty() {
+                                    remote_accounts_json = gm_acc_out;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if !raw_stdout.is_empty() {
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&raw_stdout) {
+                            let raw_instances = val
+                                .get("data")
+                                .and_then(|d| d.as_array())
+                                .or_else(|| val.as_array());
+                            if let Some(inst_array) = raw_instances {
+                                let remote_accs_val = serde_json::from_str::<serde_json::Value>(
+                                    &remote_accounts_json,
+                                )
+                                .ok();
+                                let remote_accs_array = remote_accs_val
+                                    .as_ref()
+                                    .and_then(|v| v.get("data").or(Some(v)))
+                                    .and_then(|v| v.as_array());
+
+                                for inst_val in inst_array {
+                                    let inst_id = inst_val
+                                        .get("id")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("default")
+                                        .to_string();
+                                    let inst_name = inst_val
+                                        .get("name")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or(&inst_id)
+                                        .to_string();
+                                    let is_running = inst_val
+                                        .get("is_running")
+                                        .and_then(|v| v.as_bool())
+                                        .unwrap_or(false);
+                                    let raw_email = inst_val
+                                        .get("bound_email")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("")
+                                        .to_string();
+                                    let clean_email = if raw_email.is_empty()
+                                        || raw_email.contains("Administrator")
+                                        || raw_email.contains("root")
+                                        || raw_email.contains("${adminUser}")
+                                        || raw_email.contains("${linuxUser}")
+                                    {
+                                        "(unbound)".to_string()
+                                    } else {
+                                        raw_email
+                                    };
+
+                                    let mut tier = "PRO".to_string();
+                                    let mut q_4h = 0.0;
+                                    let mut q_wk = 0.0;
+                                    let mut has_verified_quota = false;
+
+                                    if let Some(acc_array) = remote_accs_array {
+                                        for acc in acc_array {
+                                            let acc_email = acc
+                                                .get("email")
+                                                .and_then(|v| v.as_str())
+                                                .unwrap_or("");
+                                            if !clean_email.is_empty()
+                                                && clean_email != "(unbound)"
+                                                && acc_email.eq_ignore_ascii_case(&clean_email)
+                                            {
+                                                if let Some(t) = acc
+                                                    .get("quota")
+                                                    .and_then(|q| q.get("subscription_tier"))
+                                                    .and_then(|v| v.as_str())
+                                                {
+                                                    tier = t.to_string();
+                                                }
+                                                if let Some(pct4) =
+                                                    acc.get("quota_4h_pct").and_then(|v| v.as_f64())
+                                                {
+                                                    q_4h = pct4;
+                                                    has_verified_quota = true;
+                                                }
+                                                if let Some(pctw) = acc
+                                                    .get("quota_weekly_pct")
+                                                    .and_then(|v| v.as_f64())
+                                                {
+                                                    q_wk = pctw;
+                                                    has_verified_quota = true;
+                                                }
+                                                break;
+                                            }
+                                        }
                                     }
+
+                                    let status_label = if is_running {
+                                        if has_verified_quota {
+                                            "running".to_string()
+                                        } else {
+                                            "running (unverified-quota)".to_string()
+                                        }
+                                    } else {
+                                        "idle".to_string()
+                                    };
+
+                                    node_items.push(ClusterInstanceBalanceItem {
+                                        machine_alias: conn.alias.clone(),
+                                        machine_ip: conn.ip_address.clone(),
+                                        ip_address: Some(conn.ip_address.clone()),
+                                        error_message: None,
+                                        latency_ms: Some(elapsed_ms),
+                                        is_local: false,
+                                        instance_id: inst_id,
+                                        instance_name: inst_name,
+                                        running: is_running,
+                                        bound_email: clean_email,
+                                        tier,
+                                        quota_4h_pct: q_4h,
+                                        quota_weekly_pct: q_wk,
+                                        active_model: target_model.clone(),
+                                        status_label,
+                                    });
                                 }
                             }
                         }
@@ -982,13 +1193,13 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
                             is_local: false,
                             instance_id: "default".to_string(),
                             instance_name: format!("{}:default", conn.alias),
-                            running: true,
+                            running: false,
                             bound_email: "(unbound)".to_string(),
                             tier: "SSH-NODE".to_string(),
-                            quota_4h_pct: 100.0,
-                            quota_weekly_pct: 100.0,
+                            quota_4h_pct: 0.0,
+                            quota_weekly_pct: 0.0,
                             active_model: target_model.clone(),
-                            status_label: "reachable".to_string(),
+                            status_label: "unverified-balance".to_string(),
                         });
                     }
 

@@ -171,6 +171,7 @@ export function useInstancePage(): InstancePageApi {
         fetchDaemonTelemetry();
         const performThrottledPoll = async () => {
             if (isFetchingRef.current) return;
+            if (typeof document !== 'undefined' && document.hidden) return;
             isFetchingRef.current = true;
             try {
                 await Promise.all([
@@ -190,7 +191,7 @@ export function useInstancePage(): InstancePageApi {
 
         const timer = setInterval(() => {
             performThrottledPoll();
-        }, 15000);
+        }, 60000);
 
         let unlistenList: (() => void)[] = [];
         import('@tauri-apps/api/event').then(({ listen }) => {

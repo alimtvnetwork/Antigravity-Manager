@@ -21,6 +21,13 @@ pub async fn release_lease(account_id: &str) -> Result<(), AppError> {
 
 /// Retrieve all currently active leases across all nodes
 pub async fn list_active_leases() -> Result<Vec<WorkspaceLease>, AppError> {
+    if supabase_sync::is_supabase_circuit_open() {
+        if let Ok(cache) = ACTIVE_REMOTE_LEASES.read() {
+            return Ok(cache.values().cloned().collect());
+        }
+        return Ok(Vec::new());
+    }
+
     let config = supabase_sync::load_config()?;
     let client = match get_root_client(&config) {
         Some(c) => c,
@@ -33,7 +40,16 @@ pub async fn list_active_leases() -> Result<Vec<WorkspaceLease>, AppError> {
         now,
         now - 7200
     );
-    let resp = client.select("workspace_leases", &query).await?;
+    let resp = match client.select("workspace_leases", &query).await {
+        Ok(r) => r,
+        Err(e) => {
+            supabase_sync::record_supabase_network_error();
+            if let Ok(cache) = ACTIVE_REMOTE_LEASES.read() {
+                return Ok(cache.values().cloned().collect());
+            }
+            return Err(e);
+        }
+    };
 
     let leases: Vec<WorkspaceLease> = serde_json::from_value(resp).unwrap_or_default();
     if let Ok(mut cache) = ACTIVE_REMOTE_LEASES.write() {

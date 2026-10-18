@@ -19,9 +19,9 @@ pub(crate) fn transition_stale_inflight_prompts(now: i64) {
             conn.execute(
                 "UPDATE active_prompts
              SET status = 'completed', updated_at = ?1
-             WHERE status IN ('running', 'in_flight', 'dispatched')
-               AND (?1 - updated_at > 600)",
-                rusqlite::params![now],
+             WHERE (status IN ('running', 'in_flight') AND updated_at < ?2)
+                OR (status = 'dispatched' AND updated_at < ?3)",
+                rusqlite::params![now, now - 600, now - 120],
             ),
             "transition stale in-flight prompts to completed",
         );
@@ -212,7 +212,7 @@ pub(crate) fn discover_fallback_projects(
     // are written by the IDE, synthesize RunningProject entries to guarantee that
     // the left-hand panel is NEVER empty.
     if let Ok(conn) = connect_db() {
-        let active_sql = "SELECT instance_id, repo_path, status, updated_at \
+        let active_sql = "SELECT project_id, instance_id, repo_path, status, updated_at \
                           FROM active_prompts \
                           WHERE status IN ('running', 'in_flight', 'dispatched', 'queued') \
                           ORDER BY created_at ASC, id ASC";
@@ -223,27 +223,36 @@ pub(crate) fn discover_fallback_projects(
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
                     row.get::<_, String>(2)?,
-                    row.get::<_, i64>(3)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, i64>(4)?,
                 ))
             }) {
                 for item in rows.flatten() {
-                    let (raw_inst, raw_repo_path, status, updated_at) = item;
+                    let (raw_proj_id, raw_inst, raw_repo_path, status, updated_at) = item;
                     if raw_repo_path.trim().len() < 4 {
                         continue;
                     }
-                    let norm_inst = if raw_inst == "__default__" || raw_inst.is_empty() {
-                        "default".to_string()
-                    } else {
-                        crate::modules::instance::resolve_instance_id(&raw_inst)
-                            .unwrap_or_else(|_| raw_inst.clone())
-                    };
+                    let norm_inst = crate::modules::repo_db::prompts_crud::resolve_instance_id_from_project_or_fallback(
+                        &raw_proj_id,
+                        Some(&raw_inst),
+                    );
                     if let Some(target_id) = target {
-                        if target_id == "default" || target_id == "__default__" {
-                            if norm_inst != "default" && norm_inst != "__default__" {
+                        let target_clean = target_id.trim();
+                        if !target_clean.is_empty() && !target_clean.eq_ignore_ascii_case("all") {
+                            let norm_target =
+                                if target_clean == "default" || target_clean == "__default__" {
+                                    "default".to_string()
+                                } else {
+                                    crate::modules::instance::resolve_instance_id(target_clean)
+                                        .unwrap_or_else(|_| target_clean.to_string())
+                                };
+                            if norm_target == "default" {
+                                if norm_inst != "default" && norm_inst != "__default__" {
+                                    continue;
+                                }
+                            } else if norm_inst != norm_target {
                                 continue;
                             }
-                        } else if norm_inst != target_id {
-                            continue;
                         }
                     }
                     let norm_path_cmp = normalize_path_for_compare(&raw_repo_path);

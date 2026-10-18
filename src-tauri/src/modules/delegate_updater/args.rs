@@ -3,9 +3,24 @@ use std::path::{Path, PathBuf};
 
 use super::*;
 
-/// Normalize version string: e.g., "4.162" or "v4.162" -> "4.162.0".
+/// Normalize version string: e.g., "4.162" or "v4.162" -> "4.162.0",
+/// stripping any leading URL prefixes if present.
 pub fn normalize_version_string(raw: &str) -> String {
-    let clean = raw
+    let clean = raw.trim().trim_matches(['\'', '"']);
+    let stripped_url = if let Some(pos) = clean.find("/releases/tag/") {
+        let after = &clean[pos + "/releases/tag/".len()..];
+        after.split(['?', '#', '/']).next().unwrap_or(after)
+    } else if let Some(pos) = clean.find("/releases/download/") {
+        let after = &clean[pos + "/releases/download/".len()..];
+        after.split(['?', '#', '/']).next().unwrap_or(after)
+    } else if clean.starts_with("http://") || clean.starts_with("https://") {
+        let path_only = clean.split(['?', '#']).next().unwrap_or(clean);
+        path_only.rsplit('/').next().unwrap_or(clean)
+    } else {
+        clean
+    };
+
+    let clean = stripped_url
         .trim()
         .trim_matches(['\'', '"'])
         .trim_start_matches(['v', 'V'])
@@ -25,6 +40,74 @@ pub fn normalize_version_string(raw: &str) -> String {
     } else {
         clean.to_string()
     }
+}
+
+/// Extract and normalize version from a token that may be a plain version string ("4.226.3", "v4.226.3")
+/// or a full GitHub release URL (e.g. "https://github.com/.../releases/tag/v4.226.3").
+pub fn extract_version_from_token(token: &str) -> Option<String> {
+    let clean = token.trim().trim_matches(['\'', '"']);
+    if clean.is_empty() {
+        return None;
+    }
+
+    if let Some(pos) = clean.find("/releases/tag/") {
+        let after_tag = &clean[pos + "/releases/tag/".len()..];
+        let tag_part = after_tag.split(['?', '#', '/']).next().unwrap_or(after_tag);
+        let tag_clean = tag_part.trim().trim_start_matches(['v', 'V']).trim();
+        if !tag_clean.is_empty()
+            && tag_clean
+                .chars()
+                .next()
+                .map(|c| c.is_ascii_digit())
+                .unwrap_or(false)
+        {
+            return Some(normalize_version_string(tag_clean));
+        }
+    }
+
+    if let Some(pos) = clean.find("/releases/download/") {
+        let after_dl = &clean[pos + "/releases/download/".len()..];
+        let tag_part = after_dl.split(['?', '#', '/']).next().unwrap_or(after_dl);
+        let tag_clean = tag_part.trim().trim_start_matches(['v', 'V']).trim();
+        if !tag_clean.is_empty()
+            && tag_clean
+                .chars()
+                .next()
+                .map(|c| c.is_ascii_digit())
+                .unwrap_or(false)
+        {
+            return Some(normalize_version_string(tag_clean));
+        }
+    }
+
+    if clean.starts_with("http://") || clean.starts_with("https://") {
+        let path_only = clean.split(['?', '#']).next().unwrap_or(clean);
+        if let Some(last_seg) = path_only.rsplit('/').next() {
+            let seg_clean = last_seg.trim().trim_start_matches(['v', 'V']).trim();
+            if !seg_clean.is_empty()
+                && seg_clean
+                    .chars()
+                    .next()
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false)
+                && seg_clean.contains('.')
+            {
+                return Some(normalize_version_string(seg_clean));
+            }
+        }
+    }
+
+    let v = clean.trim_start_matches(['v', 'V']).trim();
+    if v.contains('.')
+        && v.chars()
+            .next()
+            .map(|c| c.is_ascii_digit())
+            .unwrap_or(false)
+    {
+        return Some(normalize_version_string(v));
+    }
+
+    None
 }
 
 /// Unwrap an Antigravity multi-instance sandbox path back to the real host user profile root.
@@ -108,11 +191,11 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
             }
             "--version" | "-v" => {
                 if i + 1 < args.len() {
-                    let v = args[i + 1]
-                        .trim()
-                        .trim_matches(['\'', '"'])
-                        .trim_start_matches(['v', 'V']);
-                    opts.target_version = Some(normalize_version_string(v));
+                    if let Some(v) = extract_version_from_token(&args[i + 1]) {
+                        opts.target_version = Some(v);
+                    } else {
+                        opts.target_version = Some(normalize_version_string(&args[i + 1]));
+                    }
                     i += 1;
                 }
             }
@@ -128,12 +211,12 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
                 } else {
                     "-v="
                 };
-                let v = arg
-                    .trim_start_matches(prefix)
-                    .trim()
-                    .trim_matches(['\'', '"'])
-                    .trim_start_matches(['v', 'V']);
-                opts.target_version = Some(normalize_version_string(v));
+                let raw_val = arg.trim_start_matches(prefix);
+                if let Some(v) = extract_version_from_token(raw_val) {
+                    opts.target_version = Some(v);
+                } else {
+                    opts.target_version = Some(normalize_version_string(raw_val));
+                }
             }
             arg if arg.starts_with("--to=")
                 || arg.starts_with("-to=")
@@ -143,12 +226,11 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
                 || arg.starts_with("-downgrade=") =>
             {
                 let prefix_len = arg.find('=').map(|idx| idx + 1).unwrap_or(0);
-                let v = arg[prefix_len..]
-                    .trim()
-                    .trim_matches(['\'', '"'])
-                    .trim_start_matches(['v', 'V']);
-                if !v.is_empty() {
-                    opts.target_version = Some(normalize_version_string(v));
+                let raw_val = &arg[prefix_len..];
+                if let Some(v) = extract_version_from_token(raw_val) {
+                    opts.target_version = Some(v);
+                } else if !raw_val.trim().is_empty() {
+                    opts.target_version = Some(normalize_version_string(raw_val));
                 }
             }
             arg if arg.eq_ignore_ascii_case("to")
@@ -162,32 +244,30 @@ pub fn parse_delegate_args(args: &[String]) -> DelegateUpdateOptions {
                 || arg.eq_ignore_ascii_case("-downgrade") =>
             {
                 if i + 1 < args.len() {
-                    let v = args[i + 1]
-                        .trim()
-                        .trim_matches(['\'', '"'])
-                        .trim_start_matches(['v', 'V']);
-                    if !v.is_empty()
-                        && v.chars()
-                            .next()
-                            .map(|c| c.is_ascii_digit())
-                            .unwrap_or(false)
-                    {
-                        opts.target_version = Some(normalize_version_string(v));
+                    if let Some(v) = extract_version_from_token(&args[i + 1]) {
+                        opts.target_version = Some(v);
                         i += 1;
+                    } else {
+                        let v = args[i + 1]
+                            .trim()
+                            .trim_matches(['\'', '"'])
+                            .trim_start_matches(['v', 'V']);
+                        if !v.is_empty()
+                            && v.chars()
+                                .next()
+                                .map(|c| c.is_ascii_digit())
+                                .unwrap_or(false)
+                        {
+                            opts.target_version = Some(normalize_version_string(v));
+                            i += 1;
+                        }
                     }
                 }
             }
             _ => {
                 if opts.target_version.is_none() && !args[i].starts_with('-') {
-                    let clean = args[i].trim().trim_matches(['\'', '"']);
-                    let v = clean.trim_start_matches(['v', 'V']);
-                    if v.contains('.')
-                        && v.chars()
-                            .next()
-                            .map(|c| c.is_ascii_digit())
-                            .unwrap_or(false)
-                    {
-                        opts.target_version = Some(normalize_version_string(v));
+                    if let Some(v) = extract_version_from_token(&args[i]) {
+                        opts.target_version = Some(v);
                     }
                 }
             }

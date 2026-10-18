@@ -254,12 +254,12 @@ export function TreePanel(props: TreePanelProps) {
 
                 {/* Row 1: 4-Tier Category Filter Segmented Capsule */}
                 <div className="flex items-center justify-between gap-1">
-                    <div className="w-full inline-flex items-center rounded-full border border-slate-200 dark:border-[#40285e] bg-white/80 dark:bg-[#171025]/80 backdrop-blur-xs p-0.5 shadow-2xs divide-x divide-slate-200 dark:divide-[#40285e]">
+                    <div className="w-full inline-flex items-center rounded-lg border border-slate-200 dark:border-[#40285e] bg-white/80 dark:bg-[#171025]/80 backdrop-blur-xs p-0.5 shadow-2xs divide-x divide-slate-200 dark:divide-[#40285e]">
                         <button
                             type="button"
                             onClick={() => setCategoryFilter('all')}
                             className={cn(
-                                "flex-1 py-1 text-[10px] font-medium rounded-l-full transition-colors text-center cursor-pointer",
+                                "flex-1 py-1 text-[10px] font-medium rounded-l-md transition-colors text-center cursor-pointer",
                                 categoryFilter === 'all'
                                     ? "bg-blue-600 text-white shadow-2xs font-semibold"
                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -300,7 +300,7 @@ export function TreePanel(props: TreePanelProps) {
                             type="button"
                             onClick={() => setCategoryFilter('system')}
                             className={cn(
-                                "flex-1 py-1 text-[10px] font-medium rounded-r-full transition-colors flex items-center justify-center gap-1 cursor-pointer",
+                                "flex-1 py-1 text-[10px] font-medium rounded-r-md transition-colors flex items-center justify-center gap-1 cursor-pointer",
                                 categoryFilter === 'system'
                                     ? "bg-slate-700 dark:bg-slate-600 text-white shadow-2xs font-semibold"
                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -315,12 +315,12 @@ export function TreePanel(props: TreePanelProps) {
 
                 {/* Row 2: Status Filter Segmented Capsule & Archive Scope */}
                 <div className="flex items-center justify-between gap-1 pt-0.5">
-                    <div className="inline-flex items-center rounded-full border border-slate-200 dark:border-[#40285e] bg-white/80 dark:bg-[#171025]/80 backdrop-blur-xs p-0.5 shadow-2xs gap-0.5">
+                    <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-[#40285e] bg-white/80 dark:bg-[#171025]/80 backdrop-blur-xs p-0.5 shadow-2xs divide-x divide-slate-200 dark:divide-[#40285e]">
                         <button
                             type="button"
                             onClick={() => setActiveFilter(activeFilter === 'running' ? 'all' : 'running')}
                             className={cn(
-                                "px-2.5 py-0.5 text-[10px] font-medium rounded-full transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1",
+                                "px-2.5 py-0.5 text-[10px] font-medium rounded-l-md transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1",
                                 activeFilter === 'running'
                                     ? "bg-emerald-600 text-white shadow-2xs font-semibold"
                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -334,7 +334,7 @@ export function TreePanel(props: TreePanelProps) {
                             type="button"
                             onClick={() => setActiveFilter(activeFilter === 'queued' ? 'all' : 'queued')}
                             className={cn(
-                                "px-2.5 py-0.5 text-[10px] font-medium rounded-full transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1",
+                                "px-2.5 py-0.5 text-[10px] font-medium rounded-none transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1",
                                 activeFilter === 'queued'
                                     ? "bg-amber-600 text-white shadow-2xs font-semibold"
                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -348,7 +348,7 @@ export function TreePanel(props: TreePanelProps) {
                             type="button"
                             onClick={() => setActiveFilter(activeFilter === 'pinned' ? 'all' : 'pinned')}
                             className={cn(
-                                "px-2 py-0.5 text-[10px] font-medium rounded-full transition-colors whitespace-nowrap cursor-pointer flex items-center gap-0.5",
+                                "px-2 py-0.5 text-[10px] font-medium rounded-r-md transition-colors whitespace-nowrap cursor-pointer flex items-center gap-0.5",
                                 activeFilter === 'pinned'
                                     ? "bg-blue-600 text-white shadow-2xs font-semibold"
                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -365,7 +365,7 @@ export function TreePanel(props: TreePanelProps) {
                             type="button"
                             onClick={handleToggleAutomated}
                             className={cn(
-                                "px-2.5 py-0.5 text-[10px] font-semibold rounded-full transition-colors cursor-pointer flex items-center gap-1 border shadow-2xs",
+                                "px-2.5 py-0.5 text-[10px] font-semibold rounded-md transition-colors cursor-pointer flex items-center gap-1 border shadow-2xs",
                                 effectiveAutomatedHidden
                                     ? "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-400/40"
                                     : "bg-slate-100 dark:bg-[#201538] text-slate-500 dark:text-slate-400 border-slate-200 dark:border-[#40285e] hover:text-slate-800 dark:hover:text-slate-200"
@@ -392,7 +392,7 @@ export function TreePanel(props: TreePanelProps) {
                                 if (val === 'archived') setActiveFilter('archived');
                                 else setActiveFilter('all');
                             }}
-                            className="text-[10px] font-medium bg-transparent border-0 focus:ring-0 focus:outline-none text-slate-700 dark:text-slate-300 rounded-full px-1 py-0.5 cursor-pointer"
+                            className="text-[10px] font-medium bg-transparent border-0 focus:ring-0 focus:outline-none text-slate-700 dark:text-slate-300 rounded-md px-1 py-0.5 cursor-pointer"
                         >
                             <option value="all" className="dark:bg-[#171025]">All ({treeData.length})</option>
                             <option value="archived" className="dark:bg-[#171025]">Archived ({archivedCount})</option>
@@ -493,7 +493,7 @@ export function TreePanel(props: TreePanelProps) {
                                     <button
                                         type="button"
                                         onClick={handleResetFilters}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 hover:bg-purple-500/25 transition-colors cursor-pointer shadow-2xs"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-[11px] font-semibold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 hover:bg-purple-500/25 transition-colors cursor-pointer shadow-2xs"
                                     >
                                         <RotateCcw className="w-3 h-3" />
                                         <span>Reset Filters</span>

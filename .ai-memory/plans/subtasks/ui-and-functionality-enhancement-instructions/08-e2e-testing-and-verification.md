@@ -1,12 +1,19 @@
-# Subtask 08: End-to-End Testing & Verification
+# Subtask 08: End-to-End Testing Verification, Quality Gates & Release
 
-Parent Task: `ui-and-functionality-enhancement-instructions`
-Task-ID: `Task-10`
-Owner: Lead
+**Parent Task:** `ui-and-functionality-enhancement-instructions`  
+**Subtask Code:** `Subtask-08`  
+**Status:** `READY`
 
-## Objectives
-1. Verify TypeScript compilation and linting on modified React components (`tsc --noEmit` or targeted checks).
-2. Verify Rust compilation and clippy on modified Rust modules (`cargo check` / `cargo clippy`).
-3. Verify `install.ps1` syntax and pinned version resolution function.
-4. Record all verification evidence in ledger.
-5. Create atomic GitMap commit via `gitmap cpf "ui-and-functionality - enhance prompt tree, instance prompt detection, ssh cluster and updater"`.
+### Objective
+Execute verification and complete atomic release:
+1. Run targeted checks on touched Rust and TypeScript files.
+2. Verify cargo fmt and clippy.
+3. Verify frontend builds cleanly.
+4. Update changelogs with `@aukgit` attribution.
+5. Atomic commit and push via GitMap.
+
+### Target Files
+- `changelog.md`
+- `changelog_en.md`
+- `README.md`
+- `README_EN.md`

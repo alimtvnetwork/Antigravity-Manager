@@ -5,7 +5,7 @@ import { supabaseService } from '../../../services/supabaseService';
 import { useErrorStore } from '../../../stores/error-store';
 import type { FleetMachineInfo } from './fleetTypes';
 
-const POLL_INTERVAL_SECONDS = 15;
+const POLL_INTERVAL_SECONDS = 300;
 
 export interface FleetMachinesState {
     machines: FleetMachineInfo[];

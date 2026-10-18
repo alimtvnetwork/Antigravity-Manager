@@ -1,7 +1,10 @@
 import type { AgmConversationNode } from './types';
 
 export function isGhostConversation(conv: AgmConversationNode): boolean {
-    if (Boolean(conv.is_running) || Boolean(conv.is_queued) || conv.status === 'QUEUED' || conv.status === 'RUNNING') {
+    const statusLower = (conv.status || '').toLowerCase();
+    const isRunning = Boolean(conv.is_running) || statusLower.includes('run') || statusLower.includes('exec');
+    const isQueued = Boolean(conv.is_queued) || statusLower.includes('queue');
+    if (isRunning || isQueued) {
         return false;
     }
     const title = (conv.title || '').trim().toLowerCase();
@@ -34,7 +37,10 @@ export function isStaleOrEmptyConversation(conv: AgmConversationNode): boolean {
         conv.prompt_preview_200w.trim().length === 0;
 
     // Running OR queued conversations must NEVER be treated as stale or empty
-    if (Boolean(conv.is_running) || Boolean(conv.is_queued) || conv.status === 'QUEUED' || conv.status === 'RUNNING') {
+    const statusLower = (conv.status || '').toLowerCase();
+    const isRunning = Boolean(conv.is_running) || statusLower.includes('run') || statusLower.includes('exec');
+    const isQueued = Boolean(conv.is_queued) || statusLower.includes('queue');
+    if (isRunning || isQueued) {
         return false;
     }
 

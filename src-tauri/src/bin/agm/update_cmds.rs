@@ -12,9 +12,24 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
-/// Normalize version string: e.g., "4.162" or "v4.162" -> "4.162.0".
+/// Normalize version string: e.g., "4.162" or "v4.162" -> "4.162.0",
+/// stripping any leading URL prefixes if present.
 pub(crate) fn normalize_version_string(raw: &str) -> String {
-    let clean = raw
+    let clean = raw.trim().trim_matches(['\'', '"']);
+    let stripped_url = if let Some(pos) = clean.find("/releases/tag/") {
+        let after = &clean[pos + "/releases/tag/".len()..];
+        after.split(['?', '#', '/']).next().unwrap_or(after)
+    } else if let Some(pos) = clean.find("/releases/download/") {
+        let after = &clean[pos + "/releases/download/".len()..];
+        after.split(['?', '#', '/']).next().unwrap_or(after)
+    } else if clean.starts_with("http://") || clean.starts_with("https://") {
+        let path_only = clean.split(['?', '#']).next().unwrap_or(clean);
+        path_only.rsplit('/').next().unwrap_or(clean)
+    } else {
+        clean
+    };
+
+    let clean = stripped_url
         .trim()
         .trim_matches(['\'', '"'])
         .trim_start_matches(['v', 'V'])
@@ -42,9 +57,14 @@ pub(crate) fn normalize_version_str(raw: &str) -> String {
 
 fn extract_version_from_token(token: &str) -> Option<String> {
     let clean = token.trim().trim_matches(['\'', '"']);
+    if clean.is_empty() {
+        return None;
+    }
+
     if let Some(pos) = clean.find("/releases/tag/") {
         let after_tag = &clean[pos + "/releases/tag/".len()..];
-        let tag_clean = after_tag
+        let tag_part = after_tag.split(['?', '#', '/']).next().unwrap_or(after_tag);
+        let tag_clean = tag_part
             .trim_matches('/')
             .trim_start_matches(['v', 'V'])
             .trim();
@@ -60,7 +80,7 @@ fn extract_version_from_token(token: &str) -> Option<String> {
     }
     if let Some(pos) = clean.find("/releases/download/") {
         let after_dl = &clean[pos + "/releases/download/".len()..];
-        let tag_part = after_dl.split('/').next().unwrap_or(after_dl);
+        let tag_part = after_dl.split(['?', '#', '/']).next().unwrap_or(after_dl);
         let tag_clean = tag_part
             .trim_matches('/')
             .trim_start_matches(['v', 'V'])
@@ -73,6 +93,22 @@ fn extract_version_from_token(token: &str) -> Option<String> {
                 .unwrap_or(false)
         {
             return Some(normalize_version_string(tag_clean));
+        }
+    }
+    if clean.starts_with("http://") || clean.starts_with("https://") {
+        let path_only = clean.split(['?', '#']).next().unwrap_or(clean);
+        if let Some(last_seg) = path_only.rsplit('/').next() {
+            let seg_clean = last_seg.trim().trim_start_matches(['v', 'V']).trim();
+            if !seg_clean.is_empty()
+                && seg_clean
+                    .chars()
+                    .next()
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false)
+                && seg_clean.contains('.')
+            {
+                return Some(normalize_version_string(seg_clean));
+            }
         }
     }
     let v = clean.trim_start_matches(['v', 'V']).trim();

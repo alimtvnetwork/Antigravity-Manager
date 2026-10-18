@@ -144,7 +144,7 @@ pub(crate) fn handle_ssh_fix_auth(args: &[String]) {
             }
             if !any_success && !reports.is_empty() {
                 println!("[*] Native key deployment unverified; attempting GitMap fix-auth delegation...");
-                if let Ok(fix_msg) = ssh_manager::fix_node_auth_via_gitmap(target) {
+                if let Ok(fix_msg) = ssh_manager::fix_node_auth_via_gitmap(target, pubkey_path) {
                     println!("✓ GitMap fix-auth repair output:\n{}", fix_msg);
                     any_success = true;
                 }
@@ -168,7 +168,7 @@ pub(crate) fn handle_ssh_fix_auth(args: &[String]) {
                 "[*] Native key deployment error: {}; attempting GitMap fix-auth delegation...",
                 e
             );
-            match ssh_manager::fix_node_auth_via_gitmap(target) {
+            match ssh_manager::fix_node_auth_via_gitmap(target, pubkey_path) {
                 Ok(fix_msg) => {
                     println!("✓ GitMap fix-auth repair succeeded:\n{}", fix_msg);
                 }

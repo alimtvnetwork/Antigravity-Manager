@@ -7,7 +7,7 @@ import type { AgmConversationNode, AgmProjectTreeNode, TierClassificationResult 
 import { isGhostConversation } from './conversationGuards';
 import { classifyPromptTier } from './tierClassification';
 import { formatSeqBadge } from './formatters';
-import { ConversationContextMenu } from './ConversationContextMenu';
+import { PromptTreeContextMenu } from './PromptTreeContextMenu';
 import { invalidatePromptTreeCache, renameConversationOptimistic } from './usePromptTreeData';
 import { useErrorStore } from '../../../stores/error-store';
 
@@ -373,7 +373,8 @@ export function ConversationNode({
             )}
 
             {turnMenuPos && (
-                <ConversationContextMenu
+                <PromptTreeContextMenu
+                    type="turn"
                     x={turnMenuPos.x}
                     y={turnMenuPos.y}
                     conversationId={turnMenuPos.turnConv.conversation_id}
@@ -396,7 +397,8 @@ export function ConversationNode({
             )}
 
             {contextMenuPos && (
-                <ConversationContextMenu
+                <PromptTreeContextMenu
+                    type="conversation"
                     x={contextMenuPos.x}
                     y={contextMenuPos.y}
                     conversationId={conv.conversation_id}

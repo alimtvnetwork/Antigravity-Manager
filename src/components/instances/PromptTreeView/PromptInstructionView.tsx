@@ -123,6 +123,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         isOpen: boolean;
         position: { x: number; y: number };
         imageSrc: string;
+        rawPath?: string;
         altText?: string;
     }>({
         isOpen: false,
@@ -135,13 +136,14 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         setPreviewImage({ src, alt });
     };
 
-    const handleImageContextMenu = (e: React.MouseEvent, src: string, alt?: string) => {
+    const handleImageContextMenu = (e: React.MouseEvent, src: string, alt?: string, rawSrc?: string) => {
         e.preventDefault();
         e.stopPropagation();
         setContextMenu({
             isOpen: true,
             position: { x: e.clientX, y: e.clientY },
             imageSrc: src,
+            rawPath: rawSrc || src,
             altText: alt,
         });
     };
@@ -486,7 +488,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                     src={resolveImageSrc(img.src)}
                                     alt={img.alt}
                                     onClick={() => handleOpenPreview(resolveImageSrc(img.src), img.alt)}
-                                    onContextMenu={(e) => handleImageContextMenu(e, resolveImageSrc(img.src), img.alt)}
+                                    onContextMenu={(e) => handleImageContextMenu(e, resolveImageSrc(img.src), img.alt, img.src)}
                                     className="h-16 w-24 object-cover rounded-md border border-slate-200 dark:border-[#40285e] hover:border-blue-500 dark:hover:border-blue-400 cursor-pointer shadow-2xs transition-all hover:scale-102 bg-slate-100 dark:bg-[#090611]"
                                     onError={(e) => {
                                         (e.target as HTMLElement).style.display = 'none';
@@ -626,12 +628,64 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                 </div>
             )}
 
+            {/* Enqueued Prompts Section (listing pending queued turns with badges directly beneath prompt views) */}
+            {enqueuedTurns.length > 0 && (
+                <div className="p-3 rounded-xl border border-amber-300/70 dark:border-amber-700/50 bg-gradient-to-r from-amber-50/80 via-white to-amber-50/40 dark:from-[#1f162b] dark:via-[#191124] dark:to-[#1a0e2e] shadow-xs space-y-2 font-poppins">
+                    <div className="flex items-center justify-between text-xs font-bold text-amber-800 dark:text-amber-300">
+                        <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 animate-pulse" />
+                            <span>Enqueued Prompts Queue ({enqueuedTurns.length} pending in FIFO sequence)</span>
+                        </div>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-200/80 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 font-bold border border-amber-300/50 dark:border-amber-700/50">
+                            FIFO DISPATCH
+                        </span>
+                    </div>
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                        {enqueuedTurns.map((turn, qIdx) => (
+                            <div
+                                key={`enqueued-strip-${turn.step_index || qIdx}`}
+                                onClick={() => {
+                                    if (turn.prompt_text) {
+                                        setActivePromptText(turn.prompt_text);
+                                        setActiveTurnPreview(turn.turn_number);
+                                        setActionMsg?.(`Loaded Queued Turn T${turn.turn_number} into viewer`);
+                                        setTimeout(() => setActionMsg?.(null), 2000);
+                                    }
+                                }}
+                                className="flex items-center justify-between p-2 rounded-lg bg-white/95 dark:bg-[#150d22]/90 border border-amber-200/80 dark:border-amber-800/40 text-xs hover:border-amber-400 dark:hover:border-amber-500 hover:shadow-xs transition-all cursor-pointer group"
+                                aria-label={`View queued prompt turn T${turn.turn_number}`}
+                            >
+                                <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                                    <span className="font-mono text-[9px] px-1.5 py-0.5 rounded-sm bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 font-bold shrink-0 border border-amber-300/40">
+                                        T{turn.turn_number}
+                                    </span>
+                                    <span className="text-[11px] text-slate-700 dark:text-slate-200 truncate group-hover:text-amber-700 dark:group-hover:text-amber-300 transition-colors">
+                                        {turn.preview_200w || turn.prompt_text || `Queued prompt #${turn.turn_number}`}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                    {turn.media_paths && turn.media_paths.length > 0 && (
+                                        <span className="text-[9.5px] font-mono px-1.5 py-0.5 rounded-sm bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 font-medium">
+                                            🖼️ {turn.media_paths.length}
+                                        </span>
+                                    )}
+                                    <span className="text-[9.5px] font-mono font-bold text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded-sm bg-amber-100/80 dark:bg-amber-950/70 border border-amber-400/50">
+                                        QUEUE #{qIdx + 1}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Context Menu for Image Actions */}
             <PromptImageContextMenu
                 isOpen={contextMenu.isOpen}
                 position={contextMenu.position}
                 imageSrc={contextMenu.imageSrc}
                 altText={contextMenu.altText}
+                rawPath={contextMenu.rawPath}
                 allImages={attachedImages.map((img) => resolveImageSrc(img.src))}
                 onClose={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}
                 onOpenPreview={handleOpenPreview}

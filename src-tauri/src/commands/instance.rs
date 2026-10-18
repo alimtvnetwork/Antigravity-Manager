@@ -52,6 +52,15 @@ pub fn create_instance(
 
 #[tauri::command]
 pub fn stop_instance(instance_id: String, target_pid: Option<u32>) -> Result<(), String> {
+    // Explicit GUI action: allow stopping instance even if AGM was spawned from an IDE terminal
+    std::env::set_var("AGM_FORCE_CALLER_OVERRIDE", "1");
+
+    let mut audit = crate::modules::task_history_db::AuditTask::start(
+        crate::modules::audit_action::AuditAction::StopInstance,
+        &format!("Stop instance {}", instance_id),
+        Some(&instance_id),
+    );
+
     if let Some(pid) = target_pid {
         if pid > 0 {
             if let Ok(reg) = instance::load_registry() {
@@ -63,9 +72,28 @@ pub fn stop_instance(instance_id: String, target_pid: Option<u32>) -> Result<(),
                     );
                 }
             }
+            #[cfg(target_os = "windows")]
+            {
+                use std::os::windows::process::CommandExt;
+                if instance::is_pid_alive_targeted(pid) {
+                    crate::error::record_ignored(
+                        std::process::Command::new("taskkill")
+                            .args(["/F", "/T", "/PID", &pid.to_string()])
+                            .creation_flags(0x08000000)
+                            .output(),
+                        "taskkill target pid directly",
+                    );
+                }
+            }
         }
     }
-    instance::stop_instance(&instance_id)?;
+    let res = instance::stop_instance(&instance_id);
+    if let Err(ref e) = res {
+        audit.fail(e);
+        return Err(e.clone());
+    }
+    audit.succeed(&format!("Instance {} stopped successfully", instance_id));
+
     if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
         use tauri::Emitter;
         // Justification: best-effort UI event emission; UI state is re-derived on poll
@@ -216,7 +244,18 @@ pub fn wipe_instance_session(instance_id: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn launch_instance(instance_id: String) -> Result<(), crate::error::AppError> {
-    instance::launch_instance(&instance_id)
+    let mut audit = crate::modules::task_history_db::AuditTask::start(
+        crate::modules::audit_action::AuditAction::StartInstance,
+        &format!("Launch instance {}", instance_id),
+        Some(&instance_id),
+    );
+    let res = instance::launch_instance(&instance_id);
+    if res.is_ok() {
+        audit.succeed(&format!("Instance {} launched", instance_id));
+    } else if let Err(ref e) = res {
+        audit.fail(&e.to_string());
+    }
+    res
 }
 
 #[tauri::command]
@@ -288,6 +327,8 @@ pub async fn switch_account_to_instance(
     account_id: String,
     instance_id: Option<String>,
 ) -> Result<(), crate::error::AppError> {
+    // Explicit GUI action: allow switching even if AGM was spawned from an IDE terminal
+    std::env::set_var("AGM_FORCE_CALLER_OVERRIDE", "1");
     let res = instance::switch_account_to_instance(&account_id, instance_id.as_deref())
         .await
         .map_err(crate::error::AppError::Process);

@@ -5,6 +5,19 @@ import { showToast } from '../../common/ToastContainer';
 import type { ExtractedPromptImage, PromptRewriteResult } from './types';
 
 /**
+ * Strips all markdown image tags (![alt](url/dataUri)) and image references from prompt text,
+ * returning clean text suitable for text-only copying and tokens counting.
+ */
+export function stripImagesFromPrompt(text: string): string {
+    if (!text) return '';
+    return text
+        .replace(/!\[.*?\]\((?:data:image\/[^;]+;base64,[A-Za-z0-9+/=]+|https?:\/\/[^\s)]+|[^\s)]+?\.(?:png|jpe?g|gif|webp|svg))\)/gi, '')
+        .replace(/!\[.*?\]\(.*?\)/gi, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
+
+/**
  * Resolves an image source URI for safe WebView rendering.
  * Handles data URIs, http(s) URLs, file:// protocols, relative project paths, and native absolute paths.
  * Uses Tauri's convertFileSrc when in Tauri environment to bypass WebView CORS and local file restrictions.
@@ -356,14 +369,24 @@ export async function writeNativeImageToClipboard(
 export async function copyPromptWithRichImages(
     markdownText: string,
     onSuccess?: (message: string) => void,
-    onError?: (err: unknown) => void
+    onError?: (err: unknown) => void,
+    mediaPaths?: string[]
 ): Promise<boolean> {
     if (!markdownText || !markdownText.trim()) {
         return false;
     }
 
+    // Gather turn media paths not already in markdown
+    let effectiveMarkdown = markdownText;
+    if (mediaPaths && mediaPaths.length > 0) {
+        const missingPaths = mediaPaths.filter((p) => p && !effectiveMarkdown.includes(p));
+        if (missingPaths.length > 0) {
+            effectiveMarkdown += '\n\n' + missingPaths.map((p, idx) => `![Turn Image ${idx + 1}](${p})`).join('\n\n');
+        }
+    }
+
     if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
-        const fallbackOk = await copyToClipboard(markdownText);
+        const fallbackOk = await copyToClipboard(effectiveMarkdown);
         if (fallbackOk) {
             const msg = 'Copied clean prompt text to clipboard (rich media unsupported in current context)';
             onSuccess?.(msg);
@@ -376,7 +399,7 @@ export async function copyPromptWithRichImages(
 
     try {
         // Pre-convert any non-base64 image sources to embedded Base64 data URIs for OneNote/Word
-        const imageMatches = Array.from(markdownText.matchAll(/!\[(.*?)\]\((.*?)\)/g));
+        const imageMatches = Array.from(effectiveMarkdown.matchAll(/!\[(.*?)\]\((.*?)\)/g));
         const srcMap = new Map<string, string>();
         for (const match of imageMatches) {
             const rawSrc = match[2].trim();
@@ -389,7 +412,7 @@ export async function copyPromptWithRichImages(
         }
 
         // Extract embedded image URLs and format rich HTML with embedded Base64 <img> tags
-        let htmlBody = markdownText
+        let htmlBody = effectiveMarkdown
             // Escape special HTML chars in text while preserving markdown tokens
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
@@ -414,10 +437,10 @@ export async function copyPromptWithRichImages(
         const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#222;"><p style="margin:8px 0;line-height:1.6;">${htmlBody}</p></body></html>`;
 
         const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
-        const textBlob = new Blob([markdownText], { type: 'text/plain' });
+        const textBlob = new Blob([effectiveMarkdown], { type: 'text/plain' });
 
         // Extract first image to attach true binary image/png alongside html and text
-        const { images } = extractAssets(markdownText);
+        const { images } = extractAssets(effectiveMarkdown);
         let pngBlob: Blob | null = null;
         if (images.length > 0) {
             const firstImg = images[0];
@@ -465,7 +488,7 @@ export async function copyPromptWithRichImages(
             return true;
         }
 
-        const fallbackOk = await copyToClipboard(markdownText);
+        const fallbackOk = await copyToClipboard(effectiveMarkdown);
         if (fallbackOk) {
             const msg = 'Copied clean prompt text to clipboard (rich media unsupported in current context)';
             onSuccess?.(msg);
@@ -475,7 +498,7 @@ export async function copyPromptWithRichImages(
         return false;
     } catch (err) {
         // Fallback to resilient text copy ladder (Clipboard API -> execCommand -> native helper)
-        const fallbackOk = await copyToClipboard(markdownText);
+        const fallbackOk = await copyToClipboard(effectiveMarkdown);
         if (fallbackOk) {
             const msg = 'Copied clean prompt text to clipboard (rich media unsupported in current context)';
             onSuccess?.(msg);
@@ -558,11 +581,8 @@ export async function copyPromptCleanText(
     }
 
     try {
-        // Strip markdown images: ![alt](src)
-        const cleanText = markdownText
-            .replace(/!\[.*?\]\((?:data:image\/[^;]+;base64,[A-Za-z0-9+/=]+|https?:\/\/[^\s)]+|[^\s)]+?\.(?:png|jpe?g|gif|webp|svg))\)/gi, '')
-            .replace(/\n{3,}/g, '\n\n')
-            .trim();
+        // Strip markdown images using centralized stripImagesFromPrompt
+        const cleanText = stripImagesFromPrompt(markdownText);
 
         const success = await copyToClipboard(cleanText);
         if (success) {

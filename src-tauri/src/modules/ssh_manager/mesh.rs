@@ -87,8 +87,8 @@ pub fn deploy_auth_key_to_target(
             }
         }
         if !online {
-            // Check if gitmap fix-auth can reach it anyway (e.g. w2 via password vault)
-            if let Ok(fix_out) = fix_node_auth_via_gitmap(&node.alias) {
+            // Check if gitmap fix-auth can reach it anyway using vaulted password credentials
+            if let Ok(fix_out) = fix_node_auth_via_gitmap(&node.alias, pubkey_path_opt) {
                 if fix_out.contains("successfully")
                     || fix_out.contains("✓")
                     || fix_out.contains("DEPLOYED")
@@ -174,7 +174,7 @@ pub fn deploy_auth_key_to_target(
                     "Native key deployment to {} failed; attempting gitmap ssh fix-auth",
                     node.alias
                 );
-                match fix_node_auth_via_gitmap(&node.alias) {
+                match fix_node_auth_via_gitmap(&node.alias, pubkey_path_opt) {
                     Ok(fix_out) => {
                         let re_verified = verify_cmd
                             .args(&verify_args)
@@ -228,7 +228,7 @@ pub fn deploy_auth_key_to_target(
             }
             Err(e) => {
                 // Attempt GitMap fix-auth repair if native ssh spawn failed
-                match fix_node_auth_via_gitmap(&node.alias) {
+                match fix_node_auth_via_gitmap(&node.alias, pubkey_path_opt) {
                     Ok(fix_out) => {
                         reports.push(KeyDeployNodeReport {
                             alias: node.alias.clone(),

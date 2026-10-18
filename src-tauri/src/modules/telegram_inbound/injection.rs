@@ -289,12 +289,16 @@ pub async fn execute_remote_prompt_injection(
     explicit_instance: Option<&str>,
     local_config: &supabase_sync::SupabaseConfig,
 ) -> String {
+    let escaped_prompt = prompt_text
+        .replace('\"', "\\\"")
+        .replace('\r', "")
+        .replace('\n', " ");
     let inst_flag = explicit_instance
         .map(|i| format!(" --instance {}", i))
         .unwrap_or_default();
     let remote_cmd = format!(
-        "agm prompt {}{} \"{}\"",
-        target_project, inst_flag, prompt_text
+        "agm prompt send {}{} \"{}\"",
+        target_project, inst_flag, escaped_prompt
     );
     let mut dispatched_gitmap = false;
     let mut gm_cmd1 = Command::new("gitmap");

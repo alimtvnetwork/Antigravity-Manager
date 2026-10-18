@@ -5,7 +5,7 @@ import {
 } from '../../../services/instanceService';
 import { useErrorStore } from '../../../stores/error-store';
 import { isTauri } from '../../../utils/env';
-import { copyPromptWithRichImages } from './clipboard';
+import { copyPromptWithRichImages, copyPromptCleanText } from './clipboard';
 import type { AgmProjectTreeNode } from './types';
 import type { PromptTreeState } from './usePromptTreeState';
 import type { ExportScopeParams } from './PromptTreeExportModal';
@@ -19,6 +19,8 @@ export interface PromptTreeCoreActions {
     handleFileRestore: (e: React.ChangeEvent<HTMLInputElement>) => void;
     handleRestore: () => Promise<void>;
     handleCopyAllTreePrompts: () => Promise<void>;
+    handleCopyPromptWithImages: (markdownText: string, mediaPaths?: string[]) => Promise<boolean>;
+    handleCopyPromptAsText: (markdownText: string) => Promise<boolean>;
     handleExportSqlite: () => Promise<void>;
     handleImportSqlite: () => Promise<void>;
     handleExportRunningJson: () => Promise<void>;
@@ -602,6 +604,71 @@ export function usePromptTreeCoreActions({
         }
     }, [treeData, setActionMsg, setError]);
 
+    const handleCopyPromptWithImages = useCallback(
+        async (markdownText: string, mediaPaths?: string[]): Promise<boolean> => {
+            try {
+                return await copyPromptWithRichImages(
+                    markdownText,
+                    (msg) => {
+                        setActionMsg(msg);
+                        setTimeout(() => setActionMsg(null), 2500);
+                    },
+                    (err) => {
+                        useErrorStore.getState().captureException(
+                            err instanceof Error ? err : new Error(String(err)),
+                            {
+                                source: 'PromptTreeViewModal.handleCopyPromptWithImages',
+                                triggerAction: 'copyPromptWithRichImages',
+                            }
+                        );
+                        setError('Failed to copy prompt with images to clipboard');
+                    },
+                    mediaPaths
+                );
+            } catch (err: unknown) {
+                useErrorStore.getState().captureError(err, {
+                    source: 'PromptTreeViewModal.handleCopyPromptWithImages',
+                    triggerAction: 'copy_prompt_with_images',
+                });
+                setError(err instanceof Error ? err.message : String(err) || 'Failed to copy prompt with images');
+                return false;
+            }
+        },
+        [setActionMsg, setError]
+    );
+
+    const handleCopyPromptAsText = useCallback(
+        async (markdownText: string): Promise<boolean> => {
+            try {
+                return await copyPromptCleanText(
+                    markdownText,
+                    (msg) => {
+                        setActionMsg(msg);
+                        setTimeout(() => setActionMsg(null), 2500);
+                    },
+                    (err) => {
+                        useErrorStore.getState().captureException(
+                            err instanceof Error ? err : new Error(String(err)),
+                            {
+                                source: 'PromptTreeViewModal.handleCopyPromptAsText',
+                                triggerAction: 'copyPromptCleanText',
+                            }
+                        );
+                        setError('Failed to copy prompt as clean text to clipboard');
+                    }
+                );
+            } catch (err: unknown) {
+                useErrorStore.getState().captureError(err, {
+                    source: 'PromptTreeViewModal.handleCopyPromptAsText',
+                    triggerAction: 'copy_prompt_as_text',
+                });
+                setError(err instanceof Error ? err.message : String(err) || 'Failed to copy prompt as text');
+                return false;
+            }
+        },
+        [setActionMsg, setError]
+    );
+
     /**
      * Export the full prompt tree (prompts, structure, metadata) to a
      * portable SQLite `.db` file. Tauri: native save dialog. Web: byte
@@ -786,9 +853,11 @@ export function usePromptTreeCoreActions({
             const ext = format === 'sqlite' ? 'db' : format === 'yaml' ? 'yaml' : 'json';
             const targetSlug = scope.project_name || scope.project_id || scope.conversation_id || scope.target_type;
             const mode = export_mode || (embed_images ? 'standalone' : 'lean');
-            const modeLabel = mode === 'standalone' ? 'Standalone' : 'Lean';
-            const modeSuffix = format === 'json' ? (mode === 'standalone' ? '-standalone' : '-lean') : '';
-            const fileName = `prompt-tree-${targetSlug}${modeSuffix}-${Date.now()}.${ext}`;
+            const modeLabel = mode === 'standalone' ? 'Standalone' : 'Clean';
+            const extSuffix = format === 'json'
+                ? (mode === 'standalone' ? 'standalone.json' : 'lean.json')
+                : ext;
+            const fileName = `prompt-tree-${targetSlug}-${Date.now()}.${extSuffix}`;
 
             try {
                 if (!isTauri()) {
@@ -828,9 +897,15 @@ export function usePromptTreeCoreActions({
                     ? [{ name: 'SQLite Database', extensions: ['db', 'sqlite'] }]
                     : format === 'yaml'
                     ? [{ name: 'YAML Document', extensions: ['yaml', 'yml'] }]
-                    : modeLabel === 'Standalone'
-                    ? [{ name: 'Standalone JSON Envelope v2.0 (Portable)', extensions: ['json'] }]
-                    : [{ name: 'Lean JSON Envelope v2.0 (Linked)', extensions: ['json'] }];
+                    : mode === 'standalone'
+                    ? [
+                        { name: 'Standalone JSON (.standalone.json)', extensions: ['standalone.json', 'json'] },
+                        { name: 'JSON Document (.json)', extensions: ['json'] },
+                      ]
+                    : [
+                        { name: 'Clean JSON (.lean.json)', extensions: ['lean.json', 'json'] },
+                        { name: 'JSON Document (.json)', extensions: ['json'] },
+                      ];
 
                 const selected = await save({
                     defaultPath: fileName,
@@ -916,6 +991,8 @@ export function usePromptTreeCoreActions({
         handleFileRestore,
         handleRestore,
         handleCopyAllTreePrompts,
+        handleCopyPromptWithImages,
+        handleCopyPromptAsText,
         handleExportSqlite,
         handleImportSqlite,
         handleExportRunningJson,

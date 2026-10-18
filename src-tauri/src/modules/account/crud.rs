@@ -3,12 +3,30 @@ pub use crate::models::{
     TokenData,
 };
 use crate::modules;
+use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::RwLock;
 use uuid::Uuid;
 
 use super::*;
+
+#[derive(Clone)]
+struct CachedAccountList {
+    accounts: Vec<Account>,
+    cached_at: i64,
+}
+
+static ACCOUNT_LIST_CACHE: Lazy<RwLock<Option<CachedAccountList>>> =
+    Lazy::new(|| RwLock::new(None));
+
+/// Invalidate the in-memory account list cache when accounts or indexes change
+pub fn invalidate_account_list_cache() {
+    if let Ok(mut guard) = ACCOUNT_LIST_CACHE.write() {
+        *guard = None;
+    }
+}
 
 /// Load account data
 pub fn load_account(account_id: &str) -> Result<Account, String> {
@@ -44,7 +62,10 @@ pub(crate) fn save_account_at_path(
         .map_err(|e| format!("failed_to_serialize_account_data: {}", e))?;
 
     crate::utils::fs::write_atomic(account_path, content.as_bytes())
-        .map_err(|e| format!("failed_to_save_account_file: {}", e))
+        .map_err(|e| format!("failed_to_save_account_file: {}", e))?;
+
+    invalidate_account_list_cache();
+    Ok(())
 }
 
 /// Save account data (thread-safe and atomic)
@@ -65,6 +86,15 @@ pub fn update_account_priority(account_id: &str, priority: u8) -> Result<(), Str
 
 /// List all accounts
 pub fn list_accounts() -> Result<Vec<Account>, String> {
+    let now = chrono::Utc::now().timestamp();
+    if let Ok(guard) = ACCOUNT_LIST_CACHE.read() {
+        if let Some(ref cached) = *guard {
+            if now - cached.cached_at < 30 {
+                return Ok(cached.accounts.clone());
+            }
+        }
+    }
+
     crate::modules::logger::log_info("Listing accounts...");
     let index = load_account_index()?;
     let mut accounts = Vec::new();
@@ -87,6 +117,14 @@ pub fn list_accounts() -> Result<Vec<Account>, String> {
     if let Err(error) = crate::modules::token_stats::populate_weekly_usage(&mut accounts) {
         tracing::warn!("Weekly token usage unavailable: {}", error);
     }
+
+    if let Ok(mut guard) = ACCOUNT_LIST_CACHE.write() {
+        *guard = Some(CachedAccountList {
+            accounts: accounts.clone(),
+            cached_at: now,
+        });
+    }
+
     Ok(accounts)
 }
 
@@ -291,6 +329,7 @@ pub fn delete_account(account_id: &str) -> Result<(), String> {
 
     // [FIX #1477] Trigger TokenManager cache cleanup signal
     crate::proxy::server::trigger_account_delete(account_id);
+    invalidate_account_list_cache();
 
     Ok(())
 }
@@ -329,7 +368,9 @@ pub fn delete_accounts(account_ids: &[String]) -> Result<(), String> {
         index.current_account_id = index.accounts.first().map(|s| s.id.clone());
     }
 
-    save_account_index(&index)
+    save_account_index(&index)?;
+    invalidate_account_list_cache();
+    Ok(())
 }
 
 /// Reorder account list

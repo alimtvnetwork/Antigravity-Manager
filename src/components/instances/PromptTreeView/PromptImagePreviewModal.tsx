@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, type WheelEvent, type MouseEvent } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Copy, Check, Download, X, Image as ImageIcon, FileText } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Copy, Check, Download, X, Image as ImageIcon, FileText, Maximize2 } from 'lucide-react';
 import { writeNativeImageToClipboard, copyImageAsMarkdownText, copySingleImageForOneNoteOrIde } from './clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 
@@ -25,6 +25,11 @@ export function PromptImagePreviewModal({
     const dragStartRef = useRef({ x: 0, y: 0, initialPanX: 0, initialPanY: 0 });
 
     const handleResetZoom = useCallback(() => {
+        setZoomScale(1);
+        setPanPosition({ x: 0, y: 0 });
+    }, []);
+
+    const handleScaleToFit = useCallback(() => {
         setZoomScale(1);
         setPanPosition({ x: 0, y: 0 });
     }, []);
@@ -192,22 +197,52 @@ export function PromptImagePreviewModal({
         }
     }, [altText, imageSrc]);
 
-    const handleDownload = useCallback(() => {
+    const handleDownload = useCallback(async () => {
         if (!imageSrc) return;
         try {
-            const a = document.createElement('a');
-            a.href = imageSrc;
             const extMatch = imageSrc.match(/\.(png|jpe?g|webp|gif|svg)(?:\?.*)?$/i);
             const ext = extMatch ? extMatch[1].toLowerCase() : 'png';
-            a.download = `prompt-attachment-${Date.now()}.${ext}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            const filename = `prompt-attachment-${Date.now()}.${ext}`;
+
+            if (imageSrc.startsWith('data:')) {
+                const a = document.createElement('a');
+                a.href = imageSrc;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } else {
+                // For http/https/asset urls, fetch blob to ensure cross-origin/Tauri asset downloads properly
+                const response = await fetch(imageSrc);
+                const blob = await response.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(blobUrl);
+            }
         } catch (err) {
             useErrorStore.getState().trackWarning(err, {
                 source: 'PromptImagePreviewModal.handleDownload',
                 triggerAction: 'download_image',
             });
+            // Fallback to direct anchor click
+            try {
+                const a = document.createElement('a');
+                a.href = imageSrc;
+                a.download = `prompt-attachment-${Date.now()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } catch (fallbackErr) {
+                useErrorStore.getState().trackWarning(fallbackErr, {
+                    source: 'PromptImagePreviewModal.handleDownload.fallback',
+                    triggerAction: 'download_image_fallback',
+                });
+            }
         }
     }, [imageSrc]);
 
@@ -258,6 +293,14 @@ export function PromptImagePreviewModal({
                         <ZoomIn className="w-3.5 h-3.5" />
                     </button>
                     <div className="w-[1px] h-4 bg-slate-700 mx-0.5" />
+                    <button
+                        type="button"
+                        onClick={handleScaleToFit}
+                        className="p-1.5 rounded-md hover:bg-slate-800 transition-colors cursor-pointer"
+                        title="Scale to Fit (100%)"
+                    >
+                        <Maximize2 className="w-3.5 h-3.5" />
+                    </button>
                     <button
                         type="button"
                         onClick={handleResetZoom}
@@ -319,6 +362,7 @@ export function PromptImagePreviewModal({
                 className="relative flex-1 w-full flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing p-4"
                 onWheel={handleWheel}
                 onMouseDown={handleMouseDown}
+                onDoubleClick={handleResetZoom}
                 onClick={(e) => e.stopPropagation()}
             >
                 <img

@@ -746,61 +746,66 @@ pub fn send_prompt_now_for_instance(
         }
     }
 
-    // 4. Dispatch via agy CLI execution with direct CDP graceful degradation fallback.
-    // Explicit user Send/Rerun replaces any lingering agy worker for this workspace.
-    if let Err(spawn_err) = spawn_or_replace_prompt_via_agy(&active_prompt, true) {
-        tracing::warn!(
-            target: "repo_db",
-            prompt_id = %active_prompt.id,
-            instance_id = %canonical_inst,
-            repo_path = %repo_path,
-            error = %spawn_err,
-            "agy CLI dispatch failed; attempting direct CDP insertion fallback"
-        );
+    // 4. Dispatch: Prioritize live DevTools CDP submission if IDE is running, falling back to agy CLI.
+    let clean_prompt = extract_clean_user_prompt(prompt_content);
+    let fallback_prompt = if clean_prompt.trim().is_empty() {
+        prompt_content.trim()
+    } else {
+        clean_prompt.as_str()
+    };
 
-        // Fallback: Direct DevTools insertion into running Antigravity IDE with retry ladder
-        let clean_prompt = extract_clean_user_prompt(prompt_content);
-        let fallback_prompt = if clean_prompt.trim().is_empty() {
-            prompt_content.trim()
-        } else {
-            clean_prompt.as_str()
-        };
-        let mut cdp_ok = false;
-        let max_cdp_attempts = if was_cold_started { 4 } else { 2 };
+    let mut dispatched_via_cdp = false;
+    let (is_running, _, pids) =
+        crate::modules::instance::is_instance_process_running_smart(&canonical_inst);
+    if is_running {
+        crate::modules::instance::focus_running_instance(&pids, Some(repo_path));
+        let max_cdp_attempts = if was_cold_started { 3 } else { 1 };
         for attempt in 1..=max_cdp_attempts {
             if crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
                 &canonical_inst,
                 fallback_prompt,
             ) {
-                cdp_ok = true;
+                dispatched_via_cdp = true;
                 break;
             }
             if attempt < max_cdp_attempts {
                 std::thread::sleep(std::time::Duration::from_millis(500));
             }
         }
+    }
 
-        if cdp_ok {
-            crate::modules::logger::log_info(&format!(
-                "[RepoDB] Direct CDP fallback succeeded for prompt '{}' on instance '{}' (cold-start: {})",
-                active_prompt.id, canonical_inst, was_cold_started
-            ));
-            crate::modules::audit::record_if_active(
-                "backend",
-                "repo_db",
-                "cdp_dispatch_fallback",
-                &format!("instance:{canonical_inst}"),
-                serde_json::json!({
-                    "promptId": active_prompt.id,
-                    "instanceId": canonical_inst,
-                    "repoPath": repo_path,
-                    "fallback": "cdp_direct",
-                    "coldStarted": was_cold_started,
-                }),
-                "ok",
-                "Prompt dispatched via live DevTools CDP fallback",
+    if dispatched_via_cdp {
+        crate::modules::logger::log_info(&format!(
+            "[RepoDB] Direct CDP dispatch succeeded for prompt '{}' on instance '{}' (cold-start: {})",
+            active_prompt.id, canonical_inst, was_cold_started
+        ));
+        crate::modules::audit::record_if_active(
+            "backend",
+            "repo_db",
+            "cdp_dispatch",
+            &format!("instance:{canonical_inst}"),
+            serde_json::json!({
+                "promptId": active_prompt.id,
+                "instanceId": canonical_inst,
+                "repoPath": repo_path,
+                "dispatch": "cdp_direct",
+                "coldStarted": was_cold_started,
+            }),
+            "ok",
+            "Prompt dispatched directly via live DevTools CDP into running IDE",
+        );
+    } else {
+        // Fallback: Dispatch via agy CLI execution.
+        // Explicit user Send/Rerun replaces any lingering agy worker for this workspace.
+        if let Err(spawn_err) = spawn_or_replace_prompt_via_agy(&active_prompt, true) {
+            tracing::warn!(
+                target: "repo_db",
+                prompt_id = %active_prompt.id,
+                instance_id = %canonical_inst,
+                repo_path = %repo_path,
+                error = %spawn_err,
+                "agy CLI dispatch failed and direct CDP was unavailable"
             );
-        } else {
             let focus_note = match crate::modules::instance::ensure_instance_running_for_dispatch(
                 &canonical_inst,
                 Some(repo_path),
@@ -809,14 +814,14 @@ pub fn send_prompt_now_for_instance(
                 Err(focus_err) => format!("IDE focus failed: {focus_err}"),
             };
             return Err(format!(
-                "{spawn_err}; direct CDP fallback failed after {max_cdp_attempts} attempts; {focus_note}"
+                "{spawn_err}; direct CDP dispatch unavailable; {focus_note}"
+            ));
+        } else {
+            crate::modules::logger::log_info(&format!(
+                "[RepoDB] send_prompt_now_for_instance dispatched prompt '{}' for instance '{}' in '{}' (cold-start: {}) via agy CLI",
+                active_prompt.id, canonical_inst, repo_path, was_cold_started
             ));
         }
-    } else {
-        crate::modules::logger::log_info(&format!(
-            "[RepoDB] send_prompt_now_for_instance dispatched prompt '{}' for instance '{}' in '{}' (cold-start: {})",
-            active_prompt.id, canonical_inst, repo_path, was_cold_started
-        ));
     }
 
     Ok(active_prompt)

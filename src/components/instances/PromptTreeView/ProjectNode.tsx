@@ -18,7 +18,7 @@ import { classifyPromptTier, assembleConversationHierarchy, isAutomatedConversat
 import { formatSeqBadge } from './formatters';
 import { ConversationNode, getConversationStatus } from './ConversationNode';
 import { ProjectContextMenu } from './ProjectContextMenu';
-import { ConversationContextMenu } from './ConversationContextMenu';
+import { PromptTreeContextMenu } from './PromptTreeContextMenu';
 
 export interface ProjectNodeProps {
     project: AgmProjectTreeNode;
@@ -55,14 +55,26 @@ export function sortConversations(
 ): AgmConversationNode[] {
     let sorted = [...convs];
     if (activeFilter === 'running') {
-        sorted = sorted.filter((c) => Boolean(c.is_running));
+        sorted = sorted.filter((c) => {
+            const status = (c.status || '').toLowerCase();
+            return Boolean(c.is_running) || status.includes('run') || status.includes('exec');
+        });
     }
     return sorted.sort((a, b) => {
-        const aRunning = Boolean(a.is_running);
-        const bRunning = Boolean(b.is_running);
+        const aStatus = (a.status || '').toLowerCase();
+        const bStatus = (b.status || '').toLowerCase();
+        const aRunning = Boolean(a.is_running) || aStatus.includes('run') || aStatus.includes('exec');
+        const bRunning = Boolean(b.is_running) || bStatus.includes('run') || bStatus.includes('exec');
         if (aRunning !== bRunning) {
             return aRunning ? -1 : 1;
         }
+
+        const aQueued = Boolean(a.is_queued) || aStatus.includes('queue');
+        const bQueued = Boolean(b.is_queued) || bStatus.includes('queue');
+        if (aQueued !== bQueued) {
+            return aQueued ? -1 : 1;
+        }
+
         const aTime = new Date(a.last_modified).getTime() || 0;
         const bTime = new Date(b.last_modified).getTime() || 0;
         return bTime - aTime;
@@ -221,7 +233,8 @@ function ConversationListWithGrouping({
             ))}
 
             {subagentMenuPos && (
-                <ConversationContextMenu
+                <PromptTreeContextMenu
+                    type="conversation"
                     x={subagentMenuPos.x}
                     y={subagentMenuPos.y}
                     conversationId={subagentMenuPos.conv.conversation_id}

@@ -107,4 +107,5 @@ scratch/*.dump
 .gitmap/backup/
 .antigravity_*.json
 *.db
+AGM_INSTANCE_STATUS.md
 

@@ -187,7 +187,11 @@ pub async fn check_update_via_script() -> Result<UpdateInfo, String> {
     logger::log_warn(
         "Script update check did not yield parseable result, falling back to check_for_updates",
     );
-    check_for_updates().await
+    let mut info = check_for_updates().await?;
+    info.current_version = CURRENT_VERSION.to_string();
+    let is_newer = compare_versions(&info.latest_version, CURRENT_VERSION);
+    info.has_update = is_newer && verify_tag_has_platform_asset(&info.latest_version).await;
+    Ok(info)
 }
 
 /// Run official installer to update the tool to the latest version

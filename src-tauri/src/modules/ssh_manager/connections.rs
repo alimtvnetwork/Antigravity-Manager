@@ -3,38 +3,40 @@ use std::fs;
 
 use super::*;
 
+fn load_connections_from_file(path: &std::path::Path) -> Option<Vec<SshConnectionRecord>> {
+    let is_valid_file = path.is_file();
+    if !is_valid_file {
+        return None;
+    }
+    let raw = fs::read_to_string(path).ok()?;
+    let conns = decode_connections_from_json(&raw).ok()?;
+    let has_connections = !conns.is_empty();
+    if has_connections {
+        Some(conns)
+    } else {
+        None
+    }
+}
+
 /// Load all stored SSH connections, auto-seeding from repo-secrets / gitmap if empty
 pub fn load_ssh_connections() -> Result<Vec<SshConnectionRecord>, String> {
     let store_path = get_ssh_nodes_store_path()?;
-    if store_path.exists() {
-        if let Ok(raw) = fs::read_to_string(&store_path) {
-            if let Ok(conns) = decode_connections_from_json(&raw) {
-                if !conns.is_empty() {
-                    return Ok(conns);
-                }
-            }
-        }
+    if let Some(conns) = load_connections_from_file(&store_path) {
+        return Ok(conns);
     }
 
     // Auto-seed from candidate gitmap-ssh-nodes.json if available
     for seed_path in candidate_seed_node_paths() {
-        if seed_path.exists() && seed_path.is_file() {
-            if let Ok(raw) = fs::read_to_string(&seed_path) {
-                if let Ok(mut conns) = decode_connections_from_json(&raw) {
-                    if !conns.is_empty() {
-                        for c in &mut conns {
-                            c.key_path = resolve_usable_key_path(&c.key_path);
-                        }
-                        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-                        crate::error::record_ignored(
-                            save_ssh_connections(&conns),
-                            "save_ssh_connections",
-                        );
-                        return Ok(conns);
-                    }
-                }
-            }
+        let Some(mut conns) = load_connections_from_file(&seed_path) else {
+            continue;
+        };
+
+        for c in &mut conns {
+            c.key_path = resolve_usable_key_path(&c.key_path);
         }
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(save_ssh_connections(&conns), "save_ssh_connections");
+        return Ok(conns);
     }
 
     Ok(Vec::new())
@@ -250,6 +252,70 @@ pub(crate) fn nodes_to_connections(nodes: &[SshNodeExportItem]) -> Vec<SshConnec
     ensure_connections_rsa_encrypted(&mapped)
 }
 
+fn normalize_incoming_connection(inc: &SshConnectionRecord) -> SshConnectionRecord {
+    let mut normalized = inc.clone();
+    normalized.key_path = resolve_usable_key_path(&normalized.key_path);
+    if normalized.os.is_empty() {
+        normalized.os = "linux".to_string();
+    }
+    normalized.username = resolve_username_placeholders(&normalized.username, &normalized.os);
+    if normalized.port == 0 {
+        normalized.port = 22;
+    }
+    normalized.encryption_algo = "RSA-2048".to_string();
+    normalized
+}
+
+fn is_connection_match(existing: &SshConnectionRecord, incoming: &SshConnectionRecord) -> bool {
+    let has_alias = !incoming.alias.is_empty();
+    let is_alias_match = has_alias && existing.alias.eq_ignore_ascii_case(&incoming.alias);
+    let has_ip = !incoming.ip_address.is_empty();
+    let is_ip_match = has_ip
+        && existing
+            .ip_address
+            .eq_ignore_ascii_case(&incoming.ip_address);
+
+    is_alias_match || is_ip_match
+}
+
+fn update_field_if_present(target: &mut String, incoming: &str) -> bool {
+    let has_incoming = !incoming.is_empty();
+    let is_different = *target != incoming;
+    if has_incoming && is_different {
+        *target = incoming.to_string();
+        true
+    } else {
+        false
+    }
+}
+
+fn merge_connection_updates(
+    curr: &mut SshConnectionRecord,
+    incoming: &SshConnectionRecord,
+) -> bool {
+    let mut is_updated = false;
+
+    is_updated |= update_field_if_present(&mut curr.alias, &incoming.alias);
+    is_updated |= update_field_if_present(&mut curr.ip_address, &incoming.ip_address);
+    is_updated |= update_field_if_present(&mut curr.username, &incoming.username);
+    is_updated |=
+        update_field_if_present(&mut curr.encrypted_password, &incoming.encrypted_password);
+
+    let has_valid_port = incoming.port != 0;
+    let is_port_different = curr.port != incoming.port;
+    if has_valid_port && is_port_different {
+        curr.port = incoming.port;
+        is_updated = true;
+    }
+
+    curr.encryption_algo = "RSA-2048".to_string();
+
+    is_updated |= update_field_if_present(&mut curr.key_path, &incoming.key_path);
+    is_updated |= update_field_if_present(&mut curr.os, &incoming.os);
+
+    is_updated
+}
+
 /// Smart match-and-update synchronization of incoming SSH connections
 pub fn sync_ssh_connections_locally(
     incoming_list: &[SshConnectionRecord],
@@ -262,65 +328,15 @@ pub fn sync_ssh_connections_locally(
     let now = Utc::now().to_rfc3339();
 
     for inc in &ensure_connections_rsa_encrypted(incoming_list) {
-        let mut normalized_inc = inc.clone();
-        normalized_inc.key_path = resolve_usable_key_path(&normalized_inc.key_path);
-        if normalized_inc.os.is_empty() {
-            normalized_inc.os = "linux".to_string();
-        }
-        normalized_inc.username =
-            resolve_username_placeholders(&normalized_inc.username, &normalized_inc.os);
-        if normalized_inc.port == 0 {
-            normalized_inc.port = 22;
-        }
-        normalized_inc.encryption_algo = "RSA-2048".to_string();
-
-        let pos = existing.iter().position(|e| {
-            (!normalized_inc.alias.is_empty()
-                && e.alias.eq_ignore_ascii_case(&normalized_inc.alias))
-                || (!normalized_inc.ip_address.is_empty()
-                    && e.ip_address
-                        .eq_ignore_ascii_case(&normalized_inc.ip_address))
-        });
+        let mut normalized_inc = normalize_incoming_connection(inc);
+        let pos = existing
+            .iter()
+            .position(|e| is_connection_match(e, &normalized_inc));
 
         if let Some(idx) = pos {
             stats.matched += 1;
-            let curr = &mut existing[idx];
-            let mut changed = false;
-
-            if !normalized_inc.alias.is_empty() && curr.alias != normalized_inc.alias {
-                curr.alias = normalized_inc.alias.clone();
-                changed = true;
-            }
-            if !normalized_inc.ip_address.is_empty() && curr.ip_address != normalized_inc.ip_address
-            {
-                curr.ip_address = normalized_inc.ip_address.clone();
-                changed = true;
-            }
-            if !normalized_inc.username.is_empty() && curr.username != normalized_inc.username {
-                curr.username = normalized_inc.username.clone();
-                changed = true;
-            }
-            if !normalized_inc.encrypted_password.is_empty()
-                && curr.encrypted_password != normalized_inc.encrypted_password
-            {
-                curr.encrypted_password = normalized_inc.encrypted_password.clone();
-                changed = true;
-            }
-            if normalized_inc.port != 0 && curr.port != normalized_inc.port {
-                curr.port = normalized_inc.port;
-                changed = true;
-            }
-            curr.encryption_algo = "RSA-2048".to_string();
-            if !normalized_inc.key_path.is_empty() && curr.key_path != normalized_inc.key_path {
-                curr.key_path = normalized_inc.key_path.clone();
-                changed = true;
-            }
-            if !normalized_inc.os.is_empty() && curr.os != normalized_inc.os {
-                curr.os = normalized_inc.os.clone();
-                changed = true;
-            }
-
-            if changed {
+            let is_changed = merge_connection_updates(&mut existing[idx], &normalized_inc);
+            if is_changed {
                 stats.updated += 1;
             } else {
                 stats.unchanged += 1;

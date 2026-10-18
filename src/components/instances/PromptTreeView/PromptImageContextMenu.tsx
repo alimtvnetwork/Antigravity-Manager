@@ -8,6 +8,7 @@ export interface PromptImageContextMenuProps {
     isOpen: boolean;
     position: { x: number; y: number };
     imageSrc: string;
+    rawPath?: string;
     altText?: string;
     allImages?: string[];
     onClose: () => void;
@@ -18,6 +19,7 @@ export function PromptImageContextMenu({
     isOpen,
     position,
     imageSrc,
+    rawPath,
     altText,
     allImages,
     onClose,
@@ -27,6 +29,7 @@ export function PromptImageContextMenu({
     const [isImageCopied, setIsImageCopied] = useState(false);
     const [isAllImagesCopied, setIsAllImagesCopied] = useState(false);
     const [isMarkdownCopied, setIsMarkdownCopied] = useState(false);
+    const [isMarkdownPathCopied, setIsMarkdownPathCopied] = useState(false);
     const [isOneNoteCopied, setIsOneNoteCopied] = useState(false);
     const [isLinkCopied, setIsLinkCopied] = useState(false);
 
@@ -167,6 +170,24 @@ export function PromptImageContextMenu({
         }
     }, [altText, imageSrc, onClose]);
 
+    const handleCopyMarkdownPath = useCallback(async () => {
+        try {
+            const target = rawPath || imageSrc;
+            const md = `![${altText || 'Image'}](${target})`;
+            await copyToClipboard(md);
+            setIsMarkdownPathCopied(true);
+            setTimeout(() => {
+                setIsMarkdownPathCopied(false);
+                onClose();
+            }, 1200);
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'PromptImageContextMenu.handleCopyMarkdownPath',
+                triggerAction: 'context_menu_copy_markdown_path',
+            });
+        }
+    }, [altText, imageSrc, rawPath, onClose]);
+
     const handleCopyForOneNote = useCallback(async () => {
         try {
             const isSuccess = await copySingleImageForOneNoteOrIde(
@@ -281,7 +302,22 @@ export function PromptImageContextMenu({
                     <Layers className="w-3.5 h-3.5 text-purple-400" />
                 )}
                 <span className="font-medium">
-                    {isAllImagesCopied ? 'Copied All Images!' : 'Copy All Attached Images'}
+                    {isAllImagesCopied ? 'Copied All Images!' : 'Copy All Images (Rich HTML)'}
+                </span>
+            </button>
+
+            <button
+                type="button"
+                onClick={handleCopyMarkdownPath}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-left text-slate-200 hover:bg-purple-600/25 hover:text-purple-200 transition-colors cursor-pointer"
+            >
+                {isMarkdownPathCopied ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                    <FileText className="w-3.5 h-3.5 text-sky-400" />
+                )}
+                <span className="font-medium">
+                    {isMarkdownPathCopied ? 'Copied Markdown Path!' : 'Copy Markdown Path (![alt](path))'}
                 </span>
             </button>
 
@@ -293,7 +329,7 @@ export function PromptImageContextMenu({
                 {isMarkdownCopied ? (
                     <Check className="w-3.5 h-3.5 text-emerald-400" />
                 ) : (
-                    <FileText className="w-3.5 h-3.5 text-sky-400" />
+                    <FileText className="w-3.5 h-3.5 text-cyan-400" />
                 )}
                 <span className="font-medium">
                     {isMarkdownCopied ? 'Copied Image as Text!' : 'Copy Image as Text (Markdown)'}

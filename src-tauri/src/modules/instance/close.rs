@@ -1321,16 +1321,25 @@ pub fn detect_caller_instance_id() -> Option<String> {
                         }
                     }
                 }
-            } else {
-                if let Some(ref reg) = registry {
-                    for inst in &reg.instances {
-                        let marker = format!("antigravity-{}", inst.id.to_lowercase());
-                        if exe_name.contains(&marker) || proc_name.contains(&marker) {
-                            return Some(inst.id.clone());
+            } else if let Some(ref reg) = registry {
+                for inst in &reg.instances {
+                    let marker = format!("antigravity-{}", inst.id.to_lowercase());
+                    if exe_name.contains(&marker) || proc_name.contains(&marker) {
+                        return Some(inst.id.clone());
+                    }
+                }
+                if let Some(def_inst) = reg
+                    .instances
+                    .iter()
+                    .find(|i| i.is_default || i.id == "default")
+                {
+                    if let Some(ref def_exe) = def_inst.executable_path {
+                        let norm_def_exe = def_exe.to_lowercase().replace('\\', "/");
+                        if ancestor_exes.iter().any(|a| a == &norm_def_exe) {
+                            return Some("default".to_string());
                         }
                     }
                 }
-                return Some("default".to_string());
             }
         }
 

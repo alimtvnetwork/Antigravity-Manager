@@ -697,6 +697,7 @@ pub fn extract_conversation_prompt_turns(
     let mut raw_turns: Vec<RawTurnInfo> = Vec::new();
     let mut last_model_step_idx: Option<usize> = None;
     let mut last_model_is_done = false;
+    let mut last_completed_model_step_idx: Option<usize> = None;
 
     for (line_idx, line_res) in reader.lines().enumerate() {
         let line = match line_res {
@@ -829,6 +830,9 @@ pub fn extract_conversation_prompt_turns(
                     || s_status.eq_ignore_ascii_case("IDLE"));
             last_model_step_idx = Some(step_idx);
             last_model_is_done = is_done;
+            if is_done {
+                last_completed_model_step_idx = Some(step_idx);
+            }
         }
     }
 
@@ -873,7 +877,17 @@ pub fn extract_conversation_prompt_turns(
                     ("QUEUED".to_string(), false, true)
                 }
             }
-            None => ("COMPLETED".to_string(), false, false),
+            None => {
+                let is_beyond_last_completed = match last_completed_model_step_idx {
+                    Some(last_comp) => turn.step_index > last_comp,
+                    None => true,
+                };
+                if is_beyond_last_completed {
+                    ("QUEUED".to_string(), false, true)
+                } else {
+                    ("COMPLETED".to_string(), false, false)
+                }
+            }
         };
 
         let (preview_200w, _) =

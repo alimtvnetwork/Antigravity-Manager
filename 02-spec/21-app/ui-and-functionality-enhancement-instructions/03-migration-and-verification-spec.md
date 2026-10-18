@@ -1,29 +1,44 @@
-# Migration, Updater & Verification Specification
+# Migration and Verification Specification: UI and Functionality Enhancement Instructions
 
-## 1. Updater Version Detection & Pinned Version Execution
-
-### 1.1 Live Version Extraction
-- In `install.ps1`, update `Get-InstalledVersion` to query running process binaries and PE file headers (`[System.Diagnostics.FileVersionInfo]::GetVersionInfo($exePath).ProductVersion`) before falling back to registry values.
-- In `Sync-InstalledAppsRegistryBranding`, set `DisplayVersion` to `$currentVer` alongside `DisplayName`.
-
-### 1.2 Pinned Version Tag URL Resolution
-- In `install.ps1` (`Resolve-PinnedVersion`), expand the regex matcher to match GitHub release tag URLs:
-  `'(?i)(?:releases/tag/|releases/download/|raw\.githubusercontent\.com/...)(?:v)?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?(?:#.*)?)'`
-- Allow downgrade installation when `$isPinned` is `$true` by bypassing the `-le` version abort guard.
+**Slug:** `ui-and-functionality-enhancement-instructions`  
+**Status:** `ACTIVE`  
+**Version:** `1.0.0`  
+**Author:** `@aukgit`
 
 ---
 
-## 2. Standalone JSON Import / Export Specifications
+## 1. Migration Strategy & Zero Regression Safeguards
 
-- Standard envelope schema v2.0 (`ExportEnvelope`):
-  - `embed_images: true`: Reads images from disk, converts to base64, and embeds in `embedded_images` map. Portable across any machine or environment.
-  - `embed_images: false`: Normalizes file paths with `${workDir}` and `${repoDir}` relative anchors for lean disk storage.
+### 1.1 Multi-Instance Running Prompt Isolation Verification
+- **Verification Criterion:**
+  - Launch an active prompt in Instance #2 (`default-copy-5597`).
+  - Query running project nodes via IPC: Instance #1 (`default`) MUST NOT report `hasActiveTask = true` and MUST NOT render a pulsing green "Prompt" badge on its instance card.
+  - Instance #2 MUST render the pulsing green "Prompt" badge.
 
----
+### 1.2 Button Rounding & Layout Compaction Verification
+- **Verification Criterion:**
+  - In `PromptTreeViewModal`, inspect rendered DOM classes.
+  - Action buttons must use `rounded-md` / `rounded-[5px]`; zero `rounded-full` classes on prompt view mode, action pills, or category tabs.
+  - View mode toggle `[Input | Output | Expand Full]` must sit contiguous on the right-hand side of the secondary header.
 
-## 3. Coding Guidelines & Verification Strategy
+### 1.3 Context Menu Verification
+- **Verification Criterion:**
+  - Right-clicking any conversation item in the left-hand sidebar opens the unified context menu at cursor coordinates.
+  - Menu options dispatch accurately on the target conversation.
+  - Fast mouse-wheel scroll does not prematurely dismiss the menu.
 
-- Standardize positive boolean flags (`is`, `has`, `should`, `can`).
-- Eliminate double negatives in conditional chains (`!a && !b` -> helper function or inverted positive guard).
-- Encapsulate magic constants in enums or constants modules.
-- Verification via targeted syntax and unit testing per module.
+### 1.4 Standalone JSON Export & Overlay Verification
+- **Verification Criterion:**
+  - Exporting a conversation with "Standalone Mode (Embed Images)" produces a JSON envelope with base64 embedded images and `${workDir}` paths.
+  - Opening the Export or Import modal displays a readable backdrop without turning completely black.
+  - Clicking on the outer modal scrollbar does not close the dialog.
+
+### 1.5 Updater & Pinned Version Verification
+- **Verification Criterion:**
+  - Running updater with a GitHub release URL (`https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v4.226.3`) parses version `v4.226.3` correctly without 404.
+  - `install.ps1` detects the active installed version from `agm-ui.exe` rather than reporting `v4.190.0`.
+  - Shortcuts correctly launch `agm-ui.exe`.
+
+### 1.6 Fleet Mesh Table Verification
+- **Verification Criterion:**
+  - With Supabase sync disabled, the Fleet Mesh table renders configured remote nodes (e.g. `w2`, `w3`, `main`) showing their IP, alias, and an offline status badge instead of hiding the entire section.

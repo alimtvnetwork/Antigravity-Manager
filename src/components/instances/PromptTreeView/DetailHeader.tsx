@@ -1,11 +1,10 @@
 import { copyToClipboard } from '../../../utils/clipboard';
-import { copyImageAsMarkdownText, copySingleImageForOneNoteOrIde, writeNativeImageToClipboard, copyPromptWithRichImages, extractAssets } from './clipboard';
+import { copyImageAsMarkdownText, copySingleImageForOneNoteOrIde, writeNativeImageToClipboard, copyPromptWithRichImages, extractAssets, stripImagesFromPrompt } from './clipboard';
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { PromptOriginTier, CopyFormat, type AgmConversationNode } from './types';
-import { stripImagesFromPrompt } from './formatters';
 import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, RERUN_MESSAGE_OPTIONS, RERUN_RANDOM_MESSAGE_SET, RERUN_DEFAULT_COUNT, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
 import { classifyPromptTier } from './tierClassification';
 import { isGhostConversation } from './conversationGuards';
@@ -106,7 +105,7 @@ export function DetailHeader(props: DetailHeaderProps) {
         isSendMenuOpen: propIsSendMenuOpen, setIsSendMenuOpen: propSetIsSendMenuOpen,
         isEnqueueMenuOpen: propIsEnqueueMenuOpen, setIsEnqueueMenuOpen: propSetIsEnqueueMenuOpen,
         isExportMenuOpen, setIsExportMenuOpen,
-        hasImages, instancePid, instanceSeqNum, instanceExeName, instanceNameDisplay,
+        hasImages, instancePid,
         formatDuration, elapsedSeconds,
         onCopyAllWithRichImages, onCopyCleanText, onCopyImageAsText,
         onCopyImageForOneNoteOrIde, onCopySingleImagePng,
@@ -397,7 +396,9 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 {tierInfo.tier === PromptOriginTier.SubagentInstruction && <Bot className="w-2.5 h-2.5 text-purple-500 shrink-0" />}
                                 {tierInfo.tier === PromptOriginTier.SystemMessage && <Terminal className="w-2.5 h-2.5 text-slate-500 shrink-0" />}
                                 {tierInfo.tier === PromptOriginTier.ToolOutput && <Wrench className="w-2.5 h-2.5 text-amber-500 shrink-0" />}
-                                <span>{isTurnSelected ? `Turn T${activeTurnNumber}` : (tierInfo.tier === PromptOriginTier.UserPrompt ? 'User Prompt' : tierInfo.tier === PromptOriginTier.SubagentInstruction ? 'Subagent' : tierInfo.tier === PromptOriginTier.SystemMessage ? 'System' : 'Tool Output')}</span>
+                                {(isTurnSelected || tierInfo.tier !== PromptOriginTier.UserPrompt) && (
+                                    <span>{isTurnSelected ? `Turn T${activeTurnNumber}` : (tierInfo.tier === PromptOriginTier.SubagentInstruction ? 'Subagent' : tierInfo.tier === PromptOriginTier.SystemMessage ? 'System' : 'Tool Output')}</span>
+                                )}
                             </span>
                         );
                     })()}
@@ -479,20 +480,12 @@ export function DetailHeader(props: DetailHeaderProps) {
                             </button>
                         </div>
                     )}
-
-                    {/* Subtle Instance Context */}
-                    <span
-                        className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate cursor-help hover:text-slate-200 transition-colors"
-                        title={`Instance #${instanceSeqNum} · ${instanceExeName} (${instanceNameDisplay})`}
-                    >
-                        {instanceNameDisplay}
-                    </span>
                 </div>
 
                 {/* Right: The Unified Segmented Dark-Glass Action Capsule */}
                 <div className="flex items-center shrink-0 ml-auto">
-                    <div className="relative flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
-                        {/* Segment 1: Copy Split Button [ Copy All | v ] */}
+                    <div className="relative flex items-center rounded-lg bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
+                        {/* Segment 1: Copy Split Button [ Copy All / Includes Image | v ] */}
                         <div className="flex items-center divide-x divide-slate-200/70 dark:divide-purple-500/20">
                             {/* Primary Button: Copy with images (Rich HTML + binary PNG) */}
                             <button
@@ -500,7 +493,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 onClick={handleCopyAll}
                                 data-ui-name="prompt-copy-all-btn"
                                 data-ui-id={`prompt-copy-all-${selectedConversation.conversation_id}`}
-                                className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                className="flex items-center gap-1.5 px-3 py-1 rounded-l-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 aria-label="Copy prompt text and all embedded images (rich HTML + binary PNG)"
                             >
                                 {isCopiedAllActive ? (
@@ -508,7 +501,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 ) : (
                                     <Copy className="w-3 h-3 text-purple-500 shrink-0" />
                                 )}
-                                <span>{isCopiedAllActive ? 'Copied All!' : 'Copy All'}</span>
+                                <span>{isCopiedAllActive ? 'Copied!' : 'Copy All / Includes Image'}</span>
                             </button>
 
                             {/* Dropdown Chevron for Clean Text, Image Saving, and Exports */}
@@ -609,7 +602,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 data-ui-id={`prompt-rerun-options-${selectedConversation.conversation_id}`}
                                 className={cn(
                                     "flex items-center justify-center px-1.5 py-1 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
-                                    !setIsDetailsModalOpen && "rounded-r-full"
+                                    !setIsDetailsModalOpen && "rounded-r-md"
                                 )}
                                 aria-label="Rerun configuration: count and message"
                             >
@@ -624,7 +617,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 onClick={() => setIsDetailsModalOpen(true)}
                                 data-ui-name="prompt-details-btn"
                                 data-ui-id={`prompt-details-${selectedConversation.conversation_id}`}
-                                className="flex items-center gap-1.5 px-3 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                className="flex items-center gap-1.5 px-3 py-1 rounded-r-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 aria-label="Open Conversation & Instance Details"
                             >
                                 <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
@@ -638,7 +631,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 className="absolute right-0 top-full mt-1.5 z-50 w-80 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-1"
                                 onMouseLeave={() => setIsCopyMenuOpen(false)}
                             >
-                                {/* Option 1: Copy Full Prompt (includes image) */}
+                                {/* Option 1: Copy All / Includes Image */}
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -651,12 +644,12 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 >
                                     <div className="flex items-center gap-2">
                                         {isCopiedAllActive ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-purple-500" />}
-                                        <span>{isCopiedAllActive ? 'Copied Full Prompt!' : 'Copy Full Prompt'}</span>
+                                        <span>{isCopiedAllActive ? 'Copied!' : 'Copy All / Includes Image'}</span>
                                     </div>
                                     <span className="text-[10px] text-purple-600 dark:text-purple-300 font-mono px-1.5 py-0.2 rounded-md bg-purple-500/10 border border-purple-500/20">includes image</span>
                                 </button>
 
-                                {/* Option 2: Copy without image (copy as text) */}
+                                {/* Option 2: Copy without image (text only) */}
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -669,9 +662,9 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 >
                                     <div className="flex items-center gap-2">
                                         {isCopiedTextActive ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <FileText className="w-3.5 h-3.5 text-slate-400" />}
-                                        <span>{isCopiedTextActive ? 'Copied as text!' : 'Copy without image'}</span>
+                                        <span>{isCopiedTextActive ? 'Copied without image!' : 'Copy without image (text only)'}</span>
                                     </div>
-                                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono px-1.5 py-0.2 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">copy as text</span>
+                                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono px-1.5 py-0.2 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">text only</span>
                                 </button>
 
                                 {/* Option 3: Copy Image as Text (Markdown) */}

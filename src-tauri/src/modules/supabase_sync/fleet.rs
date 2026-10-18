@@ -121,6 +121,16 @@ pub(crate) fn construct_local_machine_info(
 /// Fetch list of fleet machines with child instance profiles and active leases from Supabase.
 /// Falls back to returning local machine info if Supabase is offline or unconfigured.
 pub async fn fetch_fleet_machines() -> crate::error::AppResult<Vec<FleetMachineInfo>> {
+    if is_supabase_circuit_open() {
+        tracing::debug!(
+            target: "supabase_sync",
+            remaining_secs = get_supabase_cooldown_remaining_secs(),
+            "Supabase circuit breaker is open; returning local machine fallback without network requests"
+        );
+        let config = load_config().unwrap_or_default();
+        return Ok(vec![construct_local_machine_info(&config, &[])]);
+    }
+
     let config = match load_config() {
         Ok(c) => c,
         Err(e) => {
@@ -148,6 +158,7 @@ pub async fn fetch_fleet_machines() -> crate::error::AppResult<Vec<FleetMachineI
                     "Failed to initialize Supabase client for fleet query: {}",
                     e
                 );
+                record_supabase_network_error();
                 None
             }
         },
@@ -174,6 +185,7 @@ pub async fn fetch_fleet_machines() -> crate::error::AppResult<Vec<FleetMachineI
             },
             Err(e) => {
                 tracing::warn!(target: "supabase_sync", "Failed to fetch fleet table: {e}");
+                record_supabase_network_error();
             }
         }
 

@@ -192,11 +192,90 @@ function Get-InvocationHistoryCandidates {
     return $candidates
 }
 
+function Convert-ToSemVer {
+    param([string]$v)
+    $clean = $v -replace "^v", ""
+    $parts = $clean.Split("-")[0].Split(".")
+    $major = if ($parts.Length -ge 1) { [int]$parts[0] } else { 0 }
+    $minor = if ($parts.Length -ge 2) { [int]$parts[1] } else { 0 }
+    $patch = if ($parts.Length -ge 3) { [int]$parts[2] } else { 0 }
+    return [version]::new($major, $minor, $patch)
+}
+
+function Test-UrlReachable {
+    param(
+        [string]$Url,
+        [int]$TimeoutSec = 4
+    )
+    if (-not $Url) { return $false }
+    try {
+        $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
+        if ($curl) {
+            $code = & $curl.Source -fsSL -I -o NUL -w "%{http_code}" --connect-timeout $TimeoutSec --max-time ($TimeoutSec + 2) $Url 2>$null
+            if ($code -match '^(200|302|301)$') {
+                return $true
+            }
+            if ($code -eq '404') {
+                return $false
+            }
+        }
+        $req = [System.Net.HttpWebRequest]::Create($Url)
+        $req.Method = "HEAD"
+        $req.Timeout = $TimeoutSec * 1000
+        $req.AllowAutoRedirect = $true
+        $resp = $req.GetResponse()
+        $status = [int]$resp.StatusCode
+        $resp.Close()
+        return ($status -ge 200 -and $status -lt 400)
+    } catch {
+        if ($_.Exception.Response) {
+            $code = [int]$_.Exception.Response.StatusCode
+            if ($code -eq 404) { return $false }
+        }
+        return $true
+    }
+}
+
+function Test-ReleaseTagExists {
+    param([string]$TagVer)
+    if (-not $TagVer) { return $false }
+    $cleanTag = ($TagVer -replace '^v', '').Trim()
+    $candidateUrls = @(
+        "https://github.com/$Repo/releases/tag/v$cleanTag",
+        "https://github.com/$Repo/releases/tag/$cleanTag"
+    )
+    if ($cleanTag -match '^(\d+\.\d+)\.0$') {
+        $candidateUrls += "https://github.com/$Repo/releases/tag/v$($Matches[1])"
+    }
+    foreach ($url in $candidateUrls) {
+        if (Test-UrlReachable -Url $url -TimeoutSec 3) {
+            return $true
+        }
+    }
+    return $false
+}
+
 function Resolve-PinnedVersion {
     param(
         [string]$ExplicitVersion,
         [string]$BakedVersion
     )
+
+    # Detect -Force and explicit -Version from $args or PowerShell pipeline
+    if ($args -and $args.Count -gt 0) {
+        for ($i = 0; $i -lt $args.Count; $i++) {
+            $a = "$($args[$i])".Trim()
+            if ($a -match '^(?i)[/-]{1,2}force$') {
+                $global:Force = $true
+            }
+            if ($a -match '^(?i)[/-]{1,2}version$' -and ($i + 1) -lt $args.Count) {
+                if (-not $ExplicitVersion) {
+                    $ExplicitVersion = "$($args[$i + 1])".Trim()
+                }
+            }
+        }
+    }
+
     if (-not $ExplicitVersion) {
         if ($env:AGM_VERSION) {
             $ExplicitVersion = $env:AGM_VERSION
@@ -211,39 +290,69 @@ function Resolve-PinnedVersion {
             }
         }
     }
+
+    $entries = Get-InvocationHistoryCandidates
+    foreach ($entry in $entries) {
+        if ($entry -match '(?i)[/-]{1,2}force\b') {
+            $global:Force = $true
+        }
+        if (-not $ExplicitVersion) {
+            if ($entry -match '(?i)[/-]{1,2}version\s+["'']?v?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)\b') {
+                $ExplicitVersion = $Matches[1]
+            }
+        }
+    }
+
     if ($ExplicitVersion -and $ExplicitVersion -ne "latest") {
         # Check if ExplicitVersion is a GitHub release tag URL, e.g. https://github.com/.../releases/tag/v4.226.3
+        $clean = $ExplicitVersion
         if ($ExplicitVersion -match '(?i)(?:releases/tag/|releases/download/)(?:v)?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/?') {
             $clean = $Matches[1]
-            $parts = $clean.Split("-")[0].Split(".")
-            if ($parts.Length -eq 2) {
-                $clean = "$clean.0"
-            }
-            $global:isPinned = $true
-            Write-Step "Detected pinned release version from tag URL: v$clean"
-            return $clean
+        } else {
+            $clean = ($ExplicitVersion -replace "^v", "").Trim()
         }
-        $clean = ($ExplicitVersion -replace "^v", "").Trim()
         $parts = $clean.Split("-")[0].Split(".")
         if ($parts.Length -eq 2) {
             $clean = "$clean.0"
         }
+
+        # Check if target tag exists or if it's a pruned tag
+        $tagExists = Test-ReleaseTagExists -TagVer $clean
+        if (-not $tagExists) {
+            if ($global:Force -or $Force) {
+                Write-Warn "Target release tag 'v$clean' does not exist or may be a pruned release, but -Force was specified. Proceeding."
+                $global:isPinned = $true
+                return $clean
+            } else {
+                Write-Warn "Target release tag 'v$clean' was pruned or does not exist on GitHub releases. Skipping pruned version."
+                return $null
+            }
+        }
+
         $global:isPinned = $true
+        Write-Step "Target release version verified: v$clean"
         return $clean
     }
+
     if ($BakedVersion) {
         if ($BakedVersion -ne "__PINNED_VERSION__" -and $BakedVersion.Trim().Length -gt 0) {
-            Write-Step "Respecting pinned installer version: v$BakedVersion"
             $clean = ($BakedVersion -replace "^v", "").Trim()
             $parts = $clean.Split("-")[0].Split(".")
             if ($parts.Length -eq 2) {
                 $clean = "$clean.0"
             }
-            $global:isPinned = $true
-            return $clean
+            # Check if baked target tag exists or was pruned
+            $tagExists = Test-ReleaseTagExists -TagVer $clean
+            if ($tagExists -or $global:Force -or $Force) {
+                Write-Step "Respecting pinned installer version: v$clean"
+                $global:isPinned = $true
+                return $clean
+            } else {
+                Write-Warn "Baked pinned version 'v$clean' was pruned from GitHub releases. Falling back to dynamic resolution."
+            }
         }
     }
-    $entries = Get-InvocationHistoryCandidates
+
     $regexes = @(
         '(?i)(?:Antigravity-Manager/releases/download/|raw\.githubusercontent\.com/[^/]+/Antigravity-Manager/)(?:v)?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/',
         '(?i)(?:github\.com/[^/]+/Antigravity-Manager/releases/tag/|Antigravity-Manager/releases/tag/)(?:v)?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/?',
@@ -261,9 +370,15 @@ function Resolve-PinnedVersion {
                 if ($parts.Length -eq 2) {
                     $detected = "$detected.0"
                 }
-                Write-Step "Detected pinned version from download URL / invocation: v$detected"
-                $global:isPinned = $true
-                return $detected
+                # Check if detected tag exists or if it's a pruned tag
+                $tagExists = Test-ReleaseTagExists -TagVer $detected
+                if ($tagExists -or $global:Force -or $Force) {
+                    Write-Step "Detected pinned version from download URL / invocation: v$detected"
+                    $global:isPinned = $true
+                    return $detected
+                } else {
+                    Write-Warn "Detected candidate version 'v$detected' was pruned from GitHub releases. Skipping."
+                }
             }
         }
     }
@@ -275,6 +390,9 @@ $resolvedPin = Resolve-PinnedVersion -ExplicitVersion $Version -BakedVersion $Pi
 if ($resolvedPin) {
     $Version = $resolvedPin
     $isPinned = $true
+}
+if ($global:Force) {
+    $Force = [switch]::Present
 }
 
 # Resolve Architecture
@@ -951,7 +1069,72 @@ if ($Uninstall) {
 }
 
 function Get-InstalledVersion {
-    # Stage 0: Direct CLI check via active agm.exe / agm-ui.exe / agm-alim.exe binary
+    # Stage 0: Inspect Live Running Process Executables via PE Header (MainModule.FileVersionInfo.ProductVersion)
+    $runningVersions = [System.Collections.Generic.List[string]]::new()
+    try {
+        $runningProcs = Get-Process "agm-alim", "Antigravity Manager Tools", "AGM by Alim", "agm-ui", "agm" -ErrorAction SilentlyContinue
+        foreach ($p in $runningProcs) {
+            try {
+                $fvi = $p.MainModule.FileVersionInfo
+                if ($fvi) {
+                    $ver = if ($fvi.ProductVersion) { $fvi.ProductVersion } else { $fvi.FileVersion }
+                    if ($ver) {
+                        $clean = ($ver -replace '^v', '').Trim()
+                        if ($clean -notmatch '^2\.24' -and (-not $runningVersions.Contains($clean))) {
+                            $runningVersions.Add($clean)
+                        }
+                    }
+                }
+            } catch {}
+            $pPath = $null
+            try { $pPath = $p.Path } catch {}
+            if (-not $pPath) {
+                try { $pPath = $p.MainModule.FileName } catch {}
+            }
+            if ($pPath -and (Test-Path $pPath)) {
+                if ($pPath -match '(?i)Google\s*Antigravity') { continue }
+                try {
+                    $fvi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($pPath)
+                    $ver = if ($fvi.ProductVersion) { $fvi.ProductVersion } else { $fvi.FileVersion }
+                    if ($ver) {
+                        $clean = ($ver -replace '^v', '').Trim()
+                        if ($clean -notmatch '^2\.24' -and (-not $runningVersions.Contains($clean))) {
+                            $runningVersions.Add($clean)
+                        }
+                    }
+                } catch {}
+            }
+        }
+    } catch {}
+
+    try {
+        $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+            $_.Name -match '(?i)^(agm-alim|agm-ui|agm|Antigravity Manager Tools|AGM by Alim)\.exe$'
+        }
+        foreach ($proc in $procs) {
+            $pPath = $proc.ExecutablePath
+            if ($pPath -and (Test-Path $pPath)) {
+                if ($pPath -match '(?i)Google\s*Antigravity') { continue }
+                try {
+                    $fvi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($pPath)
+                    $ver = if ($fvi.ProductVersion) { $fvi.ProductVersion } else { $fvi.FileVersion }
+                    if ($ver) {
+                        $clean = ($ver -replace '^v', '').Trim()
+                        if ($clean -notmatch '^2\.24' -and (-not $runningVersions.Contains($clean))) {
+                            $runningVersions.Add($clean)
+                        }
+                    }
+                } catch {}
+            }
+        }
+    } catch {}
+
+    if ($runningVersions.Count -gt 0) {
+        $sortedProcs = @($runningVersions | Sort-Object -Descending -Property { Convert-ToSemVer $_ })
+        return $sortedProcs[0]
+    }
+
+    # Stage 1: Direct CLI check via active agm.exe / agm-ui.exe / agm-alim.exe binary
     $cliCandidates = [System.Collections.Generic.List[string]]::new()
     try {
         $agmCmds = Get-Command agm.exe, agm-ui.exe, agm-alim.exe -All -ErrorAction SilentlyContinue
@@ -1019,55 +1202,6 @@ function Get-InstalledVersion {
         # Sort descending by SemVer so it never reports v4.190 when v4.227 is installed
         $sortedCli = @($cliVersions | Sort-Object -Descending -Property { Convert-ToSemVer $_ })
         return $sortedCli[0]
-    }
-
-    # Stage 1: Inspect Live Running Process Executables via PE Header
-    $runningVersions = [System.Collections.Generic.List[string]]::new()
-    try {
-        $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
-            $_.Name -match '(?i)^(agm-alim|agm-ui|agm)\.exe$'
-        }
-        foreach ($proc in $procs) {
-            $pPath = $proc.ExecutablePath
-            if ($pPath -and (Test-Path $pPath)) {
-                if ($pPath -match '(?i)Google\s*Antigravity') { continue }
-                $fvi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($pPath)
-                $ver = if ($fvi.ProductVersion) { $fvi.ProductVersion } else { $fvi.FileVersion }
-                if ($ver) {
-                    $clean = ($ver -replace '^v', '').Trim()
-                    if ($clean -notmatch '^2\.24' -and (-not $runningVersions.Contains($clean))) {
-                        $runningVersions.Add($clean)
-                    }
-                }
-            }
-        }
-    } catch {}
-
-    try {
-        $runningProcs = Get-Process "agm-alim", "Antigravity Manager Tools", "AGM by Alim", "agm-ui", "agm" -ErrorAction SilentlyContinue
-        foreach ($p in $runningProcs) {
-            $pPath = $null
-            try { $pPath = $p.Path } catch {}
-            if (-not $pPath) {
-                try { $pPath = $p.MainModule.FileName } catch {}
-            }
-            if ($pPath -and (Test-Path $pPath)) {
-                if ($pPath -match '(?i)Google\s*Antigravity') { continue }
-                $fvi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($pPath)
-                $ver = if ($fvi.ProductVersion) { $fvi.ProductVersion } else { $fvi.FileVersion }
-                if ($ver) {
-                    $clean = ($ver -replace '^v', '').Trim()
-                    if ($clean -notmatch '^2\.24' -and (-not $runningVersions.Contains($clean))) {
-                        $runningVersions.Add($clean)
-                    }
-                }
-            }
-        }
-    } catch {}
-
-    if ($runningVersions.Count -gt 0) {
-        $sortedProcs = @($runningVersions | Sort-Object -Descending -Property { Convert-ToSemVer $_ })
-        return $sortedProcs[0]
     }
 
     # Stage 2: Inspect Configured Install Directory PE Headers

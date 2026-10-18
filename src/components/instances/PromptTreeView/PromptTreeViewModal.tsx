@@ -590,14 +590,19 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                     setSyncInterval={setSyncInterval}
                     restoreFileInputRef={restoreFileInputRef}
                     onClose={onClose}
-                    onBackup={() => coreActions.handleOpenExportModal({ target_type: 'full_tree' }, 'json')}
-                    onRestore={coreActions.handleOpenImportModal}
+                    onBackup={coreActions.handleBackup}
+                    onRestore={coreActions.handleRestore}
                     onExportSqlite={() => coreActions.handleOpenExportModal({ target_type: 'full_tree' }, 'sqlite')}
                     onImportSqlite={coreActions.handleOpenImportModal}
                     onCopyAllTreePrompts={coreActions.handleCopyAllTreePrompts}
                     onFileRestore={coreActions.handleFileRestore}
-                    onRefreshAll={() => loadTree(false, true)}
+                    isAutoSyncing={isAutoSyncing}
+                    onRefreshAll={() => {
+                        setActionMsg('Refreshing prompt tree...');
+                        loadTree(false, true);
+                    }}
                     onResetTree={() => {
+                        setActionMsg('Resetting prompt tree cache...');
                         void invoke('reset_prompt_tree_cache', { instanceId: instanceId || null })
                             .catch((err) => {
                                 useErrorStore.getState().captureException(
@@ -813,7 +818,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                         />
                                     )}
                                 </div>
-                            ) : isLoading ? (
+                            ) : isLoading && treeData.length === 0 ? (
                                 <div className="flex-1 flex flex-col px-6 py-5 space-y-4 animate-pulse overflow-hidden bg-white dark:bg-[#171025]">
                                     {/* Skeleton Header */}
                                     <div className="space-y-3 pb-3 border-b border-slate-200/70 dark:border-[#40285e]/60">

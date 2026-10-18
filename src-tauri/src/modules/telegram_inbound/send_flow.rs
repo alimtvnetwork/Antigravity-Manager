@@ -477,18 +477,7 @@ pub fn start_send_flow(rest: &str) -> String {
 }
 
 fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
-    // 1. Collision shielding guard: only the target machine responds to send:m:<alias>!
-    let is_current = super::node_label::is_current_machine(alias);
-    if !is_current {
-        tracing::info!(
-            "Dropping send:m:{} callback on node {} — targeted for different machine",
-            alias,
-            local_machine_label()
-        );
-        return (String::new(), None);
-    }
-
-    // 2. Debounce guard: if chat already has a fresh Step 2 flow for this machine (<3s), suppress duplicate message.
+    // 1. Debounce guard: if chat already has a fresh Step 2 flow for this machine (<3s), suppress duplicate message.
     if let Ok(flows) = SEND_FLOWS.lock() {
         if let Some(existing) = flows.get(&chat_id) {
             let is_same_machine = existing.machine.eq_ignore_ascii_case(alias)
@@ -518,10 +507,7 @@ fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
             if super::node_label::is_current_machine(alias) {
                 local_machine_label()
             } else {
-                return (
-                    "That machine isn't available. Send /send to pick again.".to_string(),
-                    None,
-                );
+                alias.trim().to_string()
             }
         }
     };
@@ -538,7 +524,35 @@ fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
             },
         );
     }
-    let instances = instance_entries();
+    let instances = if super::node_label::is_current_machine(&canonical) {
+        instance_entries()
+    } else {
+        let mut rem_instances = Vec::new();
+        if let Ok(cluster_items) = crate::modules::ssh_manager::get_cluster_instances_and_balances()
+        {
+            for item in cluster_items {
+                if item.machine_alias.eq_ignore_ascii_case(&canonical) {
+                    rem_instances.push(PickerInstance {
+                        id: item.instance_id.clone(),
+                        name: item.instance_name.clone(),
+                        exe_ending: "Antigravity.exe".to_string(),
+                        data_ending: if item.bound_email.is_empty()
+                            || item.bound_email == "(unbound)"
+                        {
+                            String::new()
+                        } else {
+                            item.bound_email
+                        },
+                    });
+                }
+            }
+        }
+        if rem_instances.is_empty() {
+            instance_entries()
+        } else {
+            rem_instances
+        }
+    };
     let (node_alias, ip, signal) = super::cluster::resolve_node_network_info(&canonical);
     let signal_clean = if signal.starts_with("📶") {
         signal.clone()
@@ -569,26 +583,17 @@ fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
 }
 
 fn on_instance_picked(chat_id: i64, machine: &str, instance: &str) -> (String, Option<Value>) {
-    if !super::node_label::is_current_machine(machine) {
-        tracing::debug!(
-            "Dropping send:i:{}|{} callback on node {} — targeted for different machine",
-            machine,
-            instance,
-            local_machine_label()
-        );
-        return (String::new(), None);
-    }
     let canonical_machine = match machine_entries()
         .into_iter()
         .find(|e| e.eq_ignore_ascii_case(machine))
     {
         Some(e) => e,
         None => {
-            return (
-                "That machine/instance is no longer available. Send /send to start over."
-                    .to_string(),
-                None,
-            )
+            if super::node_label::is_current_machine(machine) {
+                local_machine_label()
+            } else {
+                machine.trim().to_string()
+            }
         }
     };
     let canonical_instance = match instance_entries()
@@ -596,13 +601,7 @@ fn on_instance_picked(chat_id: i64, machine: &str, instance: &str) -> (String, O
         .find(|inst| inst.id.eq_ignore_ascii_case(instance))
     {
         Some(inst) => inst.id,
-        None => {
-            return (
-                "That machine/instance is no longer available. Send /send to start over."
-                    .to_string(),
-                None,
-            )
-        }
+        None => instance.trim().to_string(),
     };
     if let Ok(mut flows) = SEND_FLOWS.lock() {
         flows.insert(

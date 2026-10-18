@@ -6,7 +6,6 @@ use super::models::{
     ActivePrompt, ProjectAuditRationaleType, PromptAuditCriteriaType, RunningProject,
 };
 use super::schema::connect_db;
-use super::tree::invalidate_prompt_tree_cache;
 use chrono::Utc;
 use rusqlite::params;
 use std::collections::HashSet;
@@ -54,12 +53,10 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
 
     // If storage dir does not exist, return empty project list early
     if !storage_dir.exists() {
-        invalidate_prompt_tree_cache(Some(target_id));
         return Ok(projects);
     }
 
     let Ok(entries) = fs::read_dir(&storage_dir) else {
-        invalidate_prompt_tree_cache(Some(target_id));
         return Ok(projects);
     };
 
@@ -251,7 +248,6 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
         }
     }
 
-    invalidate_prompt_tree_cache(Some(target_id));
     Ok(projects)
 }
 

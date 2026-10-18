@@ -312,28 +312,23 @@ export function StatusProcessEnvCell({ inst, data, isCopied, onCopy }: StatusPro
                         </span>
                     )}
 
-                    {/* Separator */}
-                    <span className="text-slate-400 dark:text-slate-500 shrink-0 select-none text-[10px]">·</span>
-
-                    {/* Exe Path Ending */}
-                    <div
-                        className="flex items-center gap-1 min-w-0 shrink-0 text-slate-700 dark:text-slate-200 font-semibold truncate max-w-[140px] whitespace-nowrap flex-nowrap"
-                        title={`IDE: ${exeFull || exeEnding}`}
-                    >
-                        <Terminal className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate whitespace-nowrap">{exeEnding}</span>
-                    </div>
-
-                    {/* Separator */}
-                    <span className="text-slate-400 dark:text-slate-500 shrink-0 select-none text-[10px]">·</span>
-
-                    {/* Data Dir Ending */}
-                    <div
-                        className="flex items-center gap-1 min-w-0 text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[150px] whitespace-nowrap flex-nowrap"
-                        title={`Data: ${fullPath}`}
-                    >
-                        <Folder className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate whitespace-nowrap">{dataEnding}</span>
+                    {/* Path Endings together on the exact same line */}
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1 text-[11px] text-slate-700 dark:text-slate-200 font-mono truncate">
+                        <div
+                            className="flex items-center gap-1 min-w-0 shrink truncate font-semibold"
+                            title={`IDE: ${exeFull || exeEnding}`}
+                        >
+                            <Terminal className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="truncate whitespace-nowrap">{exeEnding}</span>
+                        </div>
+                        <span className="text-slate-400 dark:text-slate-500 shrink-0 select-none text-[10px]">·</span>
+                        <div
+                            className="flex items-center gap-1 min-w-0 text-[10px] text-slate-500 dark:text-slate-400 truncate"
+                            title={`Data: ${fullPath}`}
+                        >
+                            <Folder className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="truncate whitespace-nowrap">{dataEnding}</span>
+                        </div>
                     </div>
                 </div>
 
@@ -380,7 +375,7 @@ export function StatusCell({ inst, data }: { inst: InstanceStatus; data: RowCell
                     title={inst.pid ? `Process ID (PID): ${inst.pid} — Active and Running` : 'Process ID (PID): Active and Running'}
                 >
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-[#1af18d] animate-pulse shrink-0" />
-                    <span>{inst.pid ? `Running (PID: ${inst.pid})` : 'Running'}</span>
+                    <span>{inst.pid ? `PID: ${inst.pid}` : 'Running'}</span>
                 </span>
             ) : (
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100/90 text-slate-600 dark:bg-[#090611]/90 dark:text-slate-400 border border-slate-200 dark:border-[#40285e] backdrop-blur-xs">

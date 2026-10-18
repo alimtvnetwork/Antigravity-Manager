@@ -18,6 +18,35 @@ pub fn list_active_prompts() -> Result<Vec<ActivePrompt>, String> {
     list_all_prompts()
 }
 
+/// Resolve instance id from project id or fallback, inspecting composite project IDs e.g. __default-copy-5597
+pub fn resolve_instance_id_from_project_or_fallback(
+    project_id: &str,
+    instance_id_opt: Option<&str>,
+) -> String {
+    if let Some(inst) = instance_id_opt {
+        let trimmed = inst.trim();
+        if !trimmed.is_empty() && trimmed != "default" && trimmed != "__default__" {
+            return crate::modules::instance::resolve_instance_id(trimmed)
+                .unwrap_or_else(|_| trimmed.to_string());
+        }
+    }
+    if let Some(suffix) = project_id.split("__").nth(1) {
+        let trimmed_suffix = suffix.trim();
+        if !trimmed_suffix.is_empty() {
+            return crate::modules::instance::resolve_instance_id(trimmed_suffix)
+                .unwrap_or_else(|_| trimmed_suffix.to_string());
+        }
+    }
+    if let Some(inst) = instance_id_opt {
+        let trimmed = inst.trim();
+        if !trimmed.is_empty() {
+            return crate::modules::instance::resolve_instance_id(trimmed)
+                .unwrap_or_else(|_| trimmed.to_string());
+        }
+    }
+    crate::modules::instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string())
+}
+
 /// Save or re-queue an active prompt into active_prompts and running_projects
 pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
     let conn = connect_db()?;
@@ -27,14 +56,8 @@ pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| prompt.project_id.clone());
 
-    let canonical_inst = crate::modules::instance::resolve_instance_id(&prompt.instance_id)
-        .unwrap_or_else(|_| {
-            if prompt.instance_id == "__default__" || prompt.instance_id.trim().is_empty() {
-                "default".to_string()
-            } else {
-                prompt.instance_id.clone()
-            }
-        });
+    let canonical_inst =
+        resolve_instance_id_from_project_or_fallback(&prompt.project_id, Some(&prompt.instance_id));
     let base_proj_id = prompt
         .project_id
         .split("__")

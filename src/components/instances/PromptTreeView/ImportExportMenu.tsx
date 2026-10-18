@@ -72,7 +72,7 @@ export function ImportExportMenu(props: ImportExportMenuProps) {
         'w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
 
     return (
-        <div className="relative flex items-center" ref={rootRef}>
+        <div className="relative z-50 flex items-center" ref={rootRef}>
             <button
                 type="button"
                 onClick={() => setIsOpen((prev) => !prev)}

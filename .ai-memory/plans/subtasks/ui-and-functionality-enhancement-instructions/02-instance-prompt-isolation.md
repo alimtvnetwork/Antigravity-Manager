@@ -1,11 +1,18 @@
-# Subtask 02: Instance Prompt Isolation & Idle Supremacy
+# Subtask 02: Instance Prompt Isolation & Liveness Scoping
 
-Parent Task: `ui-and-functionality-enhancement-instructions`
-Task-ID: `Task-03`
-Owner: Worker 02
+**Parent Task:** `ui-and-functionality-enhancement-instructions`  
+**Subtask Code:** `Task-02`  
+**Status:** `READY`
 
-## Objectives
-1. Enforce Explicit Idle Supremacy in `tree_collect.rs` and `liveness.rs`: check `has_idle_status` (IDLE, COMPLETED, FAILED, CANCELLED) before `not_fully_idle`.
-2. In `tree_node_conv.rs` line 47, eliminate the unconditional `(is_inst_alive && item.status.contains('RUNNING'))` override so evaluated idle status is strictly honored.
-3. In `instanceCardData.ts`, add conversation-level instance ownership verification: `(node.conversations || []).some(c => c.is_running && !isGhostConversation(c) && (c.instance_id === inst.config.id || (!c.instance_id && inst.config.id === 'default')))` so Instance 1 does not display Instance 2's running prompt.
-4. In `tree_phases.rs::query_tree_projects`, iterate through all instances in registry when target is `None`.
+## 1. Objectives & Scope
+- Fix bug where running prompt is shown on both Instance #1 and Instance #2.
+- In `src-tauri/src/modules/repo_db/gemini_dirs.rs`: do not conflate `antigravity-cli` with instance `default`. Isolate CLI sessions.
+- In `src-tauri/src/modules/repo_db/prompts_crud.rs`: inspect `project_id` and extract instance discriminator (e.g. `__default-copy-5597`) so `active_prompts.instance_id` is set to the correct instance ID rather than defaulting to `default`.
+- In `src-tauri/src/modules/repo_db/liveness.rs`: ensure Gate 3 strictly matches target instance ID.
+- In `src-tauri/src/modules/repo_db/tree_phases.rs`: filter active prompts strictly by instance ID in `discover_fallback_projects`.
+
+## 2. Disjoint File Ownership
+- `Owned Files:` `src-tauri/src/modules/repo_db/gemini_dirs.rs`, `src-tauri/src/modules/repo_db/prompts_crud.rs`, `src-tauri/src/modules/repo_db/liveness.rs`, `src-tauri/src/modules/repo_db/tree_phases.rs`
+
+## 3. Verification Evidence Contract
+- Querying prompt liveness for Instance #1 returns false when the prompt is running only in Instance #2.
