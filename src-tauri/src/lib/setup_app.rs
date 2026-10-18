@@ -298,6 +298,9 @@ pub(crate) fn run_headless() {
             crate::modules::process::discover_and_persist_initial_ide_info();
         });
 
+        // Initialize databases and verify Split-DB migration state
+        init_databases();
+
         // Load config
         match modules::config::load_app_config() {
             Ok(mut config) => {
@@ -445,10 +448,14 @@ pub(crate) fn run_headless() {
         tokio::signal::ctrl_c().await.ok();
         info!("Headless mode shutting down");
     });
-    return;
 }
 
 pub(crate) fn init_databases() {
+    // 0. Auto check and run Split-DB migration to PascalCase schemas (<10ms fast boot check)
+    if let Err(e) = modules::db_migration::check_and_run_migrations() {
+        error!("Failed to check and run database migration: {}", e);
+    }
+
     // Initialize token stats database
     if let Err(e) = modules::token_stats::init_db() {
         error!("Failed to initialize token stats database: {}", e);
