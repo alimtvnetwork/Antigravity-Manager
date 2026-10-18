@@ -1,8 +1,8 @@
 # Subtask 09: End-to-End Migration & Verification Testing
 
 **Parent Plan:** `.ai-memory/plans/orm-and-database-migration-strategy.md`  
-**Status:** PENDING  
-**Target Files:** `src-tauri/tests/test_migration_e2e.rs`
+**Status:** DONE  
+**Target Files:** `src-tauri/tests/database_orm_migration_e2e.rs`
 
 ## Objective
 Author and run comprehensive integration test simulating legacy database state, exporting snapshot, initializing fresh PascalCase databases, re-importing data, and verifying zero loss.

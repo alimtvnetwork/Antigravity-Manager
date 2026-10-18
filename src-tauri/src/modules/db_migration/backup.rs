@@ -248,6 +248,7 @@ pub fn export_pre_migration_snapshot_in(
         data_dir.join("task-history").join("task-history.db"),
     ];
     let task_history_tables = &[
+        "task_history",
         "split_catalog",
         "hot_tasks_cache",
         "tasks",

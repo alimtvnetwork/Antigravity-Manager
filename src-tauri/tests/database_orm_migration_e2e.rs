@@ -310,7 +310,13 @@ fn test_database_orm_migration_e2e_full_lifecycle() {
     );
 
     let summary = restore_result.unwrap();
-    assert_eq!(summary.total_imported, 7);
+    assert_eq!(summary.errors_imported, 2);
+    assert_eq!(summary.projects_imported, 1);
+    assert_eq!(summary.prompts_imported, 2);
+    assert_eq!(summary.batches_imported, 1);
+    assert_eq!(summary.backups_imported, 1);
+    assert_eq!(summary.task_history_imported, 1);
+    assert_eq!(summary.total_imported, 8);
 
     // =========================================================================
     // Step 6: Verify Zero Account Loss
@@ -337,9 +343,8 @@ fn test_database_orm_migration_e2e_full_lifecycle() {
     }
 
     {
-        // 7.2 Verify VwActivePromptsWithProjects and VwQueuedPromptsFifo on repo-prompts.db
-        let target_repo_db = base_dir.join("repo-prompts.db");
-        let conn = Connection::open(&target_repo_db).unwrap();
+        // 7.2 Verify VwActivePromptsWithProjects and VwQueuedPromptsFifo on repo_prompts.db
+        let conn = Connection::open(&repo_prompts_db_path).unwrap();
 
         // Joined View
         let joined = ViewQueryBuilder::<VwActivePromptsWithProjects>::select()
@@ -361,9 +366,8 @@ fn test_database_orm_migration_e2e_full_lifecycle() {
     }
 
     {
-        // 7.3 Verify VwUnrestoredBackups on prompt-backups.db
-        let target_backup_db = base_dir.join("backup-prompts").join("prompt-backups.db");
-        let conn = Connection::open(&target_backup_db).unwrap();
+        // 7.3 Verify VwUnrestoredBackups on backup-prompts.db
+        let conn = Connection::open(&backup_prompts_db_path).unwrap();
         let backups = ViewQueryBuilder::<VwUnrestoredBackups>::select()
             .fetch_all(&conn)
             .expect("Fetch VwUnrestoredBackups must succeed");
@@ -374,8 +378,7 @@ fn test_database_orm_migration_e2e_full_lifecycle() {
 
     {
         // 7.4 Verify VwRecentTaskHistory on task-history.db
-        let target_th_db = base_dir.join("task-history.db");
-        let conn = Connection::open(&target_th_db).unwrap();
+        let conn = Connection::open(&task_history_db_path).unwrap();
         let history = ViewQueryBuilder::<VwRecentTaskHistory>::select()
             .fetch_all(&conn)
             .expect("Fetch VwRecentTaskHistory must succeed");

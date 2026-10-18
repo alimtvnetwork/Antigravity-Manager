@@ -1,8 +1,8 @@
 # Master Plan: ORM and Database Migration Strategy
 
 Request slug: `orm-and-database-migration-strategy`
-Status: ACTIVE
-Phase: 1 (Planning & Specification)
+Status: COMPLETED
+Phase: Complete
 Capacity: A = 3 agents × H = 2 hands = 6 concurrent operations
 
 ## User Request (Verbatim)
@@ -22,5 +22,5 @@ Can it please ensure that we are using ORM for the SQLite communication? That's 
 | Task-06 | Zero-Data-Loss Importer & Schema Version Tracking (`SchemaVersion`) | Worker 03 | DONE | `src-tauri/src/modules/db_migration/restore.rs`, `version.rs` |
 | Task-07 | Account Data Preservation & Integrity Safeguard (Zero Account Loss) | Worker 03 | DONE | `src-tauri/src/modules/db_migration/account_guard.rs` |
 | Task-08 | CLI Integration (`agm db backup`, `agm db restore`, `agm db status`) | Worker 01 | DONE | `src-tauri/src/bin/agm/db_cmds.rs`, `main.rs`, `help_text.rs` |
-| Task-09 | End-to-End Migration & Verification Testing | Worker 02 | IN PROGRESS | `src-tauri/src/modules/db_migration/tests.rs` |
-| Task-10 | Pre-flight Quality Gates, Fmt, Clippy & Atomic GitMap Commit | Lead | PENDING | Full preflight pass & atomic GitMap push |
+| Task-09 | End-to-End Migration & Verification Testing | Worker 02 | DONE | `src-tauri/src/modules/db_migration/tests.rs`, `src-tauri/tests/database_orm_migration_e2e.rs` |
+| Task-10 | Pre-flight Quality Gates, Fmt, Clippy & Atomic GitMap Commit | Lead | DONE | Full preflight pass & atomic GitMap push |
