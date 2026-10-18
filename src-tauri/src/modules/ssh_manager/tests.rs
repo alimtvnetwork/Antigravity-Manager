@@ -43,6 +43,27 @@ pub(crate) mod tests {
     }
 
     #[test]
+    pub(crate) fn test_decode_connections_from_gitmap_cluster_nodes() {
+        let json = r#"[
+            {
+                "id": "host-192.168.1.7",
+                "alias": "w2",
+                "ip": "192.168.1.7",
+                "username": "Administrator",
+                "port": 22,
+                "cluster_role": "worker",
+                "created_at": "2026-10-18T07:28:59.7493229Z"
+            }
+        ]"#;
+        let conns = decode_connections_from_json(json).unwrap();
+        assert_eq!(conns.len(), 1);
+        assert_eq!(conns[0].alias, "w2");
+        assert_eq!(conns[0].ip_address, "192.168.1.7");
+        assert_eq!(conns[0].username, "Administrator");
+        assert_eq!(conns[0].port, 22);
+    }
+
+    #[test]
     pub(crate) fn test_ssh_connections_rsa_password_encryption() {
         let raw_record = SshConnectionRecord {
             alias: "vm-test".to_string(),

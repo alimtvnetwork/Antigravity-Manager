@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
     Folder,
     Search,
@@ -16,7 +17,8 @@ import {
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import type { AgmConversationNode, AgmProjectTreeNode } from './types';
-import { ProjectNode } from './ProjectNode';
+import { ProjectNode, type ProjectNodeProps } from './ProjectNode';
+import { PromptTreeContextMenu, type PromptTreeContextMenuProps } from './PromptTreeContextMenu';
 import { promptTreeLoadingEmitter } from './usePromptTreeData';
 
 export type ActiveFilter = 'all' | 'running' | 'queued' | 'latest_conv' | 'latest_prompt' | 'pinned' | 'archived';
@@ -71,6 +73,10 @@ export interface TreePanelProps {
     onProjectContextMenu?: (e: React.MouseEvent, repoName: string, project?: AgmProjectTreeNode) => void;
 }
 
+const ProjectNodeWithMenu = ProjectNode as React.ComponentType<
+    ProjectNodeProps & { onOpenContextMenu?: (menuProps: PromptTreeContextMenuProps) => void }
+>;
+
 export function TreePanel(props: TreePanelProps) {
     const {
         isLoading,
@@ -119,6 +125,16 @@ export function TreePanel(props: TreePanelProps) {
 
     const [subLoading, setSubLoading] = useState(promptTreeLoadingEmitter.isLoading);
     const [internalAutomatedHidden, setInternalAutomatedHidden] = useState(isAutomatedHidden);
+    const [activeContextMenu, setActiveContextMenu] = useState<PromptTreeContextMenuProps | null>(null);
+
+    const handleOpenContextMenu = (menuProps: PromptTreeContextMenuProps) => {
+        setActiveContextMenu(menuProps);
+    };
+
+    const handleCloseContextMenu = () => {
+        setActiveContextMenu(null);
+    };
+
     useEffect(() => {
         setInternalAutomatedHidden(isAutomatedHidden);
     }, [isAutomatedHidden]);
@@ -160,7 +176,7 @@ export function TreePanel(props: TreePanelProps) {
         : undefined;
 
     const renderProject = (project: AgmProjectTreeNode) => (
-        <ProjectNode
+        <ProjectNodeWithMenu
             key={project.project_id}
             project={project}
             isExpanded={isScopedSingleProject || Boolean(expandedProjects[project.project_id])}
@@ -184,6 +200,7 @@ export function TreePanel(props: TreePanelProps) {
             onTogglePin={onTogglePin}
             onToggleArchive={onToggleArchive}
             onProjectContextMenu={handleProjectContextMenu}
+            onOpenContextMenu={handleOpenContextMenu}
             onRenameConversation={onRenameConversation}
             onResendPrompts={onResendPrompts}
             onEnqueue={onEnqueue}
@@ -542,6 +559,38 @@ export function TreePanel(props: TreePanelProps) {
                     </>
                 )}
             </div>
+
+            {/* Centralized Singleton Context Menu & Transparent Dismissal Backdrop */}
+            {activeContextMenu && (
+                <>
+                    {typeof document !== 'undefined' ? (
+                        createPortal(
+                            <div
+                                className="fixed inset-0 z-[99998] bg-transparent cursor-default"
+                                onClick={handleCloseContextMenu}
+                                onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    handleCloseContextMenu();
+                                }}
+                            />,
+                            document.body
+                        )
+                    ) : (
+                        <div
+                            className="fixed inset-0 z-[99998] bg-transparent cursor-default"
+                            onClick={handleCloseContextMenu}
+                            onContextMenu={(e) => {
+                                e.preventDefault();
+                                handleCloseContextMenu();
+                            }}
+                        />
+                    )}
+                    <PromptTreeContextMenu
+                        {...activeContextMenu}
+                        onClose={handleCloseContextMenu}
+                    />
+                </>
+            )}
         </div>
     );
 }

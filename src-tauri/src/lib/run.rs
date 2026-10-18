@@ -134,6 +134,7 @@ pub fn run() {
             commands::import_prompt_tree_sqlite,
             commands::import_prompt_tree_sqlite_bytes,
             commands::read_text_file,
+            commands::read_image_as_base64,
             commands::clear_log_cache,
             commands::clear_antigravity_cache,
             commands::get_antigravity_cache_paths,

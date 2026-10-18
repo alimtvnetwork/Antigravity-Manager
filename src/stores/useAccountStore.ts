@@ -9,7 +9,7 @@ interface AccountState {
     error: string | null;
 
     // Actions
-    fetchAccounts: () => Promise<void>;
+    fetchAccounts: (force?: boolean) => Promise<void>;
     fetchCurrentAccount: () => Promise<void>;
     addAccount: (email: string, refreshToken: string) => Promise<void>;
     deleteAccount: (accountId: string) => Promise<void>;
@@ -36,22 +36,38 @@ interface AccountState {
     setAccountsDisabled: (accountIds: string[], disabled: boolean, reason?: string) => Promise<void>;
 }
 
+let inFlightFetchPromise: Promise<void> | null = null;
+let lastFetchTimestamp = 0;
+const FETCH_DEBOUNCE_MS = 1500;
+
 export const useAccountStore = create<AccountState>((set, get) => ({
     accounts: [],
     currentAccount: null,
     loading: false,
     error: null,
 
-    fetchAccounts: async () => {
-        set({ loading: true, error: null });
-        try {
-            console.log('[Store] Fetching accounts...');
-            const accounts = await accountService.listAccounts();
-            set({ accounts, loading: false });
-        } catch (error) {
-            console.error('[Store] Fetch accounts failed:', error);
-            set({ error: String(error), loading: false });
+    fetchAccounts: async (force?: boolean) => {
+        const now = Date.now();
+        if (inFlightFetchPromise) {
+            return inFlightFetchPromise;
         }
+        if (!force && now - lastFetchTimestamp < FETCH_DEBOUNCE_MS && get().accounts.length > 0) {
+            return;
+        }
+        inFlightFetchPromise = (async () => {
+            set({ loading: true, error: null });
+            try {
+                const accounts = await accountService.listAccounts();
+                lastFetchTimestamp = Date.now();
+                set({ accounts, loading: false });
+            } catch (error) {
+                console.error('[Store] Fetch accounts failed:', error);
+                set({ error: String(error), loading: false });
+            } finally {
+                inFlightFetchPromise = null;
+            }
+        })();
+        return inFlightFetchPromise;
     },
 
     fetchCurrentAccount: async () => {

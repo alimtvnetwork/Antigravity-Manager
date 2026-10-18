@@ -1,13 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Bot, User, Terminal, Wrench, Clock, ChevronRight, ChevronDown } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../../utils/cn';
 import { PromptOriginTier } from './types';
 import type { AgmConversationNode, AgmProjectTreeNode, TierClassificationResult } from './types';
-import { isGhostConversation } from './conversationGuards';
+import { isGhostConversation, isConversationOrTurnQueued } from './conversationGuards';
 import { classifyPromptTier } from './tierClassification';
 import { formatSeqBadge } from './formatters';
-import { PromptTreeContextMenu } from './PromptTreeContextMenu';
 import { invalidatePromptTreeCache, renameConversationOptimistic } from './usePromptTreeData';
 import { useErrorStore } from '../../../stores/error-store';
 
@@ -21,6 +20,7 @@ export interface ConversationNodeProps {
     onResendPrompts?: (count: number | 'all') => void;
     onEnqueue?: () => void;
     onRerunConversation?: (convoId: string, nudgeType: string) => void;
+    onOpenContextMenu?: (props: any) => void;
 }
 
 export function getConversationStatus(conv: AgmConversationNode): { isRunning: boolean; isQueued: boolean } {
@@ -28,7 +28,7 @@ export function getConversationStatus(conv: AgmConversationNode): { isRunning: b
         Boolean(conv.is_running) &&
         !isGhostConversation(conv) &&
         !(conv.prompt_word_count === 0 && (!conv.prompt_preview_200w || !conv.prompt_preview_200w.trim()));
-    const isQueued = Boolean(conv.is_queued) || conv.status.toLowerCase().includes('queue');
+    const isQueued = isConversationOrTurnQueued(conv);
     return { isRunning, isQueued };
 }
 
@@ -49,27 +49,25 @@ export function ConversationNode({
     onSelect,
     onOpenInspector,
     onRenameConversation,
-    onResendPrompts,
-    onEnqueue,
-    onRerunConversation,
+    onOpenContextMenu,
 }: ConversationNodeProps) {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editingTitle, setEditingTitle] = useState(conv.title || '');
-    const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
-    const [turnMenuPos, setTurnMenuPos] = useState<{
-        x: number;
-        y: number;
-        turnConv: AgmConversationNode;
-    } | null>(null);
     const [selectedTurnNumber, setSelectedTurnNumber] = useState<number | null>(null);
-    const [isExpanded, setIsExpanded] = useState<boolean>(Boolean(conv.is_running));
+    const [isExpanded, setIsExpanded] = useState<boolean>(() => Boolean(conv.is_running) || isConversationOrTurnQueued(conv));
+
+    useEffect(() => {
+        if (Boolean(conv.is_running) || isConversationOrTurnQueued(conv)) {
+            setIsExpanded(true);
+        }
+    }, [conv.is_running, conv.is_queued, conv.status, conv.prompts]);
 
     const { isRunning, isQueued } = getConversationStatus(conv);
     const promptCategory = classifyPromptTier(conv.prompt_preview_200w, conv.title, conv);
     const IconComponent = getTierIcon(promptCategory.tier);
     const hasPrompts = Boolean(conv.prompts && conv.prompts.length > 0);
     const enqueuedTurnsCount = conv.prompts
-        ? conv.prompts.filter((p) => Boolean(p.is_queued) || p.status?.toUpperCase() === 'QUEUED').length
+        ? conv.prompts.filter((p) => Boolean(p.is_queued) || (p.status && p.status.toLowerCase().includes('queue'))).length
         : 0;
 
     const handleSaveTitle = async (draftTitle: string) => {
@@ -132,7 +130,16 @@ export function ConversationNode({
                 onContextMenu={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    setContextMenuPos({ x: e.clientX, y: e.clientY });
+                    onOpenContextMenu?.({
+                        type: 'conversation',
+                        x: e.clientX,
+                        y: e.clientY,
+                        conversationId: conv.conversation_id,
+                        currentTitle: conv.title || conv.short_id || '',
+                        conversationNode: conv,
+                        repoPath: project.repo_path,
+                        instanceId: conv.instance_id || project.instance_id,
+                    });
                 }}
                 className={cn(
                     'group flex items-center justify-between rounded-md px-2 py-1.5 text-xs cursor-pointer transition-colors relative outline-none focus-visible:ring-1 focus-visible:ring-cyan-500/50',
@@ -224,7 +231,16 @@ export function ConversationNode({
                             onContextMenu={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                setContextMenuPos({ x: e.clientX, y: e.clientY });
+                                onOpenContextMenu?.({
+                                    type: 'conversation',
+                                    x: e.clientX,
+                                    y: e.clientY,
+                                    conversationId: conv.conversation_id,
+                                    currentTitle: conv.title || conv.short_id || '',
+                                    conversationNode: conv,
+                                    repoPath: project.repo_path,
+                                    instanceId: conv.instance_id || project.instance_id,
+                                });
                             }}
                             className="truncate text-[11px] cursor-text hover:underline hover:decoration-dotted"
                             title={`${conv.title || conv.short_id || conv.conversation_id.slice(0, 8)} (Double-click to rename)`}
@@ -315,7 +331,17 @@ export function ConversationNode({
                                 onContextMenu={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    setTurnMenuPos({ x: e.clientX, y: e.clientY, turnConv: createTurnConv() });
+                                    const turnConv = createTurnConv();
+                                    onOpenContextMenu?.({
+                                        type: 'turn',
+                                        x: e.clientX,
+                                        y: e.clientY,
+                                        conversationId: turnConv.conversation_id,
+                                        currentTitle: turnConv.latest_step_summary || `Turn ${turn.turn_number}`,
+                                        conversationNode: turnConv,
+                                        repoPath: project.repo_path,
+                                        instanceId: turnConv.instance_id || project.instance_id,
+                                    });
                                 }}
                                 className={cn(
                                     "group/turn flex items-center justify-between rounded-md px-1.5 py-1 text-xs cursor-pointer transition-colors outline-none focus-visible:ring-1 focus-visible:ring-sky-500/50",
@@ -350,12 +376,12 @@ export function ConversationNode({
                                 </div>
                                 {/* Status Badges */}
                                 <div className="flex items-center gap-1 shrink-0">
-                                    {turn.is_running ? (
+                                    {turn.is_running || (turn.status && (turn.status.toLowerCase().includes('run') || turn.status.toLowerCase().includes('exec'))) ? (
                                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shrink-0 font-bold">
                                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
                                             RUNNING
                                         </span>
-                                    ) : turn.is_queued ? (
+                                    ) : (Boolean(turn.is_queued) || (turn.status && turn.status.toLowerCase().includes('queue'))) ? (
                                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0 font-bold">
                                             <Clock className="w-2.5 h-2.5 text-amber-500" />
                                             QUEUED
@@ -370,56 +396,6 @@ export function ConversationNode({
                         );
                     })}
                 </div>
-            )}
-
-            {turnMenuPos && (
-                <PromptTreeContextMenu
-                    type="turn"
-                    x={turnMenuPos.x}
-                    y={turnMenuPos.y}
-                    conversationId={turnMenuPos.turnConv.conversation_id}
-                    currentTitle={turnMenuPos.turnConv.latest_step_summary || `Turn ${turnMenuPos.turnConv.seq_code}`}
-                    conversationNode={turnMenuPos.turnConv}
-                    repoPath={project.repo_path}
-                    instanceId={turnMenuPos.turnConv.instance_id || project.instance_id}
-                    onClose={() => setTurnMenuPos(null)}
-                    onRename={() => {
-                        setTurnMenuPos(null);
-                    }}
-                    onInspect={() => {
-                        setTurnMenuPos(null);
-                        onOpenInspector(turnMenuPos.turnConv, project.repo_path);
-                    }}
-                    onResendPrompts={onResendPrompts}
-                    onEnqueue={onEnqueue}
-                    onRerunConversation={onRerunConversation}
-                />
-            )}
-
-            {contextMenuPos && (
-                <PromptTreeContextMenu
-                    type="conversation"
-                    x={contextMenuPos.x}
-                    y={contextMenuPos.y}
-                    conversationId={conv.conversation_id}
-                    currentTitle={conv.title || conv.short_id || ''}
-                    conversationNode={conv}
-                    repoPath={project.repo_path}
-                    instanceId={conv.instance_id || project.instance_id}
-                    onClose={() => setContextMenuPos(null)}
-                    onRename={() => {
-                        setContextMenuPos(null);
-                        setIsEditingTitle(true);
-                        setEditingTitle(conv.title || '');
-                    }}
-                    onInspect={() => {
-                        setContextMenuPos(null);
-                        onOpenInspector(conv, project.repo_path);
-                    }}
-                    onResendPrompts={onResendPrompts}
-                    onEnqueue={onEnqueue}
-                    onRerunConversation={onRerunConversation}
-                />
             )}
         </>
     );

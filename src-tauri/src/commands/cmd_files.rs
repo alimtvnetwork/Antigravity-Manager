@@ -100,6 +100,45 @@ pub async fn read_text_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| format!("读取文件失败: {}", e))
 }
 
+/// Read an image file directly from disk and return as a Base64 data URI (data:image/<ext>;base64,...)
+/// for safe, taint-free clipboard copy and embedding in WebView2 without CORS or canvas security errors.
+#[tauri::command]
+pub async fn read_image_as_base64(path: String) -> Result<String, String> {
+    let requested = PathBuf::from(&path);
+    if requested.as_os_str().is_empty() {
+        return Err("invalid_path: empty path".to_string());
+    }
+    let resolved = resolve_existing_or_parent(&requested)?;
+    if is_sensitive_path(&resolved) || is_os_protected_path(&resolved) {
+        return Err("security_denied: sensitive path".to_string());
+    }
+    let ext = resolved
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let mime = match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        _ => return Err(format!("unsupported_image_extension: .{}", ext)),
+    };
+    let metadata =
+        std::fs::metadata(&resolved).map_err(|e| format!("failed_to_read_metadata: {}", e))?;
+    if !metadata.is_file() {
+        return Err("invalid_path: expected a regular file".to_string());
+    }
+    if metadata.len() > 100 * 1024 * 1024 {
+        return Err("file_too_large: image exceeds 100MB limit".to_string());
+    }
+    let bytes = std::fs::read(&resolved).map_err(|e| format!("failed_to_read_file: {}", e))?;
+    use base64::Engine;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    Ok(format!("data:{};base64,{}", mime, b64))
+}
+
 fn is_os_protected_path(path: &Path) -> bool {
     let lower = path.to_string_lossy().to_ascii_lowercase();
     let protected = [
@@ -257,5 +296,29 @@ mod prompt_backup_path_tests {
             .is_some_and(|ext| ext.eq_ignore_ascii_case("json")));
         let denied = validate_prompt_backup_path(r"C:\Windows\Temp\x.json", false);
         assert!(denied.is_err());
+    }
+
+    #[tokio::test]
+    async fn read_image_as_base64_rejects_empty_and_system_path() {
+        let empty_err = super::read_image_as_base64("".to_string()).await;
+        assert!(empty_err.is_err());
+
+        let win_err = super::read_image_as_base64(r"C:\Windows\System32\cmd.exe".to_string()).await;
+        assert!(win_err.is_err());
+    }
+
+    #[tokio::test]
+    async fn read_image_as_base64_encodes_png_file() {
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let target_dir = manifest_dir.join("target");
+        let _ = std::fs::create_dir_all(&target_dir); // Justification: best-effort test setup
+        let test_png = target_dir.join("test_clipboard_image.png");
+        let png_bytes = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]; // PNG magic header
+        std::fs::write(&test_png, &png_bytes).expect("write test png");
+        let res = super::read_image_as_base64(test_png.to_string_lossy().to_string()).await;
+        let _ = std::fs::remove_file(&test_png); // Justification: best-effort test cleanup
+        assert!(res.is_ok());
+        let uri = res.unwrap();
+        assert!(uri.starts_with("data:image/png;base64,"));
     }
 }

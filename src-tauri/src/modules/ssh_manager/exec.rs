@@ -982,8 +982,8 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
                             running: false,
                             bound_email: String::new(),
                             tier: "SSH-NODE".to_string(),
-                            quota_4h_pct: 100.0,
-                            quota_weekly_pct: 100.0,
+                            quota_4h_pct: 0.0,
+                            quota_weekly_pct: 0.0,
                             active_model: target_model.clone(),
                             status_label: "offline".to_string(),
                         });

@@ -13,12 +13,11 @@ import {
 import { cn } from '../../../utils/cn';
 import { useErrorStore } from '../../../stores/error-store';
 import { PromptOriginTier, type AgmConversationNode, type AgmProjectTreeNode } from './types';
-import { isGhostConversation, isStaleOrEmptyConversation } from './conversationGuards';
+import { isGhostConversation, isStaleOrEmptyConversation, isConversationOrTurnQueued } from './conversationGuards';
 import { classifyPromptTier, assembleConversationHierarchy, isAutomatedConversation } from './tierClassification';
 import { formatSeqBadge } from './formatters';
 import { ConversationNode, getConversationStatus } from './ConversationNode';
 import { ProjectContextMenu } from './ProjectContextMenu';
-import { PromptTreeContextMenu } from './PromptTreeContextMenu';
 
 export interface ProjectNodeProps {
     project: AgmProjectTreeNode;
@@ -47,6 +46,7 @@ export interface ProjectNodeProps {
     onResendPrompts?: (count: number | 'all') => void;
     onEnqueue?: () => void;
     onRerunConversation?: (convoId: string, nudgeType: string) => void;
+    onOpenContextMenu?: (props: any) => void;
 }
 
 export function sortConversations(
@@ -69,8 +69,8 @@ export function sortConversations(
             return aRunning ? -1 : 1;
         }
 
-        const aQueued = Boolean(a.is_queued) || aStatus.includes('queue');
-        const bQueued = Boolean(b.is_queued) || bStatus.includes('queue');
+        const aQueued = isConversationOrTurnQueued(a);
+        const bQueued = isConversationOrTurnQueued(b);
         if (aQueued !== bQueued) {
             return aQueued ? -1 : 1;
         }
@@ -92,6 +92,7 @@ interface ConversationListProps {
     onResendPrompts?: (count: number | 'all') => void;
     onEnqueue?: () => void;
     onRerunConversation?: (convoId: string, nudgeType: string) => void;
+    onOpenContextMenu?: (props: any) => void;
 }
 
 function ConversationListWithGrouping({
@@ -105,6 +106,7 @@ function ConversationListWithGrouping({
     onResendPrompts,
     onEnqueue,
     onRerunConversation,
+    onOpenContextMenu,
 }: ConversationListProps) {
     if (categoryFilter === 'subagent') {
         return (
@@ -121,6 +123,7 @@ function ConversationListWithGrouping({
                         onResendPrompts={onResendPrompts}
                         onEnqueue={onEnqueue}
                         onRerunConversation={onRerunConversation}
+                        onOpenContextMenu={onOpenContextMenu}
                     />
                 ))}
             </>
@@ -128,11 +131,6 @@ function ConversationListWithGrouping({
     }
 
     const hierarchy = assembleConversationHierarchy(convList);
-    const [subagentMenuPos, setSubagentMenuPos] = useState<{
-        x: number;
-        y: number;
-        conv: AgmConversationNode;
-    } | null>(null);
 
     return (
         <>
@@ -148,6 +146,7 @@ function ConversationListWithGrouping({
                         onResendPrompts={onResendPrompts}
                         onEnqueue={onEnqueue}
                         onRerunConversation={onRerunConversation}
+                        onOpenContextMenu={onOpenContextMenu}
                     />
 
                     {/* Rendering Child Sub-Points (Indented with Branch Glyphs) */}
@@ -172,10 +171,15 @@ function ConversationListWithGrouping({
                                         onContextMenu={(e) => {
                                             e.preventDefault();
                                             e.stopPropagation();
-                                            setSubagentMenuPos({
+                                            onOpenContextMenu?.({
+                                                type: 'conversation',
                                                 x: e.clientX,
                                                 y: e.clientY,
-                                                conv: subNode.primaryNode,
+                                                conversationId: subNode.primaryNode.conversation_id,
+                                                currentTitle: subNode.primaryNode.title || subNode.primaryNode.short_id || '',
+                                                conversationNode: subNode.primaryNode,
+                                                repoPath: project.repo_path,
+                                                instanceId: subNode.primaryNode.instance_id || project.instance_id,
                                             });
                                         }}
                                         className={cn(
@@ -231,30 +235,6 @@ function ConversationListWithGrouping({
                     )}
                 </div>
             ))}
-
-            {subagentMenuPos && (
-                <PromptTreeContextMenu
-                    type="conversation"
-                    x={subagentMenuPos.x}
-                    y={subagentMenuPos.y}
-                    conversationId={subagentMenuPos.conv.conversation_id}
-                    currentTitle={subagentMenuPos.conv.title || subagentMenuPos.conv.short_id || ''}
-                    conversationNode={subagentMenuPos.conv}
-                    repoPath={project.repo_path}
-                    instanceId={subagentMenuPos.conv.instance_id || project.instance_id}
-                    onClose={() => setSubagentMenuPos(null)}
-                    onRename={() => {
-                        setSubagentMenuPos(null);
-                    }}
-                    onInspect={() => {
-                        setSubagentMenuPos(null);
-                        onOpenInspector(subagentMenuPos.conv, project.repo_path);
-                    }}
-                    onResendPrompts={onResendPrompts}
-                    onEnqueue={onEnqueue}
-                    onRerunConversation={onRerunConversation}
-                />
-            )}
         </>
     );
 }
@@ -321,7 +301,7 @@ async function exportProjectAsSqlite(project: AgmProjectTreeNode): Promise<void>
 
 export function isAutomatedPrompt(conv: AgmConversationNode): boolean {
     // Invariant: Actively running or queued conversations are never automated prompts
-    if (Boolean(conv.is_running) || Boolean(conv.is_queued) || (conv.status && conv.status.toLowerCase().includes('queue'))) {
+    if (Boolean(conv.is_running) || isConversationOrTurnQueued(conv)) {
         return false;
     }
     if (isAutomatedConversation(conv)) return true;
@@ -373,11 +353,12 @@ export function ProjectNode(props: ProjectNodeProps) {
         onResendPrompts,
         onEnqueue,
         onRerunConversation,
+        onOpenContextMenu,
     } = props;
 
     const filteredConvs = project.conversations.filter((c) => {
         if (activeFilter === 'archived') return true;
-        const isRunningOrQueued = Boolean(c.is_running) || Boolean(c.is_queued) || (c.status && c.status.toLowerCase().includes('queue'));
+        const isRunningOrQueued = Boolean(c.is_running) || isConversationOrTurnQueued(c);
         if (isRunningOrQueued) return true;
         if (isAutomatedHidden && categoryFilter !== 'system' && isAutomatedPrompt(c)) return false;
         return !isGhostConversation(c);
@@ -393,7 +374,7 @@ export function ProjectNode(props: ProjectNodeProps) {
     const staleConversations: AgmConversationNode[] = [];
 
     sortedConvs.forEach((conv) => {
-        const isRunningOrQueued = Boolean(conv.is_running) || Boolean(conv.is_queued) || (conv.status && conv.status.toLowerCase().includes('queue'));
+        const isRunningOrQueued = Boolean(conv.is_running) || isConversationOrTurnQueued(conv);
         if (!isRunningOrQueued && isGhostConversation(conv) && activeFilter !== 'archived') {
             return;
         }
@@ -413,7 +394,7 @@ export function ProjectNode(props: ProjectNodeProps) {
         if (activeFilter === 'running' && !conv.is_running) {
             return;
         }
-        if (activeFilter === 'queued' && !conv.is_queued && !conv.status.toLowerCase().includes('queue')) {
+        if (activeFilter === 'queued' && !isConversationOrTurnQueued(conv)) {
             return;
         }
         if (isStaleOrEmptyConversation(conv)) {
@@ -427,7 +408,7 @@ export function ProjectNode(props: ProjectNodeProps) {
         (c) => Boolean(c.is_running) && !isGhostConversation(c)
     ).length;
     const queuedCount = project.conversations.filter(
-        (c) => (Boolean(c.is_queued) || (c.status && c.status.toLowerCase().includes('queue'))) && !c.is_running
+        (c) => isConversationOrTurnQueued(c) && !c.is_running
     ).length;
 
     const listProps = {
@@ -440,6 +421,7 @@ export function ProjectNode(props: ProjectNodeProps) {
         onResendPrompts,
         onEnqueue,
         onRerunConversation,
+        onOpenContextMenu,
     };
 
     return (

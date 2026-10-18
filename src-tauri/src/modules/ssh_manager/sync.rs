@@ -169,8 +169,10 @@ pub fn import_ssh_from_gitmap() -> Result<(String, NodeSyncStats), String> {
     let mut all_discovered: Vec<SshConnectionRecord> = Vec::new();
     let mut sources: Vec<String> = Vec::new();
 
-    // 1. Try `gitmap ssh nodes export-json` or `gitmap ssh nodes --json`
+    // 1. Try `gitmap cluster nodes --json`, `gitmap cluster nodes export-json`, or `gitmap ssh nodes`
     for args in [
+        &["cluster", "nodes", "--json"][..],
+        &["cluster", "nodes", "export-json"][..],
         &["ssh", "nodes", "export-json"][..],
         &["ssh", "nodes", "--json"][..],
     ] {

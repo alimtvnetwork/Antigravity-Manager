@@ -1,4 +1,4 @@
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { copyToClipboard, ensureDocumentFocus } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 import { showToast } from '../../common/ToastContainer';
@@ -196,20 +196,104 @@ export function base64ToBlob(base64Data: string, mimeType = 'image/png'): Blob {
     return new Blob([uint8Array], { type: mimeType });
 }
 
+function isTauriEnvironment(): boolean {
+    return typeof window !== 'undefined' && Boolean((window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
+}
+
+/**
+ * Normalizes an image URI into a clean filesystem path if it represents a local file.
+ * Handles `file://`, `file:///`, `http://asset.localhost/...`, `asset://localhost/...`,
+ * URL-encoded paths, Windows extended prefix `\\?\`, leading slashes before drive letters,
+ * and direct absolute paths (`C:\...`, `/...`).
+ */
+export function extractLocalPathFromUri(uri: string): string | null {
+    if (!uri || !uri.trim()) return null;
+    let clean = uri.trim();
+
+    // Already a data URI or blob URI
+    if (clean.startsWith('data:') || clean.startsWith('blob:')) {
+        return null;
+    }
+
+    // Check Tauri asset protocol URLs
+    if (clean.startsWith('http://asset.localhost/')) {
+        clean = clean.slice('http://asset.localhost/'.length);
+    } else if (clean.startsWith('https://asset.localhost/')) {
+        clean = clean.slice('https://asset.localhost/'.length);
+    } else if (clean.startsWith('asset://localhost/')) {
+        clean = clean.slice('asset://localhost/'.length);
+    } else if (clean.startsWith('file:///')) {
+        clean = clean.slice(7);
+        // On Windows with drive letter, e.g. '/C:/...', strip leading slash
+        if (/^\/[a-zA-Z]:[\\/]/.test(clean)) {
+            clean = clean.slice(1);
+        }
+    } else if (clean.startsWith('file://')) {
+        clean = clean.slice(7);
+    }
+
+    // If it was an external remote web URL (not asset.localhost), do not treat as local path
+    if (clean.startsWith('http://') || clean.startsWith('https://')) {
+        return null;
+    }
+
+    try {
+        clean = decodeURIComponent(clean);
+    } catch {
+        // Keep clean as-is if decoding fails
+    }
+
+    // Strip Windows extended-length prefix: \\?\C:\... or \?\C:\...
+    clean = clean.replace(/^[\\/]+\?[\\/]+/, '');
+
+    // Strip leading slash before Windows drive letter: /C:/... -> C:/...
+    if (/^\/[a-zA-Z]:[\\/]/.test(clean)) {
+        clean = clean.slice(1);
+    }
+
+    const isWindowsPath = /^[a-zA-Z]:[\\/]/.test(clean) || clean.startsWith('\\\\');
+    const isUnixPath = clean.startsWith('/') && !clean.startsWith('//');
+
+    if (isWindowsPath || isUnixPath) {
+        return clean;
+    }
+
+    return null;
+}
+
 /**
  * Converts an image URI (Base64 data URI, HTTP URL, file path, or blob URI)
- * into a full Base64 data URI (data:image/png;base64,...) for embedding into HTML.
+ * into a full Base64 data URI (data:image/<ext>;base64,...) for embedding into HTML.
+ * Uses native Tauri backend command `read_image_as_base64` for local files to eliminate
+ * CORS/taint canvas security errors in WebView2.
  */
 export async function convertImageUriToBase64(imageUri: string): Promise<string | null> {
     try {
         if (!imageUri || !imageUri.trim()) return null;
         const cleanUri = imageUri.trim();
 
-        // Already a base64 data URI
+        // 1. Already a base64 data URI
         if (cleanUri.startsWith('data:image/')) {
             return cleanUri;
         }
 
+        // 2. Local filesystem path or Tauri asset URL -> invoke native backend
+        const localPath = extractLocalPathFromUri(cleanUri);
+        if (localPath && isTauriEnvironment()) {
+            try {
+                const b64DataUri = await invoke<string>('read_image_as_base64', { path: localPath });
+                if (b64DataUri && b64DataUri.startsWith('data:image/')) {
+                    return b64DataUri;
+                }
+            } catch (backendErr) {
+                useErrorStore.getState().trackWarning(backendErr, {
+                    source: 'clipboard.convertImageUriToBase64.read_image_as_base64',
+                    triggerAction: 'read_image_as_base64',
+                });
+            }
+        }
+
+        // 3. Fallback to offscreen HTML Image canvas rendering (for remote web URLs or non-Tauri)
         const resolvedSrc = resolveImageSrc(cleanUri);
         return await new Promise<string | null>((resolve) => {
             const timeout = setTimeout(() => resolve(null), 5000);
@@ -247,6 +331,8 @@ export async function convertImageUriToBase64(imageUri: string): Promise<string 
 /**
  * Converts an image URI (Base64 data URI, HTTP URL, or local file/blob URI)
  * into a true PNG binary Blob (image/png) for native clipboard insertion.
+ * Invokes native `read_image_as_base64` and decodes directly via `base64ToBlob`
+ * to completely eliminate canvas tainting and CORS failures.
  */
 export async function convertImageUriToPngBlob(imageUri: string): Promise<Blob | null> {
     try {
@@ -259,9 +345,33 @@ export async function convertImageUriToPngBlob(imageUri: string): Promise<Blob |
             return base64ToBlob(base64, 'image/png');
         }
 
-        const resolvedSrc = resolveImageSrc(cleanUri);
+        // 2. If it's a local file or asset URL, invoke native backend read_image_as_base64
+        const localPath = extractLocalPathFromUri(cleanUri);
+        if (localPath && isTauriEnvironment()) {
+            try {
+                const b64DataUri = await invoke<string>('read_image_as_base64', { path: localPath });
+                if (b64DataUri && b64DataUri.startsWith('data:image/')) {
+                    const commaIdx = b64DataUri.indexOf(',');
+                    const base64Payload = commaIdx !== -1 ? b64DataUri.slice(commaIdx + 1) : b64DataUri;
+                    return base64ToBlob(base64Payload, 'image/png');
+                }
+            } catch (backendErr) {
+                useErrorStore.getState().trackWarning(backendErr, {
+                    source: 'clipboard.convertImageUriToPngBlob.read_image_as_base64',
+                    triggerAction: 'read_image_as_base64',
+                });
+            }
+        }
 
-        // 2. Offscreen rendering to HTMLCanvasElement to guarantee standard PNG binary encoding
+        // 3. If it's another data URI (e.g. data:image/jpeg;base64,...), decode payload directly
+        if (cleanUri.startsWith('data:image/')) {
+            const commaIdx = cleanUri.indexOf(',');
+            const base64Payload = commaIdx !== -1 ? cleanUri.slice(commaIdx + 1) : cleanUri;
+            return base64ToBlob(base64Payload, 'image/png');
+        }
+
+        // 4. Offscreen rendering to HTMLCanvasElement for remote web URLs or non-Tauri browser environments
+        const resolvedSrc = resolveImageSrc(cleanUri);
         return await new Promise<Blob | null>((resolve) => {
             const timeout = setTimeout(() => resolve(null), 5000);
             const img = new Image();
@@ -299,6 +409,7 @@ export async function convertImageUriToPngBlob(imageUri: string): Promise<Blob |
 /**
  * Writes a single image directly to the system clipboard as a native binary PNG (image/png).
  * This enables pasting directly into apps like Gemini Web, Photoshop, Paint, Discord, etc.
+ * Falls back to Markdown text or URI if native clipboard write fails.
  */
 export async function writeNativeImageToClipboard(
     imageUri: string,
@@ -326,22 +437,27 @@ export async function writeNativeImageToClipboard(
                 showToast({ message: msg, type: 'success' });
                 return true;
             } catch {
-                // Focus was lost or binary write rejected; fall through to copyToClipboard
+                // Focus was lost or binary write rejected; fall through to copyToClipboard fallback
             }
         }
-        const fallbackOk = await copyToClipboard(imageUri);
+        // Fallback: Markdown image tag or URI
+        const isDataUri = imageUri.startsWith('data:');
+        const fallbackPayload = isDataUri ? imageUri : `![Image](${imageUri})`;
+        const fallbackOk = await copyToClipboard(fallbackPayload);
         if (fallbackOk) {
-            const msg = 'Copied image URI to clipboard!';
+            const msg = isDataUri ? 'Copied image URI to clipboard!' : 'Copied image reference to clipboard!';
             onSuccess?.(msg);
             showToast({ message: msg, type: 'info' });
             return true;
         }
         return false;
     } catch (err) {
-        // Fallback to copying image URI / reference via multi-stage clipboard
-        const fallbackOk = await copyToClipboard(imageUri);
+        // Fallback to copying image URI / markdown reference via multi-stage clipboard
+        const isDataUri = Boolean(imageUri && imageUri.startsWith('data:'));
+        const fallbackPayload = isDataUri ? imageUri : `![Image](${imageUri})`;
+        const fallbackOk = await copyToClipboard(fallbackPayload);
         if (fallbackOk) {
-            const msg = 'Copied image URI to clipboard!';
+            const msg = isDataUri ? 'Copied image URI to clipboard!' : 'Copied image reference to clipboard!';
             onSuccess?.(msg);
             showToast({ message: msg, type: 'info' });
             return true;
@@ -354,6 +470,40 @@ export async function writeNativeImageToClipboard(
         return false;
     }
 }
+
+/**
+ * Copies a prompt turn or transcript event object as formatted JSON to clipboard
+ * with immediate success toast feedback.
+ */
+export async function copyEventAsJson(
+    eventData: unknown,
+    eventName = 'Event',
+    onSuccess?: (msg: string) => void,
+    onError?: (err: unknown) => void
+): Promise<boolean> {
+    try {
+        if (!eventData) {
+            throw new Error('No event data provided to copy');
+        }
+        const jsonText = typeof eventData === 'string' ? eventData : JSON.stringify(eventData, null, 2);
+        const success = await copyToClipboard(jsonText);
+        if (success) {
+            const msg = `Copied ${eventName} data to clipboard!`;
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'success' });
+            return true;
+        }
+        return false;
+    } catch (err) {
+        useErrorStore.getState().trackWarning(err, {
+            source: 'clipboard.copyEventAsJson',
+            triggerAction: 'copy_event_as_json',
+        });
+        onError?.(err);
+        return false;
+    }
+}
+
 
 /**
  * Copies markdown prompt content and embedded images into system clipboard

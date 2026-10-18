@@ -117,7 +117,11 @@ export function PromptTreeContextMenu(props: PromptTreeContextMenuProps) {
     const top = Math.max(8, Math.min(y, window.innerHeight - MENU_HEIGHT));
 
     useEffect(() => {
-        const mountTime = Date.now();
+        const handleClickOutside = (e: Event) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                onClose();
+            }
+        };
 
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
@@ -125,38 +129,24 @@ export function PromptTreeContextMenu(props: PromptTreeContextMenuProps) {
             }
         };
 
-        const handleClickOutside = (e: MouseEvent) => {
-            if (Date.now() - mountTime < 100) return;
+        const handleScroll = (e: Event) => {
             if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
                 onClose();
             }
         };
 
-        const handleScroll = (e: Event) => {
-            if (Date.now() - mountTime < 150) return;
-            if (menuRef.current && menuRef.current.contains(e.target as Node)) return;
-            onClose();
-        };
-
-        // Scroll Listener Guard: Target `.tree-scroll-container` rather than `window` capture
-        // to prevent premature dismissal on periodic 1s timer ticks
-        const treeScrollContainer =
-            document.querySelector('.tree-scroll-container') ||
-            document.querySelector('.overflow-y-auto');
-
-        if (treeScrollContainer) {
-            treeScrollContainer.addEventListener('scroll', handleScroll, { passive: true });
-        }
-
-        window.addEventListener('keydown', handleKeyDown);
-        document.addEventListener('mousedown', handleClickOutside);
+        window.addEventListener('pointerdown', handleClickOutside, { capture: true });
+        window.addEventListener('contextmenu', handleClickOutside, { capture: true });
+        window.addEventListener('keydown', handleKeyDown, { capture: true });
+        window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+        window.addEventListener('blur', onClose);
 
         return () => {
-            window.removeEventListener('keydown', handleKeyDown);
-            document.removeEventListener('mousedown', handleClickOutside);
-            if (treeScrollContainer) {
-                treeScrollContainer.removeEventListener('scroll', handleScroll);
-            }
+            window.removeEventListener('pointerdown', handleClickOutside, { capture: true });
+            window.removeEventListener('contextmenu', handleClickOutside, { capture: true });
+            window.removeEventListener('keydown', handleKeyDown, { capture: true });
+            window.removeEventListener('scroll', handleScroll, { capture: true } as EventListenerOptions);
+            window.removeEventListener('blur', onClose);
         };
     }, [onClose]);
 

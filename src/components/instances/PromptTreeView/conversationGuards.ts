@@ -1,9 +1,18 @@
 import type { AgmConversationNode } from './types';
 
+export function isConversationOrTurnQueued(conv: AgmConversationNode): boolean {
+    if (Boolean(conv.is_queued)) return true;
+    if (conv.status && conv.status.toLowerCase().includes('queue')) return true;
+    if (conv.prompts && conv.prompts.some((p) => Boolean(p.is_queued) || (p.status && p.status.toLowerCase().includes('queue')))) {
+        return true;
+    }
+    return false;
+}
+
 export function isGhostConversation(conv: AgmConversationNode): boolean {
     const statusLower = (conv.status || '').toLowerCase();
     const isRunning = Boolean(conv.is_running) || statusLower.includes('run') || statusLower.includes('exec');
-    const isQueued = Boolean(conv.is_queued) || statusLower.includes('queue');
+    const isQueued = isConversationOrTurnQueued(conv);
     if (isRunning || isQueued) {
         return false;
     }
@@ -39,7 +48,7 @@ export function isStaleOrEmptyConversation(conv: AgmConversationNode): boolean {
     // Running OR queued conversations must NEVER be treated as stale or empty
     const statusLower = (conv.status || '').toLowerCase();
     const isRunning = Boolean(conv.is_running) || statusLower.includes('run') || statusLower.includes('exec');
-    const isQueued = Boolean(conv.is_queued) || statusLower.includes('queue');
+    const isQueued = isConversationOrTurnQueued(conv);
     if (isRunning || isQueued) {
         return false;
     }

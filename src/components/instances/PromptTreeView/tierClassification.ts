@@ -1,5 +1,6 @@
 import { PromptOriginTier } from './types';
 import type { AgmConversationNode, TierClassificationResult, HierarchicalConversationNode } from './types';
+import { isConversationOrTurnQueued } from './conversationGuards';
 
 export function classifyPromptTier(
     text?: string,
@@ -204,15 +205,27 @@ export function assembleConversationHierarchy(
     return rootNodes.reverse().sort((a, b) => {
         const aStatus = (a.primaryNode.status || '').toLowerCase();
         const bStatus = (b.primaryNode.status || '').toLowerCase();
-        const aRunning = Boolean(a.primaryNode.is_running) || aStatus.includes('run') || aStatus.includes('exec') || a.subagents.some((s) => Boolean(s.primaryNode.is_running) || (s.primaryNode.status || '').toLowerCase().includes('run'));
-        const bRunning = Boolean(b.primaryNode.is_running) || bStatus.includes('run') || bStatus.includes('exec') || b.subagents.some((s) => Boolean(s.primaryNode.is_running) || (s.primaryNode.status || '').toLowerCase().includes('run'));
+        const aRunning =
+            Boolean(a.primaryNode.is_running) ||
+            aStatus.includes('run') ||
+            aStatus.includes('exec') ||
+            Boolean(a.primaryNode.prompts && a.primaryNode.prompts.some((p) => Boolean(p.is_running) || (p.status && (p.status.toLowerCase().includes('run') || p.status.toLowerCase().includes('exec'))))) ||
+            a.subagents.some((s) => Boolean(s.primaryNode.is_running) || (s.primaryNode.status || '').toLowerCase().includes('run'));
+        const bRunning =
+            Boolean(b.primaryNode.is_running) ||
+            bStatus.includes('run') ||
+            bStatus.includes('exec') ||
+            Boolean(b.primaryNode.prompts && b.primaryNode.prompts.some((p) => Boolean(p.is_running) || (p.status && (p.status.toLowerCase().includes('run') || p.status.toLowerCase().includes('exec'))))) ||
+            b.subagents.some((s) => Boolean(s.primaryNode.is_running) || (s.primaryNode.status || '').toLowerCase().includes('run'));
         if (aRunning !== bRunning) return aRunning ? -1 : 1;
 
-        const aQueued = Boolean(a.primaryNode.is_queued) || aStatus.includes('queue') || a.subagents.some((s) => Boolean(s.primaryNode.is_queued) || (s.primaryNode.status || '').toLowerCase().includes('queue'));
-        const bQueued = Boolean(b.primaryNode.is_queued) || bStatus.includes('queue') || b.subagents.some((s) => Boolean(s.primaryNode.is_queued) || (s.primaryNode.status || '').toLowerCase().includes('queue'));
+        const aQueued = isConversationOrTurnQueued(a.primaryNode) || a.subagents.some((s) => isConversationOrTurnQueued(s.primaryNode));
+        const bQueued = isConversationOrTurnQueued(b.primaryNode) || b.subagents.some((s) => isConversationOrTurnQueued(s.primaryNode));
         if (aQueued !== bQueued) return aQueued ? -1 : 1;
 
-        return 0;
+        const aTime = new Date(a.primaryNode.last_modified).getTime() || 0;
+        const bTime = new Date(b.primaryNode.last_modified).getTime() || 0;
+        return bTime - aTime;
     });
 }
 
