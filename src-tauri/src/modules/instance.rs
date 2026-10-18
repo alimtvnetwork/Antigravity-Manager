@@ -147,11 +147,11 @@ pub(crate) use pid_scan::{
     get_cached_antigravity_processes, CachedProcessInfo, PROCESS_SCAN_CACHE,
 };
 pub use pid_store::{get_instance_saved_pid, mark_instance_stopped, record_instance_pid};
-pub(crate) use pid_util::force_refresh_process_cache;
+pub(crate) use pid_util::{first_live_window_pid, force_refresh_process_cache};
 pub use pid_util::{
-    first_live_window_pid, is_instance_running, pid_refresh_interval_seconds,
-    process_identity_matches, refresh_pid_cache_if_due, refresh_saved_instance_pids,
-    resolve_instance_pid_for_switch, saved_pid_matches,
+    is_instance_running, pid_refresh_interval_seconds, process_identity_matches,
+    refresh_pid_cache_if_due, refresh_saved_instance_pids, resolve_instance_pid_for_switch,
+    saved_pid_matches,
 };
 pub use post_switch_resume::{cancel_post_switch_resume, schedule_post_switch_resume};
 pub use process_cache::is_instance_process_running_smart;
