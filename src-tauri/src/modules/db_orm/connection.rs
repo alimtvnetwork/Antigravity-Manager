@@ -3,6 +3,8 @@
 use crate::error::AppError;
 use crate::modules::db_orm::generated::tables::ALL_TABLES;
 use crate::modules::db_orm::generated::views::ALL_VIEWS;
+use diesel::connection::Connection as DieselConnection;
+use diesel::sqlite::SqliteConnection;
 use rusqlite::Connection;
 use std::fs;
 use std::path::Path;
@@ -26,6 +28,24 @@ pub fn open_split_db(path: &Path) -> Result<Connection, AppError> {
     .map_err(AppError::Database)?;
 
     Ok(conn)
+}
+
+/// Opens a compile-time type-safe Diesel SQLite connection for Split-DB architecture.
+pub fn open_diesel_split_db(path: &Path) -> Result<SqliteConnection, AppError> {
+    if let Some(parent) = path.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent).map_err(AppError::Io)?;
+        }
+    }
+
+    let url = path.to_str().ok_or_else(|| {
+        AppError::Config("Invalid database path for Diesel connection".to_string())
+    })?;
+    SqliteConnection::establish(url).map_err(|e| {
+        AppError::Config(format!(
+            "Failed to establish Diesel SQLite connection to {url}: {e}"
+        ))
+    })
 }
 
 /// Initializes all PascalCase tables and views registered for a specific Split-DB file.

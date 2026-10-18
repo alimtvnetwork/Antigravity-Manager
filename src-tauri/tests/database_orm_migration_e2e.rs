@@ -388,14 +388,33 @@ fn test_database_orm_migration_e2e_full_lifecycle() {
     }
 
     // =========================================================================
-    // Step 8: Verify Diesel Compile-Time Model Bidirectional Conversion
+    // Step 8: Verify Diesel Compile-Time Safe ORM Querying and Model Conversion
     // =========================================================================
     {
-        let original_error = ErrorLog {
-            error_log_id: "err-diesel-test".to_string(),
+        use diesel::prelude::*;
+
+        // 8.1 Open compile-time safe Diesel connection to restored errors.db
+        let mut diesel_conn = open_diesel_split_db(&errors_db_path)
+            .expect("Diesel SQLite connection must establish successfully");
+
+        use antigravity_tools_lib::modules::db_orm::diesel_schema::ErrorLog::dsl as err_dsl;
+
+        // 8.2 Compile-time verified query via Diesel DSL
+        let loaded_errors: Vec<DieselErrorLog> = err_dsl::ErrorLog
+            .filter(err_dsl::ErrorCode.eq("E1001"))
+            .load(&mut diesel_conn)
+            .expect("Diesel query execution must succeed");
+
+        assert_eq!(loaded_errors.len(), 1);
+        assert_eq!(loaded_errors[0].error_code, "E1001");
+        assert_eq!(loaded_errors[0].message, "Database connection refused");
+
+        // 8.3 Compile-time verified insertion via Diesel DSL
+        let new_diesel_error = DieselErrorLog {
+            error_log_id: "err-diesel-999".to_string(),
             error_code: "E9001".to_string(),
             severity: "critical".to_string(),
-            message: "Diesel compile-time type checked".to_string(),
+            message: "Diesel compile-time type checked insert".to_string(),
             stack_trace: None,
             source: Some("diesel".to_string()),
             trigger_action: None,
@@ -403,11 +422,29 @@ fn test_database_orm_migration_e2e_full_lifecycle() {
             created_at: 1740000999,
         };
 
-        let diesel_model: DieselErrorLog = original_error.clone().into();
-        assert_eq!(diesel_model.error_log_id, "err-diesel-test");
-        assert_eq!(diesel_model.error_code, "E9001");
+        let inserted_rows = diesel::insert_into(err_dsl::ErrorLog)
+            .values(&new_diesel_error)
+            .execute(&mut diesel_conn)
+            .expect("Diesel insert must succeed");
+        assert_eq!(inserted_rows, 1);
 
-        let converted_back: ErrorLog = diesel_model.into();
-        assert_eq!(converted_back, original_error);
+        // 8.4 Verify inserted record exists and can be loaded
+        let query_inserted: Vec<DieselErrorLog> = err_dsl::ErrorLog
+            .filter(err_dsl::ErrorLogId.eq("err-diesel-999"))
+            .load(&mut diesel_conn)
+            .expect("Diesel reload must succeed");
+        assert_eq!(query_inserted.len(), 1);
+        assert_eq!(query_inserted[0].error_code, "E9001");
+
+        // 8.5 Verify bidirectional entity conversion
+        let domain_entity: ErrorLog = query_inserted[0].clone().into();
+        assert_eq!(domain_entity.error_log_id, "err-diesel-999");
+        assert_eq!(
+            domain_entity.message,
+            "Diesel compile-time type checked insert"
+        );
+
+        let converted_back: DieselErrorLog = domain_entity.into();
+        assert_eq!(converted_back.error_log_id, "err-diesel-999");
     }
 }
