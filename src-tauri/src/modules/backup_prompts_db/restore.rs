@@ -33,8 +33,7 @@ pub fn restore_running_prompts_for_instance(
     // Regression guard: restore must never run on the resend path.
     // `resend_queued_prompts_for_instance` runs its own single dispatch pass;
     // a nested restore would dispatch every prompt a second time.
-    let resend_active =
-        crate::modules::repo_db::backup::RESEND_IN_PROGRESS.with(|f| f.get());
+    let resend_active = crate::modules::repo_db::backup::RESEND_IN_PROGRESS.with(|f| f.get());
     if resend_active {
         return Err("restore_running_prompts_for_instance must not run while resend_queued_prompts_for_instance is active (double-dispatch guard)".to_string());
     }

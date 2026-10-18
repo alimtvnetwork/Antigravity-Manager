@@ -491,6 +491,10 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                 super::detection::extract_image_uris_or_paths(&p.prompt_content);
             let final_uris =
                 super::detection::effective_image_uris(p.image_payload.as_deref(), extracted_uris);
+            let mut final_img = super::detection::serialize_image_uris(&final_uris);
+            if final_img.is_none() && !img_paths.is_empty() {
+                final_img = Some(img_paths.join(";"));
+            }
             let byte_size = p.prompt_content.len();
             let image_count = img_paths.len() + final_uris.len();
             let seq_code = p
@@ -865,6 +869,7 @@ pub fn verify_prompts_running() -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::modules::repo_db::detection;
     use crate::modules::repo_db::init_tables;
     use rusqlite::Connection;
 
@@ -999,12 +1004,11 @@ mod tests {
             image_payload: image_payload.clone(),
         };
 
-        let (extracted_uris, img_paths) =
-            super::detection::extract_image_uris_or_paths(&prompt_text);
+        let (extracted_uris, img_paths) = detection::extract_image_uris_or_paths(&prompt_text);
         assert_eq!(extracted_uris.len(), 1);
         assert!(img_paths.is_empty());
         // Legacy single-URI wrapper still returns the first URI verbatim.
-        let (legacy_img, _) = super::detection::extract_image_payload_or_path(&prompt_text);
+        let (legacy_img, _) = detection::extract_image_payload_or_path(&prompt_text);
         assert!(legacy_img.is_some());
         let doc = resume_task_document(&prompt_obj, "backed_up", now + 1, &img_paths);
         assert_eq!(doc["workspace_id"], project_id);

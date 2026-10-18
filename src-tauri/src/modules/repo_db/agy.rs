@@ -1,6 +1,9 @@
 //! Repo DB: agy
 
-use super::detection::{effective_image_uris, extract_image_payload_or_path, extract_image_uris_or_paths, extract_screenshot_id_token, resume_task_document};
+use super::detection::{
+    effective_image_uris, extract_image_payload_or_path, extract_image_uris_or_paths,
+    extract_screenshot_id_token, resume_task_document,
+};
 use super::models::ActivePrompt;
 use super::prompts_crud::save_or_requeue_prompt;
 use super::state::get_active_agy_workers;

@@ -67,10 +67,7 @@ fn instance_predicate(target: &str) -> (&'static str, Option<String>) {
     }
 }
 
-fn query_now_running(
-    conn: &Connection,
-    target: &str,
-) -> Result<Option<PromptQueueRow>, String> {
+fn query_now_running(conn: &Connection, target: &str) -> Result<Option<PromptQueueRow>, String> {
     let (pred, param) = instance_predicate(target);
     let sql = format!(
         "SELECT id, instance_id, status, created_at, image_payload IS NOT NULL \
@@ -127,9 +124,7 @@ fn query_up_next_total(conn: &Connection, target: &str) -> Result<i64, String> {
 /// (FIFO) for an instance, plus the full queued count and a backend
 /// timestamp. Powers the prompt tree "Now Running + Up Next" panel.
 #[tauri::command]
-pub fn get_running_and_up_next(
-    instance_id: Option<String>,
-) -> Result<RunningAndUpNext, String> {
+pub fn get_running_and_up_next(instance_id: Option<String>) -> Result<RunningAndUpNext, String> {
     let target = instance_id
         .as_deref()
         .map(str::trim)

@@ -124,7 +124,7 @@ pub(crate) mod tests {
         );
 
         // Justification: best-effort cleanup; a leftover directory is harmless
-        crate::error::record_ignored(fs::::remove_dir_all(temp_dir), "remove_dir_all");
+        crate::error::record_ignored(fs::remove_dir_all(temp_dir), "remove_dir_all");
     }
 
     #[test]
@@ -157,10 +157,7 @@ pub(crate) mod tests {
             serialize_image_uris(&one).as_deref(),
             Some("data:image/png;base64,AAA")
         );
-        assert_eq!(
-            parse_image_uris("data:image/png;base64,AAA"),
-            one
-        );
+        assert_eq!(parse_image_uris("data:image/png;base64,AAA"), one);
 
         // Zero URIs -> None.
         assert!(serialize_image_uris(&[]).is_none());
@@ -174,10 +171,7 @@ pub(crate) mod tests {
         let result = restore_running_prompts(None, true, Some("/tmp/agm-test-guard.db"));
         // Must fail with the double-dispatch guard error before touching any DB.
         let err = result.expect_err("restore must refuse while resend is active");
-        assert!(
-            err.contains("double-dispatch"),
-            "unexpected error: {err}"
-        );
+        assert!(err.contains("double-dispatch"), "unexpected error: {err}");
         crate::modules::repo_db::backup::RESEND_IN_PROGRESS.with(|f| f.set(false));
 
         // Guard cleared: restore proceeds past the guard (empty DB -> Ok with
@@ -188,6 +182,9 @@ pub(crate) mod tests {
         assert!(restored.is_empty());
         // Justification: best-effort cleanup of the scratch DB file.
         crate::error::record_ignored(fs::remove_file(db2), "remove scratch db");
-        crate::error::record_ignored(fs::remove_file("/tmp/agm-test-guard.db"), "remove scratch db");
+        crate::error::record_ignored(
+            fs::remove_file("/tmp/agm-test-guard.db"),
+            "remove scratch db",
+        );
     }
 }

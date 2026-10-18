@@ -119,9 +119,10 @@ pub fn backup_active_running_prompts_for_instance(
         // payload yet, so no image is silently dropped (AC2).
         let (backup_uris, _) =
             crate::modules::repo_db::detection::extract_image_uris_or_paths(&p.prompt_content);
-        let mut images_payload = p.image_payload.clone().or_else(|| {
-            crate::modules::repo_db::detection::serialize_image_uris(&backup_uris)
-        });
+        let mut images_payload = p
+            .image_payload
+            .clone()
+            .or_else(|| crate::modules::repo_db::detection::serialize_image_uris(&backup_uris));
         // Preserve upstream screenshot-id token tagging (single-payload form
         // only; JSON-array multi-URI payloads keep their own structure so the
         // token append cannot corrupt the JSON).
@@ -413,9 +414,10 @@ pub fn backup_queued_prompts_for_instance(
         // ALL data URIs from content so no image is silently dropped (AC2).
         let (backup_uris, _) =
             crate::modules::repo_db::detection::extract_image_uris_or_paths(&p.prompt_content);
-        let mut images_payload = p.image_payload.clone().or_else(|| {
-            crate::modules::repo_db::detection::serialize_image_uris(&backup_uris)
-        });
+        let mut images_payload = p
+            .image_payload
+            .clone()
+            .or_else(|| crate::modules::repo_db::detection::serialize_image_uris(&backup_uris));
         // Preserve upstream screenshot-id token tagging (single-payload form
         // only; JSON-array multi-URI payloads keep their own structure so the
         // token append cannot corrupt the JSON).
