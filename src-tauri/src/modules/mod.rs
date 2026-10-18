@@ -11,6 +11,8 @@ pub mod cloudflared;
 pub mod compact_engine;
 pub mod config;
 pub mod db;
+pub mod db_migration;
+pub mod db_orm;
 pub mod delegate_updater;
 pub mod device;
 pub mod email_inbound;

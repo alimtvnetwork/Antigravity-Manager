@@ -35,11 +35,17 @@ export function classifyPromptTier(
     }
 
     // 2. System Message Classification
+    const hasUserContent =
+        raw.includes('<USER_REQUEST>') ||
+        raw.includes('<user_request>') ||
+        raw.includes('User Requests') ||
+        raw.includes('# User Requests');
+
     const isSystemMessage =
-        raw.startsWith('<SYSTEM_MESSAGE>') ||
-        raw.includes('<conversation_transcript>') ||
-        raw.includes('<artifacts>') ||
-        cleanTitle.startsWith('system:');
+        (raw.startsWith('<SYSTEM_MESSAGE>') ||
+            raw.startsWith('System:') ||
+            cleanTitle.startsWith('system:')) &&
+        !hasUserContent;
 
     if (isSystemMessage && !raw.includes('invoked by a caller agent') && !raw.includes('You are')) {
         return {
@@ -50,7 +56,7 @@ export function classifyPromptTier(
             badgeStyle: 'bg-zinc-500/15 text-zinc-700 dark:text-zinc-300 border-zinc-400/30',
             iconName: 'terminal',
             isSubagent: false,
-            isNonPrompt: true,
+            isNonPrompt: !(Boolean(metadata?.is_running) || Boolean(metadata?.is_queued)),
             confidence: 0.95,
             matchedPattern: 'system_message_tag',
             description: 'System initialization directives and environment preambles',

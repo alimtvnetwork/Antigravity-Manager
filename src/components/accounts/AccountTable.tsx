@@ -24,6 +24,7 @@ import { ArrowUpDown, ArrowUp, ArrowDown, Clock, GripVertical } from 'lucide-rea
 import { cn } from '../../utils/cn';
 import { Gemini } from '@lobehub/icons';
 import type { Account } from '../../types/account';
+import { computeAccountAlgorithmScore } from '../../utils/accountAlgorithmScore';
 import { SortableAccountRow } from './AccountTable/SortableAccountRow';
 import { AccountRowContent } from './AccountTable/AccountRowContent';
 import { extractAccountResetTime, type AccountTableProps } from './AccountTable/types';
@@ -135,9 +136,9 @@ export function AccountTable({
         return values.size > 1;
     }, [accounts]);
     const [activeId, setActiveId] = useState<string | null>(null);
-    // 排序状态配置: 支持按配额重置时间 (reset_time) 或最后使用时间 (last_used) 排序
+    // 排序状态配置: 支持按配额重置时间 (reset_time)、最后使用时间 (last_used) 或算法得分 (score) 排序
     const [sortConfig, setSortConfig] = useState<{
-        key: 'reset_time' | 'last_used' | null;
+        key: 'reset_time' | 'last_used' | 'score' | null;
         direction: 'asc' | 'desc' | null;
     }>({
         key: null,
@@ -146,10 +147,16 @@ export function AccountTable({
 
     const isSortingActive = sortConfig.key !== null && sortConfig.direction !== null;
 
-    const handleSortToggle = (key: 'reset_time' | 'last_used') => {
+    const handleSortToggle = (key: 'reset_time' | 'last_used' | 'score') => {
         setSortConfig(prev => {
             if (prev.key !== key) {
-                return { key, direction: 'asc' };
+                return { key, direction: key === 'score' ? 'desc' : 'asc' };
+            }
+            if (key === 'score') {
+                if (prev.direction === 'desc') {
+                    return { key, direction: 'asc' };
+                }
+                return { key: null, direction: null };
             }
             if (prev.direction === 'asc') {
                 return { key, direction: 'desc' };
@@ -180,6 +187,16 @@ export function AccountTable({
                 const timeB = b.last_used || 0;
 
                 return sortConfig.direction === 'asc' ? timeA - timeB : timeB - timeA;
+            }
+
+            if (sortConfig.key === 'score') {
+                const scoreA = computeAccountAlgorithmScore(a).score;
+                const scoreB = computeAccountAlgorithmScore(b).score;
+
+                if (scoreA !== scoreB) {
+                    return sortConfig.direction === 'desc' ? scoreB - scoreA : scoreA - scoreB;
+                }
+                return (a.email || '').localeCompare(b.email || '');
             }
 
             return 0;
@@ -330,20 +347,24 @@ export function AccountTable({
                                 </div>
                             </th>
 
-                            {/* Column 3: Reclaimed Whitespace for Date Column (Shrink to 95px) */}
-                            <th className="px-2 py-0.5 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[95px] whitespace-nowrap">
+                            {/* Column: Algorithm Candidate Score */}
+                            <th className="px-2 py-0.5 text-left rtl:text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[110px] min-w-[100px] whitespace-nowrap">
                                 <button
                                     type="button"
-                                    onClick={() => handleSortToggle('last_used')}
+                                    onClick={() => handleSortToggle('score')}
                                     className={cn(
                                         "inline-flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors uppercase font-medium",
-                                        sortConfig.key === 'last_used' && "text-blue-600 dark:text-blue-400 font-semibold"
+                                        sortConfig.key === 'score' && "text-blue-600 dark:text-blue-400 font-semibold"
                                     )}
-                                    title={t('accounts.table.sort_by_last_used', 'Sort by last used')}
+                                    title={t('accounts.table.sort_by_score', 'Sort by algorithm candidate score')}
                                 >
-                                    <span>{t('accounts.table.last_used_short', 'Used')}</span>
-                                    {sortConfig.key === 'last_used' ? (
-                                        sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />
+                                    <span>{t('accounts.table.score', 'Score')}</span>
+                                    {sortConfig.key === 'score' ? (
+                                        sortConfig.direction === 'asc' ? (
+                                            <ArrowUp className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                                        ) : (
+                                            <ArrowDown className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                                        )
                                     ) : (
                                         <ArrowUpDown className="w-3 h-3 text-gray-400 opacity-60" />
                                     )}

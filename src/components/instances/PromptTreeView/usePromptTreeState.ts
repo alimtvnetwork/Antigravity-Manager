@@ -161,7 +161,22 @@ export function usePromptTreeState(instanceId: string): PromptTreeState {
     const [activePromptText, setActivePromptText] = useState<string>('');
     const [editedPromptText, setEditedPromptText] = useState<string>('');
     const [viewMode, setViewMode] = useState<ViewMode>(PromptViewMode.Preview);
-    const [showAllWords, setShowAllWords] = useState<boolean>(false);
+    const [showAllWords, _setShowAllWords] = useState<boolean>(() => {
+        try {
+            return localStorage.getItem('agm_prompt_tree_show_all_words') === 'true';
+        } catch {
+            return false;
+        }
+    });
+    const setShowAllWords: React.Dispatch<React.SetStateAction<boolean>> = (val) => {
+        _setShowAllWords((prev) => {
+            const next = typeof val === 'function' ? val(prev) : val;
+            try {
+                localStorage.setItem('agm_prompt_tree_show_all_words', String(next));
+            } catch {}
+            return next;
+        });
+    };
     const [previewTab, setPreviewTab] = useState<'instruction' | 'results'>('instruction');
     const [isCopiedResults, setIsCopiedResults] = useState(false);
 

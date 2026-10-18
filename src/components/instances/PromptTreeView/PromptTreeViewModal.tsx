@@ -442,8 +442,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                         p.conversations.some(
                             (c) =>
                                 Boolean(c.is_running) &&
-                                !isGhostConversation(c) &&
-                                !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+                                !isGhostConversation(c)
                         )
                 )
                 .map((p) => {

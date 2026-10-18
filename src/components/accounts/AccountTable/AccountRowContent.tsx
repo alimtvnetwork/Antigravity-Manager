@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Ban,
@@ -13,8 +14,7 @@ import { TierBadge } from '../../common/TierBadge';
 import { PriorityBadge } from '../PriorityBadge';
 import { QuotaProgressBar } from '../QuotaProgressBar';
 import { ACTIVE_PILL_CLASSES } from '../../common/selectedState';
-import { formatDateTimeShort } from './types';
-import { formatDateTime } from '../../../utils/date';
+import { AlgorithmScoreCell } from './cells/AlgorithmScoreCell';
 import type { AccountRowContentProps } from './types';
 import { useAccountRowState } from './useAccountRowState';
 import { ActionsCell } from './cells/ActionsCell';
@@ -52,6 +52,16 @@ export function AccountRowContent(props: AccountRowContentProps) {
         openPriorityEditor,
         fourHourModel, weeklyCell,
     } = rowState;
+
+    const inUseAccountIds = useMemo(() => {
+        const ids = (rowState.instances || [])
+            .filter((inst) => inst.is_running && inst.config.bound_account_id)
+            .map((inst) => inst.config.bound_account_id as string);
+        if (rowState.leaseInfo && !ids.includes(account.id)) {
+            ids.push(account.id);
+        }
+        return ids;
+    }, [rowState.instances, rowState.leaseInfo, account.id]);
 
     return (
         <>
@@ -261,11 +271,11 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 )}
             </td>
 
-            <td className="px-2.5 py-0.5 align-middle whitespace-nowrap w-[95px] border-b border-slate-200/90 dark:border-slate-800/90 transition-colors">
-                <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400 font-mono transition-colors" title={formatDateTime(account.last_used)}>
-                    {formatDateTimeShort(account.last_used)}
-                </span>
-            </td>
+            <AlgorithmScoreCell
+                account={account}
+                inUseAccountIds={inUseAccountIds}
+                currentAccountId={isCurrent ? account.id : undefined}
+            />
 
             <ActionsCell {...props} rowState={rowState} />
         </>

@@ -14,6 +14,7 @@ mod cache_cmds;
 mod clean_versions_cmds;
 mod common;
 mod compact_cmds;
+mod db_cmds;
 mod doctor_cmds;
 mod email_arms_a;
 mod email_arms_b;
@@ -95,6 +96,12 @@ fn main() {
     };
 
     match subcommand.as_str() {
+        "db" | "database" => {
+            if let Err(err) = crate::db_cmds::handle_db_command(&cmd_args) {
+                eprintln!("[ERROR] {}", err);
+                std::process::exit(1);
+            }
+        }
         "status" => crate::status_cmds::cmd_status(&cmd_args),
         "balance" | "bal" | "credits" | "credit" | "status/credits" | "quota" => {
             crate::quota_cmds::dispatch_quota_domain_from_args(&cmd_args);

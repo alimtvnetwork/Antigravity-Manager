@@ -5,7 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { PromptOriginTier, CopyFormat, type AgmConversationNode } from './types';
-import { formatSeqBadge, stripImagesFromPrompt } from './formatters';
+import { stripImagesFromPrompt } from './formatters';
 import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, RERUN_MESSAGE_OPTIONS, RERUN_RANDOM_MESSAGE_SET, RERUN_DEFAULT_COUNT, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
 import { classifyPromptTier } from './tierClassification';
 import { isGhostConversation } from './conversationGuards';
@@ -374,61 +374,38 @@ export function DetailHeader(props: DetailHeaderProps) {
             <div className="flex items-center justify-between gap-2.5 flex-wrap min-w-0">
                 {/* Left: Indicator 1 (Sequence + Tier), Indicator 2 (Status Capsule), Title, Instance Context */}
                 <div className="flex items-center gap-2 flex-wrap min-w-0">
-                    {/* Indicator 1: Clean Sequence Code with compact Origin Tier Icon & Scope Differentiation */}
+                    {/* Indicator 1: Clean Origin Tier Icon & Label */}
                     {(() => {
-                        const rawSeq = selectedConversation.seq_code || 'C001';
-                        const seqDisplay = formatSeqBadge(rawSeq, 'C001');
                         const tierInfo = classifyPromptTier(activePromptText, selectedConversation.title);
                         const isTurnSelected = activeTurnNumber !== null;
 
                         return (
                             <span
                                 className={cn(
-                                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border cursor-help transition-colors",
+                                    "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border cursor-help transition-colors",
                                     isTurnSelected
                                         ? "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30 shadow-2xs"
                                         : "bg-blue-500/10 text-blue-600 dark:text-cyan-400 border-blue-500/20 hover:border-blue-500/50"
                                 )}
                                 title={
                                     isTurnSelected
-                                        ? `Turn T${activeTurnNumber} of ${selectedConversation.prompts?.length || selectedConversation.step_count || 1} · ${seqDisplay} · ${tierInfo.tier}`
-                                        : `Conversation Session #${rawSeq.replace(/^C/i, '') || '001'} · ${tierInfo.tier} (Right-click to copy JSON parameters)`
+                                        ? `Turn T${activeTurnNumber} · ${tierInfo.tier}`
+                                        : `${tierInfo.tier} (Click details to view metadata)`
                                 }
-                                onContextMenu={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    const paramPayload = {
-                                        sequence: seqDisplay,
-                                        raw_sequence: rawSeq,
-                                        tier: tierInfo.tier,
-                                        selected_turn: activeTurnNumber,
-                                        conversation_id: selectedConversation.conversation_id,
-                                        instance_id: selectedConversation.instance_id || 'default',
-                                        instance_name: instanceNameDisplay,
-                                        title: selectedConversation.title || selectedConversation.short_id || '',
-                                    };
-                                    void copyToClipboard(JSON.stringify(paramPayload, null, 2)).catch((err) => {
-                                        reportPromptActionError(err, 'DetailHeader.copyBadgeParams');
-                                    });
-                                }}
                             >
                                 {tierInfo.tier === PromptOriginTier.UserPrompt && <User className="w-2.5 h-2.5 text-sky-500 shrink-0" />}
                                 {tierInfo.tier === PromptOriginTier.SubagentInstruction && <Bot className="w-2.5 h-2.5 text-purple-500 shrink-0" />}
                                 {tierInfo.tier === PromptOriginTier.SystemMessage && <Terminal className="w-2.5 h-2.5 text-slate-500 shrink-0" />}
                                 {tierInfo.tier === PromptOriginTier.ToolOutput && <Wrench className="w-2.5 h-2.5 text-amber-500 shrink-0" />}
-                                <span>{isTurnSelected ? `Turn T${activeTurnNumber} · ${seqDisplay}` : `Session ${seqDisplay}`}</span>
+                                <span>{isTurnSelected ? `Turn T${activeTurnNumber}` : (tierInfo.tier === PromptOriginTier.UserPrompt ? 'User Prompt' : tierInfo.tier === PromptOriginTier.SubagentInstruction ? 'Subagent' : tierInfo.tier === PromptOriginTier.SystemMessage ? 'System' : 'Tool Output')}</span>
                             </span>
                         );
                     })()}
 
-                    {/* Scope Breadcrumb Badge */}
-                    {activeTurnNumber !== null ? (
+                    {/* Scope Breadcrumb Badge (only shown when a specific turn is selected) */}
+                    {activeTurnNumber !== null && (
                         <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded-md border border-purple-500/20 font-semibold shrink-0">
                             ↳ Turn {activeTurnNumber} of {selectedConversation.prompts?.length || selectedConversation.step_count || 1}
-                        </span>
-                    ) : (
-                        <span className="text-[10px] font-mono text-cyan-700 dark:text-cyan-300 bg-cyan-500/10 px-1.5 py-0.5 rounded-md border border-cyan-500/20 font-semibold shrink-0">
-                            Full Session ({selectedConversation.prompts?.length || selectedConversation.step_count || 1} turns)
                         </span>
                     )}
 
@@ -503,28 +480,12 @@ export function DetailHeader(props: DetailHeaderProps) {
                         </div>
                     )}
 
-                    {/* Subtle Instance Context (Breadcrumb style) */}
+                    {/* Subtle Instance Context */}
                     <span
                         className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate cursor-help hover:text-slate-200 transition-colors"
-                        title={`Instance #${instanceSeqNum} · ${instanceExeName} (${instanceNameDisplay}) (Right-click to copy context JSON)`}
-                        onContextMenu={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const contextSeq = formatSeqBadge(selectedConversation.seq_code, `C${String(instanceSeqNum).padStart(3, '0')}`).replace(/^#/, '');
-                            const contextPayload = {
-                                context: `#${contextSeq} · ${instanceNameDisplay}`,
-                                instance_seq: instanceSeqNum,
-                                instance_name: instanceNameDisplay,
-                                instance_exe: instanceExeName,
-                                instance_pid: instancePid,
-                                conversation_id: selectedConversation.conversation_id,
-                            };
-                            void copyToClipboard(JSON.stringify(contextPayload, null, 2)).catch((err) => {
-                                reportPromptActionError(err, 'DetailHeader.copyContextParams');
-                            });
-                        }}
+                        title={`Instance #${instanceSeqNum} · ${instanceExeName} (${instanceNameDisplay})`}
                     >
-                        #{formatSeqBadge(selectedConversation.seq_code, `C${String(instanceSeqNum).padStart(3, '0')}`).replace(/^#/, '')} · {instanceNameDisplay}
+                        {instanceNameDisplay}
                     </span>
                 </div>
 

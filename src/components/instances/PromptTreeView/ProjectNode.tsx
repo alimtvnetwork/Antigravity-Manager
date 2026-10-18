@@ -307,6 +307,10 @@ async function exportProjectAsSqlite(project: AgmProjectTreeNode): Promise<void>
 }
 
 export function isAutomatedPrompt(conv: AgmConversationNode): boolean {
+    // Invariant: Actively running or queued conversations are never automated prompts
+    if (Boolean(conv.is_running) || Boolean(conv.is_queued) || (conv.status && conv.status.toLowerCase().includes('queue'))) {
+        return false;
+    }
     if (isAutomatedConversation(conv)) return true;
     const cat = classifyPromptTier(conv.prompt_preview_200w, conv.title, conv);
     if (cat.tier === PromptOriginTier.SystemMessage || cat.tier === PromptOriginTier.ToolOutput) {
@@ -360,6 +364,8 @@ export function ProjectNode(props: ProjectNodeProps) {
 
     const filteredConvs = project.conversations.filter((c) => {
         if (activeFilter === 'archived') return true;
+        const isRunningOrQueued = Boolean(c.is_running) || Boolean(c.is_queued) || (c.status && c.status.toLowerCase().includes('queue'));
+        if (isRunningOrQueued) return true;
         if (isAutomatedHidden && categoryFilter !== 'system' && isAutomatedPrompt(c)) return false;
         return !isGhostConversation(c);
     });
@@ -374,14 +380,15 @@ export function ProjectNode(props: ProjectNodeProps) {
     const staleConversations: AgmConversationNode[] = [];
 
     sortedConvs.forEach((conv) => {
-        if (isGhostConversation(conv) && activeFilter !== 'archived') {
+        const isRunningOrQueued = Boolean(conv.is_running) || Boolean(conv.is_queued) || (conv.status && conv.status.toLowerCase().includes('queue'));
+        if (!isRunningOrQueued && isGhostConversation(conv) && activeFilter !== 'archived') {
             return;
         }
-        if (isAutomatedHidden && categoryFilter !== 'system' && isAutomatedPrompt(conv)) {
+        if (!isRunningOrQueued && isAutomatedHidden && categoryFilter !== 'system' && isAutomatedPrompt(conv)) {
             return;
         }
         const cat = classifyPromptTier(conv.prompt_preview_200w, conv.title, conv);
-        if (categoryFilter === 'all') {
+        if (!isRunningOrQueued && categoryFilter === 'all') {
             if (cat.isNonPrompt && !searchQuery.trim()) return;
         } else if (categoryFilter === 'user') {
             if (cat.tier !== PromptOriginTier.UserPrompt) return;
@@ -404,15 +411,10 @@ export function ProjectNode(props: ProjectNodeProps) {
     });
 
     const runningCount = project.conversations.filter(
-        (c) => Boolean(c.is_running) &&
-               !isGhostConversation(c) &&
-               (!isAutomatedHidden || categoryFilter === 'system' || !isAutomatedPrompt(c)) &&
-               !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+        (c) => Boolean(c.is_running) && !isGhostConversation(c)
     ).length;
     const queuedCount = project.conversations.filter(
-        (c) => (Boolean(c.is_queued) || c.status.toLowerCase().includes('queue')) &&
-               !c.is_running &&
-               (!isAutomatedHidden || categoryFilter === 'system' || !isAutomatedPrompt(c))
+        (c) => (Boolean(c.is_queued) || (c.status && c.status.toLowerCase().includes('queue'))) && !c.is_running
     ).length;
 
     const listProps = {

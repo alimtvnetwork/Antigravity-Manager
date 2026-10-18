@@ -134,6 +134,15 @@ pub(crate) fn print_help_json() {
                     { "name": "errors clear", "aliases": ["errors clean"], "flags": ["--json"], "description": "Purge all error history from errors.db" },
                     { "name": "failed-commands", "aliases": ["fc", "failed-command", "unknown-commands", "fcc"], "flags": ["[N]", "count", "clear", "--json"], "description": "Inspect undetected or failed terminal commands with frequency metrics and suggestions" }
                 ]
+            },
+            {
+                "group": "Split Database & Zero-Loss Migration",
+                "items": [
+                    { "name": "db status", "aliases": ["db"], "flags": ["--json"], "description": "Inspect all Split SQLite databases, schema versions, and row counts" },
+                    { "name": "db backup", "aliases": [], "flags": ["--file <path>", "--json"], "description": "Export single-file pre-migration snapshot (pre_migration_v4_snapshot.json)" },
+                    { "name": "db restore", "aliases": [], "flags": ["--file <path>", "--json"], "description": "Freshly initialize PascalCase Split-DBs and re-import snapshot data" },
+                    { "name": "db verify", "aliases": [], "flags": ["--json"], "description": "Validate zero account loss and SQLite integrity pragmas" }
+                ]
             }
         ]
     });
@@ -350,6 +359,18 @@ pub(crate) fn print_help() {
     println!("          agm fc 50                     # View top 50 failed commands");
     println!("          agm fc count                  # View distinct and total failed counts");
     println!("          agm fc clear                  # Purge failed command history");
+    println!();
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("  SPLIT DATABASE & ZERO-LOSS MIGRATION");
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("    db status [--json]");
+    println!("        Inspect all Split SQLite databases, schema versions, and row counts");
+    println!("    db backup [--file <path>] [--json]");
+    println!("        Export single-file pre-migration snapshot (pre_migration_v4_snapshot.json)");
+    println!("    db restore [--file <path>] [--json]");
+    println!("        Freshly initialize PascalCase Split-DBs and re-import snapshot data");
+    println!("    db verify [--json]");
+    println!("        Validate zero account loss and SQLite PRAGMA integrity checks");
     println!();
     println!("  ────────────────────────────────────────────────────────────────────────────");
     println!("  REAL-WORLD EXAMPLES (AGM & GITMAP PARITY)");

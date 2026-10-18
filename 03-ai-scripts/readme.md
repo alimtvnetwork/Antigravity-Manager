@@ -71,6 +71,7 @@ Follow this sequence before and during any repository modification task:
 | **46** | `46-agent-sqlite-task-manager.py` | Concurrency-safe SQLite task coordination and crash forensics engine | ~10ms | `task-manager`, `sqlite`, `acid`, `multi-agent`, `crash-forensics` |
 | **47** | `47-git-reconcile-and-resolve-conflict.py` | Autonomous Git divergence reconciliation, mechanical conflict resolver & push | ~30ms | `git`, `reconcile`, `merge`, `conflict-resolver`, `push`, `divergence` |
 | **49** | `49-commit-and-push-all-repos.py` | Multi-repository workspace discoverer, atomic conventional committer & remote push | ~25ms | `git`, `multi-repo`, `commit-all`, `push-all`, `workspace`, `sync` |
+| **51** | `51-db-orm-generator.py` | Type-safe Rust ORM models, PascalCase Split-DB schemas & SQLite views generator | ~15ms | `orm`, `generator`, `pascalcase`, `split-db`, `rust`, `views`, `sqlite` |
 
 ---
 
