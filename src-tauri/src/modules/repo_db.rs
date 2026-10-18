@@ -59,7 +59,8 @@ pub use failed_commands::{
 };
 // ---- detection ----
 pub use detection::{
-    detect_running_projects, extract_image_payload_or_path, live_prompt_text, resume_task_document,
+    detect_running_projects, extract_image_payload_or_path, extract_screenshot_id_token,
+    live_prompt_text, resume_task_document,
 };
 // ---- gemini_dirs ----
 pub use gemini_dirs::{gemini_dirs_for_instance, gemini_dirs_tagged, get_canonical_host_home};
@@ -86,7 +87,8 @@ pub use project_queries::{
 };
 // ---- restore ----
 pub use restore::{
-    list_backed_up_prompts, restore_prompts_from_backup_json, switch_prompt_snapshot,
+    list_backed_up_prompts, restore_prompts_from_backup_json, restore_running_prompts,
+    switch_prompt_snapshot,
 };
 // ---- prompts_crud ----
 pub use prompts_crud::{insert_active_prompt, list_active_prompts, save_or_requeue_prompt};

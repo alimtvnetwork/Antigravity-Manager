@@ -1,6 +1,8 @@
 //! Repo DB: agy
 
-use super::detection::{extract_image_payload_or_path, resume_task_document};
+use super::detection::{
+    extract_image_payload_or_path, extract_screenshot_id_token, resume_task_document,
+};
 use super::models::ActivePrompt;
 use super::prompts_crud::save_or_requeue_prompt;
 use super::state::get_active_agy_workers;
@@ -149,6 +151,14 @@ pub fn spawn_or_replace_prompt_via_agy(
     prompt: &ActivePrompt,
     replace_existing: bool,
 ) -> Result<(), String> {
+    if std::env::var("AGM_SKIP_AGY_SPAWN").as_deref() == Ok("1") {
+        crate::modules::logger::log_info(&format!(
+            "[RepoDB] AGM_SKIP_AGY_SPAWN=1 set: skipped agy spawn for prompt '{}'",
+            prompt.id
+        ));
+        return Ok(());
+    }
+
     let ws_dir = PathBuf::from(&prompt.repo_path);
     if !ws_dir.exists() {
         let message = format!("workspace directory does not exist: '{}'", prompt.repo_path);
@@ -703,6 +713,18 @@ pub fn send_prompt_now_for_instance(
         .unwrap_or_else(|| "project".to_string());
     let now = Utc::now().timestamp();
 
+    let (extracted_img, img_paths) = extract_image_payload_or_path(prompt_content);
+    let mut initial_img = extracted_img.clone();
+    if let Some(ss_token) = extract_screenshot_id_token(prompt_content) {
+        if let Some(ref cur) = initial_img {
+            if !cur.contains(&ss_token) {
+                initial_img = Some(format!("{};screenshot_id={}", cur, ss_token));
+            }
+        } else {
+            initial_img = Some(format!("screenshot_id={}", ss_token));
+        }
+    }
+
     let active_prompt = ActivePrompt {
         id: prompt_id,
         project_id: clean_repo_name.clone(),
@@ -714,7 +736,7 @@ pub fn send_prompt_now_for_instance(
         status: "running".to_string(),
         created_at: now,
         updated_at: now,
-        image_payload: None,
+        image_payload: initial_img,
     };
 
     save_or_requeue_prompt(&active_prompt)?;
@@ -723,8 +745,7 @@ pub fn send_prompt_now_for_instance(
     if !repo_path.trim().is_empty() {
         let ws_dir = PathBuf::from(repo_path);
         if ws_dir.exists() {
-            let (extracted_img, img_paths) = extract_image_payload_or_path(prompt_content);
-            let final_img = active_prompt.image_payload.clone().or(extracted_img);
+            let final_img = active_prompt.image_payload.clone();
             let mut payload = resume_task_document(&active_prompt, "dispatched", now, &img_paths);
             if final_img.is_some() {
                 payload["image_payload"] = serde_json::json!(final_img);
@@ -863,6 +884,18 @@ pub fn enqueue_prompt_for_instance(
         .unwrap_or_else(|| "project".to_string());
     let now = Utc::now().timestamp();
 
+    let (extracted_img, img_paths) = extract_image_payload_or_path(prompt_content);
+    let mut initial_img = extracted_img.clone();
+    if let Some(ss_token) = extract_screenshot_id_token(prompt_content) {
+        if let Some(ref cur) = initial_img {
+            if !cur.contains(&ss_token) {
+                initial_img = Some(format!("{};screenshot_id={}", cur, ss_token));
+            }
+        } else {
+            initial_img = Some(format!("screenshot_id={}", ss_token));
+        }
+    }
+
     let active_prompt = ActivePrompt {
         id: prompt_id,
         project_id: clean_repo_name,
@@ -874,7 +907,7 @@ pub fn enqueue_prompt_for_instance(
         status: "queued".to_string(),
         created_at: now,
         updated_at: now,
-        image_payload: None,
+        image_payload: initial_img,
     };
 
     save_or_requeue_prompt(&active_prompt)?;
@@ -882,8 +915,7 @@ pub fn enqueue_prompt_for_instance(
     if !repo_path.trim().is_empty() {
         let ws_dir = PathBuf::from(repo_path);
         if ws_dir.exists() {
-            let (extracted_img, img_paths) = extract_image_payload_or_path(prompt_content);
-            let final_img = active_prompt.image_payload.clone().or(extracted_img);
+            let final_img = active_prompt.image_payload.clone();
             let mut payload = resume_task_document(&active_prompt, "queued", now, &img_paths);
             if final_img.is_some() {
                 payload["image_payload"] = serde_json::json!(final_img);

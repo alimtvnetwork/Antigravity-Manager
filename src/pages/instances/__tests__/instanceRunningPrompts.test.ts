@@ -518,12 +518,12 @@ test('hasActiveTask: Idle Supremacy - idle instance never falsely reports anothe
 // ===========================================================================
 
 test('isGhostConversation: identifies untitled empty conversations as ghosts', () => {
-    assertTrue(isGhostConversation(makeConversation({ title: 'Untitled', prompt_word_count: 0, prompt_preview_200w: '' })));
-    assertTrue(isGhostConversation(makeConversation({ title: 'untitled conversation', prompt_word_count: 0, prompt_preview_200w: '' })));
-    assertTrue(isGhostConversation(makeConversation({ title: 'New Conversation', prompt_word_count: 0, prompt_preview_200w: '' })));
-    assertTrue(isGhostConversation(makeConversation({ title: 'chat', prompt_word_count: 0, prompt_preview_200w: '' })));
-    assertTrue(isGhostConversation(makeConversation({ title: 'conversation-1', prompt_word_count: 0, prompt_preview_200w: '' })));
-    assertTrue(isGhostConversation(makeConversation({ title: '', prompt_word_count: 0, prompt_preview_200w: '' })));
+    assertTrue(isGhostConversation(makeConversation({ title: 'Untitled', prompt_word_count: 0, prompt_preview_200w: '', is_running: false, status: 'IDLE' })));
+    assertTrue(isGhostConversation(makeConversation({ title: 'untitled conversation', prompt_word_count: 0, prompt_preview_200w: '', is_running: false, status: 'IDLE' })));
+    assertTrue(isGhostConversation(makeConversation({ title: 'New Conversation', prompt_word_count: 0, prompt_preview_200w: '', is_running: false, status: 'IDLE' })));
+    assertTrue(isGhostConversation(makeConversation({ title: 'chat', prompt_word_count: 0, prompt_preview_200w: '', is_running: false, status: 'IDLE' })));
+    assertTrue(isGhostConversation(makeConversation({ title: 'conversation-1', prompt_word_count: 0, prompt_preview_200w: '', is_running: false, status: 'IDLE' })));
+    assertTrue(isGhostConversation(makeConversation({ title: '', prompt_word_count: 0, prompt_preview_200w: '', is_running: false, status: 'IDLE' })));
 });
 
 test('isGhostConversation: short_id matching title with 0 words is identified as ghost', () => {
@@ -532,6 +532,8 @@ test('isGhostConversation: short_id matching title with 0 words is identified as
         title: '8A7B6C5D',
         prompt_word_count: 0,
         prompt_preview_200w: '',
+        is_running: false,
+        status: 'IDLE',
     });
     assertTrue(isGhostConversation(conv));
 });
@@ -541,17 +543,22 @@ test('isGhostConversation: conversation with words or preview is NOT a ghost', (
         title: 'Untitled',
         prompt_word_count: 5,
         prompt_preview_200w: 'Some prompt words',
+        is_running: false,
+        status: 'IDLE',
     })));
     assertFalse(isGhostConversation(makeConversation({
         title: 'Fix issue',
         prompt_word_count: 0,
         prompt_preview_200w: '',
+        is_running: false,
+        status: 'IDLE',
     })));
 });
 
 test('isStaleOrEmptyConversation: running conversation with content is exempt', () => {
     const runningWithContent = makeConversation({
         is_running: true,
+        status: 'RUNNING',
         title: 'New conversation',
         prompt_word_count: 15,
         prompt_preview_200w: 'Working on implementation...',
@@ -562,6 +569,7 @@ test('isStaleOrEmptyConversation: running conversation with content is exempt', 
 test('isStaleOrEmptyConversation: idle conversation with untitled name is marked stale/empty', () => {
     const idleUntitled = makeConversation({
         is_running: false,
+        status: 'IDLE',
         title: 'New conversation',
         prompt_word_count: 15,
         prompt_preview_200w: 'Some past prompt',

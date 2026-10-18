@@ -368,7 +368,47 @@ pub fn extract_image_payload_or_path(content: &str) -> (Option<String>, Vec<Stri
         raw_payload = Some(found_paths.join(";"));
     }
 
+    if let Some(ss_token) = extract_screenshot_id_token(content) {
+        if let Some(ref mut payload) = raw_payload {
+            if !payload.contains(&ss_token) {
+                payload.push_str(&format!(";screenshot_id={}", ss_token));
+            }
+        } else {
+            raw_payload = Some(format!("screenshot_id={}", ss_token));
+        }
+    }
+
     (raw_payload, found_paths)
+}
+
+/// Extract screenshot ID token (e.g. SS_ID_987654321, screenshot_id=..., screenshot_id:...) from text
+pub fn extract_screenshot_id_token(content: &str) -> Option<String> {
+    for token in content.split_whitespace() {
+        let clean = token.trim_matches(|c: char| {
+            c == '"'
+                || c == '\''
+                || c == '('
+                || c == ')'
+                || c == '['
+                || c == ']'
+                || c == '{'
+                || c == '}'
+                || c == '<'
+                || c == '>'
+                || c == ','
+                || c == ';'
+        });
+        if clean.starts_with("SS_ID_") || clean.starts_with("ss_id_") {
+            return Some(clean.to_string());
+        }
+        if clean.to_lowercase().starts_with("screenshot_id=") {
+            return Some(clean[14..].to_string());
+        }
+        if clean.to_lowercase().starts_with("screenshot_id:") {
+            return Some(clean[14..].to_string());
+        }
+    }
+    None
 }
 
 /// Text to store for a live conversation. The transcript's latest USER_INPUT wins.

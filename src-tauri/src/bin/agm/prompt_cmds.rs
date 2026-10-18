@@ -581,6 +581,7 @@ pub(crate) fn cmd_prompts_backup(args: &[String]) {
             );
         }
         let _ = repo_db::backup_running_prompts(&target_instance);
+        let _ = backup_prompts_db::backup_active_running_prompts(Some(&target_instance), None);
         let data = serde_json::json!({ "status": "backed_up", "instance_id": target_instance });
         CliEnvelope::ok("prompts backup", Some(target_instance), data).print_and_exit();
     }
@@ -601,6 +602,7 @@ pub(crate) fn cmd_prompts_restore(args: &[String]) {
                 Some(payload),
             );
         }
+        let _ = backup_prompts_db::restore_running_prompts(Some(&target_instance), false, None);
         let _ = repo_db::resend_running_commands_for_instance(Some(&target_instance), 20);
         let data = serde_json::json!({ "status": "restored", "instance_id": target_instance });
         CliEnvelope::ok("prompts restore", Some(target_instance), data).print_and_exit();

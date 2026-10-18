@@ -216,3 +216,10 @@ pub fn switch_prompt_snapshot(instance_id: &str) -> SwitchPromptSnap {
     )
     .unwrap_or_else(|_| SwitchPromptSnap::empty())
 }
+
+/// Restore running prompts from split SQLite backup database into active_prompts
+pub fn restore_running_prompts(
+    instance_id: Option<&str>,
+) -> Result<Vec<crate::modules::backup_prompts_db::PromptBackupRecord>, String> {
+    crate::modules::backup_prompts_db::restore_running_prompts(instance_id, false, None)
+}

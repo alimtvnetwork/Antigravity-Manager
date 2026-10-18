@@ -110,6 +110,19 @@ pub fn backup_active_running_prompts_for_instance(
 
         let proj_name = resolve_friendly_project_name(&p.repo_path, &p.project_id);
 
+        let (extracted_img, _) = repo_db::extract_image_payload_or_path(&p.prompt_content);
+        let mut final_img = p.image_payload.clone().or(extracted_img);
+        if let Some(ss_token) = repo_db::extract_screenshot_id_token(&p.prompt_content) {
+            if let Some(ref cur) = final_img {
+                if !cur.contains(&ss_token) {
+                    final_img = Some(format!("{};screenshot_id={}", cur, ss_token));
+                }
+            } else {
+                final_img = Some(format!("screenshot_id={}", ss_token));
+            }
+        }
+        let has_img = final_img.is_some();
+
         let record = PromptBackupRecord {
             id: format!("rec_{}", Uuid::new_v4().simple()),
             backup_batch_id: batch_id.clone(),
@@ -121,8 +134,8 @@ pub fn backup_active_running_prompts_for_instance(
             conversation_name: conv_name,
             sequence_id: (idx + 1) as i64,
             prompt_text: p.prompt_content.clone(),
-            has_images: p.image_payload.is_some(),
-            images_payload: p.image_payload.clone(),
+            has_images: has_img,
+            images_payload: final_img,
             status: p.status.clone(),
             created_at: now,
             is_restored: false,
@@ -375,6 +388,19 @@ pub fn backup_queued_prompts_for_instance(
             p.instance_id.clone()
         };
 
+        let (extracted_img, _) = repo_db::extract_image_payload_or_path(&p.prompt_content);
+        let mut final_img = p.image_payload.clone().or(extracted_img);
+        if let Some(ss_token) = repo_db::extract_screenshot_id_token(&p.prompt_content) {
+            if let Some(ref cur) = final_img {
+                if !cur.contains(&ss_token) {
+                    final_img = Some(format!("{};screenshot_id={}", cur, ss_token));
+                }
+            } else {
+                final_img = Some(format!("screenshot_id={}", ss_token));
+            }
+        }
+        let has_img = final_img.is_some();
+
         let record = PromptBackupRecord {
             id: format!("rec_{}", Uuid::new_v4().simple()),
             backup_batch_id: batch_id.clone(),
@@ -387,8 +413,8 @@ pub fn backup_queued_prompts_for_instance(
             // FIFO position in the live queue at backup time.
             sequence_id: (idx + 1) as i64,
             prompt_text: p.prompt_content.clone(),
-            has_images: p.image_payload.is_some(),
-            images_payload: p.image_payload.clone(),
+            has_images: has_img,
+            images_payload: final_img,
             status: p.status.clone(),
             created_at: now,
             is_restored: false,

@@ -17,3 +17,11 @@ Verify that the Prompt Tree View sequences conversations and prompt turns accord
 - Create automated test verifying `sortConversations` and `getConversationStatus` contracts.
 - Validate that queued turns cause their parent conversation to be classified as Tier 2 and auto-expand.
 - Confirm that running prompts are never demoted beneath queued or historical prompts.
+
+## Status: Completed (Verified)
+- **Unit Test File**: `src/components/instances/PromptTreeView/__tests__/treeSequence.test.ts`
+- **Results**: 100% pass across all test cases (16/16 test assertions verified):
+  - `isConversationOrTurnQueued`: top-level flags, status string variations, and child prompt turns.
+  - `getConversationStatus`: active execution, child turn execution, running superseding queued, purely queued, completed, and ghost protection.
+  - `sortConversations`: strict 3-tier sequence (Running Tier 1 -> Queued Tier 2 -> Completed Tier 3 descending by timestamp), plus `activeFilter` ('all', 'running', 'queued') support.
+
