@@ -15,6 +15,7 @@ import {
     Check,
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
+import { copyToClipboard } from '../../../utils/clipboard';
 import { getInstanceSwitchHistory, getInstanceAuditTrail } from '../../../services/instanceService';
 import { useErrorStore } from '../../../stores/error-store';
 import type { InstanceSwitchHistoryResponse, TaskRecord } from '../../../types/audit';
@@ -290,7 +291,7 @@ export default function InstanceAuditTrailModal({
     };
 
     const handleCopy = (text: string, id: string) => {
-        navigator.clipboard.writeText(text);
+        void copyToClipboard(text);
         setCopiedId(id);
         setTimeout(() => setCopiedId(null), 1500);
     };

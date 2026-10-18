@@ -646,11 +646,17 @@ pub async fn switch_account_to_instance(
                 "[Instance] Verified .antigravity_resume_task.json exists in workspace {}",
                 ws
             ));
+        } else {
+            verified = false;
         }
     }
     let verification_step = crate::modules::task_history_db::SwitchVerificationStep {
-        verified: true,
-        message: "Verified prompts restored and session active".to_string(),
+        verified,
+        message: if verified {
+            "Verified prompts restored and session active".to_string()
+        } else {
+            "Verified session active with best-effort prompt files".to_string()
+        },
     };
 
     let steps = crate::modules::task_history_db::SwitchAuditSteps {

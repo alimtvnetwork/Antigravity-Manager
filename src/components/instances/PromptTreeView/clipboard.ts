@@ -1,5 +1,5 @@
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { copyToClipboard } from '../../../utils/clipboard';
+import { copyToClipboard, ensureDocumentFocus } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 import { showToast } from '../../common/ToastContainer';
 import type { ExtractedPromptImage, PromptRewriteResult } from './types';
@@ -240,18 +240,27 @@ export async function writeNativeImageToClipboard(
         if (!pngBlob) {
             throw new Error('Failed to convert image to PNG binary blob');
         }
-        if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
-            throw new Error('Clipboard API unavailable in this environment');
+        ensureDocumentFocus();
+        if (navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+            const item = new ClipboardItem({
+                'image/png': pngBlob,
+            });
+            await navigator.clipboard.write([item]);
+            const msg = 'Image copied to clipboard as native PNG!';
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'success' });
+            return true;
         }
-        const item = new ClipboardItem({
-            'image/png': pngBlob,
-        });
-        await navigator.clipboard.write([item]);
-        const msg = 'Image copied to clipboard as native PNG!';
-        onSuccess?.(msg);
-        showToast({ message: msg, type: 'success' });
-        return true;
+        throw new Error('Clipboard API unavailable in this environment');
     } catch (err) {
+        // Fallback to copying image URI / reference via multi-stage clipboard
+        const fallbackOk = await copyToClipboard(imageUri);
+        if (fallbackOk) {
+            const msg = 'Copied image URI to clipboard!';
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'info' });
+            return true;
+        }
         useErrorStore.getState().trackWarning(err, {
             source: 'clipboard.writeNativeImageToClipboard',
             triggerAction: 'write_native_image',
@@ -323,6 +332,7 @@ export async function copyPromptWithRichImages(
         }
 
         let isWritten = false;
+        ensureDocumentFocus();
         if (pngBlob) {
             try {
                 const item = new ClipboardItem({
@@ -332,15 +342,14 @@ export async function copyPromptWithRichImages(
                 });
                 await navigator.clipboard.write([item]);
                 isWritten = true;
-            } catch (tripleErr) {
-                useErrorStore.getState().trackWarning(tripleErr, {
-                    source: 'PromptTree.copyPromptWithRichImages.tripleMime',
-                    triggerAction: 'clipboard.write.triple',
-                });
+            } catch {
+                // Triple MIME write failed (some browser versions reject mixed binary + rich HTML items)
+                // Fall through to dual HTML/plain-text item
             }
         }
 
         if (!isWritten) {
+            ensureDocumentFocus();
             const item = new ClipboardItem({
                 'text/html': htmlBlob,
                 'text/plain': textBlob,
@@ -353,10 +362,7 @@ export async function copyPromptWithRichImages(
         showToast({ message: successMsg, type: 'success' });
         return true;
     } catch (err) {
-        useErrorStore.getState().trackWarning(err, {
-            source: 'PromptTree.copyPromptWithRichImages',
-            triggerAction: 'clipboard.write',
-        });
+        // Fallback to resilient text copy ladder (Clipboard API -> execCommand -> native helper)
         const fallbackOk = await copyToClipboard(markdownText);
         if (fallbackOk) {
             const msg = 'Copied clean prompt text to clipboard (rich media unsupported in current context)';
@@ -364,6 +370,10 @@ export async function copyPromptWithRichImages(
             showToast({ message: msg, type: 'info' });
             return true;
         }
+        useErrorStore.getState().trackWarning(err, {
+            source: 'PromptTree.copyPromptWithRichImages',
+            triggerAction: 'clipboard.write',
+        });
         onError?.(err);
         return false;
     }
@@ -429,6 +439,7 @@ export async function copyAllImagesAsRichHtml(
     const plainText = cleanImages.join('\n');
 
     try {
+        ensureDocumentFocus();
         if (navigator.clipboard && typeof ClipboardItem !== 'undefined') {
             const htmlBlob = new Blob([fullHtml], { type: 'text/html' });
             const textBlob = new Blob([plainText], { type: 'text/plain' });
@@ -452,6 +463,13 @@ export async function copyAllImagesAsRichHtml(
         }
         return false;
     } catch (err) {
+        const fallbackOk = await copyToClipboard(plainText);
+        if (fallbackOk) {
+            const msg = `Copied ${cleanImages.length} image URL(s) to clipboard!`;
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'info' });
+            return true;
+        }
         useErrorStore.getState().trackWarning(err, {
             source: 'clipboard.copyAllImagesAsRichHtml',
             triggerAction: 'copy_all_images_html',

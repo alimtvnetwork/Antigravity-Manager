@@ -6,6 +6,7 @@ use std::os::windows::process::CommandExt;
 
 #[cfg(test)]
 mod tests {
+    use super::registry::parse_registry_payload;
     use super::*;
 
     #[test]
@@ -102,5 +103,26 @@ mod tests {
         let helper_args = "--type=renderer --user-data-dir=/tmp/test";
         let is_helper = helper_args.contains("--type=");
         assert!(is_helper);
+    }
+
+    #[test]
+    fn test_registry_parsing_and_empty_content_resilience() {
+        let valid_json = r#"{
+            "active_instance_id": "default",
+            "instances": [{
+                "id": "default",
+                "name": "Default",
+                "data_dir": "C:/test",
+                "is_default": true,
+                "created_at": 1000,
+                "last_used": 1000
+            }]
+        }"#;
+        let parsed = parse_registry_payload(valid_json).expect("valid registry should parse");
+        assert_eq!(parsed.active_instance_id, "default");
+        assert_eq!(parsed.instances.len(), 1);
+
+        assert!(parse_registry_payload("").is_err());
+        assert!(parse_registry_payload("   ").is_err());
     }
 }

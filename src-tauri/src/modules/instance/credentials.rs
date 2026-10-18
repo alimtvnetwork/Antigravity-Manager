@@ -269,14 +269,71 @@ fn reseed_shared_login_from_default_instance() {
     );
 }
 
-/// Single attempt at injecting the OAuth token into one `state.vscdb`.
-fn inject_token_once(
-    db_path: &PathBuf,
+/// Helper to update storage.json with device profile with directory creation and retry
+fn update_device_profile_storage(
+    storage_path: &Path,
+    profile: &crate::models::DeviceProfile,
+) -> Result<(), String> {
+    if let Some(parent) = storage_path.parent() {
+        if !parent.exists() {
+            // Justification: idempotent directory setup; a real failure surfaces at the next file op needing the dir
+            crate::error::record_ignored(fs::create_dir_all(parent), "create directory");
+        }
+    }
+    if !storage_path.exists() {
+        // Justification: pre-seed storage.json so write_profile can populate it
+        crate::error::record_ignored(fs::write(storage_path, "{}"), "seed storage.json");
+    }
+    let mut res = crate::modules::device::write_profile(storage_path, profile);
+    for retry in 1..=3 {
+        if res.is_ok() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(150 * retry));
+        res = crate::modules::device::write_profile(storage_path, profile);
+    }
+    res
+}
+
+/// Token injection with progressive retry: a dying IDE may still hold the
+/// SQLite lock on state.vscdb for a moment after the kill.
+pub(crate) fn inject_token_with_retry(
+    db_path: &Path,
     account: &crate::models::Account,
     target_hint: Option<&str>,
 ) -> Result<(), String> {
+    let mut inject_result = inject_token_once(db_path, account, target_hint);
+    for retry in 1..=4 {
+        if inject_result.is_ok() {
+            break;
+        }
+        let delay_ms = 150 * (1 << retry);
+        crate::modules::logger::log_warn(&format!(
+            "[CREDENTIALS] Token injection attempt {} failed for {:?} ({}); retrying in {}ms after lock release",
+            retry,
+            db_path,
+            inject_result
+                .as_ref()
+                .err()
+                .map(|e| e.as_str())
+                .unwrap_or("unknown"),
+            delay_ms
+        ));
+        std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+        inject_result = inject_token_once(db_path, account, target_hint);
+    }
+    inject_result
+}
+
+/// Single attempt at injecting the OAuth token into one `state.vscdb`.
+fn inject_token_once(
+    db_path: &Path,
+    account: &crate::models::Account,
+    target_hint: Option<&str>,
+) -> Result<(), String> {
+    let path_buf = db_path.to_path_buf();
     crate::modules::db::inject_token(
-        db_path,
+        &path_buf,
         &account.token.access_token,
         &account.token.refresh_token,
         account.token.expiry_timestamp,
@@ -297,6 +354,7 @@ fn inject_windows_appdata_credentials(
     target_data_path: &Path,
     inst_home: Option<&Path>,
     account: &crate::models::Account,
+    profile: &crate::models::DeviceProfile,
 ) {
     let appdata_db_dir = target_data_path
         .join("AppData")
@@ -309,22 +367,20 @@ fn inject_windows_appdata_credentials(
     let appdata_db_path = appdata_db_dir.join("state.vscdb");
     // Justification: best-effort token injection; auth state is re-injected on the next launch
     crate::error::record_ignored(
-        inject_token_once(&appdata_db_path, account, None),
+        inject_token_with_retry(&appdata_db_path, account, None),
         "inject token into db",
     );
-    if let Some(ref profile) = account.device_profile {
-        // Justification: device-identity bookkeeping; the existing identity persists if this fails
-        crate::error::record_ignored(
-            crate::modules::db::write_service_machine_id(&appdata_db_path, &profile.mac_machine_id),
-            "write machine id",
-        );
-        let storage_path = appdata_db_dir.join("storage.json");
-        // Justification: device-profile bookkeeping; the existing profile persists if this fails
-        crate::error::record_ignored(
-            crate::modules::device::write_profile(&storage_path, profile),
-            "write device profile",
-        );
-    }
+    // Justification: device-identity bookkeeping; the existing identity persists if this fails
+    crate::error::record_ignored(
+        crate::modules::db::write_service_machine_id(&appdata_db_path, &profile.mac_machine_id),
+        "write machine id",
+    );
+    let storage_path = appdata_db_dir.join("storage.json");
+    // Justification: device-profile bookkeeping; the existing profile persists if this fails
+    crate::error::record_ignored(
+        update_device_profile_storage(&storage_path, profile),
+        "write device profile",
+    );
 
     if let Some(inst_home) = inst_home {
         let home_appdata_db_dir = inst_home
@@ -338,24 +394,53 @@ fn inject_windows_appdata_credentials(
         let home_appdata_db_path = home_appdata_db_dir.join("state.vscdb");
         // Justification: best-effort token injection; auth state is re-injected on the next launch
         crate::error::record_ignored(
-            inject_token_once(&home_appdata_db_path, account, None),
+            inject_token_with_retry(&home_appdata_db_path, account, None),
             "inject token into db",
         );
-        if let Some(ref profile) = account.device_profile {
-            // Justification: device-identity bookkeeping; the existing identity persists if this fails
-            crate::error::record_ignored(
-                crate::modules::db::write_service_machine_id(
-                    &home_appdata_db_path,
-                    &profile.mac_machine_id,
-                ),
-                "write machine id",
-            );
-            let home_storage_path = home_appdata_db_dir.join("storage.json");
-            // Justification: device-profile bookkeeping; the existing profile persists if this fails
-            crate::error::record_ignored(
-                crate::modules::device::write_profile(&home_storage_path, profile),
-                "write device profile",
-            );
-        }
+        // Justification: device-identity bookkeeping; the existing identity persists if this fails
+        crate::error::record_ignored(
+            crate::modules::db::write_service_machine_id(
+                &home_appdata_db_path,
+                &profile.mac_machine_id,
+            ),
+            "write machine id",
+        );
+        let home_storage_path = home_appdata_db_dir.join("storage.json");
+        // Justification: device-profile bookkeeping; the existing profile persists if this fails
+        crate::error::record_ignored(
+            update_device_profile_storage(&home_storage_path, profile),
+            "write device profile",
+        );
     }
+}
+
+/// Atomically inject credentials into state.vscdb with retry logic, update storage.json, and relaunch the instance
+pub fn inject_credentials_and_relaunch(
+    instance_id: &str,
+    account: &crate::models::Account,
+) -> Result<(), String> {
+    let resolved = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
+    let registry = load_registry()?;
+    let config = registry
+        .instances
+        .iter()
+        .find(|i| i.id == resolved)
+        .ok_or_else(|| format!("Instance {} not found", resolved))?;
+
+    let is_default = config.is_default || resolved == "default";
+    inject_account_credentials(
+        &resolved,
+        &config.data_dir,
+        is_default,
+        account,
+        &CredentialInjectOptions::for_switch(),
+    )?;
+
+    crate::modules::logger::log_info(&format!(
+        "[CREDENTIALS] Injected credentials for account '{}' into instance '{}', initiating relaunch",
+        account.email, resolved
+    ));
+
+    launch_instance(&resolved).map_err(|e| e.to_string())?;
+    Ok(())
 }

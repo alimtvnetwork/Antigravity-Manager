@@ -17,10 +17,11 @@ This plan establishes deterministic process termination, robust pre-switch PID e
 | Task-ID | Subtask Name | Owner | Status | Deliverables |
 | :--- | :--- | :--- | :--- | :--- |
 | **Task-01** | Spec Authoring & Master Plan Initialization | Lead | `DONE` | Specs in `02-spec/21-app/instance-management-and-ui-ux-synchronization/`, plan and subtasks in `.ai-memory/plans/` |
-| **Task-02** | PID Layout & List View Single-Row UI Refactor | Worker 01 | `PENDING` | `InstanceTable.tsx`, `InstanceRowCells.tsx`, single-row layout |
-| **Task-03** | Deterministic Process Termination & Stop Instance Fix | Worker 02 | `PENDING` | `close.rs`, `create.rs`, 5-stage termination ladder |
-| **Task-04** | Account Switch Synchronization & Pre-Switch Eviction | Worker 02 | `PENDING` | `switch.rs`, lockfile clearing, settle delay |
-| **Task-05** | Switch Account Modal Royal Violet UI/UX Modernization | Worker 01 | `PENDING` | `SwitchAccountDialog.tsx`, token compliance, whole-card selection |
-| **Task-06** | Instance Audit Trail Logging & UI Modal Visibility | Worker 03 | `PENDING` | `task_history_db`, `InstanceAuditTrailModal.tsx`, dual-tab fallback |
-| **Task-07** | Caller Preservation, Transient Test CLI & E2E Testing | Worker 03 | `PENDING` | Ancestor walk, `refuse_if_caller`, `create-test`/`rm-test`, E2E test script |
-| **Task-08** | Minor Version Bump & Release Ceremony | Lead | `PENDING` | Version bump, changelogs, README sync, atomic GitMap push |
+| **Task-02** | PID Layout & List View Single-Row UI Refactor | Worker 01 | `DONE` | `InstanceTable.tsx`, `InstanceRowCells.tsx`, single-row layout |
+| **Task-03** | Deterministic Process Termination & Stop Instance Fix | Worker 02 | `DONE` | `close.rs`, `create.rs`, 5-stage termination ladder |
+| **Task-04** | Account Switch Synchronization & Pre-Switch Eviction | Worker 02 | `DONE` | `switch.rs`, lockfile clearing, settle delay |
+| **Task-05** | Switch Account Modal Royal Violet UI/UX Modernization | Worker 01 | `DONE` | `SwitchAccountDialog.tsx`, token compliance, whole-card selection |
+| **Task-06** | Instance Audit Trail Logging & UI Modal Visibility | Worker 03 | `DONE` | `task_history_db`, `InstanceAuditTrailModal.tsx`, dual-tab fallback |
+| **Task-07** | Caller Preservation, Transient Test CLI & E2E Testing | Worker 03 | `DONE` | Ancestor walk, `refuse_if_caller`, `create-test`/`rm-test`, E2E test script |
+| **Task-08** | Minor Version Bump & Release Ceremony | Lead | `DONE` | Version bump, changelogs, README sync, atomic GitMap push |
+

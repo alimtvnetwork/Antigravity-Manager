@@ -27,7 +27,11 @@ export function createCrudSlice(set: SetState, get: GetState): Pick<InstanceStat
             set({ instances, activeInstanceId: activeId, isLoading: false });
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to fetch instances' });
-            useErrorStore.getState().captureError(err, { source: 'useInstanceStore.fetchInstances' });
+            if (!silent) {
+                useErrorStore.getState().captureError(err, { source: 'useInstanceStore.fetchInstances' });
+            } else {
+                useErrorStore.getState().trackWarning(err, { source: 'useInstanceStore.fetchInstances' });
+            }
         }
     },
 

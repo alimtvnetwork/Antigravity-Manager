@@ -1,11 +1,14 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useErrorStore } from '../stores/error-store';
 
-function reportClipboardStage(err: unknown, triggerAction: string): void {
-    useErrorStore.getState().trackWarning(err, {
-        source: 'clipboard.copyToClipboard',
-        triggerAction,
-    });
+export function ensureDocumentFocus(): void {
+    if (typeof window !== 'undefined' && typeof window.focus === 'function' && !document.hasFocus()) {
+        try {
+            window.focus();
+        } catch {
+            // best-effort window focus
+        }
+    }
 }
 
 function copyWithExecCommand(text: string): boolean {
@@ -32,34 +35,35 @@ async function copyWithNativeHelper(text: string): Promise<void> {
 }
 
 /**
- * Copy text to the clipboard.
- * The browser Clipboard API rejects with NotAllowedError when the webview
- * document is not focused. That failure is recorded, then execCommand and the
- * OS helper (`clip` / `pbcopy` / `wl-copy`) are tried. The promise does not
- * reject. A total failure is recorded with captureError and returns false.
+ * Copy text to the clipboard with resilient multi-stage fallback:
+ * 1. Ensures document focus and tries modern Clipboard API.
+ * 2. If Clipboard API rejects (e.g. document not focused), falls back to document.execCommand('copy') which forces textarea focus.
+ * 3. If DOM execCommand fails, invokes native OS helper (`clip` / `pbcopy` / `wl-copy`) which never requires focus.
+ * Only captures an error if all 3 fallback stages fail.
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
-    if (navigator.clipboard && window.isSecureContext) {
+    ensureDocumentFocus();
+
+    // Stage 1: Modern Async Clipboard API
+    if (navigator.clipboard && window.isSecureContext && document.hasFocus()) {
         try {
             await navigator.clipboard.writeText(text);
             return true;
-        } catch (err) {
-            reportClipboardStage(err, 'navigator.clipboard.writeText');
+        } catch {
+            // Document focus may have been lost during async tick, fall through to execCommand
         }
     }
 
+    // Stage 2: document.execCommand (forces element focus)
     try {
         if (copyWithExecCommand(text)) {
             return true;
         }
-        reportClipboardStage(
-            new Error('document.execCommand("copy") returned false'),
-            'document.execCommand',
-        );
-    } catch (err) {
-        reportClipboardStage(err, 'document.execCommand');
+    } catch {
+        // Fall through to native OS helper
     }
 
+    // Stage 3: Native desktop helper (clip / pbcopy / wl-copy)
     try {
         await copyWithNativeHelper(text);
         return true;

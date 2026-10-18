@@ -277,6 +277,12 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                             const tier = (acc.quota?.subscription_tier || 'FREE').toUpperCase();
                             const isThisSwitching = switchingAccountId === acc.id;
 
+                            const fourHVal = fourH !== null ? `${Math.round(fourH)}%` : '—';
+                            const weeklyVal = weekly !== null ? `${Math.round(weekly)}%` : '—';
+                            const totalVal = (fourH !== null && weekly !== null)
+                                ? `${Math.round((fourH + weekly) / 2)}%`
+                                : (fourH !== null ? `${Math.round(fourH)}%` : (weekly !== null ? `${Math.round(weekly)}%` : '—'));
+
                             return (
                                 <div
                                     key={acc.id}
@@ -298,8 +304,8 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                         isCurrent
                                             ? 'bg-emerald-500/10 dark:bg-emerald-950/20 border-emerald-400/50 dark:border-emerald-600/40 shadow-2xs cursor-default'
                                             : isAnySwitching
-                                              ? 'opacity-60 cursor-not-allowed bg-white/80 dark:bg-[#171025]/80 border-slate-200/90 dark:border-[#40285e]'
-                                              : 'bg-white/80 dark:bg-[#171025]/80 border-slate-200/90 dark:border-[#40285e] hover:bg-slate-50/90 dark:hover:bg-[#201633] hover:border-sky-400/50 dark:hover:border-purple-400/50 hover:shadow-2xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-purple-400/60'
+                                              ? 'opacity-60 cursor-not-allowed bg-white/80 dark:bg-[var(--ui-surface-1)]/80 border-slate-200/90 dark:border-[var(--ui-border-subtle)]'
+                                              : 'bg-white/80 dark:bg-[var(--ui-surface-1)]/80 border-slate-200/90 dark:border-[var(--ui-border-subtle)] hover:bg-slate-50/90 dark:hover:bg-[var(--ui-surface-hover)] hover:border-purple-400/50 dark:hover:border-[var(--ui-border-emphasis)] hover:shadow-2xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-[var(--ui-focus-ring)]'
                                     )}
                                 >
                                     <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -309,7 +315,7 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                                 'w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-0.5 transition-all',
                                                 isCurrent
                                                     ? 'border-emerald-500 bg-emerald-500/20 text-[#1af18d]'
-                                                    : 'border-slate-300 dark:border-[#40285e] group-hover:border-sky-400 dark:group-hover:border-[#7c4dff]'
+                                                    : 'border-slate-300 dark:border-[var(--ui-border-subtle)] group-hover:border-purple-400 dark:group-hover:border-[var(--ui-interactive)]'
                                             )}
                                         >
                                             {isCurrent && <div className="w-1.5 h-1.5 rounded-full bg-[#1af18d]" />}
@@ -331,7 +337,7 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                                             ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300'
                                                             : tier.includes('PRO')
                                                               ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300'
-                                                              : 'bg-gray-100 text-gray-600 dark:bg-[#40285e] dark:text-slate-300'
+                                                              : 'bg-gray-100 text-gray-600 dark:bg-[var(--ui-border-subtle)] dark:text-slate-300'
                                                     )}
                                                 >
                                                     {tier}
@@ -344,9 +350,27 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                                 )}
                                             </div>
 
-                                            {/* Integrated QuotaProgressBar */}
+                                            {/* Quota visualization */}
                                             {(fourH !== null || weekly !== null) ? (
-                                                <div className="space-y-1.5 w-full mt-2">
+                                                <div className="space-y-2 w-full mt-2">
+                                                    {/* Contiguous segmented pill capsule header displaying quota metrics */}
+                                                    <div className="inline-flex items-center rounded-full border border-slate-200/90 dark:border-[var(--ui-border-subtle)] bg-slate-100/80 dark:bg-[var(--ui-canvas)]/80 backdrop-blur-xs px-2.5 py-0.5 text-[10px] font-mono shadow-2xs text-slate-600 dark:text-[var(--ui-text-secondary)]">
+                                                        <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-[var(--ui-text-primary)]">
+                                                            <span className="text-slate-400 dark:text-[var(--ui-text-muted)] font-normal">4H:</span>
+                                                            <span>{fourHVal}</span>
+                                                        </span>
+                                                        <span className="w-px h-2.5 bg-slate-200 dark:bg-[var(--ui-border-subtle)] mx-1.5 shrink-0" />
+                                                        <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-[var(--ui-text-primary)]">
+                                                            <span className="text-slate-400 dark:text-[var(--ui-text-muted)] font-normal">Weekly:</span>
+                                                            <span>{weeklyVal}</span>
+                                                        </span>
+                                                        <span className="w-px h-2.5 bg-slate-200 dark:bg-[var(--ui-border-subtle)] mx-1.5 shrink-0" />
+                                                        <span className="flex items-center gap-1 font-semibold text-purple-700 dark:text-[var(--ui-interactive)]">
+                                                            <span className="text-slate-400 dark:text-[var(--ui-text-muted)] font-normal">Total:</span>
+                                                            <span className="font-bold">{totalVal}</span>
+                                                        </span>
+                                                    </div>
+
                                                     {fourH !== null && (
                                                         <div className="space-y-0.5 w-full">
                                                             <div className="flex items-center justify-between text-[10px] font-mono">
@@ -363,7 +387,7 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                                         </div>
                                                     )}
                                                     {weekly !== null && (
-                                                        <div className={cn('space-y-0.5 w-full', fourH !== null && 'pt-1 border-t border-slate-200/50 dark:border-[#40285e]/50')}>
+                                                        <div className={cn('space-y-0.5 w-full', fourH !== null && 'pt-1 border-t border-slate-200/50 dark:border-[var(--ui-border-subtle)]/50')}>
                                                             <div className="flex items-center justify-between text-[10px] font-mono">
                                                                 <span className="truncate text-slate-500 dark:text-slate-400">
                                                                     Weekly Quota
@@ -389,7 +413,7 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
 
                                     {/* Action button: rendered only for non-current accounts */}
                                     {!isCurrent && (
-                                        <div className="inline-flex items-center rounded-full border border-slate-200/90 dark:border-[#40285e] bg-slate-100/80 dark:bg-[#090611] p-0.5 backdrop-blur-xs shadow-2xs shrink-0">
+                                        <div className="inline-flex items-center rounded-full border border-slate-200/90 dark:border-[var(--ui-border-subtle)] bg-slate-100/80 dark:bg-[var(--ui-canvas)] p-0.5 backdrop-blur-xs shadow-2xs shrink-0">
                                             <button
                                                 type="button"
                                                 disabled={isAnySwitching}
@@ -400,8 +424,8 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                                 className={cn(
                                                     'px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer',
                                                     isAnySwitching
-                                                        ? 'opacity-60 cursor-not-allowed bg-sky-600 text-white'
-                                                        : 'bg-sky-600 hover:bg-sky-500 text-white shadow-2xs hover:shadow-xs active:scale-95'
+                                                        ? 'opacity-60 cursor-not-allowed bg-[var(--ui-interactive)] text-white'
+                                                        : 'bg-[var(--ui-interactive)] hover:bg-purple-600 text-white shadow-2xs hover:shadow-xs active:scale-95'
                                                 )}
                                             >
                                                 {isThisSwitching ? (

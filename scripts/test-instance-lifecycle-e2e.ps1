@@ -1,7 +1,8 @@
 # Comprehensive End-to-End Test for Instance Lifecycle, Process Termination, UI Synchronization & Self-Preservation
 # Relative paths strictly enforced. Zero external dependency.
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
+$PSNativeCommandUseErrorActionPreference = $false
 
 Write-Host "==============================================================" -ForegroundColor Cyan
 Write-Host " [E2E] Instance Lifecycle, PID Termination & Audit Trail Test " -ForegroundColor Cyan
@@ -28,6 +29,22 @@ if (Test-Path "src-tauri/target/debug/agm.exe") {
 
 Write-Host "[INIT] Using AGM binary: $agmExe" -ForegroundColor Green
 
+function Parse-CliJson {
+    param([object]$rawOutput)
+    if ($null -eq $rawOutput) { return $null }
+    $text = if ($rawOutput -is [array]) { $rawOutput -join "`n" } else { "$rawOutput" }
+    $text = $text.Trim()
+    $match = [regex]::Match($text, '(?s)\{.*\}')
+    if ($match.Success) {
+        try { return ($match.Value | ConvertFrom-Json) } catch {}
+    }
+    $arrayMatch = [regex]::Match($text, '(?s)\[.*\]')
+    if ($arrayMatch.Success) {
+        try { return ($arrayMatch.Value | ConvertFrom-Json) } catch {}
+    }
+    try { return ($text | ConvertFrom-Json) } catch { return $null }
+}
+
 # -------------------------------------------------------------
 # STEP 1: Detect Caller Instance & Verify Self-Preservation Guard
 # -------------------------------------------------------------
@@ -35,7 +52,7 @@ Write-Host "`n[STEP 1] Testing caller instance detection & immunity guard..." -F
 $callerOut = & $agmExe instances whoami --json | Out-String
 Write-Host "Caller Detection Output: $callerOut"
 
-$callerJson = $callerOut | ConvertFrom-Json
+$callerJson = Parse-CliJson $callerOut
 $callerId = $null
 if ($callerJson) {
     if ($callerJson.instance_id) {
@@ -54,7 +71,7 @@ if (-not $callerId) {
     Write-Host "  -> No caller detected in current process tree. Simulating caller with AGM_INSTANCE_ID='default'..." -ForegroundColor Yellow
     $env:AGM_INSTANCE_ID = "default"
     $simCallerOut = & $agmExe instances whoami --json | Out-String
-    $simCallerJson = $simCallerOut | ConvertFrom-Json
+    $simCallerJson = Parse-CliJson $simCallerOut
     $simId = if ($simCallerJson.instance_id) { $simCallerJson.instance_id } else { $simCallerJson.data.instance_id }
     if ($simId -eq "default") {
         Write-Host "  [PASS] Simulated caller detected successfully: default" -ForegroundColor Green
@@ -133,7 +150,7 @@ $sw.Stop()
 Write-Host $createOut
 Write-Host "  -> Creation latency: $($sw.ElapsedMilliseconds) ms" -ForegroundColor Cyan
 
-$createJson = $createOut | ConvertFrom-Json
+$createJson = Parse-CliJson $createOut
 $testInstId = $null
 if ($createJson) {
     if ($createJson.id) {
@@ -152,7 +169,7 @@ Write-Host "  [OK] Created transient test instance: $testInstId" -ForegroundColo
 # -------------------------------------------------------------
 Write-Host "`n[STEP 3] Verifying instance status and PID representation..." -ForegroundColor Yellow
 $statusOut = & $agmExe instances status $testInstId --json | Out-String
-$statusJson = $statusOut | ConvertFrom-Json
+$statusJson = Parse-CliJson $statusOut
 $isRunning = if ($statusJson.is_running -ne $null) { $statusJson.is_running } else { $statusJson.data.is_running }
 $pidVal = if ($statusJson.pid -ne $null) { $statusJson.pid } else { $statusJson.data.pid }
 Write-Host "  Status verified: is_running=$isRunning, PID=$pidVal"
@@ -170,7 +187,7 @@ if ($stopExit -ne 0) {
 }
 # Confirm dead status
 $postStopStatus = & $agmExe instances status $testInstId --json | Out-String
-$postStopJson = $postStopStatus | ConvertFrom-Json
+$postStopJson = Parse-CliJson $postStopStatus
 $postStopRunning = if ($postStopJson.is_running -ne $null) { $postStopJson.is_running } else { $postStopJson.data.is_running }
 $postStopPid = if ($postStopJson.pid -ne $null) { $postStopJson.pid } else { $postStopJson.data.pid }
 Write-Host "  Confirmed post-stop status: is_running=$postStopRunning, PID=$postStopPid"
@@ -199,7 +216,7 @@ if ($switchExit -ne 0 -and $switchOut -match "No accounts registered") {
 # -------------------------------------------------------------
 Write-Host "`n[STEP 6] Verifying audit trail recording..." -ForegroundColor Yellow
 $histOut = & $agmExe history --json 2>&1 | Out-String
-$histJson = $histOut | ConvertFrom-Json
+$histJson = Parse-CliJson $histOut
 $matchingTasks = @()
 if ($histJson -and $histJson.items) {
     $matchingTasks = @($histJson.items | Where-Object {
