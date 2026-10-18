@@ -236,6 +236,7 @@ pub struct ClusterInstanceBalanceItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemotePromptDispatchPayload {
     pub node_alias: String,
+    #[serde(alias = "instance_target", alias = "instance_id")]
     pub instance_name: String,
     pub prompt_text: String,
     #[serde(default)]
@@ -247,9 +248,20 @@ pub struct RemotePromptDispatchPayload {
 pub struct RemotePromptDispatchResult {
     pub success: bool,
     pub node_alias: String,
+    #[serde(alias = "instance_target")]
     pub instance_name: String,
+    #[serde(default)]
     pub dispatch_route: String,
+    #[serde(default)]
     pub message: String,
+    #[serde(default)]
+    pub command_executed: String,
+    #[serde(default)]
+    pub stdout: String,
+    #[serde(default)]
+    pub stderr: String,
+    #[serde(default)]
+    pub duration_ms: u128,
 }
 
 /// Result of exporting system data as CSV or JSON

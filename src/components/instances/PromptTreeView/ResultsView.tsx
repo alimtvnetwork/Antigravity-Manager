@@ -16,6 +16,7 @@ export interface ResultsViewProps {
     formatDuration: (secs: number) => string;
     onFocusIde: () => void;
     elapsedSeconds: number;
+    showAllWords?: boolean;
 }
 
 export function ResultsView(props: ResultsViewProps) {
@@ -23,7 +24,7 @@ export function ResultsView(props: ResultsViewProps) {
         selectedConversation,
         isCopiedResults, setIsCopiedResults,
         isFocusing, instancePid, formatDuration, onFocusIde,
-        elapsedSeconds,
+        elapsedSeconds, showAllWords,
     } = props;
 
     const [isAiCopyMenuOpen, setIsAiCopyMenuOpen] = useState(false);
@@ -193,7 +194,10 @@ export function ResultsView(props: ResultsViewProps) {
 
                 {/* 1. Assistant Text Response */}
                 {selectedConversation.latest_response && (
-                    <div className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#090611] p-5 text-xs text-slate-800 dark:text-slate-200 leading-relaxed max-h-[460px] overflow-y-auto shadow-inner">
+                    <div className={cn(
+                        "rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#090611] p-5 text-xs text-slate-800 dark:text-slate-200 leading-relaxed overflow-y-auto shadow-inner",
+                        showAllWords ? "max-h-none" : "max-h-[460px]"
+                    )}>
                         <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-slate-200/60 dark:border-[#40285e]/60 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
                             <Sparkles className="w-3.5 h-3.5" />
                             <span>AI Assistant Response</span>
@@ -209,7 +213,10 @@ export function ResultsView(props: ResultsViewProps) {
 
                 {/* 2. Tool & Terminal Execution Details */}
                 {selectedConversation.execution_results && (
-                    <div className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-900 text-slate-100 p-4 font-mono text-[11px] leading-relaxed max-h-[300px] overflow-y-auto select-text shadow-inner">
+                    <div className={cn(
+                        "rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-900 text-slate-100 p-4 font-mono text-[11px] leading-relaxed overflow-y-auto select-text shadow-inner",
+                        showAllWords ? "max-h-none" : "max-h-[300px]"
+                    )}>
                         <div className="flex items-center gap-1.5 mb-2 pb-1 border-b border-slate-800 text-cyan-400 font-semibold text-[10px]">
                             <Terminal className="w-3 h-3" />
                             <span>Execution & Tool Details</span>

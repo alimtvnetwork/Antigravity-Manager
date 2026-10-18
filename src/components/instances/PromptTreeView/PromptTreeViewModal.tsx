@@ -810,6 +810,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                             formatDuration={formatDuration}
                                             onFocusIde={promptActions.handleFocusIde}
                                             elapsedSeconds={elapsedSeconds}
+                                            showAllWords={showAllWords}
                                         />
                                     )}
                                 </div>

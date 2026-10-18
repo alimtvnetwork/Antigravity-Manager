@@ -850,43 +850,150 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
 
     // Include configured remote SSH nodes
     let ssh_conns = load_ssh_connections().unwrap_or_default();
-    for conn in ssh_conns {
-        if conn.ip_address == local_ip || conn.alias.eq_ignore_ascii_case(&local_machine) {
-            continue;
-        }
-        let port = if conn.port == 0 { 22 } else { conn.port };
-        let start = Instant::now();
-        let reachable = check_tcp_liveness(&conn.ip_address, port, 1500);
-        let elapsed_ms = start.elapsed().as_millis() as u64;
-        let (status_label, error_message) = if reachable {
-            ("reachable".to_string(), None)
-        } else {
-            (
-                "offline".to_string(),
-                Some(format!(
-                    "TCP port {} unreachable on {} (timeout 1500ms)",
-                    port, conn.ip_address
-                )),
-            )
-        };
+    let remote_conns: Vec<SshConnectionRecord> = ssh_conns
+        .into_iter()
+        .filter(|conn| conn.ip_address != local_ip && !conn.alias.eq_ignore_ascii_case(&local_machine))
+        .collect();
 
-        items.push(ClusterInstanceBalanceItem {
-            machine_alias: conn.alias.clone(),
-            machine_ip: conn.ip_address.clone(),
-            ip_address: Some(conn.ip_address.clone()),
-            error_message,
-            latency_ms: Some(elapsed_ms),
-            is_local: false,
-            instance_id: "default".to_string(),
-            instance_name: format!("{}:default", conn.alias),
-            running: reachable,
-            bound_email: String::new(),
-            tier: "SSH-NODE".to_string(),
-            quota_4h_pct: 100.0,
-            quota_weekly_pct: 100.0,
-            active_model: target_model.clone(),
-            status_label,
-        });
+    let remote_items: Vec<Vec<ClusterInstanceBalanceItem>> = std::thread::scope(|s| {
+        let handles: Vec<_> = remote_conns
+            .iter()
+            .map(|conn| {
+                let target_model = target_model.clone();
+                s.spawn(move || {
+                    let mut node_items = Vec::new();
+                    let port = if conn.port == 0 { 22 } else { conn.port };
+                    let start = Instant::now();
+                    let reachable = check_tcp_liveness(&conn.ip_address, port, 1500);
+                    let elapsed_ms = start.elapsed().as_millis() as u64;
+
+                    if !reachable {
+                        node_items.push(ClusterInstanceBalanceItem {
+                            machine_alias: conn.alias.clone(),
+                            machine_ip: conn.ip_address.clone(),
+                            ip_address: Some(conn.ip_address.clone()),
+                            error_message: Some(format!(
+                                "TCP port {} unreachable on {} (timeout 1500ms)",
+                                port, conn.ip_address
+                            )),
+                            latency_ms: Some(elapsed_ms),
+                            is_local: false,
+                            instance_id: "default".to_string(),
+                            instance_name: format!("{}:default", conn.alias),
+                            running: false,
+                            bound_email: String::new(),
+                            tier: "SSH-NODE".to_string(),
+                            quota_4h_pct: 100.0,
+                            quota_weekly_pct: 100.0,
+                            active_model: target_model.clone(),
+                            status_label: "offline".to_string(),
+                        });
+                        return node_items;
+                    }
+
+                    // Node reachable: query real instances via SSH
+                    let remote_cmd = vec![
+                        "agm".to_string(),
+                        "instances".to_string(),
+                        "list".to_string(),
+                        "--json".to_string(),
+                    ];
+                    let exec_res = exec_ssh_command(&conn.alias, &remote_cmd, Some(port), None, None);
+                    if let Ok(res_list) = exec_res {
+                        if let Some(res) = res_list.first().filter(|r| r.success && !r.stdout.is_empty()) {
+                            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&res.stdout) {
+                                let raw_instances = val
+                                    .get("data")
+                                    .and_then(|d| d.as_array())
+                                    .or_else(|| val.as_array());
+                                if let Some(inst_array) = raw_instances {
+                                    for inst_val in inst_array {
+                                        let inst_id = inst_val
+                                            .get("id")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or("default")
+                                            .to_string();
+                                        let inst_name = inst_val
+                                            .get("name")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or(&inst_id)
+                                            .to_string();
+                                        let is_running = inst_val
+                                            .get("is_running")
+                                            .and_then(|v| v.as_bool())
+                                            .unwrap_or(false);
+                                        let raw_email = inst_val
+                                            .get("bound_email")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or("")
+                                            .to_string();
+                                        let clean_email = if raw_email.is_empty()
+                                            || raw_email.contains("Administrator")
+                                            || raw_email.contains("root")
+                                            || raw_email.contains("${adminUser}")
+                                            || raw_email.contains("${linuxUser}")
+                                        {
+                                            "(unbound)".to_string()
+                                        } else {
+                                            raw_email
+                                        };
+
+                                        node_items.push(ClusterInstanceBalanceItem {
+                                            machine_alias: conn.alias.clone(),
+                                            machine_ip: conn.ip_address.clone(),
+                                            ip_address: Some(conn.ip_address.clone()),
+                                            error_message: None,
+                                            latency_ms: Some(elapsed_ms),
+                                            is_local: false,
+                                            instance_id: inst_id,
+                                            instance_name: inst_name,
+                                            running: is_running,
+                                            bound_email: clean_email,
+                                            tier: "PRO".to_string(),
+                                            quota_4h_pct: 100.0,
+                                            quota_weekly_pct: 100.0,
+                                            active_model: target_model.clone(),
+                                            status_label: if is_running {
+                                                "running".to_string()
+                                            } else {
+                                                "idle".to_string()
+                                            },
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if node_items.is_empty() {
+                        node_items.push(ClusterInstanceBalanceItem {
+                            machine_alias: conn.alias.clone(),
+                            machine_ip: conn.ip_address.clone(),
+                            ip_address: Some(conn.ip_address.clone()),
+                            error_message: None,
+                            latency_ms: Some(elapsed_ms),
+                            is_local: false,
+                            instance_id: "default".to_string(),
+                            instance_name: format!("{}:default", conn.alias),
+                            running: true,
+                            bound_email: "(unbound)".to_string(),
+                            tier: "SSH-NODE".to_string(),
+                            quota_4h_pct: 100.0,
+                            quota_weekly_pct: 100.0,
+                            active_model: target_model.clone(),
+                            status_label: "reachable".to_string(),
+                        });
+                    }
+
+                    node_items
+                })
+            })
+            .collect();
+        handles.into_iter().filter_map(|h| h.join().ok()).collect()
+    });
+
+    for node_group in remote_items {
+        items.extend(node_group);
     }
 
     Ok(items)
@@ -931,9 +1038,17 @@ pub async fn send_remote_ssh_prompt(
         format!("{}:{} {}", node_alias, inst_name, text)
     };
 
+    let start = Instant::now();
     let reply = crate::modules::telegram_inbound::execute_prompt_injection(&cmd_str).await;
+    let duration_ms = start.elapsed().as_millis();
     let is_error_reply = reply.contains("❌") || reply.contains("⚠️ <b>Missing");
     let is_send_success = !is_error_reply;
+    let clean_msg = crate::modules::telegram_inbound::strip_telegram_html_tags(&reply);
+    let (stdout, stderr) = if is_send_success {
+        (clean_msg.clone(), String::new())
+    } else {
+        (String::new(), clean_msg.clone())
+    };
 
     Ok(RemotePromptDispatchResult {
         success: is_send_success,
@@ -944,6 +1059,10 @@ pub async fn send_remote_ssh_prompt(
         } else {
             "remote-ssh-gitmap".to_string()
         },
-        message: crate::modules::telegram_inbound::strip_telegram_html_tags(&reply),
+        message: clean_msg,
+        command_executed: cmd_str,
+        stdout,
+        stderr,
+        duration_ms,
     })
 }

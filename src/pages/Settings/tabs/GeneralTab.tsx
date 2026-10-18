@@ -4,6 +4,7 @@ import { LayoutDashboard, Users, Network, Activity, BarChart3, Settings as Setti
 import { request as invoke } from '../../../utils/request';
 import { showToast } from '../../../components/common/ToastContainer';
 import { isTauri } from '../../../utils/env';
+import { DateTimeFormatSection } from '../../../components/settings/GeneralSettingsTab';
 
 export function GeneralTab(props: SettingsPageApi) {
     const { t, i18n, saveConfig, updateLanguage, updateTheme, formData, setFormData, saveUpdateSettingsHelper } = props;
@@ -69,6 +70,12 @@ export function GeneralTab(props: SettingsPageApi) {
                                     ))}
                                 </div>
                             </div>
+
+                            {/* Date & Time Format */}
+                            <DateTimeFormatSection
+                                value={formData.date_format_mode}
+                                onChange={(mode) => setFormData({ ...formData, date_format_mode: mode, time_format_preference: mode })}
+                            />
 
                             {/* Auto launch on system startup */}
                             <div className="flex items-center justify-between p-3.5 bg-gray-50 dark:bg-base-200 rounded-lg border border-gray-100 dark:border-base-300">

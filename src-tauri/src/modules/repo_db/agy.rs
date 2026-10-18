@@ -662,15 +662,34 @@ pub fn send_prompt_now_for_instance(
     let canonical_inst = crate::modules::instance::resolve_instance_id(clean_inst)
         .unwrap_or_else(|_| clean_inst.to_string());
 
-    // 1. Ensure instance is running with smart process cache (reuses existing process without reopening)
-    if let Err(e) =
-        crate::modules::instance::ensure_instance_running_smart(&canonical_inst, Some(repo_path))
-    {
-        crate::modules::logger::log_warn(&format!(
-            "[RepoDB] ensure_instance_running_smart warning for '{}': {}",
-            canonical_inst, e
-        ));
-    }
+    // 1. Ensure instance is running with smart process cache and adaptive cold-start stabilization
+    let was_cold_started = match crate::modules::instance::smart_run::ensure_instance_running_smart_detailed(
+        &canonical_inst,
+        Some(repo_path),
+    ) {
+        Ok(res) => {
+            if res.was_cold_started {
+                crate::modules::logger::log_info(&format!(
+                    "[ColdStartDispatch] Instance '{}' was cold-started (stabilized in {}ms, pid: {:?}). Waiting 1500ms settlement buffer for IDE window/extension initialization...",
+                    canonical_inst, res.stabilization_ms, res.pid
+                ));
+                std::thread::sleep(std::time::Duration::from_millis(1500));
+                let (still_running, _, pids) =
+                    crate::modules::instance::is_instance_process_running_smart(&canonical_inst);
+                if still_running {
+                    crate::modules::instance::focus_running_instance(&pids, Some(repo_path));
+                }
+            }
+            res.was_cold_started
+        }
+        Err(e) => {
+            crate::modules::logger::log_warn(&format!(
+                "[RepoDB] ensure_instance_running_smart_detailed warning for '{}': {}",
+                canonical_inst, e
+            ));
+            false
+        }
+    };
 
     // 2. Generate prompt ID and record in DB
     let prompt_id = format!("p-{}", &uuid::Uuid::new_v4().to_string()[..8]);
@@ -736,22 +755,32 @@ pub fn send_prompt_now_for_instance(
             "agy CLI dispatch failed; attempting direct CDP insertion fallback"
         );
 
-        // Fallback: Direct DevTools insertion into running Antigravity IDE
+        // Fallback: Direct DevTools insertion into running Antigravity IDE with retry ladder
         let clean_prompt = extract_clean_user_prompt(prompt_content);
         let fallback_prompt = if clean_prompt.trim().is_empty() {
             prompt_content.trim()
         } else {
             clean_prompt.as_str()
         };
-        let cdp_ok = crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
-            &canonical_inst,
-            fallback_prompt,
-        );
+        let mut cdp_ok = false;
+        let max_cdp_attempts = if was_cold_started { 4 } else { 2 };
+        for attempt in 1..=max_cdp_attempts {
+            if crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
+                &canonical_inst,
+                fallback_prompt,
+            ) {
+                cdp_ok = true;
+                break;
+            }
+            if attempt < max_cdp_attempts {
+                std::thread::sleep(std::time::Duration::from_millis(500));
+            }
+        }
 
         if cdp_ok {
             crate::modules::logger::log_info(&format!(
-                "[RepoDB] Direct CDP fallback succeeded for prompt '{}' on instance '{}'",
-                active_prompt.id, canonical_inst
+                "[RepoDB] Direct CDP fallback succeeded for prompt '{}' on instance '{}' (cold-start: {})",
+                active_prompt.id, canonical_inst, was_cold_started
             ));
             crate::modules::audit::record_if_active(
                 "backend",
@@ -763,6 +792,7 @@ pub fn send_prompt_now_for_instance(
                     "instanceId": canonical_inst,
                     "repoPath": repo_path,
                     "fallback": "cdp_direct",
+                    "coldStarted": was_cold_started,
                 }),
                 "ok",
                 "Prompt dispatched via live DevTools CDP fallback",
@@ -776,13 +806,13 @@ pub fn send_prompt_now_for_instance(
                 Err(focus_err) => format!("IDE focus failed: {focus_err}"),
             };
             return Err(format!(
-                "{spawn_err}; direct CDP fallback failed; {focus_note}"
+                "{spawn_err}; direct CDP fallback failed after {max_cdp_attempts} attempts; {focus_note}"
             ));
         }
     } else {
         crate::modules::logger::log_info(&format!(
-            "[RepoDB] send_prompt_now_for_instance dispatched prompt '{}' for instance '{}' in '{}'",
-            active_prompt.id, canonical_inst, repo_path
+            "[RepoDB] send_prompt_now_for_instance dispatched prompt '{}' for instance '{}' in '{}' (cold-start: {})",
+            active_prompt.id, canonical_inst, repo_path, was_cold_started
         ));
     }
 

@@ -758,7 +758,7 @@ export function SshGitmapSection() {
                                                 </div>
                                             </td>
                                             <td className="py-2 px-3 font-mono text-gray-600 dark:text-slate-300">
-                                                <div className="inline-flex items-center gap-1">
+                                                <div className="inline-flex items-center gap-1 font-mono text-[11px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/40 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700/50" title={`Host: ${node.ip_address || (node as any).host || 'unknown'}:${node.port || 22}`}>
                                                     <span>
                                                         {(node.ip_address || (node as any).host || 'unknown')}:{node.port || 22}
                                                     </span>
@@ -947,19 +947,20 @@ export function SshGitmapSection() {
                     <table className="w-full text-left border-collapse text-xs">
                         <thead>
                             <tr className="bg-gray-50 dark:bg-slate-800/80 text-gray-600 dark:text-slate-300 border-b border-gray-200 dark:border-slate-800">
-                                <th className="py-2 px-3 font-semibold">Machine Alias / IP</th>
-                                <th className="py-2 px-3 font-semibold">Instance Name</th>
-                                <th className="py-2 px-3 font-semibold">Active Account Email</th>
-                                <th className="py-2 px-3 font-semibold">4h Credit %</th>
-                                <th className="py-2 px-3 font-semibold">Weekly Credit %</th>
-                                <th className="py-2 px-3 font-semibold text-right">Quick Action</th>
+                                <th className="py-2 px-3 font-semibold">Machine &amp; Node</th>
+                                <th className="py-2 px-3 font-semibold">Instance &amp; Status</th>
+                                <th className="py-2 px-3 font-semibold">Connected Google Account</th>
+                                <th className="py-2 px-3 font-semibold">Subscription Tier</th>
+                                <th className="py-2 px-3 font-semibold">4h Rolling Quota</th>
+                                <th className="py-2 px-3 font-semibold">Weekly Quota</th>
+                                <th className="py-2 px-3 font-semibold text-right">Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-slate-800/70">
                             {clusterBalances.length === 0 ? (
                                 <tr>
                                     <td
-                                        colSpan={6}
+                                        colSpan={7}
                                         className="py-4 px-3 text-center text-gray-500 dark:text-slate-400"
                                     >
                                         {isLoadingBalances
@@ -998,7 +999,7 @@ export function SshGitmapSection() {
                                             className="hover:bg-gray-50/60 dark:hover:bg-slate-800/40 transition-colors"
                                         >
                                             <td className="py-2 px-3 font-mono">
-                                                <div className="flex items-center gap-1.5">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
                                                     <span
                                                         className={`w-2 h-2 rounded-full ${
                                                             isOnline
@@ -1011,10 +1012,8 @@ export function SshGitmapSection() {
                                                         {cleanMachineAlias}
                                                     </span>
                                                     {ip ? (
-                                                        <div className="inline-flex items-center gap-1">
-                                                            <span className="text-[10px] text-gray-400">
-                                                                ({ip})
-                                                            </span>
+                                                        <div className="inline-flex items-center gap-1 font-mono text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800/40 px-1.5 py-0.2 rounded border border-slate-200 dark:border-slate-700/50" title={`Host IP: ${ip}`}>
+                                                            <span>{ip}</span>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleCopyChip(`mat-ip-${item.machine_alias}-${idx}`, ip, 'Node IP')}
@@ -1032,13 +1031,13 @@ export function SshGitmapSection() {
                                                 </div>
                                             </td>
                                             <td className="py-2 px-3 font-mono">
-                                                <div className="flex items-center gap-1.5">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
                                                     <span className="font-medium text-gray-800 dark:text-slate-200">
                                                         {item.instance_name}
                                                     </span>
                                                     {item.running ? (
                                                         <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                                            PID {item.pid ?? 'Active'}
+                                                            {typeof item.pid === 'number' ? `PID ${item.pid}` : 'Running'}
                                                         </span>
                                                     ) : isOnline ? (
                                                         <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50/80 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
@@ -1054,7 +1053,7 @@ export function SshGitmapSection() {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="py-2 px-3 font-mono text-gray-700 dark:text-slate-300">
+                                            <td className="py-2 px-3 font-mono text-gray-900 dark:text-slate-100 font-medium">
                                                 {displayEmail ? (
                                                     <div className="flex items-center gap-1.5 flex-wrap">
                                                         {(() => {
@@ -1082,22 +1081,26 @@ export function SshGitmapSection() {
                                                                 </>
                                                             );
                                                         })()}
-                                                        {badgeText && (
-                                                            <span
-                                                                className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${
-                                                                    badgeText === 'SSH-NODE'
-                                                                        ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
-                                                                        : badgeText === 'VAULT'
-                                                                          ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
-                                                                          : 'bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800'
-                                                                }`}
-                                                            >
-                                                                {badgeText}
-                                                            </span>
-                                                        )}
                                                     </div>
                                                 ) : (
                                                     <span className="text-gray-400 italic">Unbound</span>
+                                                )}
+                                            </td>
+                                            <td className="py-2 px-3">
+                                                {badgeText ? (
+                                                    <span
+                                                        className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${
+                                                            badgeText === 'SSH-NODE'
+                                                                ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
+                                                                : badgeText === 'VAULT'
+                                                                  ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                                                                  : 'bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800'
+                                                        }`}
+                                                    >
+                                                        {badgeText}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-gray-400">—</span>
                                                 )}
                                             </td>
                                             <td className="py-2 px-3 font-mono">
@@ -1148,9 +1151,14 @@ export function SshGitmapSection() {
                                                             );
                                                         } else {
                                                             showToast(
-                                                                `Target locked to ${item.machine_alias}:${item.instance_name} — enter prompt below to send`,
+                                                                `Target locked to ${item.machine_alias}:${item.instance_name} (${displayEmail || 'unbound'}) — enter prompt below to send`,
                                                                 'info'
                                                             );
+                                                            const promptInput = document.getElementById('remote-prompt-input');
+                                                            if (promptInput) {
+                                                                promptInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                                promptInput.focus();
+                                                            }
                                                         }
                                                     }}
                                                     className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 inline-flex items-center gap-1 cursor-pointer"
@@ -1188,7 +1196,18 @@ export function SshGitmapSection() {
                         <span className="text-[11px] font-semibold text-gray-400 mr-1.5">Machine:</span>
                         <select
                             value={targetMachine}
-                            onChange={(e) => setTargetMachine(e.target.value)}
+                            onChange={(e) => {
+                                const newMachine = e.target.value;
+                                setTargetMachine(newMachine);
+                                const matching = clusterBalances.filter(
+                                    (item) => item.machine_alias.toLowerCase() === newMachine.toLowerCase()
+                                );
+                                if (matching.length > 0) {
+                                    setTargetInstance(matching[0].instance_name || matching[0].instance_id);
+                                } else {
+                                    setTargetInstance('default');
+                                }
+                            }}
                             className="text-xs font-mono text-gray-900 dark:text-slate-100 bg-transparent border-0 focus:ring-0 focus:outline-none pr-2 cursor-pointer"
                         >
                             <option value="local">local (This Machine)</option>
@@ -1200,13 +1219,22 @@ export function SshGitmapSection() {
                         </select>
                         <div className="h-4 w-px bg-gray-200 dark:bg-slate-700 mx-2" />
                         <span className="text-[11px] font-semibold text-gray-400 mr-1.5">Instance:</span>
-                        <input
-                            type="text"
+                        <select
                             value={targetInstance}
                             onChange={(e) => setTargetInstance(e.target.value)}
-                            placeholder="default"
-                            className="w-24 text-xs font-mono text-gray-900 dark:text-slate-100 bg-transparent border-0 focus:ring-0 focus:outline-none"
-                        />
+                            className="text-xs font-mono text-gray-900 dark:text-slate-100 bg-transparent border-0 focus:ring-0 focus:outline-none pr-2 cursor-pointer max-w-[220px]"
+                        >
+                            {clusterBalances
+                                .filter((item) => item.machine_alias.toLowerCase() === targetMachine.toLowerCase())
+                                .map((item) => (
+                                    <option key={`${item.machine_alias}-${item.instance_id}`} value={item.instance_name || item.instance_id}>
+                                        {item.instance_name} — {item.bound_email || 'unbound'} ({item.running ? 'Running' : 'Idle'})
+                                    </option>
+                                ))}
+                            {clusterBalances.filter((item) => item.machine_alias.toLowerCase() === targetMachine.toLowerCase()).length === 0 && (
+                                <option value="default">default — (Primary Instance)</option>
+                            )}
+                        </select>
                     </div>
 
                     <button
@@ -1225,6 +1253,7 @@ export function SshGitmapSection() {
                     </button>
 
                     <input
+                        id="remote-prompt-input"
                         type="text"
                         value={promptText}
                         onChange={(e) => setPromptText(e.target.value)}

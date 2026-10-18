@@ -51,20 +51,23 @@ export interface ClusterInstanceBalanceItem {
     instance_id: string;
     instance_name: string;
     running: boolean;
-    pid: number | null;
+    pid?: number | null;
     bound_email: string | null;
-    tier: string | null;
-    quota_4h_pct: number | null;
-    quota_weekly_pct: number | null;
-    last_updated: string;
+    tier?: string | null;
+    quota_4h_pct?: number | null;
+    quota_weekly_pct?: number | null;
+    last_updated?: string;
     error?: string | null;
     error_message?: string | null;
     latency_ms?: number | null;
+    status_label?: string;
+    active_model?: string;
 }
 
 export interface RemotePromptDispatchPayload {
     node_alias: string;
     instance_target: string;
+    instance_name?: string;
     prompt_text: string;
     conversation_id?: string | null;
 }
@@ -72,11 +75,14 @@ export interface RemotePromptDispatchPayload {
 export interface RemotePromptDispatchResult {
     node_alias: string;
     instance_target: string;
+    instance_name?: string;
     success: boolean;
     command_executed: string;
     stdout: string;
     stderr: string;
     duration_ms: number;
+    message?: string;
+    dispatch_route?: string;
 }
 
 export interface NodeSyncStats {

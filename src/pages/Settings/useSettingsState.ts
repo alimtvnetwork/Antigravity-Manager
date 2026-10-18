@@ -51,6 +51,8 @@ export function useSettingsState() {
     const [formData, setFormData] = useState<AppConfig>({
         language: 'en',
         theme: 'system',
+        date_format_mode: '24h',
+        time_format_preference: '24h',
         auto_refresh: false,
         refresh_interval: 15,
         auto_sync: true,
@@ -244,6 +246,8 @@ export function useSettingsState() {
         if (config) {
             setFormData({
                 ...config,
+                date_format_mode: config.date_format_mode || '24h',
+                time_format_preference: config.time_format_preference || config.date_format_mode || '24h',
                 auto_sync: config.auto_sync ?? true,
                 auto_sync_migrated: config.auto_sync_migrated ?? true,
                 conversation_cleanup: config.conversation_cleanup ?? {

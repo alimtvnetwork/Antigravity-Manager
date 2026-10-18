@@ -207,6 +207,91 @@ pub(crate) fn discover_fallback_projects(
     }
     // ===== End Fallback & Discovery =====
 
+    // ===== Active Prompts Project Synthesis: Supplement projects from active_prompts =====
+    // When an instance is executing or queuing prompts before conversation summaries
+    // are written by the IDE, synthesize RunningProject entries to guarantee that
+    // the left-hand panel is NEVER empty.
+    if let Ok(conn) = connect_db() {
+        let active_sql = "SELECT instance_id, repo_path, status, updated_at \
+                          FROM active_prompts \
+                          WHERE status IN ('running', 'in_flight', 'dispatched', 'queued') \
+                          ORDER BY created_at ASC, id ASC";
+        let mut stmt_opt = conn.prepare(active_sql).ok();
+        if let Some(ref mut stmt) = stmt_opt {
+            if let Ok(rows) = stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)?,
+                ))
+            }) {
+                for item in rows.flatten() {
+                    let (raw_inst, raw_repo_path, status, updated_at) = item;
+                    if raw_repo_path.trim().len() < 4 {
+                        continue;
+                    }
+                    let norm_inst = if raw_inst == "__default__" || raw_inst.is_empty() {
+                        "default".to_string()
+                    } else {
+                        crate::modules::instance::resolve_instance_id(&raw_inst)
+                            .unwrap_or_else(|_| raw_inst.clone())
+                    };
+                    if let Some(target_id) = target {
+                        if target_id == "default" || target_id == "__default__" {
+                            if norm_inst != "default" && norm_inst != "__default__" {
+                                continue;
+                            }
+                        } else if norm_inst != target_id {
+                            continue;
+                        }
+                    }
+                    let norm_path_cmp = normalize_path_for_compare(&raw_repo_path);
+                    if !seen_fb.insert((norm_inst.clone(), norm_path_cmp)) {
+                        continue;
+                    }
+                    let repo_name = Path::new(&raw_repo_path)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "project".to_string());
+                    let project_key = format!("{}__{}", repo_name.to_lowercase(), norm_inst);
+                    projects.push(RunningProject {
+                        id: project_key,
+                        instance_id: norm_inst,
+                        repo_name,
+                        repo_path: raw_repo_path,
+                        workspace_storage_path: None,
+                        is_running: status == "running" || status == "in_flight",
+                        last_detected_at: if updated_at > 0 {
+                            updated_at
+                        } else {
+                            now_fb
+                        },
+                    });
+                }
+            } else {
+                // Justification: Querying active_prompts is best-effort fallback project synthesis
+                crate::error::record_ignored(
+                    Err::<(), _>("failed to query rows from active_prompts"),
+                    "query active_prompts in discover_fallback_projects",
+                );
+            }
+        } else {
+            // Justification: Prepare failure on active_prompts is non-fatal for project discovery
+            crate::error::record_ignored(
+                Err::<(), _>("failed to prepare active_prompts query"),
+                "prepare active_prompts in discover_fallback_projects",
+            );
+        }
+    } else {
+        // Justification: Connecting to repo_prompts.db during fallback discovery is best-effort
+        crate::error::record_ignored(
+            Err::<(), _>("failed to connect repo db for active_prompts discovery"),
+            "connect repo db in discover_fallback_projects",
+        );
+    }
+    // ===== End Active Prompts Project Synthesis =====
+
     projects
 }
 
