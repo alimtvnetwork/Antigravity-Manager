@@ -251,6 +251,85 @@ pub fn exec_ssh_command(
                     match cmd.args(&ssh_args).output() {
                         Ok(out) => {
                             let code = out.status.code().unwrap_or(1);
+                            let stdout_str = String::from_utf8_lossy(&out.stdout).to_string();
+                            let stderr_str = String::from_utf8_lossy(&out.stderr).to_string();
+
+                            let is_auth_failure = !out.status.success()
+                                && (code == 255
+                                    || stderr_str.to_lowercase().contains("permission denied")
+                                    || stderr_str.to_lowercase().contains("authentication failed"));
+
+                            if is_auth_failure {
+                                // Stage 2: GitMap in-process Go SSH execution fallback
+                                if let Ok((gm_code, gm_out, gm_err)) =
+                                    exec_via_gitmap_ssh(&node.alias, &cmd_str)
+                                {
+                                    if gm_code == 0
+                                        && !gm_out.contains("machine is off")
+                                        && !gm_out.contains("All target machines are currently off")
+                                    {
+                                        return SshExecNodeResult {
+                                            alias: node.alias.clone(),
+                                            target: format!(
+                                                "{}@{}",
+                                                node.username, node.ip_address
+                                            ),
+                                            ip_address: node.ip_address.clone(),
+                                            username: node.username.clone(),
+                                            port,
+                                            exit_code: 0,
+                                            stdout: gm_out,
+                                            stderr: gm_err,
+                                            duration_ms: start.elapsed().as_millis(),
+                                            success: true,
+                                        };
+                                    }
+
+                                    // Stage 3: Auto-repair via GitMap fix-auth if target is authorized via password vault
+                                    if let Ok(fix_msg) = fix_node_auth_via_gitmap(&node.alias) {
+                                        tracing::info!(
+                                            target: "ssh_manager",
+                                            "Auto-repaired auth via GitMap for {}: {}",
+                                            node.alias,
+                                            fix_msg
+                                        );
+                                        // Retry native OpenSSH once after key deployment
+                                        let mut retry_cmd = Command::new("ssh");
+                                        #[cfg(target_os = "windows")]
+                                        {
+                                            use std::os::windows::process::CommandExt;
+                                            retry_cmd.creation_flags(0x08000000);
+                                        }
+                                        if let Ok(retry_out) = retry_cmd.args(&ssh_args).output() {
+                                            let r_code = retry_out.status.code().unwrap_or(1);
+                                            if retry_out.status.success() {
+                                                return SshExecNodeResult {
+                                                    alias: node.alias.clone(),
+                                                    target: format!(
+                                                        "{}@{}",
+                                                        node.username, node.ip_address
+                                                    ),
+                                                    ip_address: node.ip_address.clone(),
+                                                    username: node.username.clone(),
+                                                    port,
+                                                    exit_code: r_code,
+                                                    stdout: String::from_utf8_lossy(
+                                                        &retry_out.stdout,
+                                                    )
+                                                    .to_string(),
+                                                    stderr: String::from_utf8_lossy(
+                                                        &retry_out.stderr,
+                                                    )
+                                                    .to_string(),
+                                                    duration_ms: start.elapsed().as_millis(),
+                                                    success: true,
+                                                };
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             SshExecNodeResult {
                                 alias: node.alias.clone(),
                                 target: format!("{}@{}", node.username, node.ip_address),
@@ -258,24 +337,44 @@ pub fn exec_ssh_command(
                                 username: node.username.clone(),
                                 port,
                                 exit_code: code,
-                                stdout: String::from_utf8_lossy(&out.stdout).to_string(),
-                                stderr: String::from_utf8_lossy(&out.stderr).to_string(),
+                                stdout: stdout_str,
+                                stderr: stderr_str,
                                 duration_ms: start.elapsed().as_millis(),
                                 success: out.status.success(),
                             }
                         }
-                        Err(e) => SshExecNodeResult {
-                            alias: node.alias.clone(),
-                            target: format!("{}@{}", node.username, node.ip_address),
-                            ip_address: node.ip_address.clone(),
-                            username: node.username.clone(),
-                            port,
-                            exit_code: 1,
-                            stdout: String::new(),
-                            stderr: format!("Failed to spawn ssh: {}", e),
-                            duration_ms: start.elapsed().as_millis(),
-                            success: false,
-                        },
+                        Err(e) => {
+                            if let Ok((gm_code, gm_out, gm_err)) =
+                                exec_via_gitmap_ssh(&node.alias, &cmd_str)
+                            {
+                                if gm_code == 0 && !gm_out.contains("machine is off") {
+                                    return SshExecNodeResult {
+                                        alias: node.alias.clone(),
+                                        target: format!("{}@{}", node.username, node.ip_address),
+                                        ip_address: node.ip_address.clone(),
+                                        username: node.username.clone(),
+                                        port,
+                                        exit_code: 0,
+                                        stdout: gm_out,
+                                        stderr: gm_err,
+                                        duration_ms: start.elapsed().as_millis(),
+                                        success: true,
+                                    };
+                                }
+                            }
+                            SshExecNodeResult {
+                                alias: node.alias.clone(),
+                                target: format!("{}@{}", node.username, node.ip_address),
+                                ip_address: node.ip_address.clone(),
+                                username: node.username.clone(),
+                                port,
+                                exit_code: 1,
+                                stdout: String::new(),
+                                stderr: format!("Failed to spawn ssh: {}", e),
+                                duration_ms: start.elapsed().as_millis(),
+                                success: false,
+                            }
+                        }
                     }
                 })
             })
@@ -285,6 +384,90 @@ pub fn exec_ssh_command(
     });
 
     Ok(results)
+}
+
+/// Invoke `gitmap ssh fix-auth <target>` to automatically deploy keys using vaulted password credentials
+pub fn fix_node_auth_via_gitmap(target: &str) -> Result<String, String> {
+    let gitmap_bin = resolve_gitmap_bin()
+        .ok_or_else(|| "GitMap CLI is not installed or detected in PATH".to_string())?;
+
+    let mut cmd = Command::new(gitmap_bin);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+
+    cmd.args(["ssh", "fix-auth", target.trim()]);
+    let out = cmd
+        .output()
+        .map_err(|e| format!("Failed to spawn gitmap ssh fix-auth: {}", e))?;
+    let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+
+    if out.status.success() {
+        tracing::info!(
+            target: "ssh_manager",
+            "gitmap ssh fix-auth for {target} succeeded: {stdout}"
+        );
+        Ok(stdout)
+    } else {
+        let msg = if !stderr.is_empty() { stderr } else { stdout };
+        tracing::warn!(
+            target: "ssh_manager",
+            "gitmap ssh fix-auth for {target} returned error: {msg}"
+        );
+        Err(msg)
+    }
+}
+
+/// Execute command on remote host via `gitmap ssh exec <target> "<command>"`
+pub fn exec_via_gitmap_ssh(
+    target: &str,
+    remote_cmd: &str,
+) -> Result<(i32, String, String), String> {
+    let gitmap_bin =
+        resolve_gitmap_bin().ok_or_else(|| "GitMap CLI is not installed".to_string())?;
+
+    let mut cmd = Command::new(gitmap_bin);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+
+    cmd.args(["ssh", "exec", target.trim(), remote_cmd]);
+    let out = cmd
+        .output()
+        .map_err(|e| format!("Failed to spawn gitmap ssh exec: {}", e))?;
+    let code = out
+        .status
+        .code()
+        .unwrap_or(if out.status.success() { 0 } else { 1 });
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+    Ok((code, stdout, stderr))
+}
+
+/// Check node connectivity via `gitmap ssh check <target>`
+pub fn check_node_via_gitmap(target: &str) -> Result<(bool, String), String> {
+    let gitmap_bin =
+        resolve_gitmap_bin().ok_or_else(|| "GitMap CLI is not installed".to_string())?;
+
+    let mut cmd = Command::new(gitmap_bin);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+
+    cmd.args(["ssh", "check", target.trim()]);
+    let out = cmd
+        .output()
+        .map_err(|e| format!("Failed to run gitmap ssh check: {}", e))?;
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let is_online = stdout.contains("ONLINE") || stdout.contains("reachable");
+    Ok((is_online, stdout.trim().to_string()))
 }
 
 /// Suggested CLI command to install GitMap when not detected

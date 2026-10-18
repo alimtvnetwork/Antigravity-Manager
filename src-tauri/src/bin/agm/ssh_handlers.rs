@@ -143,6 +143,13 @@ pub(crate) fn handle_ssh_fix_auth(args: &[String]) {
                 }
             }
             if !any_success && !reports.is_empty() {
+                println!("[*] Native key deployment unverified; attempting GitMap fix-auth delegation...");
+                if let Ok(fix_msg) = ssh_manager::fix_node_auth_via_gitmap(target) {
+                    println!("✓ GitMap fix-auth repair output:\n{}", fix_msg);
+                    any_success = true;
+                }
+            }
+            if !any_success && !reports.is_empty() {
                 std::process::exit(1);
             }
             if any_success {
@@ -157,8 +164,19 @@ pub(crate) fn handle_ssh_fix_auth(args: &[String]) {
             }
         }
         Err(e) => {
-            eprintln!("[ERROR] Deploy public key failed: {}", e);
-            std::process::exit(1);
+            println!(
+                "[*] Native key deployment error: {}; attempting GitMap fix-auth delegation...",
+                e
+            );
+            match ssh_manager::fix_node_auth_via_gitmap(target) {
+                Ok(fix_msg) => {
+                    println!("✓ GitMap fix-auth repair succeeded:\n{}", fix_msg);
+                }
+                Err(err_msg) => {
+                    eprintln!("[ERROR] Deploy public key failed: {}", err_msg);
+                    std::process::exit(1);
+                }
+            }
         }
     }
 }

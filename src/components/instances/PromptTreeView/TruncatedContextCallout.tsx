@@ -37,7 +37,7 @@ export function TruncatedContextCallout({
                         e.stopPropagation();
                         onExpandFull();
                     }}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500 text-white dark:text-slate-900 font-bold hover:bg-amber-600 transition-colors text-[10px] cursor-pointer"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-500 text-white dark:text-slate-900 font-bold hover:bg-amber-600 transition-colors text-[10px] cursor-pointer"
                 >
                     <span>Expand Full</span>
                     <ChevronDown className="w-3 h-3" />

@@ -39,6 +39,7 @@ export interface PromptTreeCoreActions {
         scope: ExportScopeParams;
         format: 'json' | 'sqlite' | 'yaml';
         embed_images: boolean;
+        export_mode?: 'standalone' | 'lean';
     }) => Promise<void>;
 
     isImportModalOpen: boolean;
@@ -779,21 +780,23 @@ export function usePromptTreeCoreActions({
             scope: ExportScopeParams;
             format: 'json' | 'sqlite' | 'yaml';
             embed_images: boolean;
+            export_mode?: 'standalone' | 'lean';
         }) => {
-            const { scope, format, embed_images } = params;
+            const { scope, format, embed_images, export_mode } = params;
             const ext = format === 'sqlite' ? 'db' : format === 'yaml' ? 'yaml' : 'json';
             const targetSlug = scope.project_name || scope.project_id || scope.conversation_id || scope.target_type;
             const fileName = `prompt-tree-${targetSlug}-${Date.now()}.${ext}`;
+            const modeLabel = export_mode === 'lean' || !embed_images ? 'Lean' : 'Standalone';
 
             try {
                 if (!isTauri()) {
-                    setActionMsg(`Exporting section as ${format.toUpperCase()}...`);
+                    setActionMsg(`Exporting ${modeLabel} section as ${format.toUpperCase()}...`);
                     const [dataB64, returnedFileName, stats] = await invoke<[string, string, TreeExportStats]>('export_prompt_tree_section_bytes', {
                         scope,
                         format,
                         options: {
                             format,
-                            embed_images,
+                            embed_images: modeLabel === 'Standalone',
                         },
                     });
                     const binary = atob(dataB64);
@@ -812,7 +815,7 @@ export function usePromptTreeCoreActions({
                     document.body.removeChild(a);
                     URL.revokeObjectURL(url);
 
-                    setActionMsg(`Exported ${stats.prompt_count} prompt(s) (${stats.project_count} projects) as ${format.toUpperCase()}`);
+                    setActionMsg(`Exported ${stats.prompt_count} prompt(s) (${stats.project_count} projects) as ${modeLabel} ${format.toUpperCase()}`);
                     setTimeout(() => setActionMsg(null), 4000);
                     return;
                 }
@@ -822,7 +825,9 @@ export function usePromptTreeCoreActions({
                     ? [{ name: 'SQLite Database', extensions: ['db', 'sqlite'] }]
                     : format === 'yaml'
                     ? [{ name: 'YAML Document', extensions: ['yaml', 'yml'] }]
-                    : [{ name: 'JSON Envelope v2.0', extensions: ['json'] }];
+                    : modeLabel === 'Standalone'
+                    ? [{ name: 'Standalone JSON Envelope v2.0 (Portable)', extensions: ['json'] }]
+                    : [{ name: 'Lean JSON Envelope v2.0 (Linked)', extensions: ['json'] }];
 
                 const selected = await save({
                     defaultPath: fileName,
@@ -832,18 +837,18 @@ export function usePromptTreeCoreActions({
                     return;
                 }
 
-                setActionMsg(`Exporting section to ${selected}...`);
+                setActionMsg(`Exporting ${modeLabel} section to ${selected}...`);
                 const stats = await invoke<TreeExportStats>('export_prompt_tree_section', {
                     scope,
                     format,
                     options: {
                         format,
-                        embed_images,
+                        embed_images: modeLabel === 'Standalone',
                     },
                     destinationPath: selected,
                 });
 
-                setActionMsg(`Exported ${stats.prompt_count} prompt(s) across ${stats.project_count} project(s) to ${stats.path || selected}`);
+                setActionMsg(`Exported ${stats.prompt_count} prompt(s) across ${stats.project_count} project(s) as ${modeLabel} ${format.toUpperCase()} to ${stats.path || selected}`);
                 setTimeout(() => setActionMsg(null), 4000);
             } catch (err: unknown) {
                 useErrorStore.getState().captureError(err, {

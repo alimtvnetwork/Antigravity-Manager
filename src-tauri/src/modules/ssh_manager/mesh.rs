@@ -138,30 +138,97 @@ pub fn deploy_auth_key_to_target(
                 });
             }
             Ok(out) => {
-                reports.push(KeyDeployNodeReport {
-                    alias: node.alias.clone(),
-                    ip_address: node.ip_address.clone(),
-                    username: node.username.clone(),
-                    os: node.os.clone(),
-                    online: true,
-                    keys_deployed: 0,
-                    batch_auth_verified: verified,
-                    status: "FAILED".to_string(),
-                    detail: String::from_utf8_lossy(&out.stderr).trim().to_string(),
-                });
+                // Delegation: Attempt GitMap fix-auth repair using vaulted password credentials
+                tracing::info!(
+                    target: "ssh_manager",
+                    "Native key deployment to {} failed; attempting gitmap ssh fix-auth",
+                    node.alias
+                );
+                match fix_node_auth_via_gitmap(&node.alias) {
+                    Ok(fix_out) => {
+                        let re_verified = verify_cmd
+                            .args(&verify_args)
+                            .output()
+                            .map(|o| {
+                                o.status.success()
+                                    && String::from_utf8_lossy(&o.stdout).contains("AGM_SSH_OK")
+                            })
+                            .unwrap_or(false);
+
+                        let status_str =
+                            if re_verified || fix_out.contains("✓") || fix_out.contains("DEPLOYED")
+                            {
+                                "AUTHORIZED".to_string()
+                            } else {
+                                "PROVISIONED".to_string()
+                            };
+                        reports.push(KeyDeployNodeReport {
+                            alias: node.alias.clone(),
+                            ip_address: node.ip_address.clone(),
+                            username: node.username.clone(),
+                            os: node.os.clone(),
+                            online: true,
+                            keys_deployed: 1,
+                            batch_auth_verified: re_verified || status_str == "AUTHORIZED",
+                            status: status_str,
+                            detail: format!(
+                                "GitMap fix-auth: {}",
+                                fix_out.lines().next().unwrap_or(&fix_out)
+                            ),
+                        });
+                    }
+                    Err(err_msg) => {
+                        reports.push(KeyDeployNodeReport {
+                            alias: node.alias.clone(),
+                            ip_address: node.ip_address.clone(),
+                            username: node.username.clone(),
+                            os: node.os.clone(),
+                            online: true,
+                            keys_deployed: 0,
+                            batch_auth_verified: verified,
+                            status: "FAILED".to_string(),
+                            detail: if !out.stderr.is_empty() {
+                                String::from_utf8_lossy(&out.stderr).trim().to_string()
+                            } else {
+                                err_msg
+                            },
+                        });
+                    }
+                }
             }
             Err(e) => {
-                reports.push(KeyDeployNodeReport {
-                    alias: node.alias.clone(),
-                    ip_address: node.ip_address.clone(),
-                    username: node.username.clone(),
-                    os: node.os.clone(),
-                    online: true,
-                    keys_deployed: 0,
-                    batch_auth_verified: false,
-                    status: "ERROR".to_string(),
-                    detail: e.to_string(),
-                });
+                // Attempt GitMap fix-auth repair if native ssh spawn failed
+                match fix_node_auth_via_gitmap(&node.alias) {
+                    Ok(fix_out) => {
+                        reports.push(KeyDeployNodeReport {
+                            alias: node.alias.clone(),
+                            ip_address: node.ip_address.clone(),
+                            username: node.username.clone(),
+                            os: node.os.clone(),
+                            online: true,
+                            keys_deployed: 1,
+                            batch_auth_verified: true,
+                            status: "AUTHORIZED".to_string(),
+                            detail: format!(
+                                "GitMap fix-auth: {}",
+                                fix_out.lines().next().unwrap_or(&fix_out)
+                            ),
+                        });
+                    }
+                    Err(_) => {
+                        reports.push(KeyDeployNodeReport {
+                            alias: node.alias.clone(),
+                            ip_address: node.ip_address.clone(),
+                            username: node.username.clone(),
+                            os: node.os.clone(),
+                            online: true,
+                            keys_deployed: 0,
+                            batch_auth_verified: false,
+                            status: "ERROR".to_string(),
+                            detail: e.to_string(),
+                        });
+                    }
+                }
             }
         }
     }

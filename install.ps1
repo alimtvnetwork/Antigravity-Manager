@@ -495,6 +495,9 @@ function Sync-InstalledAppsRegistryBranding {
                         $targetName = if ($currentVer) { "Antigravity Manager Tools $currentVer" } else { "Antigravity Manager Tools" }
                         Set-ItemProperty -Path $fullPath -Name "DisplayName" -Value $targetName -Force -ErrorAction SilentlyContinue
                         Set-ItemProperty -Path $fullPath -Name "Publisher" -Value $publisher -Force -ErrorAction SilentlyContinue
+                        if ($currentVer) {
+                            Set-ItemProperty -Path $fullPath -Name "DisplayVersion" -Value $currentVer -Force -ErrorAction SilentlyContinue
+                        }
                     } catch {}
                 }
             }
@@ -925,51 +928,71 @@ if ($Uninstall) {
 }
 
 function Get-InstalledVersion {
-    # 1. Check current configured install directory
+    # Stage 1: Inspect Live Running Process Executables via PE Header
+    try {
+        $runningProcs = Get-Process "agm-alim", "Antigravity Tools", "antigravity-tools", "Antigravity Manager Tools", "agm-ui", "agm" -ErrorAction SilentlyContinue
+        foreach ($p in $runningProcs) {
+            $pPath = $p.Path
+            if ($pPath -and (Test-Path $pPath)) {
+                $fvi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($pPath)
+                $ver = if ($fvi.ProductVersion) { $fvi.ProductVersion } else { $fvi.FileVersion }
+                if ($ver) { return ($ver -replace '^v', '').Trim() }
+            }
+        }
+    } catch {}
+
+    # Stage 2: Inspect Configured Install Directory PE Headers
     $candidateExes = @(
         (Join-Path $InstallDir $BinaryName),
         (Join-Path $InstallDir "agm-alim.exe"),
+        (Join-Path $InstallDir "Antigravity Manager Tools.exe"),
+        (Join-Path $InstallDir "Antigravity Tools.exe"),
         (Join-Path $InstallDir "AGM by Alim.exe"),
         (Join-Path $InstallDir "Anti-Gravity Tools by Alim.exe"),
         (Join-Path $InstallDir "antigravity-tools.exe"),
-        (Join-Path $InstallDir "Antigravity Tools.exe")
+        (Join-Path $InstallDir "agm.exe")
     )
     foreach ($exe in $candidateExes) {
         if (Test-Path $exe) {
             try {
-                $ver = (Get-Item $exe).VersionInfo.ProductVersion
+                $fvi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
+                $ver = if ($fvi.ProductVersion) { $fvi.ProductVersion } else { $fvi.FileVersion }
                 if ($ver) { return ($ver -replace '^v', '').Trim() }
             } catch {}
         }
     }
 
-    # 2. Check previous installation directories
+    # Stage 3: Inspect Expanded Historical Directories (including Antigravity Manager Tools)
     $prevDirs = @(
         (Join-Path $env:LOCALAPPDATA "Programs\agm-alim"),
+        (Join-Path $env:LOCALAPPDATA "Programs\Antigravity Manager Tools"),
         (Join-Path $env:LOCALAPPDATA "Programs\AGM by Alim"),
         (Join-Path $env:LOCALAPPDATA "Programs\Antigravity-Tools"),
         (Join-Path $env:LOCALAPPDATA "Programs\antigravity-tools"),
         (Join-Path $env:LOCALAPPDATA "Programs\Anti-Gravity Tools by Alim"),
         (Join-Path $env:LOCALAPPDATA "Antigravity Tools"),
+        (Join-Path $env:ProgramFiles "Antigravity Manager Tools"),
         (Join-Path $env:ProgramFiles "agm-alim"),
         (Join-Path $env:ProgramFiles "AGM by Alim"),
         (Join-Path $env:ProgramFiles "Antigravity Tools"),
         (Join-Path $env:ProgramFiles "Anti-Gravity Tools by Alim"),
-        (Join-Path ${env:ProgramFiles(x86)} "Antigravity Tools")
+        (Join-Path ${env:ProgramFiles(x86)} "Antigravity Tools"),
+        (Join-Path ${env:ProgramFiles(x86)} "Antigravity Manager Tools")
     )
     foreach ($dir in $prevDirs) {
         if (Test-Path $dir) {
             $foundExe = Get-ChildItem -Path $dir -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*uninstall*" -and $_.Name -notlike "*setup*" } | Select-Object -First 1
             if ($foundExe) {
                 try {
-                    $ver = $foundExe.VersionInfo.ProductVersion
+                    $fvi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($foundExe.FullName)
+                    $ver = if ($fvi.ProductVersion) { $fvi.ProductVersion } else { $fvi.FileVersion }
                     if ($ver) { return ($ver -replace '^v', '').Trim() }
                 } catch {}
             }
         }
     }
 
-    # 3. Check Windows Registry Uninstall entries
+    # Stage 4: Windows Registry Uninstall Fallback
     $regPaths = @(
         "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
         "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
@@ -977,7 +1000,7 @@ function Get-InstalledVersion {
     )
     foreach ($regPath in $regPaths) {
         $entries = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue | Where-Object {
-            $_.DisplayName -match '^(Antigravity Manager Tools(\s+[0-9A-Za-z.-]+)?|Antigravity Manager Tools by MD Alim Ul Karim and sponsored by RISE UP ASIA LLC|Antigravity Manager Tools By Alim|Agm Tool By Alim|AGM by Alim|Anti-Gravity Tools by Alim|Antigravity Tools|agm-alim)$'
+            $_.DisplayName -match '(?i)(Antigravity Manager Tools|agm-alim|AGM by Alim|Antigravity Tools)'
         }
         foreach ($entry in $entries) {
             if ($entry.DisplayVersion) {
@@ -1543,8 +1566,19 @@ if (-not $isPinned) {
 }
 
 # Build multi-version fallback queue
-if ($isPinned -and $cleanPinned) {
+if ($isPinned) {
+    if (-not $cleanPinned) {
+        Write-Err "Pinned release version was not specified. Aborting."
+        $global:LASTEXITCODE = 1
+        exit 1
+    }
     $versionQueue = @($cleanPinned)
+    # Strictly enforce pinned contract: fail fast with clear error if pinned version asset is missing
+    if (-not $manifestAssetUrlMap.ContainsKey($cleanPinned) -and -not $releaseMetadataMap.ContainsKey($cleanPinned)) {
+        Write-Err "Pinned release v$cleanPinned could not be downloaded or verified on GitHub. Downgrade/Update aborted."
+        $global:LASTEXITCODE = 1
+        exit 1
+    }
 } else {
     $sortedCandidates = @($candidateVersions | Sort-Object -Descending -Property { Convert-ToSemVer $_ })
     $versionQueue = @()

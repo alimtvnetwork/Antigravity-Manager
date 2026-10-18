@@ -590,7 +590,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 onClick={() => setIsRerunMenuOpen((prev) => !prev)}
                                 data-ui-name="prompt-rerun-options-btn"
                                 data-ui-id={`prompt-rerun-options-${selectedConversation.conversation_id}`}
-                                className="flex items-center justify-center px-1.5 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                className="flex items-center justify-center px-1.5 py-1 rounded-r-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title="Rerun configuration: count and message"
                             >
                                 <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isRerunMenuOpen && "rotate-180")} />
@@ -1153,6 +1153,14 @@ export function DetailHeader(props: DetailHeaderProps) {
                     {/* END RERUN SECTION (Task-04) */}
                 </div>
             </div>
+
+            {/* FIFO Enqueued Prompts Status Banner */}
+            {enqueuedCount > 0 && (
+                <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs font-medium mt-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>{enqueuedCount} prompt(s) enqueued in FIFO queue for this conversation.</span>
+                </div>
+            )}
 
             {/* Suffix Template Management Modal */}
             <SuffixTemplateModal

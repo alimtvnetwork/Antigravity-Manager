@@ -157,11 +157,11 @@ export function PromptTreeExportModal({
 
     return createPortal(
         <div
-            className="fixed inset-0 z-[10001] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+            className="fixed inset-0 z-[100005] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md overflow-y-auto animate-in fade-in duration-150"
             onClick={onClose}
         >
             <div
-                className="relative w-full max-w-lg rounded-2xl border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#120c1d] shadow-2xl p-5 space-y-4 text-slate-800 dark:text-slate-100 animate-in zoom-in-95 duration-150"
+                className="relative w-full max-w-lg rounded-2xl border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#120c1d] shadow-2xl p-5 space-y-4 text-slate-800 dark:text-slate-100 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
@@ -338,36 +338,47 @@ export function PromptTreeExportModal({
                     </div>
                 </div>
 
-                {/* Base64 Image Embedding Switch */}
-                <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50/70 dark:bg-[#1a1228]/60">
-                    <div className="flex items-start gap-2.5">
-                        <ImageIcon className="w-4 h-4 text-purple-500 mt-0.5 shrink-0" />
-                        <div>
-                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                                Embed Images as Base64 (100% Portable)
+                {/* Export Mode: Standalone vs Lean */}
+                <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        Export Mode
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div
+                            onClick={() => setEmbedImages(true)}
+                            className={cn(
+                                "flex flex-col p-2.5 rounded-xl border cursor-pointer transition-all",
+                                embedImages
+                                    ? "border-purple-500 bg-purple-500/10 text-purple-900 dark:text-purple-200 ring-2 ring-purple-500/30"
+                                    : "border-slate-200 dark:border-[#382352] hover:bg-slate-50 dark:hover:bg-[#1a1228]"
+                            )}
+                        >
+                            <div className="flex items-center gap-1.5 font-bold text-xs">
+                                <ImageIcon className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                                <span>Standalone Mode</span>
+                            </div>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-tight">
+                                Embeds Base64 images & portable {'${workDir}'} paths (100% portable across machines).
                             </span>
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                                Reads local screenshot & diagram files from disk and embeds them inline as Base64 data URIs so the export renders seamlessly on any computer without broken links.
-                            </p>
+                        </div>
+                        <div
+                            onClick={() => setEmbedImages(false)}
+                            className={cn(
+                                "flex flex-col p-2.5 rounded-xl border cursor-pointer transition-all",
+                                !embedImages
+                                    ? "border-blue-500 bg-blue-500/10 text-blue-900 dark:text-blue-200 ring-2 ring-blue-500/30"
+                                    : "border-slate-200 dark:border-[#382352] hover:bg-slate-50 dark:hover:bg-[#1a1228]"
+                            )}
+                        >
+                            <div className="flex items-center gap-1.5 font-bold text-xs">
+                                <FileJson className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                <span>Lean Mode</span>
+                            </div>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-tight">
+                                Metadata and relative file paths only. Lightweight with zero payload bloat.
+                            </span>
                         </div>
                     </div>
-                    <button
-                        type="button"
-                        role="switch"
-                        aria-checked={embedImages}
-                        onClick={() => setEmbedImages(!embedImages)}
-                        className={cn(
-                            "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
-                            embedImages ? "bg-purple-600" : "bg-slate-300 dark:bg-slate-700"
-                        )}
-                    >
-                        <span
-                            className={cn(
-                                "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out",
-                                embedImages ? "translate-x-4" : "translate-x-0"
-                            )}
-                        />
-                    </button>
                 </div>
 
                 {/* Live Stats Preview */}
@@ -375,7 +386,7 @@ export function PromptTreeExportModal({
                     <span>Projects: <strong className="text-slate-800 dark:text-slate-200">{liveStats.projectCount}</strong></span>
                     <span>Convs: <strong className="text-slate-800 dark:text-slate-200">{liveStats.conversationCount}</strong></span>
                     <span>Prompts: <strong className="text-slate-800 dark:text-slate-200">{liveStats.promptCount}</strong></span>
-                    <span>Images: <strong className={embedImages ? "text-purple-600 dark:text-purple-400" : "text-slate-400"}>{embedImages ? 'Embedded' : 'Omitted'}</strong></span>
+                    <span>Mode: <strong className={embedImages ? "text-purple-600 dark:text-purple-400" : "text-blue-600 dark:text-blue-400"}>{embedImages ? 'Standalone' : 'Lean'}</strong></span>
                 </div>
 
                 {/* Footer Buttons */}

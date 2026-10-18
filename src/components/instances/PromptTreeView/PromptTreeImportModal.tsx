@@ -211,11 +211,11 @@ export function PromptTreeImportModal({
 
     return createPortal(
         <div
-            className="fixed inset-0 z-[10001] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+            className="fixed inset-0 z-[100005] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md overflow-y-auto animate-in fade-in duration-150"
             onClick={onClose}
         >
             <div
-                className="relative w-full max-w-lg rounded-2xl border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#120c1d] shadow-2xl p-5 space-y-4 text-slate-800 dark:text-slate-100 animate-in zoom-in-95 duration-150"
+                className="relative w-full max-w-lg rounded-2xl border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#120c1d] shadow-2xl p-5 space-y-4 text-slate-800 dark:text-slate-100 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Hidden Web File Input */}

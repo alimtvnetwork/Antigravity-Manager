@@ -56,6 +56,11 @@ export interface TreePanelProps {
     // Re-send queued prompts (Task-03): shown next to the Queued filter.
     onResendQueued?: () => void;
     isResendingQueued?: boolean;
+    // Context menu handlers forwarded to ConversationNode
+    onRenameConversation?: (conversationId: string, newTitle: string) => Promise<void> | void;
+    onResendPrompts?: (count: number | 'all') => void;
+    onEnqueue?: () => void;
+    onRerunConversation?: (convoId: string, nudgeType: string) => void;
 }
 
 export function TreePanel(props: TreePanelProps) {
@@ -94,6 +99,10 @@ export function TreePanel(props: TreePanelProps) {
         onToggleArchive,
         onResendQueued,
         isResendingQueued,
+        onRenameConversation,
+        onResendPrompts,
+        onEnqueue,
+        onRerunConversation,
     } = props;
 
     const [subLoading, setSubLoading] = useState(promptTreeLoadingEmitter.isLoading);
@@ -141,6 +150,10 @@ export function TreePanel(props: TreePanelProps) {
             onRefresh={onRefreshProject}
             onTogglePin={onTogglePin}
             onToggleArchive={onToggleArchive}
+            onRenameConversation={onRenameConversation}
+            onResendPrompts={onResendPrompts}
+            onEnqueue={onEnqueue}
+            onRerunConversation={onRerunConversation}
         />
     );
 
