@@ -42,6 +42,10 @@ export interface ProjectNodeProps {
     onToggleArchive: (projectId: string, e: React.MouseEvent) => void;
     onProjectContextMenu?: (e: React.MouseEvent, repoName: string, project?: AgmProjectTreeNode) => void;
     isScopedSingleProject?: boolean;
+    onRenameConversation?: (conversationId: string, newTitle: string) => Promise<void> | void;
+    onResendPrompts?: (count: number | 'all') => void;
+    onEnqueue?: () => void;
+    onRerunConversation?: (convoId: string, nudgeType: string) => void;
 }
 
 export function sortConversations(
@@ -71,6 +75,10 @@ interface ConversationListProps {
     selectedConversationId: string | undefined;
     onSelectConversation: (conv: AgmConversationNode, project: AgmProjectTreeNode) => void;
     onOpenInspector: (conv: AgmConversationNode, repoPath: string) => void;
+    onRenameConversation?: (conversationId: string, newTitle: string) => Promise<void> | void;
+    onResendPrompts?: (count: number | 'all') => void;
+    onEnqueue?: () => void;
+    onRerunConversation?: (convoId: string, nudgeType: string) => void;
 }
 
 function ConversationListWithGrouping({
@@ -80,6 +88,10 @@ function ConversationListWithGrouping({
     selectedConversationId,
     onSelectConversation,
     onOpenInspector,
+    onRenameConversation,
+    onResendPrompts,
+    onEnqueue,
+    onRerunConversation,
 }: ConversationListProps) {
     if (categoryFilter === 'subagent') {
         return (
@@ -92,6 +104,10 @@ function ConversationListWithGrouping({
                         isSelected={selectedConversationId === conv.conversation_id}
                         onSelect={onSelectConversation}
                         onOpenInspector={onOpenInspector}
+                        onRenameConversation={onRenameConversation}
+                        onResendPrompts={onResendPrompts}
+                        onEnqueue={onEnqueue}
+                        onRerunConversation={onRerunConversation}
                     />
                 ))}
             </>
@@ -115,6 +131,10 @@ function ConversationListWithGrouping({
                         isSelected={selectedConversationId === root.primaryNode.conversation_id}
                         onSelect={onSelectConversation}
                         onOpenInspector={onOpenInspector}
+                        onRenameConversation={onRenameConversation}
+                        onResendPrompts={onResendPrompts}
+                        onEnqueue={onEnqueue}
+                        onRerunConversation={onRerunConversation}
                     />
 
                     {/* Rendering Child Sub-Points (Indented with Branch Glyphs) */}
@@ -146,7 +166,7 @@ function ConversationListWithGrouping({
                                             });
                                         }}
                                         className={cn(
-                                            "relative flex items-center justify-between rounded-[5px] px-2 py-1 text-xs cursor-pointer transition-colors group outline-none focus-visible:ring-1 focus-visible:ring-purple-400",
+                                            "relative flex items-center justify-between rounded-md px-2 py-1 text-xs cursor-pointer transition-colors group outline-none focus-visible:ring-1 focus-visible:ring-purple-400",
                                             isSubSelected
                                                 ? "bg-purple-600 text-white font-medium shadow-2xs"
                                                 : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#171025]"
@@ -165,7 +185,7 @@ function ConversationListWithGrouping({
                                             </span>
                                             <span
                                                 className={cn(
-                                                    'text-[9px] font-mono px-1 py-0.2 rounded-[3px] shrink-0 font-medium whitespace-nowrap',
+                                                    'text-[9px] font-mono px-1 py-0.2 rounded-xs shrink-0 font-medium whitespace-nowrap',
                                                     isSubSelected
                                                         ? 'bg-purple-700 text-white'
                                                         : 'bg-slate-200/90 dark:bg-[#40285e] text-slate-600 dark:text-cyan-300'
@@ -181,7 +201,7 @@ function ConversationListWithGrouping({
                                         <div className="flex items-center gap-1.5 shrink-0">
                                             {isSubRunning && (
                                                 <span className={cn(
-                                                    "flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[8.5px] font-bold font-mono border animate-pulse",
+                                                    "flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[8.5px] font-bold font-mono border animate-pulse",
                                                     isSubSelected
                                                         ? "bg-emerald-400 text-emerald-950 border-emerald-300"
                                                         : "bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border-emerald-500/40"
@@ -216,6 +236,9 @@ function ConversationListWithGrouping({
                         setSubagentMenuPos(null);
                         onOpenInspector(subagentMenuPos.conv, project.repo_path);
                     }}
+                    onResendPrompts={onResendPrompts}
+                    onEnqueue={onEnqueue}
+                    onRerunConversation={onRerunConversation}
                 />
             )}
         </>
@@ -306,6 +329,10 @@ export function ProjectNode(props: ProjectNodeProps) {
         onToggleArchive,
         onProjectContextMenu,
         isScopedSingleProject = false,
+        onRenameConversation,
+        onResendPrompts,
+        onEnqueue,
+        onRerunConversation,
     } = props;
 
     const filteredConvs = project.conversations.filter((c) => {
@@ -364,6 +391,10 @@ export function ProjectNode(props: ProjectNodeProps) {
         selectedConversationId,
         onSelectConversation,
         onOpenInspector,
+        onRenameConversation,
+        onResendPrompts,
+        onEnqueue,
+        onRerunConversation,
     };
 
     return (
@@ -385,7 +416,7 @@ export function ProjectNode(props: ProjectNodeProps) {
                         }
                     }}
                     className={cn(
-                        'group flex items-center justify-between rounded-[5px] px-2.5 py-1.5 text-xs font-semibold cursor-pointer transition-colors',
+                        'group flex items-center justify-between rounded-md px-2.5 py-1.5 text-xs font-semibold cursor-pointer transition-colors',
                         isSelected
                             ? 'bg-blue-100/70 text-blue-900 dark:bg-blue-950/60 dark:text-cyan-300'
                             : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#171025]'
@@ -401,7 +432,7 @@ export function ProjectNode(props: ProjectNodeProps) {
                         <Folder className="h-4 w-4 text-amber-500 shrink-0" />
                         <span
                             className={cn(
-                                'text-[9px] font-mono px-1 py-0.2 rounded-[3px] shrink-0 font-medium whitespace-nowrap',
+                                'text-[9px] font-mono px-1 py-0.2 rounded-xs shrink-0 font-medium whitespace-nowrap',
                                 isSelected
                                     ? 'bg-blue-600/20 text-blue-700 dark:text-cyan-300 border border-blue-500/30'
                                     : 'bg-slate-200 dark:bg-[#40285e] text-slate-600 dark:text-cyan-400'
@@ -414,7 +445,7 @@ export function ProjectNode(props: ProjectNodeProps) {
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                         {runningCount > 0 && (
-                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30">
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30">
                                 <span className="relative flex h-2 w-2">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                     <span className="relative inline-flex rounded-full h-2 w-2 bg-[#1af18d] shadow-[0_0_6px_rgba(26,241,141,0.9)] animate-pulse"></span>
@@ -425,7 +456,7 @@ export function ProjectNode(props: ProjectNodeProps) {
                             </div>
                         )}
                         {queuedCount > 0 && (
-                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30">
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/30">
                                 <Clock className="w-2.5 h-2.5 text-amber-500 shrink-0" />
                                 <span className="text-[9px] font-bold font-mono text-amber-700 dark:text-amber-300">
                                     {queuedCount} QUEUED
@@ -443,7 +474,7 @@ export function ProjectNode(props: ProjectNodeProps) {
                                 type="button"
                                 onClick={(e) => onRefresh(project.project_id, e)}
                                 disabled={isRefreshing}
-                                className="p-1 rounded-[5px] text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
+                                className="p-1 rounded-md text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
                                 title="Refresh this project"
                             >
                                 <RotateCw className={cn("w-3 h-3", isRefreshing && "animate-spin text-blue-500")} />
@@ -452,7 +483,7 @@ export function ProjectNode(props: ProjectNodeProps) {
                                 type="button"
                                 onClick={(e) => onTogglePin(project.project_id, e)}
                                 className={cn(
-                                    "p-1 rounded-[5px] transition-colors cursor-pointer",
+                                    "p-1 rounded-md transition-colors cursor-pointer",
                                     isPinned
                                         ? "text-amber-500 bg-amber-50 dark:bg-amber-950/40"
                                         : "text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#40285e]"
@@ -465,7 +496,7 @@ export function ProjectNode(props: ProjectNodeProps) {
                                 type="button"
                                 onClick={(e) => onToggleArchive(project.project_id, e)}
                                 className={cn(
-                                    "p-1 rounded-[5px] transition-colors cursor-pointer",
+                                    "p-1 rounded-md transition-colors cursor-pointer",
                                     isArchived
                                         ? "text-rose-500 bg-rose-50 dark:bg-rose-950/40"
                                         : "text-slate-400 hover:text-rose-500 hover:bg-slate-200 dark:hover:bg-[#40285e]"
@@ -503,7 +534,7 @@ export function ProjectNode(props: ProjectNodeProps) {
                         <div className="space-y-0.5 mt-1 pt-1 border-t border-slate-200/50 dark:border-[#40285e]/40">
                             <div
                                 onClick={() => onToggleStaleGroup(project.project_id)}
-                                className="group flex items-center justify-between rounded-[5px] px-2 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#171025] cursor-pointer transition-colors"
+                                className="group flex items-center justify-between rounded-md px-2 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#171025] cursor-pointer transition-colors"
                                 title="Toggle Archived / Stale Prompts"
                             >
                                 <div className="flex items-center gap-1.5 min-w-0">

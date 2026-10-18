@@ -240,7 +240,7 @@ pub fn exec_ssh_command(
 
                     let mut ssh_args =
                         build_ssh_args_for_node(node, port_override, id_opt.as_deref(), true);
-                    ssh_args.push(cmd_str);
+                    ssh_args.push(cmd_str.clone());
 
                     let mut cmd = Command::new("ssh");
                     #[cfg(target_os = "windows")]

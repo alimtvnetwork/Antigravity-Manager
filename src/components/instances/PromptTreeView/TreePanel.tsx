@@ -162,7 +162,7 @@ export function TreePanel(props: TreePanelProps) {
             {/* Search Input & Filter Controls */}
             <div className="p-3 border-b border-slate-200 dark:border-[#40285e] shrink-0 space-y-2">
                 {/* Project Scope Dropdown & Quick Pin Header */}
-                <div className="flex items-center justify-between gap-1.5 bg-white dark:bg-[#171025] px-2 py-1 rounded-[5px] border border-slate-200 dark:border-[#40285e]">
+                <div className="flex items-center justify-between gap-1.5 bg-white dark:bg-[#171025] px-2 py-1 rounded-lg border border-slate-200 dark:border-[#40285e]">
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
                         <Folder className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                         <select
@@ -184,7 +184,7 @@ export function TreePanel(props: TreePanelProps) {
                             type="button"
                             onClick={(e) => onTogglePin(selectedProjectScope, e)}
                             className={cn(
-                                "p-1 rounded-[4px] transition-colors cursor-pointer shrink-0",
+                                "p-1 rounded-md transition-colors cursor-pointer shrink-0",
                                 pinnedProjectIds.includes(selectedProjectScope)
                                     ? "text-amber-500 bg-amber-50 dark:bg-amber-950/40"
                                     : "text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#40285e]"
@@ -204,18 +204,18 @@ export function TreePanel(props: TreePanelProps) {
                         placeholder="Search projects, convos, or prompts..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full rounded-[5px] bg-white dark:bg-[#171025] pl-9 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#40285e] focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                        className="w-full rounded-lg bg-white dark:bg-[#171025] pl-9 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#40285e] focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                     />
                 </div>
 
                 {/* Row 1: 4-Tier Category Filter Segmented Capsule */}
                 <div className="flex items-center justify-between gap-1">
-                    <div className="w-full inline-flex items-center rounded-full border border-slate-200 dark:border-[#40285e] bg-white/80 dark:bg-[#171025]/80 backdrop-blur-xs p-0.5 shadow-2xs divide-x divide-slate-200 dark:divide-[#40285e]">
+                    <div className="w-full inline-flex items-center rounded-lg border border-slate-200 dark:border-[#40285e] bg-white/80 dark:bg-[#171025]/80 backdrop-blur-xs p-0.5 shadow-2xs divide-x divide-slate-200 dark:divide-[#40285e]">
                         <button
                             type="button"
                             onClick={() => setCategoryFilter('all')}
                             className={cn(
-                                "flex-1 py-1 text-[10px] font-medium rounded-l-full transition-colors text-center cursor-pointer",
+                                "flex-1 py-1 text-[10px] font-medium rounded-l-md transition-colors text-center cursor-pointer",
                                 categoryFilter === 'all'
                                     ? "bg-blue-600 text-white shadow-2xs font-semibold"
                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -256,7 +256,7 @@ export function TreePanel(props: TreePanelProps) {
                             type="button"
                             onClick={() => setCategoryFilter('system')}
                             className={cn(
-                                "flex-1 py-1 text-[10px] font-medium rounded-r-full transition-colors flex items-center justify-center gap-1 cursor-pointer",
+                                "flex-1 py-1 text-[10px] font-medium rounded-r-md transition-colors flex items-center justify-center gap-1 cursor-pointer",
                                 categoryFilter === 'system'
                                     ? "bg-slate-700 dark:bg-slate-600 text-white shadow-2xs font-semibold"
                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -271,12 +271,12 @@ export function TreePanel(props: TreePanelProps) {
 
                 {/* Row 2: Status Filter Segmented Capsule & Archive Scope */}
                 <div className="flex items-center justify-between gap-1 pt-0.5">
-                    <div className="inline-flex items-center rounded-full border border-slate-200 dark:border-[#40285e] bg-white/80 dark:bg-[#171025]/80 backdrop-blur-xs p-0.5 shadow-2xs">
+                    <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-[#40285e] bg-white/80 dark:bg-[#171025]/80 backdrop-blur-xs p-0.5 shadow-2xs gap-0.5">
                         <button
                             type="button"
                             onClick={() => setActiveFilter(activeFilter === 'running' ? 'all' : 'running')}
                             className={cn(
-                                "px-2 py-0.5 text-[10px] font-medium rounded-full transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1",
+                                "px-2 py-0.5 text-[10px] font-medium rounded-md transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1",
                                 activeFilter === 'running'
                                     ? "bg-emerald-600 text-white shadow-2xs font-semibold"
                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -290,7 +290,7 @@ export function TreePanel(props: TreePanelProps) {
                             type="button"
                             onClick={() => setActiveFilter(activeFilter === 'queued' ? 'all' : 'queued')}
                             className={cn(
-                                "px-2 py-0.5 text-[10px] font-medium rounded-full transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1",
+                                "px-2 py-0.5 text-[10px] font-medium rounded-md transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1",
                                 activeFilter === 'queued'
                                     ? "bg-amber-600 text-white shadow-2xs font-semibold"
                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -304,7 +304,7 @@ export function TreePanel(props: TreePanelProps) {
                             type="button"
                             onClick={() => setActiveFilter(activeFilter === 'pinned' ? 'all' : 'pinned')}
                             className={cn(
-                                "px-2 py-0.5 text-[10px] font-medium rounded-full transition-colors whitespace-nowrap cursor-pointer flex items-center gap-0.5",
+                                "px-2 py-0.5 text-[10px] font-medium rounded-md transition-colors whitespace-nowrap cursor-pointer flex items-center gap-0.5",
                                 activeFilter === 'pinned'
                                     ? "bg-blue-600 text-white shadow-2xs font-semibold"
                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -323,7 +323,7 @@ export function TreePanel(props: TreePanelProps) {
                             if (val === 'archived') setActiveFilter('archived');
                             else setActiveFilter('all');
                         }}
-                        className="text-[10px] font-medium bg-transparent border-0 focus:ring-0 focus:outline-none text-slate-700 dark:text-slate-300 rounded-full px-2 py-0.5 cursor-pointer"
+                        className="text-[10px] font-medium bg-transparent border-0 focus:ring-0 focus:outline-none text-slate-700 dark:text-slate-300 rounded-md px-2 py-0.5 cursor-pointer"
                     >
                         <option value="all" className="dark:bg-[#171025]">All ({treeData.length})</option>
                         <option value="archived" className="dark:bg-[#171025]">Archived ({archivedCount})</option>
@@ -337,7 +337,7 @@ export function TreePanel(props: TreePanelProps) {
                             <button
                                 type="button"
                                 onClick={handleResetFilters}
-                                className="flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50/80 dark:bg-blue-950/40 hover:bg-blue-100/80 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800/60 rounded-full transition-all cursor-pointer shadow-2xs"
+                                className="flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50/80 dark:bg-blue-950/40 hover:bg-blue-100/80 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800/60 rounded-md transition-all cursor-pointer shadow-2xs"
                                 title="Reset all search and tree filters back to default"
                             >
                                 <RotateCcw className="w-2.5 h-2.5 shrink-0" />
@@ -351,7 +351,7 @@ export function TreePanel(props: TreePanelProps) {
                                 onClick={onResendQueued}
                                 disabled={isResendingQueued}
                                 className={cn(
-                                    "flex items-center gap-1.5 px-3 py-1 text-[10px] font-semibold rounded-full transition-colors cursor-pointer",
+                                    "flex items-center gap-1.5 px-3 py-1 text-[10px] font-semibold rounded-md transition-colors cursor-pointer",
                                     "bg-amber-600/10 text-amber-700 dark:text-amber-300 border border-amber-500/40",
                                     "hover:bg-amber-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
                                 )}
@@ -431,7 +431,7 @@ export function TreePanel(props: TreePanelProps) {
                                     <div className="space-y-0.5 mt-2 pt-2 border-t border-slate-200 dark:border-[#40285e]">
                                         <div
                                             onClick={() => setIsArchivedProjectsExpanded(!isArchivedProjectsExpanded)}
-                                            className="group flex items-center justify-between rounded-[5px] px-2.5 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#171025] cursor-pointer transition-colors"
+                                            className="group flex items-center justify-between rounded-md px-2.5 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#171025] cursor-pointer transition-colors"
                                             title="Toggle Archived Projects"
                                         >
                                             <div className="flex items-center gap-1.5 min-w-0">

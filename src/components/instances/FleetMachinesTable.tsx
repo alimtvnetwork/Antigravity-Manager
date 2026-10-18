@@ -24,7 +24,7 @@ export function FleetMachinesTable() {
         toggleRowMask,
     } = useFleetMachines();
 
-    if (!isLoading && !isSyncEnabled) {
+    if (!isLoading && !isSyncEnabled && machines.length === 0) {
         return <FleetDisabledState />;
     }
 
@@ -52,9 +52,16 @@ export function FleetMachinesTable() {
                             <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
                                 {machines.length}
                             </span>
+                            {!isSyncEnabled && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                    Local Mesh
+                                </span>
+                            )}
                         </div>
                         <p className="text-[11px] text-slate-400">
-                            Real-time multi-machine cluster state synced via Supabase
+                            {isSyncEnabled
+                                ? 'Real-time multi-machine cluster state synced via Supabase & SSH Mesh'
+                                : 'Registered SSH Fleet Nodes (Local Mesh Mode)'}
                         </p>
                     </div>
                 </div>

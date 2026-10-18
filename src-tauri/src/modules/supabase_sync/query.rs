@@ -6,6 +6,93 @@ use std::collections::{HashMap, HashSet};
 
 use super::*;
 
+/// Helper to construct a FleetMachineInfo from a registered SshConnectionRecord
+pub(crate) fn build_ssh_mesh_machine_info(
+    conn: &crate::modules::ssh_manager::SshConnectionRecord,
+    now: i64,
+) -> FleetMachineInfo {
+    let port = if conn.port == 0 { 22 } else { conn.port };
+    let is_online = crate::modules::ssh_manager::check_tcp_liveness(&conn.ip_address, port, 1500);
+    let status = if is_online {
+        "online".to_string()
+    } else {
+        "offline".to_string()
+    };
+    let resolved_user =
+        crate::modules::ssh_manager::resolve_username_placeholders(&conn.username, &conn.os);
+    let bound_email = format!("{}@{}", resolved_user, conn.alias);
+
+    FleetMachineInfo {
+        node_id: format!("ssh_{}", conn.alias),
+        node_alias: conn.alias.clone(),
+        alias: conn.alias.clone(),
+        os_info: if conn.os.trim().is_empty() {
+            None
+        } else {
+            Some(conn.os.clone())
+        },
+        ip_address: conn.ip_address.clone(),
+        is_online,
+        last_heartbeat_timestamp: if is_online { now } else { 0 },
+        last_heartbeat_at: if is_online { now } else { 0 },
+        uptime_seconds: 0,
+        status,
+        is_local: false,
+        source: "ssh-mesh".to_string(),
+        in_flight_prompts_count: 0,
+        total_running_prompts: 0,
+        total_instances: 1,
+        active_instances: vec![FleetInstanceSummary {
+            profile_id: format!("{}:default", conn.alias),
+            profile_name: format!("{}:default", conn.alias),
+            is_running: is_online,
+            bound_account_id: None,
+            bound_account_email: Some(bound_email.clone()),
+        }],
+        instances: Vec::new(),
+        bound_emails: vec![bound_email.clone()],
+        active_accounts: vec![bound_email],
+        leases: Vec::new(),
+    }
+}
+
+/// Build local machine info plus all registered SSH fleet nodes
+pub fn build_local_and_ssh_fleet() -> Vec<FleetMachineInfo> {
+    let mut machines = build_local_fallback_machine();
+    let local_ip = machines
+        .first()
+        .map(|m| m.ip_address.clone())
+        .unwrap_or_default();
+    let local_alias = machines
+        .first()
+        .map(|m| m.alias.clone())
+        .unwrap_or_default();
+    let now = Utc::now().timestamp();
+
+    if let Ok(ssh_conns) = crate::modules::ssh_manager::load_ssh_connections() {
+        for conn in ssh_conns {
+            if conn.ip_address == local_ip || conn.alias.eq_ignore_ascii_case(&local_alias) {
+                continue;
+            }
+            machines.push(build_ssh_mesh_machine_info(&conn, now));
+        }
+    }
+
+    machines.sort_by(|a, b| {
+        if a.is_local != b.is_local {
+            return b.is_local.cmp(&a.is_local);
+        }
+        if a.is_online != b.is_online {
+            return b.is_online.cmp(&a.is_online);
+        }
+        a.node_alias
+            .to_lowercase()
+            .cmp(&b.node_alias.to_lowercase())
+    });
+
+    machines
+}
+
 /// Query fleet machines aggregating nodes, instance profiles, and workspace leases across the cluster
 pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
     let config = match load_config() {
@@ -15,11 +102,11 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
                 target: "supabase_sync",
                 "Failed to load config for query_fleet_machines: {e}"
             );
-            return Ok(build_local_fallback_machine());
+            return Ok(build_local_and_ssh_fleet());
         }
     };
     if !config.is_sync_enabled {
-        return Ok(build_local_fallback_machine());
+        return Ok(build_local_and_ssh_fleet());
     }
 
     let root_ep = match config
@@ -28,7 +115,7 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
         .find(|ep| ep.is_enabled && ep.role == "root")
     {
         Some(ep) => ep.clone(),
-        None => return Ok(build_local_fallback_machine()),
+        None => return Ok(build_local_and_ssh_fleet()),
     };
 
     let client = match SupabaseClient::new(&root_ep) {
@@ -38,7 +125,7 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
                 "[Fleet] Failed to create Supabase client for fleet query: {}",
                 e
             );
-            return Ok(build_local_fallback_machine());
+            return Ok(build_local_and_ssh_fleet());
         }
     };
 
@@ -49,18 +136,18 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
         Ok(val) => val,
         Err(e) => {
             tracing::warn!("[Fleet] Failed to query nodes from Supabase: {}", e);
-            return Ok(build_local_fallback_machine());
+            return Ok(build_local_and_ssh_fleet());
         }
     };
 
     if let Some(msg) = postgrest_error_message(&nodes_val) {
         tracing::warn!("[Fleet] PostgREST error querying nodes: {}", msg);
-        return Ok(build_local_fallback_machine());
+        return Ok(build_local_and_ssh_fleet());
     }
 
     let nodes_array = match nodes_val.as_array() {
         Some(arr) => arr.clone(),
-        None => return Ok(build_local_fallback_machine()),
+        None => return Ok(build_local_and_ssh_fleet()),
     };
 
     let profiles_val = match client.select("instance_profiles", "select=*").await {
@@ -351,6 +438,21 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
         let fallback = build_local_fallback_machine();
         if let Some(local_machine) = fallback.into_iter().next() {
             machines.push(local_machine);
+        }
+    }
+
+    // Merge registered SSH mesh nodes that are not present in Supabase
+    let now = Utc::now().timestamp();
+    if let Ok(ssh_conns) = crate::modules::ssh_manager::load_ssh_connections() {
+        for conn in ssh_conns {
+            let is_dup = machines.iter().any(|m| {
+                m.ip_address == conn.ip_address
+                    || m.node_alias.eq_ignore_ascii_case(&conn.alias)
+                    || m.alias.eq_ignore_ascii_case(&conn.alias)
+            });
+            if !is_dup {
+                machines.push(build_ssh_mesh_machine_info(&conn, now));
+            }
         }
     }
 

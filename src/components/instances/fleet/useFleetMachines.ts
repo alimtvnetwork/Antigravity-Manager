@@ -63,11 +63,6 @@ export function useFleetMachines(): FleetMachinesState {
                 const syncActive = Boolean(config?.is_sync_enabled);
                 setIsSyncEnabled(syncActive);
 
-                if (!syncActive) {
-                    setMachines([]);
-                    return;
-                }
-
                 let effectiveLocalId = localNodeId;
                 if (!effectiveLocalId) {
                     const localInfo = await supabaseService.getLocalNodeInfo().catch(() => null);
@@ -116,12 +111,10 @@ export function useFleetMachines(): FleetMachinesState {
                     if (isMounted) setLocalNodeId(localId);
                 }
 
-                if (syncActive) {
-                    const data = await fetchFleetMachinesApi();
-                    if (isMounted) {
-                        const filtered = data.filter((m) => m.node_id !== localId);
-                        setMachines(filtered);
-                    }
+                const data = await fetchFleetMachinesApi();
+                if (isMounted) {
+                    const filtered = data.filter((m) => m.node_id !== localId);
+                    setMachines(filtered);
                 }
             } catch (err) {
                 // Tracked in the error module; loading spinner cleared, empty state shown.
@@ -144,8 +137,6 @@ export function useFleetMachines(): FleetMachinesState {
 
     // Polling interval
     useEffect(() => {
-        if (!isSyncEnabled) return;
-
         const timer = setInterval(() => {
             setCountdown((prev) => {
                 if (prev <= 1) {
@@ -157,7 +148,7 @@ export function useFleetMachines(): FleetMachinesState {
         }, 1000);
 
         return () => clearInterval(timer);
-    }, [isSyncEnabled, fetchMachines]);
+    }, [fetchMachines]);
 
     const handleManualRefresh = () => {
         setCountdown(POLL_INTERVAL_SECONDS);
