@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.228.1] - 2026-10-18
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
 ## [v4.228.0] - 2026-10-18
 
 ### Fixed
@@ -653,7 +660,6 @@
     *   **v4.228.0 (2026-10-18)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.227.0 (2026-10-18)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
