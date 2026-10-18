@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.231.1] - 2026-10-18
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
 ## [v4.231.0] - 2026-10-18
 
 ### Added
@@ -708,17 +715,13 @@
         -   **[Instance Management & UI/UX Synchronization] PID Inline List View Layout, Deterministic Process Termination Ladder, Account Switch Pre-Switch Eviction, Royal Violet Switch Account Modal & Sharded Audit Trail Visibility (Thanks to @aukgit)**:
             -   **Description**: Confirmed numeric status `1632` represents native OS Process ID (`PID`); merged separate `Status & PID` and `IDE EXE & DATA` table columns into a unified `Status, Process & Environment` cell in `src/components/instances/InstanceTable.tsx` and `src/components/instances/table/InstanceRowCells.tsx` with inline monospace PID badge, shortened executable tail, and shortened data directory tail separated by `·` with segmented copy action capsule; established 5-stage deterministic process termination ladder (`taskkill /F /T`, Win32 `TerminateProcess`, PowerShell `Stop-Process`, 200ms kernel settle delay, Chromium lockfile eviction) in `src-tauri/src/modules/instance/close.rs` and `create.rs`; enforced pre-switch PID eviction and 200ms settle delay in `switch.rs` and `credentials.rs` to eliminate Electron write-back race conditions; redesigned `SwitchAccountDialog.tsx` to 100% Royal Violet design tokens (`var(--ui-surface-1)`, `var(--ui-border-subtle)`, `var(--ui-interactive)`, `var(--ui-success)`) with segmented quota pill capsule; resolved empty audit trail in `switch_history.rs` and `InstanceAuditTrailModal.tsx` by expanding default instance aliases, guaranteeing response fields, and adding smart auto-tab fallback to operations; hardened caller IDE detection (`detect_caller_instance_id` walking 24 parent process generations) with exit code 2 immunity guard; and verified 100% green via `scripts/test-instance-lifecycle-e2e.ps1`.
 
-
-
     *   **v4.230.0 (2026-10-18)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
 
-
     *   **v4.229.0 (2026-10-18)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.228.0 (2026-10-18)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
