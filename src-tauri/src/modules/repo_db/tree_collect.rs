@@ -164,21 +164,19 @@ pub(crate) fn collect_tree_conversation_items(
             let conv_ts = parse_flexible_timestamp(&last_time_str);
             let is_recent = conv_ts > 0 && (now - conv_ts <= 600);
 
-            let is_zero_idle = not_fully_idle == 0;
             let has_terminal_status = status.contains("COMPLETED")
                 || status.contains("FAILED")
                 || status.contains("CANCELLED");
             let has_idle_status = status.contains("IDLE") || has_terminal_status;
-            let is_explicit_idle = is_zero_idle && has_idle_status;
+            let is_explicit_idle = has_idle_status;
 
             let inspection = inspect_conversation_transcript(base, &cid);
 
-            let is_conv_running = if is_owning_inst_alive && not_fully_idle > 0 && is_recent {
-                // Invariant: Process is alive and SQLite reports active tasks: 100% RUNNING.
-                // Static transcript heuristics MUST NOT override live runtime state!
-                true
-            } else if is_explicit_idle {
+            let is_conv_running = if is_explicit_idle {
+                // Explicit Idle Supremacy: unreset not_fully_idle artifacts must not override terminal status
                 false
+            } else if is_owning_inst_alive && not_fully_idle > 0 && is_recent {
+                true
             } else if is_owning_inst_alive
                 && inspection.is_recent_active
                 && !has_idle_status

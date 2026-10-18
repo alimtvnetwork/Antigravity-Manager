@@ -28,6 +28,7 @@ export interface AgmConversationNode {
     execution_results?: string;
     tool_calls_summary?: string;
     prompts?: AgmPromptTurnNode[];
+    selected_turn_number?: number | null;
 }
 
 export interface AgmPromptTurnNode {
@@ -79,6 +80,10 @@ export interface PromptTreeViewModalProps {
 
 export interface TreePanelProps {
     renameConversation?: (conversationId: string, newTitle: string) => Promise<void> | void;
+    onRenameConversation?: (conversationId: string, newTitle: string) => Promise<void> | void;
+    onResendPrompts?: (count: number | 'all') => void;
+    onEnqueue?: () => void;
+    onRerunConversation?: (convoId: string, nudgeType: string) => void;
 }
 
 

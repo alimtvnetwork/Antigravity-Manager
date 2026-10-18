@@ -36,15 +36,14 @@ export function DetailTabs(props: DetailTabsProps) {
 
     return (
         <div className="flex items-center justify-between gap-2.5 flex-wrap py-0.5 min-h-[32px]">
-            {/* Left: Compact View Controls Capsule + Input/Output Tabs */}
-            <div className="flex items-center gap-2.5 flex-wrap">
-                {/* Compact View Controls Capsule: Preview, Raw, Edit, Details (Icons only, contiguous pill) */}
-                <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
+            {/* Left: View Mode Controls Capsule (Preview, Raw, Edit, Details) */}
+            <div className="flex items-center gap-2.5 shrink-0">
+                <div className="inline-flex items-center rounded-lg bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
                     <button
                         type="button"
                         onClick={() => setViewMode('preview')}
                         className={cn(
-                            'p-1.5 rounded-l-full transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer',
+                            'p-1.5 rounded-l-md transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer',
                             viewMode === 'preview'
                                 ? 'bg-blue-600 text-white shadow-2xs'
                                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60'
@@ -85,27 +84,35 @@ export function DetailTabs(props: DetailTabsProps) {
                     <button
                         type="button"
                         onClick={() => setIsDetailsModalOpen(true)}
-                        className="p-1.5 rounded-r-full text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                        className="p-1.5 rounded-r-md text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                         title="Details"
                         aria-label="Details"
                     >
                         <FileText className="w-3.5 h-3.5" />
                     </button>
                 </div>
+            </div>
 
-                {/* Input / Output Navigation Tabs Capsule */}
+            {/* Right: Stats + Input/Output Tabs + Expand Full Toggle */}
+            <div className="flex items-center gap-2 ml-auto shrink-0">
+                {previewTab === 'instruction' && (
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 font-mono">
+                        {activeWordCount} words · {formatByteSize(activeByteCount)}
+                    </span>
+                )}
+
                 {setPreviewTab && (
-                    <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
+                    <div className="inline-flex items-center rounded-lg bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
                         <button
                             type="button"
                             onClick={() => setPreviewTab('instruction')}
                             className={cn(
-                                "flex items-center gap-1.5 px-3 py-1 rounded-l-full text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
+                                "flex items-center gap-1.5 px-3 py-1 rounded-l-md text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
                                 previewTab === 'instruction'
                                     ? "bg-blue-600 text-white shadow-2xs"
                                     : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
                             )}
-                            title="View Input"
+                            title="View Input Instruction"
                         >
                             <MessageSquare className="w-3.5 h-3.5" />
                             <span>Input</span>
@@ -115,12 +122,12 @@ export function DetailTabs(props: DetailTabsProps) {
                             type="button"
                             onClick={() => setPreviewTab('results')}
                             className={cn(
-                                "flex items-center gap-1.5 px-3 py-1 rounded-r-full text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
+                                "flex items-center gap-1.5 px-3 py-1 rounded-r-md text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
                                 previewTab === 'results'
                                     ? "bg-blue-600 text-white shadow-2xs"
                                     : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
                             )}
-                            title="View Output"
+                            title="View Output Results"
                         >
                             {selectedConversation?.is_running ? (
                                 <span className="relative flex h-2 w-2">
@@ -137,36 +144,26 @@ export function DetailTabs(props: DetailTabsProps) {
                         </button>
                     </div>
                 )}
-            </div>
 
-            {/* Right: Word count & Byte size stats + Expand toggle */}
-            <div className="flex items-center gap-2 ml-auto shrink-0">
-                {previewTab === 'instruction' && (
-                    <>
-                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 font-mono">
-                            {activeWordCount} words · {formatByteSize(activeByteCount)}
-                        </span>
-                        {(isTruncated || activePromptText.trim().endsWith('...') || activePromptText.trim().endsWith('…') || showAllWords) && (
-                            <button
-                                type="button"
-                                onClick={() => setShowAllWords(!showAllWords)}
-                                className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-500/20 hover:bg-cyan-500/20 transition-all cursor-pointer"
-                                title={showAllWords ? 'Collapse full prompt text' : 'Expand full prompt text'}
-                            >
-                                {showAllWords ? (
-                                    <>
-                                        <ChevronUp className="w-3 h-3" />
-                                        <span>Collapse</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <ChevronDown className="w-3 h-3" />
-                                        <span>Expand Full</span>
-                                    </>
-                                )}
-                            </button>
+                {previewTab === 'instruction' && (isTruncated || activePromptText.trim().endsWith('...') || activePromptText.trim().endsWith('…') || showAllWords) && (
+                    <button
+                        type="button"
+                        onClick={() => setShowAllWords(!showAllWords)}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-500/20 hover:bg-cyan-500/20 transition-all cursor-pointer"
+                        title={showAllWords ? 'Collapse full prompt text' : 'Expand full prompt text'}
+                    >
+                        {showAllWords ? (
+                            <>
+                                <ChevronUp className="w-3 h-3" />
+                                <span>Collapse</span>
+                            </>
+                        ) : (
+                            <>
+                                <ChevronDown className="w-3 h-3" />
+                                <span>Expand Full</span>
+                            </>
                         )}
-                    </>
+                    </button>
                 )}
             </div>
         </div>

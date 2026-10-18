@@ -81,6 +81,8 @@ export interface DetailHeaderProps {
     /** Optional repo path used as the rerun dispatch target (falls back to ''). */
     rerunRepoPath?: string;
     onOpenInspector: (conv: AgmConversationNode) => void;
+    selectedTurnNumber?: number | null;
+    setIsDetailsModalOpen?: (v: boolean) => void;
 }
 
 export function DetailHeader(props: DetailHeaderProps) {
@@ -102,6 +104,7 @@ export function DetailHeader(props: DetailHeaderProps) {
         formatDuration, elapsedSeconds,
         onCopyAllWithRichImages, onCopyCleanText,
         onCopyWithImages, onSaveImages, onExport, onFocusIde, onResend, onEnqueue, rerunRepoPath, onOpenInspector,
+        selectedTurnNumber, setIsDetailsModalOpen,
     } = props;
 
     const [localNewConvTitle, setLocalNewConvTitle] = useState('');
@@ -255,21 +258,56 @@ export function DetailHeader(props: DetailHeaderProps) {
         }
     };
 
+    const handleCopyCleanText = () => {
+        try {
+            if (onCopyCleanText) {
+                onCopyCleanText();
+            } else {
+                const cleanText = stripImagesFromPrompt(activePromptText);
+                void copyToClipboard(cleanText).catch((err) => {
+                    reportPromptActionError(err, 'DetailHeader.copyCleanText');
+                });
+            }
+            setLocalCopiedText(true);
+            setIsCopiedText(true);
+            setTimeout(() => {
+                setLocalCopiedText(false);
+                setIsCopiedText(false);
+            }, 2000);
+        } catch (err) {
+            reportPromptActionError(err, 'DetailHeader.onCopyCleanText');
+        }
+    };
+
+    const activeTurnNumber = selectedTurnNumber ?? selectedConversation.selected_turn_number ?? null;
+    const enqueuedCount = selectedConversation.prompts?.filter((p) => p.is_queued || p.status === 'QUEUED').length || (selectedConversation.is_queued ? 1 : 0);
+
     return (
         <div className="pb-2.5 border-b border-slate-200 dark:border-[#40285e] shrink-0 relative z-30">
             {/* Header Row: Identity & Badges & Breadcrumb Context (Left) + Action Capsule (Right) */}
             <div className="flex items-center justify-between gap-2.5 flex-wrap min-w-0">
                 {/* Left: Indicator 1 (Sequence + Tier), Indicator 2 (Status Capsule), Title, Instance Context */}
                 <div className="flex items-center gap-2 flex-wrap min-w-0">
-                    {/* Indicator 1: Clean Sequence Code with compact Origin Tier Icon */}
+                    {/* Indicator 1: Clean Sequence Code with compact Origin Tier Icon & Scope Differentiation */}
                     {(() => {
                         const rawSeq = selectedConversation.seq_code || 'C001';
                         const seqDisplay = formatSeqBadge(rawSeq, 'C001');
                         const tierInfo = classifyPromptTier(activePromptText, selectedConversation.title);
+                        const isTurnSelected = activeTurnNumber !== null;
+
                         return (
                             <span
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20 cursor-help hover:border-blue-500/50 transition-colors"
-                                title={`Conversation #${rawSeq.replace(/^C/i, '') || '001'} (Sequential AGM Index) · ${tierInfo.tier} (Right-click to copy JSON parameters)`}
+                                className={cn(
+                                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border cursor-help transition-colors",
+                                    isTurnSelected
+                                        ? "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30 shadow-2xs"
+                                        : "bg-blue-500/10 text-blue-600 dark:text-cyan-400 border-blue-500/20 hover:border-blue-500/50"
+                                )}
+                                title={
+                                    isTurnSelected
+                                        ? `Turn T${activeTurnNumber} of ${selectedConversation.prompts?.length || selectedConversation.step_count || 1} · ${seqDisplay} · ${tierInfo.tier}`
+                                        : `Conversation Session #${rawSeq.replace(/^C/i, '') || '001'} · ${tierInfo.tier} (Right-click to copy JSON parameters)`
+                                }
                                 onContextMenu={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
@@ -277,6 +315,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         sequence: seqDisplay,
                                         raw_sequence: rawSeq,
                                         tier: tierInfo.tier,
+                                        selected_turn: activeTurnNumber,
                                         conversation_id: selectedConversation.conversation_id,
                                         instance_id: selectedConversation.instance_id || 'default',
                                         instance_name: instanceNameDisplay,
@@ -291,26 +330,37 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 {tierInfo.tier === 'SUBAGENT_INSTRUCTION' && <Bot className="w-2.5 h-2.5 text-purple-500 shrink-0" />}
                                 {tierInfo.tier === 'SYSTEM_MESSAGE' && <Terminal className="w-2.5 h-2.5 text-slate-500 shrink-0" />}
                                 {tierInfo.tier === 'TOOL_OUTPUT' && <Wrench className="w-2.5 h-2.5 text-amber-500 shrink-0" />}
-                                <span>{seqDisplay}</span>
+                                <span>{isTurnSelected ? `Turn T${activeTurnNumber} · ${seqDisplay}` : `Session ${seqDisplay}`}</span>
                             </span>
                         );
                     })()}
 
-                    {/* Indicator 2: Unified Status Capsule */}
+                    {/* Scope Breadcrumb Badge */}
+                    {activeTurnNumber !== null ? (
+                        <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded-md border border-purple-500/20 font-semibold shrink-0">
+                            ↳ Turn {activeTurnNumber} of {selectedConversation.prompts?.length || selectedConversation.step_count || 1}
+                        </span>
+                    ) : (
+                        <span className="text-[10px] font-mono text-cyan-700 dark:text-cyan-300 bg-cyan-500/10 px-1.5 py-0.5 rounded-md border border-cyan-500/20 font-semibold shrink-0">
+                            Full Session ({selectedConversation.prompts?.length || selectedConversation.step_count || 1} turns)
+                        </span>
+                    )}
+
+                    {/* Indicator 2: Unified Status Capsule (normalized rounded-md) */}
                     {Boolean(selectedConversation.is_running) && !isGhostConversation(selectedConversation) ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9.5px] font-bold font-mono bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border border-emerald-500/40 shadow-2xs animate-pulse">
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9.5px] font-bold font-mono bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border border-emerald-500/40 shadow-2xs animate-pulse">
                             <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] animate-pulse" />
                             <span>RUNNING</span>
                             {instancePid ? <span className="opacity-80">PID: {instancePid}</span> : null}
                             <span className="border-l border-emerald-400/40 pl-1">{formatDuration(elapsedSeconds)}</span>
                         </span>
                     ) : Boolean(selectedConversation.is_queued) ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold font-mono bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9.5px] font-bold font-mono bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs">
                             <Clock className="w-2.5 h-2.5 text-amber-500" />
                             <span>QUEUED</span>
                         </span>
                     ) : (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
                             IDLE
                         </span>
                     )}
@@ -392,26 +442,56 @@ export function DetailHeader(props: DetailHeaderProps) {
                     </span>
                 </div>
 
-                {/* Right: The Unified Segmented Dark-Glass Action Capsule */}
-                <div className="flex items-center shrink-0 ml-auto">
-                    <div className="relative flex items-center rounded-full bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
-                        {/* Segment 1: Content & Media Copy Split Button [ Copy All | v ] */}
+                {/* Right: The Unified Segmented Dark-Glass Action Capsule & Details Trigger */}
+                <div className="flex items-center shrink-0 ml-auto gap-2">
+                    {/* Restored Prominent Details Button */}
+                    {setIsDetailsModalOpen && (
+                        <button
+                            type="button"
+                            onClick={() => setIsDetailsModalOpen(true)}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-[#120a1f] border border-slate-200 dark:border-purple-500/30 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#40285e] text-xs font-semibold transition-colors cursor-pointer shrink-0 shadow-2xs"
+                            title="View instance environment, IDE, and process PID details"
+                        >
+                            <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                            <span>Details</span>
+                        </button>
+                    )}
+
+                    <div className="relative flex items-center rounded-lg bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
+                        {/* Segment 1: Dual Copy Buttons (Copy with images + Copy without images as text + Options chevron) */}
                         <div className="flex items-center divide-x divide-slate-200/70 dark:divide-purple-500/20">
-                            {/* Primary Click: One-Shot Copy All (Content + Images) */}
+                            {/* Primary Button: Copy with images (Rich HTML + binary PNG) */}
                             <button
                                 type="button"
                                 onClick={handleCopyAll}
                                 data-ui-name="prompt-copy-all-btn"
                                 data-ui-id={`prompt-copy-all-${selectedConversation.conversation_id}`}
-                                className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                                title="Copy full prompt text and all embedded images in one shot"
+                                className="flex items-center gap-1.5 px-3 py-1 rounded-l-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                title="Copy prompt text and all embedded images (rich HTML + binary PNG)"
                             >
                                 {isCopiedAllActive ? (
                                     <Check className="w-3 h-3 text-emerald-500 shrink-0" />
                                 ) : (
-                                    <Copy className="w-3 h-3 text-slate-500 dark:text-slate-400 shrink-0" />
+                                    <ImageIcon className="w-3 h-3 text-purple-500 shrink-0" />
                                 )}
-                                <span>{isCopiedAllActive ? 'Copied All!' : 'Copy All'}</span>
+                                <span>{isCopiedAllActive ? 'Copied with images!' : 'Copy with images'}</span>
+                            </button>
+
+                            {/* Secondary Button: Copy without images (as text) */}
+                            <button
+                                type="button"
+                                onClick={handleCopyCleanText}
+                                data-ui-name="prompt-copy-clean-text-btn"
+                                data-ui-id={`prompt-copy-clean-${selectedConversation.conversation_id}`}
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-none text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                title="Copy prompt plain text without images (pure text)"
+                            >
+                                {isCopiedTextActive ? (
+                                    <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                                ) : (
+                                    <FileText className="w-3 h-3 text-slate-500 dark:text-slate-400 shrink-0" />
+                                )}
+                                <span>{isCopiedTextActive ? 'Copied as text!' : 'Copy as text'}</span>
                             </button>
 
                             {/* Dropdown Chevron for Clean Text, Image Saving, and Exports */}

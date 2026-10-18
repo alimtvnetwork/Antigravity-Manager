@@ -308,7 +308,7 @@ fn guard_caller_instance(args: &[String], target_instance: &str) {
                 .unwrap_or_else(|_| target_instance.to_string());
             if caller_id == resolved || caller_id == target_instance {
                 eprintln!(
-                    "[ERROR] Refusing to stop, switch, or delete instance '{}' because this command is running inside its IDE process",
+                    "[ERROR] Target instance '{}' is your currently running IDE instance! Aborting to prevent terminating your own session. Pass --force to override.",
                     caller_id
                 );
                 std::process::exit(2);
@@ -358,7 +358,8 @@ pub(crate) fn cmd_instances_stop(args: &[String]) {
         &format!("Stop instance {}", target_instance),
         "CLI stop command executed",
     );
-    let forward_args = vec!["stop".to_string(), target_instance];
+    let mut forward_args = vec!["stop".to_string(), target_instance];
+    forward_args.extend(args.iter().filter(|a| a.starts_with('-')).cloned());
     crate::instance_dispatch::cmd_instances(&forward_args);
 }
 
@@ -538,7 +539,8 @@ pub(crate) fn cmd_instances_delete(args: &[String]) {
         &format!("Delete instance {}", target_instance),
         "CLI delete command executed",
     );
-    let forward_args = vec!["rm".to_string(), target_instance];
+    let mut forward_args = vec!["rm".to_string(), target_instance];
+    forward_args.extend(args.iter().filter(|a| a.starts_with('-')).cloned());
     crate::instance_dispatch::cmd_instances(&forward_args);
 }
 

@@ -275,15 +275,14 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                             continue;
                         }
 
-                        // Authoritative not_fully_idle supremacy rule:
-                        // If not_fully_idle > 0, this is definitive empirical proof of active in-flight execution.
-                        // Stale text status strings (e.g. CASCADE_RUN_STATUS_IDLE) must not override not_fully_idle > 0.
-                        let is_zero_idle = not_fully_idle == 0;
+                        // Explicit Idle Supremacy rule:
+                        // Terminal status or explicit IDLE status strings (e.g. CASCADE_RUN_STATUS_IDLE)
+                        // must strictly override unreset not_fully_idle > 0 artifacts from IDE engine quirks.
                         let has_terminal_status = status.contains("COMPLETED")
                             || status.contains("FAILED")
                             || status.contains("CANCELLED");
-                        let is_explicit_idle =
-                            is_zero_idle && (status.contains("IDLE") || has_terminal_status);
+                        let has_idle_status = status.contains("IDLE") || has_terminal_status;
+                        let is_explicit_idle = has_idle_status;
 
                         if is_explicit_idle {
                             continue;
@@ -300,7 +299,7 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                             continue;
                         }
 
-                        let is_conv_running = not_fully_idle > 0;
+                        let is_conv_running = not_fully_idle > 0 && !has_idle_status;
 
                         if is_conv_running {
                             if let Some(ws_uris_raw) = ws_uris_opt {
@@ -391,14 +390,14 @@ mod tests {
             && inst_8159_key.contains("coding-guidelines");
         assert!(matches_self);
 
-        // Test idle supremacy logic
-        let not_fully_idle = 0;
-        let status = "CASCADE_RUN_STATUS_RUNNING";
-        let is_explicit_idle = not_fully_idle == 0
-            || status.contains("IDLE")
-            || status.contains("COMPLETED")
+        // Test idle supremacy logic: unreset not_fully_idle = 1 must be overridden by idle/terminal status
+        let not_fully_idle = 1;
+        let status = "CASCADE_RUN_STATUS_IDLE";
+        let has_terminal_status = status.contains("COMPLETED")
             || status.contains("FAILED")
             || status.contains("CANCELLED");
+        let has_idle_status = status.contains("IDLE") || has_terminal_status;
+        let is_explicit_idle = has_idle_status;
         assert!(is_explicit_idle);
 
         let is_running = if is_explicit_idle {

@@ -29,8 +29,25 @@ pub(crate) fn transition_stale_inflight_prompts(now: i64) {
 }
 
 pub(crate) fn query_tree_projects(target: Option<&str>) -> Vec<RunningProject> {
-    let inst_to_detect = target.unwrap_or("default");
-    let _ = super::detection::detect_running_projects(inst_to_detect);
+    if let Some(target_id) = target {
+        let _ = super::detection::detect_running_projects(target_id);
+    } else {
+        match crate::modules::instance::load_registry() {
+            Ok(reg) => {
+                for inst in &reg.instances {
+                    let _ = super::detection::detect_running_projects(&inst.id);
+                }
+            }
+            Err(e) => {
+                // Justification: Registry load failure during sweep falls back to scanning default instance
+                crate::error::record_ignored(
+                    Err::<(), _>(e),
+                    "load registry during universal query_tree_projects sweep",
+                );
+                let _ = super::detection::detect_running_projects("default");
+            }
+        }
+    }
 
     let all_projects: Vec<RunningProject> = list_running_projects()
         .unwrap_or_default()
