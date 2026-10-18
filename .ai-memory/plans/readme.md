@@ -90,6 +90,7 @@
 | `159` | [antigravity-manager-and-gitmap-testing.md](./antigravity-manager-and-gitmap-testing.md) | `DONE` | Prompt tree cache survives process start, 120s TTL, panic backtrace on tree load, Reset control, CLI reset-tree, and CLI E2E of instances, backup, restore, send, and enqueue. |
 | `160` | [end-to-end-testing-and-ui-update-instructions.md](./end-to-end-testing-and-ui-update-instructions.md) | `DONE` | Fixed Prompt Tree `useEffect` render loop (`0xe0000008` WebView2 OOM), serialized uncached tree scans, gated Update Available notification on verified platform installer assets, restyled `UpdateNotification`, added CLI `prompts copy`/`prompts resend`, and sequential E2E verification. Re-run instructions: `.ai-memory/memory/learned/27-e2e-instance-autoswitch-prompt-playbook.md`. |
 | `161` | [root-cause-analysis-and-telegram-staff-improvement.md](./root-cause-analysis-and-telegram-staff-improvement.md) | `DONE` | 10 RCAs in `.ai-memory/rca/` (AGM fmt/E0061/branch-conflict, gitmap file-split imports/marker/coverage-locator/Windows-skip, workflow poisoned-cache/E2E-shortcircuit docs-only, Supabase paused-projects RCA), 5-file E2E playbook (auto-switch, instance open, prompt preview, prompt send, master checklist), voice-command feasibility note, Telegram `/open` + `/screenshot` (machine-targeted, `open_shot.rs`), `/send` two-step destination-first flow with screenshot proof (`send_flow.rs`), colorful HTML `/help` with copy-paste buttons, Supabase root cause: paused free-tier projects (user action needed). |
+| `163` | [orm-and-database-migration-strategy.md](./orm-and-database-migration-strategy.md) | `DONE` | Compile-time safe Diesel ORM schemas, Python ORM generator (`51-db-orm-generator.py`), strict PascalCase Split-DB schemas (`errors.db`, `repo_prompts.db`, `prompt-backups.db`, `task-history.db`), pre-defined FIFO SQLite views, single-file backup export (`pre_migration_v4_snapshot.json`), lossless re-import engine with `SchemaVersion = 1`, and zero-account-loss cryptographic guard. |
 
 ## Recent Completed Tasks Register (last 20, newest first)
 
@@ -97,7 +98,8 @@ Updated 2026-10-06T01:45:00Z from `git log` (HEAD `ccf336b1`). Referenced by `.a
 
 | # | Date | Commit | Task | Plan |
 |---|---|---|---|---|
-| 1 | 2026-10-05 | `b7e5744c`, `ccf336b1` | v4.158.0 two-phase 4 hour quota gate and hours-remaining weekly scoring, delimiter and rustfmt fixes | 138 |
+| 1 | 2026-10-18 | `77e6f780`, `0fe0b2bb` | Compile-time safe Diesel ORM, PascalCase Split-DB schemas, lossless single-file backup/re-import, zero account loss guard, and CLI migration suite | 163 |
+| 2 | 2026-10-05 | `b7e5744c`, `ccf336b1` | v4.158.0 two-phase 4 hour quota gate and hours-remaining weekly scoring, delimiter and rustfmt fixes | 138 |
 | 2 | 2026-10-05 | `7de81159` | v4.157.1 weekly scoring DESC sort and divide-by-100 integer score | 137 |
 | 3 | 2026-10-05 | `babb0b18` | v4.157.0 neon green progress bar, hours-elapsed weekly scoring, prompt tree modal header, empty tree fix | 136, 137 |
 | 4 | 2026-10-05 | `7952d8dd` | v4.156.0 prompt tree discovery from summaries DB | 136 |
