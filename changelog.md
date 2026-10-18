@@ -1,5 +1,19 @@
 # Changelog
 
+## [v4.229.0] - 2026-10-18
+
+### Fixed
+- **Process Termination Ladder & Account Switch Synchronization**: Fixed stop instance button and account switching synchronization failures by establishing a multi-stage process termination ladder (`taskkill /F /T` with fallback to Win32 `TerminateProcess`), conscious PID matching against cached process instances, and deterministic lockfile eviction (`code.lock`, `lockfile`, `DevToolsActivePort`) before updating `state.vscdb`. (Thanks to @aukgit)
+- **Active Caller IDE Self-Preservation**: Hardened caller IDE detection (`detect_caller_instance_id` walking 24 parent process generations and matching workspace paths) across `agm ff`, `switch_account_to_instance`, `stop_instance`, and `close_instance` with `refuse_if_caller_instance` guards to prevent CLI commands and automated routines from self-terminating the developer's active workspace session. (Thanks to @aukgit)
+- **Audit Trail Query Filter & Empty State Remediation**: Fixed empty instance audit trail by refining SQL filter logic to eliminate global account crud pollution from `default` instance records, instrumenting missing lifecycle operations (`RestartInstance`, `CloneInstance`, `CreateInstance`) into `task_history_db`, and expanding frontend action code mapping for lifecycle operations. (Thanks to @aukgit)
+
+### Added
+- **Instance List View Layout & PID Indicator**: Aligned running instance status (`● PID: <pid>`), executable tail, and data directory tail inline on the same horizontal row with monospace formatting, enhanced tooltips, and contiguous segmented copy actions. (Thanks to @aukgit)
+- **Switch Account Dialog UI/UX Modernization**: Redesigned switch account modal with Royal Violet tokens (`#171025`, `#40285e`, `#1af18d`), circular radio selection indicators, standard `<TierBadge />` integration, search filter clear button, and full keyboard accessibility. (Thanks to @aukgit)
+- **E2E Lifecycle Verification Suite**: Comprehensive verification through `scripts/test-instance-lifecycle-e2e.ps1` covering caller self-preservation guards, transient test sandbox creation, PID eviction, switch synchronization, and clean filesystem teardown. (Thanks to @aukgit)
+
+---
+
 ## [v4.228.1] - 2026-10-18
 
 ### Added
@@ -657,6 +671,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.229.0 (2026-10-18)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.228.0 (2026-10-18)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

@@ -54,9 +54,9 @@ pub(crate) fn refuse_if_caller(args: &[String], target_id: &str, is_json: bool) 
 }
 
 pub(crate) fn route_instances_launch(
-    args: &[String],
+    _args: &[String],
     non_flag_args: &[String],
-    is_json: bool,
+    _is_json: bool,
 ) -> bool {
     // Subcommand: agm instances launch <target> OR agm instances start <target> OR agm instances <target> launch
     if non_flag_args.len() >= 2
