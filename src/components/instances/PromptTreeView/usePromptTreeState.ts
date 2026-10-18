@@ -104,6 +104,10 @@ export interface PromptTreeState {
     setElapsedSeconds: React.Dispatch<React.SetStateAction<number>>;
     inspectorPrompt: InspectorPrompt | null;
     setInspectorPrompt: React.Dispatch<React.SetStateAction<InspectorPrompt | null>>;
+    isTreeCollapsed: boolean;
+    setIsTreeCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
+    isAutomatedHidden: boolean;
+    setIsAutomatedHidden: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export function usePromptTreeState(instanceId: string): PromptTreeState {
@@ -115,6 +119,8 @@ export function usePromptTreeState(instanceId: string): PromptTreeState {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState<'all' | 'running' | 'queued' | 'latest_conv' | 'latest_prompt' | 'pinned' | 'archived'>('all');
     const [categoryFilter, setCategoryFilter] = useState<'all' | 'user' | 'subagent' | 'system'>('all');
+    const [isTreeCollapsed, setIsTreeCollapsed] = useState<boolean>(true);
+    const [isAutomatedHidden, setIsAutomatedHidden] = useState<boolean>(true);
     const restoreFileInputRef = useRef<HTMLInputElement>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -263,5 +269,7 @@ export function usePromptTreeState(instanceId: string): PromptTreeState {
         activePromptTextRef,
         elapsedSeconds, setElapsedSeconds,
         inspectorPrompt, setInspectorPrompt,
+        isTreeCollapsed, setIsTreeCollapsed,
+        isAutomatedHidden, setIsAutomatedHidden,
     };
 }

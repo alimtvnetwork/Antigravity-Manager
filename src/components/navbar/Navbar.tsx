@@ -1,5 +1,5 @@
 import { startTransition, useRef } from 'react';
-import { LayoutDashboard, Users, Network, Activity, BarChart3, Settings, Lock, KeyRound, Laptop, Mail, Bug, ScrollText, Database, Wrench } from 'lucide-react';
+import { LayoutDashboard, Users, Network, Activity, BarChart3, Settings, Lock, KeyRound, Laptop, Mail, Bug, ScrollText, Database, Wrench, MessageSquare } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
@@ -39,6 +39,7 @@ function Navbar() {
         { path: '/security', label: t('nav.security'), icon: Lock, priority: 'low' },
         { path: '/email', label: t('nav.email', 'Email & Alerts'), icon: Mail, priority: 'high' },
         { path: '/supabase', label: t('nav.supabase', 'Supabase'), icon: Database, priority: 'high' },
+        { path: '/telegram', label: t('nav.telegram', 'Telegram Remote'), icon: MessageSquare, priority: 'high' },
         { path: '/audit', label: t('nav.audit', 'Audit'), icon: ScrollText, priority: 'high' },
         { path: '/toolchain', label: t('nav.toolchain', 'Toolchain'), icon: Wrench, priority: 'low' },
         { path: '/settings', label: t('nav.settings'), icon: Settings, priority: 'high' },

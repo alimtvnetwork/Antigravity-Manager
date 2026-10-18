@@ -69,6 +69,12 @@ const COMMAND_MAPPING: Record<string, { url: string; method: 'GET' | 'POST' | 'D
   'get_debug_console_logs': { url: '/api/debug/logs', method: 'GET' },
   'clear_debug_console_logs': { url: '/api/debug/logs/clear', method: 'POST' },
 
+  // Speed Error Database (errors.db)
+  'log_client_error': { url: '/api/errors/log', method: 'POST' },
+  'list_client_errors': { url: '/api/errors', method: 'GET' },
+  'clear_client_errors': { url: '/api/errors/clear', method: 'POST' },
+  'run_error_diagnostics': { url: '/api/errors/diagnostics', method: 'POST' },
+
   // CLI Sync
   'get_cli_sync_status': { url: '/api/proxy/cli/status', method: 'POST' },
   'execute_cli_sync': { url: '/api/proxy/cli/sync', method: 'POST' },

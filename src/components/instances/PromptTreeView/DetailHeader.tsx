@@ -1,4 +1,5 @@
 import { copyToClipboard } from '../../../utils/clipboard';
+import { copyImageAsMarkdownText } from './clipboard';
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat } from 'lucide-react';
@@ -75,6 +76,7 @@ export interface DetailHeaderProps {
     elapsedSeconds: number;
     onCopyAllWithRichImages?: () => void;
     onCopyCleanText?: () => void;
+    onCopyImageAsText?: () => void;
     onCopyWithImages: () => void;
     onSaveImages: () => void;
     onExport: (format: 'md' | 'json') => void;
@@ -104,7 +106,7 @@ export function DetailHeader(props: DetailHeaderProps) {
         isExportMenuOpen, setIsExportMenuOpen,
         hasImages, instancePid, instanceSeqNum, instanceExeName, instanceNameDisplay,
         formatDuration, elapsedSeconds,
-        onCopyAllWithRichImages, onCopyCleanText,
+        onCopyAllWithRichImages, onCopyCleanText, onCopyImageAsText,
         onCopyWithImages, onSaveImages, onExport, onFocusIde, onResend, onEnqueue, rerunRepoPath, onOpenInspector,
         selectedTurnNumber,
         setIsDetailsModalOpen,
@@ -280,6 +282,25 @@ export function DetailHeader(props: DetailHeaderProps) {
         }
     };
 
+    const [localCopiedImageText, setLocalCopiedImageText] = useState(false);
+
+    const handleCopyImageAsText = async () => {
+        try {
+            if (onCopyImageAsText) {
+                onCopyImageAsText();
+            } else {
+                const promptText = activePromptText || selectedConversation?.full_prompt_text || selectedConversation?.prompt_preview_200w || '';
+                await copyImageAsMarkdownText(promptText);
+            }
+            setLocalCopiedImageText(true);
+            setTimeout(() => {
+                setLocalCopiedImageText(false);
+            }, 2000);
+        } catch (err) {
+            reportPromptActionError(err, 'DetailHeader.onCopyImageAsText');
+        }
+    };
+
     const handleCopyByFormat = (format: CopyFormat) => {
         switch (format) {
             case CopyFormat.RichMedia:
@@ -287,6 +308,9 @@ export function DetailHeader(props: DetailHeaderProps) {
                 break;
             case CopyFormat.CleanText:
                 handleCopyCleanText();
+                break;
+            case CopyFormat.ImageAsText:
+                void handleCopyImageAsText();
                 break;
             case CopyFormat.Json:
                 onExport('json');
@@ -642,7 +666,27 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono px-1.5 py-0.2 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">copy as text</span>
                                 </button>
 
-                                {/* Sub-item 3: Save Images to Disk */}
+                                {/* Option 3: Copy Image as Text (Markdown) */}
+                                {hasImages && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            handleCopyByFormat(CopyFormat.ImageAsText);
+                                            setIsCopyMenuOpen(false);
+                                        }}
+                                        data-ui-name="prompt-menu-copy-image-text-btn"
+                                        data-ui-id={`prompt-menu-copy-image-text-${selectedConversation.conversation_id}`}
+                                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            {localCopiedImageText ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <FileText className="w-3.5 h-3.5 text-sky-400" />}
+                                            <span>{localCopiedImageText ? 'Copied image as text!' : 'Copy Image as Text'}</span>
+                                        </div>
+                                        <span className="text-[10px] text-sky-600 dark:text-sky-300 font-mono px-1.5 py-0.2 rounded-md bg-sky-500/10 border border-sky-500/20">Markdown</span>
+                                    </button>
+                                )}
+
+                                {/* Sub-item 4: Save Images to Disk */}
                                 {hasImages && (
                                     <button
                                         type="button"

@@ -87,6 +87,10 @@ pub(crate) fn admin_route_table_b() -> Router<AppState> {
             get(admin_logs::admin_get_thinking_store_count),
         )
         .route("/logs/:logId", get(admin_logs::admin_get_proxy_log_detail))
+        // Speed Error Database (errors.db)
+        .route("/errors/log", post(admin_logs::admin_log_client_error))
+        .route("/errors", get(admin_logs::admin_list_client_errors))
+        .route("/errors/clear", post(admin_logs::admin_clear_client_errors))
         // Debug Console (Log Bridge)
         .route(
             "/debug/enable",

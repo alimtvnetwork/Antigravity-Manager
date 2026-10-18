@@ -1,5 +1,6 @@
 import { startTransition } from 'react';
-import { Save, Bug, Menu, ChevronDown, Sliders, Info, ShieldCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Save, Bug, Menu, ChevronDown, Sliders, Info, ShieldCheck, MessageSquare } from 'lucide-react';
 import { useSettingsPage } from './Settings/useSettingsPage';
 import { GeneralTab } from './Settings/tabs/GeneralTab';
 import { AccountTab } from './Settings/tabs/AccountTab';
@@ -88,6 +89,16 @@ function Settings() {
                                 {t('settings.tabs.supabase', 'Supabase')}
                             </button>
 
+                            {/* Standalone Telegram Navigation Link */}
+                            <Link
+                                to="/telegram"
+                                className="px-3.5 py-1.5 rounded-full text-sm font-medium transition-all text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 hover:bg-white/80 dark:hover:bg-gray-700 flex items-center gap-1.5 cursor-pointer"
+                                title="Telegram Remote Control Hub (Dedicated Navigation)"
+                            >
+                                <MessageSquare className="w-3.5 h-3.5" />
+                                <span>{t('settings.tabs.telegram', 'Telegram ↗')}</span>
+                            </Link>
+
                             {/* Hamburger Dropdown for Advance, Debug, and About */}
                             <div className="relative">
                                 <button
@@ -166,6 +177,21 @@ function Settings() {
                                                     </span>
                                                 </div>
                                             </button>
+                                            <div className="my-1 border-t border-gray-100 dark:border-base-300" />
+                                            <Link
+                                                to="/telegram"
+                                                onClick={() => setIsMoreDropdownOpen(false)}
+                                                className="w-full px-3.5 py-2 text-left text-sm flex items-center justify-between text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-base-200 transition-colors cursor-pointer"
+                                                title="Open dedicated Telegram Remote Control Hub"
+                                            >
+                                                <div className="flex items-center gap-2.5">
+                                                    <MessageSquare className="w-4 h-4 text-sky-500" />
+                                                    <span>Telegram Remote</span>
+                                                </div>
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 font-medium">
+                                                    Dedicated ↗
+                                                </span>
+                                            </Link>
                                             <div className="my-1 border-t border-gray-100 dark:border-base-300" />
                                             <button
                                                 type="button"

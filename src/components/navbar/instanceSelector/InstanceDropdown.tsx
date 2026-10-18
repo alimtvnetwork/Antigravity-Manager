@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
     ChevronDown,
     Copy,
@@ -12,10 +13,13 @@ import {
     Plus,
     X,
     Pencil,
+    MessageSquare,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAccountStore } from '../../../stores/useAccountStore';
 import { cn } from '../../../utils/cn';
 import { SELECTED_ROW_CLASSES } from '../../common/selectedState';
+import { TelegramGuideModal } from '../../telegram/TelegramGuideModal';
 import type { InstanceSelectorApi } from './useInstanceSelector';
 
 export function InstanceDropdown({ api }: { api: InstanceSelectorApi }) {
@@ -39,13 +43,18 @@ export function InstanceDropdown({ api }: { api: InstanceSelectorApi }) {
         openCopy,
     } = api;
 
-    if (!isOpen) return null;
+    const navigate = useNavigate();
+    const [isTelegramGuideOpen, setIsTelegramGuideOpen] = useState(false);
+
+    if (!isOpen && !isTelegramGuideOpen) return null;
 
     return (
-        <div
-            className="absolute top-full right-0 mt-1.5 w-96 max-w-[calc(100vw-24px)] md:w-[420px] rounded-xl shadow-2xl bg-white dark:bg-[#171025] border border-gray-200 dark:border-[#40285e] py-2 z-[9999] animate-in fade-in zoom-in-95"
-            style={{ isolation: 'isolate' }}
-        >
+        <>
+            {isOpen && (
+                <div
+                    className="absolute top-full right-0 mt-1.5 w-96 max-w-[calc(100vw-24px)] md:w-[420px] rounded-xl shadow-2xl bg-white dark:bg-[#171025] border border-gray-200 dark:border-[#40285e] py-2 z-[9999] animate-in fade-in zoom-in-95"
+                    style={{ isolation: 'isolate' }}
+                >
             {/* Dropdown Header Bar with Duplicate and Combined Import / Export Dropdown */}
             <div className="flex items-center justify-between px-3 py-1 border-b border-gray-100 dark:border-[#40285e] pb-1.5">
                 <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
@@ -153,8 +162,8 @@ export function InstanceDropdown({ api }: { api: InstanceSelectorApi }) {
                 )}
             </div>
 
-            {/* Footer Bar: Smart Play / Run Selected Profile */}
-            <div className="p-2 border-t border-gray-100 dark:border-[#40285e]">
+            {/* Footer Bar: Smart Play / Run Selected Profile & Telegram Remote Link */}
+            <div className="p-2 border-t border-gray-100 dark:border-[#40285e] space-y-1.5">
                 <button
                     type="button"
                     disabled={launchingId === activeInstance?.config.id}
@@ -184,8 +193,42 @@ export function InstanceDropdown({ api }: { api: InstanceSelectorApi }) {
                         </>
                     )}
                 </button>
+
+                <div className="flex items-center justify-between px-1 pt-1 border-t border-gray-100 dark:border-[#40285e]/40">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setIsOpen(false);
+                            navigate('/telegram');
+                        }}
+                        className="text-xs font-medium text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 flex items-center gap-1.5 cursor-pointer transition-colors py-0.5"
+                        title="Open Telegram Remote Control Hub"
+                    >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>{t('nav.telegram', 'Telegram Remote Control')}</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setIsOpen(false);
+                            setIsTelegramGuideOpen(true);
+                        }}
+                        className="text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 px-2 py-0.5 rounded hover:bg-sky-50 dark:hover:bg-[#25173e] transition-colors cursor-pointer flex items-center gap-1"
+                        title="Open Telegram Setup Guide & CLI Reference"
+                    >
+                        <span>Setup Guide</span>
+                    </button>
+                </div>
             </div>
-        </div>
+                </div>
+            )}
+
+            <TelegramGuideModal
+                isOpen={isTelegramGuideOpen}
+                onClose={() => setIsTelegramGuideOpen(false)}
+            />
+        </>
     );
 }
 

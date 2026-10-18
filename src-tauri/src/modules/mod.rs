@@ -18,6 +18,7 @@ pub mod email_io;
 pub mod email_sender;
 pub mod email_vault_db;
 pub mod email_watcher;
+pub mod error_db;
 pub mod fleet_sync;
 pub mod git_info;
 pub mod instance;

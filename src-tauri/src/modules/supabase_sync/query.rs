@@ -28,10 +28,6 @@ pub(crate) fn build_ssh_mesh_machine_info(
     } else {
         "offline".to_string()
     };
-    let resolved_user =
-        crate::modules::ssh_manager::resolve_username_placeholders(&conn.username, &conn.os);
-    let bound_email = format!("{}@{}", resolved_user, conn.alias);
-
     FleetMachineInfo {
         node_id: format!("ssh_{}", conn.alias),
         node_alias: conn.alias.clone(),
@@ -57,11 +53,11 @@ pub(crate) fn build_ssh_mesh_machine_info(
             profile_name: format!("{}:default", conn.alias),
             is_running: is_online,
             bound_account_id: None,
-            bound_account_email: Some(bound_email.clone()),
+            bound_account_email: None,
         }],
         instances: Vec::new(),
-        bound_emails: vec![bound_email.clone()],
-        active_accounts: vec![bound_email],
+        bound_emails: Vec::new(),
+        active_accounts: Vec::new(),
         leases: Vec::new(),
     }
 }

@@ -208,4 +208,22 @@ export function normalizePromptForGrouping(conv: AgmConversationNode): string {
     return text.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-// Inline Markdown parser (Headings, bold, italic, code blocks, inline code, lists, images, blockquotes, truncated callouts)
+export function isAutomatedConversation(conv: AgmConversationNode): boolean {
+    const preview = (conv.prompt_preview_200w || '').toLowerCase();
+    const title = (conv.title || '').toLowerCase();
+    const cat = classifyPromptTier(conv.prompt_preview_200w, conv.title, conv);
+
+    if (cat.tier === PromptOriginTier.SystemMessage || cat.tier === PromptOriginTier.ToolOutput) {
+        return true;
+    }
+    if (preview.includes('<system_message>') || preview.includes('system_message')) {
+        return true;
+    }
+    if (title.includes('heartbeat') || preview.includes('heartbeat') || title.startsWith('system:')) {
+        return true;
+    }
+    if (preview.includes('token_usage') || preview.includes('telemetry') || title.includes('telemetry')) {
+        return true;
+    }
+    return false;
+}

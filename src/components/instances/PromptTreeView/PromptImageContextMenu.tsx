@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { Copy, Eye, Download, Link2, Check, Layers } from 'lucide-react';
-import { writeNativeImageToClipboard, copyAllImagesAsRichHtml } from './clipboard';
+import { Copy, Eye, Download, Link2, Check, Layers, FileText } from 'lucide-react';
+import { writeNativeImageToClipboard, copyAllImagesAsRichHtml, copyImageAsMarkdownText } from './clipboard';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 
@@ -26,6 +26,7 @@ export function PromptImageContextMenu({
     const menuRef = useRef<HTMLDivElement>(null);
     const [isImageCopied, setIsImageCopied] = useState(false);
     const [isAllImagesCopied, setIsAllImagesCopied] = useState(false);
+    const [isMarkdownCopied, setIsMarkdownCopied] = useState(false);
     const [isLinkCopied, setIsLinkCopied] = useState(false);
 
     // Close on click outside or escape key
@@ -131,6 +132,40 @@ export function PromptImageContextMenu({
         }
     }, [allImages, imageSrc, onClose]);
 
+    const handleCopyImageAsText = useCallback(async () => {
+        try {
+            const isSuccess = await copyImageAsMarkdownText(
+                imageSrc,
+                altText || 'Image',
+                () => {
+                    setIsMarkdownCopied(true);
+                    setTimeout(() => {
+                        setIsMarkdownCopied(false);
+                        onClose();
+                    }, 1200);
+                },
+                (err) => {
+                    useErrorStore.getState().trackWarning(err, {
+                        source: 'PromptImageContextMenu.handleCopyImageAsText',
+                        triggerAction: 'context_menu_copy_image_as_text',
+                    });
+                }
+            );
+            if (isSuccess) {
+                setIsMarkdownCopied(true);
+                setTimeout(() => {
+                    setIsMarkdownCopied(false);
+                    onClose();
+                }, 1200);
+            }
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'PromptImageContextMenu.handleCopyImageAsText.outer',
+                triggerAction: 'context_menu_copy_image_as_text_outer',
+            });
+        }
+    }, [altText, imageSrc, onClose]);
+
     const handleCopyLink = useCallback(async () => {
         try {
             await copyToClipboard(imageSrc);
@@ -212,6 +247,21 @@ export function PromptImageContextMenu({
                 )}
                 <span className="font-medium">
                     {isAllImagesCopied ? 'Copied All Images!' : 'Copy All Attached Images'}
+                </span>
+            </button>
+
+            <button
+                type="button"
+                onClick={handleCopyImageAsText}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-left text-slate-200 hover:bg-purple-600/25 hover:text-purple-200 transition-colors cursor-pointer"
+            >
+                {isMarkdownCopied ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                    <FileText className="w-3.5 h-3.5 text-sky-400" />
+                )}
+                <span className="font-medium">
+                    {isMarkdownCopied ? 'Copied Image as Text!' : 'Copy Image as Text (Markdown)'}
                 </span>
             </button>
 

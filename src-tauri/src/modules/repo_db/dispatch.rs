@@ -134,8 +134,14 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
         ));
 
         // Keep the conversation id on the file the IDE reads. A later rewrite must not drop it.
+        let (extracted_img, img_paths) =
+            super::detection::extract_image_payload_or_path(&prompt.prompt_content);
+        let final_img = prompt.image_payload.clone().or(extracted_img);
         let task_file = PathBuf::from(&prompt.repo_path).join(".antigravity_resume_task.json");
-        let payload = resume_task_document(&prompt, "dispatched", now, &[]);
+        let mut payload = resume_task_document(&prompt, "dispatched", now, &img_paths);
+        if final_img.is_some() {
+            payload["image_payload"] = serde_json::json!(final_img);
+        }
         let file_written = if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
             fs::write(&task_file, json_str).is_ok()
         } else {
@@ -173,6 +179,20 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
 
         if updated.is_ok() {
             dispatched_count += 1;
+            let byte_size = prompt.prompt_content.len();
+            let image_count = if !img_paths.is_empty() {
+                img_paths.len()
+            } else if final_img.is_some() {
+                1
+            } else {
+                0
+            };
+            tracing::info!(
+                "[PROMPT_RESTORE] Restoring running prompt for instance {} from backup (images: {}, bytes: {})",
+                prompt.instance_id,
+                image_count,
+                byte_size
+            );
             if let Ok(mut map) = get_memory_prompts_map().lock() {
                 if let Some(p) = map.get_mut(&prompt.id) {
                     p.status = "dispatched".to_string();
@@ -306,5 +326,58 @@ mod tests {
     fn resume_file_without_agy_does_not_count_as_restored() {
         assert!(!prompt_push_landed(false));
         assert!(prompt_push_landed(true));
+    }
+
+    #[test]
+    fn test_dispatch_restores_prompt_with_images_and_workspace() {
+        let conn = Connection::open_in_memory().unwrap();
+        assert!(init_tables(&conn).is_ok());
+
+        let now = Utc::now().timestamp();
+        let prompt_id = "test-restore-id";
+        let project_id = "workspace-proj-123";
+        let prompt_text = "Prompt with screenshot file:///d:/assets/screen.png";
+        let img_payload = Some("data:image/png;base64,TESTDATA".to_string());
+
+        // 1. Insert running project
+        conn.execute(
+            "INSERT INTO running_projects 
+             (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+             VALUES (?1, 'inst-beta', 'proj-123', '/work/proj-123', NULL, 1, ?2, ?2)",
+            params![project_id, now],
+        ).unwrap();
+
+        // 2. Insert prompt in backed_up state
+        conn.execute(
+            "INSERT INTO active_prompts 
+             (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
+             VALUES (?1, ?2, 'inst-beta', '/work/proj-123', ?3, 'gemini-pro', 'conv-123', 'backed_up', ?4, ?4, ?5)",
+            params![prompt_id, project_id, prompt_text, now, &img_payload],
+        ).unwrap();
+
+        // 3. Verify status transitions to dispatched and image payloads are retained
+        let updated = conn.execute(
+            "UPDATE active_prompts SET status = 'dispatched', updated_at = ?1 WHERE id = ?2 AND status = 'backed_up'",
+            params![now + 5, prompt_id],
+        ).unwrap();
+        assert_eq!(updated, 1);
+
+        let (status, content, stored_img, proj) = conn
+            .query_row(
+                "SELECT status, prompt_content, image_payload, project_id FROM active_prompts WHERE id = ?1",
+                params![prompt_id],
+                |r| Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, Option<String>>(2)?,
+                    r.get::<_, String>(3)?,
+                )),
+            )
+            .unwrap();
+
+        assert_eq!(status, "dispatched");
+        assert_eq!(content, prompt_text);
+        assert_eq!(stored_img, img_payload);
+        assert_eq!(proj, project_id);
     }
 }

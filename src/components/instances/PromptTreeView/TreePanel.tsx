@@ -10,6 +10,9 @@ import {
     Terminal,
     Pin,
     RotateCcw,
+    Eye,
+    EyeOff,
+    PanelLeftClose,
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import type { AgmConversationNode, AgmProjectTreeNode } from './types';
@@ -56,6 +59,10 @@ export interface TreePanelProps {
     // Re-send queued prompts (Task-03): shown next to the Queued filter.
     onResendQueued?: () => void;
     isResendingQueued?: boolean;
+    isAutomatedHidden?: boolean;
+    setIsAutomatedHidden?: (v: boolean | ((prev: boolean) => boolean)) => void;
+    isCollapsed?: boolean;
+    onToggleCollapse?: () => void;
     // Context menu handlers forwarded to ConversationNode
     onRenameConversation?: (conversationId: string, newTitle: string) => Promise<void> | void;
     onResendPrompts?: (count: number | 'all') => void;
@@ -81,6 +88,9 @@ export function TreePanel(props: TreePanelProps) {
         setSelectedProjectScope,
         isArchivedProjectsExpanded,
         setIsArchivedProjectsExpanded,
+        isAutomatedHidden = true,
+        setIsAutomatedHidden,
+        onToggleCollapse,
         instanceName,
         instanceId,
         expandedProjects,
@@ -108,6 +118,20 @@ export function TreePanel(props: TreePanelProps) {
     } = props;
 
     const [subLoading, setSubLoading] = useState(promptTreeLoadingEmitter.isLoading);
+    const [internalAutomatedHidden, setInternalAutomatedHidden] = useState(isAutomatedHidden);
+    useEffect(() => {
+        setInternalAutomatedHidden(isAutomatedHidden);
+    }, [isAutomatedHidden]);
+
+    const effectiveAutomatedHidden = isAutomatedHidden !== undefined ? isAutomatedHidden : internalAutomatedHidden;
+    const handleToggleAutomated = () => {
+        if (setIsAutomatedHidden) {
+            setIsAutomatedHidden(!effectiveAutomatedHidden);
+        } else {
+            setInternalAutomatedHidden((prev) => !prev);
+        }
+    };
+
     useEffect(() => {
         const unsubscribe = promptTreeLoadingEmitter.subscribe((v) => setSubLoading(v));
         return () => {
@@ -149,6 +173,7 @@ export function TreePanel(props: TreePanelProps) {
             activeFilter={activeFilter}
             categoryFilter={categoryFilter}
             searchQuery={searchQuery}
+            isAutomatedHidden={effectiveAutomatedHidden}
             selectedConversationId={selectedConversationId}
             onSelectProject={onSelectProject}
             onToggleExpand={onToggleProjectExpand}
@@ -201,6 +226,16 @@ export function TreePanel(props: TreePanelProps) {
                             title={pinnedProjectIds.includes(selectedProjectScope) ? "Unpin project" : "Pin project to prompt view"}
                         >
                             <Pin className={cn("w-3.5 h-3.5", pinnedProjectIds.includes(selectedProjectScope) && "fill-current")} />
+                        </button>
+                    )}
+                    {onToggleCollapse && (
+                        <button
+                            type="button"
+                            onClick={onToggleCollapse}
+                            className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#25173e] transition-colors cursor-pointer shrink-0"
+                            title="Collapse tree panel"
+                        >
+                            <PanelLeftClose className="w-3.5 h-3.5" />
                         </button>
                     )}
                 </div>
@@ -324,19 +359,44 @@ export function TreePanel(props: TreePanelProps) {
                         </button>
                     </div>
 
-                    {/* Scope / State Dropdown (All vs Archived) */}
-                    <select
-                        value={activeFilter === 'archived' ? 'archived' : 'all'}
-                        onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === 'archived') setActiveFilter('archived');
-                            else setActiveFilter('all');
-                        }}
-                        className="text-[10px] font-medium bg-transparent border-0 focus:ring-0 focus:outline-none text-slate-700 dark:text-slate-300 rounded-md px-2 py-0.5 cursor-pointer"
-                    >
-                        <option value="all" className="dark:bg-[#171025]">All ({treeData.length})</option>
-                        <option value="archived" className="dark:bg-[#171025]">Archived ({archivedCount})</option>
-                    </select>
+                    <div className="flex items-center gap-1">
+                        <button
+                            type="button"
+                            onClick={handleToggleAutomated}
+                            className={cn(
+                                "px-2 py-0.5 text-[10px] font-semibold rounded-md transition-colors cursor-pointer flex items-center gap-1 border shadow-2xs",
+                                effectiveAutomatedHidden
+                                    ? "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-400/40"
+                                    : "bg-slate-100 dark:bg-[#201538] text-slate-500 dark:text-slate-400 border-slate-200 dark:border-[#40285e] hover:text-slate-800 dark:hover:text-slate-200"
+                            )}
+                            title={
+                                effectiveAutomatedHidden
+                                    ? "Automated heartbeat & system prompts are hidden. Click to show."
+                                    : "Automated heartbeat & system prompts are shown. Click to hide."
+                            }
+                        >
+                            {effectiveAutomatedHidden ? (
+                                <EyeOff className="w-2.5 h-2.5 shrink-0 text-purple-500" />
+                            ) : (
+                                <Eye className="w-2.5 h-2.5 shrink-0 text-slate-400" />
+                            )}
+                            <span>{effectiveAutomatedHidden ? 'Hide Auto' : 'Show Auto'}</span>
+                        </button>
+
+                        {/* Scope / State Dropdown (All vs Archived) */}
+                        <select
+                            value={activeFilter === 'archived' ? 'archived' : 'all'}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === 'archived') setActiveFilter('archived');
+                                else setActiveFilter('all');
+                            }}
+                            className="text-[10px] font-medium bg-transparent border-0 focus:ring-0 focus:outline-none text-slate-700 dark:text-slate-300 rounded-md px-1 py-0.5 cursor-pointer"
+                        >
+                            <option value="all" className="dark:bg-[#171025]">All ({treeData.length})</option>
+                            <option value="archived" className="dark:bg-[#171025]">Archived ({archivedCount})</option>
+                        </select>
+                    </div>
                 </div>
 
                 {/* Row 3: Action Buttons (Reset Filters & Re-send queued prompts) */}

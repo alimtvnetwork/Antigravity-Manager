@@ -430,6 +430,11 @@ pub fn run() {
             commands::toolchain_list_items,
             commands::toolchain_check,
             commands::toolchain_install,
+            // Speed Error Database & Diagnostics commands
+            commands::log_client_error,
+            commands::list_client_errors,
+            commands::clear_client_errors,
+            commands::run_error_diagnostics,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

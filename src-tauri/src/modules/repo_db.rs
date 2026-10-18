@@ -106,7 +106,10 @@ pub use resend::{resend_all_running_commands, resend_running_commands_for_instan
 // ---- auto_resume ----
 pub use auto_resume::auto_resume_recent_prompts;
 // ---- sequences ----
-pub use sequences::{extract_prompt_tail_snippet, extract_prompt_words_preview};
+pub use sequences::{
+    extract_prompt_tail_snippet, extract_prompt_words_preview, get_sequence_code_for_conversation,
+    get_sequence_code_in_conn,
+};
 // ---- sqlite_export ----
 pub use sqlite_export::{
     export_prompt_tree_db_bytes, import_prompt_tree_db, import_prompt_tree_db_bytes,

@@ -285,6 +285,23 @@ pub fn resend_queued_prompts_for_instance(
                 reinjected_ids.insert(rec.prompt_id.clone());
                 live_by_id.insert(rec.prompt_id.clone(), "queued".to_string());
                 live_by_sig.insert(sig, "queued".to_string());
+                let (extracted_img, img_paths) =
+                    super::detection::extract_image_payload_or_path(&active_p.prompt_content);
+                let final_img = active_p.image_payload.clone().or(extracted_img);
+                let image_count = if !img_paths.is_empty() {
+                    img_paths.len()
+                } else if final_img.is_some() {
+                    1
+                } else {
+                    0
+                };
+                let byte_size = active_p.prompt_content.len();
+                tracing::info!(
+                    "[PROMPT_RESTORE] Restoring running prompt for instance {} from backup (images: {}, bytes: {})",
+                    eff_inst,
+                    image_count,
+                    byte_size
+                );
                 crate::modules::logger::log_info(&format!(
                     "[RepoDB] Resend-queued: re-injected '{}' as queued on '{}'",
                     rec.prompt_id, eff_inst
@@ -445,6 +462,26 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
             backed_up_count += 1;
             let (extracted_img, img_paths) = extract_image_payload_or_path(&p.prompt_content);
             let final_img = p.image_payload.clone().or(extracted_img);
+            let byte_size = p.prompt_content.len();
+            let image_count = if !img_paths.is_empty() {
+                img_paths.len()
+            } else if final_img.is_some() {
+                1
+            } else {
+                0
+            };
+            let seq_code = p
+                .session_id
+                .as_deref()
+                .and_then(super::sequences::get_sequence_code_for_conversation);
+            tracing::info!(
+                "[PROMPT_BACKUP] Backed up running prompt for instance {} (seq: {:?}, images: {}, bytes: {})",
+                p.instance_id,
+                seq_code,
+                image_count,
+                byte_size
+            );
+
             // Write disk resume snapshot file inside project repo directory.
             // session_id is the live conversation, so the IDE reopens that chat.
             let task_file = PathBuf::from(&p.repo_path).join(".antigravity_resume_task.json");
@@ -675,6 +712,22 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                 backed_up_count += 1;
                 let (extracted_img, img_paths) = extract_image_payload_or_path(&prompt_text);
                 let final_img = image_payload.clone().or(extracted_img);
+                let byte_size = prompt_text.len();
+                let image_count = if !img_paths.is_empty() {
+                    img_paths.len()
+                } else if final_img.is_some() {
+                    1
+                } else {
+                    0
+                };
+                let seq_code = super::sequences::get_sequence_code_for_conversation(&project.id);
+                tracing::info!(
+                    "[PROMPT_BACKUP] Backed up running prompt for instance {} (seq: {:?}, images: {}, bytes: {})",
+                    instance_id,
+                    seq_code,
+                    image_count,
+                    byte_size
+                );
 
                 let active_prompt = ActivePrompt {
                     id: prompt_id.clone(),
@@ -834,5 +887,97 @@ mod tests {
             )
             .unwrap();
         assert_eq!(count, 1, "Must never duplicate records on backup");
+    }
+
+    #[test]
+    fn test_backup_includes_full_prompt_images_sequence_and_workspace_id() {
+        let conn = Connection::open_in_memory().unwrap();
+        assert!(init_tables(&conn).is_ok());
+
+        let now = Utc::now().timestamp();
+        let prompt_text = "Detailed refactoring prompt with embedded image data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+        let image_payload = Some("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==".to_string());
+        let project_id = "proj-workspace-alpha";
+        let conversation_id = "conv-session-101";
+
+        // 1. Ensure conversation sequence exists
+        let seq_id = super::super::sequences::ensure_conversation_sequence_in_conn(
+            &conn,
+            conversation_id,
+            "d:/work/repo-alpha",
+            "Refactoring Task",
+            "default",
+        );
+        assert_eq!(seq_id, 1);
+        let seq_code = super::super::sequences::get_sequence_code_in_conn(&conn, conversation_id);
+        assert_eq!(seq_code, Some("C001".to_string()));
+
+        // 2. Insert running project
+        conn.execute(
+            "INSERT INTO running_projects 
+             (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+             VALUES (?1, 'default', 'repo-alpha', 'd:/work/repo-alpha', NULL, 1, ?2, ?2)",
+            params![project_id, now],
+        ).unwrap();
+
+        // 3. Insert active prompt with full text, image payload, and workspace ID
+        let prompt_id = "prompt-audit-test";
+        conn.execute(
+            "INSERT INTO active_prompts 
+             (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
+             VALUES (?1, ?2, 'default', 'd:/work/repo-alpha', ?3, 'gemini-2.5-pro', ?4, 'running', ?5, ?5, ?6)",
+            params![prompt_id, project_id, prompt_text, conversation_id, now, &image_payload],
+        ).unwrap();
+
+        // 4. Verify backup transitions status to backed_up and preserves all attributes
+        conn.execute(
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE id = ?2",
+            params![now + 1, prompt_id],
+        )
+        .unwrap();
+
+        let (retrieved_text, retrieved_img, retrieved_proj, retrieved_session, retrieved_status) = conn
+            .query_row(
+                "SELECT prompt_content, image_payload, project_id, session_id, status FROM active_prompts WHERE id = ?1",
+                params![prompt_id],
+                |r| Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, Option<String>>(1)?,
+                    r.get::<_, String>(2)?,
+                    r.get::<_, Option<String>>(3)?,
+                    r.get::<_, String>(4)?,
+                )),
+            )
+            .unwrap();
+
+        assert_eq!(retrieved_text, prompt_text);
+        assert_eq!(retrieved_img, image_payload);
+        assert_eq!(retrieved_proj, project_id);
+        assert_eq!(retrieved_session, Some(conversation_id.to_string()));
+        assert_eq!(retrieved_status, "backed_up");
+
+        // 5. Verify resume_task_document produces canonical document with sequence_code & workspace_id
+        let prompt_obj = ActivePrompt {
+            id: prompt_id.to_string(),
+            project_id: project_id.to_string(),
+            instance_id: "default".to_string(),
+            repo_path: "d:/work/repo-alpha".to_string(),
+            prompt_content: prompt_text.to_string(),
+            model: Some("gemini-2.5-pro".to_string()),
+            session_id: Some(conversation_id.to_string()),
+            status: "backed_up".to_string(),
+            created_at: now,
+            updated_at: now + 1,
+            image_payload: image_payload.clone(),
+        };
+
+        let (extracted_img, img_paths) = extract_image_payload_or_path(&prompt_text);
+        assert!(extracted_img.is_some());
+        let doc = resume_task_document(&prompt_obj, "backed_up", now + 1, &img_paths);
+        assert_eq!(doc["workspace_id"], project_id);
+        assert_eq!(doc["project_id"], project_id);
+        assert_eq!(doc["prompt_content"], prompt_text);
+        assert_eq!(doc["image_payload"], image_payload.unwrap());
+        assert_eq!(doc["has_image"], true);
     }
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, type WheelEvent, type MouseEvent } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Copy, Check, Download, X, Image as ImageIcon } from 'lucide-react';
-import { writeNativeImageToClipboard } from './clipboard';
+import { ZoomIn, ZoomOut, RotateCcw, Copy, Check, Download, X, Image as ImageIcon, FileText } from 'lucide-react';
+import { writeNativeImageToClipboard, copyImageAsMarkdownText } from './clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 
 export interface PromptImagePreviewModalProps {
@@ -20,6 +20,7 @@ export function PromptImagePreviewModal({
     const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
     const [isCopied, setIsCopied] = useState(false);
+    const [isTextCopied, setIsTextCopied] = useState(false);
     const dragStartRef = useRef({ x: 0, y: 0, initialPanX: 0, initialPanY: 0 });
 
     const handleResetZoom = useCallback(() => {
@@ -128,6 +129,35 @@ export function PromptImagePreviewModal({
         }
     }, [imageSrc]);
 
+    const handleCopyText = useCallback(async () => {
+        if (!imageSrc) return;
+        try {
+            const isSuccess = await copyImageAsMarkdownText(
+                imageSrc,
+                altText || 'Image',
+                () => {
+                    setIsTextCopied(true);
+                    setTimeout(() => setIsTextCopied(false), 2200);
+                },
+                (err) => {
+                    useErrorStore.getState().trackWarning(err, {
+                        source: 'PromptImagePreviewModal.handleCopyText',
+                        triggerAction: 'copy_image_as_markdown_text_preview',
+                    });
+                }
+            );
+            if (isSuccess) {
+                setIsTextCopied(true);
+                setTimeout(() => setIsTextCopied(false), 2200);
+            }
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'PromptImagePreviewModal.handleCopyText.outer',
+                triggerAction: 'copy_image_text_preview_outer',
+            });
+        }
+    }, [altText, imageSrc]);
+
     const handleDownload = useCallback(() => {
         if (!imageSrc) return;
         try {
@@ -211,6 +241,15 @@ export function PromptImagePreviewModal({
                     >
                         {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                         <span>{isCopied ? 'Copied PNG!' : 'Copy PNG'}</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleCopyText}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-sky-600/30 hover:bg-sky-600/50 text-sky-200 transition-colors cursor-pointer font-medium"
+                        title="Copy image as Markdown text (![Image](...))"
+                    >
+                        {isTextCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <FileText className="w-3.5 h-3.5" />}
+                        <span>{isTextCopied ? 'Copied Text!' : 'Copy as Text'}</span>
                     </button>
                     <button
                         type="button"

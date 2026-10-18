@@ -267,6 +267,34 @@ pub(crate) fn ensure_conversation_sequence_in_conn(
     }
 }
 
+/// Query the sequence code for a conversation (formatted as "C{:03}") from `agm_conversation_sequences`.
+pub fn get_sequence_code_for_conversation(conv_id: &str) -> Option<String> {
+    let clean = conv_id.trim();
+    if clean.is_empty() {
+        return None;
+    }
+    if let Ok(conn) = super::schema::connect_db() {
+        get_sequence_code_in_conn(&conn, clean)
+    } else {
+        None
+    }
+}
+
+/// Query the sequence code for a conversation using an existing connection.
+pub fn get_sequence_code_in_conn(conn: &Connection, conv_id: &str) -> Option<String> {
+    let clean = conv_id.trim();
+    if clean.is_empty() {
+        return None;
+    }
+    conn.query_row(
+        "SELECT seq_id FROM agm_conversation_sequences WHERE conversation_id = ?1",
+        params![clean],
+        |row| row.get::<_, i64>(0),
+    )
+    .ok()
+    .map(|s| format!("C{:03}", s))
+}
+
 /// Extract clean user prompt up to `max_words` (e.g. 200 words) and return `(preview_text, total_word_count)`.
 /// Preserves line breaks (`\n`) and vertical paragraph gaps rather than flattening all text into a single line.
 pub fn extract_prompt_words_preview(raw_text: &str, max_words: usize) -> (String, usize) {
@@ -573,5 +601,26 @@ mod tests {
         // Repeat batch to verify idempotency and metadata refresh
         let repeat = batch_ensure_sequences(&mut conn, &items).expect("repeat batch update");
         assert_eq!(repeat, vec![1, 2]);
+    }
+
+    #[test]
+    fn test_get_sequence_code_in_conn() {
+        let conn = Connection::open_in_memory().unwrap();
+        assert!(init_tables(&conn).is_ok());
+
+        assert!(get_sequence_code_in_conn(&conn, "nonexistent").is_none());
+        assert!(get_sequence_code_in_conn(&conn, "").is_none());
+
+        let seq_num = ensure_conversation_sequence_in_conn(
+            &conn,
+            "conv-seq-test-01",
+            "d:/work/test",
+            "Test Sequence",
+            "default",
+        );
+        assert_eq!(seq_num, 1);
+
+        let code = get_sequence_code_in_conn(&conn, "conv-seq-test-01");
+        assert_eq!(code, Some("C001".to_string()));
     }
 }

@@ -338,9 +338,16 @@ pub fn resume_task_document(
     image_paths: &[String],
 ) -> serde_json::Value {
     let has_image = prompt.image_payload.is_some() || !image_paths.is_empty();
+    let seq_code = prompt
+        .session_id
+        .as_deref()
+        .and_then(super::sequences::get_sequence_code_for_conversation);
     serde_json::json!({
         "prompt_id": prompt.id,
         "project_id": prompt.project_id,
+        "workspace_id": prompt.project_id,
+        "sequence_code": seq_code,
+        "seq_code": seq_code,
         "instance_id": prompt.instance_id,
         "repo_path": prompt.repo_path,
         "prompt_content": prompt.prompt_content,
@@ -412,6 +419,7 @@ mod tests {
         let doc = resume_task_document(&prompt, "dispatched", 1000, &[]);
         assert_eq!(doc["prompt_id"], "prompt-123");
         assert_eq!(doc["project_id"], "test-proj");
+        assert_eq!(doc["workspace_id"], "test-proj");
         assert_eq!(doc["instance_id"], "default");
         assert_eq!(doc["repo_path"], "/test/repo");
         assert_eq!(doc["prompt_content"], "test prompt content");

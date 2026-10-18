@@ -1,6 +1,7 @@
 import {
   useErrorStore,
   recordClickEvent,
+  persistErrorToSpeedDb,
 } from '../stores/error-store';
 
 let isInitialized = false;
@@ -17,6 +18,15 @@ export function persistClientCrash(err: unknown, source: string): void {
       at: new Date().toISOString(),
     };
     localStorage.setItem(LAST_CLIENT_ERROR_KEY, JSON.stringify(payload));
+    persistErrorToSpeedDb({
+      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36),
+      code: 'E9001',
+      level: 'error',
+      message: errorObj.message,
+      stackTrace: errorObj.stack,
+      createdAt: new Date().toISOString(),
+      context: { source, triggerAction: 'persist_client_crash' },
+    });
   } catch (storageError) {
     useErrorStore.getState().trackWarning(storageError, {
       source: 'error-listener.persistClientCrash',

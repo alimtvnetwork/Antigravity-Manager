@@ -312,3 +312,86 @@ pub(crate) async fn admin_set_data_dir(
         &new_path,
     )))
 }
+
+#[derive(Deserialize)]
+pub(crate) struct LogClientErrorPayload {
+    pub(crate) entry: crate::modules::error_db::NewErrorRecord,
+}
+
+pub(crate) async fn admin_log_client_error(
+    Json(payload): Json<LogClientErrorPayload>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    tokio::task::spawn_blocking(move || crate::modules::error_db::record_error(&payload.entry))
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })?
+        .map(|id| Json(json!({ "id": id, "success": true })))
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { error: e }),
+            )
+        })
+}
+
+#[derive(Deserialize)]
+pub(crate) struct ListClientErrorsQuery {
+    pub(crate) limit: Option<usize>,
+    pub(crate) severity: Option<String>,
+}
+
+pub(crate) async fn admin_list_client_errors(
+    Query(query): Query<ListClientErrorsQuery>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    let options = crate::modules::error_db::ErrorQueryOptions {
+        limit: query.limit,
+        offset: None,
+        severity: query.severity,
+        error_code: None,
+        search: None,
+    };
+    tokio::task::spawn_blocking(move || crate::modules::error_db::list_errors(&options))
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })?
+        .map(Json)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { error: e }),
+            )
+        })
+}
+
+pub(crate) async fn admin_clear_client_errors(
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    tokio::task::spawn_blocking(crate::modules::error_db::clear_errors)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })?
+        .map(|count| Json(json!({ "cleared": count, "success": true })))
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { error: e }),
+            )
+        })
+}

@@ -858,8 +858,6 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
         let start = Instant::now();
         let reachable = check_tcp_liveness(&conn.ip_address, port, 1500);
         let elapsed_ms = start.elapsed().as_millis() as u64;
-        let resolved_user = resolve_username_placeholders(&conn.username, &conn.os);
-
         let (status_label, error_message) = if reachable {
             ("reachable".to_string(), None)
         } else {
@@ -882,7 +880,7 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
             instance_id: "default".to_string(),
             instance_name: format!("{}:default", conn.alias),
             running: reachable,
-            bound_email: format!("{}@{}", resolved_user, conn.alias),
+            bound_email: String::new(),
             tier: "SSH-NODE".to_string(),
             quota_4h_pct: 100.0,
             quota_weekly_pct: 100.0,

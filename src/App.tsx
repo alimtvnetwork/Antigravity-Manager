@@ -14,6 +14,7 @@ import TokenStats from './pages/TokenStats';
 import Security from './pages/Security';
 import Email from './pages/Email';
 import Supabase from './pages/Supabase';
+import Telegram from './pages/Telegram';
 import ThemeManager from './components/common/ThemeManager';
 import UserToken from './pages/UserToken';
 import { ApiKeyFun } from './pages/ApiKeyFun';
@@ -86,6 +87,10 @@ const router = createBrowserRouter([
       {
         path: 'supabase',
         element: <Supabase />,
+      },
+      {
+        path: 'telegram',
+        element: <Telegram />,
       },
       {
         path: 'audit',

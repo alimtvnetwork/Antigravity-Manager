@@ -36,3 +36,9 @@ export {
     assembleConversationHierarchy,
     normalizePromptForGrouping,
 } from './PromptTreeView/tierClassification';
+export { TreePanel } from './PromptTreeView/TreePanel';
+export type { TreePanelProps } from './PromptTreeView/TreePanel';
+export { ProjectNode } from './PromptTreeView/ProjectNode';
+export type { ProjectNodeProps } from './PromptTreeView/ProjectNode';
+export { usePromptTreeState } from './PromptTreeView/usePromptTreeState';
+export type { PromptTreeState } from './PromptTreeView/usePromptTreeState';

@@ -124,6 +124,16 @@ pub(crate) fn print_help_json() {
                     { "name": "supabase sync", "aliases": ["supa sync"], "flags": [], "description": "Trigger immediate local node heartbeat and instance profile sync" },
                     { "name": "supabase schema", "aliases": ["supa schema"], "flags": ["[root|secondary]"], "description": "Output SQL schema DDL for Supabase SQL Editor" }
                 ]
+            },
+            {
+                "group": "Speed Error Database & Automated Self-Healing",
+                "items": [
+                    { "name": "errors", "aliases": ["error", "err"], "flags": ["list", "clear", "fix", "--limit <N>", "--severity <S>", "--json"], "description": "Inspect SQLite speed error database (errors.db), purge error logs, or run automated self-healing engine" },
+                    { "name": "errors list", "aliases": ["errors ls"], "flags": ["--limit <N>", "--severity <S>", "--json"], "description": "List captured errors with timestamp, severity, code, source, and message" },
+                    { "name": "errors fix", "aliases": ["errors heal"], "flags": ["--dry-run", "--json"], "description": "Surgically resolve stale lockfiles, permissions, corrupted configs, and database WAL locks" },
+                    { "name": "errors clear", "aliases": ["errors clean"], "flags": ["--json"], "description": "Purge all error history from errors.db" },
+                    { "name": "failed-commands", "aliases": ["fc", "failed-command", "unknown-commands", "fcc"], "flags": ["[N]", "count", "clear", "--json"], "description": "Inspect undetected or failed terminal commands with frequency metrics and suggestions" }
+                ]
             }
         ]
     });
@@ -321,6 +331,27 @@ pub(crate) fn print_help() {
     println!("        Output SQL schema DDL to create tables in Supabase SQL Editor");
     println!();
     println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("  SPEED ERROR DATABASE & SELF-HEALING DIAGNOSTICS");
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("    errors, error, err [list] [--limit <N>] [--severity <S>] [--json]");
+    println!("        Display errors tracked in SQLite errors.db in table or JSON format");
+    println!("    errors list, errors ls [--limit <N>] [--severity <S>] [--json]");
+    println!("        List captured errors with timestamp, severity, code, source, and message");
+    println!("    errors fix, errors heal [--dry-run] [--json]");
+    println!("        Run automated diagnostic engine & surgically repair stale locks, permissions & configs");
+    println!("    errors clear, errors clean [--json]");
+    println!("        Purge all error history from SQLite errors.db");
+    println!("    failed-commands, fc, failed-command [N] [--json] [count|clear]");
+    println!(
+        "        Inspect undetected/failed terminal commands with hit count & suggestion telemetry"
+    );
+    println!("        Examples:");
+    println!("          agm failed-commands           # View top 20 failed commands");
+    println!("          agm fc 50                     # View top 50 failed commands");
+    println!("          agm fc count                  # View distinct and total failed counts");
+    println!("          agm fc clear                  # Purge failed command history");
+    println!();
+    println!("  ────────────────────────────────────────────────────────────────────────────");
     println!("  REAL-WORLD EXAMPLES (AGM & GITMAP PARITY)");
     println!("  ────────────────────────────────────────────────────────────────────────────");
     println!(
@@ -474,6 +505,18 @@ pub(crate) fn print_commands_table() {
         "List Running Prompts",
         format!("cmd: {} | agm running-prompts ls", node_alias),
         "agm running-prompts ls"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Run Diagnostics Fix",
+        format!("cmd: {} | agm errors fix", node_alias),
+        "agm errors fix"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Failed Commands Telemetry",
+        format!("cmd: {} | agm fc", node_alias),
+        "agm fc"
     );
     println!(
         "  {:<26} {:<36} {:<32}",

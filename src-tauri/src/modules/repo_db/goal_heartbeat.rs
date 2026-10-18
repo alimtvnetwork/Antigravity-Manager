@@ -125,6 +125,25 @@ pub fn start_prompt_goal_heartbeat(
         "save prompt goal before worker spawn",
     );
 
+    let (extracted_img, img_paths) = super::detection::extract_image_payload_or_path(&prompt_text);
+    let image_count = if !img_paths.is_empty() {
+        img_paths.len()
+    } else if extracted_img.is_some() {
+        1
+    } else {
+        0
+    };
+    let byte_size = prompt_text.len();
+    let session_conv_id = format!("goal-session-{}", instance_id);
+    let seq_code = super::sequences::get_sequence_code_for_conversation(&session_conv_id);
+    tracing::info!(
+        "[PROMPT_BACKUP] Backed up running prompt for instance {} (seq: {:?}, images: {}, bytes: {})",
+        instance_id,
+        seq_code,
+        image_count,
+        byte_size
+    );
+
     // Spawn detached goal worker process
     if let Ok(cur_exe) = std::env::current_exe() {
         let mut cmd = Command::new(&cur_exe);
@@ -591,10 +610,76 @@ pub fn ensure_prompt_goals_running_for_instance(instance_id: &str) -> usize {
                         cfg.interval_secs,
                     ) {
                         reinvoked += 1;
+                        let (extracted_img, img_paths) =
+                            super::detection::extract_image_payload_or_path(&cfg.prompt_content);
+                        let image_count = if !img_paths.is_empty() {
+                            img_paths.len()
+                        } else if extracted_img.is_some() {
+                            1
+                        } else {
+                            0
+                        };
+                        let byte_size = cfg.prompt_content.len();
+                        tracing::info!(
+                            "[PROMPT_RESTORE] Restoring running prompt for instance {} from backup (images: {}, bytes: {})",
+                            instance_id,
+                            image_count,
+                            byte_size
+                        );
                     }
                 }
             }
         }
     }
     reinvoked
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_clamp_heartbeat_interval() {
+        assert_eq!(clamp_heartbeat_interval(0), 30);
+        assert_eq!(clamp_heartbeat_interval(10), 30);
+        assert_eq!(clamp_heartbeat_interval(30), 30);
+        assert_eq!(clamp_heartbeat_interval(45), 45);
+    }
+
+    #[test]
+    fn test_goal_heartbeat_config_and_audit_log() {
+        let prompt_text = "Prompt goal test with attached diagram file:///d:/temp/diagram.png";
+        let (extracted_img, img_paths) =
+            super::super::detection::extract_image_payload_or_path(prompt_text);
+        assert_eq!(img_paths.len(), 1);
+        let image_count = if !img_paths.is_empty() {
+            img_paths.len()
+        } else if extracted_img.is_some() {
+            1
+        } else {
+            0
+        };
+        assert_eq!(image_count, 1);
+        assert_eq!(prompt_text.len(), 66);
+
+        let cfg = PromptGoalHeartbeatConfig {
+            prompt_id: "goal-test-1".to_string(),
+            instance_id: "default".to_string(),
+            data_dir: "d:/data".to_string(),
+            repo_path: "d:/work/test".to_string(),
+            prompt_content: prompt_text.to_string(),
+            heartbeat_file: "d:/work/test/.hb.log".to_string(),
+            interval_secs: 30,
+            account_email: "test@example.com".to_string(),
+            worker_pid: Some(1234),
+            started_at: 1000,
+            last_heartbeat_at: Some(1030),
+        };
+
+        let json_str = serde_json::to_string(&cfg).expect("serialize cfg");
+        let parsed: PromptGoalHeartbeatConfig =
+            serde_json::from_str(&json_str).expect("deserialize cfg");
+        assert_eq!(parsed.prompt_id, "goal-test-1");
+        assert_eq!(parsed.account_email, "test@example.com");
+    }
 }

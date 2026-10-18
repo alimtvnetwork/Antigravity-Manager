@@ -10,6 +10,27 @@ interface FleetMachineRowProps {
     onToggleMask: (nodeId: string) => void;
 }
 
+function isAdminIdentifier(val?: string | null): boolean {
+    if (!val) return false;
+    const lower = val.toLowerCase().trim();
+    return (
+        lower.includes('administrator') ||
+        lower.includes('root') ||
+        lower.includes('${adminuser}') ||
+        lower.includes('${linuxuser}') ||
+        lower.includes(':') ||
+        lower.startsWith('password')
+    );
+}
+
+function sanitizeAdminText(text?: string | null): string {
+    if (!text) return '';
+    return text
+        .replace(/\$\{adminUser\}|\$\{linuxUser\}/gi, '')
+        .replace(/\b(administrator|root)\b/gi, '')
+        .trim();
+}
+
 export function FleetMachineRow({
     machine,
     isRowUnmasked,
@@ -24,7 +45,10 @@ export function FleetMachineRow({
                 .map((i) => i.bound_account_email)
                 .filter(Boolean) as string[],
         ])
-    );
+    ).filter((email) => !isAdminIdentifier(email));
+
+    const cleanAlias = sanitizeAdminText(machine.node_alias) || 'Unnamed Worker';
+    const cleanOsInfo = sanitizeAdminText(machine.os_info);
 
     return (
         <tr key={machine.node_id} className="hover:bg-slate-800/30 transition-colors duration-150">
@@ -48,9 +72,9 @@ export function FleetMachineRow({
                         <div className="flex items-center gap-1.5 flex-wrap">
                             <span
                                 className="font-semibold text-slate-100 text-xs truncate max-w-[140px]"
-                                title={machine.node_alias}
+                                title={cleanAlias}
                             >
-                                {machine.node_alias || 'Unnamed Worker'}
+                                {cleanAlias}
                             </span>
                             {machine.is_online ? (
                                 <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
@@ -68,9 +92,9 @@ export function FleetMachineRow({
                             )}
                         </div>
                         <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5 font-mono">
-                            {machine.os_info && (
-                                <span className="truncate max-w-[130px]" title={machine.os_info}>
-                                    {machine.os_info}
+                            {cleanOsInfo && (
+                                <span className="truncate max-w-[130px]" title={cleanOsInfo}>
+                                    {cleanOsInfo}
                                 </span>
                             )}
                             <span
@@ -109,16 +133,26 @@ export function FleetMachineRow({
             <td className="px-3.5 py-2.5 align-middle">
                 {machine.active_instances && machine.active_instances.length > 0 ? (
                     <div className="flex items-center gap-1.5 flex-wrap max-w-[260px]">
-                        {machine.active_instances.map((inst, i) => (
-                            <span
-                                key={inst.profile_id || `${inst.profile_name}-${i}`}
-                                className="rounded-full px-2 py-0.5 text-xs bg-blue-500/15 text-blue-400 border border-blue-500/30 flex items-center gap-1 font-medium shadow-2xs"
-                                title={`Profile: ${inst.profile_name}${inst.bound_account_email ? ` (${inst.bound_account_email})` : ''}`}
-                            >
-                                <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                                <span className="truncate max-w-[120px]">{inst.profile_name}</span>
-                            </span>
-                        ))}
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                            {machine.active_instances.length} {machine.active_instances.length === 1 ? 'inst' : 'insts'}
+                        </span>
+                        {machine.active_instances.map((inst, i) => {
+                            const cleanProfileName = sanitizeAdminText(inst.profile_name) || `Profile-${i + 1}`;
+                            const boundEmail = inst.bound_account_email && !isAdminIdentifier(inst.bound_account_email)
+                                ? (isRowUnmasked ? inst.bound_account_email : maskEmailAddress(inst.bound_account_email))
+                                : null;
+                            const tooltip = `Profile: ${cleanProfileName}${boundEmail ? ` (${boundEmail})` : ''}`;
+                            return (
+                                <span
+                                    key={inst.profile_id || `${cleanProfileName}-${i}`}
+                                    className="rounded-full px-2 py-0.5 text-xs bg-blue-500/15 text-blue-400 border border-blue-500/30 flex items-center gap-1 font-medium shadow-2xs"
+                                    title={tooltip}
+                                >
+                                    <span className={`w-1.5 h-1.5 rounded-full ${inst.is_running ? 'bg-emerald-400 animate-pulse' : 'bg-blue-400'}`} />
+                                    <span className="truncate max-w-[120px]">{cleanProfileName}</span>
+                                </span>
+                            );
+                        })}
                     </div>
                 ) : (
                     <span className="text-slate-500 italic text-xs">No active profiles</span>

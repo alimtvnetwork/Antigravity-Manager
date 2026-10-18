@@ -4,6 +4,8 @@ import {
     Maximize2,
     Minimize2,
     RefreshCw,
+    PanelLeftClose,
+    PanelLeftOpen,
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import type { SyncInterval } from '../../../services/instanceService';
@@ -29,6 +31,8 @@ export interface ModalHeaderProps {
     onFileRestore: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onRefreshAll: () => void;
     onResetTree: () => void;
+    isTreeCollapsed?: boolean;
+    onToggleTree?: () => void;
 }
 
 const SYNC_INTERVALS: { value: SyncInterval; label: string }[] = [
@@ -59,6 +63,8 @@ export function ModalHeader(props: ModalHeaderProps) {
         onFileRestore,
         onRefreshAll,
         onResetTree,
+        isTreeCollapsed,
+        onToggleTree,
     } = props;
 
     return (
@@ -164,11 +170,28 @@ export function ModalHeader(props: ModalHeaderProps) {
 
                 {/* Capsule 2: Window Controls Capsule */}
                 <div className="inline-flex items-center rounded-md bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#40285e]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#40285e]/80 shadow-2xs">
+                    {/* Tree View Collapse / Expand Toggle */}
+                    {onToggleTree && (
+                        <button
+                            type="button"
+                            onClick={onToggleTree}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-l-md text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-colors cursor-pointer"
+                            title={isTreeCollapsed ? "Show Prompt Tree Panel" : "Hide Prompt Tree Panel"}
+                        >
+                            {isTreeCollapsed ? (
+                                <PanelLeftOpen className="w-3.5 h-3.5 text-blue-500" />
+                            ) : (
+                                <PanelLeftClose className="w-3.5 h-3.5 text-slate-400" />
+                            )}
+                            <span className="hidden sm:inline">{isTreeCollapsed ? 'Show Tree' : 'Hide Tree'}</span>
+                        </button>
+                    )}
+
                     {/* Fullscreen Toggle */}
                     <button
                         type="button"
                         onClick={() => setIsFullscreen(!isFullscreen)}
-                        className="p-1.5 rounded-l-md text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-colors cursor-pointer"
+                        className={cn("p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-colors cursor-pointer", !onToggleTree && "rounded-l-md")}
                         title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
                     >
                         {isFullscreen ? (

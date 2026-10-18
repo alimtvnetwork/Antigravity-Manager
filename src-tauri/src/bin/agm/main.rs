@@ -19,6 +19,7 @@ mod email_arms_a;
 mod email_arms_b;
 mod email_cmds;
 mod email_dispatch;
+mod error_cmds;
 mod fleet_cmds;
 mod green_cmds;
 mod help_tables;
@@ -355,6 +356,9 @@ fn main() {
         | "failed-commands-count"
         | "fcc" => {
             crate::misc_cmds::cmd_failed_commands(&cmd_args);
+        }
+        "errors" | "error" | "err" => {
+            crate::error_cmds::dispatch_errors_domain(&cmd_args);
         }
         "clear" => {
             if cmd_args

@@ -14,7 +14,7 @@ import { cn } from '../../../utils/cn';
 import { useErrorStore } from '../../../stores/error-store';
 import { PromptOriginTier, type AgmConversationNode, type AgmProjectTreeNode } from './types';
 import { isGhostConversation, isStaleOrEmptyConversation } from './conversationGuards';
-import { classifyPromptTier, assembleConversationHierarchy } from './tierClassification';
+import { classifyPromptTier, assembleConversationHierarchy, isAutomatedConversation } from './tierClassification';
 import { formatSeqBadge } from './formatters';
 import { ConversationNode, getConversationStatus } from './ConversationNode';
 import { ProjectContextMenu } from './ProjectContextMenu';
@@ -27,6 +27,7 @@ export interface ProjectNodeProps {
     isPinned: boolean;
     isArchived: boolean;
     isRefreshing: boolean;
+    isAutomatedHidden?: boolean;
     isStaleGroupExpanded: boolean;
     activeFilter: 'all' | 'running' | 'queued' | 'latest_conv' | 'latest_prompt' | 'pinned' | 'archived';
     categoryFilter: 'all' | 'user' | 'subagent' | 'system';
@@ -305,6 +306,27 @@ async function exportProjectAsSqlite(project: AgmProjectTreeNode): Promise<void>
     }
 }
 
+export function isAutomatedPrompt(conv: AgmConversationNode): boolean {
+    if (isAutomatedConversation(conv)) return true;
+    const cat = classifyPromptTier(conv.prompt_preview_200w, conv.title, conv);
+    if (cat.tier === PromptOriginTier.SystemMessage || cat.tier === PromptOriginTier.ToolOutput) {
+        return true;
+    }
+    const status = (conv.status || '').toLowerCase();
+    const title = (conv.title || '').toLowerCase();
+    const preview = (conv.prompt_preview_200w || '').toLowerCase();
+    return (
+        status.includes('heartbeat') ||
+        status.includes('telemetry') ||
+        title.includes('heartbeat') ||
+        title.startsWith('system:') ||
+        preview.includes('heartbeat') ||
+        preview.includes('[tool result]') ||
+        preview.includes('<system_message>') ||
+        preview.includes('token_usage')
+    );
+}
+
 export function ProjectNode(props: ProjectNodeProps) {
     const [projectMenuPos, setProjectMenuPos] = useState<{ x: number; y: number } | null>(null);
     const {
@@ -314,6 +336,7 @@ export function ProjectNode(props: ProjectNodeProps) {
         isPinned,
         isArchived,
         isRefreshing,
+        isAutomatedHidden = true,
         isStaleGroupExpanded,
         activeFilter,
         categoryFilter,
@@ -337,6 +360,7 @@ export function ProjectNode(props: ProjectNodeProps) {
 
     const filteredConvs = project.conversations.filter((c) => {
         if (activeFilter === 'archived') return true;
+        if (isAutomatedHidden && categoryFilter !== 'system' && isAutomatedPrompt(c)) return false;
         return !isGhostConversation(c);
     });
 
@@ -351,6 +375,9 @@ export function ProjectNode(props: ProjectNodeProps) {
 
     sortedConvs.forEach((conv) => {
         if (isGhostConversation(conv) && activeFilter !== 'archived') {
+            return;
+        }
+        if (isAutomatedHidden && categoryFilter !== 'system' && isAutomatedPrompt(conv)) {
             return;
         }
         const cat = classifyPromptTier(conv.prompt_preview_200w, conv.title, conv);
@@ -379,10 +406,13 @@ export function ProjectNode(props: ProjectNodeProps) {
     const runningCount = project.conversations.filter(
         (c) => Boolean(c.is_running) &&
                !isGhostConversation(c) &&
+               (!isAutomatedHidden || categoryFilter === 'system' || !isAutomatedPrompt(c)) &&
                !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
     ).length;
     const queuedCount = project.conversations.filter(
-        (c) => (Boolean(c.is_queued) || c.status.toLowerCase().includes('queue')) && !c.is_running
+        (c) => (Boolean(c.is_queued) || c.status.toLowerCase().includes('queue')) &&
+               !c.is_running &&
+               (!isAutomatedHidden || categoryFilter === 'system' || !isAutomatedPrompt(c))
     ).length;
 
     const listProps = {

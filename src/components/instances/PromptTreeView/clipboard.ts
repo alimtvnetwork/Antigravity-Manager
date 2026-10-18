@@ -175,6 +175,54 @@ export function base64ToBlob(base64Data: string, mimeType = 'image/png'): Blob {
 }
 
 /**
+ * Converts an image URI (Base64 data URI, HTTP URL, file path, or blob URI)
+ * into a full Base64 data URI (data:image/png;base64,...) for embedding into HTML.
+ */
+export async function convertImageUriToBase64(imageUri: string): Promise<string | null> {
+    try {
+        if (!imageUri || !imageUri.trim()) return null;
+        const cleanUri = imageUri.trim();
+
+        // Already a base64 data URI
+        if (cleanUri.startsWith('data:image/')) {
+            return cleanUri;
+        }
+
+        const resolvedSrc = resolveImageSrc(cleanUri);
+        return await new Promise<string | null>((resolve) => {
+            const timeout = setTimeout(() => resolve(null), 5000);
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                clearTimeout(timeout);
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth || img.width || 300;
+                    canvas.height = img.naturalHeight || img.height || 150;
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        resolve(null);
+                        return;
+                    }
+                    ctx.drawImage(img, 0, 0);
+                    const dataUrl = canvas.toDataURL('image/png');
+                    resolve(dataUrl);
+                } catch {
+                    resolve(null);
+                }
+            };
+            img.onerror = () => {
+                clearTimeout(timeout);
+                resolve(null);
+            };
+            img.src = resolvedSrc;
+        });
+    } catch {
+        return null;
+    }
+}
+
+/**
  * Converts an image URI (Base64 data URI, HTTP URL, or local file/blob URI)
  * into a true PNG binary Blob (image/png) for native clipboard insertion.
  */
@@ -193,9 +241,11 @@ export async function convertImageUriToPngBlob(imageUri: string): Promise<Blob |
 
         // 2. Offscreen rendering to HTMLCanvasElement to guarantee standard PNG binary encoding
         return await new Promise<Blob | null>((resolve) => {
+            const timeout = setTimeout(() => resolve(null), 5000);
             const img = new Image();
             img.crossOrigin = 'anonymous';
             img.onload = () => {
+                clearTimeout(timeout);
                 try {
                     const canvas = document.createElement('canvas');
                     canvas.width = img.naturalWidth || img.width || 300;
@@ -214,6 +264,7 @@ export async function convertImageUriToPngBlob(imageUri: string): Promise<Blob |
                 }
             };
             img.onerror = () => {
+                clearTimeout(timeout);
                 resolve(null);
             };
             img.src = resolvedSrc;
@@ -287,6 +338,12 @@ export async function writeNativeImageToClipboard(
  * simultaneously using triple/dual MIME types ('image/png', 'text/html', and 'text/plain')
  * with a resilient tri-stage fallback ladder (Async Clipboard API -> DOM execCommand -> Native IPC).
  */
+/**
+ * Copies markdown prompt content and embedded images into system clipboard
+ * simultaneously using triple/dual MIME types ('image/png', 'text/html', and 'text/plain')
+ * with embedded Base64 <img> tags so pasting into Microsoft OneNote, Word, or external IDEs
+ * correctly retains and renders the images without broken external dependencies.
+ */
 export async function copyPromptWithRichImages(
     markdownText: string,
     onSuccess?: (message: string) => void,
@@ -309,7 +366,20 @@ export async function copyPromptWithRichImages(
     }
 
     try {
-        // Extract embedded image URLs and format rich HTML
+        // Pre-convert any non-base64 image sources to embedded Base64 data URIs for OneNote/Word
+        const imageMatches = Array.from(markdownText.matchAll(/!\[(.*?)\]\((.*?)\)/g));
+        const srcMap = new Map<string, string>();
+        for (const match of imageMatches) {
+            const rawSrc = match[2].trim();
+            if (rawSrc.startsWith('data:image/')) {
+                srcMap.set(rawSrc, rawSrc);
+            } else if (!srcMap.has(rawSrc)) {
+                const base64Uri = await convertImageUriToBase64(rawSrc);
+                srcMap.set(rawSrc, base64Uri || rawSrc);
+            }
+        }
+
+        // Extract embedded image URLs and format rich HTML with embedded Base64 <img> tags
         let htmlBody = markdownText
             // Escape special HTML chars in text while preserving markdown tokens
             .replace(/&/g, '&amp;')
@@ -322,10 +392,11 @@ export async function copyPromptWithRichImages(
             })
             // Inline code
             .replace(/`([^`]+)`/g, '<code style="background:#282a36;color:#50fa7b;padding:2px 4px;border-radius:3px;font-family:monospace;">$1</code>')
-            // Markdown image syntax: ![alt](url) -> formatted paragraph image
+            // Markdown image syntax: ![alt](url) -> formatted paragraph with embedded Base64 image
             .replace(/!\[(.*?)\]\((.*?)\)/g, (_m, alt, src) => {
                 const cleanSrc = src.trim();
-                return `<p style="margin:12px 0;"><img src="${cleanSrc}" alt="${alt || 'image'}" style="max-width:100%;height:auto;border-radius:6px;display:block;box-shadow:0 2px 8px rgba(0,0,0,0.15);" /></p>`;
+                const resolvedSrc = srcMap.get(cleanSrc) || cleanSrc;
+                return `<p style="margin:12px 0;"><img src="${resolvedSrc}" alt="${alt || 'image'}" style="max-width:100%;height:auto;border-radius:6px;display:block;box-shadow:0 2px 8px rgba(0,0,0,0.15);" /></p>`;
             })
             // Paragraphs and line breaks
             .replace(/\n\n+/g, '</p><p style="margin:8px 0;line-height:1.6;">')
@@ -340,7 +411,9 @@ export async function copyPromptWithRichImages(
         const { images } = extractAssets(markdownText);
         let pngBlob: Blob | null = null;
         if (images.length > 0) {
-            pngBlob = await convertImageUriToPngBlob(images[0]);
+            const firstImg = images[0];
+            const base64First = srcMap.get(firstImg) || firstImg;
+            pngBlob = await convertImageUriToPngBlob(base64First);
         }
 
         let isWritten = false;
@@ -410,6 +483,59 @@ export async function copyPromptWithRichImages(
 }
 
 /**
+ * Copies prompt images or a single image as clean Markdown text
+ * (![Image](data:image/png;base64,...) or relative path text) so it can be pasted as clean text anywhere.
+ */
+export async function copyImageAsMarkdownText(
+    sourceTextOrUri: string,
+    altText = 'Image',
+    onSuccess?: (msg: string) => void,
+    onError?: (err: unknown) => void
+): Promise<boolean> {
+    if (!sourceTextOrUri || !sourceTextOrUri.trim()) {
+        return false;
+    }
+
+    try {
+        const trimmed = sourceTextOrUri.trim();
+        let markdownOutput = '';
+
+        // Check if input is a prompt containing markdown image tags (![alt](src))
+        const mdImageMatches = Array.from(trimmed.matchAll(/!\[(.*?)\]\((.*?)\)/g));
+        if (mdImageMatches.length > 0) {
+            markdownOutput = mdImageMatches.map((m) => m[0]).join('\n\n');
+        } else {
+            // Check if input contains referenced image assets
+            const { images } = extractAssets(trimmed);
+            if (images.length > 0) {
+                markdownOutput = images
+                    .map((img, idx) => `![${altText}${images.length > 1 ? ` ${idx + 1}` : ''}](${img})`)
+                    .join('\n\n');
+            } else {
+                // Input is a direct image URI or path
+                markdownOutput = `![${altText}](${trimmed})`;
+            }
+        }
+
+        const success = await copyToClipboard(markdownOutput);
+        if (success) {
+            const msg = 'Copied image as Markdown text!';
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'success' });
+            return true;
+        }
+        return false;
+    } catch (err) {
+        useErrorStore.getState().trackWarning(err, {
+            source: 'clipboard.copyImageAsMarkdownText',
+            triggerAction: 'copy_image_as_markdown_text',
+        });
+        onError?.(err);
+        return false;
+    }
+}
+
+/**
  * Strips all markdown image tags (![alt](url/dataUri)) and optional trailing image-only lines from prompt text,
  * copying a clean plain-text version to clipboard.
  */
@@ -449,7 +575,7 @@ export async function copyPromptCleanText(
 
 /**
  * Copies multiple image URIs into clipboard memory as rich HTML (<p><img src="..." /></p>)
- * alongside plain text URIs.
+ * with embedded Base64 data URIs and attached binary PNG blob, alongside plain text URIs.
  */
 export async function copyAllImagesAsRichHtml(
     images: string[],
@@ -464,29 +590,68 @@ export async function copyAllImagesAsRichHtml(
         return false;
     }
 
-    const htmlBody = cleanImages.map((src) => `<p><img src="${src}" /></p>`).join('');
-    const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${htmlBody}</body></html>`;
-    const plainText = cleanImages.join('\n');
-
     try {
+        // Convert all images to Base64 data URIs for rich HTML clipboard pasting
+        const base64List: string[] = [];
+        for (const img of cleanImages) {
+            const b64 = await convertImageUriToBase64(img);
+            base64List.push(b64 || img);
+        }
+
+        const htmlBody = base64List
+            .map(
+                (src) =>
+                    `<p style="margin:12px 0;"><img src="${src}" style="max-width:100%;height:auto;border-radius:6px;display:block;box-shadow:0 2px 8px rgba(0,0,0,0.15);" /></p>`
+            )
+            .join('');
+        const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#222;"><p style="margin:8px 0;line-height:1.6;">${htmlBody}</p></body></html>`;
+        const plainText = cleanImages.join('\n');
+
+        let firstPngBlob: Blob | null = null;
+        if (base64List.length > 0) {
+            firstPngBlob = await convertImageUriToPngBlob(base64List[0]);
+        }
+
+        let isWritten = false;
         ensureDocumentFocus();
         const hasFocus = typeof document !== 'undefined' && typeof document.hasFocus === 'function' ? document.hasFocus() : true;
         if (hasFocus && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
-            try {
-                const htmlBlob = new Blob([fullHtml], { type: 'text/html' });
-                const textBlob = new Blob([plainText], { type: 'text/plain' });
-                const item = new ClipboardItem({
-                    'text/html': htmlBlob,
-                    'text/plain': textBlob,
-                });
-                await navigator.clipboard.write([item]);
-                const msg = `Copied ${cleanImages.length} image(s) as rich HTML to clipboard!`;
-                onSuccess?.(msg);
-                showToast({ message: msg, type: 'success' });
-                return true;
-            } catch {
-                // Focus was lost or rich HTML item rejected; fall through to copyToClipboard
+            const htmlBlob = new Blob([fullHtml], { type: 'text/html' });
+            const textBlob = new Blob([plainText], { type: 'text/plain' });
+
+            if (firstPngBlob) {
+                try {
+                    const item = new ClipboardItem({
+                        'image/png': firstPngBlob,
+                        'text/html': htmlBlob,
+                        'text/plain': textBlob,
+                    });
+                    await navigator.clipboard.write([item]);
+                    isWritten = true;
+                } catch {
+                    // Fall back to dual HTML/plain text item
+                }
             }
+
+            if (!isWritten) {
+                try {
+                    const item = new ClipboardItem({
+                        'text/html': htmlBlob,
+                        'text/plain': textBlob,
+                    });
+                    await navigator.clipboard.write([item]);
+                    isWritten = true;
+                } catch {
+                    // Focus was lost or rich HTML item rejected; fall through to copyToClipboard
+                }
+            }
+        }
+
+        if (isWritten) {
+            const msg = `Copied ${cleanImages.length} image(s) as rich HTML with embedded media!`;
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'success' });
+            return true;
         }
 
         const success = await copyToClipboard(plainText);
@@ -498,6 +663,7 @@ export async function copyAllImagesAsRichHtml(
         }
         return false;
     } catch (err) {
+        const plainText = cleanImages.join('\n');
         const fallbackOk = await copyToClipboard(plainText);
         if (fallbackOk) {
             const msg = `Copied ${cleanImages.length} image URL(s) to clipboard!`;

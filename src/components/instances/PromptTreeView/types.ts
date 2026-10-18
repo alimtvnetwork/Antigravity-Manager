@@ -103,6 +103,7 @@ export enum PromptViewMode {
 export enum CopyFormat {
     RichMedia = 'rich_media',
     CleanText = 'clean_text',
+    ImageAsText = 'image_as_text',
     Json = 'json',
 }
 

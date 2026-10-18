@@ -34,6 +34,7 @@ import {
 import { copyToClipboard } from '../../../utils/clipboard';
 import { showToast } from '../../common/ToastContainer';
 import { useErrorStore } from '../../../stores/error-store';
+import { maskEmailAddress } from '../../instances/fleet/fleetFormatUtils';
 
 const toast = {
     success: (msg: string) => showToast(msg, 'success'),
@@ -41,6 +42,27 @@ const toast = {
     info: (msg: string) => showToast(msg, 'info'),
     warning: (msg: string) => showToast(msg, 'warning'),
 };
+
+function isAdminIdentifier(val?: string | null): boolean {
+    if (!val) return false;
+    const lower = val.toLowerCase().trim();
+    return (
+        lower.includes('administrator') ||
+        lower.includes('root') ||
+        lower.includes('${adminuser}') ||
+        lower.includes('${linuxuser}') ||
+        lower.includes(':') ||
+        lower.startsWith('password')
+    );
+}
+
+function sanitizeAdminText(text?: string | null): string {
+    if (!text) return '';
+    return text
+        .replace(/\$\{adminUser\}|\$\{linuxUser\}/gi, '')
+        .replace(/\b(administrator|root)\b/gi, '')
+        .trim();
+}
 
 export function SshGitmapSection() {
     const [status, setStatus] = useState<SshGitmapStatus | null>(null);
@@ -59,12 +81,17 @@ export function SshGitmapSection() {
     const [isExportingCsv, setIsExportingCsv] = useState(false);
 
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
+    const [unmaskedEmailNodes, setUnmaskedEmailNodes] = useState<Record<string, boolean>>({});
+
+    const toggleEmailMask = (key: string) => {
+        setUnmaskedEmailNodes((prev) => ({ ...prev, [key]: !prev[key] }));
+    };
 
     // SSH Node Form State (RSA-2048 Encrypted Password on First Login)
     const [alias, setAlias] = useState('');
     const [ipAddress, setIpAddress] = useState('');
     const [port, setPort] = useState<number>(22);
-    const [username, setUsername] = useState('Administrator');
+    const [username, setUsername] = useState('');
     const [osType, setOsType] = useState('windows');
     const [keyPath, setKeyPath] = useState('~/.ssh/id_ed25519');
     const [plaintextPassword, setPlaintextPassword] = useState('');
@@ -571,13 +598,13 @@ export function SshGitmapSection() {
 
                     <div>
                         <label className="block text-[11px] font-medium text-gray-700 dark:text-slate-300 mb-1">
-                            Username *
+                            SSH OS User *
                         </label>
                         <input
                             type="text"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
-                            placeholder="Administrator / root"
+                            placeholder="SSH user (e.g. deploy or agm-agent)"
                             className="w-full h-8 px-2.5 text-xs rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                     </div>
@@ -686,45 +713,136 @@ export function SshGitmapSection() {
                         <table className="w-full text-left border-collapse text-xs">
                             <thead>
                                 <tr className="bg-gray-50 dark:bg-slate-800/80 text-gray-600 dark:text-slate-300 border-b border-gray-200 dark:border-slate-800">
-                                    <th className="py-2 px-3 font-semibold">Alias</th>
+                                    <th className="py-2 px-3 font-semibold">Node &amp; Alias</th>
                                     <th className="py-2 px-3 font-semibold">IP / Host:Port</th>
-                                    <th className="py-2 px-3 font-semibold">Username</th>
-                                    <th className="py-2 px-3 font-semibold">OS</th>
-                                    <th className="py-2 px-3 font-semibold">RSA Vault &amp; Auth Status</th>
+                                    <th className="py-2 px-3 font-semibold">Running Instance(s)</th>
+                                    <th className="py-2 px-3 font-semibold">Bound Account Email(s)</th>
+                                    <th className="py-2 px-3 font-semibold">Security &amp; Auth</th>
                                     <th className="py-2 px-3 font-semibold text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-slate-800/70">
-                                {nodes.map((node) => (
-                                    <tr
-                                        key={node.alias}
-                                        className="hover:bg-gray-50/60 dark:hover:bg-slate-800/40 transition-colors"
-                                    >
-                                        <td className="py-2 px-3 font-mono font-semibold text-gray-900 dark:text-slate-100">
-                                            {node.alias}
-                                        </td>
-                                        <td className="py-2 px-3 font-mono text-gray-600 dark:text-slate-300">
-                                            {(node.ip_address || (node as any).host || 'unknown')}:{node.port || 22}
-                                        </td>
-                                        <td className="py-2 px-3 font-mono text-gray-600 dark:text-slate-300">
-                                            {node.username}
-                                        </td>
-                                        <td className="py-2 px-3 uppercase text-[10px] font-semibold text-gray-500 dark:text-slate-400">
-                                            {node.os || 'linux'}
-                                        </td>
-                                        <td className="py-2 px-3">
-                                            {(node.has_encrypted_password || (node as any).has_password) ? (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                                    <Lock className="w-2.5 h-2.5" />
-                                                    RSA-2048 Encrypted ({node.encrypted_password_preview || 'ag_rsa_v1_***'})
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
-                                                    <KeyRound className="w-2.5 h-2.5" />
-                                                    SSH Key ({node.key_path || 'default'})
-                                                </span>
-                                            )}
-                                        </td>
+                                {nodes.map((node) => {
+                                    const nodeInstances = clusterBalances.filter(
+                                        (item) => item.machine_alias.toLowerCase() === node.alias.toLowerCase()
+                                    );
+                                    const runningCount = nodeInstances.filter((item) => item.running).length;
+                                    const totalCount = nodeInstances.length;
+                                    const nodeEmails = Array.from(
+                                        new Set(
+                                            nodeInstances
+                                                .map((item) => item.bound_email)
+                                                .filter(
+                                                    (email): email is string =>
+                                                        typeof email === 'string' &&
+                                                        email.trim().length > 0 &&
+                                                        !isAdminIdentifier(email)
+                                                )
+                                        )
+                                    );
+                                    const cleanNodeAlias = sanitizeAdminText(node.alias) || 'Node';
+
+                                    return (
+                                        <tr
+                                            key={node.alias}
+                                            className="hover:bg-gray-50/60 dark:hover:bg-slate-800/40 transition-colors"
+                                        >
+                                            <td className="py-2 px-3 font-mono">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="font-semibold text-gray-900 dark:text-slate-100" title={cleanNodeAlias}>
+                                                        {cleanNodeAlias}
+                                                    </span>
+                                                    <span className="uppercase text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                                                        {node.os || 'linux'}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="py-2 px-3 font-mono text-gray-600 dark:text-slate-300">
+                                                <div className="inline-flex items-center gap-1">
+                                                    <span>
+                                                        {(node.ip_address || (node as any).host || 'unknown')}:{node.port || 22}
+                                                    </span>
+                                                    {node.ip_address && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleCopyChip(`ip-${node.alias}`, node.ip_address, 'Node IP')}
+                                                            className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 cursor-pointer"
+                                                            title="Copy IP Address"
+                                                        >
+                                                            {copiedKey === `ip-${node.alias}` ? (
+                                                                <Check className="w-2.5 h-2.5 text-emerald-500" />
+                                                            ) : (
+                                                                <Copy className="w-2.5 h-2.5" />
+                                                            )}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="py-2 px-3 font-mono">
+                                                {runningCount > 0 ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                        {runningCount} Running {totalCount > 1 ? `(${totalCount} total)` : ''}
+                                                    </span>
+                                                ) : totalCount > 0 ? (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                                        {totalCount} Idle Instance{totalCount === 1 ? '' : 's'}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-gray-400 italic text-[11px]">No active instances</span>
+                                                )}
+                                            </td>
+                                            <td className="py-2 px-3 font-mono text-gray-700 dark:text-slate-300">
+                                                {nodeEmails.length > 0 ? (
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <div className="flex flex-col gap-0.5">
+                                                            {nodeEmails.map((em) => {
+                                                                const isUnmasked = Boolean(unmaskedEmailNodes[node.alias]);
+                                                                return (
+                                                                    <span
+                                                                        key={em}
+                                                                        className="text-[11px] text-sky-600 dark:text-sky-300 font-mono"
+                                                                        title={isUnmasked ? em : 'Masked email (click eye icon to toggle)'}
+                                                                    >
+                                                                        {isUnmasked ? em : maskEmailAddress(em)}
+                                                                    </span>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleEmailMask(node.alias)}
+                                                            className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                                                            title={
+                                                                unmaskedEmailNodes[node.alias]
+                                                                    ? 'Mask bound account emails for this node'
+                                                                    : 'Reveal bound account emails for this node'
+                                                            }
+                                                        >
+                                                            {unmaskedEmailNodes[node.alias] ? (
+                                                                <EyeOff className="w-3 h-3 text-indigo-500" />
+                                                            ) : (
+                                                                <Eye className="w-3 h-3" />
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-gray-400 italic text-[11px]">Unbound</span>
+                                                )}
+                                            </td>
+                                            <td className="py-2 px-3">
+                                                {(node.has_encrypted_password || (node as any).has_password) ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                                        <Lock className="w-2.5 h-2.5" />
+                                                        RSA-2048 Vault
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                                                        <KeyRound className="w-2.5 h-2.5" />
+                                                        SSH Key Auth
+                                                    </span>
+                                                )}
+                                            </td>
                                         <td className="py-2 px-3 text-right">
                                             <div className="inline-flex items-center rounded-full border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-0.5">
                                                 <button
@@ -773,7 +891,8 @@ export function SshGitmapSection() {
                                             </div>
                                         </td>
                                     </tr>
-                                ))}
+                                );
+                            })}
                             </tbody>
                         </table>
                     </div>
@@ -865,9 +984,8 @@ export function SshGitmapSection() {
                                         'Connection timed out';
 
                                     const rawEmail = item.bound_email || '';
-                                    const displayEmail = rawEmail
-                                        .replace(/\$\{adminUser\}/g, 'Administrator')
-                                        .replace(/\$\{linuxUser\}/g, 'root');
+                                    const displayEmail = isAdminIdentifier(rawEmail) ? '' : rawEmail;
+                                    const cleanMachineAlias = sanitizeAdminText(item.machine_alias) || 'local';
 
                                     const rawBadge = item.tier || (!item.is_local ? 'SSH-NODE' : '');
                                     const badgeText = rawBadge.toUpperCase();
@@ -889,13 +1007,27 @@ export function SshGitmapSection() {
                                                         }`}
                                                         title={isOnline ? 'Node online & reachable' : nodeError}
                                                     />
-                                                    <span className="font-semibold text-gray-900 dark:text-slate-100">
-                                                        {item.machine_alias}
+                                                    <span className="font-semibold text-gray-900 dark:text-slate-100" title={cleanMachineAlias}>
+                                                        {cleanMachineAlias}
                                                     </span>
                                                     {ip ? (
-                                                        <span className="text-[10px] text-gray-400">
-                                                            ({ip})
-                                                        </span>
+                                                        <div className="inline-flex items-center gap-1">
+                                                            <span className="text-[10px] text-gray-400">
+                                                                ({ip})
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleCopyChip(`mat-ip-${item.machine_alias}-${idx}`, ip, 'Node IP')}
+                                                                className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 cursor-pointer"
+                                                                title="Copy IP Address"
+                                                            >
+                                                                {copiedKey === `mat-ip-${item.machine_alias}-${idx}` ? (
+                                                                    <Check className="w-2.5 h-2.5 text-emerald-500" />
+                                                                ) : (
+                                                                    <Copy className="w-2.5 h-2.5" />
+                                                                )}
+                                                            </button>
+                                                        </div>
                                                     ) : null}
                                                 </div>
                                             </td>
@@ -924,8 +1056,32 @@ export function SshGitmapSection() {
                                             </td>
                                             <td className="py-2 px-3 font-mono text-gray-700 dark:text-slate-300">
                                                 {displayEmail ? (
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span>{displayEmail}</span>
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        {(() => {
+                                                            const maskKey = `inst-${item.machine_alias}-${item.instance_name || item.instance_id}`;
+                                                            const isUnmasked = Boolean(unmaskedEmailNodes[maskKey] || unmaskedEmailNodes[item.machine_alias]);
+                                                            return (
+                                                                <>
+                                                                    <span
+                                                                        title={isUnmasked ? displayEmail : 'Masked email (click eye icon to toggle)'}
+                                                                    >
+                                                                        {isUnmasked ? displayEmail : maskEmailAddress(displayEmail)}
+                                                                    </span>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => toggleEmailMask(maskKey)}
+                                                                        className="p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                                                                        title={isUnmasked ? 'Mask email for this instance' : 'Reveal email for this instance'}
+                                                                    >
+                                                                        {isUnmasked ? (
+                                                                            <EyeOff className="w-3 h-3 text-indigo-500" />
+                                                                        ) : (
+                                                                            <Eye className="w-3 h-3" />
+                                                                        )}
+                                                                    </button>
+                                                                </>
+                                                            );
+                                                        })()}
                                                         {badgeText && (
                                                             <span
                                                                 className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${
