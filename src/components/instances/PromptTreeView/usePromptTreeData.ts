@@ -197,6 +197,20 @@ export function usePromptTreeData({
                 return;
             }
 
+            // If selectedConversationRef.current exists and its conversation_id is still present in data,
+            // preserve that conversation selection rather than forcing winning[0]! This eliminates selection flapping.
+            if (selectedConversationRef.current) {
+                const currentConvId = selectedConversationRef.current.conversation_id;
+                for (const proj of data) {
+                    const matchedConv = proj.conversations.find((c) => c.conversation_id === currentConvId);
+                    if (matchedConv) {
+                        setExpandedProjects((prev) => ({ ...prev, [proj.project_id]: true }));
+                        selectConversation(matchedConv, proj);
+                        return;
+                    }
+                }
+            }
+
             // Direct deep-link focus if initialSelectedProjectId is provided
             if (initialSelectedProjectId) {
                 const target = data.find((p) => p.project_id === initialSelectedProjectId);

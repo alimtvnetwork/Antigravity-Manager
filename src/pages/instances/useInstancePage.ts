@@ -169,9 +169,9 @@ export function useInstancePage(): InstancePageApi {
         fetchAccounts();
         fetchRunningTasks();
         fetchDaemonTelemetry();
+        let lastPollTimestamp = Date.now();
         const performThrottledPoll = async () => {
             if (isFetchingRef.current) return;
-            if (typeof document !== 'undefined' && document.hidden) return;
             isFetchingRef.current = true;
             try {
                 await Promise.all([
@@ -181,6 +181,7 @@ export function useInstancePage(): InstancePageApi {
                     fetchRunningTasks(),
                     fetchDaemonTelemetry(),
                 ]);
+                lastPollTimestamp = Date.now();
             } catch (err) {
                 // Justification: periodic background polling failure is non-fatal and retried on next interval
                 useErrorStore.getState().trackWarning(err, { source: 'useInstancePage.poll', triggerAction: 'periodic_status_poll' });
@@ -189,9 +190,47 @@ export function useInstancePage(): InstancePageApi {
             }
         };
 
-        const timer = setInterval(() => {
-            performThrottledPoll();
-        }, 60000);
+        let pollTimer: ReturnType<typeof setTimeout> | null = null;
+        const scheduleNextPoll = () => {
+            if (pollTimer) clearTimeout(pollTimer);
+            const isHidden = typeof document !== 'undefined' && document.hidden;
+            const interval = isHidden ? 300000 : 60000;
+            const elapsed = Date.now() - lastPollTimestamp;
+            const delay = Math.max(0, interval - elapsed);
+            pollTimer = setTimeout(async () => {
+                await performThrottledPoll();
+                scheduleNextPoll();
+            }, delay);
+        };
+        scheduleNextPoll();
+
+        const handleVisibilityChange = () => {
+            scheduleNextPoll();
+        };
+        if (typeof document !== 'undefined') {
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+        }
+
+        let eventDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+        const triggerCoalescedRefresh = () => {
+            if (eventDebounceTimer) {
+                clearTimeout(eventDebounceTimer);
+            }
+            eventDebounceTimer = setTimeout(async () => {
+                eventDebounceTimer = null;
+                try {
+                    await Promise.all([
+                        fetchInstances(true),
+                        fetchSwitcherStatus(),
+                        fetchAccounts(),
+                        fetchRunningTasks(),
+                        fetchDaemonTelemetry(),
+                    ]);
+                } catch (err) {
+                    useErrorStore.getState().trackWarning(err, { source: 'useInstancePage.coalescedRefresh', triggerAction: 'event_coalesced_refresh' });
+                }
+            }, 2000);
+        };
 
         let unlistenList: (() => void)[] = [];
         import('@tauri-apps/api/event').then(({ listen }) => {
@@ -205,14 +244,8 @@ export function useInstancePage(): InstancePageApi {
             ];
             Promise.all([
                 ...events.map((ev) =>
-                    listen(ev, async () => {
-                        await Promise.all([
-                            fetchInstances(true),
-                            fetchSwitcherStatus(),
-                            fetchAccounts(),
-                            fetchRunningTasks(),
-                            fetchDaemonTelemetry(),
-                        ]);
+                    listen(ev, () => {
+                        triggerCoalescedRefresh();
                     })
                 ),
                 listen<AutoSwitcherDaemonStatus>('auto-switcher://status-tick', (event) => {
@@ -240,7 +273,11 @@ export function useInstancePage(): InstancePageApi {
         });
 
         return () => {
-            clearInterval(timer);
+            if (pollTimer) clearTimeout(pollTimer);
+            if (eventDebounceTimer) clearTimeout(eventDebounceTimer);
+            if (typeof document !== 'undefined') {
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
+            }
             unlistenList.forEach((fn) => fn());
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps

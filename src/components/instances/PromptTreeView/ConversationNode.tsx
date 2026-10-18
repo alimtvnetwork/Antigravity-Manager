@@ -4,11 +4,13 @@ import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../../utils/cn';
 import { PromptOriginTier } from './types';
 import type { AgmConversationNode, AgmProjectTreeNode, TierClassificationResult } from './types';
-import { isGhostConversation, isConversationOrTurnQueued } from './conversationGuards';
+import { isConversationOrTurnQueued, getConversationStatus } from './conversationGuards';
 import { classifyPromptTier } from './tierClassification';
 import { formatSeqBadge } from './formatters';
 import { invalidatePromptTreeCache, renameConversationOptimistic } from './usePromptTreeData';
 import { useErrorStore } from '../../../stores/error-store';
+
+export { getConversationStatus };
 
 export interface ConversationNodeProps {
     conv: AgmConversationNode;
@@ -21,15 +23,6 @@ export interface ConversationNodeProps {
     onEnqueue?: () => void;
     onRerunConversation?: (convoId: string, nudgeType: string) => void;
     onOpenContextMenu?: (props: any) => void;
-}
-
-export function getConversationStatus(conv: AgmConversationNode): { isRunning: boolean; isQueued: boolean } {
-    const isRunning =
-        Boolean(conv.is_running) &&
-        !isGhostConversation(conv) &&
-        !(conv.prompt_word_count === 0 && (!conv.prompt_preview_200w || !conv.prompt_preview_200w.trim()));
-    const isQueued = isConversationOrTurnQueued(conv);
-    return { isRunning, isQueued };
 }
 
 export function getTierIcon(tier: TierClassificationResult['tier']) {

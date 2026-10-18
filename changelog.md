@@ -1,5 +1,17 @@
 # Changelog
 
+## [v4.234.0] - 2026-10-19
+
+### Added
+- **GitMap Cluster Node Deduplication & Local Host-IP Resolution**: Added `deduplicate_connections()` in `src-tauri/src/modules/ssh_manager/connections.rs` to eliminate duplicate cluster node records; resolved local node identity in `src-tauri/src/modules/ssh_manager/exec.rs` by matching local IPv4 against configured SSH connections (resolving local alias as `w1`), ensuring local instances are not excluded or misattributed to remote nodes; added dual-key matching (`machine_alias` or `ip_address`) in `src/components/settings/EmailNotifications/SshGitmapSection.tsx` to accurately display instances and bound accounts. (Thanks to @aukgit)
+- **Telegram Inbound Multi-VM Collision Shielding & Hostname Precedence**: Restored multi-VM collision shielding guards in `src-tauri/src/modules/telegram_inbound/send_flow.rs` (`on_machine_picked`, `on_instance_picked`), ensuring only targeted nodes respond to machine/instance callbacks while non-target nodes drop replies cleanly to prevent multi-daemon message collisions; refined `is_current_machine` in `src-tauri/src/modules/telegram_inbound/node_label.rs` to prioritize authentic local hostnames (`detect_machine_name`) and local IPs before querying cluster nodes; standardized remote CLI dispatch syntax in `src-tauri/src/modules/telegram_inbound/injection.rs` to `agm prompt send --instance <inst> [--repo <repo>] "<prompt>"`. (Thanks to @aukgit)
+
+### Fixed
+- **Unified Prompt Tree Status & Strict 3-Tier Hierarchy**: Centralized conversation status detection in `src/components/instances/PromptTreeView/conversationGuards.ts` (`getConversationStatus`) and re-exported through `ConversationNode.tsx`; enforced strict 3-tier ordering in `ProjectNode.tsx`, `tierClassification.ts`, and `PromptTreeViewModal.tsx` so running prompts stay strictly at Tier 1 on top, queued prompts at Tier 2 with amber clock badges, and completed/historical prompts ordered by timestamp descending. (Thanks to @aukgit)
+- **Supabase Polling Throttling & Background Debouncing**: Added document visibility change detection and 5-minute background throttling in `src/pages/instances/useInstancePage.ts` and `src/stores/useAccountStore.ts`, coalescing IPC refresh requests and eliminating CPU spikes during inactive background state. (Thanks to @aukgit)
+
+---
+
 ## [v4.233.1] - 2026-10-19
 
 ### Added
@@ -767,6 +779,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.234.0 (2026-10-19)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.233.1 (2026-10-19)**:
         -   **[Prompt Tree View Reliability, GitMap Node Discovery & Clipboard Pipeline] Singleton Context Menu Architecture, Outside Capture Dismissal, Queued Turn Auto-Expansion, GitMap Cluster Node Import, Accurate Offline Node Quotas & Taint-Free Base64 Image Reader (Thanks to @aukgit)**:
             -   **Description**: Centralized context menu state into `TreePanel.tsx` with a single `<PromptTreeContextMenu>` and transparent portal backdrop; added outside capture event listeners (`pointerdown`, `contextmenu`, `keydown`, `scroll`, `blur`) to dismiss immediately on any outside interaction; introduced `isConversationOrTurnQueued` to auto-expand queued child turns, render amber `QUEUED` badges with clock icons, and prioritize queued items in Tier 2 sorting; prioritized `gitmap cluster nodes --json` and `export-json` in `src-tauri/src/modules/ssh_manager/sync.rs` for reliable cluster node discovery across Windows/Linux machines; corrected offline SSH node quota fallbacks to 0.0% instead of 100.0% in `src-tauri/src/modules/ssh_manager/exec.rs`; added request debouncing and in-flight promise coalescing to `useAccountStore.ts` to prevent redundant IPC bursts; implemented `read_image_as_base64` in `src-tauri/src/commands/cmd_files.rs` and `run.rs` with safe path canonicalization and 100MB limit; decoded Base64 directly into PNG blobs in `clipboard.ts`, eliminating offscreen canvas CORS errors and WebView2 `SecurityError` tainting; and added rich event JSON clipboard copying with instant toast feedback.

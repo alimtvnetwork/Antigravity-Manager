@@ -28,6 +28,17 @@ pub fn invalidate_account_list_cache() {
     }
 }
 
+/// Update an account in-place in the in-memory cache without dropping the entire list
+pub fn update_cached_account(account: &Account) {
+    if let Ok(mut guard) = ACCOUNT_LIST_CACHE.write() {
+        if let Some(ref mut cached) = *guard {
+            if let Some(existing) = cached.accounts.iter_mut().find(|a| a.id == account.id) {
+                *existing = account.clone();
+            }
+        }
+    }
+}
+
 /// Load account data
 pub fn load_account(account_id: &str) -> Result<Account, String> {
     let accounts_dir = get_accounts_dir()?;
@@ -64,7 +75,7 @@ pub(crate) fn save_account_at_path(
     crate::utils::fs::write_atomic(account_path, content.as_bytes())
         .map_err(|e| format!("failed_to_save_account_file: {}", e))?;
 
-    invalidate_account_list_cache();
+    update_cached_account(account);
     Ok(())
 }
 
@@ -81,7 +92,9 @@ pub fn update_account_priority(account_id: &str, priority: u8) -> Result<(), Str
     let _account_write = lock_account_file_updates()?;
     let mut account = load_account(account_id)?;
     account.priority = priority;
-    save_account(&account)
+    save_account(&account)?;
+    invalidate_account_list_cache();
+    Ok(())
 }
 
 /// List all accounts
@@ -170,6 +183,7 @@ pub fn add_account(
     }
 
     save_account_index(&index)?;
+    invalidate_account_list_cache();
 
     crate::modules::task_history_db::record(
         crate::modules::audit_action::AuditAction::AddAccount,
@@ -410,7 +424,9 @@ pub fn reorder_accounts(account_ids: &[String]) -> Result<(), String> {
         index.accounts.len()
     ));
 
-    save_account_index(&index)
+    save_account_index(&index)?;
+    invalidate_account_list_cache();
+    Ok(())
 }
 
 /// Toggle disabled status for an account (atomically updating account file and index summary)

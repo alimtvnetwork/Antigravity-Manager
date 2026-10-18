@@ -283,6 +283,9 @@ pub(crate) fn email_from_postgrest(value: &serde_json::Value) -> Option<String> 
 
 /// Force an immediate heartbeat and instance registry sync to all root endpoints
 pub async fn sync_local_node_now() -> Result<(), AppError> {
+    if is_supabase_circuit_open() {
+        return Ok(());
+    }
     let config = load_config()?;
     for ep in &config.endpoints {
         if ep.is_enabled && ep.role == "root" {

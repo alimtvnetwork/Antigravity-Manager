@@ -64,6 +64,10 @@ impl SupabaseClient {
 
     /// Log a transport error with complete context and stack backtrace
     pub(crate) fn log_transport_error(&self, op: &str, url: &str, err: &reqwest::Error) {
+        if err.is_timeout() || err.is_connect() || err.status().map_or(false, |s| s.as_u16() >= 500)
+        {
+            crate::modules::supabase_sync::record_supabase_network_error();
+        }
         let backtrace = std::backtrace::Backtrace::capture();
         tracing::error!(
             target: "supabase_client",
@@ -112,6 +116,9 @@ impl SupabaseClient {
     }
 
     fn network_error(&self, operation: &str, url: &str, e: reqwest::Error) -> AppError {
+        if e.is_timeout() || e.is_connect() || e.status().map_or(false, |s| s.as_u16() >= 500) {
+            crate::modules::supabase_sync::record_supabase_network_error();
+        }
         AppError::Network(self.explain_transport_error(operation, url, &e), None)
     }
 
@@ -374,6 +381,12 @@ impl SupabaseClient {
 
     /// Query rows from a table with PostgREST query parameters
     pub async fn select(&self, table: &str, query: &str) -> Result<Value, AppError> {
+        if crate::modules::supabase_sync::is_supabase_circuit_open() {
+            return Err(AppError::Network(
+                "Supabase 5-minute cooldown active; network call suppressed".to_string(),
+                None,
+            ));
+        }
         let mut url = self.table_url(table);
         if !query.is_empty() {
             url.push('?');
@@ -396,6 +409,12 @@ impl SupabaseClient {
 
     /// Insert a record into a table
     pub async fn insert(&self, table: &str, payload: Value) -> Result<Value, AppError> {
+        if crate::modules::supabase_sync::is_supabase_circuit_open() {
+            return Err(AppError::Network(
+                "Supabase 5-minute cooldown active; network call suppressed".to_string(),
+                None,
+            ));
+        }
         let url = self.table_url(table);
         let resp = self
             .client
@@ -420,6 +439,12 @@ impl SupabaseClient {
         payload: Value,
         on_conflict: &str,
     ) -> Result<Value, AppError> {
+        if crate::modules::supabase_sync::is_supabase_circuit_open() {
+            return Err(AppError::Network(
+                "Supabase 5-minute cooldown active; network call suppressed".to_string(),
+                None,
+            ));
+        }
         let mut url = self.table_url(table);
         if !on_conflict.is_empty() {
             url = format!("{}?on_conflict={}", url, on_conflict);
@@ -451,6 +476,12 @@ impl SupabaseClient {
         query: &str,
         payload: Value,
     ) -> Result<Value, AppError> {
+        if crate::modules::supabase_sync::is_supabase_circuit_open() {
+            return Err(AppError::Network(
+                "Supabase 5-minute cooldown active; network call suppressed".to_string(),
+                None,
+            ));
+        }
         let mut url = self.table_url(table);
         if !query.is_empty() {
             url.push('?');
@@ -475,6 +506,12 @@ impl SupabaseClient {
 
     /// Delete records matching a query filter
     pub async fn delete(&self, table: &str, query: &str) -> Result<Value, AppError> {
+        if crate::modules::supabase_sync::is_supabase_circuit_open() {
+            return Err(AppError::Network(
+                "Supabase 5-minute cooldown active; network call suppressed".to_string(),
+                None,
+            ));
+        }
         let mut url = self.table_url(table);
         if !query.is_empty() {
             url.push('?');
@@ -498,6 +535,12 @@ impl SupabaseClient {
 
     /// Call a PostgreSQL stored function via RPC
     pub async fn rpc(&self, function_name: &str, payload: Value) -> Result<Value, AppError> {
+        if crate::modules::supabase_sync::is_supabase_circuit_open() {
+            return Err(AppError::Network(
+                "Supabase 5-minute cooldown active; network call suppressed".to_string(),
+                None,
+            ));
+        }
         let url = self.rpc_url(function_name);
         let resp = self
             .client

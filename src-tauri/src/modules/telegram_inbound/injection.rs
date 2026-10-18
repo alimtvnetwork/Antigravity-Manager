@@ -294,38 +294,83 @@ pub async fn execute_remote_prompt_injection(
         .replace('\r', "")
         .replace('\n', " ");
     let inst_flag = explicit_instance
-        .map(|i| format!(" --instance {}", i))
+        .map(|i| format!(" --instance {}", i.trim()))
         .unwrap_or_default();
-    let remote_cmd = format!(
-        "agm prompt send {}{} \"{}\"",
-        target_project, inst_flag, escaped_prompt
-    );
+    let target_proj = if target_project.trim().is_empty() {
+        "default"
+    } else {
+        target_project.trim()
+    };
+    let is_windows = {
+        let ssh_nodes = crate::modules::ssh_manager::load_ssh_connections().unwrap_or_default();
+        ssh_nodes
+            .iter()
+            .find(|n| {
+                n.alias.eq_ignore_ascii_case(target_node)
+                    || n.ip_address.eq_ignore_ascii_case(target_node)
+            })
+            .map(|n| {
+                n.os.to_lowercase().contains("win")
+                    || n.username.eq_ignore_ascii_case("administrator")
+                    || n.alias.to_lowercase().starts_with('w')
+            })
+            .unwrap_or_else(|| {
+                target_node.to_lowercase().starts_with('w')
+                    || target_node.to_lowercase().contains("win")
+            })
+    };
+    let agm_bin = if is_windows { "agm.exe" } else { "agm" };
+    let remote_cmd = format!("{agm_bin} prompt {target_proj}{inst_flag} \"{escaped_prompt}\"");
+
     let mut dispatched_gitmap = false;
+
+    // 1. First attempt: gitmap cluster exec <target_node> <remote_cmd>
     let mut gm_cmd1 = Command::new("gitmap");
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
         gm_cmd1.creation_flags(0x08000000);
     }
-    let gm_out = gm_cmd1
+    if let Ok(out) = gm_cmd1
         .args(["cluster", "exec", target_node, &remote_cmd])
         .output()
-        .or_else(|_| {
-            let mut gm_cmd2 = Command::new("gitmap");
-            #[cfg(target_os = "windows")]
-            {
-                use std::os::windows::process::CommandExt;
-                gm_cmd2.creation_flags(0x08000000);
-            }
-            gm_cmd2
-                .args(["ssh", "exec", &remote_cmd, "--node", target_node])
-                .output()
-        });
-    if let Ok(out) = gm_out {
+    {
         if out.status.success() {
             dispatched_gitmap = true;
         }
     }
+
+    // 2. Second attempt: gitmap ssh exec <target_node> <remote_cmd> / exec_via_gitmap_ssh
+    if !dispatched_gitmap {
+        let mut gm_cmd2 = Command::new("gitmap");
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            gm_cmd2.creation_flags(0x08000000);
+        }
+        if let Ok(out) = gm_cmd2
+            .args(["ssh", "exec", target_node, &remote_cmd])
+            .output()
+        {
+            if out.status.success() {
+                dispatched_gitmap = true;
+            }
+        }
+        if !dispatched_gitmap {
+            if let Ok((code, out_str, _)) =
+                crate::modules::ssh_manager::exec_via_gitmap_ssh(target_node, &remote_cmd)
+            {
+                let is_gm_success = code == 0
+                    && !out_str.contains("machine is off")
+                    && !out_str.to_lowercase().contains("connection timed out");
+                if is_gm_success {
+                    dispatched_gitmap = true;
+                }
+            }
+        }
+    }
+
+    // 3. Third attempt: native SSH exec command
     if !dispatched_gitmap {
         if let Ok(results) = crate::modules::ssh_manager::exec_ssh_command(
             target_node,

@@ -30,11 +30,6 @@ pub fn is_current_machine(alias: &str) -> bool {
         return true;
     }
 
-    let local_ip = crate::modules::email_watcher::detect_local_ip();
-    if !local_ip.is_empty() && target.eq_ignore_ascii_case(&local_ip) {
-        return true;
-    }
-
     let detected = crate::modules::email_watcher::detect_machine_name();
     if !detected.is_empty() && target.eq_ignore_ascii_case(detected.trim()) {
         return true;
@@ -45,6 +40,11 @@ pub fn is_current_machine(alias: &str) -> bool {
         return true;
     }
 
+    let local_ip = crate::modules::email_watcher::detect_local_ip();
+    if !local_ip.is_empty() && target.eq_ignore_ascii_case(&local_ip) {
+        return true;
+    }
+
     if let Some((t_alias, t_ip)) = target.split_once('|') {
         if is_current_machine(t_alias) || is_current_machine(t_ip) {
             return true;
@@ -52,14 +52,22 @@ pub fn is_current_machine(alias: &str) -> bool {
     }
 
     let cluster_nodes = super::cluster::query_gitmap_cluster_nodes();
-    let my_cluster_node = cluster_nodes
-        .iter()
-        .find(|n| !local_ip.is_empty() && n.ip_address.trim() == local_ip.trim());
-
-    if let Some(my_node) = my_cluster_node {
-        if target.eq_ignore_ascii_case(&my_node.alias) {
+    if let Some(matched_cluster) = cluster_nodes.iter().find(|n| {
+        target.eq_ignore_ascii_case(&n.alias)
+            || (!n.ip_address.is_empty() && target.eq_ignore_ascii_case(&n.ip_address))
+    }) {
+        if !local_ip.is_empty() && matched_cluster.ip_address.trim() == local_ip.trim() {
             return true;
         }
+        if !detected.is_empty()
+            && matched_cluster
+                .alias
+                .trim()
+                .eq_ignore_ascii_case(detected.trim())
+        {
+            return true;
+        }
+        return false;
     }
 
     false

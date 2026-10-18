@@ -8,10 +8,10 @@ import { copyToClipboard } from '../../../utils/clipboard';
 import { getTruncatedText, countWords, stripImagesFromPrompt } from './formatters';
 import type { PromptTreeViewModalProps } from './types';
 import { usePromptTreeState } from './usePromptTreeState';
-import { usePromptTreeData } from './usePromptTreeData';
+import { usePromptTreeData, invalidatePromptTreeCache } from './usePromptTreeData';
 import { usePromptTreeCoreActions } from './usePromptTreeCoreActions';
 import { usePromptTreePromptActions, dispatchRerunMessages, type RerunMessageOption } from './usePromptTreePromptActions';
-import { isGhostConversation, isStaleOrEmptyConversation } from './conversationGuards';
+import { isGhostConversation, isStaleOrEmptyConversation, getConversationStatus } from './conversationGuards';
 import { classifyPromptTier } from './tierClassification';
 import { ModalHeader } from './ModalHeader';
 import { TreePanel } from './TreePanel';
@@ -519,9 +519,17 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             const bPinned = pinnedProjectIds.includes(b.project_id);
             if (aPinned !== bPinned) return aPinned ? -1 : 1;
 
-            const aRunning = Boolean(a.is_running) || a.conversations.some((c) => Boolean(c.is_running));
-            const bRunning = Boolean(b.is_running) || b.conversations.some((c) => Boolean(c.is_running));
+            const aRunning =
+                Boolean(a.is_running) ||
+                a.conversations.some((c) => getConversationStatus(c).isRunning);
+            const bRunning =
+                Boolean(b.is_running) ||
+                b.conversations.some((c) => getConversationStatus(c).isRunning);
             if (aRunning !== bRunning) return aRunning ? -1 : 1;
+
+            const aQueued = a.conversations.some((c) => getConversationStatus(c).isQueued);
+            const bQueued = b.conversations.some((c) => getConversationStatus(c).isQueued);
+            if (aQueued !== bQueued) return aQueued ? -1 : 1;
 
             const aLatest = Math.max(0, ...a.conversations.map((c) => new Date(c.last_modified).getTime() || 0));
             const bLatest = Math.max(0, ...b.conversations.map((c) => new Date(c.last_modified).getTime() || 0));
@@ -597,22 +605,41 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                     onCopyAllTreePrompts={coreActions.handleCopyAllTreePrompts}
                     onFileRestore={coreActions.handleFileRestore}
                     isAutoSyncing={isAutoSyncing}
-                    onRefreshAll={() => {
+                    onRefreshAll={async () => {
                         setActionMsg('Refreshing prompt tree...');
-                        loadTree(false, true);
-                    }}
-                    onResetTree={() => {
-                        setActionMsg('Resetting prompt tree cache...');
-                        void invoke('reset_prompt_tree_cache', { instanceId: instanceId || null })
-                            .catch((err) => {
-                                useErrorStore.getState().captureException(
-                                    err instanceof Error ? err : new Error(String(err)),
-                                    { source: 'PromptTreeViewModal.onResetTree', triggerAction: 'reset_prompt_tree_cache' }
-                                );
-                            })
-                            .finally(() => {
-                                loadTree(false, true);
+                        try {
+                            await loadTree(false, true);
+                            setActionMsg('Prompt tree refreshed');
+                        } catch (err) {
+                            useErrorStore.getState().trackWarning(err, {
+                                source: 'PromptTreeViewModal.onRefreshAll',
+                                triggerAction: 'refresh_prompt_tree',
                             });
+                            setActionMsg('Prompt tree refresh failed');
+                        } finally {
+                            setTimeout(() => {
+                                setActionMsg(null);
+                            }, 2500);
+                        }
+                    }}
+                    onResetTree={async () => {
+                        setActionMsg('Resetting prompt cache...');
+                        try {
+                            invalidatePromptTreeCache(instanceId);
+                            await invoke('reset_prompt_tree_cache', { instanceId: instanceId || null });
+                            await loadTree(false, true);
+                            setActionMsg('Prompt cache reset successfully');
+                        } catch (err) {
+                            useErrorStore.getState().captureException(
+                                err instanceof Error ? err : new Error(String(err)),
+                                { source: 'PromptTreeViewModal.onResetTree', triggerAction: 'reset_prompt_tree_cache' }
+                            );
+                            setActionMsg('Failed to reset prompt cache');
+                        } finally {
+                            setTimeout(() => {
+                                setActionMsg(null);
+                            }, 2500);
+                        }
                     }}
                 />
 
@@ -818,7 +845,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                         />
                                     )}
                                 </div>
-                            ) : isLoading && treeData.length === 0 ? (
+                            ) : selectedConversation === null && treeData.length === 0 ? (
                                 <div className="flex-1 flex flex-col px-6 py-5 space-y-4 animate-pulse overflow-hidden bg-white dark:bg-[#171025]">
                                     {/* Skeleton Header */}
                                     <div className="space-y-3 pb-3 border-b border-slate-200/70 dark:border-[#40285e]/60">

@@ -11,6 +11,7 @@ use super::state::{get_active_agy_workers, get_memory_prompts_map};
 use chrono::Utc;
 use rusqlite::params;
 use rusqlite::Connection;
+use std::collections::HashSet;
 use std::path::Path;
 
 fn check_memory_prompts_running(
@@ -82,8 +83,131 @@ fn check_memory_prompts_running(
     false
 }
 
+/// Read conversation_summaries.db once for an instance sweep to collect all active workspace URIs into a HashSet<String>
+pub fn collect_active_workspace_uris_for_instance(norm_inst: &str) -> HashSet<String> {
+    let mut active_uris = HashSet::new();
+    let candidate_dirs = gemini_dirs_for_instance(norm_inst);
+    let now = Utc::now().timestamp();
+
+    for base_dir in candidate_dirs {
+        let summaries_db = base_dir.join("conversation_summaries.db");
+        if !summaries_db.exists() {
+            continue;
+        }
+
+        let conn_res = Connection::open_with_flags(
+            &summaries_db,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+        )
+        .or_else(|_| {
+            let uri = format!(
+                "file:{}?immutable=1",
+                summaries_db.to_string_lossy().replace('\\', "/")
+            );
+            Connection::open_with_flags(
+                &uri,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+            )
+        });
+
+        if let Ok(conn) = conn_res {
+            // Justification: busy_timeout on a third-party read-only database is a nicety; reads continue with the default
+            crate::error::record_ignored(
+                conn.pragma_update(None, "busy_timeout", 3000),
+                "set busy_timeout on Antigravity summaries database",
+            );
+            if let Ok(mut stmt) = conn.prepare(
+                "SELECT status, not_fully_idle, workspace_uris, last_modified_time, title, preview 
+                 FROM conversation_summaries 
+                 ORDER BY last_modified_time DESC 
+                 LIMIT 30",
+            ) {
+                let rows = stmt.query_map([], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, i32>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, Option<String>>(4)?.unwrap_or_default(),
+                        row.get::<_, Option<String>>(5)?.unwrap_or_default(),
+                    ))
+                });
+                if let Ok(rows) = rows {
+                    for item in rows.flatten() {
+                        let (status, not_fully_idle, ws_uris_opt, _last_time_str, title, preview) =
+                            item;
+
+                        let is_untitled = title.trim().is_empty()
+                            || title.to_lowercase().starts_with("untitled")
+                            || title.to_lowercase() == "new conversation";
+                        let (_, eff_wc) = extract_prompt_words_preview(&preview, 5);
+                        let is_empty_prompt = preview.trim().is_empty() || eff_wc == 0;
+                        if (is_untitled && is_empty_prompt)
+                            || (title.trim().is_empty() && preview.trim().is_empty())
+                        {
+                            continue;
+                        }
+
+                        let cascade_status = CascadeRunStatusType::from_status_str(&status);
+                        if cascade_status.is_idle_or_terminal() {
+                            continue;
+                        }
+
+                        let conv_time = parse_flexible_timestamp(&_last_time_str);
+                        let max_allowed_elapsed = if not_fully_idle > 0 { 600 } else { 60 };
+                        let is_recent = conv_time > 0 && (now - conv_time <= max_allowed_elapsed);
+
+                        if !is_recent {
+                            continue;
+                        }
+
+                        let is_conv_running = if cascade_status.is_idle_or_terminal() {
+                            false
+                        } else {
+                            not_fully_idle > 0
+                        };
+
+                        if is_conv_running {
+                            if let Some(ws_uris_raw) = ws_uris_opt {
+                                let ws_uris: Vec<String> =
+                                    serde_json::from_str(&ws_uris_raw).unwrap_or_default();
+                                for u in ws_uris {
+                                    let clean_p =
+                                        normalize_path_for_compare(&decode_uri_to_path(&u));
+                                    let folder_name = Path::new(&clean_p)
+                                        .file_name()
+                                        .and_then(|n| n.to_str())
+                                        .unwrap_or("")
+                                        .to_lowercase();
+                                    if !clean_p.is_empty() {
+                                        active_uris.insert(clean_p);
+                                    }
+                                    if !folder_name.is_empty() {
+                                        active_uris.insert(folder_name);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    active_uris
+}
+
 /// Check if any prompt or task is currently actively executing for a project
 pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> bool {
+    is_prompt_running_for_project_with_summaries(project_id, instance_id, None)
+}
+
+/// Check if any prompt or task is currently actively executing for a project, optionally reusing pre-collected summaries
+pub fn is_prompt_running_for_project_with_summaries(
+    project_id: &str,
+    instance_id: &str,
+    active_summaries_uris: Option<&HashSet<String>>,
+) -> bool {
     if project_id.trim().is_empty() {
         return false;
     }
@@ -278,133 +402,40 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
     }
 
     // 4. Check Antigravity live conversation summaries directly for running sessions in this instance
-    let candidate_dirs = gemini_dirs_for_instance(norm_inst);
+    let target_folder = Path::new(&clean_target)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let has_target = !clean_target.is_empty();
 
-    for base_dir in candidate_dirs {
-        let summaries_db = base_dir.join("conversation_summaries.db");
-        if !summaries_db.exists() {
-            continue;
-        }
+    let is_summary_matched = if let Some(active_uris) = active_summaries_uris {
+        has_target
+            && (active_uris.contains(&clean_target)
+                || (!target_folder.is_empty() && active_uris.contains(&target_folder)))
+    } else {
+        let active_uris = collect_active_workspace_uris_for_instance(norm_inst);
+        has_target
+            && (active_uris.contains(&clean_target)
+                || (!target_folder.is_empty() && active_uris.contains(&target_folder)))
+    };
 
-        let conn_res = Connection::open_with_flags(
-            &summaries_db,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
-        )
-        .or_else(|_| {
-            let uri = format!(
-                "file:{}?immutable=1",
-                summaries_db.to_string_lossy().replace('\\', "/")
-            );
-            Connection::open_with_flags(
-                &uri,
-                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
-            )
-        });
-
-        if let Ok(conn) = conn_res {
-            // Justification: busy_timeout on a third-party read-only database is a nicety; reads continue with the default
-            crate::error::record_ignored(
-                conn.pragma_update(None, "busy_timeout", 3000),
-                "set busy_timeout on Antigravity summaries database",
-            );
-            if let Ok(mut stmt) = conn.prepare(
-                "SELECT status, not_fully_idle, workspace_uris, last_modified_time, title, preview 
-                 FROM conversation_summaries 
-                 ORDER BY last_modified_time DESC 
-                 LIMIT 30",
-            ) {
-                let rows = stmt.query_map([], |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, i32>(1)?,
-                        row.get::<_, Option<String>>(2)?,
-                        row.get::<_, String>(3)?,
-                        row.get::<_, Option<String>>(4)?.unwrap_or_default(),
-                        row.get::<_, Option<String>>(5)?.unwrap_or_default(),
-                    ))
-                });
-                if let Ok(rows) = rows {
-                    for item in rows.flatten() {
-                        let (status, not_fully_idle, ws_uris_opt, _last_time_str, title, preview) =
-                            item;
-
-                        // Ghost conversation filter: Inspect title and preview. If empty title / "Untitled Conversation"
-                        // and 0 prompt content or 0 words, skip it (do not consider it running).
-                        let is_untitled = title.trim().is_empty()
-                            || title.to_lowercase().starts_with("untitled")
-                            || title.to_lowercase() == "new conversation";
-                        let (_, eff_wc) = extract_prompt_words_preview(&preview, 5);
-                        let is_empty_prompt = preview.trim().is_empty() || eff_wc == 0;
-                        if (is_untitled && is_empty_prompt)
-                            || (title.trim().is_empty() && preview.trim().is_empty())
-                        {
-                            continue;
-                        }
-
-                        // Explicit Idle Supremacy rule:
-                        // Terminal status or explicit IDLE status strings (e.g. CASCADE_RUN_STATUS_IDLE)
-                        // must strictly override unreset not_fully_idle > 0 artifacts from IDE engine quirks.
-                        let cascade_status = CascadeRunStatusType::from_status_str(&status);
-                        if cascade_status.is_idle_or_terminal() {
-                            continue;
-                        }
-
-                        // Adaptive 10-Minute Thinking Window: Expand timestamp cutoff to 600s (10 minutes)
-                        // for active turns with not_fully_idle > 0, ensuring reasoning/thinking models
-                        // (Claude 3.7 Thinking, Gemini 2.5 Pro) are never prematurely flipped to IDLE mid-generation.
-                        let conv_time = parse_flexible_timestamp(&_last_time_str);
-                        let max_allowed_elapsed = if not_fully_idle > 0 { 600 } else { 60 };
-                        let is_recent = conv_time > 0 && (now - conv_time <= max_allowed_elapsed);
-
-                        if !is_recent {
-                            continue;
-                        }
-
-                        let is_conv_running = if cascade_status.is_idle_or_terminal() {
-                            false
-                        } else {
-                            not_fully_idle > 0
-                        };
-
-                        if is_conv_running {
-                            if let Some(ws_uris_raw) = ws_uris_opt {
-                                let ws_uris: Vec<String> =
-                                    serde_json::from_str(&ws_uris_raw).unwrap_or_default();
-                                for u in ws_uris {
-                                    let clean_p =
-                                        normalize_path_for_compare(&decode_uri_to_path(&u));
-                                    let folder_name = Path::new(&clean_p)
-                                        .file_name()
-                                        .and_then(|n| n.to_str())
-                                        .unwrap_or("")
-                                        .to_lowercase();
-                                    let has_target = !clean_target.is_empty();
-                                    let is_target_matched = has_target
-                                        && (clean_p == clean_target || folder_name == clean_target);
-                                    if is_target_matched {
-                                        crate::modules::logger::log_instance_prompt_audit(
-                                            norm_inst,
-                                            &resolved_name,
-                                            project_id,
-                                            &clean_p,
-                                            &summaries_db.to_string_lossy(),
-                                            host_pid,
-                                            PromptAuditCriteriaType::Gate4ConversationSummariesLiveTurn.as_str(),
-                                            true,
-                                            ProjectAuditRationaleType::ConversationSummaryActiveTurn.as_str(),
-                                        );
-                                        return true;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    if is_summary_matched {
+        crate::modules::logger::log_instance_prompt_audit(
+            norm_inst,
+            &resolved_name,
+            project_id,
+            &clean_target,
+            "conversation_summaries.db",
+            host_pid,
+            PromptAuditCriteriaType::Gate4ConversationSummariesLiveTurn.as_str(),
+            true,
+            ProjectAuditRationaleType::ConversationSummaryActiveTurn.as_str(),
+        );
+        return true;
     }
 
-    crate::modules::logger::log_instance_prompt_audit(
+    let audit_line = crate::modules::logger::format_instance_prompt_audit(
         norm_inst,
         &resolved_name,
         project_id,
@@ -415,6 +446,7 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
         false,
         ProjectAuditRationaleType::IdleNoActiveTasks.as_str(),
     );
+    tracing::debug!("{audit_line}");
 
     false
 }

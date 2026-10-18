@@ -715,7 +715,7 @@ export function SshGitmapSection() {
                                 <tr className="bg-gray-50 dark:bg-slate-800/80 text-gray-600 dark:text-slate-300 border-b border-gray-200 dark:border-slate-800">
                                     <th className="py-2 px-3 font-semibold">Node &amp; Alias</th>
                                     <th className="py-2 px-3 font-semibold">IP / Host:Port</th>
-                                    <th className="py-2 px-3 font-semibold">Running Instance(s)</th>
+                                    <th className="py-2 px-3 font-semibold">Instance Count &amp; Status</th>
                                     <th className="py-2 px-3 font-semibold">Bound Account Email(s)</th>
                                     <th className="py-2 px-3 font-semibold">Security &amp; Auth</th>
                                     <th className="py-2 px-3 font-semibold text-right">Actions</th>
@@ -724,7 +724,9 @@ export function SshGitmapSection() {
                             <tbody className="divide-y divide-gray-100 dark:divide-slate-800/70">
                                 {nodes.map((node) => {
                                     const nodeInstances = clusterBalances.filter(
-                                        (item) => item.machine_alias.toLowerCase() === node.alias.toLowerCase()
+                                        (item) =>
+                                            item.machine_alias.toLowerCase() === node.alias.toLowerCase() ||
+                                            (Boolean(node.ip_address) && (item.machine_ip === node.ip_address || item.ip_address === node.ip_address))
                                     );
                                     const runningCount = nodeInstances.filter((item) => item.running).length;
                                     const totalCount = nodeInstances.length;
@@ -779,17 +781,33 @@ export function SshGitmapSection() {
                                                 </div>
                                             </td>
                                             <td className="py-2 px-3 font-mono">
-                                                {runningCount > 0 ? (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                                        {runningCount} Running {totalCount > 1 ? `(${totalCount} total)` : ''}
-                                                    </span>
-                                                ) : totalCount > 0 ? (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                                                        {totalCount} Idle Instance{totalCount === 1 ? '' : 's'}
-                                                    </span>
+                                                {totalCount > 0 ? (
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <span className="font-semibold text-gray-800 dark:text-slate-200 text-xs">
+                                                                {totalCount} Instance{totalCount === 1 ? '' : 's'}
+                                                            </span>
+                                                            {runningCount > 0 ? (
+                                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                                    {runningCount} Running
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                                                    All Idle
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {totalCount > runningCount && runningCount > 0 && (
+                                                            <span className="text-[10px] text-gray-400 dark:text-slate-400">
+                                                                {totalCount - runningCount} Idle
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 ) : (
-                                                    <span className="text-gray-400 italic text-[11px]">No active instances</span>
+                                                    <span className="text-gray-400 italic text-[11px]">
+                                                        {isLoadingBalances ? 'Scanning...' : '0 instances (unverified)'}
+                                                    </span>
                                                 )}
                                             </td>
                                             <td className="py-2 px-3 font-mono text-gray-700 dark:text-slate-300">
@@ -801,7 +819,7 @@ export function SshGitmapSection() {
                                                                 return (
                                                                     <span
                                                                         key={em}
-                                                                        className="text-[11px] text-sky-600 dark:text-sky-300 font-mono"
+                                                                        className="text-[11px] text-sky-600 dark:text-sky-300 font-mono font-medium"
                                                                         title={isUnmasked ? em : 'Masked email (click eye icon to toggle)'}
                                                                     >
                                                                         {isUnmasked ? em : maskEmailAddress(em)}
@@ -827,7 +845,7 @@ export function SshGitmapSection() {
                                                         </button>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-gray-400 italic text-[11px]">Unbound</span>
+                                                    <span className="text-gray-400 italic text-[11px]">(unbound)</span>
                                                 )}
                                             </td>
                                             <td className="py-2 px-3">
@@ -864,8 +882,17 @@ export function SshGitmapSection() {
                                                     type="button"
                                                     onClick={() => {
                                                         setTargetMachine(node.alias);
-                                                        setTargetInstance('default');
-                                                        showToast(`Selected ${node.alias}:default for prompting`, 'info');
+                                                        const matching = clusterBalances.filter(
+                                                            (item) => item.machine_alias.toLowerCase() === node.alias.toLowerCase()
+                                                        );
+                                                        const cleanInst = matching.length > 0 ? (matching[0].instance_id || 'default') : 'default';
+                                                        setTargetInstance(cleanInst);
+                                                        showToast(`Selected ${node.alias}:${cleanInst} for prompting`, 'info');
+                                                        const promptInput = document.getElementById('remote-prompt-input');
+                                                        if (promptInput) {
+                                                            promptInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                            promptInput.focus();
+                                                        }
                                                     }}
                                                     className="px-2.5 py-1 text-[11px] font-medium text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 flex items-center gap-1 cursor-pointer"
                                                     title="Target this machine in the Prompt Dispatcher below"
@@ -1141,17 +1168,18 @@ export function SshGitmapSection() {
                                                 <button
                                                     type="button"
                                                     onClick={() => {
+                                                        const cleanId = item.instance_id || 'default';
                                                         setTargetMachine(item.machine_alias);
-                                                        setTargetInstance(item.instance_name || item.instance_id);
+                                                        setTargetInstance(cleanId);
                                                         if (promptText.trim()) {
                                                             handleDispatchRemotePrompt(
                                                                 item.machine_alias,
-                                                                item.instance_name || item.instance_id,
+                                                                cleanId,
                                                                 promptText
                                                             );
                                                         } else {
                                                             showToast(
-                                                                `Target locked to ${item.machine_alias}:${item.instance_name} (${displayEmail || 'unbound'}) — enter prompt below to send`,
+                                                                `Target locked to ${item.machine_alias}:${cleanId} (${displayEmail || 'unbound'}) — enter prompt below to send`,
                                                                 'info'
                                                             );
                                                             const promptInput = document.getElementById('remote-prompt-input');
@@ -1203,7 +1231,7 @@ export function SshGitmapSection() {
                                     (item) => item.machine_alias.toLowerCase() === newMachine.toLowerCase()
                                 );
                                 if (matching.length > 0) {
-                                    setTargetInstance(matching[0].instance_name || matching[0].instance_id);
+                                    setTargetInstance(matching[0].instance_id || 'default');
                                 } else {
                                     setTargetInstance('default');
                                 }
@@ -1222,17 +1250,22 @@ export function SshGitmapSection() {
                         <select
                             value={targetInstance}
                             onChange={(e) => setTargetInstance(e.target.value)}
-                            className="text-xs font-mono text-gray-900 dark:text-slate-100 bg-transparent border-0 focus:ring-0 focus:outline-none pr-2 cursor-pointer max-w-[220px]"
+                            className="text-xs font-mono text-gray-900 dark:text-slate-100 bg-transparent border-0 focus:ring-0 focus:outline-none pr-2 cursor-pointer max-w-[280px]"
                         >
                             {clusterBalances
                                 .filter((item) => item.machine_alias.toLowerCase() === targetMachine.toLowerCase())
-                                .map((item) => (
-                                    <option key={`${item.machine_alias}-${item.instance_id}`} value={item.instance_name || item.instance_id}>
-                                        {item.instance_name} — {item.bound_email || 'unbound'} ({item.running ? 'Running' : 'Idle'})
-                                    </option>
-                                ))}
+                                .map((item) => {
+                                    const cleanId = item.instance_id || 'default';
+                                    const email = item.bound_email && !isAdminIdentifier(item.bound_email) ? item.bound_email : 'unbound';
+                                    const statusText = item.running ? 'Running' : 'Idle';
+                                    return (
+                                        <option key={`${item.machine_alias}-${cleanId}`} value={cleanId}>
+                                            {cleanId} — {email} ({statusText})
+                                        </option>
+                                    );
+                                })}
                             {clusterBalances.filter((item) => item.machine_alias.toLowerCase() === targetMachine.toLowerCase()).length === 0 && (
-                                <option value="default">default — (Primary Instance)</option>
+                                <option value="default">default — unbound (Default Instance)</option>
                             )}
                         </select>
                     </div>

@@ -375,6 +375,11 @@ pub fn start_sync_worker() {
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
 
+            if is_supabase_circuit_open() {
+                tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
+                continue;
+            }
+
             let config = match load_config() {
                 Ok(c) => c,
                 Err(e) => {

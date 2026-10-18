@@ -632,7 +632,12 @@ pub fn fix_node_auth_via_gitmap(target: &str, pubkey_path: Option<&str>) -> Resu
     }
 
     cmd.args(["ssh", "fix-auth", target.trim()]);
-    if let Some(pk) = pubkey_path.map(str::trim).filter(|s| !s.is_empty()) {
+    let resolved_key_path = pubkey_path
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .or_else(|| ensure_default_ssh_key().ok().map(|k| k.public_path));
+    if let Some(ref pk) = resolved_key_path {
         cmd.args(["-i", pk]);
     }
     let out = cmd
@@ -835,6 +840,32 @@ pub fn install_gitmap_via_powershell(open_window: bool) -> Result<String, String
     }
 }
 
+/// Strip leading logger outputs (e.g. `INFO Log system initialized...`) before parsing JSON
+pub(crate) fn extract_clean_json(raw: &str) -> Option<&str> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let obj_start = trimmed.find('{');
+    let arr_start = trimmed.find('[');
+    let start_idx = match (obj_start, arr_start) {
+        (Some(o), Some(a)) => Some(o.min(a)),
+        (Some(o), None) => Some(o),
+        (None, Some(a)) => Some(a),
+        (None, None) => None,
+    }?;
+
+    let is_obj = trimmed[start_idx..].starts_with('{');
+    let end_char = if is_obj { '}' } else { ']' };
+    let end_idx = trimmed.rfind(end_char)?;
+
+    if end_idx >= start_idx {
+        Some(&trimmed[start_idx..=end_idx])
+    } else {
+        None
+    }
+}
+
 /// Return multi-machine instance & bound account balances across local machine and SSH/GitMap nodes
 pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalanceItem>, String> {
     let mut items = Vec::new();
@@ -843,6 +874,19 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
     let local_ip = crate::modules::email_watcher::detect_local_ip();
     let app_cfg = crate::modules::config::load_app_config().unwrap_or_default();
     let target_model = app_cfg.auto_profile_switcher.target_model.clone();
+
+    let ssh_conns = load_ssh_connections().unwrap_or_default();
+    let matched_local_node = ssh_conns
+        .iter()
+        .find(|conn| !local_ip.is_empty() && conn.ip_address.trim() == local_ip.trim())
+        .or_else(|| {
+            ssh_conns
+                .iter()
+                .find(|conn| conn.alias.eq_ignore_ascii_case(&local_machine))
+        });
+    let effective_local_alias = matched_local_node
+        .map(|n| n.alias.clone())
+        .unwrap_or_else(|| local_machine.clone());
 
     let reg = crate::modules::instance::load_registry().unwrap_or_default();
     let accounts = crate::modules::account::list_accounts().unwrap_or_default();
@@ -867,7 +911,7 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
             ("(unbound)".to_string(), "PRO".to_string(), 100.0, 100.0)
         };
         items.push(ClusterInstanceBalanceItem {
-            machine_alias: local_machine.clone(),
+            machine_alias: effective_local_alias.clone(),
             machine_ip: local_ip.clone(),
             ip_address: Some(local_ip.clone()),
             error_message: None,
@@ -922,7 +966,7 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
                 .unwrap_or((Some(100.0), Some(100.0)));
 
             items.push(ClusterInstanceBalanceItem {
-                machine_alias: local_machine.clone(),
+                machine_alias: effective_local_alias.clone(),
                 machine_ip: local_ip.clone(),
                 ip_address: Some(local_ip.clone()),
                 error_message: None,
@@ -946,11 +990,12 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
     }
 
     // Include configured remote SSH nodes
-    let ssh_conns = load_ssh_connections().unwrap_or_default();
     let remote_conns: Vec<SshConnectionRecord> = ssh_conns
         .into_iter()
         .filter(|conn| {
-            conn.ip_address != local_ip && !conn.alias.eq_ignore_ascii_case(&local_machine)
+            (local_ip.is_empty() || conn.ip_address.trim() != local_ip.trim())
+                && !conn.alias.eq_ignore_ascii_case(&effective_local_alias)
+                && !conn.alias.eq_ignore_ascii_case(&local_machine)
         })
         .collect();
 
@@ -978,7 +1023,7 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
                             latency_ms: Some(elapsed_ms),
                             is_local: false,
                             instance_id: "default".to_string(),
-                            instance_name: format!("{}:default", conn.alias),
+                            instance_name: "default".to_string(),
                             running: false,
                             bound_email: String::new(),
                             tier: "SSH-NODE".to_string(),
@@ -990,9 +1035,14 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
                         return node_items;
                     }
 
+                    let is_windows = conn.os.to_lowercase().contains("win")
+                        || conn.username.eq_ignore_ascii_case("administrator")
+                        || conn.alias.to_lowercase().starts_with('w');
+                    let agm_bin = if is_windows { "agm.exe" } else { "agm" };
+
                     // Node reachable: query real instances via SSH with gitmap fallback
                     let remote_cmd = vec![
-                        "agm".to_string(),
+                        agm_bin.to_string(),
                         "instances".to_string(),
                         "list".to_string(),
                         "--json".to_string(),
@@ -1017,7 +1067,7 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
                         };
                         for target_id in candidate_targets {
                             if let Ok((code, gm_out, _)) =
-                                exec_via_gitmap_ssh(target_id, "agm instances list --json")
+                                exec_via_gitmap_ssh(target_id, &format!("{agm_bin} instances list --json"))
                             {
                                 if code == 0 && !gm_out.is_empty() {
                                     raw_stdout = gm_out;
@@ -1027,10 +1077,59 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
                         }
                     }
 
+                    // Direct file inspection fallback over SSH if CLI failed or returned empty
+                    if raw_stdout.is_empty() || extract_clean_json(&raw_stdout).is_none() {
+                        let file_inst_cmd = if is_windows {
+                            vec![
+                                "powershell".to_string(),
+                                "-NoProfile".to_string(),
+                                "-NonInteractive".to_string(),
+                                "-Command".to_string(),
+                                "\"if (Test-Path $HOME\\.antigravity_tools\\instances\\instances.json) { Get-Content -Raw $HOME\\.antigravity_tools\\instances\\instances.json }\"".to_string(),
+                            ]
+                        } else {
+                            vec![
+                                "cat".to_string(),
+                                "~/.antigravity_tools/instances/instances.json".to_string(),
+                            ]
+                        };
+                        if let Ok(res_list) =
+                            exec_ssh_command(&conn.alias, &file_inst_cmd, Some(port), None, None)
+                        {
+                            if let Some(res) = res_list
+                                .first()
+                                .filter(|r| r.success && !r.stdout.is_empty())
+                            {
+                                raw_stdout = res.stdout.clone();
+                            }
+                        }
+                        if raw_stdout.is_empty() || extract_clean_json(&raw_stdout).is_none() {
+                            let candidate_targets = if conn.alias.eq_ignore_ascii_case(&conn.ip_address)
+                            {
+                                vec![conn.alias.as_str()]
+                            } else {
+                                vec![conn.alias.as_str(), conn.ip_address.as_str()]
+                            };
+                            let file_inst_str = if is_windows {
+                                "powershell -NoProfile -NonInteractive -Command \"if (Test-Path $HOME\\.antigravity_tools\\instances\\instances.json) { Get-Content -Raw $HOME\\.antigravity_tools\\instances\\instances.json }\""
+                            } else {
+                                "cat ~/.antigravity_tools/instances/instances.json"
+                            };
+                            for target_id in candidate_targets {
+                                if let Ok((code, gm_out, _)) = exec_via_gitmap_ssh(target_id, file_inst_str) {
+                                    if code == 0 && !gm_out.is_empty() {
+                                        raw_stdout = gm_out;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // Query remote accounts to extract real quota balances
                     let mut remote_accounts_json = String::new();
                     let acc_cmd = vec![
-                        "agm".to_string(),
+                        agm_bin.to_string(),
                         "accounts".to_string(),
                         "list".to_string(),
                         "--json".to_string(),
@@ -1054,7 +1153,7 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
                         };
                         for target_id in candidate_targets {
                             if let Ok((code, gm_acc_out, _)) =
-                                exec_via_gitmap_ssh(target_id, "agm accounts list --json")
+                                exec_via_gitmap_ssh(target_id, &format!("{agm_bin} accounts list --json"))
                             {
                                 if code == 0 && !gm_acc_out.is_empty() {
                                     remote_accounts_json = gm_acc_out;
@@ -1064,22 +1163,81 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
                         }
                     }
 
-                    if !raw_stdout.is_empty() {
-                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&raw_stdout) {
+                    // Direct file inspection fallback over SSH for accounts if CLI failed or returned empty
+                    if remote_accounts_json.is_empty() || extract_clean_json(&remote_accounts_json).is_none() {
+                        let file_acc_cmd = if is_windows {
+                            vec![
+                                "powershell".to_string(),
+                                "-NoProfile".to_string(),
+                                "-NonInteractive".to_string(),
+                                "-Command".to_string(),
+                                "\"if (Test-Path $HOME\\.antigravity_tools\\accounts.json) { Get-Content -Raw $HOME\\.antigravity_tools\\accounts.json }\"".to_string(),
+                            ]
+                        } else {
+                            vec![
+                                "cat".to_string(),
+                                "~/.antigravity_tools/accounts.json".to_string(),
+                            ]
+                        };
+                        if let Ok(res_list) =
+                            exec_ssh_command(&conn.alias, &file_acc_cmd, Some(port), None, None)
+                        {
+                            if let Some(res) = res_list
+                                .first()
+                                .filter(|r| r.success && !r.stdout.is_empty())
+                            {
+                                remote_accounts_json = res.stdout.clone();
+                            }
+                        }
+                        if remote_accounts_json.is_empty() || extract_clean_json(&remote_accounts_json).is_none() {
+                            let candidate_targets = if conn.alias.eq_ignore_ascii_case(&conn.ip_address)
+                            {
+                                vec![conn.alias.as_str()]
+                            } else {
+                                vec![conn.alias.as_str(), conn.ip_address.as_str()]
+                            };
+                            let file_acc_str = if is_windows {
+                                "powershell -NoProfile -NonInteractive -Command \"if (Test-Path $HOME\\.antigravity_tools\\accounts.json) { Get-Content -Raw $HOME\\.antigravity_tools\\accounts.json }\""
+                            } else {
+                                "cat ~/.antigravity_tools/accounts.json"
+                            };
+                            for target_id in candidate_targets {
+                                if let Ok((code, gm_out, _)) = exec_via_gitmap_ssh(target_id, file_acc_str) {
+                                    if code == 0 && !gm_out.is_empty() {
+                                        remote_accounts_json = gm_out;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Parse remote accounts
+                    let clean_accs_str = extract_clean_json(&remote_accounts_json);
+                    let remote_accs_val = clean_accs_str
+                        .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok());
+                    let curr_account_id = remote_accs_val
+                        .as_ref()
+                        .and_then(|v| v.get("current_account_id"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    let remote_accs_array = remote_accs_val
+                        .as_ref()
+                        .and_then(|v| {
+                            v.get("accounts")
+                                .and_then(|a| a.as_array())
+                                .or_else(|| v.get("data").and_then(|d| d.as_array()))
+                                .or_else(|| v.as_array())
+                        });
+
+                    if let Some(clean_inst_str) = extract_clean_json(&raw_stdout) {
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(clean_inst_str) {
                             let raw_instances = val
-                                .get("data")
+                                .get("instances")
                                 .and_then(|d| d.as_array())
+                                .or_else(|| val.get("data").and_then(|d| d.as_array()))
                                 .or_else(|| val.as_array());
                             if let Some(inst_array) = raw_instances {
-                                let remote_accs_val = serde_json::from_str::<serde_json::Value>(
-                                    &remote_accounts_json,
-                                )
-                                .ok();
-                                let remote_accs_array = remote_accs_val
-                                    .as_ref()
-                                    .and_then(|v| v.get("data").or(Some(v)))
-                                    .and_then(|v| v.as_array());
-
                                 for inst_val in inst_array {
                                     let inst_id = inst_val
                                         .get("id")
@@ -1095,20 +1253,54 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
                                         .get("is_running")
                                         .and_then(|v| v.as_bool())
                                         .unwrap_or(false);
+                                    let is_default = inst_val
+                                        .get("is_default")
+                                        .and_then(|v| v.as_bool())
+                                        .unwrap_or(inst_id == "default");
                                     let raw_email = inst_val
                                         .get("bound_email")
                                         .and_then(|v| v.as_str())
                                         .unwrap_or("")
                                         .to_string();
-                                    let clean_email = if raw_email.is_empty()
+                                    let mut clean_email = if raw_email.is_empty()
                                         || raw_email.contains("Administrator")
                                         || raw_email.contains("root")
                                         || raw_email.contains("${adminUser}")
                                         || raw_email.contains("${linuxUser}")
                                     {
-                                        "(unbound)".to_string()
+                                        String::new()
                                     } else {
                                         raw_email
+                                    };
+
+                                    // Fallback to accounts.json.current_account_id when bound_email is empty for default instance
+                                    if clean_email.is_empty() && is_default {
+                                        if let Some(ref curr_id) = curr_account_id {
+                                            if let Some(acc_array) = remote_accs_array {
+                                                for acc in acc_array {
+                                                    let a_id = acc
+                                                        .get("id")
+                                                        .and_then(|v| v.as_str())
+                                                        .unwrap_or("");
+                                                    if a_id == curr_id.as_str() {
+                                                        let a_email = acc
+                                                            .get("email")
+                                                            .and_then(|v| v.as_str())
+                                                            .unwrap_or("");
+                                                        if !a_email.is_empty() {
+                                                            clean_email = a_email.to_string();
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    let final_bound_email = if clean_email.is_empty() {
+                                        "(unbound)".to_string()
+                                    } else {
+                                        clean_email.clone()
                                     };
 
                                     let mut tier = "PRO".to_string();
@@ -1117,34 +1309,52 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
                                     let mut has_verified_quota = false;
 
                                     if let Some(acc_array) = remote_accs_array {
-                                        for acc in acc_array {
-                                            let acc_email = acc
+                                        for acc_val in acc_array {
+                                            let acc_email = acc_val
                                                 .get("email")
                                                 .and_then(|v| v.as_str())
                                                 .unwrap_or("");
-                                            if !clean_email.is_empty()
-                                                && clean_email != "(unbound)"
-                                                && acc_email.eq_ignore_ascii_case(&clean_email)
-                                            {
-                                                if let Some(t) = acc
+                                            let acc_id = acc_val
+                                                .get("id")
+                                                .and_then(|v| v.as_str())
+                                                .unwrap_or("");
+                                            let is_match = (!clean_email.is_empty()
+                                                && acc_email.eq_ignore_ascii_case(&clean_email))
+                                                || (clean_email.is_empty()
+                                                    && is_default
+                                                    && curr_account_id.as_deref() == Some(acc_id));
+
+                                            if is_match {
+                                                if let Ok(acc) = serde_json::from_value::<
+                                                    crate::models::Account,
+                                                >(
+                                                    acc_val.clone()
+                                                ) {
+                                                    tier = acc
+                                                        .quota
+                                                        .as_ref()
+                                                        .and_then(|q| q.subscription_tier.as_deref())
+                                                        .unwrap_or("PRO")
+                                                        .to_string();
+                                                    let (pct4_opt, pctw_opt) =
+                                                        crate::modules::auto_switcher::extract_dual_window_quotas(
+                                                            &acc,
+                                                            &target_model,
+                                                        );
+                                                    if let Some(p4) = pct4_opt {
+                                                        q_4h = p4;
+                                                        has_verified_quota = true;
+                                                    }
+                                                    if let Some(pw) = pctw_opt {
+                                                        q_wk = pw;
+                                                        has_verified_quota = true;
+                                                    }
+                                                } else if let Some(t) = acc_val
                                                     .get("quota")
                                                     .and_then(|q| q.get("subscription_tier"))
                                                     .and_then(|v| v.as_str())
                                                 {
                                                     tier = t.to_string();
-                                                }
-                                                if let Some(pct4) =
-                                                    acc.get("quota_4h_pct").and_then(|v| v.as_f64())
-                                                {
-                                                    q_4h = pct4;
-                                                    has_verified_quota = true;
-                                                }
-                                                if let Some(pctw) = acc
-                                                    .get("quota_weekly_pct")
-                                                    .and_then(|v| v.as_f64())
-                                                {
-                                                    q_wk = pctw;
-                                                    has_verified_quota = true;
                                                 }
                                                 break;
                                             }
@@ -1171,7 +1381,7 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
                                         instance_id: inst_id,
                                         instance_name: inst_name,
                                         running: is_running,
-                                        bound_email: clean_email,
+                                        bound_email: final_bound_email,
                                         tier,
                                         quota_4h_pct: q_4h,
                                         quota_weekly_pct: q_wk,
@@ -1184,6 +1394,62 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
                     }
 
                     if node_items.is_empty() {
+                        let mut def_email = "(unbound)".to_string();
+                        let mut def_tier = "SSH-NODE".to_string();
+                        let mut def_q_4h = 0.0;
+                        let mut def_q_wk = 0.0;
+                        let mut def_has_quota = false;
+
+                        if let Some(acc_array) = remote_accs_array {
+                            let matched_def_acc = if let Some(ref curr_id) = curr_account_id {
+                                acc_array
+                                    .iter()
+                                    .find(|a| a.get("id").and_then(|v| v.as_str()) == Some(curr_id.as_str()))
+                                    .or_else(|| acc_array.first())
+                            } else {
+                                acc_array.first()
+                            };
+
+                            if let Some(acc_val) = matched_def_acc {
+                                let a_email = acc_val
+                                    .get("email")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("");
+                                if !a_email.is_empty() {
+                                    def_email = a_email.to_string();
+                                }
+                                if let Ok(acc) = serde_json::from_value::<crate::models::Account>(
+                                    acc_val.clone(),
+                                ) {
+                                    def_tier = acc
+                                        .quota
+                                        .as_ref()
+                                        .and_then(|q| q.subscription_tier.as_deref())
+                                        .unwrap_or("PRO")
+                                        .to_string();
+                                    let (pct4_opt, pctw_opt) =
+                                        crate::modules::auto_switcher::extract_dual_window_quotas(
+                                            &acc,
+                                            &target_model,
+                                        );
+                                    if let Some(p4) = pct4_opt {
+                                        def_q_4h = p4;
+                                        def_has_quota = true;
+                                    }
+                                    if let Some(pw) = pctw_opt {
+                                        def_q_wk = pw;
+                                        def_has_quota = true;
+                                    }
+                                }
+                            }
+                        }
+
+                        let status_label = if def_has_quota {
+                            "idle".to_string()
+                        } else {
+                            "unverified-balance".to_string()
+                        };
+
                         node_items.push(ClusterInstanceBalanceItem {
                             machine_alias: conn.alias.clone(),
                             machine_ip: conn.ip_address.clone(),
@@ -1192,14 +1458,14 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
                             latency_ms: Some(elapsed_ms),
                             is_local: false,
                             instance_id: "default".to_string(),
-                            instance_name: format!("{}:default", conn.alias),
+                            instance_name: "default".to_string(),
                             running: false,
-                            bound_email: "(unbound)".to_string(),
-                            tier: "SSH-NODE".to_string(),
-                            quota_4h_pct: 0.0,
-                            quota_weekly_pct: 0.0,
+                            bound_email: def_email,
+                            tier: def_tier,
+                            quota_4h_pct: def_q_4h,
+                            quota_weekly_pct: def_q_wk,
                             active_model: target_model.clone(),
-                            status_label: "unverified-balance".to_string(),
+                            status_label,
                         });
                     }
 
@@ -1226,10 +1492,16 @@ pub async fn send_remote_ssh_prompt(
     } else {
         payload.node_alias.trim().to_string()
     };
-    let inst_name = if payload.instance_name.trim().is_empty() {
+    let raw_inst = payload.instance_name.trim();
+    let clean_inst = if let Some((_, last)) = raw_inst.rsplit_once(':') {
+        last.trim()
+    } else {
+        raw_inst
+    };
+    let inst_name = if clean_inst.is_empty() {
         "default".to_string()
     } else {
-        payload.instance_name.trim().to_string()
+        clean_inst.to_string()
     };
     let text = payload.prompt_text.trim();
     if text.is_empty() {
@@ -1237,9 +1509,20 @@ pub async fn send_remote_ssh_prompt(
     }
 
     let local_machine = crate::modules::email_watcher::detect_machine_name();
+    let local_ip = crate::modules::email_watcher::detect_local_ip();
+    let ssh_conns = load_ssh_connections().unwrap_or_default();
+    let matched_local_alias = ssh_conns
+        .iter()
+        .find(|conn| !local_ip.is_empty() && conn.ip_address.trim() == local_ip.trim())
+        .map(|conn| conn.alias.clone());
     let is_local = node_alias.eq_ignore_ascii_case("local")
         || node_alias.eq_ignore_ascii_case("localhost")
-        || node_alias.eq_ignore_ascii_case(&local_machine);
+        || node_alias.eq_ignore_ascii_case(&local_machine)
+        || (!local_ip.is_empty() && node_alias.eq_ignore_ascii_case(&local_ip))
+        || matched_local_alias
+            .as_deref()
+            .map(|a| node_alias.eq_ignore_ascii_case(a))
+            .unwrap_or(false);
 
     let cmd_str = if is_local {
         if let Some(conv) = payload.conversation_id.as_deref().filter(|s| !s.is_empty()) {

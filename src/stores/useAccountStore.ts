@@ -38,7 +38,8 @@ interface AccountState {
 
 let inFlightFetchPromise: Promise<void> | null = null;
 let lastFetchTimestamp = 0;
-const FETCH_DEBOUNCE_MS = 1500;
+const FETCH_DEBOUNCE_MS = 30000;
+const BACKGROUND_THROTTLE_MS = 300000;
 
 export const useAccountStore = create<AccountState>((set, get) => ({
     accounts: [],
@@ -51,7 +52,10 @@ export const useAccountStore = create<AccountState>((set, get) => ({
         if (inFlightFetchPromise) {
             return inFlightFetchPromise;
         }
-        if (!force && now - lastFetchTimestamp < FETCH_DEBOUNCE_MS && get().accounts.length > 0) {
+        const effectiveDebounce = (typeof document !== 'undefined' && document.hidden)
+            ? BACKGROUND_THROTTLE_MS
+            : FETCH_DEBOUNCE_MS;
+        if (!force && now - lastFetchTimestamp < effectiveDebounce && get().accounts.length > 0) {
             return;
         }
         inFlightFetchPromise = (async () => {

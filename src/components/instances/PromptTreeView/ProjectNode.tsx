@@ -55,26 +55,24 @@ export function sortConversations(
 ): AgmConversationNode[] {
     let sorted = [...convs];
     if (activeFilter === 'running') {
-        sorted = sorted.filter((c) => {
-            const status = (c.status || '').toLowerCase();
-            return Boolean(c.is_running) || status.includes('run') || status.includes('exec');
-        });
+        sorted = sorted.filter((c) => getConversationStatus(c).isRunning);
+    } else if (activeFilter === 'queued') {
+        sorted = sorted.filter((c) => getConversationStatus(c).isQueued);
     }
     return sorted.sort((a, b) => {
-        const aStatus = (a.status || '').toLowerCase();
-        const bStatus = (b.status || '').toLowerCase();
-        const aRunning = Boolean(a.is_running) || aStatus.includes('run') || aStatus.includes('exec');
-        const bRunning = Boolean(b.is_running) || bStatus.includes('run') || bStatus.includes('exec');
-        if (aRunning !== bRunning) {
-            return aRunning ? -1 : 1;
+        const aStatus = getConversationStatus(a);
+        const bStatus = getConversationStatus(b);
+        // Tier 1: Running prompts (is_running === true or has running turns)
+        if (aStatus.isRunning !== bStatus.isRunning) {
+            return aStatus.isRunning ? -1 : 1;
         }
 
-        const aQueued = isConversationOrTurnQueued(a);
-        const bQueued = isConversationOrTurnQueued(b);
-        if (aQueued !== bQueued) {
-            return aQueued ? -1 : 1;
+        // Tier 2: Queued prompts (is_queued === true or has queued turns)
+        if (aStatus.isQueued !== bStatus.isQueued) {
+            return aStatus.isQueued ? -1 : 1;
         }
 
+        // Tier 3: Timestamp descending (last_modified)
         const aTime = new Date(a.last_modified).getTime() || 0;
         const bTime = new Date(b.last_modified).getTime() || 0;
         return bTime - aTime;
@@ -225,6 +223,17 @@ function ConversationListWithGrouping({
                                                 )}>
                                                     <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] animate-pulse" />
                                                     RUNNING
+                                                </span>
+                                            )}
+                                            {!isSubRunning && isConversationOrTurnQueued(subNode.primaryNode) && (
+                                                <span className={cn(
+                                                    "flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[8.5px] font-bold font-mono border",
+                                                    isSubSelected
+                                                        ? "bg-amber-400 text-amber-950 border-amber-300"
+                                                        : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                                                )}>
+                                                    <Clock className="w-2.5 h-2.5 text-amber-500 shrink-0" />
+                                                    QUEUED
                                                 </span>
                                             )}
                                         </div>

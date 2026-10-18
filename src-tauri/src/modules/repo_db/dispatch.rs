@@ -17,6 +17,11 @@ pub(crate) fn prompt_push_landed(agy_ok: bool) -> bool {
     agy_ok
 }
 
+/// Directly dispatch/send backed-up prompts to the running projects with flexible instance matching.
+pub fn dispatch_backed_up_prompts(instance_id: &str) -> Result<usize, String> {
+    dispatch_running_prompts(instance_id)
+}
+
 /// Directly dispatch/send backed-up prompts to the running projects without queuing
 pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
     let conn = connect_db()?;
@@ -61,8 +66,9 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
         .flatten()
         .collect::<Vec<ActivePrompt>>();
 
-    let prompts: Vec<ActivePrompt> = all_backed_up
-        .into_iter()
+    let mut prompts: Vec<ActivePrompt> = all_backed_up
+        .iter()
+        .cloned()
         .filter(|p| {
             let prompt_inst = crate::modules::instance::resolve_instance_id(&p.instance_id)
                 .unwrap_or_else(|_| {
@@ -92,6 +98,74 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
             is_match
         })
         .collect();
+
+    // Flexible instance matching: If the target instance doesn't match or is missing,
+    // dispatch to active instance or default instance instead of silently failing with 0 matches.
+    if prompts.is_empty() && !all_backed_up.is_empty() {
+        crate::modules::logger::log_info(&format!(
+            "[RepoDB] No exact instance match for target '{}'; falling back flexibly across {} backed-up prompt(s)",
+            target_inst,
+            all_backed_up.len()
+        ));
+
+        // 1. Try active instance
+        let active_inst = crate::modules::instance::get_active_instance_id()
+            .unwrap_or_else(|_| "default".to_string());
+        let active_resolved = crate::modules::instance::resolve_instance_id(&active_inst)
+            .unwrap_or_else(|_| "default".to_string());
+        let is_active_default = active_resolved == "default" || active_resolved == "__default__";
+
+        prompts = all_backed_up
+            .iter()
+            .cloned()
+            .filter(|p| {
+                let prompt_inst = crate::modules::instance::resolve_instance_id(&p.instance_id)
+                    .unwrap_or_else(|_| {
+                        if p.instance_id == "__default__" || p.instance_id.is_empty() {
+                            "default".to_string()
+                        } else {
+                            p.instance_id.clone()
+                        }
+                    });
+                if is_active_default {
+                    prompt_inst == "default"
+                        || prompt_inst == "__default__"
+                        || prompt_inst.is_empty()
+                } else {
+                    prompt_inst == active_resolved
+                }
+            })
+            .collect();
+
+        // 2. If still empty, try default instance
+        if prompts.is_empty() {
+            prompts = all_backed_up
+                .iter()
+                .cloned()
+                .filter(|p| {
+                    let prompt_inst = crate::modules::instance::resolve_instance_id(&p.instance_id)
+                        .unwrap_or_else(|_| {
+                            if p.instance_id == "__default__" || p.instance_id.is_empty() {
+                                "default".to_string()
+                            } else {
+                                p.instance_id.clone()
+                            }
+                        });
+                    prompt_inst == "default"
+                        || prompt_inst == "__default__"
+                        || prompt_inst.is_empty()
+                })
+                .collect();
+        }
+
+        // 3. If still empty, dispatch all available backed-up prompts
+        if prompts.is_empty() {
+            crate::modules::logger::log_info(
+                "[RepoDB] Fallback to all backed-up prompts regardless of instance tag",
+            );
+            prompts = all_backed_up;
+        }
+    }
 
     let mut dispatched_count = 0;
 
@@ -148,20 +222,36 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
             false
         };
 
-        let sent = spawn_or_replace_prompt_via_agy(&prompt, true);
-        if let Err(ref spawn_err) = sent {
+        let mut agy_sent = spawn_or_replace_prompt_via_agy(&prompt, true);
+        if let Err(ref spawn_err) = agy_sent {
             crate::modules::logger::log_warn(&format!(
-                "[RepoDB] agy dispatch failed for prompt '{}': {spawn_err}",
+                "[RepoDB] agy dispatch failed for prompt '{}': {spawn_err}; attempting direct DevTools CDP fallback",
                 prompt.id
             ));
+            let clean_prompt = super::text_utils::extract_clean_user_prompt(&prompt.prompt_content);
+            let fallback_prompt = if clean_prompt.trim().is_empty() {
+                prompt.prompt_content.trim()
+            } else {
+                clean_prompt.as_str()
+            };
+            if crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
+                &target_inst,
+                fallback_prompt,
+            ) {
+                crate::modules::logger::log_info(&format!(
+                    "[RepoDB] CDP prompt submission fallback succeeded for prompt '{}' on instance '{}'",
+                    prompt.id, target_inst
+                ));
+                agy_sent = Ok(());
+            }
         }
         // The resume file is only a hint. A written file with a session id is not
         // proof the IDE continued the prompt. Leave the row backed_up so the
         // post-launch retry can push it once the process is accepting input.
-        if !prompt_push_landed(sent.is_ok()) {
+        if !prompt_push_landed(agy_sent.is_ok()) {
             if file_written {
                 crate::modules::logger::log_warn(&format!(
-                    "[RepoDB] Prompt '{}' resume file was written but agy did not accept it; left backed_up",
+                    "[RepoDB] Prompt '{}' resume file was written but agy/CDP did not accept it; left backed_up",
                     prompt.id
                 ));
             }
@@ -379,5 +469,11 @@ mod tests {
         assert_eq!(content, prompt_text);
         assert_eq!(stored_img, img_payload);
         assert_eq!(proj, project_id);
+    }
+
+    #[test]
+    fn test_dispatch_backed_up_prompts_signature() {
+        assert!(prompt_push_landed(true));
+        assert!(!prompt_push_landed(false));
     }
 }

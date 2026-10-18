@@ -1,6 +1,6 @@
 import { PromptOriginTier } from './types';
 import type { AgmConversationNode, TierClassificationResult, HierarchicalConversationNode } from './types';
-import { isConversationOrTurnQueued } from './conversationGuards';
+import { getConversationStatus } from './conversationGuards';
 
 export function classifyPromptTier(
     text?: string,
@@ -203,24 +203,14 @@ export function assembleConversationHierarchy(
     // Reverse rootNodes so newest user prompt appears at top,
     // and sort running and queued roots to the top
     return rootNodes.reverse().sort((a, b) => {
-        const aStatus = (a.primaryNode.status || '').toLowerCase();
-        const bStatus = (b.primaryNode.status || '').toLowerCase();
-        const aRunning =
-            Boolean(a.primaryNode.is_running) ||
-            aStatus.includes('run') ||
-            aStatus.includes('exec') ||
-            Boolean(a.primaryNode.prompts && a.primaryNode.prompts.some((p) => Boolean(p.is_running) || (p.status && (p.status.toLowerCase().includes('run') || p.status.toLowerCase().includes('exec'))))) ||
-            a.subagents.some((s) => Boolean(s.primaryNode.is_running) || (s.primaryNode.status || '').toLowerCase().includes('run'));
-        const bRunning =
-            Boolean(b.primaryNode.is_running) ||
-            bStatus.includes('run') ||
-            bStatus.includes('exec') ||
-            Boolean(b.primaryNode.prompts && b.primaryNode.prompts.some((p) => Boolean(p.is_running) || (p.status && (p.status.toLowerCase().includes('run') || p.status.toLowerCase().includes('exec'))))) ||
-            b.subagents.some((s) => Boolean(s.primaryNode.is_running) || (s.primaryNode.status || '').toLowerCase().includes('run'));
+        const aStatus = getConversationStatus(a.primaryNode);
+        const bStatus = getConversationStatus(b.primaryNode);
+        const aRunning = aStatus.isRunning || a.subagents.some((s) => getConversationStatus(s.primaryNode).isRunning);
+        const bRunning = bStatus.isRunning || b.subagents.some((s) => getConversationStatus(s.primaryNode).isRunning);
         if (aRunning !== bRunning) return aRunning ? -1 : 1;
 
-        const aQueued = isConversationOrTurnQueued(a.primaryNode) || a.subagents.some((s) => isConversationOrTurnQueued(s.primaryNode));
-        const bQueued = isConversationOrTurnQueued(b.primaryNode) || b.subagents.some((s) => isConversationOrTurnQueued(s.primaryNode));
+        const aQueued = aStatus.isQueued || a.subagents.some((s) => getConversationStatus(s.primaryNode).isQueued);
+        const bQueued = bStatus.isQueued || b.subagents.some((s) => getConversationStatus(s.primaryNode).isQueued);
         if (aQueued !== bQueued) return aQueued ? -1 : 1;
 
         const aTime = new Date(a.primaryNode.last_modified).getTime() || 0;

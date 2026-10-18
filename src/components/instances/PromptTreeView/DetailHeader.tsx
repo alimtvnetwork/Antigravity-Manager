@@ -378,6 +378,11 @@ export function DetailHeader(props: DetailHeaderProps) {
                         const tierInfo = classifyPromptTier(activePromptText, selectedConversation.title);
                         const isTurnSelected = activeTurnNumber !== null;
 
+                        // Preview Header Decluttering: remove redundant "User Prompt" plain badges
+                        if (tierInfo.tier === PromptOriginTier.UserPrompt && !isTurnSelected) {
+                            return null;
+                        }
+
                         return (
                             <span
                                 className={cn(
@@ -396,9 +401,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 {tierInfo.tier === PromptOriginTier.SubagentInstruction && <Bot className="w-2.5 h-2.5 text-purple-500 shrink-0" />}
                                 {tierInfo.tier === PromptOriginTier.SystemMessage && <Terminal className="w-2.5 h-2.5 text-slate-500 shrink-0" />}
                                 {tierInfo.tier === PromptOriginTier.ToolOutput && <Wrench className="w-2.5 h-2.5 text-amber-500 shrink-0" />}
-                                {(isTurnSelected || tierInfo.tier !== PromptOriginTier.UserPrompt) && (
-                                    <span>{isTurnSelected ? `Turn T${activeTurnNumber}` : (tierInfo.tier === PromptOriginTier.SubagentInstruction ? 'Subagent' : tierInfo.tier === PromptOriginTier.SystemMessage ? 'System' : 'Tool Output')}</span>
-                                )}
+                                <span>{isTurnSelected ? `Turn T${activeTurnNumber}` : (tierInfo.tier === PromptOriginTier.SubagentInstruction ? 'Subagent' : tierInfo.tier === PromptOriginTier.SystemMessage ? 'System' : 'Tool Output')}</span>
                             </span>
                         );
                     })()}

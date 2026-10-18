@@ -73,3 +73,17 @@ export function isStaleOrEmptyConversation(conv: AgmConversationNode): boolean {
 }
 
 export const isUntitledOrEmpty = isStaleOrEmptyConversation;
+
+export function getConversationStatus(conv: AgmConversationNode): { isRunning: boolean; isQueued: boolean } {
+    const status = (conv.status || '').toLowerCase();
+    const hasRunningPrompt = Boolean(
+        conv.prompts &&
+        conv.prompts.some((p) => Boolean(p.is_running) || (p.status && (p.status.toLowerCase().includes('run') || p.status.toLowerCase().includes('exec'))))
+    );
+    const isRunning =
+        (Boolean(conv.is_running) || status.includes('run') || status.includes('exec') || hasRunningPrompt) &&
+        !isGhostConversation(conv) &&
+        !(conv.prompt_word_count === 0 && (!conv.prompt_preview_200w || !conv.prompt_preview_200w.trim()));
+    const isQueued = isConversationOrTurnQueued(conv) && !isRunning;
+    return { isRunning, isQueued };
+}

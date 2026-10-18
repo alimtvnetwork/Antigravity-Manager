@@ -3,6 +3,36 @@ use std::fs;
 
 use super::*;
 
+/// Deduplicate connections by alias (case-insensitive) and by IP address, preserving order
+pub fn deduplicate_connections(conns: Vec<SshConnectionRecord>) -> Vec<SshConnectionRecord> {
+    let mut seen_aliases = std::collections::HashSet::new();
+    let mut seen_ips = std::collections::HashSet::new();
+    let mut deduped = Vec::new();
+
+    for c in conns {
+        let alias_norm = c.alias.trim().to_ascii_lowercase();
+        let ip_norm = c.ip_address.trim().to_string();
+
+        if !alias_norm.is_empty() && seen_aliases.contains(&alias_norm) {
+            continue;
+        }
+        if !ip_norm.is_empty() && seen_ips.contains(&ip_norm) {
+            continue;
+        }
+
+        if !alias_norm.is_empty() {
+            seen_aliases.insert(alias_norm);
+        }
+        if !ip_norm.is_empty() {
+            seen_ips.insert(ip_norm);
+        }
+
+        deduped.push(c);
+    }
+
+    deduped
+}
+
 fn load_connections_from_file(path: &std::path::Path) -> Option<Vec<SshConnectionRecord>> {
     let is_valid_file = path.is_file();
     if !is_valid_file {
@@ -12,7 +42,7 @@ fn load_connections_from_file(path: &std::path::Path) -> Option<Vec<SshConnectio
     let conns = decode_connections_from_json(&raw).ok()?;
     let has_connections = !conns.is_empty();
     if has_connections {
-        Some(conns)
+        Some(deduplicate_connections(conns))
     } else {
         None
     }
@@ -92,7 +122,8 @@ pub fn ensure_connections_rsa_encrypted(conns: &[SshConnectionRecord]) -> Vec<Ss
 pub fn save_ssh_connections(
     conns: &[SshConnectionRecord],
 ) -> Result<SshNodesExportEnvelope, String> {
-    let safe_conns = ensure_connections_rsa_encrypted(conns);
+    let deduped = deduplicate_connections(conns.to_vec());
+    let safe_conns = ensure_connections_rsa_encrypted(&deduped);
     let envelope = build_envelope_from_connections(&safe_conns);
     let store_path = get_ssh_nodes_store_path()?;
     if let Some(parent) = store_path.parent() {
@@ -457,9 +488,41 @@ pub fn upsert_ssh_node_rsa(payload: &SaveSshNodeRsaPayload) -> Result<SshNodeRec
     sync_ssh_connections_locally(std::slice::from_ref(&record))?;
     let all = load_ssh_connections()?;
     let saved = all
-        .into_iter()
+        .iter()
         .find(|c| c.alias.eq_ignore_ascii_case(alias))
+        .cloned()
         .unwrap_or(record);
+
+    // Sync node connection info to ~/.gitmap/gitmap-ssh-nodes.json so GitMap fix-auth has credentials
+    if let Some(home) = dirs::home_dir() {
+        let gm_dir = home.join(".gitmap");
+        if !gm_dir.exists() {
+            // Justification: best-effort creation of ~/.gitmap directory for node credentials sync
+            crate::error::record_ignored(fs::create_dir_all(&gm_dir), "create_dir_all gitmap");
+        }
+        let gm_nodes_file = gm_dir.join("gitmap-ssh-nodes.json");
+        let mut combined = all.clone();
+        if let Some(existing_gm_conns) = load_connections_from_file(&gm_nodes_file) {
+            for gm_c in existing_gm_conns {
+                let is_already_present = combined.iter().any(|c| {
+                    c.alias.eq_ignore_ascii_case(&gm_c.alias)
+                        || c.ip_address.eq_ignore_ascii_case(&gm_c.ip_address)
+                });
+                if !is_already_present {
+                    combined.push(gm_c);
+                }
+            }
+        }
+        let gm_envelope = build_envelope_from_connections(&combined);
+        if let Ok(json_str) = serde_json::to_string_pretty(&gm_envelope) {
+            // Justification: best-effort sync of credentials to GitMap nodes file
+            crate::error::record_ignored(
+                fs::write(&gm_nodes_file, json_str),
+                "sync gitmap-ssh-nodes.json",
+            );
+        }
+    }
+
     Ok(to_ssh_node_record(&saved))
 }
 

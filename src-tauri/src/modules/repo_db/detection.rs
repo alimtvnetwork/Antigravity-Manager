@@ -1,17 +1,31 @@
 //! Repo DB: detection
 
 use super::failed_commands::decode_uri_to_path;
-use super::liveness::is_prompt_running_for_project;
+use super::liveness::{
+    collect_active_workspace_uris_for_instance, is_prompt_running_for_project,
+    is_prompt_running_for_project_with_summaries,
+};
 use super::models::{
     ActivePrompt, ProjectAuditRationaleType, PromptAuditCriteriaType, RunningProject,
 };
 use super::schema::connect_db;
 use chrono::Utc;
+use once_cell::sync::Lazy;
 use rusqlite::params;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::RwLock;
+
+#[derive(Clone)]
+struct CachedRunningProjects {
+    projects: Vec<RunningProject>,
+    cached_at: i64,
+}
+
+static RUNNING_PROJECTS_CACHE: Lazy<RwLock<HashMap<String, CachedRunningProjects>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
 
 /// Scan active workspace storage for an instance and discover projects
 pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>, String> {
@@ -24,6 +38,15 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
             }
         });
     let target_id = resolved_id.as_str();
+
+    let now = Utc::now().timestamp();
+    if let Ok(guard) = RUNNING_PROJECTS_CACHE.read() {
+        if let Some(cached) = guard.get(target_id) {
+            if now - cached.cached_at < 15 {
+                return Ok(cached.projects.clone());
+            }
+        }
+    }
     let registry = crate::modules::instance::load_registry()?;
     let instance = registry
         .instances
@@ -53,12 +76,32 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
 
     // If storage dir does not exist, return empty project list early
     if !storage_dir.exists() {
+        if let Ok(mut guard) = RUNNING_PROJECTS_CACHE.write() {
+            guard.insert(
+                target_id.to_string(),
+                CachedRunningProjects {
+                    projects: projects.clone(),
+                    cached_at: now,
+                },
+            );
+        }
         return Ok(projects);
     }
 
     let Ok(entries) = fs::read_dir(&storage_dir) else {
+        if let Ok(mut guard) = RUNNING_PROJECTS_CACHE.write() {
+            guard.insert(
+                target_id.to_string(),
+                CachedRunningProjects {
+                    projects: projects.clone(),
+                    cached_at: now,
+                },
+            );
+        }
         return Ok(projects);
     };
+
+    let active_ws_uris = collect_active_workspace_uris_for_instance(target_id);
 
     for entry in entries.flatten() {
         let ws_folder = entry.path();
@@ -102,25 +145,44 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
         );
         let composite_id = format!("{}__{}", base_project_id, target_id);
 
-        let is_project_active =
-            is_instance_active && is_prompt_running_for_project(&raw_path, target_id);
+        let is_project_active = is_instance_active
+            && is_prompt_running_for_project_with_summaries(
+                &raw_path,
+                target_id,
+                Some(&active_ws_uris),
+            );
 
         let pid_opt = pids.first().copied();
         let criteria = PromptAuditCriteriaType::WorkspaceStorageScanAndProcessLiveness;
         let rationale =
             ProjectAuditRationaleType::from_liveness(is_project_active, is_instance_active);
 
-        crate::modules::logger::log_instance_prompt_audit(
-            target_id,
-            &instance.name,
-            &repo_name,
-            &raw_path,
-            &ws_folder.to_string_lossy(),
-            pid_opt,
-            criteria.as_str(),
-            is_project_active,
-            rationale.as_str(),
-        );
+        if is_project_active {
+            crate::modules::logger::log_instance_prompt_audit(
+                target_id,
+                &instance.name,
+                &repo_name,
+                &raw_path,
+                &ws_folder.to_string_lossy(),
+                pid_opt,
+                criteria.as_str(),
+                is_project_active,
+                rationale.as_str(),
+            );
+        } else {
+            let line = crate::modules::logger::format_instance_prompt_audit(
+                target_id,
+                &instance.name,
+                &repo_name,
+                &raw_path,
+                &ws_folder.to_string_lossy(),
+                pid_opt,
+                criteria.as_str(),
+                is_project_active,
+                rationale.as_str(),
+            );
+            tracing::debug!("{line}");
+        }
 
         projects.push(RunningProject {
             id: composite_id,
@@ -246,6 +308,16 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
         for p in &mut projects {
             p.is_running = false;
         }
+    }
+
+    if let Ok(mut guard) = RUNNING_PROJECTS_CACHE.write() {
+        guard.insert(
+            target_id.to_string(),
+            CachedRunningProjects {
+                projects: projects.clone(),
+                cached_at: now,
+            },
+        );
     }
 
     Ok(projects)
