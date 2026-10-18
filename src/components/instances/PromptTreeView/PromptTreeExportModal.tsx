@@ -157,7 +157,7 @@ export function PromptTreeExportModal({
 
     return createPortal(
         <div
-            className="fixed inset-0 z-[100005] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md overflow-y-auto animate-in fade-in duration-150"
+            className="fixed inset-0 z-[100050] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md overflow-y-auto animate-in fade-in duration-150"
             onClick={onClose}
         >
             <div
@@ -180,7 +180,7 @@ export function PromptTreeExportModal({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#251b3a] transition-colors cursor-pointer"
+                        className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#251b3a] transition-colors cursor-pointer"
                         title="Close (Escape)"
                     >
                         <X className="w-4 h-4" />
@@ -340,9 +340,14 @@ export function PromptTreeExportModal({
 
                 {/* Export Mode: Standalone vs Lean */}
                 <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                        Export Mode
-                    </label>
+                    <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                            JSON & Asset Export Mode
+                        </label>
+                        <span className="text-[10px] font-mono text-slate-400">
+                            {embedImages ? 'Standalone (Embedded Base64)' : 'Lean (Relative Paths)'}
+                        </span>
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
                         <div
                             onClick={() => setEmbedImages(true)}
@@ -355,11 +360,14 @@ export function PromptTreeExportModal({
                         >
                             <div className="flex items-center gap-1.5 font-bold text-xs">
                                 <ImageIcon className="w-3.5 h-3.5 text-purple-500 shrink-0" />
-                                <span>Standalone Mode</span>
+                                <span>Standalone JSON</span>
                             </div>
                             <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-tight">
-                                Embeds Base64 images & portable {'${workDir}'} paths (100% portable across machines).
+                                Embeds Base64 images & portable {'${workDir}'} paths directly into JSON. 100% portable across machines without external image dependencies.
                             </span>
+                            <div className="mt-1.5 flex items-center gap-1 text-[9px] font-mono text-purple-600 dark:text-purple-400 font-semibold">
+                                <span>● Full Portability</span>
+                            </div>
                         </div>
                         <div
                             onClick={() => setEmbedImages(false)}
@@ -372,11 +380,14 @@ export function PromptTreeExportModal({
                         >
                             <div className="flex items-center gap-1.5 font-bold text-xs">
                                 <FileJson className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                                <span>Lean Mode</span>
+                                <span>Lean JSON</span>
                             </div>
                             <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-tight">
-                                Metadata and relative file paths only. Lightweight with zero payload bloat.
+                                Preserves relative file paths only. Minimal payload size with zero image data URI bloat; references local disk images.
                             </span>
+                            <div className="mt-1.5 flex items-center gap-1 text-[9px] font-mono text-blue-600 dark:text-blue-400 font-semibold">
+                                <span>● Zero Payload Bloat</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -386,7 +397,7 @@ export function PromptTreeExportModal({
                     <span>Projects: <strong className="text-slate-800 dark:text-slate-200">{liveStats.projectCount}</strong></span>
                     <span>Convs: <strong className="text-slate-800 dark:text-slate-200">{liveStats.conversationCount}</strong></span>
                     <span>Prompts: <strong className="text-slate-800 dark:text-slate-200">{liveStats.promptCount}</strong></span>
-                    <span>Mode: <strong className={embedImages ? "text-purple-600 dark:text-purple-400" : "text-blue-600 dark:text-blue-400"}>{embedImages ? 'Standalone' : 'Lean'}</strong></span>
+                    <span>Mode: <strong className={embedImages ? "text-purple-600 dark:text-purple-400" : "text-blue-600 dark:text-blue-400"}>{embedImages ? 'Standalone JSON (Base64)' : 'Lean JSON (Relative)'}</strong></span>
                 </div>
 
                 {/* Footer Buttons */}
@@ -395,7 +406,7 @@ export function PromptTreeExportModal({
                         type="button"
                         onClick={onClose}
                         disabled={isExporting}
-                        className="px-4 py-1.5 text-xs font-semibold rounded-full border border-slate-200 dark:border-[#40285e] hover:bg-slate-100 dark:hover:bg-[#251b3a] text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                        className="px-4 py-1.5 text-xs font-semibold rounded-md border border-slate-200 dark:border-[#40285e] hover:bg-slate-100 dark:hover:bg-[#251b3a] text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
                     >
                         Cancel
                     </button>
@@ -404,7 +415,7 @@ export function PromptTreeExportModal({
                         onClick={handleExport}
                         disabled={isExporting || exportSuccess}
                         className={cn(
-                            "flex items-center gap-1.5 px-5 py-1.5 text-xs font-bold rounded-full text-white shadow-md transition-all cursor-pointer",
+                            "flex items-center gap-1.5 px-5 py-1.5 text-xs font-bold rounded-md text-white shadow-md transition-all cursor-pointer",
                             exportSuccess
                                 ? "bg-emerald-600 hover:bg-emerald-700"
                                 : "bg-blue-600 hover:bg-blue-700 active:scale-95 disabled:opacity-50"

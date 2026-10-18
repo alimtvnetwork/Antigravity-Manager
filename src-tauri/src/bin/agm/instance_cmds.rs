@@ -300,22 +300,46 @@ fn resolve_target_instance_arg(ctx: &CliContext) -> String {
         .unwrap_or_else(|_| "default".to_string())
 }
 
-fn guard_caller_instance(args: &[String], target_instance: &str) {
+pub(crate) fn guard_caller_instance(args: &[String], target_instance: &str) {
     let has_force = args.iter().any(|a| a == "--force" || a == "-f");
+    let is_json = args.iter().any(|a| a == "--json" || a == "-j");
     if !has_force {
+        let resolved = instance::resolve_instance_id(target_instance)
+            .unwrap_or_else(|_| target_instance.to_string());
+        let mut matched_caller: Option<String> = None;
         if let Some(caller_id) = instance::detect_caller_instance_id() {
-            let resolved = instance::resolve_instance_id(target_instance)
-                .unwrap_or_else(|_| target_instance.to_string());
-            if caller_id == resolved || caller_id == target_instance {
-                eprintln!(
-                    "[ERROR] Target instance '{}' is your currently running IDE instance! Aborting to prevent terminating your own session. Pass --force to override.",
-                    caller_id
-                );
-                std::process::exit(2);
+            if caller_id.eq_ignore_ascii_case(&resolved)
+                || caller_id.eq_ignore_ascii_case(target_instance)
+            {
+                matched_caller = Some(caller_id);
             }
         }
+        if let Some(caller_id) = matched_caller {
+            let msg = format!(
+                "Refusing to stop, switch, restart, or delete instance '{caller_id}' because this command is running inside its IDE process. Target instance '{caller_id}' is your currently running IDE instance! Aborting to prevent terminating your own session. Pass --force to override."
+            );
+            if is_json {
+                let err_res = serde_json::json!({
+                    "success": false,
+                    "error": msg,
+                    "code": "REFUSE_CALLER_INSTANCE"
+                });
+                println!("{}", serde_json::to_string(&err_res).unwrap_or_default());
+            }
+            eprintln!("[ERROR] {msg}");
+            std::process::exit(2);
+        }
         if let Err(err) = instance::refuse_if_caller_instance(target_instance) {
-            eprintln!("[ERROR] {err}");
+            let msg = format!("{err}. Pass --force to override.");
+            if is_json {
+                let err_res = serde_json::json!({
+                    "success": false,
+                    "error": msg,
+                    "code": "REFUSE_CALLER_INSTANCE"
+                });
+                println!("{}", serde_json::to_string(&err_res).unwrap_or_default());
+            }
+            eprintln!("[ERROR] {msg}");
             std::process::exit(2);
         }
     } else {
@@ -340,8 +364,19 @@ pub(crate) fn cmd_instances_stop(args: &[String]) {
             }
         }
         if let Err(err) = instance::stop_instance(&target_instance) {
-            eprintln!("[ERROR] {err}");
-            std::process::exit(1);
+            let code = if err.contains("Refusing to stop") || err.contains("currently running IDE")
+            {
+                2
+            } else {
+                1
+            };
+            let err_res = serde_json::json!({
+                "success": false,
+                "error": err,
+                "code": "STOP_FAILED"
+            });
+            println!("{}", serde_json::to_string(&err_res).unwrap_or_default());
+            std::process::exit(code);
         }
         antigravity_tools_lib::modules::task_history_db::record_instance_lifecycle_event(
             antigravity_tools_lib::modules::audit_action::AuditAction::StopInstance,
@@ -446,7 +481,8 @@ pub(crate) fn cmd_instances_switch(args: &[String]) {
 
     guard_caller_instance(args, &target_instance);
     if account_query.is_none() {
-        let forward_args = vec!["switch".to_string(), target_instance];
+        let mut forward_args = vec!["switch".to_string(), target_instance];
+        forward_args.extend(args.iter().filter(|a| a.starts_with('-')).cloned());
         crate::instance_dispatch::cmd_instances(&forward_args);
         return;
     }
@@ -493,7 +529,8 @@ pub(crate) fn cmd_instances_switch(args: &[String]) {
         });
         CliEnvelope::ok("instances switch", Some(target_instance), data).print_and_exit();
     }
-    let forward_args = vec!["switch".to_string(), target_instance, acc];
+    let mut forward_args = vec!["switch".to_string(), target_instance, acc];
+    forward_args.extend(args.iter().filter(|a| a.starts_with('-')).cloned());
     crate::instance_dispatch::cmd_instances(&forward_args);
 }
 

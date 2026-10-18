@@ -59,7 +59,7 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                                                             <button
                                                                 type="button"
                                                                 disabled={isBusy}
-                                                                onClick={() => handleStop(inst.config.id)}
+                                                                onClick={() => handleStop(inst.config.id, inst.pid ?? undefined)}
                                                                 className="flex-1 flex items-center justify-center py-1 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-l-[4px] transition-colors cursor-pointer disabled:opacity-50"
                                                                 title="Stop Instance"
                                                             >

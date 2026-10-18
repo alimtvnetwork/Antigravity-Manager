@@ -64,6 +64,30 @@ export function getActionLabel(item: TaskRecord): string {
     if (code === 2 || action.toLowerCase().includes('update')) {
         return 'Update Account';
     }
+    if (code === 6 || action === 'LaunchInstance' || action === 'launch_instance') {
+        return 'Launch Instance';
+    }
+    if (code === 7 || action === 'StopInstance' || action === 'stop_instance') {
+        return 'Stop Instance';
+    }
+    if (code === 8 || action === 'RestartInstance' || action === 'restart_instance') {
+        return 'Restart Instance';
+    }
+    if (code === 9 || action === 'KillInstance' || action === 'kill_instance') {
+        return 'Kill Instance';
+    }
+    if (code === 10 || action === 'CreateInstance' || action === 'create_instance') {
+        return 'Create Instance';
+    }
+    if (code === 11 || action === 'DeleteInstance' || action === 'delete_instance') {
+        return 'Delete Instance';
+    }
+    if (code === 12 || action === 'CloneInstance' || action === 'clone_instance') {
+        return 'Clone Instance';
+    }
+    if (code === 13 || action === 'InstanceError' || action === 'instance_error') {
+        return 'Instance Error';
+    }
     return action || '—';
 }
 
@@ -104,6 +128,16 @@ export function renderActionBadge(item: TaskRecord) {
         badgeClass = 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300 border-cyan-200/50 dark:border-cyan-800/50';
     } else if (code === 2 || action.toLowerCase().includes('update')) {
         badgeClass = 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200/50 dark:border-blue-800/50';
+    } else if (code === 6 || action === 'LaunchInstance' || action === 'launch_instance') {
+        badgeClass = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-[#1af18d] border-emerald-200/50 dark:border-emerald-800/50';
+    } else if (code === 7 || action === 'StopInstance' || action === 'stop_instance' || code === 9 || action === 'KillInstance') {
+        badgeClass = 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 border-rose-200/50 dark:border-rose-800/50';
+    } else if (code === 8 || action === 'RestartInstance' || action === 'restart_instance') {
+        badgeClass = 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300 border-sky-200/50 dark:border-sky-800/50';
+    } else if (code === 10 || action === 'CreateInstance' || code === 12 || action === 'CloneInstance') {
+        badgeClass = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border-indigo-200/50 dark:border-indigo-800/50';
+    } else if (code === 11 || action === 'DeleteInstance' || code === 13 || action === 'InstanceError') {
+        badgeClass = 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border-red-200/50 dark:border-red-800/50';
     }
 
     return (

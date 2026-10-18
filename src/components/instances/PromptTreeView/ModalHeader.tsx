@@ -98,7 +98,7 @@ export function ModalHeader(props: ModalHeaderProps) {
             {/* Top Right Header Controls: Two Independent Segmented Dark-Glass Capsules */}
             <div className="flex items-center gap-1.5 shrink-0">
                 {/* Capsule 1: Data Operations Capsule */}
-                <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#40285e]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#40285e]/80 shadow-2xs">
+                <div className="inline-flex items-center rounded-md bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#40285e]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#40285e]/80 shadow-2xs">
                     {/* Unified Import / Export section: all tree-level data
                         operations (Export SQLite, Export JSON, Import SQLite,
                         Import JSON, Copy All Tree Prompts) in one entry point. */}
@@ -163,12 +163,12 @@ export function ModalHeader(props: ModalHeaderProps) {
                 </div>
 
                 {/* Capsule 2: Window Controls Capsule */}
-                <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#40285e]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#40285e]/80 shadow-2xs">
+                <div className="inline-flex items-center rounded-md bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#40285e]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#40285e]/80 shadow-2xs">
                     {/* Fullscreen Toggle */}
                     <button
                         type="button"
                         onClick={() => setIsFullscreen(!isFullscreen)}
-                        className="p-1.5 rounded-l-full text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-colors cursor-pointer"
+                        className="p-1.5 rounded-l-md text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-colors cursor-pointer"
                         title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
                     >
                         {isFullscreen ? (
@@ -182,7 +182,7 @@ export function ModalHeader(props: ModalHeaderProps) {
                     <button
                         type="button"
                         onClick={onClose}
-                        className="p-1.5 rounded-r-full text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-100/80 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                        className="p-1.5 rounded-r-md text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-100/80 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
                         title="Close"
                     >
                         <X className="w-4 h-4" />

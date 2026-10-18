@@ -50,7 +50,7 @@ export function DetailsModal(props: DetailsModalProps) {
     };
 
     return (
-    <div className="fixed inset-0 z-[330] flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100050] flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-in fade-in duration-200">
         <div className="w-full max-w-lg overflow-hidden rounded-xl border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025] shadow-2xl flex flex-col">
             {/* Details Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#40285e] px-5 py-3.5 bg-slate-50 dark:bg-[#090611] shrink-0">

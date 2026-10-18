@@ -21,7 +21,7 @@ export interface InstanceTableProps {
     searchQuery?: string;
     actionState?: Record<string, InstanceActionType>;
     onLaunch: (id: string) => void;
-    onStop: (id: string) => void;
+    onStop: (id: string, targetPid?: number) => void;
     onRestart: (id: string) => void;
     onSwitch: (id: string) => void;
     onFastForward: (id: string) => void;

@@ -172,7 +172,7 @@ pub(crate) fn collect_tree_conversation_items(
 
             let inspection = inspect_conversation_transcript(base, &cid);
 
-            let is_conv_running = if is_explicit_idle {
+            let is_conv_running = if has_idle_status || inspection.is_terminal_done {
                 // Explicit Idle Supremacy: unreset not_fully_idle artifacts must not override terminal status
                 false
             } else if is_owning_inst_alive && not_fully_idle > 0 && is_recent {

@@ -88,7 +88,7 @@ export interface InstancePageApi {
     handleWipeSession: (id: string) => void;
     handleConfirmWipe: () => Promise<void>;
     handleLaunch: (id: string) => Promise<void>;
-    handleStop: (id: string) => Promise<void>;
+    handleStop: (id: string, targetPid?: number) => Promise<void>;
     handleRestart: (id: string) => Promise<void>;
     handleFastForward: (id: string) => Promise<void>;
     handleSync: (id: string) => Promise<void>;

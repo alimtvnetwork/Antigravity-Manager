@@ -127,8 +127,8 @@ export async function closeInstance(instanceId: string): Promise<void> {
     return await invoke('close_instance', { instanceId });
 }
 
-export async function stopInstance(instanceId: string): Promise<void> {
-    return await invoke('stop_instance', { instanceId });
+export async function stopInstance(instanceId: string, targetPid?: number): Promise<void> {
+    return await invoke('stop_instance', { instanceId, targetPid: targetPid ?? null });
 }
 
 export async function restartInstance(instanceId: string): Promise<InstanceStatus> {

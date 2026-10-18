@@ -282,9 +282,8 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                             || status.contains("FAILED")
                             || status.contains("CANCELLED");
                         let has_idle_status = status.contains("IDLE") || has_terminal_status;
-                        let is_explicit_idle = has_idle_status;
 
-                        if is_explicit_idle {
+                        if has_idle_status {
                             continue;
                         }
 
@@ -299,7 +298,11 @@ pub fn is_prompt_running_for_project(project_id: &str, instance_id: &str) -> boo
                             continue;
                         }
 
-                        let is_conv_running = not_fully_idle > 0 && !has_idle_status;
+                        let is_conv_running = if has_idle_status {
+                            false
+                        } else {
+                            not_fully_idle > 0
+                        };
 
                         if is_conv_running {
                             if let Some(ws_uris_raw) = ws_uris_opt {

@@ -332,7 +332,16 @@ pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
 
 /// Stop an instance process and confirm the PID is gone.
 pub fn stop_instance(instance_id: &str) -> Result<(), String> {
+    refuse_if_caller_instance(instance_id)?;
     let resolved = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
+    let saved_pid = get_instance_saved_pid(&resolved).or_else(|| {
+        load_registry().ok().and_then(|r| {
+            r.instances
+                .into_iter()
+                .find(|i| i.id == resolved)
+                .and_then(|i| i.pid)
+        })
+    });
     let closed = close_instance_verified(&resolved, std::time::Duration::from_millis(5000))
         .map_err(|e| format!("Error closing instance '{resolved}': {e}"))?;
 
@@ -343,15 +352,10 @@ pub fn stop_instance(instance_id: &str) -> Result<(), String> {
             clear_stale_instance_lockfiles(&data_path);
         }
     }
-    // Justification: mark instance stopped in DB and registry; best effort cleanup
-    crate::error::record_ignored(mark_instance_stopped(&resolved), "mark instance stopped");
-    invalidate_instance_process_cache(&resolved);
-    crate::modules::repo_db::invalidate_prompt_tree_cache(Some(&resolved));
 
     if !closed {
-        let remaining = get_instance_saved_pid(&resolved);
-        if let Some(pid) = remaining {
-            if is_pid_alive_targeted(pid) {
+        if let Some(pid) = saved_pid {
+            if is_pid_alive_targeted(pid) && saved_pid_matches(pid) {
                 return Err(format!(
                     "Instance '{resolved}' primary PID {pid} stayed alive after stop"
                 ));
@@ -362,6 +366,12 @@ pub fn stop_instance(instance_id: &str) -> Result<(), String> {
             resolved
         ));
     }
+
+    // Only mark stopped in registry/DB after termination is confirmed
+    // Justification: mark instance stopped in DB and registry; best effort cleanup
+    crate::error::record_ignored(mark_instance_stopped(&resolved), "mark instance stopped");
+    invalidate_instance_process_cache(&resolved);
+    crate::modules::repo_db::invalidate_prompt_tree_cache(Some(&resolved));
 
     crate::modules::task_history_db::record(
         crate::modules::audit_action::AuditAction::StopInstance,

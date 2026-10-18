@@ -646,6 +646,10 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                     <DetailHeader
                                         previewTab={previewTab}
                                         setPreviewTab={setPreviewTab}
+                                        showAllWords={showAllWords}
+                                        setShowAllWords={setShowAllWords}
+                                        isTruncated={isTruncated}
+                                        setIsDetailsModalOpen={setIsDetailsModalOpen}
                                         selectedConversation={selectedConversation}
                                         activePromptText={activePromptText}
                                         confirmationSuffix={confirmationSuffix}
@@ -816,6 +820,11 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                 copiedField={copiedField}
                 setCopiedField={setCopiedField}
                 instanceId={instanceId}
+                instanceExeName={instanceExeName}
+                instancePid={instancePid}
+                instanceSeqNum={instanceSeqNum}
+                instanceNameDisplay={instanceNameDisplay}
+                executablePath={executablePath}
             />
 
             {/* Project Right-Click Context Menu */}

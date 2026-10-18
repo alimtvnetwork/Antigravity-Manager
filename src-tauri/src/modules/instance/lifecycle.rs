@@ -27,6 +27,12 @@ pub fn restart_instance(instance_id: &str) -> AppResult<InstanceStatus> {
         instance_id, resolved_id
     ));
 
+    let mut audit = crate::modules::task_history_db::AuditTask::start(
+        crate::modules::audit_action::AuditAction::RestartInstance,
+        &format!("Restart instance {}", resolved_id),
+        Some(&resolved_id),
+    );
+
     let registry = load_registry().map_err(AppError::Config)?;
     let config = registry
         .instances
@@ -97,6 +103,20 @@ pub fn restart_instance(instance_id: &str) -> AppResult<InstanceStatus> {
         "[Instance] Restarted instance '{}' on bound account {:?}",
         resolved_id, config.bound_account_id
     ));
+    audit.succeed(&format!(
+        "Restarted instance '{}' on bound account {:?}",
+        resolved_id, config.bound_account_id
+    ));
+    crate::modules::task_history_db::record(
+        crate::modules::audit_action::AuditAction::RestartInstance,
+        &resolved_id,
+        "ok",
+        &format!(
+            "Restarted instance '{}' on bound account {:?}",
+            resolved_id, config.bound_account_id
+        ),
+        Some(&resolved_id),
+    );
     Ok(updated)
 }
 

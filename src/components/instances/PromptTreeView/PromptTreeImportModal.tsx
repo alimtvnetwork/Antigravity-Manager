@@ -211,7 +211,7 @@ export function PromptTreeImportModal({
 
     return createPortal(
         <div
-            className="fixed inset-0 z-[100005] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md overflow-y-auto animate-in fade-in duration-150"
+            className="fixed inset-0 z-[100050] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md overflow-y-auto animate-in fade-in duration-150"
             onClick={onClose}
         >
             <div
@@ -243,7 +243,7 @@ export function PromptTreeImportModal({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#251b3a] transition-colors cursor-pointer"
+                        className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#251b3a] transition-colors cursor-pointer"
                         title="Close (Escape)"
                     >
                         <X className="w-4 h-4" />
@@ -393,7 +393,7 @@ export function PromptTreeImportModal({
                         type="button"
                         onClick={onClose}
                         disabled={isImporting}
-                        className="px-4 py-1.5 text-xs font-semibold rounded-full border border-slate-200 dark:border-[#40285e] hover:bg-slate-100 dark:hover:bg-[#251b3a] text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                        className="px-4 py-1.5 text-xs font-semibold rounded-md border border-slate-200 dark:border-[#40285e] hover:bg-slate-100 dark:hover:bg-[#251b3a] text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
                     >
                         Cancel
                     </button>
@@ -402,7 +402,7 @@ export function PromptTreeImportModal({
                         onClick={handleImport}
                         disabled={isImporting || (!selectedPath && !dataB64) || Boolean(validationError) || importSuccess}
                         className={cn(
-                            "flex items-center gap-1.5 px-5 py-1.5 text-xs font-bold rounded-full text-white shadow-md transition-all cursor-pointer",
+                            "flex items-center gap-1.5 px-5 py-1.5 text-xs font-bold rounded-md text-white shadow-md transition-all cursor-pointer",
                             importSuccess
                                 ? "bg-emerald-600 hover:bg-emerald-700"
                                 : "bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:opacity-50"

@@ -50,6 +50,8 @@ pub async fn switch_account_to_instance(
             err
         })?;
 
+    refuse_if_caller_instance(&target_id)?;
+
     // Sibling Local Running Guard: prevent switching to accounts actively bound to running sibling instances on the same host!
     let bound_inst = registry
         .instances
@@ -251,7 +253,7 @@ pub async fn switch_account_to_instance(
     {
         let stragglers = find_pids_for_data_dir(&instance.data_dir, is_default_inst);
         for spid in stragglers {
-            if is_pid_alive_targeted(spid) {
+            if is_pid_alive_targeted(spid) && saved_pid_matches(spid) {
                 crate::modules::logger::log_warn(&format!(
                     "[INSTANCE_SWITCH] Found straggler PID {} before credential rewrite; force terminating via Win32",
                     spid
@@ -261,17 +263,85 @@ pub async fn switch_account_to_instance(
         }
     }
 
-    let target_data_path = std::path::PathBuf::from(&instance.data_dir);
-    clear_stale_instance_lockfiles(&target_data_path);
-    std::thread::sleep(std::time::Duration::from_millis(200));
+    // Settle drain loop (up to 1500ms) after force_terminate_pid_win32 for OS kernel and NTFS file handle release
+    let drain_start = std::time::Instant::now();
+    let max_drain = std::time::Duration::from_millis(1500);
+    while drain_start.elapsed() < max_drain {
+        force_refresh_process_cache();
+        let remaining_live = find_pids_for_data_dir(&instance.data_dir, is_default_inst);
+        let still_alive = remaining_live
+            .iter()
+            .any(|&p| is_pid_alive_targeted(p) && saved_pid_matches(p));
+        let saved_alive = get_instance_saved_pid(&instance.id)
+            .or(instance.pid)
+            .map_or(false, |p| is_pid_alive_targeted(p) && saved_pid_matches(p));
+        if !still_alive && !saved_alive {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
 
+    let target_data_path = std::path::PathBuf::from(&instance.data_dir);
+    // Ensure lockfiles are purged before credentials are written
+    clear_stale_instance_lockfiles(&target_data_path);
+
+    force_refresh_process_cache();
     let final_live = find_pids_for_data_dir(&instance.data_dir, is_default_inst);
-    let any_alive = final_live.iter().any(|&p| is_pid_alive_targeted(p));
-    let saved_pid_alive = instance
-        .pid
-        .or_else(|| get_instance_saved_pid(&instance.id))
-        .map_or(false, is_pid_alive_targeted);
-    if !closed || any_alive || saved_pid_alive {
+    let mut any_alive = final_live
+        .iter()
+        .any(|&p| is_pid_alive_targeted(p) && saved_pid_matches(p));
+    let mut saved_pid_alive = get_instance_saved_pid(&instance.id)
+        .or(instance.pid)
+        .map_or(false, |p| is_pid_alive_targeted(p) && saved_pid_matches(p));
+
+    if any_alive || saved_pid_alive {
+        crate::modules::logger::log_warn(&format!(
+            "[INSTANCE_SWITCH] Candidate PIDs still alive for '{}' before rewrite; attempting immediate force termination",
+            instance.id
+        ));
+        for &spid in &final_live {
+            if is_pid_alive_targeted(spid) && saved_pid_matches(spid) {
+                #[cfg(target_os = "windows")]
+                force_terminate_pid_win32(spid);
+                #[cfg(not(target_os = "windows"))]
+                {
+                    // Justification: best effort fallback kill on surviving processes
+                    crate::error::record_ignored(
+                        std::process::Command::new("kill")
+                            .args(["-9", &spid.to_string()])
+                            .output(),
+                        "kill straggler pid",
+                    );
+                }
+            }
+        }
+        if let Some(spid) = get_instance_saved_pid(&instance.id).or(instance.pid) {
+            if is_pid_alive_targeted(spid) && saved_pid_matches(spid) {
+                #[cfg(target_os = "windows")]
+                force_terminate_pid_win32(spid);
+            }
+        }
+
+        // Additional drain after fallback force-termination
+        let fallback_drain = std::time::Instant::now();
+        while fallback_drain.elapsed() < std::time::Duration::from_millis(1000) {
+            force_refresh_process_cache();
+            let remaining_live = find_pids_for_data_dir(&instance.data_dir, is_default_inst);
+            any_alive = remaining_live
+                .iter()
+                .any(|&p| is_pid_alive_targeted(p) && saved_pid_matches(p));
+            saved_pid_alive = get_instance_saved_pid(&instance.id)
+                .or(instance.pid)
+                .map_or(false, |p| is_pid_alive_targeted(p) && saved_pid_matches(p));
+            if !any_alive && !saved_pid_alive {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    }
+
+    if any_alive || saved_pid_alive {
         let err = format!(
             "Instance '{}' is still running after close; account switch stopped before credentials were rewritten",
             instance.id
@@ -279,6 +349,10 @@ pub async fn switch_account_to_instance(
         crate::modules::logger::log_error(&format!("[INSTANCE_SWITCH:ERROR] {}", err));
         return Err(err);
     }
+
+    // Ensure lockfiles are completely clean before injecting credentials
+    clear_stale_instance_lockfiles(&target_data_path);
+    invalidate_instance_process_cache(&instance.id);
 
     // 3. [Step 3/5] Inject credentials into target instance's state.vscdb & storage.json (and OS keyring) AFTER process exit
     inject_account_credentials(

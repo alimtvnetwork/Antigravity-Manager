@@ -53,7 +53,7 @@ export interface PageActionContext {
     deleteInstance: (id: string) => Promise<void>;
     wipeSession: (id: string) => Promise<void>;
     launchInstance: (id: string) => Promise<void>;
-    stopInstance: (id: string) => Promise<void>;
+    stopInstance: (id: string, targetPid?: number) => Promise<void>;
     restartInstance: (id: string) => Promise<InstanceStatus>;
     fastForwardInstance: (id: string) => Promise<string>;
     syncInstance: (id: string) => Promise<void>;
@@ -76,7 +76,7 @@ export interface PageActions {
     handleWipeSession: (id: string) => void;
     handleConfirmWipe: () => Promise<void>;
     handleLaunch: (id: string) => Promise<void>;
-    handleStop: (id: string) => Promise<void>;
+    handleStop: (id: string, targetPid?: number) => Promise<void>;
     handleRestart: (id: string) => Promise<void>;
     handleFastForward: (id: string) => Promise<void>;
     handleSync: (id: string) => Promise<void>;
@@ -291,7 +291,8 @@ export function createPageActions(ctx: PageActionContext): PageActions {
         };
 
         const handleLaunch = (id: string) => runGuardedAction(id, 'launch', () => launchInstance(id));
-        const handleStop = (id: string) => runGuardedAction(id, 'stop', () => stopInstance(id));
+        const handleStop = (id: string, targetPid?: number) =>
+            runGuardedAction(id, 'stop', () => stopInstance(id, targetPid));
         const handleRestart = (id: string) =>
             runGuardedAction(id, 'restart', () => restartInstance(id), 'Instance restarted successfully on current account');
         const handleFastForward = (id: string) =>

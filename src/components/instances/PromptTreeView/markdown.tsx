@@ -12,7 +12,12 @@ const TOKEN_REGEX =
 // Maximum bytes cap for inline regex parsing to protect UI thread and prevent virtual DOM bloat
 const MAX_INLINE_BLOCK_BYTES = 50 * 1024; // 50 KB
 
-function parseInlineMarkdown(text: string, onToggleExpand?: () => void): React.ReactNode[] {
+function parseInlineMarkdown(
+    text: string,
+    onToggleExpand?: () => void,
+    onImageClick?: (src: string, alt?: string) => void,
+    onImageContextMenu?: (e: React.MouseEvent, src: string, alt?: string) => void
+): React.ReactNode[] {
     // Length guard: for large conversation excerpts, avoid regex parsing explosion
     if (text.length > MAX_INLINE_BLOCK_BYTES) {
         return [
@@ -22,7 +27,7 @@ function parseInlineMarkdown(text: string, onToggleExpand?: () => void): React.R
             <span
                 key="oversized-trunc-notice"
                 onClick={onToggleExpand}
-                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 my-1 rounded-full text-[10px] font-mono font-medium bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30 shadow-2xs cursor-pointer hover:bg-amber-500/25 transition-all"
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 my-1 rounded-md text-[10px] font-mono font-medium bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30 shadow-2xs cursor-pointer hover:bg-amber-500/25 transition-all"
                 title={`Omitted ${text.length - 2000} bytes of context - Click to inspect/expand`}
             >
                 <span className="text-amber-500 font-bold">⚡</span>
@@ -53,7 +58,7 @@ function parseInlineMarkdown(text: string, onToggleExpand?: () => void): React.R
                 <span
                     key={`trunc-${match.index}`}
                     onClick={onToggleExpand}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 my-0.5 rounded-full text-[10px] font-mono font-medium bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30 shadow-2xs cursor-pointer hover:bg-amber-500/25 transition-all"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 my-0.5 rounded-md text-[10px] font-mono font-medium bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30 shadow-2xs cursor-pointer hover:bg-amber-500/25 transition-all"
                     title={`Omitted ${truncCount} ${truncUnit} from prompt transcript context - Click to inspect/expand`}
                 >
                     <span className="text-amber-500 font-bold">⚡</span>
@@ -66,7 +71,15 @@ function parseInlineMarkdown(text: string, onToggleExpand?: () => void): React.R
                     key={`img-${match.index}`}
                     src={imgSrc}
                     alt={imgAlt || ''}
-                    className="inline-block max-h-48 max-w-full my-1 rounded-[5px] border border-slate-200 dark:border-[#40285e]"
+                    onClick={() => onImageClick?.(imgSrc, imgAlt)}
+                    onContextMenu={(e) => {
+                        if (onImageContextMenu) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onImageContextMenu(e, imgSrc, imgAlt);
+                        }
+                    }}
+                    className={`inline-block max-h-48 max-w-full my-1 rounded-md border border-slate-200 dark:border-[#40285e] ${onImageClick ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}`}
                     onError={(e) => {
                         (e.target as HTMLElement).style.display = 'none';
                     }}
@@ -88,7 +101,7 @@ function parseInlineMarkdown(text: string, onToggleExpand?: () => void): React.R
             rawNodes.push(
                 <code
                     key={`code-${match.index}`}
-                    className="px-1.5 py-0.5 rounded-[4px] bg-slate-100 dark:bg-[#090611] text-cyan-700 dark:text-cyan-300 font-mono text-[11px] border border-slate-200 dark:border-cyan-900/40"
+                    className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-[#090611] text-cyan-700 dark:text-cyan-300 font-mono text-[11px] border border-slate-200 dark:border-cyan-900/40"
                 >
                     {inlineCode}
                 </code>
@@ -145,15 +158,24 @@ function parseInlineMarkdown(text: string, onToggleExpand?: () => void): React.R
     return nodes.length > 0 ? nodes : [text];
 }
 
-interface RichMarkdownRendererProps {
+export interface RichMarkdownRendererProps {
     content: string;
     showAllWords?: boolean;
     onToggleExpand?: () => void;
     isTruncated?: boolean;
+    onImageClick?: (src: string, alt?: string) => void;
+    onImageContextMenu?: (e: React.MouseEvent, src: string, alt?: string) => void;
 }
 
 // Rich Markdown renderer component
-export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, isTruncated }: RichMarkdownRendererProps) {
+export function RichMarkdownRenderer({
+    content,
+    showAllWords,
+    onToggleExpand,
+    isTruncated,
+    onImageClick,
+    onImageContextMenu,
+}: RichMarkdownRendererProps) {
     const [copiedBlockIndex, setCopiedBlockIndex] = useState<number | null>(null);
 
     const handleCopyCode = (code: string, index: number) => {
@@ -172,7 +194,7 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
             return (
                 <div className="space-y-2">
                     <p className="text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words">
-                        {parseInlineMarkdown(content.slice(0, 2000), onToggleExpand)}
+                        {parseInlineMarkdown(content.slice(0, 2000), onToggleExpand, onImageClick, onImageContextMenu)}
                     </p>
                     <TruncatedContextCallout
                         omittedBytes={content.length - 2000}
@@ -199,7 +221,7 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
             elements.push(
                 <ul key={`ul-${keyPrefix}`} className="list-disc ml-5 my-2 space-y-1 text-xs text-slate-700 dark:text-slate-300">
                     {currentList.items.map((item, idx) => (
-                        <li key={idx}>{parseInlineMarkdown(item, onToggleExpand)}</li>
+                        <li key={idx}>{parseInlineMarkdown(item, onToggleExpand, onImageClick, onImageContextMenu)}</li>
                     ))}
                 </ul>
             );
@@ -207,7 +229,7 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
             elements.push(
                 <ol key={`ol-${keyPrefix}`} className="list-decimal ml-5 my-2 space-y-1 text-xs text-slate-700 dark:text-slate-300">
                     {currentList.items.map((item, idx) => (
-                        <li key={idx}>{parseInlineMarkdown(item, onToggleExpand)}</li>
+                        <li key={idx}>{parseInlineMarkdown(item, onToggleExpand, onImageClick, onImageContextMenu)}</li>
                     ))}
                 </ol>
             );
@@ -221,9 +243,9 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
         elements.push(
             <blockquote
                 key={`quote-${keyPrefix}`}
-                className="border-l-3 border-blue-500/80 bg-blue-50/30 dark:bg-blue-950/20 px-3 py-1.5 my-2 rounded-r-[5px] text-xs italic text-slate-700 dark:text-slate-300"
+                className="border-l-3 border-blue-500/80 bg-blue-50/30 dark:bg-blue-950/20 px-3 py-1.5 my-2 rounded-r-md text-xs italic text-slate-700 dark:text-slate-300"
             >
-                {parseInlineMarkdown(text, onToggleExpand)}
+                {parseInlineMarkdown(text, onToggleExpand, onImageClick, onImageContextMenu)}
             </blockquote>
         );
     };
@@ -242,14 +264,14 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
                 elements.push(
                     <div
                         key={`codeblock-${blockIdx}`}
-                        className="my-3 overflow-hidden rounded-[5px] border border-slate-200 dark:border-[#40285e] bg-slate-900 text-slate-100"
+                        className="my-3 overflow-hidden rounded-md border border-slate-200 dark:border-[#40285e] bg-slate-900 text-slate-100"
                     >
                         <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950/70 px-3 py-1.5 text-[11px] font-mono text-slate-400">
                             <span>{lang || 'code'}</span>
                             <button
                                 type="button"
                                 onClick={() => handleCopyCode(fullCode, blockIdx)}
-                                className="flex items-center gap-1 rounded-[5px] px-2 py-0.5 hover:bg-slate-800 text-slate-300 transition-colors cursor-pointer"
+                                className="flex items-center gap-1 rounded-md px-2 py-0.5 hover:bg-slate-800 text-slate-300 transition-colors cursor-pointer"
                                 title="Copy code"
                             >
                                 {copiedBlockIndex === blockIdx ? (
@@ -356,7 +378,7 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
         if (trimmed.startsWith('# ')) {
             elements.push(
                 <h1 key={`h1-${i}`} className="text-base font-bold mt-3 mb-1.5 text-slate-900 dark:text-white pb-1 border-b border-slate-200 dark:border-[#40285e]">
-                    {parseInlineMarkdown(trimmed.slice(2), onToggleExpand)}
+                    {parseInlineMarkdown(trimmed.slice(2), onToggleExpand, onImageClick, onImageContextMenu)}
                 </h1>
             );
             continue;
@@ -364,7 +386,7 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
         if (trimmed.startsWith('## ')) {
             elements.push(
                 <h2 key={`h2-${i}`} className="text-sm font-bold mt-2.5 mb-1 text-slate-900 dark:text-white pb-0.5 border-b border-slate-200/60 dark:border-[#40285e]/60">
-                    {parseInlineMarkdown(trimmed.slice(3), onToggleExpand)}
+                    {parseInlineMarkdown(trimmed.slice(3), onToggleExpand, onImageClick, onImageContextMenu)}
                 </h2>
             );
             continue;
@@ -372,7 +394,7 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
         if (trimmed.startsWith('### ')) {
             elements.push(
                 <h3 key={`h3-${i}`} className="text-xs font-bold mt-2 mb-1 text-slate-900 dark:text-white">
-                    {parseInlineMarkdown(trimmed.slice(4), onToggleExpand)}
+                    {parseInlineMarkdown(trimmed.slice(4), onToggleExpand, onImageClick, onImageContextMenu)}
                 </h3>
             );
             continue;
@@ -380,7 +402,7 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
         if (trimmed.startsWith('#### ')) {
             elements.push(
                 <h4 key={`h4-${i}`} className="text-xs font-semibold mt-1.5 mb-0.5 text-slate-800 dark:text-slate-200">
-                    {parseInlineMarkdown(trimmed.slice(5), onToggleExpand)}
+                    {parseInlineMarkdown(trimmed.slice(5), onToggleExpand, onImageClick, onImageContextMenu)}
                 </h4>
             );
             continue;
@@ -389,17 +411,27 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
         // Standalone image line: ![alt](url)
         const singleImgMatch = trimmed.match(/^!\[(.*?)\]\((.*?)\)$/);
         if (singleImgMatch) {
+            const imgSrc = singleImgMatch[2];
+            const imgAlt = singleImgMatch[1] || '';
             elements.push(
                 <div key={`imgline-${i}`} className="my-2">
                     <img
-                        src={singleImgMatch[2]}
-                        alt={singleImgMatch[1] || ''}
-                        className="max-h-60 max-w-full rounded-[5px] border border-slate-200 dark:border-[#40285e] object-contain bg-slate-100 dark:bg-[#090611]"
+                        src={imgSrc}
+                        alt={imgAlt}
+                        onClick={() => onImageClick?.(imgSrc, imgAlt)}
+                        onContextMenu={(e) => {
+                            if (onImageContextMenu) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onImageContextMenu(e, imgSrc, imgAlt);
+                            }
+                        }}
+                        className={`max-h-60 max-w-full rounded-md border border-slate-200 dark:border-[#40285e] object-contain bg-slate-100 dark:bg-[#090611] ${onImageClick ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}`}
                         onError={(e) => {
                             (e.target as HTMLElement).style.display = 'none';
                         }}
                     />
-                    {singleImgMatch[1] && <div className="text-[10px] text-slate-400 mt-0.5">{singleImgMatch[1]}</div>}
+                    {imgAlt && <div className="text-[10px] text-slate-400 mt-0.5">{imgAlt}</div>}
                 </div>
             );
             continue;
@@ -414,7 +446,7 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
             elements.push(
                 <div key={`p-wrap-${i}`} className="my-1.5 leading-relaxed">
                     <p className="text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words inline">
-                        {parseInlineMarkdown(cleanLine, onToggleExpand)}
+                        {parseInlineMarkdown(cleanLine, onToggleExpand, onImageClick, onImageContextMenu)}
                     </p>
                     <span
                         onClick={(e) => {
@@ -422,7 +454,7 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
                             onToggleExpand();
                         }}
                         title={showAllWords ? 'Click to collapse preview to 120 words' : 'Click to expand full prompt text'}
-                        className="cursor-pointer font-bold text-cyan-600 dark:text-cyan-400 hover:underline px-1.5 py-0.5 rounded bg-cyan-500/10 hover:bg-cyan-500/20 transition-colors ml-1.5 inline-block select-none"
+                        className="cursor-pointer font-bold text-cyan-600 dark:text-cyan-400 hover:underline px-1.5 py-0.5 rounded-md bg-cyan-500/10 hover:bg-cyan-500/20 transition-colors ml-1.5 inline-block select-none"
                     >
                         {showAllWords ? 'Collapse full text' : 'Expand full text'}
                     </span>
@@ -433,7 +465,7 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
             elements.push(
                 <div key={`p-wrap-${i}`} className="my-1.5 leading-relaxed">
                     <p className="text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words">
-                        {parseInlineMarkdown(line, onToggleExpand)}
+                        {parseInlineMarkdown(line, onToggleExpand, onImageClick, onImageContextMenu)}
                     </p>
                     <br className="my-1.5 block select-none" />
                 </div>
@@ -446,7 +478,7 @@ export function RichMarkdownRenderer({ content, showAllWords, onToggleExpand, is
 
     if (inCodeBlock && codeBuffer.length > 0) {
         elements.push(
-            <pre key="unclosed-code" className="my-2 p-3 font-mono text-xs rounded-[5px] bg-slate-900 text-slate-100 overflow-x-auto leading-relaxed select-text">
+            <pre key="unclosed-code" className="my-2 p-3 font-mono text-xs rounded-md bg-slate-900 text-slate-100 overflow-x-auto leading-relaxed select-text">
                 {codeBuffer.join('\n')}
             </pre>
         );

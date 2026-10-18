@@ -333,7 +333,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                             {inst.is_running ? (
                                 <span
                                     className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#1af18d]/10 text-emerald-700 dark:text-[#1af18d] border border-[#1af18d]/30 shadow-2xs font-mono backdrop-blur-xs"
-                                    title={inst.pid ? `Process ID (PID): ${inst.pid}` : 'Process ID (PID): Active'}
+                                    title={inst.pid ? `Process ID (PID): ${inst.pid} — Active and Running` : 'Process ID (PID): Active and Running'}
                                 >
                                     <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] shadow-[0_0_4px_rgba(26,241,141,0.9)] animate-pulse shrink-0" />
                                     <span>Running</span>

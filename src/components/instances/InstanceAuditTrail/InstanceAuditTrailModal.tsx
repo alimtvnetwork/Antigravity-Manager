@@ -27,110 +27,122 @@ const HISTORY_LIMIT = 10;
 const TRAIL_LIMIT = 50;
 
 function getActionBadgeStyle(code: number, actionName: string): { bg: string; text: string; border: string } {
-    const act = actionName.toLowerCase();
-    if (code === 3 || act.includes('switch')) {
-        return {
-            bg: 'bg-amber-100 dark:bg-amber-950/60',
-            text: 'text-amber-800 dark:text-amber-300',
-            border: 'border-amber-300/50 dark:border-amber-700/50',
-        };
-    }
-    if (code === 4 || act.includes('schedule')) {
-        return {
-            bg: 'bg-purple-100 dark:bg-purple-950/60',
-            text: 'text-purple-800 dark:text-purple-300',
-            border: 'border-purple-300/50 dark:border-purple-700/50',
-        };
-    }
-    if (code === 5 || act.includes('requeue')) {
-        return {
-            bg: 'bg-cyan-100 dark:bg-cyan-950/60',
-            text: 'text-cyan-800 dark:text-cyan-300',
-            border: 'border-cyan-300/50 dark:border-cyan-700/50',
-        };
-    }
+    const act = (actionName || '').toLowerCase();
+    // 1: AddAccount
     if (code === 1 || act.includes('add')) {
         return {
-            bg: 'bg-emerald-100 dark:bg-emerald-950/60',
-            text: 'text-emerald-800 dark:text-emerald-300',
-            border: 'border-emerald-300/50 dark:border-emerald-700/50',
+            bg: 'bg-emerald-50 dark:bg-emerald-950/40',
+            text: 'text-emerald-700 dark:text-[#1af18d]',
+            border: 'border-emerald-300/50 dark:border-emerald-600/40',
         };
     }
+    // 2: UpdateAccount
     if (code === 2 || act.includes('update')) {
         return {
-            bg: 'bg-blue-100 dark:bg-blue-950/60',
-            text: 'text-blue-800 dark:text-blue-300',
-            border: 'border-blue-300/50 dark:border-blue-700/50',
+            bg: 'bg-blue-50 dark:bg-blue-950/40',
+            text: 'text-blue-700 dark:text-blue-300',
+            border: 'border-blue-300/50 dark:border-blue-700/40',
         };
     }
-    // Action codes 6–13
+    // 3: SwitchAccount
+    if (code === 3 || act.includes('switch')) {
+        return {
+            bg: 'bg-amber-50 dark:bg-amber-950/40',
+            text: 'text-amber-700 dark:text-amber-300',
+            border: 'border-amber-300/50 dark:border-amber-700/40',
+        };
+    }
+    // 4: SchedulePrompt
+    if (code === 4 || act.includes('schedule')) {
+        return {
+            bg: 'bg-purple-50 dark:bg-purple-950/40',
+            text: 'text-purple-700 dark:text-purple-300',
+            border: 'border-purple-300/50 dark:border-[#40285e]',
+        };
+    }
+    // 5: RequeueConversation
+    if (code === 5 || act.includes('requeue')) {
+        return {
+            bg: 'bg-cyan-50 dark:bg-cyan-950/40',
+            text: 'text-cyan-700 dark:text-cyan-300',
+            border: 'border-cyan-300/50 dark:border-cyan-700/40',
+        };
+    }
+    // 6: LaunchInstance / StartInstance
     if (code === 6 || act.includes('launch') || act.includes('start')) {
         return {
-            bg: 'bg-emerald-100 dark:bg-emerald-950/60',
-            text: 'text-emerald-800 dark:text-emerald-300',
-            border: 'border-emerald-300/50 dark:border-emerald-700/50',
+            bg: 'bg-emerald-50 dark:bg-emerald-950/40',
+            text: 'text-emerald-700 dark:text-[#1af18d]',
+            border: 'border-emerald-300/50 dark:border-emerald-600/40',
         };
     }
+    // 7: StopInstance
     if (code === 7 || act.includes('stop') || act.includes('close')) {
         return {
-            bg: 'bg-amber-100 dark:bg-amber-950/60',
-            text: 'text-amber-800 dark:text-amber-300',
-            border: 'border-amber-300/50 dark:border-amber-700/50',
+            bg: 'bg-amber-50 dark:bg-amber-950/40',
+            text: 'text-amber-700 dark:text-amber-300',
+            border: 'border-amber-300/50 dark:border-amber-700/40',
         };
     }
+    // 8: RestartInstance
     if (code === 8 || act.includes('restart')) {
         return {
-            bg: 'bg-indigo-100 dark:bg-indigo-950/60',
-            text: 'text-indigo-800 dark:text-indigo-300',
-            border: 'border-indigo-300/50 dark:border-indigo-700/50',
+            bg: 'bg-indigo-50 dark:bg-[#201633]',
+            text: 'text-indigo-700 dark:text-purple-300',
+            border: 'border-indigo-300/50 dark:border-[#40285e]',
         };
     }
+    // 9: KillInstance
     if (code === 9 || act.includes('kill')) {
         return {
-            bg: 'bg-rose-100 dark:bg-rose-950/60',
-            text: 'text-rose-800 dark:text-rose-300',
-            border: 'border-rose-300/50 dark:border-rose-700/50',
+            bg: 'bg-rose-50 dark:bg-rose-950/40',
+            text: 'text-rose-700 dark:text-rose-300',
+            border: 'border-rose-300/50 dark:border-rose-700/40',
         };
     }
+    // 10: CreateInstance
     if (code === 10 || act.includes('create')) {
         return {
-            bg: 'bg-teal-100 dark:bg-teal-950/60',
-            text: 'text-teal-800 dark:text-teal-300',
-            border: 'border-teal-300/50 dark:border-teal-700/50',
+            bg: 'bg-teal-50 dark:bg-teal-950/40',
+            text: 'text-teal-700 dark:text-teal-300',
+            border: 'border-teal-300/50 dark:border-teal-700/40',
         };
     }
+    // 11: DeleteInstance
     if (code === 11 || act.includes('delete') || act.includes('remove')) {
         return {
-            bg: 'bg-red-100 dark:bg-red-950/60',
-            text: 'text-red-800 dark:text-red-300',
-            border: 'border-red-300/50 dark:border-red-700/50',
+            bg: 'bg-red-50 dark:bg-red-950/40',
+            text: 'text-red-700 dark:text-red-300',
+            border: 'border-red-300/50 dark:border-red-700/40',
         };
     }
+    // 12: CloneInstance
     if (code === 12 || act.includes('clone') || act.includes('copy')) {
         return {
-            bg: 'bg-sky-100 dark:bg-sky-950/60',
-            text: 'text-sky-800 dark:text-sky-300',
-            border: 'border-sky-300/50 dark:border-sky-700/50',
+            bg: 'bg-sky-50 dark:bg-sky-950/40',
+            text: 'text-sky-700 dark:text-sky-300',
+            border: 'border-sky-300/50 dark:border-sky-700/40',
         };
     }
+    // 13: InstanceError
     if (code === 13 || act.includes('error') || act.includes('fail')) {
         return {
-            bg: 'bg-rose-100 dark:bg-rose-950/60',
-            text: 'text-rose-800 dark:text-rose-300',
+            bg: 'bg-rose-50 dark:bg-rose-950/50',
+            text: 'text-rose-700 dark:text-rose-300',
             border: 'border-rose-300/50 dark:border-rose-700/50',
         };
     }
     if (act.includes('backup') || act.includes('restore') || act.includes('prompt')) {
         return {
-            bg: 'bg-indigo-100 dark:bg-indigo-950/60',
-            text: 'text-indigo-800 dark:text-indigo-300',
-            border: 'border-indigo-300/50 dark:border-indigo-700/50',
+            bg: 'bg-indigo-50 dark:bg-[#201633]',
+            text: 'text-indigo-700 dark:text-purple-300',
+            border: 'border-indigo-300/50 dark:border-[#40285e]',
         };
     }
     return {
-        bg: 'bg-slate-100 dark:bg-slate-800/60',
+        bg: 'bg-slate-100 dark:bg-[#120d1d]',
         text: 'text-slate-700 dark:text-slate-300',
-        border: 'border-slate-300/50 dark:border-slate-700/50',
+        border: 'border-slate-300/50 dark:border-[#40285e]',
     };
 }
 
@@ -174,8 +186,9 @@ export default function InstanceAuditTrailModal({
             });
             setExpandedCards(initialExpanded);
 
-            // If recentSwitches.length === 0, automatically default to the 'operations' tab so users see real events
-            if (loaded.length === 0) {
+            // If recentSwitches.length === 0 and totalOperations > 0, default to 'operations' tab
+            const opsCount = trailRes?.length || 0;
+            if (loaded.length === 0 && opsCount > 0) {
                 setActiveTab('operations');
             } else {
                 setActiveTab('switches');
@@ -376,7 +389,7 @@ export default function InstanceAuditTrailModal({
                 </div>
 
                 {/* Content Body */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/40 dark:bg-[#081a2b]">
+                <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/40 dark:bg-[#090611]">
                     {error && (
                         <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2.5">
                             <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />

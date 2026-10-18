@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { Copy, Eye, Download, Link2, Check } from 'lucide-react';
-import { writeNativeImageToClipboard } from './clipboard';
+import { Copy, Eye, Download, Link2, Check, Layers } from 'lucide-react';
+import { writeNativeImageToClipboard, copyAllImagesAsRichHtml } from './clipboard';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 
@@ -9,6 +9,7 @@ export interface PromptImageContextMenuProps {
     position: { x: number; y: number };
     imageSrc: string;
     altText?: string;
+    allImages?: string[];
     onClose: () => void;
     onOpenPreview: (src: string, alt?: string) => void;
 }
@@ -18,11 +19,13 @@ export function PromptImageContextMenu({
     position,
     imageSrc,
     altText,
+    allImages,
     onClose,
     onOpenPreview,
 }: PromptImageContextMenuProps) {
     const menuRef = useRef<HTMLDivElement>(null);
     const [isImageCopied, setIsImageCopied] = useState(false);
+    const [isAllImagesCopied, setIsAllImagesCopied] = useState(false);
     const [isLinkCopied, setIsLinkCopied] = useState(false);
 
     // Close on click outside or escape key
@@ -83,6 +86,40 @@ export function PromptImageContextMenu({
         }
     }, [imageSrc, onClose]);
 
+    const handleCopyAllImages = useCallback(async () => {
+        try {
+            const imagesToCopy = allImages && allImages.length > 0 ? allImages : [imageSrc];
+            const isSuccess = await copyAllImagesAsRichHtml(
+                imagesToCopy,
+                () => {
+                    setIsAllImagesCopied(true);
+                    setTimeout(() => {
+                        setIsAllImagesCopied(false);
+                        onClose();
+                    }, 1200);
+                },
+                (err) => {
+                    useErrorStore.getState().trackWarning(err, {
+                        source: 'PromptImageContextMenu.handleCopyAllImages',
+                        triggerAction: 'context_menu_copy_all_images',
+                    });
+                }
+            );
+            if (isSuccess) {
+                setIsAllImagesCopied(true);
+                setTimeout(() => {
+                    setIsAllImagesCopied(false);
+                    onClose();
+                }, 1200);
+            }
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'PromptImageContextMenu.handleCopyAllImages.outer',
+                triggerAction: 'context_menu_copy_all_images_outer',
+            });
+        }
+    }, [allImages, imageSrc, onClose]);
+
     const handleCopyLink = useCallback(async () => {
         try {
             await copyToClipboard(imageSrc);
@@ -122,14 +159,14 @@ export function PromptImageContextMenu({
 
     // Viewport boundary clamping
     const menuWidth = 230;
-    const menuHeight = 170;
+    const menuHeight = 210;
     const x = Math.min(position.x, window.innerWidth - menuWidth - 12);
     const y = Math.min(position.y, window.innerHeight - menuHeight - 12);
 
     return (
         <div
             ref={menuRef}
-            className="fixed z-50 min-w-[210px] rounded-xl border border-slate-700/60 bg-slate-900/95 backdrop-blur-md shadow-2xl p-1.5 text-xs text-slate-200 animate-in fade-in zoom-in-95 duration-100"
+            className="fixed z-[100050] min-w-[210px] rounded-xl border border-slate-700/60 bg-slate-900/95 backdrop-blur-md shadow-2xl p-1.5 text-xs text-slate-200 animate-in fade-in zoom-in-95 duration-100"
             style={{ left: Math.max(12, x), top: Math.max(12, y) }}
             onClick={(e) => e.stopPropagation()}
         >
@@ -140,7 +177,7 @@ export function PromptImageContextMenu({
             <button
                 type="button"
                 onClick={handleCopyImageBinary}
-                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left text-slate-200 hover:bg-purple-600/25 hover:text-purple-200 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-left text-slate-200 hover:bg-purple-600/25 hover:text-purple-200 transition-colors cursor-pointer"
             >
                 {isImageCopied ? (
                     <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -148,7 +185,22 @@ export function PromptImageContextMenu({
                     <Copy className="w-3.5 h-3.5 text-purple-400" />
                 )}
                 <span className="font-medium">
-                    {isImageCopied ? 'Copied Image!' : 'Copy Image to Clipboard'}
+                    {isImageCopied ? 'Copied Single Image!' : 'Copy Single Image (PNG)'}
+                </span>
+            </button>
+
+            <button
+                type="button"
+                onClick={handleCopyAllImages}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-left text-slate-200 hover:bg-purple-600/25 hover:text-purple-200 transition-colors cursor-pointer"
+            >
+                {isAllImagesCopied ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                    <Layers className="w-3.5 h-3.5 text-purple-400" />
+                )}
+                <span className="font-medium">
+                    {isAllImagesCopied ? 'Copied All Images!' : 'Copy All Attached Images'}
                 </span>
             </button>
 
@@ -158,7 +210,7 @@ export function PromptImageContextMenu({
                     onClose();
                     onOpenPreview(imageSrc, altText);
                 }}
-                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-left text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
             >
                 <Eye className="w-3.5 h-3.5 text-sky-400" />
                 <span>View Fullscreen Lightbox</span>
@@ -167,7 +219,7 @@ export function PromptImageContextMenu({
             <button
                 type="button"
                 onClick={handleCopyLink}
-                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-left text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
             >
                 {isLinkCopied ? (
                     <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -182,7 +234,7 @@ export function PromptImageContextMenu({
             <button
                 type="button"
                 onClick={handleDownload}
-                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-left text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
             >
                 <Download className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Download Image File</span>

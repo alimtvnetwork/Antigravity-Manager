@@ -74,6 +74,8 @@ pub(crate) fn cmd_fast_forward(args: &[String]) {
         None => instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string()),
     };
 
+    crate::instance_cmds::guard_caller_instance(args, &target_instance);
+
     // Snapshot & backup running prompts before rotation
     antigravity_tools_lib::error::record_ignored(
         repo_db::backup_running_prompts(&target_instance),

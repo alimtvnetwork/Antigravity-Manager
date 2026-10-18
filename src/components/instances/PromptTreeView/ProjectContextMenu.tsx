@@ -11,6 +11,7 @@ import {
     FolderInput,
     Repeat,
     FileText,
+    Trash2,
 } from 'lucide-react';
 
 export interface ProjectContextMenuProps {
@@ -33,6 +34,8 @@ export interface ProjectContextMenuProps {
     onExportJson: () => void;
     onExportSqlite: () => void;
     onExportYaml: () => void;
+    onDeleteProject?: () => void;
+    onDelete?: () => void;
 }
 
 export function ProjectContextMenu({
@@ -55,6 +58,8 @@ export function ProjectContextMenu({
     onExportJson,
     onExportSqlite,
     onExportYaml,
+    onDeleteProject,
+    onDelete,
 }: ProjectContextMenuProps) {
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -94,7 +99,7 @@ export function ProjectContextMenu({
     return createPortal(
         <div
             ref={menuRef}
-            className="fixed z-[10000] min-w-[210px] rounded-xl border border-slate-200 dark:border-[#40285e] bg-white/95 dark:bg-[#171025]/95 backdrop-blur-md py-1.5 shadow-2xl text-xs text-slate-800 dark:text-slate-200 select-none animate-in fade-in zoom-in-95 duration-100"
+            className="fixed z-[100050] min-w-[210px] rounded-xl border border-slate-200 dark:border-[#40285e] bg-white/95 dark:bg-[#171025]/95 backdrop-blur-md py-1.5 shadow-2xl text-xs text-slate-800 dark:text-slate-200 select-none animate-in fade-in zoom-in-95 duration-100"
             style={{ top, left }}
             onClick={(e) => e.stopPropagation()}
             onContextMenu={(e) => {
@@ -266,6 +271,32 @@ export function ProjectContextMenu({
                     <span>Export Project as YAML...</span>
                 </div>
                 <span className="text-[10px] font-mono text-slate-400">.yaml</span>
+            </button>
+
+            <div className="border-t border-slate-100 dark:border-[#2b1b42] my-1" />
+
+            {/* Delete / Remove Project */}
+            <button
+                type="button"
+                className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer text-rose-600 dark:text-rose-400"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    if (onDeleteProject) {
+                        onDeleteProject();
+                    } else if (onDelete) {
+                        onDelete();
+                    } else if (onToggleArchive && !isArchived) {
+                        onToggleArchive();
+                    }
+                    onClose();
+                }}
+                title="Remove this project from the current view"
+            >
+                <div className="flex items-center gap-2.5">
+                    <Trash2 className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                    <span>Remove Project from View</span>
+                </div>
+                <span className="text-[10px] font-mono text-rose-400 font-bold">Remove</span>
             </button>
         </div>,
         document.body

@@ -431,5 +431,26 @@ pub fn copy_instance_with_options(
     );
     sync_instance_ide_parity(&new_instance.id).map_err(|e| e.to_string())?;
 
+    crate::modules::task_history_db::record(
+        crate::modules::audit_action::AuditAction::CloneInstance,
+        &source.id,
+        "ok",
+        &format!(
+            "Cloned instance '{}' into '{}'",
+            source.name, new_instance.name
+        ),
+        Some(&source.id),
+    );
+    crate::modules::task_history_db::record(
+        crate::modules::audit_action::AuditAction::CreateInstance,
+        &new_instance.id,
+        "ok",
+        &format!(
+            "Created instance '{}' by cloning '{}'",
+            new_instance.name, source.name
+        ),
+        Some(&new_instance.id),
+    );
+
     Ok(new_instance)
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, type WheelEvent, type MouseEvent } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw, Copy, Check, Download, X, Image as ImageIcon } from 'lucide-react';
 import { writeNativeImageToClipboard } from './clipboard';
 import { useErrorStore } from '../../../stores/error-store';
@@ -68,14 +68,14 @@ export function PromptImagePreviewModal({
     }, [isOpen, onClose, handleZoomIn, handleZoomOut, handleResetZoom]);
 
     // Wheel zoom
-    const handleWheel = useCallback((e: React.WheelEvent) => {
+    const handleWheel = useCallback((e: WheelEvent) => {
         e.preventDefault();
         const delta = e.deltaY < 0 ? 0.15 : -0.15;
         setZoomScale((prev) => Math.min(5, Math.max(0.25, Math.round((prev + delta) * 100) / 100)));
     }, []);
 
     // Pan / Drag handlers
-    const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    const handleMouseDown = useCallback((e: MouseEvent) => {
         if (e.button !== 0) return;
         setIsPanning(true);
         dragStartRef.current = {
@@ -86,7 +86,7 @@ export function PromptImagePreviewModal({
         };
     }, [panPosition]);
 
-    const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    const handleMouseMove = useCallback((e: MouseEvent) => {
         if (!isPanning) return;
         const dx = e.clientX - dragStartRef.current.x;
         const dy = e.clientY - dragStartRef.current.y;
@@ -153,7 +153,7 @@ export function PromptImagePreviewModal({
 
     return (
         <div
-            className="fixed inset-0 z-50 flex flex-col items-center justify-between bg-black/85 backdrop-blur-md select-none transition-opacity duration-200"
+            className="fixed inset-0 z-[100050] flex flex-col items-center justify-between bg-black/85 backdrop-blur-md select-none transition-opacity duration-200"
             onClick={onClose}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -171,12 +171,12 @@ export function PromptImagePreviewModal({
                 </div>
 
                 {/* Segmented Capsule Actions */}
-                <div className="inline-flex items-center rounded-full border border-slate-700/60 bg-slate-900/90 shadow-lg px-2 py-1 gap-1 text-slate-300 text-xs">
+                <div className="inline-flex items-center rounded-lg border border-slate-700/60 bg-slate-900/90 shadow-lg px-2 py-1 gap-1 text-slate-300 text-xs">
                     <button
                         type="button"
                         onClick={handleZoomOut}
                         disabled={zoomScale <= 0.25}
-                        className="p-1.5 rounded-full hover:bg-slate-800 disabled:opacity-40 transition-colors cursor-pointer"
+                        className="p-1.5 rounded-md hover:bg-slate-800 disabled:opacity-40 transition-colors cursor-pointer"
                         title="Zoom Out (-)"
                     >
                         <ZoomOut className="w-3.5 h-3.5" />
@@ -188,7 +188,7 @@ export function PromptImagePreviewModal({
                         type="button"
                         onClick={handleZoomIn}
                         disabled={zoomScale >= 5}
-                        className="p-1.5 rounded-full hover:bg-slate-800 disabled:opacity-40 transition-colors cursor-pointer"
+                        className="p-1.5 rounded-md hover:bg-slate-800 disabled:opacity-40 transition-colors cursor-pointer"
                         title="Zoom In (+)"
                     >
                         <ZoomIn className="w-3.5 h-3.5" />
@@ -197,7 +197,7 @@ export function PromptImagePreviewModal({
                     <button
                         type="button"
                         onClick={handleResetZoom}
-                        className="p-1.5 rounded-full hover:bg-slate-800 transition-colors cursor-pointer"
+                        className="p-1.5 rounded-md hover:bg-slate-800 transition-colors cursor-pointer"
                         title="Reset Zoom (0)"
                     >
                         <RotateCcw className="w-3.5 h-3.5" />
@@ -206,7 +206,7 @@ export function PromptImagePreviewModal({
                     <button
                         type="button"
                         onClick={handleCopyNative}
-                        className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 transition-colors cursor-pointer font-medium"
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 transition-colors cursor-pointer font-medium"
                         title="Copy native PNG image binary to clipboard for pasting into Gemini Web, Photoshop, Paint"
                     >
                         {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -215,7 +215,7 @@ export function PromptImagePreviewModal({
                     <button
                         type="button"
                         onClick={handleDownload}
-                        className="p-1.5 rounded-full hover:bg-slate-800 transition-colors cursor-pointer"
+                        className="p-1.5 rounded-md hover:bg-slate-800 transition-colors cursor-pointer"
                         title="Download image file"
                     >
                         <Download className="w-3.5 h-3.5" />
@@ -224,7 +224,7 @@ export function PromptImagePreviewModal({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="p-1.5 rounded-full hover:bg-red-500/20 hover:text-red-300 transition-colors cursor-pointer text-slate-400"
+                        className="p-1.5 rounded-md hover:bg-red-500/20 hover:text-red-300 transition-colors cursor-pointer text-slate-400"
                         title="Close (Esc)"
                     >
                         <X className="w-3.5 h-3.5" />

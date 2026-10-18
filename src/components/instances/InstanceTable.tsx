@@ -138,7 +138,7 @@ export default function InstanceTable({
                                         isBusy={data.isBusy}
                                         isMoreOpen={openMoreId === inst.config.id}
                                         onLaunch={() => onLaunch(inst.config.id)}
-                                        onStop={() => onStop(inst.config.id)}
+                                        onStop={() => onStop(inst.config.id, inst.pid ?? undefined)}
                                         onRestart={() => onRestart(inst.config.id)}
                                         onSwitch={() => onSwitch(inst.config.id)}
                                         onFastForward={() => onFastForward(inst.config.id)}

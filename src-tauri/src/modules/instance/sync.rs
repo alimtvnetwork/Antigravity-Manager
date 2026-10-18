@@ -23,6 +23,7 @@ pub async fn sync_instance_pid_and_quota_logic(
     let data_dir = registry.instances[idx].data_dir.clone();
 
     // 1. Inspect live running PIDs
+    force_refresh_process_cache();
     let pids = find_pids_for_data_dir(&data_dir, is_default_inst);
     let live_pid = pids.first().copied();
     let is_running = !pids.is_empty()
@@ -32,13 +33,18 @@ pub async fn sync_instance_pid_and_quota_logic(
             registry.instances[idx].pid,
         );
 
-    if let Some(pid) = live_pid {
-        registry.instances[idx].pid = Some(pid);
-        // Justification: PID cache bookkeeping; staleness is tolerated via the OS-level re-detect fallback
-        crate::error::record_ignored(
-            record_instance_pid(&registry.instances[idx].id, pid, &data_dir),
-            "record instance pid",
-        );
+    let resolved_pid = live_pid.or_else(|| get_instance_saved_pid(&registry.instances[idx].id));
+    if let Some(pid) = resolved_pid {
+        if is_running {
+            registry.instances[idx].pid = Some(pid);
+            // Justification: PID cache bookkeeping; staleness is tolerated via the OS-level re-detect fallback
+            crate::error::record_ignored(
+                record_instance_pid(&registry.instances[idx].id, pid, &data_dir),
+                "record instance pid",
+            );
+        } else {
+            registry.instances[idx].pid = None;
+        }
     } else if !is_running {
         registry.instances[idx].pid = None;
     }

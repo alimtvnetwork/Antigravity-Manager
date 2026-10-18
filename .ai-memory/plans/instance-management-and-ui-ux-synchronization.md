@@ -1,72 +1,54 @@
 # Master Execution Plan: Instance Management and UI/UX Synchronization
 
 **Slug:** `instance-management-and-ui-ux-synchronization`  
-**Parent Task ID:** `task-20261018030546-instance-management-and-ui-ux-synchronization`  
-**Status:** `COMPLETED`  
-**Phase:** `3 - Completed and Verified`  
+**Parent Task ID:** `task-20261018041848-instance-management-and-ui-ux-synchronization`  
+**Status:** `ACTIVE`  
+**Phase:** `2 - Execution Step (Worker Waves)`  
 
 ---
 
-## 1. Executive Summary & Problem Diagnosis
+## 1. Executive Summary & Root Cause Resolution
 
 This master plan addresses critical defects and UI/UX inconsistencies in Antigravity-Manager's instance management subsystem:
-1. **PID & Path Display in List View (Task-01)**:
-   - Operating System process identifier `1632` was rendered without context (e.g. `(1632)` in card view, `PID 1632` in list view without colon).
-   - In `src/components/instances/table/InstanceRowCells.tsx` (`IdeExeAndDataCell`), the executable binary name and user data directory were stacked vertically in two separate lines.
-   - *Fix*: Format status explicitly as `PID: <pid>`. Place the terminal segment of the executable and data directory on the same horizontal line (`{exeEnding} · {dataEnding}`) in `IdeExeAndDataCell`.
-2. **Account Switching & Stop Instance Process Lifecycle (Task-02)**:
-   - `stop_instance` failed because `close_instance` had a 3-second hard-abort returning an `Err`, aborting before lockfile clearance, database `is_active = 0`, and process cache invalidation could occur.
-   - On Windows, `taskkill` lacked fallback escalation to Win32 `TerminateProcess` or PowerShell `Stop-Process -Force`.
-   - Account switching was not verifying process death before overwriting credentials, causing SQLite file locks on `state.vscdb`, credential rollbacks upon IDE exit, and failing to emit `instances://refreshed` events to the Tauri UI.
-   - *Fix*: Remove 3s hard abort, implement multi-stage kill ladder (taskkill -> TerminateProcess / Stop-Process), unconditional lockfile + DB cleanup, and implement 6-stage deterministic switch sequence with Tauri UI event emission.
-3. **Switch Account Dialog UI/UX Modernization (Task-03)**:
-   - `SwitchAccountDialog.tsx` used legacy purple palette, an unstyled inline progress bar (`w-20 h-1.5`), and raw button styling.
-   - *Fix*: Modernize with dark glass styling (`dark:bg-[#171025]`, `bg-[var(--ui-surface-1)]`, subtle borders), segmented pill capsules, reusable `QuotaProgressBar` integration, and Escape key dismissal.
-4. **Audit Trail Visibility & Lifecycle Event Recording (Task-04)**:
-   - `task_history_db` never recorded instance start/stop/restart/reload events (only scheduled prompts and switches were recorded). Standard instances had 0 records in the database.
-   - *Fix*: Expand `AuditAction` enum with lifecycle action codes (`LaunchInstance`, `StopInstance`, `RestartInstance`, etc.), record events on instance operations, and ensure frontend displays both switch cycles and lifecycle operations.
-5. **Active IDE Instance Protection & CLI Detection (Task-05)**:
-   - CLI lacked explicit defense-in-depth against self-termination when running inside active IDE terminals (VS Code, Cursor, Antigravity).
-   - *Fix*: Enhance `detect_caller_instance_id()` with `VSCODE_PID` inspection and ancestor tree scanning, enforce `guard_caller_instance` across all lifecycle CLI commands, and provide `agm instances current` output.
-6. **End-to-End Lifecycle Verification & Clean Teardown (Task-06)**:
-   - Author `scripts/test-instance-lifecycle-e2e.ps1` to verify test instance creation, start, stop, account switch, PID termination, and clean removal without touching active IDE instances.
-7. **Minor Version Bump & Release Ceremony (Task-07)**:
+1. **PID & Path Display in List View (Task-01 & Task-02)**:
+   - Operating System process identifier `1632` is confirmed as the native OS Process ID (`PID`).
+   - Format status explicitly as `Running (PID: <pid>)` with green pulsating indicator beacon.
+   - Place the terminal segment of the executable and data directory on the same horizontal line (`{exeEnding} · {dataEnding}`) in `IdeExeAndDataCell`, with zero wrapping (`whitespace-nowrap flex-nowrap`).
+2. **Deterministic Process Termination (Task-03)**:
+   - Fix dead-code bug in `stop_instance` (`create.rs`): check `saved_pid` before wiping registry/DB state so termination liveness check functions correctly.
+   - Fix empty `proc.cmd()` handling on Windows in `close.rs` so non-default PIDs aren't discarded when command line is empty.
+   - Implement hardened multi-stage process tree kill ladder with Toolhelp32 child traversal and direct Win32 `TerminateProcess` kernel handles.
+3. **Pre-Switch PID Eviction & Synchronization (Task-04)**:
+   - In `switch.rs`, replace raw OS-wide PID check (`is_pid_alive_targeted`) with verified identity check (`saved_pid_matches`) to prevent false-positive aborts on recycled PIDs.
+   - Implement deterministic 1500ms settle drain loop for OS kernel and NTFS file handle release before writing credentials to `state.vscdb`.
+   - Purge stale lockfiles (`lockfile`, `code.lock`, `DevToolsActivePort`, `singleton*`).
+4. **Switch Account Dialog UI/UX Modernization (Task-05)**:
+   - Remove ad-hoc 4-part segmented quota capsule (`4h | Weekly | Total | [custom bar]`).
+   - Integrate standardized `QuotaProgressBar` component from `src/components/accounts/QuotaProgressBar.tsx`.
+   - Apply Royal Violet design tokens (`--ui-surface-1: #171025`, `--ui-border-subtle: #40285e`, `--ui-success: #1af18d`).
+   - Support whole-card row selection (`.ui-interactive-row`), keyboard navigation (`Enter`/`Space`), and `Escape` key dismissal.
+5. **Instance Lifecycle Audit Trail Logging & Visibility (Task-06)**:
+   - Wire all lifecycle operations (`LaunchInstance`, `StopInstance`, `RestartInstance`, `CreateInstance`, `SwitchAccount`, `DeleteInstance`) into `task_history_db` split databases.
+   - In `launch.rs`, call `audit.succeed()` on process spawn to prevent tasks dropping as aborted/failed.
+   - In `InstanceAuditTrailModal.tsx`, support dual tabs (`Switch Cycles` and `All Operations`), and automatically route to `operations` when switches are 0.
+6. **Active IDE Instance Protection & CLI Detection (Task-07)**:
+   - Walk ancestor process tree up to 24 levels and inspect `VSCODE_PID`, `ANTIGRAVITY_INSTANCE_ID`, and `--user-data-dir` arguments.
+   - Enforce `guard_caller_instance` and `refuse_if_caller_instance` with exit code 2 across all lifecycle CLI commands.
+   - Ensure transient test sandbox commands `agm instances create-test` and `agm instances rm-test` operate efficiently with sub-50ms latency.
+7. **End-to-End Lifecycle Verification & Release Ceremony (Task-08)**:
+   - Execute `scripts/test-instance-lifecycle-e2e.ps1` to verify caller immunity, test instance creation, PID reporting, process termination, account switching, and clean disposal.
    - Execute minor bump (`npm run bump minor`), update changelogs and readmes with `@aukgit` attribution, and commit/push atomically via GitMap.
 
 ---
 
-## 2. Subtask Breakdown & Multi-Agent Concurrency Topology
+## 2. Multi-Agent Concurrency Topology & Exclusive File Boxes
 
 Capacity = 6 (A = 3 agents × H = 2 operations).
-Zero file ownership overlap across worker waves.
+Strictly disjoint file ownership across worker waves:
 
-| Task ID | Title | Assigned Agent | Exclusive Owned Files | Verification Contract |
+| Worker | Code | Title | Exclusive Owned Files | Verification Contract |
 |---|---|---|---|---|
-| **Task-01** | List View Layout & PID Clarity | Worker 01 | `src/components/instances/table/InstanceRowCells.tsx`, `src/pages/instances/InstanceCard.tsx` | Status displays `PID: <pid>`; exe & data tails on same line |
-| **Task-02** | Instance Process Lifecycle & PID Control | Worker 02 | `src-tauri/src/modules/instance/close.rs`, `src-tauri/src/modules/instance/create.rs`, `src-tauri/src/modules/instance/switch.rs`, `src-tauri/src/commands/instance.rs` | Stop kills PID reliably; switch closes PID first |
-| **Task-03** | Switch Account Dialog UI/UX Modernization | Worker 01 | `src/pages/instances/SwitchAccountDialog.tsx` | Modern dark glass styling; QuotaProgressBar integrated |
-| **Task-04** | Audit Trail Visibility & Lifecycle Logging | Worker 03 | `src-tauri/src/modules/audit_action.rs`, `src-tauri/src/modules/task_history_db/`, `src/components/instances/InstanceAuditTrail/InstanceAuditTrailModal.tsx` | Instance start/stop/switch recorded and visible in modal |
-| **Task-05** | Active IDE Instance Protection & CLI Detection | Worker 03 | `src-tauri/src/bin/agm/instance_cmds.rs`, `src-tauri/src/modules/instance/close.rs` | `agm instances current` returns active instance; self-stop refused |
-| **Task-06** | E2E Testing & Lifecycle Verification | Worker 02 | `scripts/test-instance-lifecycle-e2e.ps1` | PowerShell test completes with Exit Code 0 |
-| **Task-07** | Minor Version Bump & Release Ceremony | Lead | `package.json`, `src-tauri/Cargo.toml`, `CHANGELOG.md`, `changelog_en.md`, `README.md`, `README_EN.md` | `gitmap cpf "instance - synchronization and ui ux enhancements"` |
-
----
-
-## 3. Disjoint Execution Wave Plan
-
-### Wave 1 (Core Implementation - Parallel Execution across A = 3 Workers):
-- **Worker 01**:
-  - Implements **Task-01**: Single-line path display in `InstanceRowCells.tsx` and explicit `PID: <pid>` label in `InstanceRowCells.tsx` and `InstanceCard.tsx`.
-  - Implements **Task-03**: Modernizes `SwitchAccountDialog.tsx` with dark glass styling, segmented pills, and `QuotaProgressBar`.
-- **Worker 02**:
-  - Implements **Task-02**: Eliminates 3s hard-abort in `close.rs`, implements Windows tree kill fallback ladder, unconditional cleanup, 6-stage switch sequence in `switch.rs`, and UI event emission in `commands/instance.rs`.
-- **Worker 03**:
-  - Implements **Task-04**: Expands `AuditAction` enum, instruments lifecycle logging in instance operations, and updates `InstanceAuditTrailModal.tsx`.
-  - Implements **Task-05**: Enhances `detect_caller_instance_id` with `VSCODE_PID`, shields caller IDE, and updates CLI commands.
-
-### Wave 2 (Verification, E2E Testing & Release):
-- **Worker 02**:
-  - Implements **Task-06**: Creates `scripts/test-instance-lifecycle-e2e.ps1` and runs the verification suite.
-- **Lead Orchestrator**:
-  - Runs targeted linter and pre-flight checks (`cargo fmt --check`, `cargo clippy`, `npm run build`).
-  - Executes **Task-07**: Minor version bump, changelog / README synchronization, atomic GitMap commit and push.
+| **Worker 01** | `Task-02`, `Task-05` | Frontend List View, Switch Dialog & Audit Modal | `src/components/instances/table/InstanceRowCells.tsx`, `src/pages/instances/SwitchAccountDialog.tsx`, `src/components/instances/InstanceAuditTrail/InstanceAuditTrailModal.tsx` | Status displays `PID: <pid>`; exe & data tails on same line; QuotaProgressBar integrated; dual-tab audit trail |
+| **Worker 02** | `Task-03`, `Task-04`, `Task-06` | Backend Process Termination, Switch Sync & Audit Logging | `src-tauri/src/modules/instance/create.rs`, `src-tauri/src/modules/instance/close.rs`, `src-tauri/src/modules/instance/switch.rs`, `src-tauri/src/modules/instance/launch.rs`, `src-tauri/src/modules/instance/lifecycle.rs` | Stop kills PID reliably; switch closes PID first; launch/restart logged to audit trail |
+| **Worker 03** | `Task-07`, `Task-08` | CLI Caller Safety, E2E Test Suite & Pre-flight | `src-tauri/src/bin/agm/instance_cmds.rs`, `src-tauri/src/bin/agm/instance_routes_b.rs`, `scripts/test-instance-lifecycle-e2e.ps1` | `whoami` returns caller; self-stop refused; E2E PowerShell script exits 0 |
+| **Lead Agent** | `Task-08` | Version Bump, Attribution & Atomic GitMap Commit | `package.json`, `src-tauri/Cargo.toml`, `CHANGELOG.md`, `changelog_en.md`, `README.md`, `README_EN.md` | `gitmap cpf "instances - instance management and ui ux synchronization"` |

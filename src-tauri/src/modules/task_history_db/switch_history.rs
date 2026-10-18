@@ -64,7 +64,7 @@ pub fn get_instance_switch_history(
 
     let switch_cond = "
         WHERE (action_code = 3 OR action = 'SwitchAccount' OR action = 'switch_account')
-          AND (LOWER(instance_id) = LOWER(?1) OR (?1 = 'default' AND (LOWER(instance_id) IN ('default', '__default__', '', 'antigravity', 'agy', 'ide', 'classic') OR instance_id IS NULL)))";
+          AND (LOWER(instance_id) = LOWER(?1) OR LOWER(subject) = LOWER(?1) OR (?1 = 'default' AND (LOWER(instance_id) IN ('default', '__default__', '', 'antigravity', 'agy', 'ide', 'classic') OR LOWER(subject) IN ('default', '__default__', '', 'antigravity', 'agy', 'ide', 'classic') OR instance_id IS NULL)))";
 
     for split in &splits {
         let conn = open_split(Path::new(&split.file_path))?;
@@ -365,7 +365,14 @@ pub fn get_instance_audit_trail(
     let mut seen_ids = std::collections::HashSet::new();
 
     let cond = "
-        WHERE (LOWER(instance_id) = LOWER(?1) OR (?1 = 'default' AND (LOWER(instance_id) IN ('default', '__default__', '', 'antigravity', 'agy', 'ide', 'classic') OR instance_id IS NULL)))";
+        WHERE (LOWER(instance_id) = LOWER(?1)
+           OR LOWER(subject) = LOWER(?1)
+           OR (?1 = 'default' AND (
+                LOWER(instance_id) IN ('default', '__default__', 'antigravity', 'agy', 'ide', 'classic')
+                OR LOWER(subject) IN ('default', '__default__', 'antigravity', 'agy', 'ide', 'classic')
+                OR ((instance_id IS NULL OR instance_id = '') AND action_code >= 3 AND action_code <= 14)
+              ))
+        )";
 
     // 1. First consult hot_tasks_cache for recent in-memory/hot items
     let query_hot_sql = format!(

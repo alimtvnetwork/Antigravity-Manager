@@ -16,6 +16,8 @@ import {
     FolderInput,
     Repeat,
     ListPlus,
+    Pin,
+    Trash2,
 } from 'lucide-react';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
@@ -55,6 +57,11 @@ export interface ConversationContextMenuProps {
     conversationNode?: AgmConversationNode;
     repoPath?: string;
     instanceId?: string;
+    isPinned?: boolean;
+    onTogglePin?: () => void;
+    onPinConversation?: (convoId: string) => void;
+    onDelete?: () => void;
+    onDeleteConversation?: (convoId: string) => void;
 }
 
 export function ConversationContextMenu({
@@ -79,6 +86,11 @@ export function ConversationContextMenu({
     conversationNode,
     repoPath,
     instanceId,
+    isPinned: isPinnedProp,
+    onTogglePin,
+    onPinConversation,
+    onDelete,
+    onDeleteConversation,
 }: ConversationContextMenuProps) {
     const menuRef = useRef<HTMLDivElement>(null);
     const [isIdCopied, setIsIdCopied] = useState(false);
@@ -88,6 +100,80 @@ export function ConversationContextMenu({
     const [isResendSubmenuOpen, setIsResendSubmenuOpen] = useState(false);
     const [isCustomNDialogOpen, setIsCustomNDialogOpen] = useState(false);
     const [customNCount, setCustomNCount] = useState<number>(5);
+
+    const [isPinned, setIsPinned] = useState<boolean>(() => {
+        if (typeof isPinnedProp === 'boolean') return isPinnedProp;
+        try {
+            const raw = localStorage.getItem(`agm_pinned_conversations_${instanceId || 'default'}`);
+            if (raw) {
+                const list = JSON.parse(raw);
+                return Array.isArray(list) && list.includes(conversationId);
+            }
+        } catch (err: unknown) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'ConversationContextMenu.initIsPinned',
+                triggerAction: 'read_pinned_conversations',
+            });
+        }
+        return false;
+    });
+
+    const handleTogglePin = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onTogglePin) {
+            onTogglePin();
+            onClose();
+            return;
+        }
+        if (onPinConversation) {
+            onPinConversation(conversationId);
+            onClose();
+            return;
+        }
+        try {
+            const storageKey = `agm_pinned_conversations_${instanceId || 'default'}`;
+            const raw = localStorage.getItem(storageKey);
+            const list: string[] = raw ? JSON.parse(raw) : [];
+            const nextList = list.includes(conversationId)
+                ? list.filter((id) => id !== conversationId)
+                : [...list, conversationId];
+            localStorage.setItem(storageKey, JSON.stringify(nextList));
+            setIsPinned(!isPinned);
+        } catch (err: unknown) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'ConversationContextMenu.handleTogglePin',
+                triggerAction: 'persist_pinned_conversations',
+            });
+        }
+        onClose();
+    };
+
+    const handleDelete = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onDelete) {
+            onDelete();
+            onClose();
+            return;
+        }
+        if (onDeleteConversation) {
+            onDeleteConversation(conversationId);
+            onClose();
+            return;
+        }
+        try {
+            const { invoke } = await import('@tauri-apps/api/core');
+            await invoke('delete_conversation_record', {
+                conversationId,
+                instanceId: instanceId || undefined,
+            });
+        } catch (err: unknown) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'ConversationContextMenu.handleDelete',
+                triggerAction: 'delete_conversation',
+            });
+        }
+        onClose();
+    };
 
     const left = Math.max(8, Math.min(x, window.innerWidth - 260));
     const top = Math.max(8, Math.min(y, window.innerHeight - 480));
@@ -386,7 +472,7 @@ export function ConversationContextMenu({
     return createPortal(
         <div
             ref={menuRef}
-            className="fixed z-[10000] min-w-[240px] rounded-xl border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025] py-1.5 shadow-2xl text-xs text-slate-800 dark:text-slate-200 select-none font-poppins animate-in fade-in zoom-in-95 duration-100"
+            className="fixed z-[100050] min-w-[240px] rounded-xl border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025] py-1.5 shadow-2xl text-xs text-slate-800 dark:text-slate-200 select-none font-poppins animate-in fade-in zoom-in-95 duration-100"
             style={{ top, left }}
             onClick={(e) => e.stopPropagation()}
             onContextMenu={(e) => {
@@ -576,6 +662,20 @@ export function ConversationContextMenu({
 
             <div className="my-1 border-t border-slate-100 dark:border-[#2b1b42]" />
 
+            {/* Pin / Unpin Conversation */}
+            <button
+                type="button"
+                className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400 cursor-pointer"
+                onClick={handleTogglePin}
+                title={isPinned ? 'Unpin conversation from top' : 'Pin conversation to top'}
+            >
+                <div className="flex items-center gap-2.5">
+                    <Pin className={cn("w-3.5 h-3.5 text-amber-500 shrink-0", isPinned && "fill-current")} />
+                    <span className="font-medium">{isPinned ? 'Unpin Conversation' : 'Pin Conversation to Top'}</span>
+                </div>
+                <span className="text-[9px] font-mono text-amber-500 font-bold">{isPinned ? 'Pinned' : 'Pin'}</span>
+            </button>
+
             {/* Rename Conversation (F2) */}
             {onRename && (
                 <button
@@ -683,6 +783,22 @@ export function ConversationContextMenu({
                     <span>Export Conversation as YAML...</span>
                 </div>
                 <span className="text-[9px] font-mono text-slate-400">.yaml</span>
+            </button>
+
+            <div className="my-1 border-t border-slate-100 dark:border-[#2b1b42]" />
+
+            {/* Delete Conversation */}
+            <button
+                type="button"
+                className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer text-rose-600 dark:text-rose-400"
+                onClick={handleDelete}
+                title="Delete this conversation session"
+            >
+                <div className="flex items-center gap-2.5">
+                    <Trash2 className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                    <span className="font-medium">Delete Conversation</span>
+                </div>
+                <span className="text-[9px] font-mono text-rose-400 font-bold">Delete</span>
             </button>
         </div>,
         document.body

@@ -43,31 +43,47 @@ pub(crate) fn clear_stale_instance_lockfiles(target_data_path: &Path) {
     if !target_data_path.exists() {
         return;
     }
-    let lockfile = target_data_path.join("lockfile");
-    if lockfile.exists() {
-        // Justification: cleanup of an optional file; absence is the normal case
-        crate::error::record_ignored(fs::remove_file(&lockfile), "remove file");
-    }
-    let code_lock = target_data_path.join("code.lock");
-    if code_lock.exists() {
-        // Justification: cleanup of an optional file; absence is the normal case
-        crate::error::record_ignored(fs::remove_file(&code_lock), "remove file");
-    }
-    let dt_port = target_data_path.join("DevToolsActivePort");
-    if dt_port.exists() {
-        // Justification: cleanup of an optional file; absence is the normal case
-        crate::error::record_ignored(fs::remove_file(&dt_port), "remove file");
-    }
+    let remove_lock_entry = |path: &Path| {
+        if path.exists() {
+            #[cfg(target_os = "windows")]
+            {
+                if let Ok(metadata) = fs::metadata(path) {
+                    let mut permissions = metadata.permissions();
+                    if permissions.readonly() {
+                        permissions.set_readonly(false);
+                        // Justification: clearing readonly flag to allow lockfile removal
+                        crate::error::record_ignored(
+                            fs::set_permissions(path, permissions),
+                            "clear readonly permission",
+                        );
+                    }
+                }
+            }
+            if path.is_dir() {
+                // Justification: cleanup of an optional lock directory; absence is the normal case
+                crate::error::record_ignored(fs::remove_dir_all(path), "remove lock directory");
+            } else {
+                // Justification: cleanup of an optional lock file; absence is the normal case
+                crate::error::record_ignored(fs::remove_file(path), "remove file");
+            }
+        }
+    };
+
+    remove_lock_entry(&target_data_path.join("lockfile"));
+    remove_lock_entry(&target_data_path.join("code.lock"));
+    remove_lock_entry(&target_data_path.join("DevToolsActivePort"));
+
     if let Ok(entries) = fs::read_dir(target_data_path) {
         for entry in entries.flatten() {
+            let path = entry.path();
             let fname = entry.file_name().to_string_lossy().to_lowercase();
             let is_stale_lock = fname == "lockfile"
                 || fname.starts_with("singleton")
                 || fname.ends_with(".lock")
-                || fname == "code.lock";
+                || fname == "code.lock"
+                || fname == "devtoolsactiveport";
             if is_stale_lock {
-                // Justification: cleanup of an optional file; absence is the normal case
-                crate::error::record_ignored(fs::remove_file(entry.path()), "remove file");
+                remove_lock_entry(&path);
             }
         }
     }
@@ -217,7 +233,28 @@ fn saved_pid_belongs_to_instance(
                 _ => false,
             };
 
-            if pid_matches {
+            let in_cache_or_db = current_pid.map_or(false, |cpid| {
+                let in_cache = INSTANCE_PROCESS_CACHE.read().ok().map_or(false, |cache| {
+                    cache.get(instance_id).map_or(false, |rec| {
+                        rec.pid == cpid
+                            || rec.primary_pid == Some(cpid)
+                            || rec.pids.contains(&cpid)
+                    })
+                });
+                if in_cache {
+                    return true;
+                }
+                open_instance_db().ok().map_or(false, |conn| {
+                    conn.query_row(
+                        "SELECT 1 FROM instance_processes WHERE instance_id = ?1 AND pid = ?2 AND is_active = 1",
+                        rusqlite::params![instance_id, cpid as i64],
+                        |_| Ok(true),
+                    )
+                    .unwrap_or(false)
+                })
+            });
+
+            if pid_matches || in_cache_or_db {
                 let target_pid = current_pid.or(recorded_pid).unwrap_or(0);
                 let (protected_pids, markers) = other_instance_protection(instance_id);
                 if !should_spare_pid(
@@ -296,6 +333,17 @@ pub fn close_instance_verified(
                     ) {
                         pids.push(pid);
                     }
+                }
+            }
+        }
+        if pids.is_empty() {
+            let is_default = instance_id == "default" || instance_id == "__default__";
+            let wpid = find_pids_for_data_dir(&data_dir, is_default)
+                .into_iter()
+                .find(|&pid| is_pid_alive_targeted(pid) && saved_pid_matches(pid));
+            if let Some(wpid) = wpid {
+                if !pids.contains(&wpid) {
+                    pids.push(wpid);
                 }
             }
         }
@@ -567,6 +615,51 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
                     }
                 }
 
+                #[cfg(target_os = "windows")]
+                {
+                    if proc.cmd().is_empty() {
+                        let configured = config
+                            .executable_path
+                            .as_deref()
+                            .unwrap_or("")
+                            .to_lowercase()
+                            .replace('\\', "/");
+                        let exe_matches = if !configured.is_empty() {
+                            let file = configured.rsplit('/').next().unwrap_or(&configured);
+                            p_exe == configured
+                                || (!file.is_empty()
+                                    && (p_exe.ends_with(&format!("/{file}"))
+                                        || p_exe.ends_with(file)))
+                        } else {
+                            p_exe.ends_with("antigravity.exe")
+                                || p_name == "antigravity.exe"
+                                || p_name.contains("antigravity")
+                        };
+
+                        let in_process_cache =
+                            INSTANCE_PROCESS_CACHE.read().ok().map_or(false, |cache| {
+                                cache.get(instance_id).map_or(false, |rec| {
+                                    rec.pid == pid
+                                        || rec.primary_pid == Some(pid)
+                                        || rec.pids.contains(&pid)
+                                })
+                            });
+
+                        let in_db = open_instance_db().ok().map_or(false, |conn| {
+                            conn.query_row(
+                                "SELECT 1 FROM instance_processes WHERE instance_id = ?1 AND pid = ?2 AND is_active = 1",
+                                rusqlite::params![instance_id, pid as i64],
+                                |_| Ok(true),
+                            )
+                            .unwrap_or(false)
+                        });
+
+                        if exe_matches || in_process_cache || in_db {
+                            return true;
+                        }
+                    }
+                }
+
                 crate::modules::logger::log_warn(&format!(
                     "[Instance] Safety filter: PID {} rejected from close list for instance '{}' because process arguments do not match instance data_dir",
                     pid, instance_id
@@ -670,6 +763,22 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
     }
 
     if pids.is_empty() {
+        let is_default = is_default_inst;
+        let wpid = find_pids_for_data_dir(&config.data_dir, is_default)
+            .into_iter()
+            .find(|&pid| is_pid_alive_targeted(pid) && saved_pid_matches(pid));
+        if let Some(wpid) = wpid {
+            if !pids.contains(&wpid) {
+                crate::modules::logger::log_warn(&format!(
+                    "[Instance] Window kill: candidate list was empty but window PID {} for instance '{}' is alive. Enqueuing for tree termination.",
+                    wpid, instance_id
+                ));
+                pids.push(wpid);
+            }
+        }
+    }
+
+    if pids.is_empty() {
         // Justification: registry flag update; live state is re-derived from the OS on next refresh
         crate::error::record_ignored(mark_instance_stopped(instance_id), "mark instance stopped");
         audit.succeed(&format!(
@@ -677,6 +786,56 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
             instance_id
         ));
         return Ok(());
+    }
+
+    // Ensure descendant child processes (renderers, helpers, utility) are gathered and terminated
+    let current_pids_set: std::collections::HashSet<u32> = pids.iter().copied().collect();
+    let mut descendant_pids = Vec::new();
+    for (spid, sproc) in system.processes() {
+        let cand_pid = spid.as_u32();
+        if current_pids_set.contains(&cand_pid) {
+            continue;
+        }
+        let p_name = sproc.name().to_string_lossy().to_lowercase();
+        let p_exe = sproc
+            .exe()
+            .map(|p| p.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        let is_editor_or_manager = p_name.contains("cursor")
+            || p_exe.contains("cursor")
+            || p_name.contains("agm")
+            || p_exe.contains("agm-alim")
+            || p_name.contains("antigravity-manager")
+            || p_exe.contains("antigravity-manager");
+        if is_editor_or_manager {
+            continue;
+        }
+
+        let mut curr = cand_pid;
+        for _ in 0..10 {
+            if let Some(parent) = system
+                .process(sysinfo::Pid::from_u32(curr))
+                .and_then(|pr| pr.parent())
+                .map(|pp| pp.as_u32())
+            {
+                if current_pids_set.contains(&parent) {
+                    descendant_pids.push(cand_pid);
+                    break;
+                }
+                curr = parent;
+            } else {
+                break;
+            }
+        }
+    }
+    for dpid in descendant_pids {
+        if !pids.contains(&dpid) {
+            crate::modules::logger::log_info(&format!(
+                "[Instance] Including descendant child process PID {} (renderer/helper/utility) for termination",
+                dpid
+            ));
+            pids.push(dpid);
+        }
     }
 
     crate::modules::logger::log_info(&format!(
@@ -813,6 +972,7 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
         crate::error::record_ignored(fs::remove_file(&dt_port), "remove file");
     }
     clear_stale_instance_lockfiles(&target_data_path);
+    crate::modules::process::sweep_orphan_language_servers();
 
     // Justification: registry flag update; live state is re-derived from the OS on next refresh
     crate::error::record_ignored(mark_instance_stopped(instance_id), "mark instance stopped");

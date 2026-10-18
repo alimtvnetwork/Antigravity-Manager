@@ -218,7 +218,7 @@ fn live_pid_is_instance_window(pid: u32, instance_id: &str, data_dir: &str) -> b
     command_is_instance_window(instance_id, data_dir, &name, &exe, &args)
 }
 
-fn first_live_window_pid(instance_id: &str, data_dir: &str) -> Option<u32> {
+pub(crate) fn first_live_window_pid(instance_id: &str, data_dir: &str) -> Option<u32> {
     let is_default = instance_id == "default" || instance_id == "__default__";
     let from_scan = find_pids_for_data_dir(data_dir, is_default)
         .into_iter()

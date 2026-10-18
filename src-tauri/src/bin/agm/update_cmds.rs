@@ -40,13 +40,61 @@ pub(crate) fn normalize_version_str(raw: &str) -> String {
     normalize_version_string(raw)
 }
 
+fn extract_version_from_token(token: &str) -> Option<String> {
+    let clean = token.trim().trim_matches(['\'', '"']);
+    if let Some(pos) = clean.find("/releases/tag/") {
+        let after_tag = &clean[pos + "/releases/tag/".len()..];
+        let tag_clean = after_tag
+            .trim_matches('/')
+            .trim_start_matches(['v', 'V'])
+            .trim();
+        if !tag_clean.is_empty()
+            && tag_clean
+                .chars()
+                .next()
+                .map(|c| c.is_ascii_digit())
+                .unwrap_or(false)
+        {
+            return Some(normalize_version_string(tag_clean));
+        }
+    }
+    if let Some(pos) = clean.find("/releases/download/") {
+        let after_dl = &clean[pos + "/releases/download/".len()..];
+        let tag_part = after_dl.split('/').next().unwrap_or(after_dl);
+        let tag_clean = tag_part
+            .trim_matches('/')
+            .trim_start_matches(['v', 'V'])
+            .trim();
+        if !tag_clean.is_empty()
+            && tag_clean
+                .chars()
+                .next()
+                .map(|c| c.is_ascii_digit())
+                .unwrap_or(false)
+        {
+            return Some(normalize_version_string(tag_clean));
+        }
+    }
+    let v = clean.trim_start_matches(['v', 'V']).trim();
+    if v.contains('.')
+        && v.chars()
+            .next()
+            .map(|c| c.is_ascii_digit())
+            .unwrap_or(false)
+    {
+        return Some(normalize_version_string(v));
+    }
+    None
+}
+
 /// Extract target version string from command-line arguments.
-/// Supports: 'to v4.162', '--to v4.162', '-to v4.162', 'revert v4.162', 'downgrade 4.162', '4.162', 'v4.162', '--version 4.162', '-v 4.162'.
+/// Supports: 'to v4.162', '--to v4.162', '-to v4.162', 'revert v4.162', 'downgrade 4.162', '4.162', 'v4.162', '--version 4.162', '-v 4.162',
+/// as well as GitHub release tag URLs (e.g. 'https://github.com/.../releases/tag/v4.226.3').
 pub(crate) fn extract_target_version(args: &[String]) -> Option<String> {
     let mut iter = args.iter().peekable();
     while let Some(arg) = iter.next() {
         let clean = arg.trim().trim_matches(['\'', '"']);
-        if clean.eq_ignore_ascii_case("to")
+        let is_prefix_keyword = clean.eq_ignore_ascii_case("to")
             || clean.eq_ignore_ascii_case("--to")
             || clean.eq_ignore_ascii_case("-to")
             || clean.eq_ignore_ascii_case("revert")
@@ -55,34 +103,13 @@ pub(crate) fn extract_target_version(args: &[String]) -> Option<String> {
             || clean.eq_ignore_ascii_case("downgrade")
             || clean.eq_ignore_ascii_case("--downgrade")
             || clean.eq_ignore_ascii_case("-downgrade")
-        {
+            || clean == "--version"
+            || clean == "-v";
+
+        if is_prefix_keyword {
             if let Some(next_arg) = iter.next() {
-                let v = next_arg
-                    .trim()
-                    .trim_matches(['\'', '"'])
-                    .trim_start_matches(['v', 'V']);
-                if !v.is_empty()
-                    && v.chars()
-                        .next()
-                        .map(|c| c.is_ascii_digit())
-                        .unwrap_or(false)
-                {
-                    return Some(normalize_version_string(v));
-                }
-            }
-        } else if clean == "--version" || clean == "-v" {
-            if let Some(next_arg) = iter.next() {
-                let v = next_arg
-                    .trim()
-                    .trim_matches(['\'', '"'])
-                    .trim_start_matches(['v', 'V']);
-                if !v.is_empty()
-                    && v.chars()
-                        .next()
-                        .map(|c| c.is_ascii_digit())
-                        .unwrap_or(false)
-                {
-                    return Some(normalize_version_string(v));
+                if let Some(ver) = extract_version_from_token(next_arg) {
+                    return Some(ver);
                 }
             }
         } else if let Some(stripped) = clean
@@ -95,36 +122,22 @@ pub(crate) fn extract_target_version(args: &[String]) -> Option<String> {
             .or_else(|| clean.strip_prefix("--downgrade="))
             .or_else(|| clean.strip_prefix("-downgrade="))
         {
-            let v = stripped
-                .trim()
-                .trim_matches(['\'', '"'])
-                .trim_start_matches(['v', 'V']);
-            if !v.is_empty()
-                && v.chars()
-                    .next()
-                    .map(|c| c.is_ascii_digit())
-                    .unwrap_or(false)
-            {
-                return Some(normalize_version_string(v));
+            if let Some(ver) = extract_version_from_token(stripped) {
+                return Some(ver);
             }
-        } else if !clean.starts_with('-')
-            && !clean.eq_ignore_ascii_case("all")
-            && !clean.eq_ignore_ascii_case("gitmap")
-            && !clean.eq_ignore_ascii_case("gm")
-            && !clean.eq_ignore_ascii_case("ssh")
-            && !clean.eq_ignore_ascii_case("export-zip")
-            && !clean.eq_ignore_ascii_case("help")
-        {
-            let v = clean
-                .trim_matches(['\'', '"'])
-                .trim_start_matches(['v', 'V']);
-            if v.contains('.')
-                && v.chars()
-                    .next()
-                    .map(|c| c.is_ascii_digit())
-                    .unwrap_or(false)
-            {
-                return Some(normalize_version_string(v));
+        } else {
+            let is_special_cmd = clean.starts_with('-')
+                || clean.eq_ignore_ascii_case("all")
+                || clean.eq_ignore_ascii_case("gitmap")
+                || clean.eq_ignore_ascii_case("gm")
+                || clean.eq_ignore_ascii_case("ssh")
+                || clean.eq_ignore_ascii_case("export-zip")
+                || clean.eq_ignore_ascii_case("help");
+
+            if !is_special_cmd {
+                if let Some(ver) = extract_version_from_token(clean) {
+                    return Some(ver);
+                }
             }
         }
     }
@@ -133,6 +146,7 @@ pub(crate) fn extract_target_version(args: &[String]) -> Option<String> {
 
 pub(crate) fn cmd_update(args: &[String]) {
     let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+    let is_interactive = !is_json;
     let is_help = args
         .iter()
         .any(|a| a == "--help" || a == "-h" || a == "help");
@@ -143,6 +157,8 @@ pub(crate) fn cmd_update(args: &[String]) {
         .any(|a| a.eq_ignore_ascii_case("gitmap") || a.eq_ignore_ascii_case("gm"));
     let is_ssh_fleet = args.iter().any(|a| a.eq_ignore_ascii_case("ssh"));
     let is_check = args.iter().any(|a| a == "--check" || a == "-c");
+    let is_execute_mode = !is_check;
+    let is_specialized_target = is_help || is_gitmap || is_ssh_fleet;
     let is_force = args.iter().any(|a| a == "--force" || a == "-f");
     let is_export_zip = args
         .iter()
@@ -230,8 +246,8 @@ pub(crate) fn cmd_update(args: &[String]) {
         return;
     }
 
-    if is_all && !is_check {
-        if !is_json {
+    if is_all && is_execute_mode {
+        if is_interactive {
             println!("[*] Checking GitMap CLI for updates (gitmap self-update)...");
         }
         // Justification: optional gitmap self-update during update-all is best-effort
@@ -241,7 +257,7 @@ pub(crate) fn cmd_update(args: &[String]) {
         );
     }
 
-    if !is_json {
+    if is_interactive {
         println!("[*] Checking GitHub for AGM updates...");
     }
 
@@ -276,7 +292,7 @@ pub(crate) fn cmd_update(args: &[String]) {
             || a == "--delegated-worker"
             || a == "--install-dir"
     });
-    if is_delegated_stage2 && !is_json && !is_check && !is_help && !is_gitmap && !is_ssh_fleet {
+    if is_delegated_stage2 && is_interactive && is_execute_mode && !is_specialized_target {
         let ok = antigravity_tools_lib::modules::delegate_updater::run_cli_update(args);
         std::process::exit(if ok { 0 } else { 1 });
     }
@@ -477,8 +493,8 @@ pub(crate) fn cmd_update(args: &[String]) {
     };
     let mut repo_pulled = false;
 
-    if is_all && is_git_repo && !is_check {
-        if !is_json {
+    if is_all && is_git_repo && is_execute_mode {
+        if is_interactive {
             println!(
                 "[*] Pulling latest repository commits (git pull origin {})...",
                 git_branch
@@ -493,14 +509,15 @@ pub(crate) fn cmd_update(args: &[String]) {
     }
 
     // Binary update if needed
-    let should_proceed_update = (!is_up_to_date || is_force || has_explicit_target) && !is_check;
+    let needs_update = !is_up_to_date || is_force || has_explicit_target;
+    let should_proceed_update = needs_update && is_execute_mode;
     if should_proceed_update {
         let export_path = crate::update_helpers::default_update_export_path();
         match crate::update_helpers::download_release_zip(&export_path, Some(&tag_name)) {
             Ok(()) => println!("EXPORT_ZIP={}", export_path.display()),
             Err(err) => eprintln!("[WARN] update zip was not saved: {}", err),
         }
-        if !is_json {
+        if is_interactive {
             if is_downgrade {
                 println!(
                     "[*] Target release requested: v{} -> v{} (revert/downgrade)",
@@ -537,7 +554,7 @@ pub(crate) fn cmd_update(args: &[String]) {
             let current_exe = std::env::current_exe().unwrap_or_default();
             let exe_str = current_exe.to_string_lossy().to_lowercase();
             let is_isolated_temp = exe_str.contains("agm-updater");
-            if !is_isolated_temp && !is_json {
+            if !is_isolated_temp && is_interactive {
                 println!(
                     "[*] Windows executable lock guard: Self-delegating to isolated updater in %TEMP%..."
                 );
@@ -561,7 +578,7 @@ pub(crate) fn cmd_update(args: &[String]) {
                 std::process::id(),
             );
 
-        if ui_running && !is_json {
+        if ui_running && is_interactive {
             println!(
                 "[*] Antigravity Manager UI is currently running. Delegating to 3-stage Update CLI (agm-update-cli -> agm update -> agm open-ui)..."
             );
@@ -736,6 +753,29 @@ mod tests {
         assert_eq!(
             extract_target_version(&["--version=4.162".to_string()]),
             Some("4.162.0".to_string())
+        );
+        assert_eq!(
+            extract_target_version(&[
+                "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v4.226.3"
+                    .to_string()
+            ]),
+            Some("4.226.3".to_string())
+        );
+        assert_eq!(
+            extract_target_version(&[
+                "to".to_string(),
+                "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v4.226.3"
+                    .to_string()
+            ]),
+            Some("4.226.3".to_string())
+        );
+        assert_eq!(
+            extract_target_version(&[
+                "--version".to_string(),
+                "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/4.226.3"
+                    .to_string()
+            ]),
+            Some("4.226.3".to_string())
         );
         assert_eq!(
             extract_target_version(&["all".to_string(), "--force".to_string()]),

@@ -1,7 +1,7 @@
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat } from 'lucide-react';
+import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, ChevronDown, ChevronUp, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat, MessageSquare } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import type { AgmConversationNode } from './types';
 import { formatSeqBadge, stripImagesFromPrompt } from './formatters';
@@ -37,6 +37,9 @@ function reportPromptActionError(err: unknown, source: string): void {
 export interface DetailHeaderProps {
     previewTab?: 'instruction' | 'results';
     setPreviewTab?: (v: 'instruction' | 'results') => void;
+    showAllWords?: boolean;
+    setShowAllWords?: (v: boolean | ((prev: boolean) => boolean)) => void;
+    isTruncated?: boolean;
     selectedConversation: AgmConversationNode;
     activePromptText: string;
     confirmationSuffix: string;
@@ -87,6 +90,8 @@ export interface DetailHeaderProps {
 
 export function DetailHeader(props: DetailHeaderProps) {
     const {
+        previewTab, setPreviewTab,
+        showAllWords, setShowAllWords, isTruncated,
         selectedConversation, activePromptText,
         confirmationSuffix, setConfirmationSuffix,
         conversationTargetMode = 'current', setConversationTargetMode,
@@ -444,6 +449,73 @@ export function DetailHeader(props: DetailHeaderProps) {
 
                 {/* Right: The Unified Segmented Dark-Glass Action Capsule & Details Trigger */}
                 <div className="flex items-center shrink-0 ml-auto gap-2">
+                    {/* Compact Input / Output Toggle Capsule */}
+                    {setPreviewTab && (
+                        <div className="inline-flex items-center rounded-md bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setPreviewTab('instruction')}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-2.5 py-1 rounded-l-md text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
+                                    previewTab === 'instruction'
+                                        ? "bg-blue-600 text-white shadow-2xs"
+                                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                                )}
+                                title="View Input Instruction"
+                            >
+                                <MessageSquare className="w-3.5 h-3.5" />
+                                <span>Input</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setPreviewTab('results')}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-2.5 py-1 rounded-r-md text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
+                                    previewTab === 'results'
+                                        ? "bg-blue-600 text-white shadow-2xs"
+                                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                                )}
+                                title="View Output Results"
+                            >
+                                {selectedConversation?.is_running ? (
+                                    <span className="relative flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[#1af18d]"></span>
+                                    </span>
+                                ) : (
+                                    <Terminal className="w-3.5 h-3.5 text-cyan-500" />
+                                )}
+                                <span>Output</span>
+                                {(selectedConversation?.execution_results || selectedConversation?.latest_response) && (
+                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                                )}
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Adjacent Expand Full Toggle */}
+                    {setShowAllWords && previewTab === 'instruction' && (isTruncated || activePromptText.trim().endsWith('...') || activePromptText.trim().endsWith('…') || showAllWords) && (
+                        <button
+                            type="button"
+                            onClick={() => setShowAllWords(!showAllWords)}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-500/20 hover:bg-cyan-500/20 transition-all cursor-pointer shadow-2xs"
+                            title={showAllWords ? 'Collapse full prompt text' : 'Expand full prompt text'}
+                        >
+                            {showAllWords ? (
+                                <>
+                                    <ChevronUp className="w-3 h-3" />
+                                    <span>Collapse</span>
+                                </>
+                            ) : (
+                                <>
+                                    <ChevronDown className="w-3 h-3" />
+                                    <span>Expand Full</span>
+                                </>
+                            )}
+                        </button>
+                    )}
+
                     {/* Restored Prominent Details Button */}
                     {setIsDetailsModalOpen && (
                         <button
@@ -457,7 +529,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                         </button>
                     )}
 
-                    <div className="relative flex items-center rounded-lg bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
+                    <div className="relative flex items-center rounded-md bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
                         {/* Segment 1: Dual Copy Buttons (Copy with images + Copy without images as text + Options chevron) */}
                         <div className="flex items-center divide-x divide-slate-200/70 dark:divide-purple-500/20">
                             {/* Primary Button: Copy with images (Rich HTML + binary PNG) */}

@@ -61,6 +61,7 @@ export interface TreePanelProps {
     onResendPrompts?: (count: number | 'all') => void;
     onEnqueue?: () => void;
     onRerunConversation?: (convoId: string, nudgeType: string) => void;
+    onProjectContextMenu?: (e: React.MouseEvent, repoName: string, project?: AgmProjectTreeNode) => void;
 }
 
 export function TreePanel(props: TreePanelProps) {
@@ -103,6 +104,7 @@ export function TreePanel(props: TreePanelProps) {
         onResendPrompts,
         onEnqueue,
         onRerunConversation,
+        onProjectContextMenu,
     } = props;
 
     const [subLoading, setSubLoading] = useState(promptTreeLoadingEmitter.isLoading);
@@ -127,6 +129,12 @@ export function TreePanel(props: TreePanelProps) {
         setSelectedProjectScope('all');
     };
 
+    const handleProjectContextMenu = onProjectContextMenu
+        ? (e: React.MouseEvent, repoName: string, project?: AgmProjectTreeNode) => {
+              onProjectContextMenu(e, repoName, project);
+          }
+        : undefined;
+
     const renderProject = (project: AgmProjectTreeNode) => (
         <ProjectNode
             key={project.project_id}
@@ -150,6 +158,7 @@ export function TreePanel(props: TreePanelProps) {
             onRefresh={onRefreshProject}
             onTogglePin={onTogglePin}
             onToggleArchive={onToggleArchive}
+            onProjectContextMenu={handleProjectContextMenu}
             onRenameConversation={onRenameConversation}
             onResendPrompts={onResendPrompts}
             onEnqueue={onEnqueue}

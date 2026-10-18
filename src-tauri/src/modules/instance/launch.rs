@@ -372,10 +372,11 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
             "reinject_prompts": reinject_prompts,
         })
         .to_string();
-        audit.succeed_with_payload(
-            &format!("Instance {} launched (PID {})", instance_id, actual_pid),
-            &payload,
-        );
+        let primary_pid = Some(actual_pid);
+        audit.succeed(&format!(
+            "Launched instance {} (PID: {:?})",
+            instance_id, primary_pid
+        ));
         crate::modules::task_history_db::record(
             crate::modules::audit_action::AuditAction::StartInstance,
             &inst_config.name,
@@ -699,13 +700,15 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
                                     "reinject_prompts": reinject_prompts,
                                 })
                                 .to_string();
-                                audit.succeed_with_payload(
-                                    &format!(
-                                        "Instance {} launched via shell ladder (PID {})",
-                                        instance_id, detected_pid
-                                    ),
-                                    &payload,
-                                );
+                                let primary_pid = if detected_pid > 0 {
+                                    Some(detected_pid)
+                                } else {
+                                    None
+                                };
+                                audit.succeed(&format!(
+                                    "Launched instance {} (PID: {:?})",
+                                    instance_id, primary_pid
+                                ));
                                 crate::modules::task_history_db::record(
                                     crate::modules::audit_action::AuditAction::StartInstance,
                                     &inst_config.name,
@@ -730,6 +733,7 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
 
         // Justification: PID cache bookkeeping; staleness is tolerated via the OS-level re-detect fallback
         let spawned_pid = child.id();
+        let primary_pid = Some(spawned_pid);
         record_spawned_instance_process(instance_id, &data_dir, reinject_prompts, spawned_pid)?;
         spawn_security_notice_dismisser(
             target_data_path.clone(),
@@ -744,10 +748,10 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
             "reinject_prompts": reinject_prompts,
         })
         .to_string();
-        audit.succeed_with_payload(
-            &format!("Instance {} launched (PID {})", instance_id, spawned_pid),
-            &payload,
-        );
+        audit.succeed(&format!(
+            "Launched instance {} (PID: {:?})",
+            instance_id, primary_pid
+        ));
         crate::modules::task_history_db::record(
             crate::modules::audit_action::AuditAction::StartInstance,
             &inst_config.name,

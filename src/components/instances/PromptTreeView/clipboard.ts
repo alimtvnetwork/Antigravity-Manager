@@ -255,10 +255,10 @@ export async function copyPromptWithRichImages(
             })
             // Inline code
             .replace(/`([^`]+)`/g, '<code style="background:#282a36;color:#50fa7b;padding:2px 4px;border-radius:3px;font-family:monospace;">$1</code>')
-            // Markdown image syntax: ![alt](url)
+            // Markdown image syntax: ![alt](url) -> formatted paragraph image
             .replace(/!\[(.*?)\]\((.*?)\)/g, (_m, alt, src) => {
                 const cleanSrc = src.trim();
-                return `<div style="margin:12px 0;"><img src="${cleanSrc}" alt="${alt || 'image'}" style="max-width:100%;height:auto;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.15);display:block;" /></div>`;
+                return `<p style="margin:12px 0;"><img src="${cleanSrc}" alt="${alt || 'image'}" style="max-width:100%;height:auto;border-radius:6px;display:block;box-shadow:0 2px 8px rgba(0,0,0,0.15);" /></p>`;
             })
             // Paragraphs and line breaks
             .replace(/\n\n+/g, '</p><p style="margin:8px 0;line-height:1.6;">')
@@ -318,6 +318,98 @@ export async function copyPromptWithRichImages(
             showToast({ message: msg, type: 'info' });
             return true;
         }
+        onError?.(err);
+        return false;
+    }
+}
+
+/**
+ * Strips all markdown image tags (![alt](url/dataUri)) and optional trailing image-only lines from prompt text,
+ * copying a clean plain-text version to clipboard.
+ */
+export async function copyPromptCleanText(
+    markdownText: string,
+    onSuccess?: (message: string) => void,
+    onError?: (err: unknown) => void
+): Promise<boolean> {
+    if (!markdownText || !markdownText.trim()) {
+        return false;
+    }
+
+    try {
+        // Strip markdown images: ![alt](src)
+        const cleanText = markdownText
+            .replace(/!\[.*?\]\((?:data:image\/[^;]+;base64,[A-Za-z0-9+/=]+|https?:\/\/[^\s)]+|[^\s)]+?\.(?:png|jpe?g|gif|webp|svg))\)/gi, '')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+
+        const success = await copyToClipboard(cleanText);
+        if (success) {
+            const msg = 'Copied clean prompt text (without images) to clipboard!';
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'success' });
+            return true;
+        }
+        return false;
+    } catch (err) {
+        useErrorStore.getState().trackWarning(err, {
+            source: 'clipboard.copyPromptCleanText',
+            triggerAction: 'copy_prompt_clean_text',
+        });
+        onError?.(err);
+        return false;
+    }
+}
+
+/**
+ * Copies multiple image URIs into clipboard memory as rich HTML (<p><img src="..." /></p>)
+ * alongside plain text URIs.
+ */
+export async function copyAllImagesAsRichHtml(
+    images: string[],
+    onSuccess?: (msg: string) => void,
+    onError?: (err: unknown) => void
+): Promise<boolean> {
+    if (!images || images.length === 0) {
+        return false;
+    }
+    const cleanImages = images.map((img) => img.trim()).filter(Boolean);
+    if (cleanImages.length === 0) {
+        return false;
+    }
+
+    const htmlBody = cleanImages.map((src) => `<p><img src="${src}" /></p>`).join('');
+    const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${htmlBody}</body></html>`;
+    const plainText = cleanImages.join('\n');
+
+    try {
+        if (navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+            const htmlBlob = new Blob([fullHtml], { type: 'text/html' });
+            const textBlob = new Blob([plainText], { type: 'text/plain' });
+            const item = new ClipboardItem({
+                'text/html': htmlBlob,
+                'text/plain': textBlob,
+            });
+            await navigator.clipboard.write([item]);
+            const msg = `Copied ${cleanImages.length} image(s) as rich HTML to clipboard!`;
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'success' });
+            return true;
+        }
+
+        const success = await copyToClipboard(plainText);
+        if (success) {
+            const msg = `Copied ${cleanImages.length} image URL(s) to clipboard!`;
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'info' });
+            return true;
+        }
+        return false;
+    } catch (err) {
+        useErrorStore.getState().trackWarning(err, {
+            source: 'clipboard.copyAllImagesAsRichHtml',
+            triggerAction: 'copy_all_images_html',
+        });
         onError?.(err);
         return false;
     }

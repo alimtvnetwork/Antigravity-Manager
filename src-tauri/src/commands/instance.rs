@@ -51,7 +51,20 @@ pub fn create_instance(
 }
 
 #[tauri::command]
-pub fn stop_instance(instance_id: String) -> Result<(), String> {
+pub fn stop_instance(instance_id: String, target_pid: Option<u32>) -> Result<(), String> {
+    if let Some(pid) = target_pid {
+        if pid > 0 {
+            if let Ok(reg) = instance::load_registry() {
+                if let Some(inst) = reg.instances.iter().find(|i| i.id == instance_id) {
+                    // Justification: best effort recording of target pid before stopping
+                    crate::error::record_ignored(
+                        instance::record_instance_pid(&instance_id, pid, &inst.data_dir),
+                        "record target pid before stop",
+                    );
+                }
+            }
+        }
+    }
     instance::stop_instance(&instance_id)?;
     if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
         use tauri::Emitter;
@@ -138,6 +151,24 @@ pub async fn fast_forward_instance(instance_id: String) -> Result<String, String
         }),
         "audit fast_forward_instance",
     );
+
+    let status = if res.is_ok() {
+        crate::modules::task_history_db::AuditTaskStatus::Succeeded
+    } else {
+        crate::modules::task_history_db::AuditTaskStatus::Failed
+    };
+    let detail = match &res {
+        Ok(msg) => msg.clone(),
+        Err(err) => format!("Fast-forward rotation failed: {err}"),
+    };
+    crate::modules::task_history_db::record_instance_lifecycle_event_with_status(
+        crate::modules::audit_action::AuditAction::SwitchAccount,
+        Some(&instance_id),
+        &format!("Fast-forward rotation for {}", instance_id),
+        status,
+        &detail,
+    );
+
     res
 }
 

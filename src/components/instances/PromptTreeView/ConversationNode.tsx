@@ -67,6 +67,9 @@ export function ConversationNode({
     const promptCategory = classifyPromptTier(conv.prompt_preview_200w, conv.title, conv);
     const IconComponent = getTierIcon(promptCategory.tier);
     const hasPrompts = Boolean(conv.prompts && conv.prompts.length > 0);
+    const enqueuedTurnsCount = conv.prompts
+        ? conv.prompts.filter((p) => Boolean(p.is_queued) || p.status?.toUpperCase() === 'QUEUED').length
+        : 0;
 
     const handleSaveTitle = async (draftTitle: string) => {
         setIsEditingTitle(false);
@@ -114,7 +117,7 @@ export function ConversationNode({
                 tabIndex={0}
                 onClick={() => {
                     setSelectedTurnNumber(null);
-                    onSelect(conv, project);
+                    onSelect({ ...conv, selected_turn_number: null }, project);
                 }}
                 onDoubleClick={() => onOpenInspector(conv, project.repo_path)}
                 onKeyDown={(e) => {
@@ -131,7 +134,7 @@ export function ConversationNode({
                     setContextMenuPos({ x: e.clientX, y: e.clientY });
                 }}
                 className={cn(
-                    'group flex items-center justify-between rounded-[5px] px-2 py-1.5 text-xs cursor-pointer transition-colors relative outline-none focus-visible:ring-1 focus-visible:ring-cyan-500/50',
+                    'group flex items-center justify-between rounded-md px-2 py-1.5 text-xs cursor-pointer transition-colors relative outline-none focus-visible:ring-1 focus-visible:ring-cyan-500/50',
                     isSelected && selectedTurnNumber === null
                         ? 'bg-blue-600 text-white font-medium shadow-2xs'
                         : isSelected
@@ -165,7 +168,7 @@ export function ConversationNode({
                     </span>
                     <span
                         className={cn(
-                            'text-[9px] font-mono px-1 py-0.2 rounded-[3px] shrink-0 font-medium whitespace-nowrap',
+                            'text-[9px] font-mono px-1 py-0.2 rounded-xs shrink-0 font-medium whitespace-nowrap',
                             isSelected
                                 ? 'bg-blue-700/80 text-white'
                                 : 'bg-slate-200/90 dark:bg-[#40285e] text-slate-600 dark:text-cyan-300'
@@ -177,7 +180,7 @@ export function ConversationNode({
                     {(conv.repeat_badge || (conv.repeat_count && conv.repeat_count > 1)) && (
                         <span
                             className={cn(
-                                "px-1.5 py-0.2 rounded-full text-[8.5px] font-mono font-bold shrink-0 border",
+                                "px-1.5 py-0.2 rounded-md text-[8.5px] font-mono font-bold shrink-0 border",
                                 isSelected
                                     ? "bg-amber-300 text-amber-950 border-amber-200"
                                     : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
@@ -232,8 +235,8 @@ export function ConversationNode({
                 <div className="flex items-center gap-1.5 shrink-0">
                     {isRunning && (
                         <span className={cn(
-                            "flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[8.5px] font-bold font-mono border animate-pulse",
-                            isSelected
+                            "flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[8.5px] font-bold font-mono border animate-pulse",
+                            isSelected && selectedTurnNumber === null
                                 ? "bg-emerald-400 text-emerald-950 border-emerald-300"
                                 : "bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border-emerald-500/40"
                         )}>
@@ -243,13 +246,27 @@ export function ConversationNode({
                     )}
                     {isQueued && !isRunning && (
                         <span className={cn(
-                            "flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[8.5px] font-bold font-mono border",
-                            isSelected
+                            "flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[8.5px] font-bold font-mono border",
+                            isSelected && selectedTurnNumber === null
                                 ? "bg-amber-300 text-amber-950 border-amber-200"
                                 : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40"
                         )}>
                             <Clock className="w-2.5 h-2.5 text-amber-500" />
                             <span>QUEUED</span>
+                        </span>
+                    )}
+                    {enqueuedTurnsCount > 0 && (isRunning || !isQueued || enqueuedTurnsCount > 1) && (
+                        <span
+                            className={cn(
+                                "flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[8.5px] font-bold font-mono border",
+                                isSelected && selectedTurnNumber === null
+                                    ? "bg-amber-300 text-amber-950 border-amber-200"
+                                    : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40"
+                            )}
+                            title={`${enqueuedTurnsCount} prompt(s) enqueued in FIFO queue`}
+                        >
+                            <Clock className="w-2.5 h-2.5 text-amber-500" />
+                            <span>+{enqueuedTurnsCount} queued</span>
                         </span>
                     )}
                 </div>
@@ -270,6 +287,7 @@ export function ConversationNode({
                             is_running: turn.is_running,
                             is_queued: turn.is_queued,
                             status: turn.status,
+                            selected_turn_number: turn.turn_number,
                         });
 
                         return (
@@ -299,7 +317,7 @@ export function ConversationNode({
                                     setTurnMenuPos({ x: e.clientX, y: e.clientY, turnConv: createTurnConv() });
                                 }}
                                 className={cn(
-                                    "group/turn flex items-center justify-between rounded-[4px] px-1.5 py-1 text-xs cursor-pointer transition-colors outline-none focus-visible:ring-1 focus-visible:ring-sky-500/50",
+                                    "group/turn flex items-center justify-between rounded-md px-1.5 py-1 text-xs cursor-pointer transition-colors outline-none focus-visible:ring-1 focus-visible:ring-sky-500/50",
                                     isTurnActive
                                         ? "bg-sky-500/10 border-l-2 border-sky-500 text-sky-400 font-medium"
                                         : "hover:bg-slate-100 dark:hover:bg-[#1a1228]"
@@ -312,13 +330,13 @@ export function ConversationNode({
                                         {isLastTurn ? '└──' : '↳'}
                                     </span>
                                     {/* Turn ID badge */}
-                                    <span className="font-mono text-[9px] px-1 py-0.2 rounded bg-slate-200 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold shrink-0">
+                                    <span className="font-mono text-[9px] px-1 py-0.2 rounded-xs bg-slate-200 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold shrink-0">
                                         T{turn.turn_number}
                                     </span>
                                     {/* Media chips if images present */}
                                     {hasImages && (
                                         <span
-                                            className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[9px] bg-sky-500/10 text-sky-600 dark:text-sky-300 border border-sky-500/30 shrink-0 font-medium"
+                                            className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded-xs text-[9px] bg-sky-500/10 text-sky-600 dark:text-sky-300 border border-sky-500/30 shrink-0 font-medium"
                                             title={`Attached images (${turn.media_paths.length}):\n${turn.media_paths.join('\n')}`}
                                         >
                                             🖼️ {turn.media_paths.length}
@@ -332,12 +350,12 @@ export function ConversationNode({
                                 {/* Status Badges */}
                                 <div className="flex items-center gap-1 shrink-0">
                                     {turn.is_running ? (
-                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shrink-0 font-bold">
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shrink-0 font-bold">
                                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
                                             RUNNING
                                         </span>
                                     ) : turn.is_queued ? (
-                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0 font-bold">
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0 font-bold">
                                             <Clock className="w-2.5 h-2.5 text-amber-500" />
                                             QUEUED
                                         </span>

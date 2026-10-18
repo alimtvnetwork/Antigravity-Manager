@@ -202,17 +202,32 @@ function Resolve-PinnedVersion {
         } elseif ($env:INSTALLER_VERSION) {
             $ExplicitVersion = $env:INSTALLER_VERSION
         } elseif ($args -and $args.Count -gt 0) {
-            if ($args[0] -match '^[vV]?[0-9]+\.[0-9]+') {
+            if ($args[0] -match '(?i)(?:releases/tag/|releases/download/)(?:v)?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/?') {
+                $ExplicitVersion = $Matches[1]
+                $global:isPinned = $true
+            } elseif ($args[0] -match '^[vV]?[0-9]+\.[0-9]+') {
                 $ExplicitVersion = $args[0]
             }
         }
     }
     if ($ExplicitVersion -and $ExplicitVersion -ne "latest") {
+        # Check if ExplicitVersion is a GitHub release tag URL, e.g. https://github.com/.../releases/tag/v4.226.3
+        if ($ExplicitVersion -match '(?i)(?:releases/tag/|releases/download/)(?:v)?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/?') {
+            $clean = $Matches[1]
+            $parts = $clean.Split("-")[0].Split(".")
+            if ($parts.Length -eq 2) {
+                $clean = "$clean.0"
+            }
+            $global:isPinned = $true
+            Write-Step "Detected pinned release version from tag URL: v$clean"
+            return $clean
+        }
         $clean = ($ExplicitVersion -replace "^v", "").Trim()
         $parts = $clean.Split("-")[0].Split(".")
         if ($parts.Length -eq 2) {
             $clean = "$clean.0"
         }
+        $global:isPinned = $true
         return $clean
     }
     if ($BakedVersion) {
@@ -223,12 +238,14 @@ function Resolve-PinnedVersion {
             if ($parts.Length -eq 2) {
                 $clean = "$clean.0"
             }
+            $global:isPinned = $true
             return $clean
         }
     }
     $entries = Get-InvocationHistoryCandidates
     $regexes = @(
         '(?i)(?:Antigravity-Manager/releases/download/|raw\.githubusercontent\.com/[^/]+/Antigravity-Manager/)(?:v)?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/',
+        '(?i)(?:github\.com/[^/]+/Antigravity-Manager/releases/tag/|Antigravity-Manager/releases/tag/)(?:v)?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/?',
         '(?i)Antigravity-Manager.*-(?:Version|-version)\s+["'']?v?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/?',
         '(?i)AGM_VERSION\s*=\s*["'']?v?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)/?'
     )
@@ -244,6 +261,7 @@ function Resolve-PinnedVersion {
                     $detected = "$detected.0"
                 }
                 Write-Step "Detected pinned version from download URL / invocation: v$detected"
+                $global:isPinned = $true
                 return $detected
             }
         }
@@ -255,6 +273,7 @@ function Resolve-PinnedVersion {
 $resolvedPin = Resolve-PinnedVersion -ExplicitVersion $Version -BakedVersion $PinnedVersion
 if ($resolvedPin) {
     $Version = $resolvedPin
+    $isPinned = $true
 }
 
 # Resolve Architecture
@@ -473,6 +492,9 @@ function Sync-InstalledAppsRegistryBranding {
             if ($fvi.ProductVersion) { $resolvedVer = ($fvi.ProductVersion -replace '^v', '').Trim() }
             elseif ($fvi.FileVersion) { $resolvedVer = ($fvi.FileVersion -replace '^v', '').Trim() }
         } catch {}
+    }
+    if (-not $resolvedVer) {
+        $resolvedVer = Get-InstalledVersion
     }
 
     $publisher = "Maintained by Alim, Sponsored by RISEUP ASIA LLC"
@@ -930,9 +952,27 @@ if ($Uninstall) {
 function Get-InstalledVersion {
     # Stage 1: Inspect Live Running Process Executables via PE Header
     try {
-        $runningProcs = Get-Process "agm-alim", "Antigravity Tools", "antigravity-tools", "Antigravity Manager Tools", "agm-ui", "agm" -ErrorAction SilentlyContinue
+        $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+            $_.Name -match '(?i)^(agm-alim|antigravity.*|agm)\.exe$'
+        }
+        foreach ($proc in $procs) {
+            $pPath = $proc.ExecutablePath
+            if ($pPath -and (Test-Path $pPath)) {
+                $fvi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($pPath)
+                $ver = if ($fvi.ProductVersion) { $fvi.ProductVersion } else { $fvi.FileVersion }
+                if ($ver) { return ($ver -replace '^v', '').Trim() }
+            }
+        }
+    } catch {}
+
+    try {
+        $runningProcs = Get-Process "agm-alim", "Antigravity Tools", "antigravity-tools", "Antigravity Manager Tools", "AGM by Alim", "agm-ui", "agm" -ErrorAction SilentlyContinue
         foreach ($p in $runningProcs) {
-            $pPath = $p.Path
+            $pPath = $null
+            try { $pPath = $p.Path } catch {}
+            if (-not $pPath) {
+                try { $pPath = $p.MainModule.FileName } catch {}
+            }
             if ($pPath -and (Test-Path $pPath)) {
                 $fvi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($pPath)
                 $ver = if ($fvi.ProductVersion) { $fvi.ProductVersion } else { $fvi.FileVersion }
@@ -952,12 +992,13 @@ function Get-InstalledVersion {
         (Join-Path $InstallDir "antigravity-tools.exe"),
         (Join-Path $InstallDir "agm.exe")
     )
+    $diskVersions = [System.Collections.Generic.List[string]]::new()
     foreach ($exe in $candidateExes) {
         if (Test-Path $exe) {
             try {
                 $fvi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
                 $ver = if ($fvi.ProductVersion) { $fvi.ProductVersion } else { $fvi.FileVersion }
-                if ($ver) { return ($ver -replace '^v', '').Trim() }
+                if ($ver) { $diskVersions.Add(($ver -replace '^v', '').Trim()) }
             } catch {}
         }
     }
@@ -981,15 +1022,20 @@ function Get-InstalledVersion {
     )
     foreach ($dir in $prevDirs) {
         if (Test-Path $dir) {
-            $foundExe = Get-ChildItem -Path $dir -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*uninstall*" -and $_.Name -notlike "*setup*" } | Select-Object -First 1
-            if ($foundExe) {
+            $foundExes = Get-ChildItem -Path $dir -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*uninstall*" -and $_.Name -notlike "*setup*" }
+            foreach ($foundExe in $foundExes) {
                 try {
                     $fvi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($foundExe.FullName)
                     $ver = if ($fvi.ProductVersion) { $fvi.ProductVersion } else { $fvi.FileVersion }
-                    if ($ver) { return ($ver -replace '^v', '').Trim() }
+                    if ($ver) { $diskVersions.Add(($ver -replace '^v', '').Trim()) }
                 } catch {}
             }
         }
+    }
+    if ($diskVersions.Count -gt 0) {
+        # Sort descending by SemVer to always prefer the newest installed version on disk over stale 4.190 installs
+        $sorted = @($diskVersions | Sort-Object -Descending -Property { Convert-ToSemVer $_ })
+        return $sorted[0]
     }
 
     # Stage 4: Windows Registry Uninstall Fallback
@@ -998,15 +1044,20 @@ function Get-InstalledVersion {
         "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
         "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
     )
+    $regVersions = [System.Collections.Generic.List[string]]::new()
     foreach ($regPath in $regPaths) {
         $entries = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue | Where-Object {
             $_.DisplayName -match '(?i)(Antigravity Manager Tools|agm-alim|AGM by Alim|Antigravity Tools)'
         }
         foreach ($entry in $entries) {
             if ($entry.DisplayVersion) {
-                return ($entry.DisplayVersion -replace '^v', '').Trim()
+                $regVersions.Add(($entry.DisplayVersion -replace '^v', '').Trim())
             }
         }
+    }
+    if ($regVersions.Count -gt 0) {
+        $sortedReg = @($regVersions | Sort-Object -Descending -Property { Convert-ToSemVer $_ })
+        return $sortedReg[0]
     }
 
     return ""
@@ -1614,6 +1665,8 @@ if ($CurrentVersion) {
     Write-Step "Target release version   : v$TargetVersion (Architecture: $Arch)"
     if ($CurrentVersion -eq $TargetVersion) {
         Write-Step "Migration mode           : Reinstalling / Updating v$TargetVersion"
+    } elseif ((Convert-ToSemVer $TargetVersion) -lt (Convert-ToSemVer $CurrentVersion)) {
+        Write-Step "Migration path           : v$CurrentVersion -> v$TargetVersion (Downgrading/Reverting to pinned version)"
     } else {
         Write-Step "Migration path           : v$CurrentVersion -> v$TargetVersion"
     }

@@ -26,7 +26,7 @@ export interface InstanceState {
     cloneInstanceExecutable: (instanceId: string) => Promise<string>;
     setInstanceExecutable: (instanceId: string, executablePath?: string) => Promise<void>;
     closeInstance: (instanceId: string) => Promise<void>;
-    stopInstance: (instanceId: string) => Promise<void>;
+    stopInstance: (instanceId: string, targetPid?: number) => Promise<void>;
     restartInstance: (instanceId: string) => Promise<InstanceStatus>;
     fastForwardInstance: (instanceId: string) => Promise<string>;
     toggleAutoSwitcher: () => Promise<void>;

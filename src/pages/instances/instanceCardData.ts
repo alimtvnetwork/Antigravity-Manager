@@ -96,7 +96,7 @@ export function useInstanceCardData(
             const hasGenuineRunningConv = (node.conversations || []).some(
                 (c) =>
                     Boolean(c.is_running) &&
-                    isConversationOwnedByInstance(c.instance_id, inst.config) &&
+                    (c.instance_id === inst.config.id || (!c.instance_id && inst.config.id === 'default')) &&
                     !isGhostConversation(c) &&
                     !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
             );
