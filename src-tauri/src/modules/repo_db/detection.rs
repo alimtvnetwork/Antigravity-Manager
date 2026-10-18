@@ -323,22 +323,37 @@ pub fn detect_running_projects(instance_id: &str) -> Result<Vec<RunningProject>,
     Ok(projects)
 }
 
-/// Extract image data URI, file path, or markdown image reference from text
-pub fn extract_image_payload_or_path(content: &str) -> (Option<String>, Vec<String>) {
+/// Extract ALL image data URIs and file paths from text.
+///
+/// Returns `(data_uris, file_paths)`:
+/// - `data_uris`: every `data:image/` URI found, verbatim (byte-identical, no
+///   re-encoding), in document order, deduplicated.
+/// - `file_paths`: every local image path reference, as before.
+///
+/// This is the multi-image successor of `extract_image_payload_or_path`,
+/// which only captured the FIRST data URI and silently dropped the rest.
+pub fn extract_image_uris_or_paths(content: &str) -> (Vec<String>, Vec<String>) {
+    let mut data_uris: Vec<String> = Vec::new();
     let mut found_paths: Vec<String> = Vec::new();
-    let mut raw_payload = None;
 
-    if content.contains("data:image/") {
-        if let Some(start) = content.find("data:image/") {
-            let tail = &content[start..];
-            let end = tail
-                .find('"')
-                .or_else(|| tail.find('\''))
-                .or_else(|| tail.find(' '))
-                .or_else(|| tail.find(')'))
-                .unwrap_or(tail.len());
-            raw_payload = Some(tail[..end].to_string());
+    // Collect every data:image/ URI in document order.
+    let mut search_from = 0;
+    while let Some(rel) = content[search_from..].find("data:image/") {
+        let start = search_from + rel;
+        let tail = &content[start..];
+        let end = tail
+            .find('"')
+            .or_else(|| tail.find('\''))
+            .or_else(|| tail.find(' '))
+            .or_else(|| tail.find(')'))
+            .unwrap_or(tail.len());
+        // "data:image/" itself is 11 bytes, so `end >= 11` and the cursor
+        // always advances — no infinite loop.
+        let uri = tail[..end].to_string();
+        if !data_uris.contains(&uri) {
+            data_uris.push(uri);
         }
+        search_from = start + end;
     }
 
     let img_exts = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".bmp"];
@@ -363,6 +378,93 @@ pub fn extract_image_payload_or_path(content: &str) -> (Option<String>, Vec<Stri
             }
         }
     }
+
+    (data_uris, found_paths)
+}
+
+/// Serialize extracted data URIs for the single-TEXT `image_payload` /
+/// `images_payload` columns.
+///
+/// - 0 URIs → `None`
+/// - 1 URI → the URI verbatim (legacy single-string format, byte-identical)
+/// - 2+ URIs → JSON array string, so no URI is silently dropped
+pub fn serialize_image_uris(uris: &[String]) -> Option<String> {
+    match uris.len() {
+        0 => None,
+        1 => Some(uris[0].clone()),
+        _ => serde_json::to_string(uris).ok(),
+    }
+}
+
+/// Parse a stored `image_payload` / `images_payload` value back into URIs.
+///
+/// Handles both the legacy verbatim single-URI format and the JSON array
+/// format produced by `serialize_image_uris` for multi-image prompts.
+pub fn parse_image_uris(payload: &str) -> Vec<String> {
+    let trimmed = payload.trim();
+    if trimmed.starts_with('[') {
+        if let Ok(uris) = serde_json::from_str::<Vec<String>>(trimmed) {
+            return uris;
+        }
+    }
+    if trimmed.is_empty() {
+        Vec::new()
+    } else {
+        vec![trimmed.to_string()]
+    }
+}
+
+/// Resolve the effective image URIs for a prompt: the stored payload wins
+/// (parsed back into URIs); otherwise the freshly extracted URIs are used.
+/// File paths travel in the separate `image_paths` channel and are not
+/// included here.
+pub fn effective_image_uris(
+    stored_payload: Option<&str>,
+    extracted_uris: Vec<String>,
+) -> Vec<String> {
+    match stored_payload {
+        Some(s) => {
+            let parsed = parse_image_uris(s);
+            if parsed.is_empty() {
+                extracted_uris
+            } else {
+                parsed
+            }
+        }
+        None => extracted_uris,
+    }
+}
+
+/// Compose the storable single-TEXT `image_payload` value from a stored
+/// payload, freshly extracted URIs, and file paths.
+///
+/// Precedence: stored payload → extracted URIs → legacy joined-paths fallback
+/// (preserves the historical behavior where paths-only prompts stored
+/// `"p1;p2"` in `image_payload`) → `None`.
+pub fn compose_image_payload(
+    stored: Option<&str>,
+    extracted_uris: Vec<String>,
+    paths: &[String],
+) -> Option<String> {
+    let uris = effective_image_uris(stored, extracted_uris);
+    if let Some(ser) = serialize_image_uris(&uris) {
+        return Some(ser);
+    }
+    if paths.is_empty() {
+        None
+    } else {
+        Some(paths.join(";"))
+    }
+}
+
+/// Extract image data URI, file path, or markdown image reference from text.
+///
+/// Backward-compatible wrapper: returns the FIRST `data:image/` URI (legacy
+/// behavior) plus all file paths. New code that needs every image should use
+/// `extract_image_uris_or_paths` instead.
+pub fn extract_image_payload_or_path(content: &str) -> (Option<String>, Vec<String>) {
+    let (uris, found_paths) = extract_image_uris_or_paths(content);
+    let mut raw_payload = uris.into_iter().next();
 
     if raw_payload.is_none() && !found_paths.is_empty() {
         raw_payload = Some(found_paths.join(";"));

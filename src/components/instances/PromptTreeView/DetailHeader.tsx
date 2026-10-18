@@ -206,6 +206,55 @@ export function DetailHeader(props: DetailHeaderProps) {
     const [isRerunning, setIsRerunning] = useState(false);
     const [rerunFlash, setRerunFlash] = useState<string | null>(null);
 
+    // RERUN WITH IMAGE (spec 154 §2.1): attached image staged in the flyout.
+    const [attachedImage, setAttachedImage] = useState<{
+        path: string;
+        dataUri: string;
+        fileName: string;
+        byteSize: number;
+    } | null>(null);
+    const [isAttachingImage, setIsAttachingImage] = useState(false);
+
+    // Drop a stale attachment when the user switches conversations.
+    useEffect(() => {
+        setAttachedImage(null);
+    }, [selectedConversation.conversation_id]);
+
+    const handleAttachRerunImage = async (): Promise<void> => {
+        if (isAttachingImage) return;
+        setIsAttachingImage(true);
+        try {
+            const { open } = await import('@tauri-apps/plugin-dialog');
+            const selected = await open({
+                multiple: false,
+                filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'] }],
+            });
+            // Cancelled: flyout stays open, no error, no state change.
+            if (!selected) return;
+            const filePath = typeof selected === 'string' ? selected : selected[0];
+            if (!filePath) return;
+            // read_image_as_base64 enforces the 100MB cap backend-side
+            // ("file_too_large"); over-cap rejects here -> error-store toast,
+            // flyout stays open (spec §2.1).
+            const dataUri = await invoke<string>('read_image_as_base64', { path: filePath });
+            if (!dataUri || !dataUri.startsWith('data:image/')) {
+                throw new Error('read_image_as_base64 returned an unexpected payload');
+            }
+            const commaIdx = dataUri.indexOf(',');
+            const b64 = commaIdx >= 0 ? dataUri.slice(commaIdx + 1) : '';
+            const byteSize = Math.floor((b64.length * 3) / 4);
+            const fileName = filePath.split(/[/\\]/).pop() || 'image';
+            setAttachedImage({ path: filePath, dataUri, fileName, byteSize });
+        } catch (err: unknown) {
+            useErrorStore.getState().captureError(err, {
+                source: 'DetailHeader.rerunAttachImage',
+                triggerAction: 'read_image_as_base64',
+            });
+        } finally {
+            setIsAttachingImage(false);
+        }
+    };
+
     const handleRerun = async (): Promise<void> => {
         if (isRerunning) return;
         setIsRerunMenuOpen(false);
@@ -217,13 +266,22 @@ export function DetailHeader(props: DetailHeaderProps) {
                 ? (newConversationTitle?.trim() || undefined)
                 : selectedConversation.conversation_id;
             const originalPrompt = activePromptText || selectedConversation?.prompt_preview_200w || '';
+            // Image staging BEFORE dispatch (fail before point of no return):
+            // the attachment is validated above (readable, within 100MB cap).
+            // The file path rides in the message so the backend captures it
+            // into the side-channel image_payload at dispatch time; a broken
+            // staging aborts here via the catch below, never dispatching
+            // without the image.
+            const promptWithImage = attachedImage
+                ? `${originalPrompt.trim()}\n\n![attached-image](${attachedImage.path})`
+                : originalPrompt;
             const result = await dispatchRerunMessages({
                 targetInstId,
                 repoPath: rerunRepoPath ?? '',
                 convId: targetConvId,
                 count: rerunCount,
                 messageOption: rerunMessageOption,
-                originalPrompt,
+                originalPrompt: promptWithImage,
                 source: 'DetailHeader.rerunSection',
             } as any);
             if (result.failed > 0) {
@@ -236,6 +294,7 @@ export function DetailHeader(props: DetailHeaderProps) {
             } else if (result.dispatched > 0) {
                 setRerunFlash(`Sent ×${result.dispatched}`);
                 setTimeout(() => setRerunFlash(null), 2500);
+                setAttachedImage(null);
             }
         } catch (err) {
             reportPromptActionError(err, 'DetailHeader.rerunSection');
@@ -1178,6 +1237,53 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         </ul>
                                     </div>
                                 )}
+
+                                {/* Attach image (spec 154 §2.1): staged before dispatch */}
+                                <div className="mx-2 px-2 py-1.5 rounded-lg bg-slate-50/80 dark:bg-purple-950/20 border border-slate-200/60 dark:border-purple-500/20">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                            Image attachment:
+                                        </span>
+                                        {attachedImage ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => setAttachedImage(null)}
+                                                className="text-[10px] font-semibold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer"
+                                            >
+                                                Remove
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => void handleAttachRerunImage().catch((err) => {
+                                                    reportPromptActionError(err, 'DetailHeader.rerunAttachImage');
+                                                })}
+                                                disabled={isAttachingImage}
+                                                className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-semibold text-sky-700 dark:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 transition-colors cursor-pointer disabled:opacity-50"
+                                            >
+                                                <ImageIcon className={cn('w-3.5 h-3.5', isAttachingImage && 'animate-pulse')} />
+                                                <span>{isAttachingImage ? 'Reading…' : 'Attach image'}</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                    {attachedImage && (
+                                        <div className="mt-1.5 flex items-center gap-2">
+                                            <img
+                                                src={attachedImage.dataUri}
+                                                alt={attachedImage.fileName}
+                                                className="w-10 h-10 rounded-lg object-cover border border-slate-200 dark:border-purple-500/30 shrink-0"
+                                            />
+                                            <div className="min-w-0">
+                                                <div className="text-[10.5px] font-medium text-slate-700 dark:text-slate-200 truncate">
+                                                    {attachedImage.fileName}
+                                                </div>
+                                                <div className="text-[9.5px] font-mono text-slate-400">
+                                                    {(attachedImage.byteSize / 1024).toFixed(1)} KB · re-injected on rerun
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
 
                                 {/* Dispatch Action Button inside flyout */}
                                 <div className="pt-1 border-t border-slate-100 dark:border-[#40285e]/60">

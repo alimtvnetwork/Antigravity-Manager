@@ -124,6 +124,70 @@ pub(crate) mod tests {
         );
 
         // Justification: best-effort cleanup; a leftover directory is harmless
-        crate::error::record_ignored(fs::remove_dir_all(temp_dir), "remove_dir_all");
+        crate::error::record_ignored(fs::::remove_dir_all(temp_dir), "remove_dir_all");
+    }
+
+    #[test]
+    pub(crate) fn test_multi_image_extraction_collects_all_uris() {
+        use crate::modules::repo_db::detection::{
+            extract_image_uris_or_paths, parse_image_uris, serialize_image_uris,
+        };
+
+        let content = "look at this data:image/png;base64,AAA first and data:image/jpeg;base64,BBB second, also data:image/png;base64,AAA again plus /tmp/shot.png";
+        let (uris, paths) = extract_image_uris_or_paths(content);
+        // All distinct URIs collected verbatim in document order; duplicate dropped.
+        assert_eq!(
+            uris,
+            vec![
+                "data:image/png;base64,AAA".to_string(),
+                "data:image/jpeg;base64,BBB".to_string(),
+            ]
+        );
+        assert_eq!(paths, vec!["/tmp/shot.png".to_string()]);
+
+        // Serialization: 3 URIs -> JSON array, none silently dropped (AC2).
+        let three = vec!["u1".to_string(), "u2".to_string(), "u3".to_string()];
+        let ser = serialize_image_uris(&three).expect("must serialize");
+        assert!(ser.starts_with('['));
+        assert_eq!(parse_image_uris(&ser), three);
+
+        // Single URI stays verbatim (legacy format, byte-identical).
+        let one = vec!["data:image/png;base64,AAA".to_string()];
+        assert_eq!(
+            serialize_image_uris(&one).as_deref(),
+            Some("data:image/png;base64,AAA")
+        );
+        assert_eq!(
+            parse_image_uris("data:image/png;base64,AAA"),
+            one
+        );
+
+        // Zero URIs -> None.
+        assert!(serialize_image_uris(&[]).is_none());
+        assert!(parse_image_uris("").is_empty());
+    }
+
+    #[test]
+    pub(crate) fn test_restore_refuses_to_run_on_resend_path() {
+        // Simulate the resend path being active on this thread.
+        crate::modules::repo_db::backup::RESEND_IN_PROGRESS.with(|f| f.set(true));
+        let result = restore_running_prompts(None, true, Some("/tmp/agm-test-guard.db"));
+        // Must fail with the double-dispatch guard error before touching any DB.
+        let err = result.expect_err("restore must refuse while resend is active");
+        assert!(
+            err.contains("double-dispatch"),
+            "unexpected error: {err}"
+        );
+        crate::modules::repo_db::backup::RESEND_IN_PROGRESS.with(|f| f.set(false));
+
+        // Guard cleared: restore proceeds past the guard (empty DB -> Ok with
+        // zero rows), proving the guard was the only blocker above.
+        let db2 = "/tmp/agm-test-guard2.db";
+        let result2 = restore_running_prompts(None, true, Some(db2));
+        let restored = result2.expect("restore should proceed once guard is clear");
+        assert!(restored.is_empty());
+        // Justification: best-effort cleanup of the scratch DB file.
+        crate::error::record_ignored(fs::remove_file(db2), "remove scratch db");
+        crate::error::record_ignored(fs::remove_file("/tmp/agm-test-guard.db"), "remove scratch db");
     }
 }

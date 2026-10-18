@@ -30,6 +30,15 @@ pub fn restore_running_prompts_for_instance(
     keep_backup: bool,
     custom_file: Option<&str>,
 ) -> Result<Vec<PromptBackupRecord>, String> {
+    // Regression guard: restore must never run on the resend path.
+    // `resend_queued_prompts_for_instance` runs its own single dispatch pass;
+    // a nested restore would dispatch every prompt a second time.
+    let resend_active =
+        crate::modules::repo_db::backup::RESEND_IN_PROGRESS.with(|f| f.get());
+    if resend_active {
+        return Err("restore_running_prompts_for_instance must not run while resend_queued_prompts_for_instance is active (double-dispatch guard)".to_string());
+    }
+
     let target_inst = instance_id.unwrap_or("default");
     // None means "restore everything": no instance predicate at all.
     let unscoped = instance_id.is_none();

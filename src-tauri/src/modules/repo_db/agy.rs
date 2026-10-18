@@ -1,8 +1,6 @@
 //! Repo DB: agy
 
-use super::detection::{
-    extract_image_payload_or_path, extract_screenshot_id_token, resume_task_document,
-};
+use super::detection::{effective_image_uris, extract_image_payload_or_path, extract_image_uris_or_paths, extract_screenshot_id_token, resume_task_document};
 use super::models::ActivePrompt;
 use super::prompts_crud::save_or_requeue_prompt;
 use super::state::get_active_agy_workers;
@@ -745,10 +743,21 @@ pub fn send_prompt_now_for_instance(
     if !repo_path.trim().is_empty() {
         let ws_dir = PathBuf::from(repo_path);
         if ws_dir.exists() {
-            let final_img = active_prompt.image_payload.clone();
+            let (extracted_uris, img_paths) = extract_image_uris_or_paths(prompt_content);
+            let final_uris =
+                effective_image_uris(active_prompt.image_payload.as_deref(), extracted_uris);
             let mut payload = resume_task_document(&active_prompt, "dispatched", now, &img_paths);
-            if final_img.is_some() {
-                payload["image_payload"] = serde_json::json!(final_img);
+            if !final_uris.is_empty() {
+                // Legacy single-string format for one URI; JSON array for many.
+                payload["image_payload"] = if final_uris.len() == 1 {
+                    serde_json::json!(final_uris[0].as_str())
+                } else {
+                    serde_json::json!(final_uris)
+                };
+            } else if !img_paths.is_empty() {
+                // Legacy fallback: paths-only prompts previously stored the
+                // joined paths in image_payload; preserve that behavior.
+                payload["image_payload"] = serde_json::json!(img_paths.join(";"));
             }
             let serialized = serde_json::to_string_pretty(&payload).unwrap_or_default();
             // Justification: resume snapshot is a convenience file; the agy dispatch result below is the authoritative outcome
@@ -915,10 +924,21 @@ pub fn enqueue_prompt_for_instance(
     if !repo_path.trim().is_empty() {
         let ws_dir = PathBuf::from(repo_path);
         if ws_dir.exists() {
-            let final_img = active_prompt.image_payload.clone();
+            let (extracted_uris, img_paths) = extract_image_uris_or_paths(prompt_content);
+            let final_uris =
+                effective_image_uris(active_prompt.image_payload.as_deref(), extracted_uris);
             let mut payload = resume_task_document(&active_prompt, "queued", now, &img_paths);
-            if final_img.is_some() {
-                payload["image_payload"] = serde_json::json!(final_img);
+            if !final_uris.is_empty() {
+                // Legacy single-string format for one URI; JSON array for many.
+                payload["image_payload"] = if final_uris.len() == 1 {
+                    serde_json::json!(final_uris[0].as_str())
+                } else {
+                    serde_json::json!(final_uris)
+                };
+            } else if !img_paths.is_empty() {
+                // Legacy fallback: paths-only prompts previously stored the
+                // joined paths in image_payload; preserve that behavior.
+                payload["image_payload"] = serde_json::json!(img_paths.join(";"));
             }
             payload["auto_boot"] = serde_json::json!(false);
             let serialized = serde_json::to_string_pretty(&payload).unwrap_or_default();

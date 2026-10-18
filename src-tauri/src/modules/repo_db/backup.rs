@@ -1,8 +1,6 @@
 //! Repo DB: backup
 
-use super::detection::{
-    detect_running_projects, extract_image_payload_or_path, resume_task_document,
-};
+use super::detection::{detect_running_projects, resume_task_document};
 use super::discovery::discover_running_prompts_from_antigravity;
 use super::models::{ActivePrompt, RunningProject};
 use super::project_queries::get_live_project_execution_info;
@@ -19,6 +17,33 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use uuid::Uuid;
+
+thread_local! {
+    /// Regression guard: set while `resend_queued_prompts_for_instance` runs.
+    /// `backup_prompts_db::restore_running_prompts_for_instance` must never
+    /// execute on the resend path — it dispatches internally, so calling it
+    /// from resend would double-dispatch. The restore entry point checks this
+    /// flag and fails loudly if the invariant is violated.
+    pub(crate) static RESEND_IN_PROGRESS: std::cell::Cell<bool> =
+        std::cell::Cell::new(false);
+}
+
+/// RAII guard that marks the resend path as active for the current thread.
+/// Dropping the guard (including on early return / `?`) clears the flag.
+struct ResendPathGuard;
+
+impl ResendPathGuard {
+    fn enter() -> Self {
+        RESEND_IN_PROGRESS.with(|f| f.set(true));
+        ResendPathGuard
+    }
+}
+
+impl Drop for ResendPathGuard {
+    fn drop(&mut self) {
+        RESEND_IN_PROGRESS.with(|f| f.set(false));
+    }
+}
 
 /// Outcome of re-sending backed-up queued prompts via a single dispatch pass.
 /// Counts are real — nothing is reported as sent unless the dispatch pass
@@ -85,6 +110,11 @@ pub fn resend_queued_prompts_for_instance(
     instance_id: Option<&str>,
     limit: usize,
 ) -> Result<ResendQueuedOutcome, String> {
+    // Regression guard (Step 4): mark the resend path active so a nested
+    // restore_running_prompts_for_instance call fails loudly instead of
+    // double-dispatching. Cleared on drop, including early returns.
+    let _resend_guard = ResendPathGuard::enter();
+
     let unscoped = instance_id.is_none();
     let target_inst = instance_id.unwrap_or("default");
     let now = Utc::now().timestamp();
@@ -285,16 +315,13 @@ pub fn resend_queued_prompts_for_instance(
                 reinjected_ids.insert(rec.prompt_id.clone());
                 live_by_id.insert(rec.prompt_id.clone(), "queued".to_string());
                 live_by_sig.insert(sig, "queued".to_string());
-                let (extracted_img, img_paths) =
-                    super::detection::extract_image_payload_or_path(&active_p.prompt_content);
-                let final_img = active_p.image_payload.clone().or(extracted_img);
-                let image_count = if !img_paths.is_empty() {
-                    img_paths.len()
-                } else if final_img.is_some() {
-                    1
-                } else {
-                    0
-                };
+                let (extracted_uris, img_paths) =
+                    super::detection::extract_image_uris_or_paths(&active_p.prompt_content);
+                let final_uris = super::detection::effective_image_uris(
+                    active_p.image_payload.as_deref(),
+                    extracted_uris,
+                );
+                let image_count = img_paths.len() + final_uris.len();
                 let byte_size = active_p.prompt_content.len();
                 tracing::info!(
                     "[PROMPT_RESTORE] Restoring running prompt for instance {} from backup (images: {}, bytes: {})",
@@ -460,16 +487,12 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
 
         if res.is_ok() {
             backed_up_count += 1;
-            let (extracted_img, img_paths) = extract_image_payload_or_path(&p.prompt_content);
-            let final_img = p.image_payload.clone().or(extracted_img);
+            let (extracted_uris, img_paths) =
+                super::detection::extract_image_uris_or_paths(&p.prompt_content);
+            let final_uris =
+                super::detection::effective_image_uris(p.image_payload.as_deref(), extracted_uris);
             let byte_size = p.prompt_content.len();
-            let image_count = if !img_paths.is_empty() {
-                img_paths.len()
-            } else if final_img.is_some() {
-                1
-            } else {
-                0
-            };
+            let image_count = img_paths.len() + final_uris.len();
             let seq_code = p
                 .session_id
                 .as_deref()
@@ -551,7 +574,8 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                                                                 if let Some(content) = candidate_txt {
                                                                     let trimmed = content.trim();
                                                                     if !trimmed.is_empty() && trimmed.len() > 10 && !trimmed.starts_with('{') {
-                                                                        let (img_payload, _) = extract_image_payload_or_path(trimmed);
+                                                                        let (img_uris, img_paths) = super::detection::extract_image_uris_or_paths(trimmed);
+                                                                        let img_payload = super::detection::compose_image_payload(None, img_uris, &img_paths);
                                                                         extracted.push((trimmed.to_string(), img_payload));
                                                                     }
                                                                 }
@@ -559,7 +583,8 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                                                         } else if let Some(content) = json_val.get("text").or_else(|| json_val.get("content")).and_then(|v| v.as_str()) {
                                                             let trimmed = content.trim();
                                                             if !trimmed.is_empty() && trimmed.len() > 10 && !trimmed.starts_with('{') {
-                                                                let (img_payload, _) = extract_image_payload_or_path(trimmed);
+                                                                let (img_uris, img_paths) = super::detection::extract_image_uris_or_paths(trimmed);
+                                                                let img_payload = super::detection::compose_image_payload(None, img_uris, &img_paths);
                                                                 extracted.push((trimmed.to_string(), img_payload));
                                                             }
                                                         }
@@ -710,16 +735,19 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
 
             if result.is_ok() {
                 backed_up_count += 1;
-                let (extracted_img, img_paths) = extract_image_payload_or_path(&prompt_text);
-                let final_img = image_payload.clone().or(extracted_img);
+                let (extracted_uris, img_paths) =
+                    super::detection::extract_image_uris_or_paths(&prompt_text);
+                let final_uris = super::detection::effective_image_uris(
+                    image_payload.as_deref(),
+                    extracted_uris,
+                );
+                let mut final_img = super::detection::serialize_image_uris(&final_uris);
+                if final_img.is_none() && !img_paths.is_empty() {
+                    // Legacy fallback: paths-only prompts stored the joined paths.
+                    final_img = Some(img_paths.join(";"));
+                }
                 let byte_size = prompt_text.len();
-                let image_count = if !img_paths.is_empty() {
-                    img_paths.len()
-                } else if final_img.is_some() {
-                    1
-                } else {
-                    0
-                };
+                let image_count = img_paths.len() + final_uris.len();
                 let seq_code = super::sequences::get_sequence_code_for_conversation(&project.id);
                 tracing::info!(
                     "[PROMPT_BACKUP] Backed up running prompt for instance {} (seq: {:?}, images: {}, bytes: {})",
@@ -971,8 +999,13 @@ mod tests {
             image_payload: image_payload.clone(),
         };
 
-        let (extracted_img, img_paths) = extract_image_payload_or_path(&prompt_text);
-        assert!(extracted_img.is_some());
+        let (extracted_uris, img_paths) =
+            super::detection::extract_image_uris_or_paths(&prompt_text);
+        assert_eq!(extracted_uris.len(), 1);
+        assert!(img_paths.is_empty());
+        // Legacy single-URI wrapper still returns the first URI verbatim.
+        let (legacy_img, _) = super::detection::extract_image_payload_or_path(&prompt_text);
+        assert!(legacy_img.is_some());
         let doc = resume_task_document(&prompt_obj, "backed_up", now + 1, &img_paths);
         assert_eq!(doc["workspace_id"], project_id);
         assert_eq!(doc["project_id"], project_id);

@@ -95,9 +95,14 @@ pub fn backup_active_running_prompts_for_instance(
                 || uris_norm.contains(&p.project_id.to_lowercase())
         });
 
-        let conv_id = matched_conv
-            .map(|c| c.conversation_id.clone())
-            .or_else(|| p.session_id.clone())
+        // Preserve the prompt's ORIGINAL session_id verbatim so restore and
+        // re-send re-attach to the same conversation. The live matched
+        // conversation is only a fallback when the prompt carries no session.
+        let conv_id = p
+            .session_id
+            .clone()
+            .filter(|s| !s.trim().is_empty())
+            .or_else(|| matched_conv.map(|c| c.conversation_id.clone()))
             .unwrap_or_else(|| "-".to_string());
 
         let conv_name = matched_conv.and_then(|c| {
@@ -110,18 +115,29 @@ pub fn backup_active_running_prompts_for_instance(
 
         let proj_name = resolve_friendly_project_name(&p.repo_path, &p.project_id);
 
-        let (extracted_img, _) = repo_db::extract_image_payload_or_path(&p.prompt_content);
-        let mut final_img = p.image_payload.clone().or(extracted_img);
+        // Extract ALL data URIs from content when the live row carries no
+        // payload yet, so no image is silently dropped (AC2).
+        let (backup_uris, _) =
+            crate::modules::repo_db::detection::extract_image_uris_or_paths(&p.prompt_content);
+        let mut images_payload = p.image_payload.clone().or_else(|| {
+            crate::modules::repo_db::detection::serialize_image_uris(&backup_uris)
+        });
+        // Preserve upstream screenshot-id token tagging (single-payload form
+        // only; JSON-array multi-URI payloads keep their own structure so the
+        // token append cannot corrupt the JSON).
         if let Some(ss_token) = repo_db::extract_screenshot_id_token(&p.prompt_content) {
-            if let Some(ref cur) = final_img {
-                if !cur.contains(&ss_token) {
-                    final_img = Some(format!("{};screenshot_id={}", cur, ss_token));
-                }
-            } else {
-                final_img = Some(format!("screenshot_id={}", ss_token));
+            let needs_token = images_payload
+                .as_ref()
+                .map(|cur| !cur.contains(&ss_token) && !cur.starts_with('['))
+                .unwrap_or(true);
+            if needs_token {
+                images_payload = Some(match images_payload {
+                    Some(cur) => format!("{};screenshot_id={}", cur, ss_token),
+                    None => format!("screenshot_id={}", ss_token),
+                });
             }
         }
-        let has_img = final_img.is_some();
+        let has_images = images_payload.is_some();
 
         let record = PromptBackupRecord {
             id: format!("rec_{}", Uuid::new_v4().simple()),
@@ -134,8 +150,8 @@ pub fn backup_active_running_prompts_for_instance(
             conversation_name: conv_name,
             sequence_id: (idx + 1) as i64,
             prompt_text: p.prompt_content.clone(),
-            has_images: has_img,
-            images_payload: final_img,
+            has_images,
+            images_payload,
             status: p.status.clone(),
             created_at: now,
             is_restored: false,
@@ -366,9 +382,14 @@ pub fn backup_queued_prompts_for_instance(
                 || uris_norm.contains(&p.project_id.to_lowercase())
         });
 
-        let conv_id = matched_conv
-            .map(|c| c.conversation_id.clone())
-            .or_else(|| p.session_id.clone())
+        // Preserve the prompt's ORIGINAL session_id verbatim so restore and
+        // re-send re-attach to the same conversation. The live matched
+        // conversation is only a fallback when the prompt carries no session.
+        let conv_id = p
+            .session_id
+            .clone()
+            .filter(|s| !s.trim().is_empty())
+            .or_else(|| matched_conv.map(|c| c.conversation_id.clone()))
             .unwrap_or_else(|| "-".to_string());
 
         let conv_name = matched_conv.and_then(|c| {
@@ -388,18 +409,29 @@ pub fn backup_queued_prompts_for_instance(
             p.instance_id.clone()
         };
 
-        let (extracted_img, _) = repo_db::extract_image_payload_or_path(&p.prompt_content);
-        let mut final_img = p.image_payload.clone().or(extracted_img);
+        // Fresh enqueues store image_payload: None on the live row; extract
+        // ALL data URIs from content so no image is silently dropped (AC2).
+        let (backup_uris, _) =
+            crate::modules::repo_db::detection::extract_image_uris_or_paths(&p.prompt_content);
+        let mut images_payload = p.image_payload.clone().or_else(|| {
+            crate::modules::repo_db::detection::serialize_image_uris(&backup_uris)
+        });
+        // Preserve upstream screenshot-id token tagging (single-payload form
+        // only; JSON-array multi-URI payloads keep their own structure so the
+        // token append cannot corrupt the JSON).
         if let Some(ss_token) = repo_db::extract_screenshot_id_token(&p.prompt_content) {
-            if let Some(ref cur) = final_img {
-                if !cur.contains(&ss_token) {
-                    final_img = Some(format!("{};screenshot_id={}", cur, ss_token));
-                }
-            } else {
-                final_img = Some(format!("screenshot_id={}", ss_token));
+            let needs_token = images_payload
+                .as_ref()
+                .map(|cur| !cur.contains(&ss_token) && !cur.starts_with('['))
+                .unwrap_or(true);
+            if needs_token {
+                images_payload = Some(match images_payload {
+                    Some(cur) => format!("{};screenshot_id={}", cur, ss_token),
+                    None => format!("screenshot_id={}", ss_token),
+                });
             }
         }
-        let has_img = final_img.is_some();
+        let has_images = images_payload.is_some();
 
         let record = PromptBackupRecord {
             id: format!("rec_{}", Uuid::new_v4().simple()),
@@ -413,8 +445,8 @@ pub fn backup_queued_prompts_for_instance(
             // FIFO position in the live queue at backup time.
             sequence_id: (idx + 1) as i64,
             prompt_text: p.prompt_content.clone(),
-            has_images: has_img,
-            images_payload: final_img,
+            has_images,
+            images_payload,
             status: p.status.clone(),
             created_at: now,
             is_restored: false,

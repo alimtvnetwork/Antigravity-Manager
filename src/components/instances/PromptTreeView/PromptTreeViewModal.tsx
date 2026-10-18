@@ -15,6 +15,9 @@ import { isGhostConversation, isStaleOrEmptyConversation, getConversationStatus 
 import { classifyPromptTier } from './tierClassification';
 import { ModalHeader } from './ModalHeader';
 import { TreePanel } from './TreePanel';
+import { NowRunningUpNext } from './NowRunningUpNext';
+import { useRunningAndUpNext } from './useRunningAndUpNext';
+import { sendPromptNow } from '../../../services/instanceService';
 import { DetailHeader } from './DetailHeader';
 import { DetailTabs } from './DetailTabs';
 import { PromptInstructionView } from './PromptInstructionView';
@@ -25,7 +28,7 @@ import { DetailsModal } from './DetailsModal';
 import { PromptTreeExportModal } from './PromptTreeExportModal';
 import { PromptTreeImportModal } from './PromptTreeImportModal';
 import { ProjectContextMenu } from './ProjectContextMenu';
-import type { AgmProjectTreeNode } from './types';
+import type { AgmConversationNode, AgmProjectTreeNode } from './types';
 
 function formatDuration(secs: number): string {
     if (!Number.isFinite(secs) || isNaN(secs) || secs < 0) return '0s';
@@ -230,6 +233,67 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             messageOption: msgOption,
             source: 'PromptTreeViewModal.onRerunConversation',
         });
+    };
+
+    // "Now Running + Up Next" strip (spec 154 §1): data hook + row-action handlers.
+    const runningUpNext = useRunningAndUpNext(instanceId, isOpen);
+
+    const findStripConversation = (promptId: string): { conv: AgmConversationNode; proj: AgmProjectTreeNode } | null => {
+        for (const proj of treeData) {
+            const conv = (proj.conversations || []).find((c) => c.conversation_id === promptId);
+            if (conv) return { conv, proj };
+        }
+        return null;
+    };
+
+    const handleStripSelectPrompt = (promptId: string) => {
+        const found = findStripConversation(promptId);
+        if (!found) {
+            useErrorStore.getState().trackWarning(`NowRunningUpNext: prompt ${promptId} not found in tree`, {
+                source: 'PromptTreeViewModal.stripSelectPrompt',
+                triggerAction: 'select_prompt',
+            });
+            return;
+        }
+        selectConversation(found.conv, found.proj);
+    };
+
+    const handleStripRerun = (promptId: string) => {
+        handleRerunConversation(promptId, 'is-it-done');
+    };
+
+    const handleStripResendWithImage = (promptId: string) => {
+        const found = findStripConversation(promptId);
+        if (!found) {
+            useErrorStore.getState().trackWarning(`NowRunningUpNext: prompt ${promptId} not found in tree`, {
+                source: 'PromptTreeViewModal.stripResendWithImage',
+                triggerAction: 'resend_with_image',
+            });
+            setActionMsg('Resend failed: prompt not found in tree.');
+            return;
+        }
+        const { conv, proj } = found;
+        const text = (conv.full_prompt_text || conv.prompt_preview_200w || '').trim();
+        if (!text) {
+            setActionMsg('Resend failed: prompt has no text content.');
+            return;
+        }
+        const targetInstId = conv.instance_id || proj.instance_id || instanceId || 'default';
+        const repoPath = proj.repo_path || '';
+        // Send raw text (no base64→attachment rewrite): embedded data URIs /
+        // image refs travel verbatim so the backend captures them into the
+        // side-channel image_payload at dispatch time.
+        setActionMsg('Resending prompt with images...');
+        void sendPromptNow(targetInstId, repoPath, text, conv.conversation_id)
+            .then(() => {
+                setActionMsg('Prompt resent with images!');
+                setTimeout(() => setActionMsg(null), 3000);
+            })
+            .catch((err: unknown) => {
+                // sendPromptNow already routed this into the error store; surface user text.
+                const msg = err instanceof Error ? err.message : String(err) || 'dispatch rejected';
+                setActionMsg(`Resend failed: ${msg}`);
+            });
     };
 
     const currentInstance = useMemo(() => {
@@ -666,7 +730,20 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                 {/* Main Split View */}
                 <div className="flex flex-1 overflow-hidden">
                     {!isTreeCollapsed ? (
-                        <TreePanel
+                        <div className="w-80 sm:w-96 shrink-0 flex flex-col border-r border-slate-200 dark:border-[#40285e] bg-slate-50/50 dark:bg-[#090611]/60">
+                            <NowRunningUpNext
+                                items={runningUpNext.items}
+                                isLoading={runningUpNext.isLoading}
+                                lastSyncAt={runningUpNext.lastSyncAt}
+                                hasError={runningUpNext.hasError}
+                                upNextTotal={runningUpNext.upNextTotal}
+                                onSelectPrompt={handleStripSelectPrompt}
+                                onRerun={handleStripRerun}
+                                onResendWithImage={handleStripResendWithImage}
+                                onRefresh={runningUpNext.onRefresh}
+                            />
+                            <div className="flex-1 min-h-0 flex flex-col [&>div]:h-full [&>div]:border-r-0">
+                                <TreePanel
                             treeData={treeData}
                             activeProjects={activeProjects}
                             archivedProjects={archivedProjects}
@@ -712,7 +789,9 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                             onResendPrompts={handleResendPrompts}
                             onEnqueue={handleEnqueue}
                             onRerunConversation={handleRerunConversation}
-                        />
+                                />
+                            </div>
+                        </div>
                     ) : (
                         <div className="w-10 shrink-0 border-r border-slate-200 dark:border-[#40285e] bg-slate-50/70 dark:bg-[#090611]/70 flex flex-col items-center py-3 gap-3">
                             <button

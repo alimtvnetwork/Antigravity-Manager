@@ -33,7 +33,7 @@ export interface ResendAsPreset {
 export interface ResendAsModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSelectPreset?: (preset: ResendAsPreset) => void;
+    onSelectPreset?: (preset: ResendAsPreset, opts?: { includeImage: boolean }) => void;
     activePresetId?: string;
 }
 
@@ -190,6 +190,11 @@ export function ResendAsModal({
 
     // Live preview test input
     const [previewSampleTitle, setPreviewSampleTitle] = useState('Implement OAuth Token Auto-Refresh');
+
+    // Include-image toggle (spec 154 §2.2): per-send. When on, the resent
+    // prompt carries image_payload alongside text; honoured per target_mode
+    // ('new' creates a conversation with the image, 'current' appends).
+    const [includeImage, setIncludeImage] = useState(false);
 
     const loadPresets = async () => {
         try {
@@ -764,17 +769,29 @@ export function ResendAsModal({
                                         {/* Actions */}
                                         <div className="flex items-center gap-2 shrink-0">
                                             {onSelectPreset && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        onSelectPreset(selectedPreset);
-                                                        onClose();
-                                                    }}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-                                                >
-                                                    <Check className="w-3.5 h-3.5" />
-                                                    <span>Select Preset</span>
-                                                </button>
+                                                <>
+                                                    <label className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-[#40285e] text-[11px] font-medium text-slate-600 dark:text-slate-300 cursor-pointer select-none hover:bg-slate-50 dark:hover:bg-[#40285e]/40 transition-colors">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={includeImage}
+                                                            onChange={(e) => setIncludeImage(e.target.checked)}
+                                                            className="w-3.5 h-3.5 rounded accent-purple-600 cursor-pointer"
+                                                            aria-label="Include image payload when resending"
+                                                        />
+                                                        <span>Include image</span>
+                                                    </label>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            onSelectPreset(selectedPreset, { includeImage });
+                                                            onClose();
+                                                        }}
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                                                    >
+                                                        <Check className="w-3.5 h-3.5" />
+                                                        <span>Select Preset</span>
+                                                    </button>
+                                                </>
                                             )}
 
                                             {defaultPresetId !== selectedPreset.id && (
