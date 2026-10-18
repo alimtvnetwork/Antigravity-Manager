@@ -108,11 +108,10 @@ export function FleetMachinesTable() {
                 <table className="w-full text-left text-xs">
                     <thead>
                         <tr className="border-b border-slate-700/40 dark:border-slate-800/60 bg-slate-950/40 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                            <th className="px-3.5 py-2.5 min-w-[170px]">Machine & Status</th>
-                            <th className="px-3.5 py-2.5 min-w-[140px]">IP Address</th>
-                            <th className="px-3.5 py-2.5 min-w-[180px]">Running Instance(s)</th>
-                            <th className="px-3.5 py-2.5 min-w-[190px]">Bound Account Email(s)</th>
-                            <th className="px-3.5 py-2.5 min-w-[130px]">Running Prompts</th>
+                            <th className="px-3.5 py-2.5 min-w-[180px]">Machine &amp; Status</th>
+                            <th className="px-3.5 py-2.5 min-w-[220px]">Connected Google Account(s)</th>
+                            <th className="px-3.5 py-2.5 min-w-[200px]">Active Instance(s)</th>
+                            <th className="px-3.5 py-2.5 min-w-[120px]">Running Prompts</th>
                             <th className="px-3.5 py-2.5 text-right min-w-[110px]">Last Seen</th>
                         </tr>
                     </thead>

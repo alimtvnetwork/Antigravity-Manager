@@ -1,12 +1,13 @@
 import { useState, useMemo, useCallback } from 'react';
 import type React from 'react';
-import { Check, Copy, ChevronDown, ChevronRight, Brain, Code } from 'lucide-react';
+import { Check, Copy, ChevronDown, ChevronRight, Brain, Code, ImageOff } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 import { TruncatedContextCallout } from './TruncatedContextCallout';
 import { PromptImagePreviewModal } from './PromptImagePreviewModal';
 import { PromptImageContextMenu } from './PromptImageContextMenu';
+import { resolveImageSrc } from './clipboard';
 
 export interface PromptMarkdownPreviewProps {
     content: string;
@@ -15,6 +16,7 @@ export interface PromptMarkdownPreviewProps {
     onToggleExpand?: () => void;
     isTruncated?: boolean;
     maxInlineBytes?: number;
+    repoPath?: string;
 }
 
 // Token regex matching bold, italics, code, links, images, truncation markers, and thinking tags
@@ -112,6 +114,70 @@ function LavenderThinkingCard({ content }: { content: string }) {
     );
 }
 
+interface MarkdownInlineImageProps {
+    rawSrc: string;
+    alt?: string;
+    repoPath?: string;
+    onImageClick?: (src: string, alt?: string) => void;
+    onImageContextMenu?: (e: React.MouseEvent, src: string, alt?: string) => void;
+}
+
+function MarkdownInlineImage({
+    rawSrc,
+    alt,
+    repoPath,
+    onImageClick,
+    onImageContextMenu,
+}: MarkdownInlineImageProps) {
+    const [hasError, setHasError] = useState(false);
+    const resolvedSrc = useMemo(() => resolveImageSrc(rawSrc, repoPath), [rawSrc, repoPath]);
+
+    if (hasError) {
+        return (
+            <span
+                className="inline-flex items-center gap-2 my-1.5 px-3 py-1.5 rounded-lg border border-red-500/30 bg-red-950/20 text-red-300 text-xs font-mono select-text"
+                title={`Image failed to load: ${resolvedSrc || rawSrc}`}
+            >
+                <ImageOff className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                <span className="truncate max-w-[280px]">
+                    {alt ? `[Image: ${alt}]` : '[Image Load Error]'}
+                </span>
+                <span className="text-[10px] text-red-400/70 font-normal">
+                    ({rawSrc.length > 30 ? `...${rawSrc.slice(-25)}` : rawSrc})
+                </span>
+            </span>
+        );
+    }
+
+    return (
+        <span
+            className="relative inline-block my-1.5 group cursor-pointer"
+            onClick={(e) => {
+                e.stopPropagation();
+                onImageClick?.(resolvedSrc, alt);
+            }}
+            onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onImageContextMenu?.(e, resolvedSrc, alt);
+            }}
+            title="Click to preview in lightbox · Right-click for options"
+        >
+            <img
+                src={resolvedSrc}
+                alt={alt || ''}
+                className="inline-block max-h-56 max-w-full rounded-lg border border-slate-200 dark:border-[#40285e] group-hover:border-purple-500/70 shadow-sm transition-all duration-150 group-hover:scale-[1.01]"
+                onError={() => {
+                    setHasError(true);
+                }}
+            />
+            <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[10px] bg-black/75 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none font-mono shadow-sm">
+                Preview
+            </span>
+        </span>
+    );
+}
+
 /**
  * Parses inline markdown tokens (links, images, bold, italics, code, omission banners).
  */
@@ -119,7 +185,8 @@ function parseInlineMarkdown(
     text: string,
     onToggleExpand?: () => void,
     onImageClick?: (src: string, alt?: string) => void,
-    onImageContextMenu?: (e: React.MouseEvent, src: string, alt?: string) => void
+    onImageContextMenu?: (e: React.MouseEvent, src: string, alt?: string) => void,
+    repoPath?: string
 ): React.ReactNode[] {
     if (text.length > MAX_INLINE_BLOCK_BYTES) {
         return [
@@ -187,33 +254,14 @@ function parseInlineMarkdown(
             );
         } else if (imgSrc !== undefined) {
             rawNodes.push(
-                <span
+                <MarkdownInlineImage
                     key={`img-wrap-${match.index}`}
-                    className="relative inline-block my-1.5 group cursor-pointer"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onImageClick?.(imgSrc, imgAlt);
-                    }}
-                    onContextMenu={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onImageContextMenu?.(e, imgSrc, imgAlt);
-                    }}
-                    title="Click to preview in lightbox · Right-click for options"
-                >
-                    <img
-                        key={`img-${match.index}`}
-                        src={imgSrc}
-                        alt={imgAlt || ''}
-                        className="inline-block max-h-56 max-w-full rounded-lg border border-slate-200 dark:border-[#40285e] group-hover:border-purple-500/70 shadow-sm transition-all duration-150 group-hover:scale-[1.01]"
-                        onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
-                        }}
-                    />
-                    <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[10px] bg-black/75 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none font-mono shadow-sm">
-                        Preview
-                    </span>
-                </span>
+                    rawSrc={imgSrc}
+                    alt={imgAlt}
+                    repoPath={repoPath}
+                    onImageClick={onImageClick}
+                    onImageContextMenu={onImageContextMenu}
+                />
             );
         } else if (linkUrl !== undefined) {
             rawNodes.push(
@@ -298,6 +346,7 @@ export function PromptMarkdownPreview({
     showAllWords = true,
     onToggleExpand,
     isTruncated = false,
+    repoPath,
 }: PromptMarkdownPreviewProps) {
     const [previewImageSrc, setPreviewImageSrc] = useState<string | null>(null);
     const [previewAltText, setPreviewAltText] = useState<string>('');
@@ -327,7 +376,7 @@ export function PromptMarkdownPreview({
         }
 
         const renderInline = (text: string) =>
-            parseInlineMarkdown(text, onToggleExpand, handleImageClick, handleImageContextMenu);
+            parseInlineMarkdown(text, onToggleExpand, handleImageClick, handleImageContextMenu, repoPath);
 
         const lines = content.split('\n');
         const elements: React.ReactNode[] = [];
@@ -537,17 +586,17 @@ export function PromptMarkdownPreview({
         flushTable(lines.length);
 
         return elements;
-    }, [content, onToggleExpand, handleImageClick, handleImageContextMenu]);
+    }, [content, onToggleExpand, handleImageClick, handleImageContextMenu, repoPath]);
 
     const allMarkdownImages = useMemo(() => {
         const matches: string[] = [];
         const regex = /!\[(.*?)\]\((.*?)\)/g;
         let m: RegExpExecArray | null;
         while ((m = regex.exec(content)) !== null) {
-            if (m[2]) matches.push(m[2]);
+            if (m[2]) matches.push(resolveImageSrc(m[2], repoPath));
         }
         return matches;
-    }, [content]);
+    }, [content, repoPath]);
 
     return (
         <div className={cn('prose prose-xs dark:prose-invert max-w-none font-sans', className)}>

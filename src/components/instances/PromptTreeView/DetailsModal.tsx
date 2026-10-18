@@ -36,6 +36,11 @@ export function DetailsModal(props: DetailsModalProps) {
     const resolvedPath = executablePath || selectedProject?.repo_path || '';
     const isLive = Boolean(instancePid && instancePid > 0);
 
+    const seqCode = selectedConversation?.seq_code || 'CONV';
+    const convNumberMatch = seqCode.match(/\d+/);
+    const convNumberDisplay = convNumberMatch ? convNumberMatch[0] : null;
+    const turnCount = selectedConversation?.prompts?.length || selectedConversation?.step_count || 1;
+
     const handleCopyField = async (field: string, value: string) => {
         try {
             await copyToClipboard(value);
@@ -156,6 +161,35 @@ export function DetailsModal(props: DetailsModalProps) {
                                         {copiedField === 'conv_id' ? 'Copied!' : 'Copy'}
                                     </button>
                                 )}
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/50 dark:border-[#40285e]/50">
+                            <div>
+                                <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-mono">
+                                    Sequence Code
+                                </span>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40">
+                                        {seqCode}
+                                        {convNumberDisplay ? ` (Conversation #${convNumberDisplay})` : ''}
+                                    </span>
+                                </div>
+                                <span className="text-[9.5px] text-slate-400 dark:text-slate-500 block mt-0.5">
+                                    Sequential conversation index in workspace
+                                </span>
+                            </div>
+                            <div>
+                                <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-mono">
+                                    Interaction Turns
+                                </span>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200">
+                                        {turnCount} {turnCount === 1 ? 'Interaction Turn' : 'Interaction Turns'}
+                                    </span>
+                                </div>
+                                <span className="text-[9.5px] text-slate-400 dark:text-slate-500 block mt-0.5">
+                                    User request instructions &amp; AI response cycles
+                                </span>
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/50 dark:border-[#40285e]/50">

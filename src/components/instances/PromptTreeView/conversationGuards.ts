@@ -1,6 +1,9 @@
 import type { AgmConversationNode } from './types';
 
 export function isGhostConversation(conv: AgmConversationNode): boolean {
+    if (Boolean(conv.is_running) || Boolean(conv.is_queued) || conv.status === 'QUEUED' || conv.status === 'RUNNING') {
+        return false;
+    }
     const title = (conv.title || '').trim().toLowerCase();
     const isUntitled =
         !title ||
@@ -20,7 +23,7 @@ export function isGhostConversation(conv: AgmConversationNode): boolean {
     return isUntitled && isEmptyPrompt;
 }
 
-// Helper to check if a conversation is stale or empty (exempt if actively running with content)
+// Helper to check if a conversation is stale or empty (exempt if actively running or queued with content)
 export function isStaleOrEmptyConversation(conv: AgmConversationNode): boolean {
     if (isGhostConversation(conv)) {
         return true;
@@ -29,12 +32,15 @@ export function isStaleOrEmptyConversation(conv: AgmConversationNode): boolean {
         conv.prompt_word_count === 0 ||
         !conv.prompt_preview_200w ||
         conv.prompt_preview_200w.trim().length === 0;
+
+    // Running OR queued conversations must NEVER be treated as stale or empty
+    if (Boolean(conv.is_running) || Boolean(conv.is_queued) || conv.status === 'QUEUED' || conv.status === 'RUNNING') {
+        return false;
+    }
+
     // 0-word empty untitled conversations must NEVER be treated as running or active
     if (isEmptyPrompt) {
         return true;
-    }
-    if (Boolean(conv.is_running)) {
-        return false;
     }
     const title = (conv.title || '').trim().toLowerCase();
     const isUntitled =

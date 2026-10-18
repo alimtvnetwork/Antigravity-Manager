@@ -6,10 +6,10 @@ import type { ExtractedPromptImage, PromptRewriteResult } from './types';
 
 /**
  * Resolves an image source URI for safe WebView rendering.
- * Handles data URIs, http(s) URLs, file:// protocols, and native absolute paths.
+ * Handles data URIs, http(s) URLs, file:// protocols, relative project paths, and native absolute paths.
  * Uses Tauri's convertFileSrc when in Tauri environment to bypass WebView CORS and local file restrictions.
  */
-export function resolveImageSrc(src: string): string {
+export function resolveImageSrc(src: string, repoPath?: string): string {
     if (!src || !src.trim()) return '';
     const trimmed = src.trim();
 
@@ -34,6 +34,15 @@ export function resolveImageSrc(src: string): string {
         cleanPath = decodeURIComponent(cleanPath);
     } catch {
         // Keep raw cleanPath if decoding fails
+    }
+
+    // If cleanPath is relative and repoPath is provided, resolve against repoPath
+    const isAbsolute = /^[a-zA-Z]:[\\/]/.test(cleanPath) || cleanPath.startsWith('/') || cleanPath.startsWith('\\\\');
+    if (!isAbsolute && repoPath && repoPath.trim().length > 0) {
+        const sep = repoPath.includes('/') ? '/' : '\\';
+        const normRepo = repoPath.replace(/[/\\]+$/, '');
+        const normChild = cleanPath.replace(/^[./\\]+/, '');
+        cleanPath = `${normRepo}${sep}${normChild}`;
     }
 
     try {

@@ -35,7 +35,7 @@ export function DetailTabs(props: DetailTabsProps) {
         setIsDetailsModalOpen,
     } = props;
 
-    const hasExpandToggle = previewTab === 'instruction' && Boolean(
+    const hasExpandToggle = Boolean(
         isTruncated ||
         activePromptText.trim().endsWith('...') ||
         activePromptText.trim().endsWith('…') ||
