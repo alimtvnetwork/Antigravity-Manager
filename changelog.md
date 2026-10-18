@@ -1,5 +1,22 @@
 # Changelog
 
+## [v4.235.0] - 2026-10-19
+
+### Added
+- **SSH Cluster Multi-Instance & Account Telemetry with Direct File Fallback**: Upgraded `get_cluster_instances_and_balances` in `src-tauri/src/modules/ssh_manager/exec.rs` with `extract_clean_json` to bypass leading logger noise, OS-specific CLI execution (`agm.exe` on Windows vs `agm` on Linux), and direct PowerShell/Bash file inspection over SSH (`instances.json`, `accounts.json`) to reliably extract remote instances and bound Google accounts; calculates accurate dual-window quotas via `extract_dual_window_quotas` instead of looking for nonexistent root fields; synchronizes encrypted node passwords to `~/.gitmap/gitmap-ssh-nodes.json` in `connections.rs` so GitMap's `fix-auth` engine possesses authentication credentials; and forwards default identity key paths (`-i <pubkey>`) in `fix_node_auth_via_gitmap`. (Thanks to @aukgit)
+- **Universal Supabase 5-Minute Network Error Circuit Breaker**: Integrated automatic cooldown triggers in `src-tauri/src/modules/supabase_client/client.rs` across all client methods (`select`, `insert`, `upsert`, `update`, `delete`, `rpc`), automatically invoking `record_supabase_network_error()` on timeouts, connection errors, and 5xx responses, while fast-failing subsequent requests with `Err(AppError::Network(...))` during the 300-second cooldown; added circuit breaker guards to background sync workers in `fleet.rs`, `sync.rs`, and `supabase_pruner.rs` to stop repetitive connection retry loops. (Thanks to @aukgit)
+
+### Fixed
+- **Prompt Tree Action Button Reliability & Async Feedback**: Converted `onRefreshAll` and `onResetTree` in `src/components/instances/PromptTreeView/PromptTreeViewModal.tsx` into async functions awaiting `loadTree(false, true)`, synchronizing cache invalidation (`invalidatePromptTreeCache`) and auto-dismissing visual status banners after 2500ms; enabled flexible instance dispatch in `src-tauri/src/modules/repo_db/dispatch.rs` so restored prompts dispatch cleanly across active and default instances with loopback CDP injection fallback (`submit_prompt_via_cdp_for_instance`). (Thanks to @aukgit)
+- **Import/Export Menu Stacking Context & Portal Isolation**: Refactored `src/components/instances/PromptTreeView/ImportExportMenu.tsx` to mount its dropdown popup via React Portal (`createPortal(..., document.body)`) with `fixed z-[99999]` and a full-screen transparent capture backdrop (`fixed inset-0 z-[99998]`), completely eliminating CSS stacking context clipping and blur bleed-through from `ModalHeader` (`z-40`) and `TreePanel`. (Thanks to @aukgit)
+- **Preview Header Decluttering & Auto-Selection Flapping**: Removed redundant plain `User Prompt` badges and verbose instance ID tokens (`default-copy-5597`) from `DetailHeader.tsx`, directing deep runtime telemetry to `DetailsModal.tsx`; updated `performAutoSelection` in `usePromptTreeData.ts` to preserve existing selected conversations on reloads; tightened skeleton shimmer mounting to avoid screen glitches during background refreshes. (Thanks to @aukgit)
+- **Subagent Queued Badges & 3-Tier Sorting**: Added explicit amber clock `QUEUED` badges to child subagents in `ProjectNode.tsx` when enqueued under parent prompts; enforced strict 3-tier ordering (Tier 1: Running, Tier 2: Queued, Tier 3: Newest Timestamp) across project trees. (Thanks to @aukgit)
+- **UI Transaction & Polling Cadence Dampening**: Increased `FETCH_DEBOUNCE_MS` to 30s in `src/stores/useAccountStore.ts` with 5-minute idle throttling when `document.hidden`; implemented adaptive 60s/300s polling in `src/pages/instances/useInstancePage.ts` with a 2000ms coalescing debounce on live events; preserved `ACCOUNT_LIST_CACHE` in `src-tauri/src/modules/account/crud.rs` via in-place memory updates on quota saves. (Thanks to @aukgit)
+- **CLM Query Flood Elimination & Audit Log Demotion**: Optimized `src-tauri/src/modules/repo_db/liveness.rs` to query `conversation_summaries.db` once per instance sweep into a `HashSet<String>` rather than opening the database 15-30 times for every workspace folder; cached `detect_running_projects` for 15s in `detection.rs`; and demoted idle/negative audit logs (`IdleNoActiveTasks`) from `info!` to `tracing::debug!`. (Thanks to @aukgit)
+- **Telegram Machine Discovery & Remote Command Syntax**: Expanded `machine_entries()` in `src-tauri/src/modules/telegram_inbound/send_flow.rs` to discover SSH mesh and Supabase fleet nodes alongside GitMap nodes; standardized remote dispatch syntax in `src-tauri/src/modules/telegram_inbound/injection.rs` to `agm.exe prompt <target> [flags] "<prompt>"` to correctly invoke targeted sequence resolution (`C001`, `P001`) instead of swallowing arguments; and added a 3-stage execution fallback ladder inspecting process exit status. (Thanks to @aukgit)
+
+---
+
 ## [v4.234.0] - 2026-10-19
 
 ### Added
@@ -779,6 +796,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.235.0 (2026-10-19)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.234.0 (2026-10-19)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
