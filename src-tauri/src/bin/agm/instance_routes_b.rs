@@ -865,7 +865,7 @@ pub(crate) fn route_instances_test_lifecycle(
         let mut cleaned_count = 0usize;
         let mut cleaned_ids = Vec::new();
 
-        for inst in targets_to_clean {
+        for inst in &targets_to_clean {
             refuse_if_caller(args, &inst.id, is_json);
             antigravity_tools_lib::error::record_ignored(
                 instance::stop_instance(&inst.id),
@@ -877,7 +877,7 @@ pub(crate) fn route_instances_test_lifecycle(
                         println!("  [✓] Purged test instance '{}' ({})", inst.name, inst.id);
                     }
                     cleaned_count += 1;
-                    cleaned_ids.push(inst.id);
+                    cleaned_ids.push(inst.id.clone());
                 }
                 Err(e) => {
                     eprintln!("  [!] Failed to delete test instance '{}': {}", inst.id, e);
