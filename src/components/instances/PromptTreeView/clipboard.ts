@@ -679,3 +679,121 @@ export async function copyAllImagesAsRichHtml(
         return false;
     }
 }
+
+/**
+ * Copies a single image into clipboard memory formatted for Microsoft OneNote / Word (rich HTML & binary PNG blob)
+ * and external IDEs like VS Code / Cursor (plain-text Markdown image tag).
+ */
+export async function copySingleImageForOneNoteOrIde(
+    imageUri: string,
+    altText = 'Image',
+    onSuccess?: (msg: string) => void,
+    onError?: (err: unknown) => void
+): Promise<boolean> {
+    if (!imageUri || !imageUri.trim()) {
+        return false;
+    }
+
+    const cleanUri = imageUri.trim();
+
+    if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
+        const mdText = `![${altText}](${cleanUri})`;
+        const fallbackOk = await copyToClipboard(mdText);
+        if (fallbackOk) {
+            const msg = 'Copied image as Markdown text (rich clipboard unsupported in current environment)';
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'info' });
+            return true;
+        }
+        onError?.(new Error('Clipboard API unavailable'));
+        return false;
+    }
+
+    try {
+        const base64Uri = await convertImageUriToBase64(cleanUri);
+        const resolvedSrc = base64Uri || cleanUri;
+
+        const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#222;"><p style="margin:8px 0;"><img src="${resolvedSrc}" alt="${altText}" style="max-width:100%;height:auto;border-radius:6px;display:block;box-shadow:0 2px 8px rgba(0,0,0,0.15);" /></p></body></html>`;
+        const mdText = `![${altText}](${cleanUri})`;
+
+        const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
+        const textBlob = new Blob([mdText], { type: 'text/plain' });
+        const pngBlob = await convertImageUriToPngBlob(resolvedSrc);
+
+        let isWritten = false;
+        ensureDocumentFocus();
+        const hasFocus = typeof document !== 'undefined' && typeof document.hasFocus === 'function' ? document.hasFocus() : true;
+
+        if (hasFocus && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+            if (pngBlob) {
+                try {
+                    const item = new ClipboardItem({
+                        'image/png': pngBlob,
+                        'text/html': htmlBlob,
+                        'text/plain': textBlob,
+                    });
+                    await navigator.clipboard.write([item]);
+                    isWritten = true;
+                } catch {
+                    // Triple MIME write failed; fall through to dual HTML/plain-text
+                }
+            }
+
+            if (!isWritten) {
+                try {
+                    const item = new ClipboardItem({
+                        'text/html': htmlBlob,
+                        'text/plain': textBlob,
+                    });
+                    await navigator.clipboard.write([item]);
+                    isWritten = true;
+                } catch {
+                    // Fall back to PNG binary only
+                    if (pngBlob) {
+                        try {
+                            const item = new ClipboardItem({
+                                'image/png': pngBlob,
+                            });
+                            await navigator.clipboard.write([item]);
+                            isWritten = true;
+                        } catch {
+                            // Binary write failed
+                        }
+                    }
+                }
+            }
+        }
+
+        if (isWritten) {
+            const msg = 'Copied image for OneNote/Word (rich media) and IDEs (Markdown)!';
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'success' });
+            return true;
+        }
+
+        const fallbackOk = await copyToClipboard(mdText);
+        if (fallbackOk) {
+            const msg = 'Copied image as Markdown text to clipboard!';
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'info' });
+            return true;
+        }
+        return false;
+    } catch (err) {
+        const mdText = `![${altText}](${cleanUri})`;
+        const fallbackOk = await copyToClipboard(mdText);
+        if (fallbackOk) {
+            const msg = 'Copied image as Markdown text to clipboard!';
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'info' });
+            return true;
+        }
+        useErrorStore.getState().trackWarning(err, {
+            source: 'clipboard.copySingleImageForOneNoteOrIde',
+            triggerAction: 'copy_image_onenote_ide',
+        });
+        onError?.(err);
+        return false;
+    }
+}
+

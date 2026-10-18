@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { Copy, Eye, Download, Link2, Check, Layers, FileText } from 'lucide-react';
-import { writeNativeImageToClipboard, copyAllImagesAsRichHtml, copyImageAsMarkdownText } from './clipboard';
+import { writeNativeImageToClipboard, copyAllImagesAsRichHtml, copyImageAsMarkdownText, copySingleImageForOneNoteOrIde } from './clipboard';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 
@@ -27,6 +27,7 @@ export function PromptImageContextMenu({
     const [isImageCopied, setIsImageCopied] = useState(false);
     const [isAllImagesCopied, setIsAllImagesCopied] = useState(false);
     const [isMarkdownCopied, setIsMarkdownCopied] = useState(false);
+    const [isOneNoteCopied, setIsOneNoteCopied] = useState(false);
     const [isLinkCopied, setIsLinkCopied] = useState(false);
 
     // Close on click outside or escape key
@@ -166,6 +167,40 @@ export function PromptImageContextMenu({
         }
     }, [altText, imageSrc, onClose]);
 
+    const handleCopyForOneNote = useCallback(async () => {
+        try {
+            const isSuccess = await copySingleImageForOneNoteOrIde(
+                imageSrc,
+                altText || 'Image',
+                () => {
+                    setIsOneNoteCopied(true);
+                    setTimeout(() => {
+                        setIsOneNoteCopied(false);
+                        onClose();
+                    }, 1200);
+                },
+                (err) => {
+                    useErrorStore.getState().trackWarning(err, {
+                        source: 'PromptImageContextMenu.handleCopyForOneNote',
+                        triggerAction: 'context_menu_copy_onenote',
+                    });
+                }
+            );
+            if (isSuccess) {
+                setIsOneNoteCopied(true);
+                setTimeout(() => {
+                    setIsOneNoteCopied(false);
+                    onClose();
+                }, 1200);
+            }
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'PromptImageContextMenu.handleCopyForOneNote.outer',
+                triggerAction: 'context_menu_copy_onenote_outer',
+            });
+        }
+    }, [altText, imageSrc, onClose]);
+
     const handleCopyLink = useCallback(async () => {
         try {
             await copyToClipboard(imageSrc);
@@ -205,7 +240,7 @@ export function PromptImageContextMenu({
 
     // Viewport boundary clamping
     const menuWidth = 230;
-    const menuHeight = 210;
+    const menuHeight = 250;
     const x = Math.min(position.x, window.innerWidth - menuWidth - 12);
     const y = Math.min(position.y, window.innerHeight - menuHeight - 12);
 
@@ -262,6 +297,21 @@ export function PromptImageContextMenu({
                 )}
                 <span className="font-medium">
                     {isMarkdownCopied ? 'Copied Image as Text!' : 'Copy Image as Text (Markdown)'}
+                </span>
+            </button>
+
+            <button
+                type="button"
+                onClick={handleCopyForOneNote}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-left text-slate-200 hover:bg-purple-600/25 hover:text-purple-200 transition-colors cursor-pointer"
+            >
+                {isOneNoteCopied ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                    <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                )}
+                <span className="font-medium">
+                    {isOneNoteCopied ? 'Copied for OneNote/IDE!' : 'Copy Image for OneNote/IDE'}
                 </span>
             </button>
 

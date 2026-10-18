@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, type WheelEvent, type MouseEvent } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw, Copy, Check, Download, X, Image as ImageIcon, FileText } from 'lucide-react';
-import { writeNativeImageToClipboard, copyImageAsMarkdownText } from './clipboard';
+import { writeNativeImageToClipboard, copyImageAsMarkdownText, copySingleImageForOneNoteOrIde } from './clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 
 export interface PromptImagePreviewModalProps {
@@ -21,6 +21,7 @@ export function PromptImagePreviewModal({
     const [isPanning, setIsPanning] = useState(false);
     const [isCopied, setIsCopied] = useState(false);
     const [isTextCopied, setIsTextCopied] = useState(false);
+    const [isOneNoteCopied, setIsOneNoteCopied] = useState(false);
     const dragStartRef = useRef({ x: 0, y: 0, initialPanX: 0, initialPanY: 0 });
 
     const handleResetZoom = useCallback(() => {
@@ -41,6 +42,8 @@ export function PromptImagePreviewModal({
         if (isOpen) {
             handleResetZoom();
             setIsCopied(false);
+            setIsTextCopied(false);
+            setIsOneNoteCopied(false);
         }
     }, [isOpen, imageSrc, handleResetZoom]);
 
@@ -128,6 +131,35 @@ export function PromptImagePreviewModal({
             });
         }
     }, [imageSrc]);
+
+    const handleCopyOneNote = useCallback(async () => {
+        if (!imageSrc) return;
+        try {
+            const isSuccess = await copySingleImageForOneNoteOrIde(
+                imageSrc,
+                altText || 'Image',
+                () => {
+                    setIsOneNoteCopied(true);
+                    setTimeout(() => setIsOneNoteCopied(false), 2200);
+                },
+                (err) => {
+                    useErrorStore.getState().trackWarning(err, {
+                        source: 'PromptImagePreviewModal.handleCopyOneNote',
+                        triggerAction: 'copy_image_onenote_preview',
+                    });
+                }
+            );
+            if (isSuccess) {
+                setIsOneNoteCopied(true);
+                setTimeout(() => setIsOneNoteCopied(false), 2200);
+            }
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'PromptImagePreviewModal.handleCopyOneNote.outer',
+                triggerAction: 'copy_image_onenote_preview_outer',
+            });
+        }
+    }, [altText, imageSrc]);
 
     const handleCopyText = useCallback(async () => {
         if (!imageSrc) return;
@@ -240,7 +272,16 @@ export function PromptImagePreviewModal({
                         title="Copy native PNG image binary to clipboard for pasting into Gemini Web, Photoshop, Paint"
                     >
                         {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{isCopied ? 'Copied PNG!' : 'Copy PNG'}</span>
+                        <span>{isCopied ? 'Copied Single Image!' : 'Copy Single Image (PNG)'}</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleCopyOneNote}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 transition-colors cursor-pointer font-medium"
+                        title="Copy rich image for OneNote, Word, or Markdown for IDEs"
+                    >
+                        {isOneNoteCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <FileText className="w-3.5 h-3.5 text-indigo-400" />}
+                        <span>{isOneNoteCopied ? 'Copied for OneNote/IDE!' : 'Copy Image for OneNote/IDE'}</span>
                     </button>
                     <button
                         type="button"
@@ -248,8 +289,8 @@ export function PromptImagePreviewModal({
                         className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-sky-600/30 hover:bg-sky-600/50 text-sky-200 transition-colors cursor-pointer font-medium"
                         title="Copy image as Markdown text (![Image](...))"
                     >
-                        {isTextCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <FileText className="w-3.5 h-3.5" />}
-                        <span>{isTextCopied ? 'Copied Text!' : 'Copy as Text'}</span>
+                        {isTextCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <FileText className="w-3.5 h-3.5 text-sky-400" />}
+                        <span>{isTextCopied ? 'Copied Image as Text!' : 'Copy Image as Text (Markdown)'}</span>
                     </button>
                     <button
                         type="button"

@@ -143,9 +143,17 @@ pub fn backup_active_running_prompts_for_instance(
         if let Some(existing_rec_id) = existing_unrestored {
             // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
             crate::error::record_ignored(conn.execute(
-                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, is_restored = 0 WHERE id = ?4",
-                params![record.backup_batch_id, now, target_inst, existing_rec_id],
+                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, is_restored = 0, has_images = ?4, images_payload = ?5, prompt_text = ?6 WHERE id = ?7",
+                params![record.backup_batch_id, now, target_inst, record.has_images, record.images_payload, record.prompt_text, existing_rec_id],
             ), "db execute");
+            let payload_bytes = record.images_payload.as_ref().map(|s| s.len()).unwrap_or(0);
+            crate::modules::logger::log_info(&format!(
+                "[PROMPT_BACKUP] Backed up prompt {} for instance '{}' (has_images: {}, payload_bytes: {})",
+                record.prompt_id,
+                record.instance_id.as_deref().unwrap_or(target_inst),
+                record.has_images,
+                payload_bytes
+            ));
             records.push(record);
             continue;
         }
@@ -162,9 +170,17 @@ pub fn backup_active_running_prompts_for_instance(
         if let Some(existing_rec_id) = existing_restored {
             // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
             crate::error::record_ignored(conn.execute(
-                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, is_restored = 0, restored_at = NULL WHERE id = ?4",
-                params![record.backup_batch_id, now, target_inst, existing_rec_id],
+                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, is_restored = 0, restored_at = NULL, has_images = ?4, images_payload = ?5, prompt_text = ?6 WHERE id = ?7",
+                params![record.backup_batch_id, now, target_inst, record.has_images, record.images_payload, record.prompt_text, existing_rec_id],
             ), "db execute");
+            let payload_bytes = record.images_payload.as_ref().map(|s| s.len()).unwrap_or(0);
+            crate::modules::logger::log_info(&format!(
+                "[PROMPT_BACKUP] Backed up prompt {} for instance '{}' (has_images: {}, payload_bytes: {})",
+                record.prompt_id,
+                record.instance_id.as_deref().unwrap_or(target_inst),
+                record.has_images,
+                payload_bytes
+            ));
             records.push(record);
             continue;
         }
@@ -196,6 +212,15 @@ pub fn backup_active_running_prompts_for_instance(
             ],
         )
         .map_err(|e| format!("Failed to insert prompt backup record: {}", e))?;
+
+        let payload_bytes = record.images_payload.as_ref().map(|s| s.len()).unwrap_or(0);
+        crate::modules::logger::log_info(&format!(
+            "[PROMPT_BACKUP] Backed up prompt {} for instance '{}' (has_images: {}, payload_bytes: {})",
+            record.prompt_id,
+            record.instance_id.as_deref().unwrap_or(target_inst),
+            record.has_images,
+            payload_bytes
+        ));
 
         records.push(record);
     }
@@ -383,9 +408,17 @@ pub fn backup_queued_prompts_for_instance(
         if let Some(existing_rec_id) = existing_unrestored {
             // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
             crate::error::record_ignored(conn.execute(
-                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, sequence_id = ?4, is_restored = 0 WHERE id = ?5",
-                params![record.backup_batch_id, now, eff_inst, record.sequence_id, existing_rec_id],
+                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, sequence_id = ?4, is_restored = 0, has_images = ?5, images_payload = ?6, prompt_text = ?7 WHERE id = ?8",
+                params![record.backup_batch_id, now, eff_inst, record.sequence_id, record.has_images, record.images_payload, record.prompt_text, existing_rec_id],
             ), "db execute");
+            let payload_bytes = record.images_payload.as_ref().map(|s| s.len()).unwrap_or(0);
+            crate::modules::logger::log_info(&format!(
+                "[PROMPT_BACKUP] Backed up prompt {} for instance '{}' (has_images: {}, payload_bytes: {})",
+                record.prompt_id,
+                record.instance_id.as_deref().unwrap_or(target_inst),
+                record.has_images,
+                payload_bytes
+            ));
             records.push(record);
             continue;
         }
@@ -402,9 +435,17 @@ pub fn backup_queued_prompts_for_instance(
         if let Some(existing_rec_id) = existing_restored {
             // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
             crate::error::record_ignored(conn.execute(
-                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, sequence_id = ?4, is_restored = 0, restored_at = NULL WHERE id = ?5",
-                params![record.backup_batch_id, now, eff_inst, record.sequence_id, existing_rec_id],
+                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, sequence_id = ?4, is_restored = 0, restored_at = NULL, has_images = ?5, images_payload = ?6, prompt_text = ?7 WHERE id = ?8",
+                params![record.backup_batch_id, now, eff_inst, record.sequence_id, record.has_images, record.images_payload, record.prompt_text, existing_rec_id],
             ), "db execute");
+            let payload_bytes = record.images_payload.as_ref().map(|s| s.len()).unwrap_or(0);
+            crate::modules::logger::log_info(&format!(
+                "[PROMPT_BACKUP] Backed up prompt {} for instance '{}' (has_images: {}, payload_bytes: {})",
+                record.prompt_id,
+                record.instance_id.as_deref().unwrap_or(target_inst),
+                record.has_images,
+                payload_bytes
+            ));
             records.push(record);
             continue;
         }
@@ -436,6 +477,15 @@ pub fn backup_queued_prompts_for_instance(
             ],
         )
         .map_err(|e| format!("Failed to insert queued prompt backup record: {}", e))?;
+
+        let payload_bytes = record.images_payload.as_ref().map(|s| s.len()).unwrap_or(0);
+        crate::modules::logger::log_info(&format!(
+            "[PROMPT_BACKUP] Backed up prompt {} for instance '{}' (has_images: {}, payload_bytes: {})",
+            record.prompt_id,
+            record.instance_id.as_deref().unwrap_or(target_inst),
+            record.has_images,
+            payload_bytes
+        ));
 
         records.push(record);
     }

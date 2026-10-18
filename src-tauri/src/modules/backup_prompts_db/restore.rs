@@ -99,6 +99,10 @@ pub fn restore_running_prompts_for_instance(
         let eff_inst = rec.instance_id.as_deref().unwrap_or(target_inst);
         let restored_status = prompt_status_after_restore(&rec.status);
         crate::modules::logger::log_info(&format!(
+            "[PROMPT_RESTORE] Restoring prompt {} for instance '{}' (has_images: {}) -> status: {}",
+            rec.prompt_id, eff_inst, rec.has_images, restored_status
+        ));
+        crate::modules::logger::log_info(&format!(
             "[BackupDB] Restore prompt {} on {}: saved '{}' -> '{}'",
             rec.prompt_id, eff_inst, rec.status, restored_status
         ));
