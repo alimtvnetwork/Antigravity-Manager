@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.232.1] - 2026-10-18
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
 ## [v4.232.0] - 2026-10-18
 
 ### Added
@@ -729,7 +736,6 @@
     *   **v4.232.0 (2026-10-18)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.231.0 (2026-10-18)**:
         -   **[Instance Management & UI/UX Synchronization] PID Inline List View Layout, Deterministic Process Termination Ladder, Account Switch Pre-Switch Eviction, Royal Violet Switch Account Modal & Sharded Audit Trail Visibility (Thanks to @aukgit)**:
