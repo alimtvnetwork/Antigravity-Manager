@@ -119,8 +119,13 @@ pub(crate) fn collect_all_peer_connections() -> Vec<crate::modules::ssh_manager:
                 username: "Administrator".to_string(),
                 key_path: String::new(),
                 os: "Windows".to_string(),
-                auth_type: "key".to_string(),
-                password_encrypted: None,
+                encrypted_password: String::new(),
+                encryption_algo: "RSA-2048".to_string(),
+                os_group: None,
+                os_version: None,
+                build_version: None,
+                first_run_at: None,
+                created_at: None,
             });
         }
     }

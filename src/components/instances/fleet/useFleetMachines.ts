@@ -22,6 +22,36 @@ export interface FleetMachinesState {
     toggleRowMask: (nodeId: string) => void;
 }
 
+interface SshNodeItem {
+    alias: string;
+    ip: string;
+    status?: string;
+    port?: number;
+    os?: string;
+}
+
+function mapSshNodesToFleet(sshNodes: SshNodeItem[], localId: string): FleetMachineInfo[] {
+    return sshNodes
+        .filter((n) => n.alias && !n.alias.toLowerCase().startsWith('local') && n.alias !== localId)
+        .map((n) => ({
+            node_id: `ssh_${n.alias}`,
+            node_alias: n.alias,
+            ip_address: n.ip,
+            is_online: n.status === 'online' || n.status === 'ready',
+            last_heartbeat_timestamp: Math.floor(Date.now() / 1000),
+            uptime_seconds: 0,
+            in_flight_prompts_count: 0,
+            active_instances: [
+                {
+                    profile_id: `${n.alias}:default`,
+                    profile_name: `${n.alias}:default`,
+                    is_running: true,
+                },
+            ],
+            bound_emails: [],
+        }));
+}
+
 export function useFleetMachines(): FleetMachinesState {
     const [machines, setMachines] = useState<FleetMachineInfo[]>([]);
     const [localNodeId, setLocalNodeId] = useState<string>('');
@@ -61,7 +91,6 @@ export function useFleetMachines(): FleetMachinesState {
             try {
                 const config = await supabaseService.getConfig().catch(() => null);
                 const syncActive = Boolean(config?.is_sync_enabled);
-                setIsSyncEnabled(syncActive);
 
                 let effectiveLocalId = localNodeId;
                 if (!effectiveLocalId) {
@@ -73,11 +102,27 @@ export function useFleetMachines(): FleetMachinesState {
                 }
 
                 const data = await fetchFleetMachinesApi();
-                const filtered = data.filter(
+                let filtered = data.filter(
                     (m) =>
                         !(m as { is_local?: boolean }).is_local &&
                         (effectiveLocalId ? m.node_id !== effectiveLocalId : true)
                 );
+
+                if (filtered.length === 0) {
+                    try {
+                        const sshNodes = await invoke<SshNodeItem[]>('list_ssh_nodes');
+                        if (sshNodes && sshNodes.length > 0) {
+                            filtered = mapSshNodesToFleet(sshNodes, effectiveLocalId);
+                        }
+                    } catch (e) {
+                        useErrorStore.getState().trackWarning(e, {
+                            source: 'FleetMachinesTable.fallback_ssh_nodes',
+                            triggerAction: 'fetch_ssh_nodes',
+                        });
+                    }
+                }
+
+                setIsSyncEnabled(syncActive || filtered.length > 0);
                 setMachines(filtered);
             } catch (err) {
                 // Tracked in the error module; stale list kept, retried on next refresh.
@@ -117,11 +162,27 @@ export function useFleetMachines(): FleetMachinesState {
 
                 const data = await fetchFleetMachinesApi();
                 if (isMounted) {
-                    const filtered = data.filter(
+                    let filtered = data.filter(
                         (m) =>
                             !(m as { is_local?: boolean }).is_local &&
                             (localId ? m.node_id !== localId : true)
                     );
+
+                    if (filtered.length === 0) {
+                        try {
+                            const sshNodes = await invoke<SshNodeItem[]>('list_ssh_nodes');
+                            if (sshNodes && sshNodes.length > 0) {
+                                filtered = mapSshNodesToFleet(sshNodes, localId);
+                            }
+                        } catch (e) {
+                            useErrorStore.getState().trackWarning(e, {
+                                source: 'FleetMachinesTable.init_fallback_ssh_nodes',
+                                triggerAction: 'init_ssh_nodes',
+                            });
+                        }
+                    }
+
+                    setIsSyncEnabled(syncActive || filtered.length > 0);
                     setMachines(filtered);
                 }
             } catch (err) {

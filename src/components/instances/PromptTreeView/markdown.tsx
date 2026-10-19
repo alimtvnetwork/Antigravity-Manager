@@ -118,24 +118,14 @@ function parseInlineMarkdown(
                 </span>
             );
         } else if (imgSrc !== undefined) {
-            const resolvedImgSrc = resolveImageSrc(imgSrc);
             rawNodes.push(
-                <img
+                <MarkdownImage
                     key={`img-${match.index}`}
-                    src={resolvedImgSrc}
+                    src={imgSrc}
                     alt={imgAlt || ''}
-                    onClick={() => onImageClick?.(resolvedImgSrc, imgAlt)}
-                    onContextMenu={(e) => {
-                        if (onImageContextMenu) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onImageContextMenu(e, resolvedImgSrc, imgAlt);
-                        }
-                    }}
+                    onClick={onImageClick}
+                    onContextMenu={onImageContextMenu}
                     className={`inline-block max-h-48 max-w-full my-1 rounded-md border border-slate-200 dark:border-[#40285e] ${onImageClick ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}`}
-                    onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                    }}
                 />
             );
         } else if (linkUrl !== undefined) {
@@ -466,24 +456,14 @@ export function RichMarkdownRenderer({
         if (singleImgMatch) {
             const imgSrc = singleImgMatch[2];
             const imgAlt = singleImgMatch[1] || '';
-            const resolvedImgSrc = resolveImageSrc(imgSrc);
             elements.push(
                 <div key={`imgline-${i}`} className="my-2">
-                    <img
-                        src={resolvedImgSrc}
+                    <MarkdownImage
+                        src={imgSrc}
                         alt={imgAlt}
-                        onClick={() => onImageClick?.(resolvedImgSrc, imgAlt)}
-                        onContextMenu={(e) => {
-                            if (onImageContextMenu) {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onImageContextMenu(e, resolvedImgSrc, imgAlt);
-                            }
-                        }}
+                        onClick={onImageClick}
+                        onContextMenu={onImageContextMenu}
                         className={`max-h-60 max-w-full rounded-md border border-slate-200 dark:border-[#40285e] object-contain bg-slate-100 dark:bg-[#090611] ${onImageClick ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}`}
-                        onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
-                        }}
                     />
                     {imgAlt && <div className="text-[10px] text-slate-400 mt-0.5">{imgAlt}</div>}
                 </div>
