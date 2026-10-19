@@ -139,12 +139,17 @@ pub fn button_json(text: &str, callback_data: &str, style: Option<&str>) -> Valu
 
 /// Proper name for `alias`. Non-generated aliases skip GitMap. Generated aliases
 /// reuse SQLite until the refresh window elapses, then query GitMap once.
+/// Proper name for `alias`. Non-generated aliases skip GitMap. Generated aliases
+/// or "none" reuse SQLite until the refresh window elapses, then query GitMap once.
 pub fn display_name_for(alias: &str) -> String {
     let alias = alias.trim();
     if alias.is_empty() {
         return String::new();
     }
-    if !is_generated_node_alias(alias) {
+    if alias.contains("(collected from gitmap)") {
+        return alias.to_string();
+    }
+    if !alias.eq_ignore_ascii_case("none") && !is_generated_node_alias(alias) {
         remember(alias, alias);
         return alias.to_string();
     }
@@ -190,7 +195,10 @@ fn refresh_window_secs() -> i64 {
 
 fn fallback_name(alias: &str) -> String {
     let detected = crate::modules::email_watcher::detect_machine_name();
-    if !detected.trim().is_empty() && !is_generated_node_alias(&detected) {
+    if !detected.trim().is_empty()
+        && !is_generated_node_alias(&detected)
+        && !detected.eq_ignore_ascii_case("none")
+    {
         detected
     } else {
         alias.to_string()
@@ -198,36 +206,78 @@ fn fallback_name(alias: &str) -> String {
 }
 
 fn pick_better_alias(requested: &str, items: &[SshNodeExportItem]) -> Option<String> {
-    let exact = items
-        .iter()
-        .find(|item| item.alias.eq_ignore_ascii_case(requested));
-    if let Some(item) = exact {
-        if !is_generated_node_alias(&item.alias) && !item.alias.trim().is_empty() {
-            return Some(item.alias.clone());
+    let req_clean = requested.trim();
+
+    // 1. Direct match: if requested is a non-generated, non-none alias matching an item
+    if !req_clean.is_empty()
+        && !req_clean.eq_ignore_ascii_case("none")
+        && !is_generated_node_alias(req_clean)
+    {
+        if let Some(item) = items
+            .iter()
+            .find(|i| i.alias.eq_ignore_ascii_case(req_clean))
+        {
+            return Some(format!("{} (collected from gitmap)", item.alias));
         }
     }
-    if !is_generated_node_alias(requested) {
-        return None;
+
+    // 2. Local IP resolution: if requested is "none", empty, or auto-generated Node-*,
+    // resolve machine's local IP (e.g. 192.168.1.3) against GitMap node configs.
+    let local_ip = crate::modules::email_watcher::detect_local_ip();
+    if !local_ip.is_empty() && local_ip != "127.0.0.1" && local_ip != "Unknown IP" {
+        if let Some(item) = items.iter().find(|i| {
+            !i.alias.trim().is_empty()
+                && !i.alias.eq_ignore_ascii_case("none")
+                && !is_generated_node_alias(&i.alias)
+                && i.ip_address.trim() == local_ip.trim()
+        }) {
+            return Some(format!("{} (collected from gitmap)", item.alias));
+        }
     }
-    let ip = exact
-        .map(|item| item.ip_address.trim())
-        .filter(|ip| !ip.is_empty());
-    let Some(ip) = ip else {
-        return None;
-    };
-    items.iter().find_map(|item| {
-        if item.alias.trim().is_empty() || is_generated_node_alias(&item.alias) {
-            return None;
+
+    // 3. Match requested as an explicit IP
+    if !req_clean.is_empty() && !req_clean.eq_ignore_ascii_case("none") {
+        if let Some(item) = items.iter().find(|i| {
+            !i.alias.trim().is_empty()
+                && !i.alias.eq_ignore_ascii_case("none")
+                && !is_generated_node_alias(&i.alias)
+                && i.ip_address.trim().eq_ignore_ascii_case(req_clean)
+        }) {
+            return Some(format!("{} (collected from gitmap)", item.alias));
         }
-        if item.ip_address.eq_ignore_ascii_case(ip) {
-            Some(item.alias.clone())
-        } else {
-            None
-        }
-    })
+    }
+
+    None
 }
 
 fn export_gitmap_nodes() -> Result<Vec<SshNodeExportItem>, String> {
+    // 1. Check user home ~/.gitmap/gitmap-ssh-nodes.json
+    if let Some(home) = dirs::home_dir() {
+        let p = home.join(".gitmap").join("gitmap-ssh-nodes.json");
+        if p.exists() {
+            if let Ok(content) = std::fs::read_to_string(&p) {
+                if let Ok(items) = parse_export_items(&content) {
+                    if !items.is_empty() {
+                        return Ok(items);
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Check repo working directory ./gitmap-ssh-nodes.json
+    let local_file = std::path::Path::new("gitmap-ssh-nodes.json");
+    if local_file.exists() {
+        if let Ok(content) = std::fs::read_to_string(local_file) {
+            if let Ok(items) = parse_export_items(&content) {
+                if !items.is_empty() {
+                    return Ok(items);
+                }
+            }
+        }
+    }
+
+    // 3. Fall back to CLI export
     let mut cmd = std::process::Command::new("gitmap");
     #[cfg(target_os = "windows")]
     {

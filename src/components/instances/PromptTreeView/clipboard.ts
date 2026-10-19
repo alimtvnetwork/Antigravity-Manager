@@ -367,23 +367,62 @@ export async function convertImageUriToBase64(imageUri: string): Promise<string 
  * Invokes native `read_image_as_base64` and decodes directly via `base64ToBlob`
  * to completely eliminate canvas tainting and CORS failures.
  */
+/**
+ * Transcodes any image source or data URI (JPEG, WebP, SVG, PNG) through an offscreen HTMLCanvasElement
+ * to guarantee 100% valid PNG magic bytes (\x89PNG\r\n\x1a\n) before placing on the clipboard.
+ */
+export async function transcodeSrcToPngBlob(src: string): Promise<Blob | null> {
+    if (!src || !src.trim()) return null;
+    return await new Promise<Blob | null>((resolve) => {
+        const timeout = setTimeout(() => resolve(null), 7000);
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            clearTimeout(timeout);
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth || img.width || 300;
+                canvas.height = img.naturalHeight || img.height || 150;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    resolve(null);
+                    return;
+                }
+                ctx.drawImage(img, 0, 0);
+                canvas.toBlob((blob) => {
+                    resolve(blob);
+                }, 'image/png');
+            } catch {
+                resolve(null);
+            }
+        };
+        img.onerror = () => {
+            clearTimeout(timeout);
+            resolve(null);
+        };
+        img.src = src;
+    });
+}
+
+/**
+ * Converts an image URI (Base64 data URI, HTTP URL, or local file/blob URI)
+ * into a true PNG binary Blob (image/png) for native clipboard insertion.
+ * Invokes native `read_image_as_base64` and transcodes directly through an offscreen canvas
+ * to ensure 100% valid PNG magic bytes and eliminate CORS failures.
+ */
 export async function convertImageUriToPngBlob(imageUri: string): Promise<Blob | null> {
     try {
         if (!imageUri || !imageUri.trim()) return null;
         const cleanUri = imageUri.trim();
 
-        // 1. If it's already a PNG data URI, decode base64 directly to binary blob
-        if (cleanUri.startsWith('data:image/png;base64,')) {
-            const base64 = cleanUri.slice('data:image/png;base64,'.length);
-            return base64ToBlob(base64, 'image/png');
-        }
-
-        // 2. If it's a local file or asset URL, invoke native backend read_image_as_base64
+        // 1. If it's a local file or asset URL, invoke native backend read_image_as_base64
         const localPath = extractLocalPathFromUri(cleanUri);
         if (localPath && isTauriEnvironment()) {
             try {
                 const b64DataUri = await invoke<string>('read_image_as_base64', { path: localPath });
                 if (b64DataUri && b64DataUri.startsWith('data:image/')) {
+                    const transcoded = await transcodeSrcToPngBlob(b64DataUri);
+                    if (transcoded) return transcoded;
                     const commaIdx = b64DataUri.indexOf(',');
                     const base64Payload = commaIdx !== -1 ? b64DataUri.slice(commaIdx + 1) : b64DataUri;
                     return base64ToBlob(base64Payload, 'image/png');
@@ -396,112 +435,96 @@ export async function convertImageUriToPngBlob(imageUri: string): Promise<Blob |
             }
         }
 
-        // 3. If it's another data URI (e.g. data:image/jpeg;base64,...), decode payload directly
+        // 2. If it's already a data URI, transcode to genuine PNG
         if (cleanUri.startsWith('data:image/')) {
+            const transcoded = await transcodeSrcToPngBlob(cleanUri);
+            if (transcoded) return transcoded;
             const commaIdx = cleanUri.indexOf(',');
             const base64Payload = commaIdx !== -1 ? cleanUri.slice(commaIdx + 1) : cleanUri;
             return base64ToBlob(base64Payload, 'image/png');
         }
 
-        // 4. Offscreen rendering to HTMLCanvasElement for remote web URLs or non-Tauri browser environments
+        // 3. Remote URL or resolved src
         const resolvedSrc = resolveImageSrc(cleanUri);
-        return await new Promise<Blob | null>((resolve) => {
-            const timeout = setTimeout(() => resolve(null), 5000);
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload = () => {
-                clearTimeout(timeout);
-                try {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = img.naturalWidth || img.width || 300;
-                    canvas.height = img.naturalHeight || img.height || 150;
-                    const ctx = canvas.getContext('2d');
-                    if (!ctx) {
-                        resolve(null);
-                        return;
-                    }
-                    ctx.drawImage(img, 0, 0);
-                    canvas.toBlob((blob) => {
-                        resolve(blob);
-                    }, 'image/png');
-                } catch {
-                    resolve(null);
-                }
-            };
-            img.onerror = () => {
-                clearTimeout(timeout);
-                resolve(null);
-            };
-            img.src = resolvedSrc;
-        });
+        return await transcodeSrcToPngBlob(resolvedSrc);
     } catch {
         return null;
     }
 }
 
 /**
- * Writes a single image directly to the system clipboard as a native binary PNG (image/png).
- * This enables pasting directly into apps like Gemini Web, Photoshop, Paint, Discord, etc.
- * Falls back to Markdown text or URI if native clipboard write fails.
+ * Writes pure PNG binary (image/png) directly to the system clipboard without any
+ * competing text/plain or text/html MIME types. This ensures Microsoft OneNote,
+ * Telegram, Discord, Teams, Photoshop, etc. recognize the clipboard payload as a real
+ * image rather than stripping data URIs or pasting text.
  */
-export async function writeNativeImageToClipboard(
-    imageUri: string,
+export async function writePureImageToClipboard(
+    imageUriOrBlob: string | Blob,
     onSuccess?: (msg: string) => void,
     onError?: (err: unknown) => void
 ): Promise<boolean> {
     try {
-        if (!imageUri || !imageUri.trim()) {
-            throw new Error('No image URI provided to copy');
+        let pngBlob: Blob | null = null;
+        if (imageUriOrBlob instanceof Blob) {
+            pngBlob = imageUriOrBlob;
+        } else if (typeof imageUriOrBlob === 'string') {
+            pngBlob = await convertImageUriToPngBlob(imageUriOrBlob);
         }
-        const pngBlob = await convertImageUriToPngBlob(imageUri);
         if (!pngBlob) {
-            throw new Error('Failed to convert image to PNG binary blob');
+            throw new Error('Failed to convert image to valid PNG binary blob');
         }
+
         ensureDocumentFocus();
         const hasFocus = typeof document !== 'undefined' && typeof document.hasFocus === 'function' ? document.hasFocus() : true;
         if (hasFocus && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
             try {
+                // Strictly single MIME type: 'image/png' ONLY. Zero text/plain, zero text/html.
                 const item = new ClipboardItem({
                     'image/png': pngBlob,
                 });
                 await navigator.clipboard.write([item]);
-                const msg = 'Image copied to clipboard as native PNG!';
+                const msg = 'Image copied to clipboard as pure PNG!';
                 onSuccess?.(msg);
                 showToast({ message: msg, type: 'success' });
                 return true;
-            } catch {
-                // Focus was lost or binary write rejected; fall through to copyToClipboard fallback
+            } catch (clipErr) {
+                useErrorStore.getState().trackWarning(clipErr, {
+                    source: 'clipboard.writePureImageToClipboard.navigator',
+                    triggerAction: 'write_pure_image',
+                });
             }
         }
-        // Fallback: Markdown image tag or URI
-        const isDataUri = imageUri.startsWith('data:');
-        const fallbackPayload = isDataUri ? imageUri : `![Image](${imageUri})`;
+
+        // Fallback: Markdown image tag or URI via copyToClipboard
+        const fallbackPayload = typeof imageUriOrBlob === 'string' ? imageUriOrBlob : 'image.png';
         const fallbackOk = await copyToClipboard(fallbackPayload);
         if (fallbackOk) {
-            const msg = isDataUri ? 'Copied image URI to clipboard!' : 'Copied image reference to clipboard!';
+            const msg = 'Copied image reference to clipboard!';
             onSuccess?.(msg);
             showToast({ message: msg, type: 'info' });
             return true;
         }
         return false;
     } catch (err) {
-        // Fallback to copying image URI / markdown reference via multi-stage clipboard
-        const isDataUri = Boolean(imageUri && imageUri.startsWith('data:'));
-        const fallbackPayload = isDataUri ? imageUri : `![Image](${imageUri})`;
-        const fallbackOk = await copyToClipboard(fallbackPayload);
-        if (fallbackOk) {
-            const msg = isDataUri ? 'Copied image URI to clipboard!' : 'Copied image reference to clipboard!';
-            onSuccess?.(msg);
-            showToast({ message: msg, type: 'info' });
-            return true;
-        }
         useErrorStore.getState().trackWarning(err, {
-            source: 'clipboard.writeNativeImageToClipboard',
-            triggerAction: 'write_native_image',
+            source: 'clipboard.writePureImageToClipboard',
+            triggerAction: 'write_pure_image',
         });
         onError?.(err);
         return false;
     }
+}
+
+/**
+ * Writes a single image directly to the system clipboard as a native binary PNG (image/png).
+ * This enables pasting directly into apps like Gemini Web, Photoshop, Paint, Discord, OneNote, etc.
+ */
+export async function writeNativeImageToClipboard(
+    imageUri: string,
+    onSuccess?: (msg: string) => void,
+    onError?: (err: unknown) => void
+): Promise<boolean> {
+    return writePureImageToClipboard(imageUri, onSuccess, onError);
 }
 
 /**

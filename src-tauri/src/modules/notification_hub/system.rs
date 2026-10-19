@@ -113,14 +113,14 @@ async fn dispatch_telegram_update_alert(
 
     let node_line = if !m_ip.is_empty() && m_ip != "127.0.0.1" && m_ip != "Unknown IP" {
         format!(
-            "🖥️ <b>Machine:</b> <b>{}</b> [<code>{}</code>] • 🏷️ <b>Instance:</b> <b>{}</b>",
+            "🖥️ <b>Machine:</b> <b>{}</b> [<code>{}</code>]\n🏷️ <b>Instance:</b> <b>{}</b>",
             escape_telegram_html(&m_name),
             escape_telegram_html(&m_ip),
             escape_telegram_html(&active_inst_id)
         )
     } else {
         format!(
-            "🖥️ <b>Machine:</b> <b>{}</b> • 🏷️ <b>Instance:</b> <b>{}</b>",
+            "🖥️ <b>Machine:</b> <b>{}</b>\n🏷️ <b>Instance:</b> <b>{}</b>",
             escape_telegram_html(&m_name),
             escape_telegram_html(&active_inst_id)
         )

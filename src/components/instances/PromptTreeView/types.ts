@@ -27,6 +27,8 @@ export interface AgmConversationNode {
     latest_response?: string;
     execution_results?: string;
     tool_calls_summary?: string;
+    media_paths?: string[];
+    media_thumbnails?: string[];
     prompts?: AgmPromptTurnNode[];
     selected_turn_number?: number | null;
 }

@@ -208,6 +208,8 @@ export function usePromptTreePromptActions({
             return;
         }
 
+        const conv = selectedConversationRef.current || selectedConversation;
+        const mediaPaths = conv?.media_paths;
         const ok = await copyPromptWithRichImages(
             text,
             (msg) => {
@@ -227,13 +229,14 @@ export function usePromptTreePromptActions({
                     }
                 );
                 setError('Failed to copy prompt to clipboard');
-            }
+            },
+            mediaPaths
         );
         if (ok) {
             setIsCopiedAll(true);
             setTimeout(() => setIsCopiedAll(false), 2000);
         }
-    }, [editedPromptText, activePromptText, selectedConversation, activePromptTextRef, setIsCopiedAll, setActionMsg, setError]);
+    }, [editedPromptText, activePromptText, selectedConversation, activePromptTextRef, selectedConversationRef, setIsCopiedAll, setActionMsg, setError]);
 
     const handleCopyWithImagesRich = useCallback(async () => {
         await handleCopyAllWithRichImages();
@@ -398,6 +401,15 @@ export function usePromptTreePromptActions({
                 }
             }
 
+            // Append attached images from conversation media_paths if not already in markdown
+            const mediaList = selectedConversation?.media_paths || conv?.media_paths || [];
+            if (mediaList.length > 0) {
+                const missing = mediaList.filter((p) => p && !promptContent.includes(p));
+                if (missing.length > 0) {
+                    promptContent += '\n\n' + missing.map((p, idx) => `![Attached Image ${idx + 1}](${p})`).join('\n\n');
+                }
+            }
+
             // 1. Rewrite prompt to lightweight relative markdown links if Base64 images exist
             const { rewrittenPrompt } = extractPromptImages(promptContent);
 
@@ -416,7 +428,7 @@ export function usePromptTreePromptActions({
 
             // 3. Prime system clipboard concurrently with dual-MIME rich HTML images for immediate pasting.
             try {
-                await copyPromptWithRichImages(promptContent);
+                await copyPromptWithRichImages(promptContent, undefined, undefined, mediaList);
             } catch (clipErr) {
                 useErrorStore.getState().trackWarning(clipErr, {
                     source: 'PromptTreeViewModal.handleSend',
@@ -559,6 +571,15 @@ ${activePromptText}
                 }
             }
 
+            // Append attached images from conversation media_paths if not already in markdown
+            const mediaList = selectedConversation?.media_paths || conv.media_paths || [];
+            if (mediaList.length > 0) {
+                const missing = mediaList.filter((p) => p && !promptContent.includes(p));
+                if (missing.length > 0) {
+                    promptContent += '\n\n' + missing.map((p, idx) => `![Attached Image ${idx + 1}](${p})`).join('\n\n');
+                }
+            }
+
             // 1. Rewrite prompt to lightweight relative markdown links if Base64 images exist
             const { rewrittenPrompt } = extractPromptImages(promptContent);
 
@@ -567,7 +588,7 @@ ${activePromptText}
 
             // 3. Prime system clipboard concurrently with dual-MIME rich HTML images for immediate pasting
             try {
-                await copyPromptWithRichImages(promptContent);
+                await copyPromptWithRichImages(promptContent, undefined, undefined, mediaList);
             } catch (clipErr) {
                 useErrorStore.getState().trackWarning(clipErr, {
                     source: 'PromptTreeViewModal.handleEnqueuePrompt',

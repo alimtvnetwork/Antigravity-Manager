@@ -34,6 +34,7 @@ pub use detection::*;
 pub use formatting::*;
 pub use injection::*;
 pub use media::*;
+pub use node_label::*;
 pub use open_shot::*;
 pub use palette::*;
 pub use processing::*;

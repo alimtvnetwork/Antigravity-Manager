@@ -53,9 +53,10 @@ pub(crate) fn cmd_status(args: &[String]) {
 
     let is_json = args.iter().any(|a| a == "--json");
     let machine_name = email_watcher::detect_machine_name();
-    let node_alias = supabase_sync::load_config()
+    let raw_alias = supabase_sync::load_config()
         .map(|c| c.node_alias)
         .unwrap_or_else(|_| machine_name.clone());
+    let node_alias = telegram_inbound::display_name_for(&raw_alias);
     let local_ip = email_watcher::detect_local_ip();
     let active_acc = account::get_current_account().ok().flatten();
 

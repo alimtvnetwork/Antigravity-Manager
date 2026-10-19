@@ -85,8 +85,9 @@ pub fn format_expand_prompt_report(query_str: &str) -> String {
             );
             format!(
                 "{} <b>Prompt {} — {}</b>\n\
-                Machine: {} · Instance: <code>{}</code>\n\
-                Status: {}\n\
+                • <b>Machine:</b> {}\n\
+                • <b>Instance:</b> <code>{}</code>\n\
+                • <b>Status:</b> {}\n\
                 {}\n\
                 {}{}",
                 palette.mark,

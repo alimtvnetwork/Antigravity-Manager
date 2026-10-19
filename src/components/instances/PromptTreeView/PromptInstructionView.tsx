@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Check, RotateCcw, ChevronUp, ChevronDown, Clock, Image as LucideImage } from 'lucide-react';
+import { Check, Copy, RotateCcw, ChevronUp, ChevronDown, Clock, Image as LucideImage } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../../utils/cn';
 import { PromptViewMode, type AgmConversationNode, type AgmProjectTreeNode, type ViewMode } from './types';
@@ -7,7 +7,7 @@ import { RichMarkdownRenderer } from './markdown';
 import { countWords, formatPromptForMarkdown } from './formatters';
 import { PromptImagePreviewModal } from './PromptImagePreviewModal';
 import { PromptImageContextMenu } from './PromptImageContextMenu';
-import { resolveImageSrc, extractLocalPathFromUri } from './clipboard';
+import { resolveImageSrc, extractLocalPathFromUri, writePureImageToClipboard } from './clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 import { formatDateTime, formatDateOnly } from '../../../utils/date';
 
@@ -109,6 +109,7 @@ interface PromptThumbnailCardProps {
 function PromptThumbnailCard({ img, repoPath, onPreview, onContextMenu }: PromptThumbnailCardProps) {
     const [resolvedSrc, setResolvedSrc] = useState<string>(() => resolveImageSrc(img.src, repoPath));
     const [hasFailed, setHasFailed] = useState(false);
+    const [isThumbnailCopied, setIsThumbnailCopied] = useState(false);
 
     useEffect(() => {
         let isCancelled = false;
@@ -202,6 +203,25 @@ function PromptThumbnailCard({ img, repoPath, onPreview, onContextMenu }: Prompt
                     <span className="text-[9px] font-mono truncate w-full px-0.5">{img.alt || 'Attached Image'}</span>
                 </div>
             )}
+            {/* 1-Click Pure PNG Clipboard Button */}
+            <button
+                type="button"
+                onClick={async (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const target = resolvedSrc || img.src;
+                    const ok = await writePureImageToClipboard(target);
+                    if (ok) {
+                        setIsThumbnailCopied(true);
+                        setTimeout(() => setIsThumbnailCopied(false), 2000);
+                    }
+                }}
+                className="absolute top-1 right-1 p-1 rounded-sm bg-black/75 hover:bg-purple-600 text-white transition-all opacity-0 group-hover:opacity-100 cursor-pointer shadow-xs z-10"
+                title="Copy pure PNG to clipboard for OneNote / chat"
+                aria-label="Copy pure PNG image"
+            >
+                {isThumbnailCopied ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5 text-white" />}
+            </button>
             <div className="absolute bottom-0 inset-x-0 bg-black/60 text-[9px] text-white truncate px-1 py-0.5 rounded-b-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                 {img.alt}
             </div>
@@ -308,6 +328,35 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         () => extractImagesFromPrompt(activePromptText, selectedConversation),
         [activePromptText, selectedConversation]
     );
+
+    const [copiedPureImageIdx, setCopiedPureImageIdx] = useState<number | null>(null);
+    const [activeSequenceCopyIdx, setActiveSequenceCopyIdx] = useState<number | null>(null);
+
+    const handleCopyFirstImage = async () => {
+        if (!attachedImages || attachedImages.length === 0) return;
+        const first = attachedImages[0];
+        const ok = await writePureImageToClipboard(first.src);
+        if (ok) {
+            setCopiedPureImageIdx(0);
+            setActionMsg?.('Image copied to clipboard as pure PNG for OneNote / chat!');
+            setTimeout(() => {
+                setCopiedPureImageIdx(null);
+                setActionMsg?.(null);
+            }, 2500);
+        }
+    };
+
+    const handleCopyAllImagesSequence = async () => {
+        if (!attachedImages || attachedImages.length === 0) return;
+        const nextIdx = activeSequenceCopyIdx === null ? 0 : (activeSequenceCopyIdx + 1) % attachedImages.length;
+        const target = attachedImages[nextIdx];
+        const ok = await writePureImageToClipboard(target.src);
+        if (ok) {
+            setActiveSequenceCopyIdx(nextIdx);
+            setActionMsg?.(`Copied image ${nextIdx + 1} of ${attachedImages.length} (PNG)! Paste into OneNote, then click again for next.`);
+            setTimeout(() => setActionMsg?.(null), 3000);
+        }
+    };
 
     const turns = selectedConversation.prompts || [];
     const totalTurns = selectedConversation.prompts?.length || 1;
@@ -675,13 +724,39 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
             {/* Image Thumbnail Gallery Strip */}
             {attachedImages.length > 0 && (
                 <div className="p-2.5 rounded-lg border border-slate-200 dark:border-[#40285e] bg-white/70 dark:bg-[#120a1f]/80 backdrop-blur-xs space-y-2">
-                    <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300 flex-wrap gap-2">
                         <span className="flex items-center gap-1.5">
                             <span>🖼️ Attached Images ({attachedImages.length})</span>
                         </span>
-                        <span className="text-[10px] text-slate-400 font-normal">
-                            Click to preview · Right-click for options
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                            <button
+                                type="button"
+                                onClick={handleCopyFirstImage}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40 transition-colors shadow-2xs cursor-pointer"
+                                title="Copy first image to clipboard as pure PNG (ready to paste directly into OneNote or chat)"
+                            >
+                                <Copy className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+                                <span>{copiedPureImageIdx === 0 ? '✓ Copied PNG' : 'Copy Image (PNG)'}</span>
+                            </button>
+                            {attachedImages.length > 1 && (
+                                <button
+                                    type="button"
+                                    onClick={handleCopyAllImagesSequence}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-[#1f162e] dark:hover:bg-[#2b1f40] dark:text-slate-200 border border-slate-200 dark:border-[#3d2757] transition-colors shadow-2xs cursor-pointer"
+                                    title={`Copy images sequentially (currently ${activeSequenceCopyIdx !== null ? activeSequenceCopyIdx + 1 : 1}/${attachedImages.length}) - paste into OneNote and click again for next`}
+                                >
+                                    <Copy className="w-3 h-3 text-slate-500" />
+                                    <span>
+                                        {activeSequenceCopyIdx !== null
+                                            ? `Next Image (${activeSequenceCopyIdx + 1}/${attachedImages.length})`
+                                            : `Copy Images (${attachedImages.length})`}
+                                    </span>
+                                </button>
+                            )}
+                            <span className="text-[10px] text-slate-400 font-normal ml-1 hidden sm:inline">
+                                Click to preview
+                            </span>
+                        </div>
                     </div>
                     <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5">
                         {attachedImages.map((img, idx) => (
@@ -702,7 +777,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                 <div className="space-y-3">
                     <div
                         onDoubleClick={() => openInspector(selectedConversation, selectedProject?.repo_path || '')}
-                        className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#090611] p-5 text-xs text-slate-800 dark:text-slate-200 leading-relaxed max-h-[460px] overflow-y-auto cursor-pointer hover:border-blue-400 dark:hover:border-blue-500/50 transition-colors shadow-inner"
+                        className="rounded-xl border border-slate-200 dark:border-purple-500/25 bg-slate-50 dark:bg-[#0c0514]/95 p-5 text-xs text-slate-800 dark:text-slate-100 leading-relaxed max-h-[460px] overflow-y-auto cursor-pointer hover:border-purple-400 dark:hover:border-purple-500/50 transition-colors shadow-inner"
                     >
                         <RichMarkdownRenderer
                             content={displayedMarkdown}
@@ -751,7 +826,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
             {/* Tab 2: Raw Mode (Monospace Clean Text with Explicit <br /> Line Gaps) */}
             {viewMode === PromptViewMode.Raw && (
                 <div className="space-y-3">
-                    <div className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#090611] p-5 font-mono text-xs text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap break-words max-h-[460px] overflow-y-auto select-text shadow-inner">
+                    <div className="rounded-xl border border-slate-200 dark:border-purple-500/25 bg-slate-50 dark:bg-[#0c0514]/95 p-5 font-mono text-xs text-slate-800 dark:text-slate-100 leading-relaxed whitespace-pre-wrap break-words max-h-[460px] overflow-y-auto select-text shadow-inner">
                         {activePromptText ? (
                             formatPromptForMarkdown(activePromptText).split('\n').map((line, idx, arr) => (
                                 <span key={`raw-line-${idx}`} className="block">
@@ -778,7 +853,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                     <textarea
                         value={editedPromptText}
                         onChange={(e) => setEditedPromptText(e.target.value)}
-                        className="w-full h-80 rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#090611] p-4 font-mono text-xs text-slate-900 dark:text-slate-100 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-y"
+                        className="w-full h-80 rounded-xl border border-slate-200 dark:border-purple-500/25 bg-slate-50 dark:bg-[#0c0514]/95 p-4 font-mono text-xs text-slate-900 dark:text-slate-100 leading-relaxed focus:outline-none focus:ring-2 focus:ring-purple-500/40 resize-y"
                         placeholder="Type or modify prompt instruction here..."
                     />
                     <div className="flex items-center justify-between pt-1">

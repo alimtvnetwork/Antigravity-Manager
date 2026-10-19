@@ -1,5 +1,5 @@
 import { copyToClipboard } from '../../../utils/clipboard';
-import { copyImageAsMarkdownText, copySingleImageForOneNoteOrIde, writeNativeImageToClipboard, copyPromptWithRichImages, extractAssets, stripImagesFromPrompt } from './clipboard';
+import { copyImageAsMarkdownText, writePureImageToClipboard, copyPromptWithRichImages, extractAssets, stripImagesFromPrompt } from './clipboard';
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat } from 'lucide-react';
@@ -266,15 +266,18 @@ export function DetailHeader(props: DetailHeaderProps) {
                 ? (newConversationTitle?.trim() || undefined)
                 : selectedConversation.conversation_id;
             const originalPrompt = activePromptText || selectedConversation?.prompt_preview_200w || '';
-            // Image staging BEFORE dispatch (fail before point of no return):
-            // the attachment is validated above (readable, within 100MB cap).
-            // The file path rides in the message so the backend captures it
-            // into the side-channel image_payload at dispatch time; a broken
-            // staging aborts here via the catch below, never dispatching
-            // without the image.
-            const promptWithImage = attachedImage
-                ? `${originalPrompt.trim()}\n\n![attached-image](${attachedImage.path})`
-                : originalPrompt;
+            // Preserve both existing conversation media paths and any newly attached rerun image
+            let promptWithImage = originalPrompt;
+            const existingMedia: string[] = selectedConversation?.media_paths || [];
+            if (existingMedia.length > 0) {
+                const missing = existingMedia.filter((p: string) => p && !promptWithImage.includes(p));
+                if (missing.length > 0) {
+                    promptWithImage += '\n\n' + missing.map((p: string, idx: number) => `![Turn Image ${idx + 1}](${p})`).join('\n\n');
+                }
+            }
+            if (attachedImage && !promptWithImage.includes(attachedImage.path)) {
+                promptWithImage = `${promptWithImage.trim()}\n\n![attached-image](${attachedImage.path})`;
+            }
             const result = await dispatchRerunMessages({
                 targetInstId,
                 repoPath: rerunRepoPath ?? '',
@@ -371,10 +374,11 @@ export function DetailHeader(props: DetailHeaderProps) {
             } else {
                 const promptText = activePromptText || selectedConversation?.full_prompt_text || selectedConversation?.prompt_preview_200w || '';
                 const { images } = extractAssets(promptText);
-                if (images.length > 0) {
-                    await copySingleImageForOneNoteOrIde(images[0], 'Prompt Image');
+                const allImages = [...images, ...(selectedConversation?.media_paths || [])];
+                if (allImages.length > 0) {
+                    await writePureImageToClipboard(allImages[0]);
                 } else {
-                    await copyPromptWithRichImages(promptText);
+                    await copyPromptWithRichImages(promptText, undefined, undefined, selectedConversation?.media_paths);
                 }
             }
             setLocalCopiedOneNote(true);
@@ -393,8 +397,9 @@ export function DetailHeader(props: DetailHeaderProps) {
             } else {
                 const promptText = activePromptText || selectedConversation?.full_prompt_text || selectedConversation?.prompt_preview_200w || '';
                 const { images } = extractAssets(promptText);
-                if (images.length > 0) {
-                    await writeNativeImageToClipboard(images[0]);
+                const allImages = [...images, ...(selectedConversation?.media_paths || [])];
+                if (allImages.length > 0) {
+                    await writePureImageToClipboard(allImages[0]);
                 }
             }
             setLocalCopiedSinglePng(true);

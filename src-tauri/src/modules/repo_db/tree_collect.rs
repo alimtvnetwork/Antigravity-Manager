@@ -169,16 +169,18 @@ pub(crate) fn collect_tree_conversation_items(
 
             let inspection = inspect_conversation_transcript(base, &cid);
 
-            let is_conv_running = if is_explicit_idle || inspection.is_terminal_done {
-                // Explicit Idle Supremacy: unreset not_fully_idle artifacts must not override terminal status
-                false
-            } else if is_owning_inst_alive && not_fully_idle > 0 && is_recent {
-                true
-            } else if is_owning_inst_alive
+            let is_conv_running = if is_owning_inst_alive
                 && inspection.is_recent_active
-                && !is_explicit_idle
                 && !inspection.is_terminal_done
             {
+                // Live transcript activity supremacy: if the instance process is alive
+                // and the transcript was written within the last 15 seconds without a terminal done record,
+                // the conversation is actively running in real life regardless of stale database status.
+                true
+            } else if is_explicit_idle || inspection.is_terminal_done {
+                // Explicit Idle: unreset not_fully_idle artifacts must not override terminal status
+                false
+            } else if is_owning_inst_alive && not_fully_idle > 0 && is_recent {
                 true
             } else {
                 false
