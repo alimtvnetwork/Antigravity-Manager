@@ -654,6 +654,8 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             <div data-tauri-drag-region className="fixed top-0 left-0 right-0 h-8 z-[100000] pointer-events-none" />
 
             <div
+                onClick={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => e.stopPropagation()}
                 className={`flex flex-col overflow-hidden bg-white dark:bg-[#171025] shadow-2xl transition-all relative z-10 ${isFullscreen
                     ? "h-full w-full rounded-none border-0"
                     : "h-[88vh] w-full max-w-6xl rounded-2xl border border-slate-200 dark:border-[#40285e]"

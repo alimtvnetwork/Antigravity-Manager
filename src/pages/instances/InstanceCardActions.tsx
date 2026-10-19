@@ -13,8 +13,16 @@ import {
     Play,
     ArrowRightLeft,
     FastForward,
+    FileDown,
+    FileUp,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { showToast } from '../../components/common/ToastContainer';
+import {
+    downloadPromptTreeStatusJson,
+    openAndRestorePromptBackupFile,
+    resendPromptsForInstance,
+} from '../../components/instances/PromptTreeView/usePromptTreeCoreActions';
 import type { InstanceStatus } from '../../services/instanceService';
 import type { InstanceCardData } from './instanceCardData';
 import type { InstancePageApi } from './instancePageTypes';
@@ -229,6 +237,61 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                                                                 className="absolute right-0 bottom-full mb-1 z-30 min-w-[170px] rounded-[5px] border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025] py-1 text-slate-800 dark:text-slate-200 shadow-xl text-xs"
                                                                 onClick={(e) => e.stopPropagation()}
                                                             >
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={isBusy}
+                                                                    onClick={async () => {
+                                                                        setCardMoreId(null);
+                                                                        try {
+                                                                            const count = await resendPromptsForInstance(inst.config.id, (msg) => {
+                                                                                if (msg) showToast(msg, 'info');
+                                                                            });
+                                                                            showToast(`Resent ${count} prompt(s) for ${inst.config.name}`, 'success');
+                                                                        } catch (e: any) {
+                                                                            showToast(e?.message || 'Failed to resend prompts', 'error');
+                                                                        }
+                                                                    }}
+                                                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#40285e] text-blue-600 dark:text-cyan-300 cursor-pointer disabled:opacity-50"
+                                                                    title="Re-send running and queued prompts in FIFO order"
+                                                                >
+                                                                    <RotateCcw className="w-3.5 h-3.5 text-cyan-500" />
+                                                                    <span>Resend Prompts (FIFO)</span>
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={isBusy}
+                                                                    onClick={async () => {
+                                                                        setCardMoreId(null);
+                                                                        await downloadPromptTreeStatusJson('running_and_queued', undefined, (msg) => {
+                                                                            if (msg) showToast(msg, 'info');
+                                                                        });
+                                                                    }}
+                                                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#40285e] text-purple-600 dark:text-purple-300 cursor-pointer disabled:opacity-50"
+                                                                    title="Export running and queued prompts to JSON"
+                                                                >
+                                                                    <FileDown className="w-3.5 h-3.5 text-purple-500" />
+                                                                    <span>Export Prompts (.json)</span>
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={isBusy}
+                                                                    onClick={async () => {
+                                                                        setCardMoreId(null);
+                                                                        try {
+                                                                            await openAndRestorePromptBackupFile(inst.config.id, (msg) => {
+                                                                                if (msg) showToast(msg, 'info');
+                                                                            });
+                                                                        } catch (e: any) {
+                                                                            showToast(e?.message || 'Failed to restore prompts', 'error');
+                                                                        }
+                                                                    }}
+                                                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#40285e] text-emerald-600 dark:text-emerald-400 cursor-pointer disabled:opacity-50"
+                                                                    title="Restore prompts from JSON backup file"
+                                                                >
+                                                                    <FileUp className="w-3.5 h-3.5 text-emerald-500" />
+                                                                    <span>Restore Prompts (.json)</span>
+                                                                </button>
+                                                                <div className="my-1 border-t border-slate-100 dark:border-[#40285e]" />
                                                                 <button
                                                                     type="button"
                                                                     disabled={isBusy}

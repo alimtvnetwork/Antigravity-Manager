@@ -37,3 +37,50 @@ pub fn backup_queued_prompts(
         crate::modules::backup_prompts_db::backup_queued_prompts_for_instance(scope, None)?;
     Ok(batch)
 }
+
+/// Re-send all running commands for an instance or all instances
+#[tauri::command]
+pub fn resend_running_prompts(
+    instance_id: Option<String>,
+    limit: Option<usize>,
+) -> Result<Vec<crate::modules::repo_db::ActivePrompt>, String> {
+    let scope = instance_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty() && *s != "all");
+    crate::modules::repo_db::resend_running_commands_for_instance(scope, limit.unwrap_or(20).max(1))
+}
+
+/// Re-send both running and enqueued prompts for an instance or all instances
+#[tauri::command]
+pub fn resend_all_prompts(
+    instance_id: Option<String>,
+    limit: Option<usize>,
+) -> Result<usize, String> {
+    let scope = instance_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty() && *s != "all");
+    let lim = limit.unwrap_or(20).max(1);
+    let running_count = crate::modules::repo_db::resend_running_commands_for_instance(scope, lim)
+        .map(|v| v.len())
+        .unwrap_or(0);
+    let queued_outcome = crate::modules::repo_db::resend_queued_prompts_for_instance(scope, lim)
+        .map(|o| o.dispatched)
+        .unwrap_or(0);
+    Ok(running_count + queued_outcome)
+}
+
+/// Durably back up running and queued prompts for an instance
+#[tauri::command]
+pub fn backup_running_and_queued_prompts(
+    instance_id: Option<String>,
+) -> Result<crate::modules::backup_prompts_db::BackupBatchInfo, String> {
+    let scope = instance_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty() && *s != "all");
+    let (batch, _records) =
+        crate::modules::backup_prompts_db::backup_active_running_prompts_for_instance(scope, None)?;
+    Ok(batch)
+}

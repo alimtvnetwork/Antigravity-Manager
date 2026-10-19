@@ -140,11 +140,28 @@ function downloadJsonBlob(fileName: string, json: string): void {
 
 /**
  * Download JSON for running or queued prompts from the tree already loaded
- * in the prompt view. Uses the existing backup file writer in the desktop
- * app and a browser download otherwise.
+ * in the prompt view, or fetching the current tree on demand. Uses the existing
+ * backup file writer in the desktop app and a browser download otherwise.
  */
-export async function downloadPromptTreeStatusJson(kind: PromptTreeStatusExport): Promise<void> {
-    const projects = collectStatusPrompts(loadedPromptTree.tree, kind);
+export async function downloadPromptTreeStatusJson(
+    kind: PromptTreeStatusExport,
+    customTree?: AgmProjectTreeNode[],
+    notify?: (msg: string | null) => void
+): Promise<void> {
+    const notifier = notify || loadedPromptTree.notify;
+    let tree = customTree || loadedPromptTree.tree;
+    if (!tree || tree.length === 0) {
+        try {
+            tree = await invoke<AgmProjectTreeNode[]>('get_project_conversation_tree', {
+                maxWords: 2000,
+                onlyRunning: false,
+                force: false,
+            });
+        } catch {
+            tree = [];
+        }
+    }
+    const projects = collectStatusPrompts(tree, kind);
     const promptCount = projects.reduce((sum, project) => sum + project.conversations.length, 0);
     const label = kind === 'running_and_queued' ? 'running & queued' : kind;
     const payload = {
@@ -159,11 +176,11 @@ export async function downloadPromptTreeStatusJson(kind: PromptTreeStatusExport)
     const fileSlug = kind === 'running_and_queued' ? 'running-and-queued' : kind;
     const fileName = `prompts-${fileSlug}-${Date.now()}.json`;
     try {
-        loadedPromptTree.notify(`Exporting ${label} prompts...`);
+        notifier(`Exporting ${label} prompts...`);
         if (!isTauri()) {
             downloadJsonBlob(fileName, jsonStr);
-            loadedPromptTree.notify(`Exported ${promptCount} ${label} prompt(s) as JSON.`);
-            window.setTimeout(() => loadedPromptTree.notify(null), 3000);
+            notifier(`Exported ${promptCount} ${label} prompt(s) as JSON.`);
+            window.setTimeout(() => notifier(null), 3000);
             return;
         }
         const { save } = await import('@tauri-apps/plugin-dialog');
@@ -172,18 +189,112 @@ export async function downloadPromptTreeStatusJson(kind: PromptTreeStatusExport)
             filters: [{ name: 'JSON', extensions: ['json'] }],
         });
         if (!selected) {
-            loadedPromptTree.notify(null);
+            notifier(null);
             return;
         }
         await invoke('write_prompt_backup_file', { path: selected, content: jsonStr });
-        loadedPromptTree.notify(`Exported ${promptCount} ${label} prompt(s) to ${selected}`);
-        window.setTimeout(() => loadedPromptTree.notify(null), 4000);
+        notifier(`Exported ${promptCount} ${label} prompt(s) to ${selected}`);
+        window.setTimeout(() => notifier(null), 4000);
     } catch (err: unknown) {
         useErrorStore.getState().captureError(err, {
             source: 'PromptTreeViewModal.downloadPromptTreeStatusJson',
             triggerAction: `export_${kind}_prompts_json`,
         });
-        loadedPromptTree.notify(null);
+        notifier(null);
+    }
+}
+
+/**
+ * Restores prompts from raw JSON text in strict FIFO order, with an interactive
+ * 3-second countdown banner before dispatching restored prompts to the target instance.
+ */
+export async function restorePromptBackupFromJsonString(
+    content: string,
+    targetInstanceId?: string,
+    notify?: (msg: string | null) => void
+): Promise<{ restoredCount: number; dispatchedCount: number }> {
+    JSON.parse(content);
+    notify?.('Importing prompts backup...');
+    const restoredCount = await invoke<number>('restore_prompts_backup', { backupJson: content });
+    const targetInst = targetInstanceId || 'default';
+    for (let remaining = 3; remaining > 0; remaining--) {
+        notify?.(`⏳ Waiting time: ${remaining}s remaining · Next action: Resume and dispatch restored prompt(s) to instance ${targetInst}`);
+        await new Promise((r) => setTimeout(r, 1000));
+    }
+    let dispatched = 0;
+    try {
+        dispatched = await invoke<number>('dispatch_backed_up_prompts', {
+            instanceId: targetInst,
+        });
+    } catch (err: unknown) {
+        useErrorStore.getState().captureError(err, {
+            source: 'restorePromptBackupFromJsonString',
+            triggerAction: 'dispatch_backed_up_prompts',
+        });
+    }
+    notify?.(`Restored ${restoredCount} prompt(s) and dispatched ${dispatched} to instance ${targetInst}.`);
+    window.setTimeout(() => notify?.(null), 5000);
+    return { restoredCount, dispatchedCount: dispatched };
+}
+
+/**
+ * Opens the native file picker to select a .json prompts backup and restores it.
+ */
+export async function openAndRestorePromptBackupFile(
+    targetInstanceId?: string,
+    notify?: (msg: string | null) => void
+): Promise<{ restoredCount: number; dispatchedCount: number } | null> {
+    if (!isTauri()) {
+        return new Promise((resolve) => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json,application/json';
+            input.onchange = async () => {
+                const file = input.files?.[0];
+                if (!file) {
+                    resolve(null);
+                    return;
+                }
+                const text = await file.text();
+                const res = await restorePromptBackupFromJsonString(text, targetInstanceId, notify);
+                resolve(res);
+            };
+            input.click();
+        });
+    }
+    const { open } = await import('@tauri-apps/plugin-dialog');
+    const selected = await open({
+        multiple: false,
+        filters: [{ name: 'JSON Backup', extensions: ['json'] }],
+    });
+    if (!selected || typeof selected !== 'string') return null;
+    const content = await invoke<string>('read_prompt_backup_file', { path: selected });
+    return await restorePromptBackupFromJsonString(content, targetInstanceId, notify);
+}
+
+/**
+ * Re-sends all running and queued prompts for an instance or all instances in FIFO order.
+ */
+export async function resendPromptsForInstance(
+    instanceId?: string | null,
+    notify?: (msg: string | null) => void
+): Promise<number> {
+    notify?.('Re-sending prompts & queued messages in FIFO order...');
+    try {
+        const count = await invoke<number>('resend_all_prompts', {
+            instanceId: instanceId || undefined,
+            limit: 20,
+        });
+        notify?.(`Successfully resent ${count} prompt(s) in FIFO order.`);
+        window.setTimeout(() => notify?.(null), 4000);
+        return count;
+    } catch (err: unknown) {
+        useErrorStore.getState().captureError(err, {
+            source: 'resendPromptsForInstance',
+            triggerAction: 'resend_all_prompts',
+        });
+        notify?.(null);
+        throw err;
     }
 }
 

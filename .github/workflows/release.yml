@@ -456,12 +456,17 @@ jobs:
           LINUX_AMD64_SIG=$(read_sig "*_amd64.AppImage.sig")
           LINUX_AARCH64_SIG=$(read_sig "*_aarch64.AppImage.sig")
 
+          # Sanitize asset filename: GitHub Release replaces spaces and parentheses with dots
+          sanitize_asset() {
+            echo "$1" | sed 's/[ ()]/./g' | sed 's/\.\././g'
+          }
+
           # Read matching asset filenames for each platform
-          MACOS_AARCH64_ASSET=$(get_asset_name "*_aarch64.app.tar.gz" "agm-alim_aarch64.app.tar.gz")
-          MACOS_X64_ASSET=$(get_asset_name "*_x64.app.tar.gz" "agm-alim_x64.app.tar.gz")
-          WINDOWS_NSIS_ASSET=$(get_asset_name "*_x64-setup.exe" "agm-alim_${VER}_x64-setup.exe")
-          LINUX_AMD64_ASSET=$(get_asset_name "*_amd64.AppImage" "agm-alim_${VER}_amd64.AppImage")
-          LINUX_AARCH64_ASSET=$(get_asset_name "*_aarch64.AppImage" "agm-alim_${VER}_aarch64.AppImage")
+          MACOS_AARCH64_ASSET=$(sanitize_asset "$(get_asset_name "*_aarch64.app.tar.gz" "agm-alim_aarch64.app.tar.gz")")
+          MACOS_X64_ASSET=$(sanitize_asset "$(get_asset_name "*_x64.app.tar.gz" "agm-alim_x64.app.tar.gz")")
+          WINDOWS_NSIS_ASSET="agm-alim-setup.exe"
+          LINUX_AMD64_ASSET=$(sanitize_asset "$(get_asset_name "*_amd64.AppImage" "agm-alim_${VER}_amd64.AppImage")")
+          LINUX_AARCH64_ASSET=$(sanitize_asset "$(get_asset_name "*_aarch64.AppImage" "agm-alim_${VER}_aarch64.AppImage")")
 
           echo "Signatures found:"
           [ -n "$MACOS_AARCH64_SIG" ] && echo "  macOS aarch64: YES ($MACOS_AARCH64_ASSET)" || echo "  macOS aarch64: NO"

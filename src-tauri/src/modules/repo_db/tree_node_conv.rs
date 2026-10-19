@@ -190,7 +190,34 @@ pub(crate) fn build_active_prompt_conv_nodes(
     {
         for ap in aps {
             let cid = ap.session_id.clone().unwrap_or_else(|| ap.id.clone());
-            if let Some(target_conv) = conv_nodes.iter_mut().find(|c| c.conversation_id == cid) {
+            let target_idx = conv_nodes
+                .iter()
+                .position(|c| {
+                    c.conversation_id == cid
+                        || c.conversation_id.eq_ignore_ascii_case(&cid)
+                        || c.prompts.iter().any(|p| {
+                            p.prompt_text.trim() == ap.prompt_content.trim()
+                                || p.preview_200w.trim() == ap.prompt_content.trim()
+                        })
+                        || c.full_prompt_text.as_deref().unwrap_or("").trim()
+                            == ap.prompt_content.trim()
+                })
+                .or_else(|| {
+                    // If not matched by ID or text, but conversations exist for this project,
+                    // attach to the active conversation or most recently modified conversation
+                    // so we NEVER create duplicate competing conversation nodes that flap titles!
+                    if !conv_nodes.is_empty() {
+                        conv_nodes
+                            .iter()
+                            .position(|c| c.is_running || c.is_queued)
+                            .or_else(|| Some(conv_nodes.len() - 1))
+                    } else {
+                        None
+                    }
+                });
+
+            if let Some(idx) = target_idx {
+                let target_conv = &mut conv_nodes[idx];
                 let ap_status_lower = ap.status.to_lowercase();
                 if ap_status_lower.contains("queue")
                     || ap_status_lower.contains("running")
@@ -206,39 +233,62 @@ pub(crate) fn build_active_prompt_conv_nodes(
                         && (ap_status_lower.contains("running")
                             || ap_status_lower.contains("dispatched")
                             || ap_status_lower.contains("in_flight"));
-                    let turn_num = target_conv.prompts.len() + 1;
-                    let (ap_preview, _) =
-                        extract_prompt_words_preview(&ap.prompt_content, word_cap);
-                    let ap_turn = AgmPromptTurnNode {
-                        turn_number: turn_num,
-                        step_index: target_conv.prompts.len(),
-                        prompt_text: ap.prompt_content.clone(),
-                        preview_200w: ap_preview,
-                        status: if is_ap_run {
-                            "RUNNING".to_string()
+
+                    // Check if an existing turn already matches this prompt content
+                    let existing_turn = target_conv
+                        .prompts
+                        .iter_mut()
+                        .find(|p| p.prompt_text.trim() == ap.prompt_content.trim());
+
+                    if let Some(turn) = existing_turn {
+                        if is_ap_run {
+                            turn.is_running = true;
+                            turn.status = "RUNNING".to_string();
+                            target_conv.is_running = true;
+                            target_conv.status = "RUNNING".to_string();
                         } else if is_queued {
-                            "QUEUED".to_string()
-                        } else {
-                            "COMPLETED".to_string()
-                        },
-                        is_running: is_ap_run,
-                        is_queued,
-                        timestamp: chrono::DateTime::from_timestamp(ap.updated_at, 0)
-                            .map(|dt| dt.to_rfc3339())
-                            .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
-                        created_at: ap.created_at,
-                        media_paths: Vec::new(),
-                        media_thumbnails: Vec::new(),
-                    };
-                    target_conv.prompts.push(ap_turn);
-                    if is_queued {
-                        target_conv.is_queued = true;
-                    }
-                    if is_ap_run {
-                        target_conv.is_running = true;
-                        target_conv.status = "RUNNING".to_string();
-                    } else if is_queued && !target_conv.is_running {
-                        target_conv.status = "QUEUED".to_string();
+                            turn.is_queued = true;
+                            turn.status = "QUEUED".to_string();
+                            if !target_conv.is_running {
+                                target_conv.is_queued = true;
+                                target_conv.status = "QUEUED".to_string();
+                            }
+                        }
+                    } else {
+                        let turn_num = target_conv.prompts.len() + 1;
+                        let (ap_preview, _) =
+                            extract_prompt_words_preview(&ap.prompt_content, word_cap);
+                        let ap_turn = AgmPromptTurnNode {
+                            turn_number: turn_num,
+                            step_index: target_conv.prompts.len(),
+                            prompt_text: ap.prompt_content.clone(),
+                            preview_200w: ap_preview,
+                            status: if is_ap_run {
+                                "RUNNING".to_string()
+                            } else if is_queued {
+                                "QUEUED".to_string()
+                            } else {
+                                "COMPLETED".to_string()
+                            },
+                            is_running: is_ap_run,
+                            is_queued,
+                            timestamp: chrono::DateTime::from_timestamp(ap.updated_at, 0)
+                                .map(|dt| dt.to_rfc3339())
+                                .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
+                            created_at: ap.created_at,
+                            media_paths: Vec::new(),
+                            media_thumbnails: Vec::new(),
+                        };
+                        target_conv.prompts.push(ap_turn);
+                        if is_queued {
+                            target_conv.is_queued = true;
+                        }
+                        if is_ap_run {
+                            target_conv.is_running = true;
+                            target_conv.status = "RUNNING".to_string();
+                        } else if is_queued && !target_conv.is_running {
+                            target_conv.status = "QUEUED".to_string();
+                        }
                     }
                 }
                 continue;
