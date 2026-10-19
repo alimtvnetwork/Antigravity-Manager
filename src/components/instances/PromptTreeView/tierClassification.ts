@@ -74,27 +74,14 @@ export function classifyPromptTier(
         raw.includes('invoked by a caller agent') ||
         raw.includes('<subagent_reminder>') ||
         raw.includes('send_message to communicate all results') ||
-        raw.includes('Execute enhanced Read Memory protocol') ||
-        raw.includes('You are pair programming with a USER') ||
-        raw.includes('Project Structure Memory Analysis') ||
-        raw.includes('Safe Removal Architect') ||
-        raw.includes('Spec Author') ||
-        raw.includes('Codebase Researcher') ||
-        raw.includes('Database Debugger') ||
-        raw.includes('QA Tester') ||
-        raw.includes('Read & Understand') ||
         /Role:\s*(?:Codebase Researcher|Database Debugger|QA Tester|Subagent|Worker|Architect)/i.test(raw) ||
-        cleanTitle.includes('subagent') ||
-        cleanTitle.includes('worker-') ||
-        cleanTitle.includes('worker ') ||
-        cleanTitle.includes('author-') ||
-        cleanTitle.includes('researcher') ||
-        cleanTitle.includes('debugger') ||
-        cleanTitle.includes('memory') ||
-        cleanTitle.includes('analysis') ||
-        cleanTitle.includes('spec') ||
-        cleanTitle.includes('tester') ||
-        cleanTitle.includes('qa') ||
+        cleanTitle.startsWith('subagent:') ||
+        cleanTitle.startsWith('subagent-') ||
+        cleanTitle.startsWith('subagent ') ||
+        cleanTitle.startsWith('[subagent]') ||
+        cleanTitle.startsWith('worker:') ||
+        cleanTitle.startsWith('worker-') ||
+        cleanTitle.startsWith('worker ') ||
         metadata?.is_subagent === true ||
         metadata?.prompt_category === 'subagent';
 
@@ -102,22 +89,16 @@ export function classifyPromptTier(
         let detectedRole = 'Subagent';
         if (subagentRoleMatch) {
             detectedRole = subagentRoleMatch[1].trim();
-        } else if (cleanTitle.includes('memory') || raw.includes('Memory Analysis')) {
-            detectedRole = 'Memory Analysis';
-        } else if (cleanTitle.includes('spec') || raw.includes('Spec Author')) {
-            detectedRole = 'Spec Author';
+        } else if (cleanTitle.startsWith('worker')) {
+            detectedRole = 'Worker';
         } else if (cleanTitle.includes('research') || raw.includes('Researcher')) {
             detectedRole = 'Researcher';
-        } else if (cleanTitle.includes('worker')) {
-            detectedRole = 'Worker';
         } else if (cleanTitle.includes('debug') || raw.includes('Debugger')) {
             detectedRole = 'Debugger';
-        } else if (cleanTitle.includes('tester') || cleanTitle.includes('qa') || raw.includes('QA Tester')) {
+        } else if (cleanTitle.includes('tester') || raw.includes('QA Tester')) {
             detectedRole = 'QA Tester';
         } else if (cleanTitle.includes('architect') || raw.includes('Architect')) {
             detectedRole = 'Architect';
-        } else if (cleanTitle.includes('analysis') || raw.includes('Analysis')) {
-            detectedRole = 'Analysis';
         }
 
         return {
@@ -184,11 +165,15 @@ export function assembleConversationHierarchy(
         };
 
         if (classification.tier === PromptOriginTier.SubagentInstruction) {
-            if (currentRoot) {
+            const rootTime = currentRoot ? (new Date(currentRoot.primaryNode.last_modified).getTime() || 0) : 0;
+            const nodeTime = new Date(conv.last_modified).getTime() || 0;
+            const isRecentChild = currentRoot && Math.abs(nodeTime - rootTime) <= 2 * 3600 * 1000;
+
+            if (currentRoot && isRecentChild) {
                 // Attach as child sub-point to active root prompt
                 currentRoot.subagents.push(node);
             } else {
-                // If no root has occurred yet, treat as standalone root
+                // If no root has occurred yet or gap > 2 hours, treat as standalone root
                 rootNodes.push(node);
             }
         } else {

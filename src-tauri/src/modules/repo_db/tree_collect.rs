@@ -125,10 +125,10 @@ pub(crate) fn collect_tree_conversation_items(
         );
 
         let Ok(mut stmt) = s_conn.prepare(
-            "SELECT conversation_id, title, preview, status, not_fully_idle, workspace_uris, last_modified_time 
-             FROM conversation_summaries 
-             ORDER BY last_modified_time DESC 
-             LIMIT 200",
+            "SELECT conversation_id, title, preview, status, not_fully_idle, workspace_uris, last_modified_time \
+             FROM conversation_summaries \
+             ORDER BY last_modified_time DESC \
+             LIMIT 500",
         ) else {
             continue;
         };
@@ -187,13 +187,31 @@ pub(crate) fn collect_tree_conversation_items(
             };
             let prompt_turns = extract_conversation_prompt_turns(base, &cid, is_conv_running);
             let steps = inspection.step_count;
-            let effective_prompt = inspection
+            let mut effective_prompt = inspection
                 .latest_prompt
+                .filter(|s| !s.trim().is_empty())
+                .or_else(|| prompt_turns.last().map(|t| t.prompt_text.clone()))
+                .or_else(|| prompt_turns.first().map(|t| t.prompt_text.clone()))
                 .filter(|s| !s.trim().is_empty())
                 .unwrap_or_else(|| preview.clone());
 
-            // Non-prompt filter: skip internal background hooks or non-prompts if not running
-            if inspection.is_non_prompt && !is_conv_running {
+            let has_meaningful_title = !title.trim().is_empty()
+                && !title.to_lowercase().starts_with("untitled")
+                && title.to_lowercase() != "new conversation";
+
+            if effective_prompt.trim().is_empty() && has_meaningful_title {
+                effective_prompt = title.clone();
+            }
+
+            let has_prompt_content =
+                !effective_prompt.trim().is_empty() || !prompt_turns.is_empty();
+
+            // Non-prompt filter: skip internal background hooks or non-prompts if not running AND no meaningful title or prompts
+            if inspection.is_non_prompt
+                && !is_conv_running
+                && !has_meaningful_title
+                && !has_prompt_content
+            {
                 continue;
             }
 
@@ -206,16 +224,8 @@ pub(crate) fn collect_tree_conversation_items(
                     || t_lower.contains("research")
                     || t_lower.contains("worker")
                     || t_lower.contains("author")
-                    || t_lower.contains("analysis")
-                    || t_lower.contains("memory analysis")
-                    || t_lower.contains("read & understand")
-                    || t_lower.contains("safe removal")
-                    || t_lower.contains("debugger")
-                    || t_lower.contains("architect")
-                    || t_lower.contains("tester")
                     || p_lower.contains("you are research")
                     || p_lower.contains("you are worker")
-                    || p_lower.contains("you are a")
                     || p_lower.contains("invoked by a caller agent")
                     || p_lower.contains("execute enhanced read memory")
                     || p_lower.contains("<subagent_reminder>")
@@ -232,13 +242,14 @@ pub(crate) fn collect_tree_conversation_items(
                 || status.to_lowercase().contains("pending");
             let latest_step_summary = inspection.latest_step_summary;
 
-            // Ghost conversation filter: skip untitled / empty title with empty prompt (regardless of running status)
+            // Ghost conversation filter: skip untitled / empty title with empty prompt AND zero turns
             let is_untitled_candidate = title.trim().is_empty()
                 || title.to_lowercase().starts_with("untitled")
                 || title.to_lowercase() == "new conversation";
             let (_, eff_wc) = extract_prompt_words_preview(&effective_prompt, 5);
-            if (is_untitled_candidate && (effective_prompt.trim().is_empty() || eff_wc == 0))
-                || (effective_prompt.trim().is_empty() && eff_wc == 0)
+            if is_untitled_candidate
+                && (effective_prompt.trim().is_empty() || eff_wc == 0)
+                && prompt_turns.is_empty()
             {
                 continue;
             }

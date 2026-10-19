@@ -2,6 +2,7 @@ import { copyToClipboard } from '../../../utils/clipboard';
 import { copyImageAsMarkdownText, writePureImageToClipboard, copyPromptWithRichImages, extractAssets, stripImagesFromPrompt } from './clipboard';
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { formatRelativeRecency } from './formatters';
 import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { PromptOriginTier, CopyFormat, type AgmConversationNode } from './types';
@@ -491,9 +492,19 @@ export function DetailHeader(props: DetailHeaderProps) {
                             <span>QUEUED</span>
                         </span>
                     ) : (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-                            IDLE
-                        </span>
+                        (() => {
+                            const recency = formatRelativeRecency(selectedConversation.last_modified);
+                            return (
+                                <span
+                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-mono text-zinc-400 bg-zinc-900/60 border border-zinc-700/50 shadow-2xs cursor-default"
+                                    title={`Last active: ${recency.formattedTime}`}
+                                >
+                                    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", recency.dotClass)} />
+                                    <span>IDLE</span>
+                                    <span className="text-zinc-500 border-l border-zinc-700/60 pl-1">{recency.label}</span>
+                                </span>
+                            );
+                        })()
                     )}
 
                     {/* Title with Double-Click Inline Rename and 1-Click Header Copy Button */}

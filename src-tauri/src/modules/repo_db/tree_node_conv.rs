@@ -69,10 +69,32 @@ pub(crate) fn build_transcript_conv_nodes(
     // Instance identity for the current project (used when conv_inst_id matches proj.instance_id)
     let (instance_seq_num, instance_name, instance_exe_name) =
         resolve_instance_meta(&proj.instance_id, registry);
-    if let Some(raw_convs) =
-        convs_by_inst_and_path.get(&(norm_proj_inst.to_string(), norm_path.to_string()))
-    {
-        for item in raw_convs {
+    let is_proj_default = norm_proj_inst == "default"
+        || norm_proj_inst == "__default__"
+        || norm_proj_inst.starts_with("default-copy");
+
+    let mut candidate_raw_convs: Vec<&super::tree_collect::RawConvItem> = Vec::new();
+    let mut seen_cids: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    for ((inst_id, p_path), items) in convs_by_inst_and_path {
+        if p_path == norm_path {
+            let matches_inst = inst_id == norm_proj_inst
+                || (is_proj_default
+                    && (inst_id == "default"
+                        || inst_id == "__default__"
+                        || inst_id.starts_with("default-copy")));
+            if matches_inst {
+                for it in items {
+                    if seen_cids.insert(it.cid.clone()) {
+                        candidate_raw_convs.push(it);
+                    }
+                }
+            }
+        }
+    }
+
+    if !candidate_raw_convs.is_empty() {
+        for item in candidate_raw_convs {
             let (preview_200w, word_count) = extract_prompt_words_preview(&item.prompt, word_cap);
 
             // Filter out empty "Untitled Conversation" (0 Words) nodes
@@ -190,31 +212,16 @@ pub(crate) fn build_active_prompt_conv_nodes(
     {
         for ap in aps {
             let cid = ap.session_id.clone().unwrap_or_else(|| ap.id.clone());
-            let target_idx = conv_nodes
-                .iter()
-                .position(|c| {
-                    c.conversation_id == cid
-                        || c.conversation_id.eq_ignore_ascii_case(&cid)
-                        || c.prompts.iter().any(|p| {
-                            p.prompt_text.trim() == ap.prompt_content.trim()
-                                || p.preview_200w.trim() == ap.prompt_content.trim()
-                        })
-                        || c.full_prompt_text.as_deref().unwrap_or("").trim()
-                            == ap.prompt_content.trim()
-                })
-                .or_else(|| {
-                    // If not matched by ID or text, but conversations exist for this project,
-                    // attach to the active conversation or most recently modified conversation
-                    // so we NEVER create duplicate competing conversation nodes that flap titles!
-                    if !conv_nodes.is_empty() {
-                        conv_nodes
-                            .iter()
-                            .position(|c| c.is_running || c.is_queued)
-                            .or_else(|| Some(conv_nodes.len() - 1))
-                    } else {
-                        None
-                    }
-                });
+            let target_idx = conv_nodes.iter().position(|c| {
+                c.conversation_id == cid
+                    || c.conversation_id.eq_ignore_ascii_case(&cid)
+                    || c.prompts.iter().any(|p| {
+                        p.prompt_text.trim() == ap.prompt_content.trim()
+                            || p.preview_200w.trim() == ap.prompt_content.trim()
+                    })
+                    || c.full_prompt_text.as_deref().unwrap_or("").trim()
+                        == ap.prompt_content.trim()
+            });
 
             if let Some(idx) = target_idx {
                 let target_conv = &mut conv_nodes[idx];
@@ -275,7 +282,11 @@ pub(crate) fn build_active_prompt_conv_nodes(
                             timestamp: chrono::DateTime::from_timestamp(ap.updated_at, 0)
                                 .map(|dt| dt.to_rfc3339())
                                 .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
-                            created_at: ap.created_at,
+                            created_at: if ap.created_at > 0 && ap.created_at < 100_000_000_000 {
+                                ap.created_at * 1000
+                            } else {
+                                ap.created_at
+                            },
                             media_paths: Vec::new(),
                             media_thumbnails: Vec::new(),
                         };
@@ -454,7 +465,11 @@ pub(crate) fn build_active_prompt_conv_nodes(
                 timestamp: chrono::DateTime::from_timestamp(ap.updated_at, 0)
                     .map(|dt| dt.to_rfc3339())
                     .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
-                created_at: ap.created_at,
+                created_at: if ap.created_at > 0 && ap.created_at < 100_000_000_000 {
+                    ap.created_at * 1000
+                } else {
+                    ap.created_at
+                },
                 media_paths: Vec::new(),
                 media_thumbnails: Vec::new(),
             };

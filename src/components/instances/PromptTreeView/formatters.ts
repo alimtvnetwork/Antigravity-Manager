@@ -120,4 +120,111 @@ export function stripImagesFromPrompt(text: string): string {
         .trim();
 }
 
+export interface RelativeRecency {
+    label: string;
+    dotClass: string;
+    textClass: string;
+    formattedTime: string;
+}
+
+/**
+ * Computes human-friendly relative recency label (now, 30m, 6h, 12h, 1d) matching
+ * Antigravity IDE history, along with glowing status dots and full timestamp tooltip.
+ */
+export function formatRelativeRecency(
+    lastModified: string | number | undefined | null,
+    isRunning?: boolean,
+    isQueued?: boolean
+): RelativeRecency {
+    if (isRunning) {
+        return {
+            label: 'now',
+            dotClass: 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse',
+            textClass: 'text-emerald-300 font-semibold',
+            formattedTime: 'Running now',
+        };
+    }
+    if (isQueued) {
+        return {
+            label: 'queued',
+            dotClass: 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)] animate-pulse',
+            textClass: 'text-amber-300 font-semibold',
+            formattedTime: 'Queued',
+        };
+    }
+
+    if (!lastModified) {
+        return {
+            label: 'idle',
+            dotClass: 'bg-zinc-500/60',
+            textClass: 'text-zinc-400',
+            formattedTime: 'Idle',
+        };
+    }
+
+    let timestampMs = 0;
+    if (typeof lastModified === 'number') {
+        timestampMs = lastModified < 100_000_000_000 ? lastModified * 1000 : lastModified;
+    } else {
+        const num = Number(lastModified);
+        if (!isNaN(num) && num > 0) {
+            timestampMs = num < 100_000_000_000 ? num * 1000 : num;
+        } else {
+            const parsed = new Date(lastModified).getTime();
+            if (!isNaN(parsed) && parsed > 0) {
+                timestampMs = parsed;
+            }
+        }
+    }
+
+    if (timestampMs === 0) {
+        return {
+            label: 'idle',
+            dotClass: 'bg-zinc-500/60',
+            textClass: 'text-zinc-400',
+            formattedTime: 'Idle',
+        };
+    }
+
+    const now = Date.now();
+    const diffMs = Math.max(0, now - timestampMs);
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHours = Math.floor(diffMin / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    let label: string;
+    let dotClass: string;
+    let textClass: string;
+
+    if (diffMin < 2) {
+        label = 'now';
+        dotClass = 'bg-emerald-400/80';
+        textClass = 'text-emerald-300';
+    } else if (diffMin < 60) {
+        label = `${diffMin}m`;
+        dotClass = diffMin <= 30 ? 'bg-sky-400/80' : 'bg-cyan-500/70';
+        textClass = 'text-sky-300';
+    } else if (diffHours < 24) {
+        label = `${diffHours}h`;
+        dotClass = diffHours <= 6 ? 'bg-indigo-400/70' : 'bg-purple-400/60';
+        textClass = 'text-indigo-300';
+    } else if (diffDays < 7) {
+        label = `${diffDays}d`;
+        dotClass = 'bg-zinc-500/60';
+        textClass = 'text-zinc-400';
+    } else {
+        const weeks = Math.floor(diffDays / 7);
+        label = `${weeks}w`;
+        dotClass = 'bg-zinc-600/50';
+        textClass = 'text-zinc-500';
+    }
+
+    const d = new Date(timestampMs);
+    const formattedTime = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+    return { label, dotClass, textClass, formattedTime };
+}
+
+
 // Helper for rich clipboard media copying with ClipboardItem

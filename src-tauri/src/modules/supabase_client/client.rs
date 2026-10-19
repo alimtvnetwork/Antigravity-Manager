@@ -69,7 +69,7 @@ impl SupabaseClient {
             crate::modules::supabase_sync::record_supabase_network_error();
         }
         if err.is_connect() || err.is_timeout() {
-            tracing::error!(
+            tracing::warn!(
                 target: "supabase_client",
                 operation = op,
                 url = url,
@@ -77,7 +77,7 @@ impl SupabaseClient {
                 is_timeout = err.is_timeout(),
                 is_connect = err.is_connect(),
                 status = ?err.status(),
-                "Supabase client {} transport error on {}: {}",
+                "Supabase client {} transport warning on {}: {}",
                 op,
                 url,
                 err
@@ -132,9 +132,6 @@ impl SupabaseClient {
     }
 
     fn network_error(&self, operation: &str, url: &str, e: reqwest::Error) -> AppError {
-        if e.is_timeout() || e.is_connect() || e.status().map_or(false, |s| s.as_u16() >= 500) {
-            crate::modules::supabase_sync::record_supabase_network_error();
-        }
         AppError::Network(self.explain_transport_error(operation, url, &e), None)
     }
 

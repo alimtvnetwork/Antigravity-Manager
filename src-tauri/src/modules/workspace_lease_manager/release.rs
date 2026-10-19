@@ -43,7 +43,6 @@ pub async fn list_active_leases() -> Result<Vec<WorkspaceLease>, AppError> {
     let resp = match client.select("workspace_leases", &query).await {
         Ok(r) => r,
         Err(e) => {
-            supabase_sync::record_supabase_network_error();
             if let Ok(cache) = ACTIVE_REMOTE_LEASES.read() {
                 return Ok(cache.values().cloned().collect());
             }

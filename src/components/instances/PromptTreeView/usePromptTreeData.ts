@@ -382,12 +382,14 @@ export function usePromptTreeData({
                     onlyRunning: false,
                     force: isForce,
                 });
-                const isTargetDefault = instanceId === 'default' || instanceId === '__default__';
-                const relevant = instanceId
+                const isTargetDefault = !instanceId || instanceId === 'default' || instanceId === '__default__' || instanceId === 'all' || instanceId.includes('default');
+                const isFilterAll = !instanceId || instanceId === 'all';
+                const relevant = isFilterAll
                     ? data
+                    : data
                           .filter((p) => {
                               if (p.instance_id === instanceId) return true;
-                              if (isTargetDefault && (!p.instance_id || p.instance_id === 'default' || p.instance_id === '__default__')) {
+                              if (isTargetDefault && (!p.instance_id || p.instance_id === 'default' || p.instance_id === '__default__' || p.instance_id.includes('default'))) {
                                   return true;
                               }
                               return false;
@@ -396,13 +398,12 @@ export function usePromptTreeData({
                               ...p,
                               conversations: (p.conversations || []).filter((c) => {
                                   if (c.instance_id === instanceId) return true;
-                                  if (isTargetDefault && (!c.instance_id || c.instance_id === 'default' || c.instance_id === '__default__')) {
+                                  if (isTargetDefault && (!c.instance_id || c.instance_id === 'default' || c.instance_id === '__default__' || c.instance_id.includes('default'))) {
                                       return true;
                                   }
                                   return false;
                               }),
-                          }))
-                    : data;
+                          }));
                 const finalData = relevant;
 
                 // Cache in memory for immediate SWR retrieval on subsequent opens

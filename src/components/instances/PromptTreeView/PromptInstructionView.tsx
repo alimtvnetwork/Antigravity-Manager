@@ -392,7 +392,16 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         }
 
         const timestamps = turns
-            .map((t) => t.created_at || (t.timestamp ? new Date(t.timestamp).getTime() : 0))
+            .map((t) => {
+                let ms = 0;
+                if (typeof t.created_at === 'number' && t.created_at > 0) {
+                    ms = t.created_at < 100_000_000_000 ? t.created_at * 1000 : t.created_at;
+                } else if (t.timestamp) {
+                    const parsed = new Date(t.timestamp).getTime();
+                    if (!isNaN(parsed) && parsed > 0) ms = parsed;
+                }
+                return ms;
+            })
             .filter((t) => t > 0)
             .sort((a, b) => a - b);
 
@@ -420,7 +429,12 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                 ? `${formatTime24(first)} → ${formatTime24(last)}`
                 : `${formatDateOnly(first)} ${formatTime24(first)} → ${formatDateOnly(last)} ${formatTime24(last)}`;
 
-        const diffSeconds = Math.max(0, Math.floor((last.getTime() - first.getTime()) / 1000));
+        const wallDiffSeconds = Math.max(0, Math.floor((last.getTime() - first.getTime()) / 1000));
+        const firstDaySec = first.getHours() * 3600 + first.getMinutes() * 60 + first.getSeconds();
+        const lastDaySec = last.getHours() * 3600 + last.getMinutes() * 60 + last.getSeconds();
+        const daySpanSec = lastDaySec >= firstDaySec ? lastDaySec - firstDaySec : wallDiffSeconds;
+        const diffSeconds = isSameDay && daySpanSec > 0 ? daySpanSec : wallDiffSeconds;
+
         let durationStr = '';
         if (diffSeconds < 60) {
             durationStr = `${diffSeconds}s`;

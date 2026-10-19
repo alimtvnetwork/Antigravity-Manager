@@ -37,7 +37,7 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
         "open" => Some(commands::execute_open_command(rest).await),
         "screenshot" => Some(commands::execute_screenshot_command(rest).await),
         "send" => Some(super::send_flow::start_send_flow(rest)),
-        "seek" | "conversations" | "convs" | "turns" => Some(
+        "seek" | "conversations" | "convs" | "turns" | "prompts" | "prompt" => Some(
             super::reports_b::format_seek_conversations_report(rest)
                 .await
                 .0,
@@ -76,7 +76,9 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
             let only_running = !rest.eq_ignore_ascii_case("all");
             Some(repo_db::format_tree_view_telegram_html(200, only_running))
         }
-        "expand" | "exp" => Some(format_expand_prompt_report(rest)),
+        "expand" | "exp" | "inspect" | "ins" | "show" | "view" => {
+            Some(format_expand_prompt_report(rest))
+        }
         "history" | "hist" => Some(super::prompt_history::format_prompt_history(8).0),
         "rerun" | "rr" => Some(super::prompt_history::rerun_prompt_by_id(rest).await.0),
         "active" | "running" => Some(format_active_prompts_report().await),

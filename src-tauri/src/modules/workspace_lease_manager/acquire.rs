@@ -33,6 +33,16 @@ pub async fn acquire_lease_with_details(
     };
 
     let config = supabase_sync::load_config()?;
+    if supabase_sync::is_supabase_circuit_open() {
+        return Ok(LeaseResult {
+            is_success: true,
+            error_message: None,
+            owner_node_id: Some(supabase_sync::get_local_node_id()),
+            owner_alias: Some(config.node_alias),
+            expires_at: Some(Utc::now().timestamp() + effective_ttl),
+        });
+    }
+
     let client = match get_root_client(&config) {
         Some(c) => c,
         None => {
@@ -71,12 +81,56 @@ pub async fn acquire_lease_with_details(
         "p_ip_address": local_ip
     });
 
-    if let Ok(rpc_resp) = client.rpc("acquire_workspace_lease", rpc_payload).await {
-        let is_ok = rpc_resp
-            .get("is_success")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-        if is_ok {
+    match client.rpc("acquire_workspace_lease", rpc_payload).await {
+        Ok(rpc_resp) => {
+            let is_ok = rpc_resp
+                .get("is_success")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            if is_ok {
+                return Ok(LeaseResult {
+                    is_success: true,
+                    error_message: None,
+                    owner_node_id: Some(node_id),
+                    owner_alias: Some(node_alias),
+                    expires_at: Some(expires),
+                });
+            } else {
+                let owner_node_id = rpc_resp
+                    .get("owner_node_id")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let owner_alias = rpc_resp
+                    .get("owner_alias")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let expires_at = rpc_resp.get("expires_at").and_then(|v| v.as_i64());
+                let error_message = rpc_resp
+                    .get("error")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .or_else(|| {
+                        let alias = owner_alias.as_deref().unwrap_or("another machine");
+                        let rem = expires_at.map(|e| (e - now).max(0)).unwrap_or(0);
+                        Some(format!(
+                            "Account is currently held by node '{}' (expires in {}s)",
+                            alias, rem
+                        ))
+                    });
+                return Ok(LeaseResult {
+                    is_success: false,
+                    error_message,
+                    owner_node_id,
+                    owner_alias,
+                    expires_at,
+                });
+            }
+        }
+        Err(AppError::Network(err, _)) => {
+            tracing::warn!(
+                target: "workspace_lease",
+                "Supabase network unavailable during lease RPC ({err}); falling back to local lease"
+            );
             return Ok(LeaseResult {
                 is_success: true,
                 error_message: None,
@@ -84,35 +138,9 @@ pub async fn acquire_lease_with_details(
                 owner_alias: Some(node_alias),
                 expires_at: Some(expires),
             });
-        } else {
-            let owner_node_id = rpc_resp
-                .get("owner_node_id")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            let owner_alias = rpc_resp
-                .get("owner_alias")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            let expires_at = rpc_resp.get("expires_at").and_then(|v| v.as_i64());
-            let error_message = rpc_resp
-                .get("error")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string())
-                .or_else(|| {
-                    let alias = owner_alias.as_deref().unwrap_or("another machine");
-                    let rem = expires_at.map(|e| (e - now).max(0)).unwrap_or(0);
-                    Some(format!(
-                        "Account is currently held by node '{}' (expires in {}s)",
-                        alias, rem
-                    ))
-                });
-            return Ok(LeaseResult {
-                is_success: false,
-                error_message,
-                owner_node_id,
-                owner_alias,
-                expires_at,
-            });
+        }
+        Err(_) => {
+            // Function missing or schema mismatch, attempt REST fallback
         }
     }
 

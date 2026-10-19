@@ -22,12 +22,15 @@ pub(crate) static LAST_SUPABASE_ERROR_TIMESTAMP: Lazy<AtomicI64> = Lazy::new(|| 
 /// Record a Supabase network/transport failure to open the 5-minute circuit breaker
 pub fn record_supabase_network_error() {
     let now = Utc::now().timestamp();
-    LAST_SUPABASE_ERROR_TIMESTAMP.store(now, Ordering::Relaxed);
-    tracing::warn!(
-        target: "supabase_sync",
-        cooldown_secs = SUPABASE_CIRCUIT_BREAKER_COOLDOWN_SECS,
-        "Supabase network error recorded; circuit breaker active for 300 seconds (5 minutes)"
-    );
+    let prev = LAST_SUPABASE_ERROR_TIMESTAMP.swap(now, Ordering::Relaxed);
+    // Only log the transition into circuit breaker cooldown if it wasn't already active recently
+    if prev <= 0 || (now - prev) >= SUPABASE_CIRCUIT_BREAKER_COOLDOWN_SECS {
+        tracing::warn!(
+            target: "supabase_sync",
+            cooldown_secs = SUPABASE_CIRCUIT_BREAKER_COOLDOWN_SECS,
+            "Supabase network error recorded; circuit breaker active for 300 seconds (5 minutes)"
+        );
+    }
 }
 
 /// Alias for specification parity

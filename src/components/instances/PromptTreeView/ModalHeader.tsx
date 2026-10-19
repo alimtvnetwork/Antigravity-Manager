@@ -15,6 +15,7 @@ import { ImportExportMenu } from './ImportExportMenu';
 
 export interface ModalHeaderProps {
     instanceName: string;
+    appVersion?: string;
     sequenceNumber?: number;
     executablePath?: string;
     isFullscreen: boolean;
@@ -49,6 +50,7 @@ const SYNC_INTERVALS: { value: SyncInterval; label: string }[] = [
 export function ModalHeader(props: ModalHeaderProps) {
     const {
         instanceName,
+        appVersion,
         sequenceNumber,
         executablePath,
         isFullscreen,
@@ -73,9 +75,9 @@ export function ModalHeader(props: ModalHeaderProps) {
     } = props;
 
     return (
-        <div className="relative z-40 flex items-center justify-between border-b border-slate-200/80 dark:border-[#40285e] px-4 py-2.5 bg-slate-50/80 dark:bg-[#090611] shrink-0">
+        <div className="relative z-40 flex items-center justify-between border-b border-slate-200/80 dark:border-purple-900/40 px-4 py-2.5 bg-slate-50/80 dark:bg-[#0c0817]/95 backdrop-blur-xl shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
-                <div className="flex h-8 w-8 items-center justify-center rounded-[5px] bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20 shrink-0">
+                <div className="flex h-8 w-8 items-center justify-center rounded-[5px] bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 shrink-0">
                     <Layers className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
@@ -83,6 +85,11 @@ export function ModalHeader(props: ModalHeaderProps) {
                         <h2 className="text-sm font-bold text-slate-900 dark:text-white shrink-0">
                             Project & Prompt Tree View
                         </h2>
+                        {appVersion && (
+                            <span className="shrink-0 rounded-[5px] bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20 px-1.5 py-0.5 text-[10px] font-mono font-semibold" title={`Antigravity Manager v${appVersion}`}>
+                                v{appVersion}
+                            </span>
+                        )}
                         {sequenceNumber != null && sequenceNumber > 0 && (
                             <span className="shrink-0 rounded-[5px] bg-slate-100 dark:bg-[#171025] px-1.5 py-0.5 text-[10px] font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#40285e]">
                                 #{sequenceNumber}
@@ -108,7 +115,7 @@ export function ModalHeader(props: ModalHeaderProps) {
 
             {/* Top Right Header Controls: Single Contiguous Segmented Dark-Glass Pill Capsule */}
             <div className="flex items-center shrink-0">
-                <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#171025]/90 backdrop-blur-md border border-slate-200/80 dark:border-[#40285e]/90 p-0.5 divide-x divide-slate-200/70 dark:divide-[#40285e]/80 shadow-2xs">
+                <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#120d20]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-900/50 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-900/40 shadow-2xs">
                     {/* Segment 1: Unified Import / Export section */}
                     <ImportExportMenu
                         onExportSqlite={onExportSqlite}

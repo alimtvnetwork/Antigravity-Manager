@@ -42,7 +42,13 @@ pub fn get_project_conversation_tree_cached(
     force: bool,
 ) -> Vec<AgmProjectTreeNode> {
     let inst_key = instance_id.unwrap_or("all");
-    let cache_key = format!("tree:{}:{}:{}", inst_key, max_words, only_running);
+    let cache_key = format!(
+        "tree:v{}:{}:{}:{}",
+        env!("CARGO_PKG_VERSION"),
+        inst_key,
+        max_words,
+        only_running
+    );
     let now = Utc::now().timestamp();
 
     if !force {
@@ -103,14 +109,16 @@ pub fn get_project_conversation_tree_cached(
 pub fn invalidate_prompt_tree_cache(instance_id: Option<&str>) {
     let Ok(conn) = connect_db() else { return };
     match instance_id {
-        Some(id) if id != "all" => {
+        Some(id) if !id.trim().is_empty() && id != "all" => {
             let norm = crate::modules::instance::resolve_instance_id(id)
                 .unwrap_or_else(|_| id.to_string());
+            let pattern1 = format!("%:{}%", id);
+            let pattern2 = format!("%:{}%", norm);
             // Justification: cache invalidation is best-effort; stale entries expire via TTL anyway
             crate::error::record_ignored(
                 conn.execute(
-                    "DELETE FROM prompt_tree_cache WHERE instance_id = ?1 OR instance_id = 'all'",
-                    rusqlite::params![&norm],
+                    "DELETE FROM prompt_tree_cache WHERE instance_id = ?1 OR instance_id = ?2 OR instance_id = 'all' OR cache_key LIKE ?3 OR cache_key LIKE ?4",
+                    rusqlite::params![id, &norm, pattern1, pattern2],
                 ),
                 "invalidate prompt tree cache for instance",
             );

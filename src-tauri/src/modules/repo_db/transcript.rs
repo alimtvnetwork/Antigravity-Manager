@@ -14,7 +14,7 @@ use std::io::{Read, Seek, SeekFrom};
 const MAX_TAIL_BYTES: u64 = 256 * 1024; // 256 KB
 const MAX_TAIL_LINES: usize = 100;
 
-/// Inspect strictly line 0 of transcript to determine if conversation was initiated
+/// Inspect early lines of transcript to determine if conversation was initiated
 /// as an autonomous subagent without loading the whole file into RAM.
 fn inspect_first_line_is_subagent(path: &Path) -> bool {
     use std::io::{BufRead, BufReader};
@@ -22,33 +22,40 @@ fn inspect_first_line_is_subagent(path: &Path) -> bool {
         Ok(f) => f,
         Err(_) => return false,
     };
-    let mut reader = BufReader::new(file);
-    let mut first_line = String::new();
-    if reader.read_line(&mut first_line).is_err() || first_line.trim().is_empty() {
-        return false;
-    }
-    if let Ok(first_val) = serde_json::from_str::<serde_json::Value>(first_line.trim()) {
-        let src = first_val
-            .get("source")
-            .and_then(|s| s.as_str())
-            .unwrap_or("");
-        let tp = first_val.get("type").and_then(|t| t.as_str()).unwrap_or("");
-        if src == "SYSTEM" || tp == "SYSTEM_MESSAGE" {
-            let txt = first_val
-                .get("content")
-                .and_then(|c| c.as_str())
-                .unwrap_or("");
-            let txt_lower = txt.to_lowercase();
-            return txt.contains("You are ")
-                || txt_lower.contains("subagent")
-                || txt_lower.contains("worker")
-                || txt_lower.contains("author")
-                || txt_lower.contains("research")
-                || txt_lower.contains("debugger")
-                || txt_lower.contains("analysis")
-                || txt_lower.contains("architect")
-                || txt_lower.contains("invoked by a caller agent")
-                || txt_lower.contains("execute enhanced read memory");
+    let reader = BufReader::new(file);
+    for line_res in reader.lines().take(5) {
+        if let Ok(line) = line_res {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            if let Ok(first_val) = serde_json::from_str::<serde_json::Value>(trimmed) {
+                let tp = first_val.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                if tp == "EPHEMERAL_MESSAGE" {
+                    continue;
+                }
+                let src = first_val
+                    .get("source")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("");
+                if src == "SYSTEM" || tp == "SYSTEM_MESSAGE" {
+                    let txt = first_val
+                        .get("content")
+                        .and_then(|c| c.as_str())
+                        .unwrap_or("");
+                    let txt_lower = txt.to_lowercase();
+                    return txt.contains("You are ")
+                        || txt_lower.contains("subagent")
+                        || txt_lower.contains("worker")
+                        || txt_lower.contains("author")
+                        || txt_lower.contains("research")
+                        || txt_lower.contains("debugger")
+                        || txt_lower.contains("invoked by a caller agent")
+                        || txt_lower.contains("execute enhanced read memory");
+                } else {
+                    break;
+                }
+            }
         }
     }
     false
@@ -631,6 +638,39 @@ pub(crate) fn inspect_conversation_transcript(
                 latest_step_summary =
                     Some(format!("Step {} · {} ({})", step_idx, s_type, s_status));
                 break;
+            }
+        }
+    }
+
+    if latest_prompt.is_none() {
+        use std::io::{BufRead, BufReader};
+        if let Ok(f) = std::fs::File::open(&chosen_path) {
+            let r = BufReader::new(f);
+            for line_res in r.lines().take(50) {
+                if let Ok(line) = line_res {
+                    let trimmed = line.trim();
+                    if trimmed.is_empty() {
+                        continue;
+                    }
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(trimmed) {
+                        let s_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                        let s_source = val.get("source").and_then(|v| v.as_str()).unwrap_or("");
+                        let is_user = (s_type.eq_ignore_ascii_case("USER_INPUT")
+                            || s_source.eq_ignore_ascii_case("USER_EXPLICIT")
+                            || s_source.eq_ignore_ascii_case("USER"))
+                            && !s_source.eq_ignore_ascii_case("SYSTEM");
+                        if is_user {
+                            if let Some(c) = val.get("content").and_then(|v| v.as_str()) {
+                                let clean = extract_clean_user_prompt(c);
+                                if !clean.is_empty() {
+                                    latest_prompt = Some(clean);
+                                    has_real_user_prompt = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

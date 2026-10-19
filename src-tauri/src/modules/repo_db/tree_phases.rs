@@ -61,17 +61,28 @@ pub(crate) fn query_tree_projects(target: Option<&str>) -> Vec<RunningProject> {
         })
         .collect();
     if let Some(target_id) = target {
-        if target_id == "default" || target_id == "__default__" {
-            all_projects
-                .into_iter()
-                .filter(|p| p.instance_id == "default" || p.instance_id == "__default__")
-                .collect()
-        } else {
-            all_projects
-                .into_iter()
-                .filter(|p| p.instance_id == target_id)
-                .collect()
-        }
+        let norm_target = crate::modules::instance::resolve_instance_id(target_id)
+            .unwrap_or_else(|_| target_id.to_string());
+        let is_target_default = target_id == "default"
+            || target_id == "__default__"
+            || norm_target == "default"
+            || norm_target == "default-copy-5597";
+        all_projects
+            .into_iter()
+            .filter(|p| {
+                if p.instance_id == target_id || p.instance_id == norm_target {
+                    return true;
+                }
+                if is_target_default
+                    && (p.instance_id == "default"
+                        || p.instance_id == "__default__"
+                        || p.instance_id == "default-copy-5597")
+                {
+                    return true;
+                }
+                false
+            })
+            .collect()
     } else {
         all_projects
             .into_iter()
@@ -143,7 +154,7 @@ pub(crate) fn discover_fallback_projects(
                    FROM conversation_summaries \
                    WHERE workspace_uris IS NOT NULL AND workspace_uris != '[]' \
                    ORDER BY last_modified_time DESC \
-                   LIMIT 200";
+                   LIMIT 500";
         let mut stmt_opt = s_conn.prepare(sql).ok();
         if let Some(ref mut stmt) = stmt_opt {
             if let Ok(rows) = stmt.query_map([], |row| {

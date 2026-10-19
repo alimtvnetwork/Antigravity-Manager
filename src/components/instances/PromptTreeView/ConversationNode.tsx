@@ -6,7 +6,7 @@ import { PromptOriginTier } from './types';
 import type { AgmConversationNode, AgmProjectTreeNode, TierClassificationResult } from './types';
 import { isConversationOrTurnQueued, getConversationStatus } from './conversationGuards';
 import { classifyPromptTier } from './tierClassification';
-import { formatSeqBadge } from './formatters';
+import { formatSeqBadge, formatRelativeRecency } from './formatters';
 import { invalidatePromptTreeCache, renameConversationOptimistic } from './usePromptTreeData';
 import { useErrorStore } from '../../../stores/error-store';
 
@@ -152,12 +152,12 @@ export function ConversationNode({
                     });
                 }}
                 className={cn(
-                    'group flex items-center justify-between rounded-md px-2 py-1.5 text-xs cursor-pointer transition-colors relative outline-none focus-visible:ring-1 focus-visible:ring-cyan-500/50',
+                    'group flex items-center justify-between rounded-md px-2 py-1.5 text-xs cursor-pointer transition-all duration-150 relative outline-none focus-visible:ring-1 focus-visible:ring-purple-500/50',
                     isSelected && selectedTurnNumber === null
-                        ? 'bg-blue-600 text-white font-medium shadow-2xs'
+                        ? 'bg-gradient-to-r from-violet-600/30 to-purple-600/20 border border-violet-500/50 text-white font-medium shadow-[0_0_12px_rgba(139,92,246,0.15)] backdrop-blur-md'
                         : isSelected
-                          ? 'bg-sky-500/10 border-l-2 border-sky-500 text-sky-400 font-medium'
-                          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#171025]'
+                          ? 'bg-purple-500/15 border-l-2 border-purple-500 text-purple-300 font-medium'
+                          : 'text-slate-600 dark:text-zinc-300 hover:bg-slate-100/80 dark:hover:bg-[#181126]/70 border border-transparent hover:border-purple-900/30'
                 )}
                 title={`${conv.title || 'Conversation'} · ${conv.step_count || 1} steps · Click to view (F2 to rename)`}
             >
@@ -260,28 +260,49 @@ export function ConversationNode({
                     )}
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                    {isRunning && (
-                        <span className={cn(
-                            "flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[8.5px] font-bold font-mono border animate-pulse",
-                            isSelected && selectedTurnNumber === null
-                                ? "bg-emerald-400 text-emerald-950 border-emerald-300"
-                                : "bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border-emerald-500/40"
-                        )}>
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] animate-pulse" />
-                            RUNNING
-                        </span>
-                    )}
-                    {isQueued && !isRunning && (
-                        <span className={cn(
-                            "flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[8.5px] font-bold font-mono border",
-                            isSelected && selectedTurnNumber === null
-                                ? "bg-amber-300 text-amber-950 border-amber-200"
-                                : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40"
-                        )}>
-                            <Clock className="w-2.5 h-2.5 text-amber-500" />
-                            <span>QUEUED</span>
-                        </span>
-                    )}
+                    {(() => {
+                        const recency = formatRelativeRecency(conv.last_modified, isRunning, isQueued);
+                        if (isRunning) {
+                            return (
+                                <span className={cn(
+                                    "flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[8.5px] font-bold font-mono border animate-pulse",
+                                    isSelected && selectedTurnNumber === null
+                                        ? "bg-emerald-400 text-emerald-950 border-emerald-300"
+                                        : "bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border-emerald-500/40"
+                                )} title="Running now">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] animate-pulse" />
+                                    RUNNING
+                                </span>
+                            );
+                        }
+                        if (isQueued) {
+                            return (
+                                <span className={cn(
+                                    "flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[8.5px] font-bold font-mono border",
+                                    isSelected && selectedTurnNumber === null
+                                        ? "bg-amber-300 text-amber-950 border-amber-200"
+                                        : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40"
+                                )} title="Queued in FIFO queue">
+                                    <Clock className="w-2.5 h-2.5 text-amber-500" />
+                                    <span>QUEUED</span>
+                                </span>
+                            );
+                        }
+                        return (
+                            <span
+                                className={cn(
+                                    "flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[8.5px] font-mono border transition-colors",
+                                    isSelected && selectedTurnNumber === null
+                                        ? "bg-violet-950/60 border-violet-400/40 text-violet-200"
+                                        : "bg-zinc-900/40 dark:bg-[#120d20]/60 border-zinc-700/40 dark:border-purple-900/40 text-zinc-400"
+                                )}
+                                title={`Last active: ${recency.formattedTime}`}
+                            >
+                                <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", recency.dotClass)} />
+                                <span className={cn("font-medium", recency.textClass)}>{recency.label}</span>
+                            </span>
+                        );
+                    })()}
                     {enqueuedTurnsCount > 0 && (isRunning || !isQueued || enqueuedTurnsCount > 1) && (
                         <span
                             className={cn(
@@ -400,9 +421,18 @@ export function ConversationNode({
                                             QUEUED
                                         </span>
                                     ) : (
-                                        <span className="text-slate-400 dark:text-zinc-500 text-[9px] font-medium shrink-0">
-                                            COMPLETED
-                                        </span>
+                                        (() => {
+                                            const turnRecency = formatRelativeRecency(turn.created_at || turn.timestamp);
+                                            return (
+                                                <span
+                                                    className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-mono text-zinc-400 bg-zinc-900/40 dark:bg-[#120d20]/60 border border-zinc-700/40 dark:border-purple-900/40"
+                                                    title={`Turn executed: ${turnRecency.formattedTime}`}
+                                                >
+                                                    <span className={cn("w-1 h-1 rounded-full shrink-0", turnRecency.dotClass)} />
+                                                    <span className={cn("font-medium", turnRecency.textClass)}>{turnRecency.label}</span>
+                                                </span>
+                                            );
+                                        })()
                                     )}
                                 </div>
                             </div>

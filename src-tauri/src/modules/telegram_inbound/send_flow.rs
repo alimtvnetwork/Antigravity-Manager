@@ -881,6 +881,10 @@ pub async fn handle_send_callback(chat_id: i64, data: &str) -> (String, Option<V
     if let Some(rest) = payload.strip_prefix("v:") {
         return handle_turn_rerun_callback(chat_id, rest, true).await;
     }
+    // Turn Image Fetch: send:img:<cid8>:<turn>
+    if let Some(rest) = payload.strip_prefix("img:") {
+        return handle_turn_image_callback(chat_id, rest).await;
+    }
     (send_unknown(), None)
 }
 
@@ -1129,6 +1133,97 @@ async fn dispatch_turn_rerun_execution(
     );
 
     (reply, None)
+}
+
+/// Handle sending attached images for a prompt turn directly to the Telegram chat
+async fn handle_turn_image_callback(chat_id: i64, payload: &str) -> (String, Option<Value>) {
+    let (cid8, turn_str) = match payload.split_once(':') {
+        Some((c, t)) => (c.trim(), t.trim()),
+        None => (payload.trim(), "1"),
+    };
+    let turn_num = turn_str.parse::<usize>().unwrap_or(1);
+    if cid8.is_empty() {
+        return (send_unknown(), None);
+    }
+
+    let tree = crate::modules::repo_db::get_project_conversation_tree(200, false);
+    let (proj, conv) = match find_conversation_in_tree(&tree, cid8) {
+        Some(m) => m,
+        None => {
+            return (
+                format!(
+                    "⚠️ <b>Conversation Not Found:</b> No active conversation matching <code>{}</code> in registry.",
+                    clean_for_telegram_html(cid8, 24)
+                ),
+                None,
+            );
+        }
+    };
+
+    // Find targeted turn
+    let target_turn = conv
+        .prompts
+        .iter()
+        .find(|t| t.turn_number == turn_num)
+        .or_else(|| conv.prompts.last());
+
+    let media_paths = target_turn
+        .map(|t| t.media_paths.clone())
+        .unwrap_or_default();
+
+    if media_paths.is_empty() {
+        return (
+            format!(
+                "ℹ️ <b>No Images Found:</b> #{} Turn #{} has no image attachments.",
+                conv.seq_code, turn_num
+            ),
+            None,
+        );
+    }
+
+    let token = match super::load_config().map(|c| c.bot_token).ok() {
+        Some(t) if !t.is_empty() => t,
+        _ => return ("⚠️ Telegram bot token not configured.".to_string(), None),
+    };
+
+    let mut sent_count = 0;
+    for (idx, path_str) in media_paths.iter().enumerate() {
+        let p = std::path::Path::new(path_str);
+        if p.exists() {
+            if let Ok(bytes) = std::fs::read(p) {
+                let caption = format!(
+                    "🖼️ <b>Attachment {}/{}</b> · #{} Turn #{}\n<code>{}</code>",
+                    idx + 1,
+                    media_paths.len(),
+                    conv.seq_code,
+                    turn_num,
+                    clean_for_telegram_html(&proj.project_id, 40)
+                );
+                if super::media::send_telegram_photo(&token, chat_id, &bytes, &caption, None)
+                    .await
+                    .is_ok()
+                {
+                    sent_count += 1;
+                }
+            }
+        }
+    }
+
+    if sent_count > 0 {
+        (
+            format!(
+                "✅ <b>Delivered {} image attachment(s)</b> for #{} Turn #{} to chat.",
+                sent_count, conv.seq_code, turn_num
+            ),
+            None,
+        )
+    } else {
+        (
+            "⚠️ <b>Images Missing on Disk:</b> Attached files could not be read from disk."
+                .to_string(),
+            None,
+        )
+    }
 }
 
 /// Dispatch the prompt through the existing prompt-injection path and confirm
@@ -1618,17 +1713,19 @@ mod tests {
         let _lock = TEST_FLOW_MUTEX.lock().unwrap();
         let chat_id: i64 = -9_001_350;
 
-        // 1. Non-local machine callback must be dropped cleanly without replying
-        let (dropped_reply, dropped_markup) =
-            on_machine_picked(chat_id, "definitely-not-this-machine");
+        // 1. Cross-machine relay: remote machine callback produces Step 2 to allow picking instances on target node
+        let (remote_reply, remote_markup) = on_machine_picked(chat_id, "remote-machine-01");
         assert!(
-            dropped_reply.is_empty(),
-            "non-local callback must drop reply"
+            remote_reply.contains("Step 2 of 3"),
+            "cross-machine relay must produce Step 2 header"
         );
         assert!(
-            dropped_markup.is_none(),
-            "non-local callback must drop markup"
+            remote_markup.is_some(),
+            "cross-machine relay must provide instance buttons"
         );
+
+        // Reset flow for clean local test
+        drop_flow(chat_id);
 
         // 2. Local machine callback produces Step 2 with alias, IP, and signal
         let (step2_reply, step2_markup) = on_machine_picked(chat_id, "local");

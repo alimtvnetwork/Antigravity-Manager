@@ -301,7 +301,9 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
         .to_lowercase();
 
     let mut markup_opt = match cmd_base.as_str() {
-        "expand" | "exp" => reports_b::resolve_expand_prompt_markup(rest),
+        "expand" | "exp" | "inspect" | "ins" | "show" | "view" => {
+            reports_b::resolve_expand_prompt_markup(rest)
+        }
         "history" | "hist" => Some(super::prompt_history::format_prompt_history(8).1),
         "fleet" | "whoami" => Some(json!({
             "inline_keyboard": [

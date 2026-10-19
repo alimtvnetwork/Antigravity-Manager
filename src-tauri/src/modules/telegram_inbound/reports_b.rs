@@ -522,8 +522,11 @@ pub async fn format_seek_conversations_report(
         let verify_cb = format!("send:v:{}:{}", cid8, turn_num);
         let copy_turn_text = clamp_telegram_copy_text(raw_turn_prompt, 3800);
 
+        let has_turn_images = conv.prompts.iter().any(|t| !t.media_paths.is_empty());
+        let img_cb = format!("send:img:{}:{}", cid8, turn_num);
+
         if matches.len() == 1 {
-            keyboard_rows.push(vec![
+            let mut row = vec![
                 serde_json::json!({
                     "text": format!("🔁 Rerun Turn #{}", turn_num),
                     "callback_data": rerun_cb
@@ -536,9 +539,16 @@ pub async fn format_seek_conversations_report(
                     "text": "📋 Copy Turn",
                     "copy_text": { "text": copy_turn_text }
                 }),
-            ]);
+            ];
+            if has_turn_images {
+                row.push(serde_json::json!({
+                    "text": "🖼️ Send Images",
+                    "callback_data": img_cb
+                }));
+            }
+            keyboard_rows.push(row);
         } else {
-            keyboard_rows.push(vec![
+            let mut row = vec![
                 serde_json::json!({
                     "text": format!("🔁 #{} Rerun T#{}", conv.seq_code, turn_num),
                     "callback_data": rerun_cb
@@ -551,7 +561,14 @@ pub async fn format_seek_conversations_report(
                     "text": format!("📋 #{} Copy", conv.seq_code),
                     "copy_text": { "text": copy_turn_text }
                 }),
-            ]);
+            ];
+            if has_turn_images {
+                row.push(serde_json::json!({
+                    "text": format!("🖼️ #{} Img", conv.seq_code),
+                    "callback_data": img_cb
+                }));
+            }
+            keyboard_rows.push(row);
         }
     }
 
@@ -625,7 +642,10 @@ pub fn resolve_seek_conversations_markup(query_str: &str) -> Option<serde_json::
                 let verify_cb = format!("send:v:{}:{}", cid8, turn_num);
                 let copy_turn_text = clamp_telegram_copy_text(raw_prompt, 3800);
 
-                keyboard_rows.push(vec![
+                let has_turn_images = conv.prompts.iter().any(|t| !t.media_paths.is_empty());
+                let img_cb = format!("send:img:{}:{}", cid8, turn_num);
+
+                let mut row = vec![
                     serde_json::json!({
                         "text": format!("🔁 #{} Rerun T#{}", conv.seq_code, turn_num),
                         "callback_data": rerun_cb
@@ -638,7 +658,14 @@ pub fn resolve_seek_conversations_markup(query_str: &str) -> Option<serde_json::
                         "text": format!("📋 #{} Copy", conv.seq_code),
                         "copy_text": { "text": copy_turn_text }
                     }),
-                ]);
+                ];
+                if has_turn_images {
+                    row.push(serde_json::json!({
+                        "text": format!("🖼️ #{} Img", conv.seq_code),
+                        "callback_data": img_cb
+                    }));
+                }
+                keyboard_rows.push(row);
                 count += 1;
             }
         }

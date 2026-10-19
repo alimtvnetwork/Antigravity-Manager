@@ -111,6 +111,36 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
 
     const { instances } = useInstanceStore();
     const state = usePromptTreeState(instanceId);
+    const [appVersion, setAppVersion] = useState<string>('');
+
+    useEffect(() => {
+        let isMounted = true;
+        import('@tauri-apps/api/app')
+            .then(({ getVersion }) => {
+                getVersion().then((v) => {
+                    if (isMounted) {
+                        setAppVersion(v);
+                        const lastSeen = localStorage.getItem('agm_prompt_tree_version');
+                        if (lastSeen && lastSeen !== v) {
+                            localStorage.setItem('agm_prompt_tree_version', v);
+                            invalidatePromptTreeCache(instanceId);
+                            void invoke('reset_prompt_tree_cache', { instanceId: instanceId || null });
+                        } else if (!lastSeen) {
+                            localStorage.setItem('agm_prompt_tree_version', v);
+                        }
+                    }
+                });
+            })
+            .catch((err: unknown) => {
+                useErrorStore.getState().trackWarning(err, {
+                    source: 'PromptTreeViewModal.getVersion',
+                    triggerAction: 'getVersion',
+                });
+            });
+        return () => {
+            isMounted = false;
+        };
+    }, [instanceId]);
     const {
         treeData,
         setTreeData,
@@ -648,7 +678,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                     onClose();
                 }
             }}
-            className={`fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 ${isFullscreen ? "p-0" : "p-4 sm:p-6"}`}
+            className={`fixed inset-0 z-[99999] flex items-center justify-center bg-black/75 backdrop-blur-md animate-in fade-in duration-200 ${isFullscreen ? "p-0" : "p-4 sm:p-6"}`}
         >
             {/* Draggable Top Region */}
             <div data-tauri-drag-region className="fixed top-0 left-0 right-0 h-8 z-[100000] pointer-events-none" />
@@ -656,13 +686,14 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             <div
                 onClick={(e) => e.stopPropagation()}
                 onDoubleClick={(e) => e.stopPropagation()}
-                className={`flex flex-col overflow-hidden bg-white dark:bg-[#171025] shadow-2xl transition-all relative z-10 ${isFullscreen
+                className={`flex flex-col overflow-hidden bg-white dark:bg-[#0c0817]/95 backdrop-blur-2xl shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-slate-200 dark:border-purple-900/40 transition-all relative z-10 ${isFullscreen
                     ? "h-full w-full rounded-none border-0"
-                    : "h-[88vh] w-full max-w-6xl rounded-2xl border border-slate-200 dark:border-[#40285e]"
+                    : "h-[88vh] w-full max-w-6xl rounded-2xl"
                     }`}
             >
                 <ModalHeader
                     instanceName={instanceName}
+                    appVersion={appVersion}
                     sequenceNumber={sequenceNumber}
                     executablePath={executablePath}
                     isFullscreen={isFullscreen}
@@ -702,6 +733,9 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                         setActionMsg('Resetting prompt cache...');
                         try {
                             invalidatePromptTreeCache(instanceId);
+                            setSearchQuery('');
+                            setActiveFilter('all');
+                            setCategoryFilter('all');
                             await invoke('reset_prompt_tree_cache', { instanceId: instanceId || null });
                             await loadTree(false, true);
                             setActionMsg('Prompt cache reset successfully');
