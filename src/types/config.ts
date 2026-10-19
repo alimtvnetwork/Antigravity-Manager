@@ -178,7 +178,7 @@ export enum DateFormatModeType {
     Iso = 'iso',
 }
 
-export type DateFormatMode = DateFormatModeType | '24h' | '12h' | 'iso';
+export type DateFormatMode = DateFormatModeType;
 
 export interface AppConfig {
     language: string;
