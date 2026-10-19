@@ -14,7 +14,8 @@
     9. Fully cleans up test records and temporary artifacts.
 #>
 param(
-    [switch]$VerboseOutput
+    [switch]$VerboseOutput,
+    [int]$CallerSessionPid = 32
 )
 
 $ErrorActionPreference = "Continue"
@@ -60,13 +61,17 @@ Write-Host "Using binary:    $agm" -ForegroundColor Gray
 Write-Host "Repo DB Path:    $repoDbPath" -ForegroundColor Gray
 Write-Host "Backup DB Path:  $backupDbPath" -ForegroundColor Gray
 
-# Protect caller instance / session PID 10076
-$callerSessionPid = 10076
+# Protect caller instance / session PID
+if ($CallerSessionPid -le 0) {
+    $CallerSessionPid = 32
+}
+$callerSessionPid = $CallerSessionPid
 $callerProcess = Get-Process -Id $callerSessionPid -ErrorAction SilentlyContinue
 if (-not $callerProcess) {
     $ideProc = Get-Process -Name "Antigravity" -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($ideProc) {
         $callerProcess = $ideProc
+        $callerSessionPid = $callerProcess.Id
     }
 }
 if ($null -ne $callerProcess) {
