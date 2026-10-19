@@ -816,6 +816,7 @@ ${activePromptText}
                 await auditRecord({
                     actor: 'user',
                     methodName: 'prompt_tree_verification_rounds_enqueued',
+                    route: '/prompts',
                     uiTarget: 'VerificationModal | EnqueueRounds',
                     trigger: 'click',
                     params: {
@@ -965,6 +966,7 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
     const auditBase = {
         actor: 'user' as const,
         methodName: 'prompt_tree_rerun_dispatch',
+        route: '/prompts',
         uiTarget: 'PromptTreeView | DetailHeader | RerunSection',
         trigger: 'click' as const,
     };
@@ -1071,6 +1073,7 @@ export async function dispatchMultiPromptResend(
             await auditRecord({
                 actor: 'user',
                 methodName: 'prompt_tree_multi_resend',
+                route: '/prompts',
                 uiTarget: 'ConversationContextMenu | ResendSubmenu',
                 trigger: 'click',
                 params: {
@@ -1130,6 +1133,7 @@ export async function handleVerifyLastPromptsAndEnqueue(
         await auditRecord({
             actor: 'user',
             methodName: 'prompt_tree_verify_last_prompts_enqueue',
+            route: '/prompts',
             uiTarget: 'ConversationContextMenu | VerifyLastPrompts',
             trigger: 'click',
             params: {
@@ -1206,6 +1210,7 @@ export async function handleCloneAndCompactConversation(
         await auditRecord({
             actor: 'user',
             methodName: 'prompt_tree_clone_and_compact',
+            route: '/prompts',
             uiTarget: 'ConversationContextMenu | CloneCompact',
             trigger: 'click',
             params: {

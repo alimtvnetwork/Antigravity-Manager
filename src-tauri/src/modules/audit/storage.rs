@@ -43,15 +43,34 @@ fn io_with_context(path: &Path, op: &str, err: std::io::Error) -> AppError {
 
 /// Resolve the audit DB directory following the repo storage convention.
 pub fn audit_dir() -> AppResult<PathBuf> {
-    let local = PathBuf::from("data").join("ui-audit");
-    if local.exists() {
-        return Ok(local);
+    if let Ok(dir_str) = std::env::var("AGM_UI_AUDIT_DIR") {
+        if !dir_str.trim().is_empty() {
+            let dir = PathBuf::from(dir_str.trim());
+            fs::create_dir_all(&dir)
+                .map_err(|err| io_with_context(&dir, "create ui-audit folder", err))?;
+            return Ok(dir);
+        }
     }
-    let data_dir = crate::modules::account::get_data_dir()
-        .map_err(|err| AppError::Unknown(format!("resolve AGM data dir: {err}")))?;
-    let dir = data_dir.join("ui-audit");
-    fs::create_dir_all(&dir).map_err(|err| io_with_context(&dir, "create ui-audit folder", err))?;
-    Ok(dir)
+    #[cfg(test)]
+    {
+        let dir = std::env::temp_dir().join("agm-test-ui-audit");
+        fs::create_dir_all(&dir)
+            .map_err(|err| io_with_context(&dir, "create test ui-audit folder", err))?;
+        return Ok(dir);
+    }
+    #[cfg(not(test))]
+    {
+        let local = PathBuf::from("data").join("ui-audit");
+        if local.exists() {
+            return Ok(local);
+        }
+        let data_dir = crate::modules::account::get_data_dir()
+            .map_err(|err| AppError::Unknown(format!("resolve AGM data dir: {err}")))?;
+        let dir = data_dir.join("ui-audit");
+        fs::create_dir_all(&dir)
+            .map_err(|err| io_with_context(&dir, "create ui-audit folder", err))?;
+        Ok(dir)
+    }
 }
 
 fn open_db() -> AppResult<Connection> {

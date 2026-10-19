@@ -1,10 +1,12 @@
 import { copyToClipboard } from '../../../utils/clipboard';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type React from 'react';
 import { Check, Copy } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
 import { TruncatedContextCallout } from './TruncatedContextCallout';
 import { formatPromptForMarkdown } from './formatters';
-import { resolveImageSrc } from './clipboard';
+import { resolveImageSrc, extractLocalPathFromUri } from './clipboard';
+import { useErrorStore } from '../../../stores/error-store';
 
 // Hoisted static regular expression with explicit character exclusions to eliminate catastrophic backtracking
 const TOKEN_REGEX =
@@ -28,14 +30,66 @@ export function MarkdownImage({
     onClick,
     onContextMenu,
 }: MarkdownImageProps) {
+    const [currentSrc, setCurrentSrc] = useState<string>(() => resolveImageSrc(src));
     const [hasError, setHasError] = useState(false);
-    const resolvedImgSrc = useMemo(() => resolveImageSrc(src), [src]);
+
+    useEffect(() => {
+        let isCancelled = false;
+        const raw = src.trim();
+        if (raw.startsWith('data:') || raw.startsWith('http://') || raw.startsWith('https://')) {
+            setCurrentSrc(raw);
+            setHasError(false);
+            return;
+        }
+
+        const localPath = extractLocalPathFromUri(raw) || raw;
+        const isAbsolute = /^[a-zA-Z]:[\\/]/.test(localPath) || localPath.startsWith('/') || localPath.startsWith('\\\\');
+        if (isAbsolute) {
+            invoke<string>('read_image_as_base64', { path: localPath })
+                .then((b64) => {
+                    if (!isCancelled && b64 && b64.startsWith('data:image/')) {
+                        setCurrentSrc(b64);
+                        setHasError(false);
+                    }
+                })
+                .catch((err) => {
+                    useErrorStore.getState().trackWarning(err, {
+                        source: 'MarkdownImage.read_image_as_base64',
+                        triggerAction: 'read_inline_markdown_image',
+                    });
+                });
+        }
+        return () => {
+            isCancelled = true;
+        };
+    }, [src]);
+
+    const handleImgError = async () => {
+        const raw = src.trim();
+        const localPath = extractLocalPathFromUri(raw) || raw;
+        if (localPath && !currentSrc.startsWith('data:image/')) {
+            try {
+                const b64 = await invoke<string>('read_image_as_base64', { path: localPath });
+                if (b64 && b64.startsWith('data:image/')) {
+                    setCurrentSrc(b64);
+                    setHasError(false);
+                    return;
+                }
+            } catch (err) {
+                useErrorStore.getState().trackWarning(err, {
+                    source: 'MarkdownImage.handleImgError',
+                    triggerAction: 'read_image_as_base64_fallback',
+                });
+            }
+        }
+        setHasError(true);
+    };
 
     if (hasError) {
         return (
             <span
-                onClick={() => onClick?.(resolvedImgSrc, alt)}
-                onContextMenu={(e) => onContextMenu?.(e, resolvedImgSrc, alt)}
+                onClick={() => onClick?.(currentSrc, alt)}
+                onContextMenu={(e) => onContextMenu?.(e, currentSrc, alt)}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 my-1 rounded-md text-[11px] font-mono bg-slate-100/90 dark:bg-[#120a1f]/90 text-amber-600 dark:text-amber-400 border border-amber-500/30 backdrop-blur-md shadow-2xs cursor-pointer hover:bg-amber-500/10 transition-colors"
                 title={`Image: ${src} (Preview Unavailable - Click to inspect)`}
             >
@@ -48,18 +102,18 @@ export function MarkdownImage({
 
     return (
         <img
-            src={resolvedImgSrc}
+            src={currentSrc}
             alt={alt || ''}
-            onClick={() => onClick?.(resolvedImgSrc, alt)}
+            onClick={() => onClick?.(currentSrc, alt)}
             onContextMenu={(e) => {
                 if (onContextMenu) {
                     e.preventDefault();
                     e.stopPropagation();
-                    onContextMenu(e, resolvedImgSrc, alt);
+                    onContextMenu(e, currentSrc, alt);
                 }
             }}
             className={className}
-            onError={() => setHasError(true)}
+            onError={handleImgError}
         />
     );
 }

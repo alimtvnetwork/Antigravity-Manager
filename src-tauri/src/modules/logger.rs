@@ -125,6 +125,18 @@ fn init_logger_inner() {
         } else {
             "unknown panic payload".to_string()
         };
+
+        // Standard OS pipe closure (e.g. piped into `head`, `less`, or closed stdout) is normal
+        // CLI termination and must not be logged as a critical panic or crash stack trace.
+        if payload.contains("The pipe is being closed")
+            || payload.contains("Broken pipe")
+            || payload.contains("failed printing to stdout")
+            || payload.contains("os error 232")
+            || payload.contains("os error 32")
+        {
+            std::process::exit(0);
+        }
+
         let timestamp = chrono::Local::now().to_rfc3339();
         let pid = std::process::id();
         let thread = std::thread::current();

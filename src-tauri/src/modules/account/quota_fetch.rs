@@ -166,8 +166,16 @@ pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppR
                 account.disabled = true;
                 account.disabled_at = Some(chrono::Utc::now().timestamp());
                 account.disabled_reason = Some(format!("invalid_grant: {}", e));
-                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-                crate::error::record_ignored(save_account(account), "save_account");
+                // Justification: best-effort persistence to account file and index; failure logged
+                crate::error::record_ignored(
+                    crate::modules::account::toggle_account_disabled(
+                        &account.id,
+                        true,
+                        Some(&format!("invalid_grant: {}", e)),
+                    )
+                    .map(|_| ()),
+                    "toggle_account_disabled on invalid_grant",
+                );
                 crate::proxy::server::trigger_account_reload(&account.id);
             }
             invalidate_l1_quota_cache_for_account(&account.id);
@@ -277,8 +285,16 @@ pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppR
                     account.disabled = true;
                     account.disabled_at = Some(chrono::Utc::now().timestamp());
                     account.disabled_reason = Some(format!("invalid_grant: {}", e));
-                    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-                    crate::error::record_ignored(save_account(account), "save_account");
+                    // Justification: best-effort persistence to account file and index; failure logged
+                    crate::error::record_ignored(
+                        crate::modules::account::toggle_account_disabled(
+                            &account.id,
+                            true,
+                            Some(&format!("invalid_grant: {}", e)),
+                        )
+                        .map(|_| ()),
+                        "toggle_account_disabled on forced invalid_grant",
+                    );
                     crate::proxy::server::trigger_account_reload(&account.id);
                 }
                 invalidate_l1_quota_cache_for_account(&account.id);

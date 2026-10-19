@@ -577,6 +577,8 @@ fn check_git_resumption_artifacts(
     let target_artifacts = [
         "antigravity-resume_task.json",
         ".antigravity_resume_task.json",
+        "antigravity_resume_task.json",
+        ".antigravity-resume_task.json",
     ];
 
     let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
@@ -584,8 +586,27 @@ fn check_git_resumption_artifacts(
 
     for a in &target_artifacts {
         let file_path = current_dir.join(a);
-        if file_path.is_file() {
+        if file_path.is_file() && !found_artifacts.contains(&file_path) {
             found_artifacts.push(file_path);
+        }
+    }
+
+    if let Ok(entries) = fs::read_dir(&current_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if (name.starts_with(".antigravity_resume_task.")
+                        || name.starts_with("antigravity-resume_task.")
+                        || name.starts_with(".antigravity-resume_task.")
+                        || name.starts_with("antigravity_resume_task."))
+                        && name.ends_with(".json")
+                        && !found_artifacts.contains(&path)
+                    {
+                        found_artifacts.push(path);
+                    }
+                }
+            }
         }
     }
 
@@ -598,6 +619,7 @@ fn check_git_resumption_artifacts(
             auto_fixed: false,
         });
     } else if apply_fixes {
+        let count = found_artifacts.len();
         for a in &found_artifacts {
             if fs::remove_file(a).is_ok() {
                 fixes_applied.push(format!(
@@ -610,10 +632,7 @@ fn check_git_resumption_artifacts(
             name,
             category,
             passed: true,
-            message: format!(
-                "Removed {} stray resumption artifact(s).",
-                found_artifacts.len()
-            ),
+            message: format!("Removed {count} stray resumption artifact(s)."),
             auto_fixed: true,
         });
     } else {

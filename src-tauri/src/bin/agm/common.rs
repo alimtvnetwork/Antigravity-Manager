@@ -240,6 +240,21 @@ pub(crate) fn suggest_agm_commands(input: &str) -> Vec<String> {
         "add-key",
         "gitignore",
         "gitignore-agm",
+        "errors",
+        "status",
+        "switch",
+        "ff",
+        "backup",
+        "restore",
+        "compact",
+        "logs",
+        "notifications",
+        "whoami",
+        "list",
+        "ls",
+        "audit",
+        "history",
+        "health",
     ];
 
     let low = input.to_lowercase();

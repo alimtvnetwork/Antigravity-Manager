@@ -284,20 +284,21 @@ pub fn record_interaction(input: RecordInteractionInput) -> AppResult<RecordInte
             id: None,
         });
     }
-    let result = input.result.trim().to_lowercase();
-    validate_result(&result)?;
-    let method_name = input.method_name.trim();
-    if method_name.is_empty() {
-        return Err(AppError::Unknown(
-            "ui audit record requires a non-empty method_name".to_string(),
-        ));
-    }
-    let route = input.route.trim();
-    if route.is_empty() {
-        return Err(AppError::Unknown(
-            "ui audit record requires a non-empty route".to_string(),
-        ));
-    }
+    let result_raw = input.result.trim().to_lowercase();
+    let result = if result_raw.is_empty() {
+        "ok".to_string()
+    } else {
+        validate_result(&result_raw)?;
+        result_raw
+    };
+    let method_name_raw = input.method_name.trim();
+    let method_name = if method_name_raw.is_empty() {
+        "unknown"
+    } else {
+        method_name_raw
+    };
+    let route_raw = input.route.trim();
+    let route = if route_raw.is_empty() { "/" } else { route_raw };
     let ui_target = format_ui_target(
         route,
         input.component.as_deref(),

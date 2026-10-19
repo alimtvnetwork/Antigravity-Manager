@@ -1,80 +1,82 @@
-# Root Cause Analysis and End-to-End Testing Specification: Architecture & Systems Reasoning
+# Architecture Spec: Root Cause Analysis and End-to-End Testing
 
-## 1. Metadata & Identification
-- **Title**: Root Cause Analysis and End-to-End Testing: Prompt Tree Discrepancies, Timestamp Alignment, Image Previews, and Cross-Machine Relay Parity
-- **Slug**: root-cause-analysis-and-end-to-end-testing
-- **Author**: @aukgit
-- **Created**: 2026-10-19
-- **Status**: Active Specification
-- **Target Subsystems**:
-  - `src/components/instances/PromptTreeView/` (Selection stability, image preview card rendering, turn count alignment)
-  - `src-tauri/src/modules/repo_db/` (Transcript parsing, turn extraction, timestamp computation)
-  - `src-tauri/src/modules/telegram_inbound/` (Cross-machine prompt relay, date/time acknowledgment, proof screenshot delivery)
-  - `src-tauri/src/modules/ssh_manager/` & `src-tauri/src/modules/supabase_sync/` (GitMap Port 22 SSH mesh fallback when Supabase is paused)
-
----
-
-## 2. User Request (Verbatim)
-
+## User Request (Verbatim)
 ```markdown
+is it done already??
+
 # Root Cause Analysis and End-to-End Testing: high priority instruction, non-negotiable task
 
 I've added the screenshot. You can see I have a running prompt, and the running prompt is very different from what you can show here, show there. I've added two big screenshots so that you can understand in the prompt tree. Your calculation and everything mostly wrong. You need to find the root cause. Find with date, time when you send it, the acknowledgment prompt with image. Image I cannot see yet, so that is a scam. You are performing for the long period of time. I hope you understand and get out of this scam business. If something is not working, tell me that it is not working. It's a pure wastage. You waste my time, not your, but everyone's time. That's not really cool. You need to test it here with end-to-end testing as much as possible. Try to see by using the machine how you can fix it. Also follow through the telegram steps to send prompt from one machine to another. Make sure that it works. Currently, we still cannot connect with two machines where GitMap can.
+
+## task: Root Cause Analysis and End-to-End Testing
+## slug: root-cause-analysis-and-end-to-end-testing
+
+# Actionable Items Must Follow Non-Negotiable
+
+1. Git pull BEFORE starting any work — first try `gitmap pull <repo path>` (or run `gitmap pull` in repository folder); if that fails, fall back to regular `git pull` and resolve any merge conflicts so the repository is completely up to date and clean before starting.
+2. Write spec under 02-spec/21-app/root-cause-analysis-and-end-to-end-testing/ and enqueue plan task in .ai-memory/plans/root-cause-analysis-and-end-to-end-testing.md (subtasks in .ai-memory/plans/subtasks/root-cause-analysis-and-end-to-end-testing/) first
+3. Search codebase exclusively via GitMap (gitmap aum search, gitmap find, gitmap cat, gitmap ps, gitmap py, gitmap llm train); TOTAL BAN on rg, ripgrep, grep, git grep, Select-String
+4. Strictly use relative Git paths (02-spec/..., .ai-memory/..., cmd/...); only add the relative paths, never add the absolute path during your work, and ensure this is respected on the release page and in release notes as well
+5. Find the root cause of the discrepancies in the prompt tree using date and time stamps.
+6. Conduct end-to-end testing to identify and resolve issues.
+7. Follow telegram steps to send prompts between machines and ensure connectivity.
+8. Verify that GitMap can connect with two machines and troubleshoot any connectivity issues.
+
+## Must follow and spawn agent using
+
+@[.agents/skills/execute-parent-task-with-n-steps-v6]
+
+## Additional Instructions
+
+- /plan first before doing the work to reduce the credits.
+- /learn from @[.agents/skills/gitmap] skill to leverage GitMap high-speed search, toolchain discovery, and caching.
+- Only add the relative paths, never add the absolute path during your work; this should be respected on the release page and in release notes as well.
 ```
 
 ---
 
-## 3. High-Level Architecture & Root Cause Taxonomy
+## 1. Architectural Scope & Problem Statement
 
-```
-+--------------------------------------------------------------------------------------------------+
-|                                    Antigravity Manager Desktop GUI                               |
-|                                                                                                  |
-|   +--------------------------+   +-----------------------------------------------------------+   |
-|   |   Sidebar Tree Panel     |   |                   Detail Pane & Viewer                    |   |
-|   |                          |   |                                                           |   |
-|   |   C244 (Instance Mgmt)   |   |   Header: C244 RUNNING 12 turns · 16h 18m                 |   |
-|   |   +-- T1: Instance Mgmt  |   |   PID: 32 (45s elapsed on current turn)                   |   |
-|   |   +-- ...                |   |                                                           |   |
-|   |   +-- T12: Formula UI    |   |   Attached Images (4) [Clean Deduplicated Grid Cards]     |   |
-|   |                          |   |   +--------+  +--------+  +--------+  +--------+          |   |
-|   |   [Selection Stable]     |   |   | Img 1  |  | Img 2  |  | Img 3  |  | Img 4  |          |   |
-|   |   [No Flapping on 30s]   |   |   +--------+  +--------+  +--------+  +--------+          |   |
-|   +--------------------------+   +-----------------------------------------------------------+   |
-+--------------------------------------------------------------------------------------------------+
-                                        ^
-                                        | (Tauri IPC / State Queries)
-                                        v
-+--------------------------------------------------------------------------------------------------+
-|                                   src-tauri Rust Backend                                         |
-|                                                                                                  |
-|   +--------------------------+   +-----------------------------------------------------------+   |
-|   |   repo_db / transcript   |   |                 Telegram Inbound & Remote Relay           |   |
-|   |                          |   |                                                           |   |
-|   |   1. Turns = USER_INPUT  |   |   1. Date & Time timestamp in Telegram ACK card           |   |
-|   |      (Exclude internal)  |   |   2. Remote screenshot via Session 1 API / CDP            |   |
-|   |   2. step_count != turns |   |   3. Tier 1: GitMap SSH Port 22 Mesh (192.168.1.3 <-> .20)|   |
-|   |   3. URI Normalization   |   |   4. Tier 2: Supabase Command Queue (when active)         |   |
-|   +--------------------------+   +-----------------------------------------------------------+   |
-+--------------------------------------------------------------------------------------------------+
-```
-
-### 3.1 Defect Classification Matrix
-
-| Defect ID | Subsystem | Symptom | Grounded Root Cause | Architectural Remediation |
-|---|---|---|---|---|
-| **BUG-01** | `PromptTreeView` | Title flapping & jumping between projects every 30s | `usePromptTreeState.ts` recreates callbacks every render without `useCallback`. The 30s sync interval triggers `loadTree()` which calls `performAutoSelection()` and defaults to the newest active project if ephemeral turn ref isn't found. | Stabilize callbacks with `useCallback`. Guard auto-selection with a stable selection key (`selectedConversationId`, `selectedTurnNumber`). Prevent background sync from overwriting active turn selection. |
-| **BUG-02** | `PromptInstructionView` & `InstanceCardProjects` | Turn count says 16 turns, but only T1-T12 are rendered | `InstanceCardProjects.tsx:61` and `DetailHeader.tsx:471` use transcript line count (`c.step_count`) instead of actual prompt turns (`c.prompts.length`). | Always count turns as `c.prompts?.length || 1`. Label transcript event count separately if needed. |
-| **BUG-03** | `PromptInstructionView` & `clipboard.ts` | Image count says 6 instead of 4, images invisible ("Image I cannot see yet") | (a) Unscoped aggregation across all turns + raw string matching against markdown regex duplicates count from 4 to 6. (b) `resolveImageSrc` has an off-by-one error on `file:///` (`slice(7)` instead of `slice(8)` on Windows `file:///C:/...`), and `<img onError>` has `style.display='none'`, vanishing broken images silently. | Scope image extraction to selected turn. Normalize file paths (strip `file:///`, decode percent-encoding). Fix slice offset. Provide visible image placeholder card with click-to-preview. |
-| **BUG-04** | `PromptInstructionView` | Timestamp confusion (`16h 18m` vs `PID 32 45s`) | `16h 18m` is the cumulative lifespan of the entire conversation session (turn 1 to turn 16). `PID 32 45s` is elapsed runtime for the active process. | Add clear disambiguation in UI: "Session Span: 16h 18m (01:23 AM -> 05:41 PM)" vs "Active Turn Elapsed: 45s (PID 32)". |
-| **BUG-05** | `telegram_inbound` | Telegram prompt ACK missing Date/Time and Proof Image | `injection.rs` formats ACK text without date/time. Proof shot via `CopyFromScreen` crashes in Session 0 on Windows OpenSSH. | Include formatted Local/UTC timestamps on all Telegram response envelopes. Bypass Session 0 via CDP screenshot or AGM local API proxy. |
-| **BUG-06** | `supabase_sync` & `FleetMachinesTable` | AGM cannot connect across machines while GitMap can | GitMap uses direct peer-to-peer SSH (port 22). AGM relied on paused Supabase cloud endpoints (`pezjuuddecbyfmqxytrv.supabase.co`). | Promote GitMap SSH cluster nodes to primary tier-1 fleet discovery in `get_fleet_machines` and remote prompt relay. |
+### 1.1 Problem Domains
+1. **Prompt Tree Timing & Turn Calculation Discrepancies**:
+   - The user's active IDE shows running prompts and queued turns (e.g. Turn 16 running, 4 queued messages scheduled to send afterwards).
+   - In AGM's Prompt Tree View, turn numbers, timestamp durations (e.g. `16h 18m (01:23:45 AM -> 05:41:47 PM)`), and turn statuses can diverge or display inaccurate spans if timestamps are calculated using first-step vs last-turn offsets incorrectly.
+2. **Missing Image Previews & Attached Media Failures**:
+   - Images attached in prompts or captured as acknowledgments were not rendering in the UI or were failing to load in `PromptThumbnailCard`.
+   - Root causes: Tauri asset protocol (`asset://localhost/`) restrictions in WebView2, local filesystem access guards in `src-tauri/src/commands/cmd_files.rs` that blocked `C:\Users\Administrator` paths, and missing Base64 data URL fallbacks.
+3. **Cross-Machine Prompt Dispatching & GitMap SSH Connectivity**:
+   - AGM supports sending prompts across machines via Telegram bot commands and GitMap SSH port 22 mesh.
+   - When communicating between `192.168.1.3` (w1) and `192.168.1.20` (main / w2), the system must correctly resolve machine names using GitMap node configuration (`~/.gitmap/gitmap-ssh-nodes.json` and `GITMAP_CLUSTER_NODES`), append acknowledgments with timestamps and screenshots, and establish reliable bidirectional communication.
 
 ---
 
-## 4. Invariants & Negative Guardrails
-- **FIFO Dispatch Invariant**: All queries on prompt tables must maintain `ORDER BY created_at ASC, id ASC`.
-- **No Silent Failures**: Never suppress image loading errors with `style.display = 'none'`. Always display an interactive fallback card.
-- **Strict Relative Git Paths**: Zero absolute filesystem paths (`D:\...`, `C:\...`) in code, specs, and logs.
-- **Process Immunity**: Never kill developer session PID 32 (`Antigravity.exe`).
-- **No Credential Leaks**: Never print SSH private keys or bot tokens in chat or logs.
+## 2. Subsystem Architecture & Invariants
+
+### 2.1 Prompt Tree Engine
+- **Source of Truth**: `transcript_full.jsonl`, `transcript.jsonl`, and `.antigravity_goal_prompt.log`.
+- **Status Computation**:
+  - A conversation is marked active if `is_recent_active && is_owning_inst_alive`.
+  - The currently executing turn must be flagged with `RUNNING` status and emerald badge.
+  - Queued turns waiting to run must be flagged with `QUEUED` status and amber clock badge.
+  - Finished turns are marked `COMPLETED`.
+- **Timestamp & Duration Formulas**:
+  - Turn Start Time: `created_at` timestamp of the `USER_INPUT` turn step.
+  - Turn End Time:
+    - If `RUNNING`: Current system time (`chrono::Utc::now()`).
+    - If `COMPLETED`: Timestamp of the final assistant response or tool completion step in that turn.
+  - Elapsed Duration: Format as `Xh Ym Zs` (or `Xm Ys` for < 1 hour).
+  - Explicit Wall-Clock Display: `hh:mm:ss AM/PM -> hh:mm:ss AM/PM`.
+
+### 2.2 Image Loading & Security Architecture
+- **Capabilities & Permissions**: `src-tauri/capabilities/default.json` grants `core:asset:default` to allow WebView2 to load local media assets via `convertFileSrc`.
+- **Path Guard Invariant**: `src-tauri/src/commands/cmd_files.rs` `is_sensitive_path` must distinguish between system-critical folders (e.g. `C:\Windows\System32`) and legitimate user home directories (`C:\Users\Administrator\...`). User workspace assets, screenshots, and uploads must be explicitly permitted.
+- **Data URL Fallback**: If WebView2 asset protocol fails or is blocked, the frontend proactively falls back to IPC `read_image_as_base64`, embedding the image as a `data:image/png;base64,...` URL.
+
+### 2.3 Cross-Machine Telegram & GitMap SSH Mesh
+- **Node Identification**: Local IP matching against GitMap SSH nodes table (`~/.gitmap/gitmap-ssh-nodes.json`) takes precedence over ambiguous hostname checks.
+- **Port 22 SSH Relay**: When dispatching prompts remotely, AGM invokes GitMap SSH mesh commands or `ssh_manager` to route prompts to node `w1` or `main/w2`.
+- **Telemetry Card Schema**: Acknowledgment cards sent to Telegram must include:
+  - Machine Alias (`• Machine: w1 (collected from gitmap)`)
+  - Instance Identifier (`• Instance: <instance_id>`)
+  - Exact Date & Time Stamp (`• Timestamp: YYYY-MM-DD HH:MM:SS`)
+  - Attached Screenshot Proof (JPEG/PNG buffer).

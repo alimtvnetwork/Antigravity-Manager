@@ -204,16 +204,19 @@ pub(crate) fn record_channel(
             line
         }
         Err(err) => {
-            let trace = std::backtrace::Backtrace::force_capture();
-            let line = format!(
-                "[Notify] {}: FAIL {}\n{}",
-                name,
-                redact_secrets(&err),
-                trace
-            );
-            logger::log_error(&line);
-            eprintln!("{}", line);
-            format!("[Notify] {}: FAIL {}", name, redact_secrets(&err))
+            let redacted = redact_secrets(&err);
+            if redacted.contains("cooldown active") || redacted.contains("call suppressed") {
+                let line = format!("[Notify] {}: SKIPPED ({})", name, redacted);
+                logger::log_warn(&line);
+                eprintln!("{}", line);
+                format!("[Notify] {}: SKIPPED {}", name, redacted)
+            } else {
+                let trace = std::backtrace::Backtrace::force_capture();
+                let line = format!("[Notify] {}: FAIL {}\n{}", name, redacted, trace);
+                logger::log_error(&line);
+                eprintln!("{}", line);
+                format!("[Notify] {}: FAIL {}", name, redacted)
+            }
         }
     }
 }

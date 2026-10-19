@@ -74,26 +74,6 @@ pub fn clean_antigravity_lockfiles(target_ide: Option<&str>) {
             continue;
         }
 
-        let lockfile = dir.join("lockfile");
-        if lockfile.exists() {
-            // Justification: best-effort cleanup; a leftover file is harmless
-            crate::error::record_ignored(std::fs::remove_file(&lockfile), "remove_file");
-            crate::modules::logger::log_info(&format!(
-                "[Lockfile] Cleaned stale Electron lockfile: {:?}",
-                lockfile
-            ));
-        }
-
-        let code_lock = dir.join("code.lock");
-        if code_lock.exists() {
-            // Justification: best-effort cleanup; a leftover file is harmless
-            crate::error::record_ignored(std::fs::remove_file(&code_lock), "remove_file");
-            crate::modules::logger::log_info(&format!(
-                "[Lockfile] Cleaned stale code.lock: {:?}",
-                code_lock
-            ));
-        }
-
         if let Ok(entries) = std::fs::read_dir(&dir) {
             for entry in entries.flatten() {
                 let fname = entry.file_name().to_string_lossy().to_lowercase();
@@ -103,8 +83,27 @@ pub fn clean_antigravity_lockfiles(target_ide: Option<&str>) {
                     || fname == "code.lock"
                     || fname == "devtoolsactiveport";
                 if is_lock {
-                    // Justification: best-effort cleanup; a leftover file is harmless
-                    crate::error::record_ignored(std::fs::remove_file(entry.path()), "remove_file");
+                    let path = entry.path();
+                    match std::fs::remove_file(&path) {
+                        Ok(()) => {
+                            crate::modules::logger::log_info(&format!(
+                                "[Lockfile] Cleaned stale lockfile: {:?}",
+                                path
+                            ));
+                        }
+                        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                        Err(e) if e.raw_os_error() == Some(32) => {
+                            // On Windows, OS error 32 (Sharing Violation) means an active IDE process is currently running and holding the lockfile.
+                            tracing::debug!(target: "process_cleanup", "Lockfile in active use (os error 32): {:?}", path);
+                        }
+                        Err(e) => {
+                            // Justification: best-effort cleanup of stale lockfiles; leftover files are harmless
+                            crate::error::record_ignored(
+                                Err::<(), std::io::Error>(e),
+                                "remove stale lockfile",
+                            );
+                        }
+                    }
                 }
             }
         }

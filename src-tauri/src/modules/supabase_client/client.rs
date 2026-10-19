@@ -68,21 +68,37 @@ impl SupabaseClient {
         {
             crate::modules::supabase_sync::record_supabase_network_error();
         }
-        let backtrace = std::backtrace::Backtrace::capture();
-        tracing::error!(
-            target: "supabase_client",
-            operation = op,
-            url = url,
-            error = %err,
-            is_timeout = err.is_timeout(),
-            is_connect = err.is_connect(),
-            status = ?err.status(),
-            backtrace = %backtrace,
-            "Supabase client {} transport error on {}: {}",
-            op,
-            url,
-            err
-        );
+        if err.is_connect() || err.is_timeout() {
+            tracing::error!(
+                target: "supabase_client",
+                operation = op,
+                url = url,
+                error = %err,
+                is_timeout = err.is_timeout(),
+                is_connect = err.is_connect(),
+                status = ?err.status(),
+                "Supabase client {} transport error on {}: {}",
+                op,
+                url,
+                err
+            );
+        } else {
+            let backtrace = std::backtrace::Backtrace::capture();
+            tracing::error!(
+                target: "supabase_client",
+                operation = op,
+                url = url,
+                error = %err,
+                is_timeout = err.is_timeout(),
+                is_connect = err.is_connect(),
+                status = ?err.status(),
+                backtrace = %backtrace,
+                "Supabase client {} transport error on {}: {}",
+                op,
+                url,
+                err
+            );
+        }
     }
 
     /// Classify a reqwest transport error into an actionable user-facing message

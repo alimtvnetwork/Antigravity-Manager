@@ -285,6 +285,7 @@ export function VerificationModal({
             await auditRecord({
                 actor: 'user',
                 methodName: 'dispatch_verification_rounds',
+                route: '/prompts',
                 uiTarget: 'VerificationModal | DispatchQueue',
                 trigger: 'click',
                 params: {

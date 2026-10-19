@@ -181,8 +181,40 @@ fn fetch_page_ws_urls(port: u16) -> Vec<String> {
     }
 
     let mut resp = Vec::new();
-    // Justification: partial read before EOF is normal when reading HTTP response until close
-    crate::error::record_ignored(stream.read_to_end(&mut resp), "read CDP /json response");
+    let mut buf = [0u8; 4096];
+    loop {
+        match stream.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => {
+                resp.extend_from_slice(&buf[..n]);
+                if let Some((_, body)) = std::str::from_utf8(&resp)
+                    .ok()
+                    .and_then(|s| s.split_once("\r\n\r\n"))
+                {
+                    if serde_json::from_str::<serde_json::Value>(body.trim()).is_ok() {
+                        break;
+                    }
+                }
+            }
+            Err(e)
+                if e.kind() == std::io::ErrorKind::TimedOut
+                    || e.kind() == std::io::ErrorKind::WouldBlock
+                    || e.raw_os_error() == Some(10060)
+                    || e.to_string().contains("10060")
+                    || e.to_string().contains("timed out") =>
+            {
+                break;
+            }
+            Err(e) => {
+                // Justification: partial read or failure during local CDP discovery is handled by fallback loop
+                crate::error::record_ignored(
+                    Err::<(), std::io::Error>(e),
+                    "read CDP /json response",
+                );
+                break;
+            }
+        }
+    }
     let text = String::from_utf8_lossy(&resp);
     let Some((_, body)) = text.split_once("\r\n\r\n") else {
         return Vec::new();

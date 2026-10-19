@@ -323,35 +323,49 @@ pub fn ui_service_goto_to(
     route_raw: &str,
     intent_path: &PathBuf,
 ) -> Result<String, AppError> {
+    let is_canonical_intent = ui_intent_file_path()
+        .map(|canonical| &canonical == intent_path)
+        .unwrap_or(false);
+
     match resolve_ui_route(route_raw) {
         Some(route) => {
             queue_ui_intent_to(actor, "goto", Some(&route), None, intent_path)?;
-            audit_ui_action(
-                actor,
-                "ui_goto",
-                &route,
-                None,
-                InteractionTrigger::Navigation,
-                json!({ "route": route }),
-                "ok",
-                None,
-            );
+            if is_canonical_intent {
+                audit_ui_action(
+                    actor,
+                    "ui_goto",
+                    &route,
+                    None,
+                    InteractionTrigger::Navigation,
+                    json!({ "route": route }),
+                    "ok",
+                    None,
+                );
+            }
             Ok(format!(
                 "🧭 <b>UI navigation sent</b>\n• <b>Route:</b> <code>{}</code>\nThe manager window navigates there now (intent also queued).",
                 escape_html(&route)
             ))
         }
         None => {
-            audit_ui_action(
-                actor,
-                "ui_goto",
-                "/ui",
-                None,
-                InteractionTrigger::Navigation,
-                json!({ "requested": route_raw.trim() }),
-                "error",
-                Some(format!("unknown ui route: {}", route_raw.trim())),
-            );
+            if is_canonical_intent {
+                let requested = route_raw.trim();
+                let ui_target = if requested.is_empty() {
+                    "/ui".to_string()
+                } else {
+                    format!("/ui?invalid={requested}")
+                };
+                audit_ui_action(
+                    actor,
+                    "ui_goto",
+                    &ui_target,
+                    None,
+                    InteractionTrigger::Navigation,
+                    json!({ "requested": requested }),
+                    "error",
+                    Some(format!("unknown ui route: {}", requested)),
+                );
+            }
             Ok(unknown_route_reply(route_raw))
         }
     }
@@ -373,32 +387,40 @@ pub fn ui_service_scroll_to(
     element_id_raw: &str,
     intent_path: &PathBuf,
 ) -> Result<String, AppError> {
+    let is_canonical_intent = ui_intent_file_path()
+        .map(|canonical| &canonical == intent_path)
+        .unwrap_or(false);
+
     let element_id = element_id_raw.trim();
     if element_id.is_empty() || element_id.len() > 128 || element_id.chars().any(|c| c.is_control())
     {
+        if is_canonical_intent {
+            audit_ui_action(
+                actor,
+                "ui_scroll",
+                "/ui?invalid_element=true",
+                None,
+                InteractionTrigger::Scroll,
+                json!({ "requested": element_id_raw }),
+                "error",
+                Some("invalid element id".to_string()),
+            );
+        }
+        return Ok("⚠️ <b>Invalid element id.</b> Send <code>/ui scroll &lt;element-id&gt;</code> with a plain element id (max 128 chars).".to_string());
+    }
+    queue_ui_intent_to(actor, "scroll", None, Some(element_id), intent_path)?;
+    if is_canonical_intent {
         audit_ui_action(
             actor,
             "ui_scroll",
             "/ui",
-            None,
+            Some(element_id),
             InteractionTrigger::Scroll,
-            json!({ "requested": element_id_raw }),
-            "error",
-            Some("invalid element id".to_string()),
+            json!({ "element_id": element_id }),
+            "ok",
+            None,
         );
-        return Ok("⚠️ <b>Invalid element id.</b> Send <code>/ui scroll &lt;element-id&gt;</code> with a plain element id (max 128 chars).".to_string());
     }
-    queue_ui_intent_to(actor, "scroll", None, Some(element_id), intent_path)?;
-    audit_ui_action(
-        actor,
-        "ui_scroll",
-        "/ui",
-        Some(element_id),
-        InteractionTrigger::Scroll,
-        json!({ "element_id": element_id }),
-        "ok",
-        None,
-    );
     Ok(format!(
         "🖱️ <b>UI scroll queued</b>\n• <b>Element:</b> <code>{}</code>\nThe manager window scrolls it into view and focuses it on its next poll.",
         escape_html(element_id)

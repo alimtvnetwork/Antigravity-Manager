@@ -102,7 +102,7 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        "status" => crate::status_cmds::cmd_status(&cmd_args),
+        "status" | "whoami" => crate::status_cmds::cmd_status(&cmd_args),
         "balance" | "bal" | "credits" | "credit" | "status/credits" | "quota" => {
             crate::quota_cmds::dispatch_quota_domain_from_args(&cmd_args);
         }
@@ -125,13 +125,19 @@ fn main() {
         "instances" | "instance" | "intrance" | "intrances" | "profile" | "profiles" => {
             crate::instance_cmds::dispatch_instance_domain_from_args(&cmd_args);
         }
-        "ls" => {
+        "ls" | "list" => {
             if cmd_args
                 .first()
                 .map(|s| s == "prompts" || s == "prompt")
                 .unwrap_or(false)
             {
                 crate::prompt_cmds::dispatch_prompt_domain("list", &cmd_args[1..]);
+            } else if cmd_args
+                .first()
+                .map(|s| s == "accounts" || s == "account" || s == "acc")
+                .unwrap_or(false)
+            {
+                crate::quota_cmds::dispatch_quota_domain("list", &cmd_args[1..]);
             } else {
                 crate::instance_cmds::dispatch_instance_domain("list", &cmd_args);
             }
@@ -278,7 +284,7 @@ fn main() {
         "shutdown-until-green" | "sug" => {
             crate::green_cmds::cmd_shutdown_until_green(&cmd_args);
         }
-        "broadcast-email" => {
+        "broadcast-email" | "notifications" | "notification" => {
             crate::email_cmds::cmd_broadcast_email(&cmd_args);
         }
         "telegram" => {

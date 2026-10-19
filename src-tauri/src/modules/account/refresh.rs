@@ -36,10 +36,16 @@ pub async fn refresh_all_quotas_logic() -> Result<RefreshStats, String> {
     let tasks: Vec<_> = accounts
         .into_iter()
         .filter(|account| {
-            // [MOD] Now we allow refreshing disabled and proxy_disabled accounts
-            // to support forced re-sync from UI.
-            // Only strictly skip forbidden accounts if necessary, but even those
-            // might want a retry to see if they are unbanned.
+            if account.disabled {
+                let reason = account.disabled_reason.as_deref().unwrap_or("");
+                if reason.contains("invalid_grant") {
+                    crate::modules::logger::log_info(&format!(
+                        "  - Skipping {} (Disabled: invalid_grant requires re-login)",
+                        account.email
+                    ));
+                    return false;
+                }
+            }
             if let Some(ref q) = account.quota {
                 if q.is_forbidden {
                     crate::modules::logger::log_info(&format!(
