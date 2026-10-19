@@ -367,12 +367,12 @@ pub fn stop_instance(instance_id: &str) -> Result<(), String> {
         ));
     }
 
-    // Update SQLite database instance_processes marking stopped state (is_active = 0, pid = NULL)
+    // Update SQLite database instance_processes marking stopped state (is_active = 0)
     if let Ok(conn) = open_instance_db() {
         // Justification: non-critical sqlite bookkeeping write; read paths tolerate stale data
         crate::error::record_ignored(
             conn.execute(
-                "UPDATE instance_processes SET is_active = 0, pid = NULL WHERE instance_id = ?1 OR instance_id = ?2",
+                "UPDATE instance_processes SET is_active = 0 WHERE instance_id = ?1 OR instance_id = ?2",
                 rusqlite::params![resolved, instance_id],
             ),
             "update instance_processes stopped state",

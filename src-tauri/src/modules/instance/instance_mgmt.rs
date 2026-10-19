@@ -33,7 +33,7 @@ pub fn delete_instance(instance_id: &str) -> Result<(), String> {
                 if instance_folder.exists() {
                     // Justification: cleanup of an optional directory tree; absence is the normal case
                     crate::error::record_ignored(
-                        fs::remove_dir_all(&instance_folder),
+                        crate::utils::fs::remove_dir_all_force(&instance_folder),
                         "remove directory tree",
                     );
                 }
@@ -62,7 +62,7 @@ pub fn delete_instance(instance_id: &str) -> Result<(), String> {
         if instance_folder.exists() {
             // Justification: cleanup of an optional directory tree; absence is the normal case
             crate::error::record_ignored(
-                fs::remove_dir_all(&instance_folder),
+                crate::utils::fs::remove_dir_all_force(&instance_folder),
                 "remove directory tree",
             );
         }
@@ -71,7 +71,10 @@ pub fn delete_instance(instance_id: &str) -> Result<(), String> {
         let data_pb = PathBuf::from(&data_dir_to_remove);
         if data_pb.exists() && data_dir_to_remove.contains("instances") {
             // Justification: cleanup of an optional directory tree; absence is the normal case
-            crate::error::record_ignored(fs::remove_dir_all(&data_pb), "remove directory tree");
+            crate::error::record_ignored(
+                crate::utils::fs::remove_dir_all_force(&data_pb),
+                "remove directory tree",
+            );
         }
     }
     if let Some(custom_exe) = custom_exe_to_remove {

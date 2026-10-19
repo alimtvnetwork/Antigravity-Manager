@@ -50,9 +50,22 @@ if (!(Test-Path $agm)) {
 $env:AGM_SKIP_AGY_SPAWN = "1"
 
 # Resolve SQLite database paths
-$dataDir = Join-Path $env:USERPROFILE ".antigravity_tools"
+$dataDir = if ($env:ABV_DATA_DIR -and (Test-Path $env:ABV_DATA_DIR)) {
+    $env:ABV_DATA_DIR
+} elseif ($env:USERPROFILE -match '(.*?)[\\/]\.antigravity_tools[\\/]instances' -and (Test-Path (Join-Path $Matches[1] ".antigravity_tools"))) {
+    Join-Path $Matches[1] ".antigravity_tools"
+} elseif (Test-Path (Join-Path $env:USERPROFILE ".antigravity_tools\repo_prompts.db")) {
+    Join-Path $env:USERPROFILE ".antigravity_tools"
+} elseif (Test-Path "$env:SystemDrive\Users\Administrator\.antigravity_tools\repo_prompts.db") {
+    "$env:SystemDrive\Users\Administrator\.antigravity_tools"
+} else {
+    Join-Path $env:USERPROFILE ".antigravity_tools"
+}
 $repoDbPath = Join-Path $dataDir "repo_prompts.db"
 $backupDbPath = Join-Path $dataDir "backup-prompts\backup-prompts.db"
+if (!(Test-Path $backupDbPath) -and (Test-Path (Join-Path $dataDir "backup_prompts.db"))) {
+    $backupDbPath = Join-Path $dataDir "backup_prompts.db"
+}
 
 Write-Host "================================================================================" -ForegroundColor Cyan
 Write-Host " AGM Prompt Backup and Restore E2E Test Suite (Screenshot ID & FIFO Parity)     " -ForegroundColor Cyan

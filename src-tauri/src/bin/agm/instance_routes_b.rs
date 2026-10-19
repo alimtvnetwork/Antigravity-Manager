@@ -891,7 +891,7 @@ pub(crate) fn route_instances_test_lifecycle(
                     let candidate = instances_root.join(target);
                     if candidate.is_dir() && !target.eq_ignore_ascii_case("default") {
                         antigravity_tools_lib::error::record_ignored(
-                            std::fs::remove_dir_all(&candidate),
+                            antigravity_tools_lib::utils::fs::remove_dir_all_force(&candidate),
                             "remove targeted test instance directory",
                         ); // Justification: test cleanup; absence is safe
                         cleaned_count += 1;
@@ -913,7 +913,9 @@ pub(crate) fn route_instances_test_lifecycle(
                                     && !cleaned_ids.iter().any(|id| id == file_name)
                                 {
                                     antigravity_tools_lib::error::record_ignored(
-                                        std::fs::remove_dir_all(&path),
+                                        antigravity_tools_lib::utils::fs::remove_dir_all_force(
+                                            &path,
+                                        ),
                                         "remove orphaned test instance directory",
                                     ); // Justification: test cleanup; absence is safe
                                 }

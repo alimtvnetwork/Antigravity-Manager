@@ -107,6 +107,61 @@ pub fn write_atomic<P: AsRef<Path>>(target_path: P, content: &[u8]) -> Result<()
     Ok(())
 }
 
+/// Resilient directory tree removal that resets read-only/hidden/system attributes on Windows
+/// before removing files and directories, preventing "os error 5: Access is denied".
+pub fn remove_dir_all_force<P: AsRef<Path>>(path: P) -> std::io::Result<()> {
+    let p = path.as_ref();
+    if !p.exists() {
+        return Ok(());
+    }
+
+    // Attempt fast standard removal first
+    if std::fs::remove_dir_all(p).is_ok() {
+        return Ok(());
+    }
+
+    // Fallback: bottom-up recursive deletion with attribute stripping
+    fn delete_bottom_up(entry: &Path) -> std::io::Result<()> {
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::ffi::OsStrExt;
+            #[link(name = "Kernel32")]
+            extern "system" {
+                fn SetFileAttributesW(lp_file_name: *const u16, dw_file_attributes: u32) -> i32;
+            }
+            let wide: Vec<u16> = entry
+                .as_os_str()
+                .encode_wide()
+                .chain(std::iter::once(0))
+                .collect();
+            // FILE_ATTRIBUTE_NORMAL = 0x80
+            unsafe {
+                SetFileAttributesW(wide.as_ptr(), 0x80);
+            }
+        }
+        if let Ok(m) = std::fs::metadata(entry) {
+            let mut perms = m.permissions();
+            if perms.readonly() {
+                perms.set_readonly(false);
+                let _ = std::fs::set_permissions(entry, perms);
+            }
+        }
+
+        if entry.is_dir() {
+            if let Ok(rd) = std::fs::read_dir(entry) {
+                for child in rd.flatten() {
+                    let _ = delete_bottom_up(&child.path());
+                }
+            }
+            std::fs::remove_dir(entry)
+        } else {
+            std::fs::remove_file(entry)
+        }
+    }
+
+    delete_bottom_up(p)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
