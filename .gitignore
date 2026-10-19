@@ -105,6 +105,7 @@ scratch/*.dump
 
 # GitMap & Task Persistence
 .gitmap/backup/
+.antigravity/
 .antigravity_*.json
 *.db
 AGM_INSTANCE_STATUS.md
