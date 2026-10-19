@@ -189,8 +189,22 @@ export function usePromptTreeData({
     const selectConversation = useCallback(
         (conv: AgmConversationNode, project: AgmProjectTreeNode) => {
             setSelectedProject(project);
-            setSelectedConversation(conv);
-            const text = resolveConversationPromptText(conv, conv.selected_turn_number);
+            let effectiveConv = conv;
+            let effectiveTurnNum = conv.selected_turn_number;
+            if (effectiveTurnNum == null && conv.prompts && conv.prompts.length > 0) {
+                const runningTurn = conv.prompts.find((p) => p.is_running) || conv.prompts[conv.prompts.length - 1];
+                if (runningTurn) {
+                    effectiveTurnNum = runningTurn.turn_number;
+                    effectiveConv = {
+                        ...conv,
+                        selected_turn_number: effectiveTurnNum,
+                        full_prompt_text: runningTurn.prompt_text,
+                        prompt_preview_200w: runningTurn.preview_200w || runningTurn.prompt_text.slice(0, 200),
+                    };
+                }
+            }
+            setSelectedConversation(effectiveConv);
+            const text = resolveConversationPromptText(effectiveConv, effectiveTurnNum);
             setActivePromptText(text);
             setEditedPromptText(text);
             setShowAllWords(false);

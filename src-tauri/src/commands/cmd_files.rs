@@ -103,7 +103,9 @@ pub async fn read_text_file(path: String) -> Result<String, String> {
 /// for safe, taint-free clipboard copy and embedding in WebView2 without CORS or canvas security errors.
 #[tauri::command]
 pub async fn read_image_as_base64(path: String) -> Result<String, String> {
-    let requested = PathBuf::from(&path);
+    let clean_path = crate::modules::repo_db::failed_commands::decode_uri_to_path(&path);
+    let trimmed = clean_path.trim().replace(r"\\?\", "").replace(r"\?\", "");
+    let requested = PathBuf::from(&trimmed);
     if requested.as_os_str().is_empty() {
         return Err("invalid_path: empty path".to_string());
     }
@@ -315,6 +317,22 @@ mod prompt_backup_path_tests {
         let png_bytes = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]; // PNG magic header
         std::fs::write(&test_png, &png_bytes).expect("write test png");
         let res = super::read_image_as_base64(test_png.to_string_lossy().to_string()).await;
+        let _ = std::fs::remove_file(&test_png); // Justification: best-effort test cleanup
+        assert!(res.is_ok());
+        let uri = res.unwrap();
+        assert!(uri.starts_with("data:image/png;base64,"));
+    }
+
+    #[tokio::test]
+    async fn read_image_as_base64_resolves_file_protocol_uri() {
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let target_dir = manifest_dir.join("target");
+        let _ = std::fs::create_dir_all(&target_dir); // Justification: best-effort test setup
+        let test_png = target_dir.join("test_file_uri_image.png");
+        let png_bytes = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        std::fs::write(&test_png, &png_bytes).expect("write test png");
+        let file_uri = format!("file:///{}", test_png.to_string_lossy().replace('\\', "/"));
+        let res = super::read_image_as_base64(file_uri).await;
         let _ = std::fs::remove_file(&test_png); // Justification: best-effort test cleanup
         assert!(res.is_ok());
         let uri = res.unwrap();

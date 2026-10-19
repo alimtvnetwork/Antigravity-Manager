@@ -546,18 +546,7 @@ pub fn start_send_flow(rest: &str) -> String {
 }
 
 fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
-    // 1. Collision shielding guard: only the target machine responds to send:m:<alias>!
-    let is_current = super::node_label::is_current_machine(alias);
-    if !is_current {
-        tracing::info!(
-            "Dropping send:m:{} callback on node {} — targeted for different machine",
-            alias,
-            local_machine_label()
-        );
-        return (String::new(), None);
-    }
-
-    // 2. Debounce guard: if chat already has a fresh Step 2 flow for this machine (<3s), suppress duplicate message.
+    // 1. Debounce guard: if chat already has a fresh Step 2 flow for this machine (<3s), suppress duplicate message.
     if let Ok(flows) = SEND_FLOWS.lock() {
         if let Some(existing) = flows.get(&chat_id) {
             let is_same_machine = existing.machine.eq_ignore_ascii_case(alias)
@@ -663,15 +652,6 @@ fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
 }
 
 fn on_instance_picked(chat_id: i64, machine: &str, instance: &str) -> (String, Option<Value>) {
-    if !super::node_label::is_current_machine(machine) {
-        tracing::debug!(
-            "Dropping send:i:{}|{} callback on node {} — targeted for different machine",
-            machine,
-            instance,
-            local_machine_label()
-        );
-        return (String::new(), None);
-    }
     let canonical_machine = match machine_entries()
         .into_iter()
         .find(|e| e.eq_ignore_ascii_case(machine))

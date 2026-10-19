@@ -65,7 +65,7 @@ function extractImagesFromPrompt(
     if (conv.prompts && conv.prompts.length > 0) {
         const turns = conv.selected_turn_number != null
             ? conv.prompts.filter((t) => t.turn_number === conv.selected_turn_number)
-            : conv.prompts.slice(0, 1);
+            : [conv.prompts.find((t) => t.is_running) || conv.prompts[conv.prompts.length - 1]];
         for (const t of turns) {
             if (t.media_paths) {
                 for (const p of t.media_paths) {
@@ -111,8 +111,42 @@ function PromptThumbnailCard({ img, repoPath, onPreview, onContextMenu }: Prompt
     const [hasFailed, setHasFailed] = useState(false);
 
     useEffect(() => {
-        setResolvedSrc(resolveImageSrc(img.src, repoPath));
-        setHasFailed(false);
+        let isCancelled = false;
+        const load = async () => {
+            const raw = img.src.trim();
+            if (raw.startsWith('data:') || raw.startsWith('http://') || raw.startsWith('https://')) {
+                setResolvedSrc(raw);
+                setHasFailed(false);
+                return;
+            }
+            let localPath = extractLocalPathFromUri(raw) || raw;
+            const isAbsolute = /^[a-zA-Z]:[\\/]/.test(localPath) || localPath.startsWith('/') || localPath.startsWith('\\\\');
+            if (!isAbsolute && repoPath && repoPath.trim().length > 0) {
+                const sep = repoPath.includes('/') ? '/' : '\\';
+                localPath = `${repoPath.replace(/[/\\]+$/, '')}${sep}${localPath.replace(/^(\.[/\\]|[/\\])+/, '')}`;
+            }
+
+            try {
+                const base64Data = await invoke<string>('read_image_as_base64', { path: localPath });
+                if (!isCancelled && base64Data && base64Data.startsWith('data:image/')) {
+                    setResolvedSrc(base64Data);
+                    setHasFailed(false);
+                    return;
+                }
+            } catch (err: unknown) {
+                useErrorStore.getState().trackWarning(err, {
+                    source: 'PromptThumbnailCard.load_base64',
+                    triggerAction: 'read_image_as_base64_proactive',
+                });
+            }
+            if (!isCancelled) {
+                setResolvedSrc(resolveImageSrc(img.src, repoPath));
+            }
+        };
+        load();
+        return () => {
+            isCancelled = true;
+        };
     }, [img.src, repoPath]);
 
     const handleImgError = async () => {

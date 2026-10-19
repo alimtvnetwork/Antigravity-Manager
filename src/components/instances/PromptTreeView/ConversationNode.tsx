@@ -123,8 +123,10 @@ export function ConversationNode({
                 key={conv.conversation_id}
                 tabIndex={0}
                 onClick={() => {
-                    setSelectedTurnNumber(null);
-                    onSelect({ ...conv, selected_turn_number: null }, project);
+                    const runningTurn = conv.prompts?.find((p) => p.is_running) || conv.prompts?.[conv.prompts.length - 1];
+                    const defaultTurnNum = runningTurn ? runningTurn.turn_number : null;
+                    setSelectedTurnNumber(defaultTurnNum);
+                    onSelect({ ...conv, selected_turn_number: defaultTurnNum }, project);
                 }}
                 onDoubleClick={() => onOpenInspector(conv, project.repo_path)}
                 onKeyDown={(e) => {
