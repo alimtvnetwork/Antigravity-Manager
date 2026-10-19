@@ -2,7 +2,7 @@ use crate::modules::email_watcher;
 use crate::modules::repo_db;
 use crate::modules::supabase_client::SupabaseClient;
 use crate::modules::supabase_sync;
-use chrono::Utc;
+use chrono::{Local, Utc};
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::process::Command;
@@ -266,17 +266,35 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
     let exec_status = PromptExecutionStatusType::from_spawned(spawned);
     let ide_line = ide_exe_line_for(&resolved_instance).unwrap_or_default();
     let id8 = prompt_id.strip_prefix("p-").unwrap_or(&prompt_id);
+    let now_utc = Utc::now();
+    let utc_str = now_utc.to_rfc3339();
+    let local_str = Local::now().format("%Y-%m-%d %I:%M:%S %p").to_string();
+    let (_, detected_images) = repo_db::extract_image_payload_or_path(&prompt_text);
+    let media_count = detected_images
+        .len()
+        .max(if active_prompt.image_payload.is_some() {
+            1
+        } else {
+            0
+        });
 
     format!(
-        "✅ <b>Prompt sent</b> to {} · {}\n\
-        <b>Status:</b> {}\n\
-        <b>Reference:</b> <code>{}</code>\n\
+        "✅ <b>Prompt Dispatched & Acknowledged</b>\n\
+        • <b>Dispatched At:</b> <code>{}</code> ({})\n\
+        • <b>Target Node:</b> <code>local</code>\n\
+        • <b>Instance:</b> <code>{}</code> · <code>{}</code>\n\
+        • <b>Status:</b> {}\n\
+        • <b>Reference:</b> <code>{}</code>\n\
+        • <b>Attached Media:</b> {} image(s)\n\
         {}\
         <b>Your prompt:</b>\n<pre>{}</pre>",
+        utc_str,
+        local_str,
         clean_for_telegram_html(&resolved_instance, 32),
         clean_for_telegram_html(&final_proj_id, 40),
         exec_status,
         clean_for_telegram_html(id8, 16),
+        media_count,
         ide_line,
         clean_for_telegram_html(&repo_db::strip_internal_id_wrappers(&prompt_text), 800)
     )
@@ -416,18 +434,30 @@ pub async fn execute_remote_prompt_injection(
 
     let ide_line = ide_exe_line_for(explicit_instance.unwrap_or("default")).unwrap_or_default();
     let id8 = cmd_id.get(..8).unwrap_or(&cmd_id);
+    let now_utc = Utc::now();
+    let utc_str = now_utc.to_rfc3339();
+    let local_str = Local::now().format("%Y-%m-%d %I:%M:%S %p").to_string();
+    let (_, detected_images) = repo_db::extract_image_payload_or_path(prompt_text);
+    let media_count = detected_images.len();
 
     format!(
-        "✅ <b>Prompt sent</b> to {} · {} ({})\n\
-        <b>Status:</b> {}\n\
-        <b>Reference:</b> <code>{}</code>\n\
+        "✅ <b>Prompt Dispatched & Acknowledged</b>\n\
+        • <b>Dispatched At:</b> <code>{}</code> ({})\n\
+        • <b>Target Node:</b> <code>{}</code>\n\
+        • <b>Instance:</b> <code>{}</code> ({})\n\
+        • <b>Status:</b> {}\n\
+        • <b>Reference:</b> <code>{}</code>\n\
+        • <b>Attached Media:</b> {} image(s)\n\
         {}\
         <b>Your prompt:</b>\n<pre>{}</pre>",
+        utc_str,
+        local_str,
         clean_for_telegram_html(target_node, 40),
         clean_for_telegram_html(target_project, 40),
         clean_for_telegram_html(explicit_instance.unwrap_or("default"), 32),
         dispatch_status,
         clean_for_telegram_html(id8, 16),
+        media_count,
         ide_line,
         clean_for_telegram_html(prompt_text, 800)
     )

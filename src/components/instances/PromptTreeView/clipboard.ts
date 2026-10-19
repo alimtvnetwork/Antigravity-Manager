@@ -34,13 +34,19 @@ export function resolveImageSrc(src: string, repoPath?: string): string {
     // Handle file:/// or file://
     let cleanPath = trimmed;
     if (cleanPath.startsWith('file:///')) {
-        cleanPath = cleanPath.slice(7);
-        // On Windows with drive letter, e.g. '/C:/...' or '/D:/...', strip leading slash
-        if (/^\/[a-zA-Z]:[\\/]/.test(cleanPath)) {
-            cleanPath = cleanPath.slice(1);
+        if (/^file:\/\/\/[a-zA-Z]:[\\/]/.test(cleanPath)) {
+            cleanPath = cleanPath.slice(8);
+        } else {
+            cleanPath = cleanPath.slice(7);
+            if (/^\/[a-zA-Z]:[\\/]/.test(cleanPath)) {
+                cleanPath = cleanPath.slice(1);
+            }
         }
     } else if (cleanPath.startsWith('file://')) {
         cleanPath = cleanPath.slice(7);
+        if (/^\/[a-zA-Z]:[\\/]/.test(cleanPath)) {
+            cleanPath = cleanPath.slice(1);
+        }
     }
 
     try {
@@ -49,12 +55,16 @@ export function resolveImageSrc(src: string, repoPath?: string): string {
         // Keep raw cleanPath if decoding fails
     }
 
+    if (/^\/[a-zA-Z]:[\\/]/.test(cleanPath)) {
+        cleanPath = cleanPath.slice(1);
+    }
+
     // If cleanPath is relative and repoPath is provided, resolve against repoPath
     const isAbsolute = /^[a-zA-Z]:[\\/]/.test(cleanPath) || cleanPath.startsWith('/') || cleanPath.startsWith('\\\\');
     if (!isAbsolute && repoPath && repoPath.trim().length > 0) {
         const sep = repoPath.includes('/') ? '/' : '\\';
         const normRepo = repoPath.replace(/[/\\]+$/, '');
-        const normChild = cleanPath.replace(/^[./\\]+/, '');
+        const normChild = cleanPath.replace(/^(\.[/\\]|[/\\])+/, '');
         cleanPath = `${normRepo}${sep}${normChild}`;
     }
 
@@ -161,22 +171,39 @@ export function rewritePromptForIpcDispatch(promptText: string): PromptRewriteRe
 export function extractAssets(text: string): { images: string[]; files: string[] } {
     const images: string[] = [];
     const files: string[] = [];
+    const seenImages = new Set<string>();
+    const seenFiles = new Set<string>();
 
     const imgRegex = /!\[(.*?)\]\((https?:\/\/.*?|data:image\/[^;]+;base64,[A-Za-z0-9+/=]+|[^\s)]+?\.(?:png|jpe?g|gif|webp|svg))\)/gi;
     let match: RegExpExecArray | null;
     while ((match = imgRegex.exec(text)) !== null) {
         if (match[2]) {
-            images.push(match[2].trim());
+            const raw = match[2].trim();
+            const key = (extractLocalPathFromUri(raw) || raw).replace(/\\/g, '/').toLowerCase();
+            if (!seenImages.has(key)) {
+                seenImages.add(key);
+                images.push(raw);
+            }
         }
     }
 
     const fileRegex = /(?:file:\/\/\/|[a-zA-Z]:\\|\/)[^\s)"]+/g;
     let fileMatch: RegExpExecArray | null;
     while ((fileMatch = fileRegex.exec(text)) !== null) {
-        if (!fileMatch[0].match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) {
-            files.push(fileMatch[0]);
+        const raw = fileMatch[0].trim();
+        const isImg = Boolean(raw.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i));
+        const key = (extractLocalPathFromUri(raw) || raw).replace(/\\/g, '/').toLowerCase();
+
+        if (isImg) {
+            if (!seenImages.has(key)) {
+                seenImages.add(key);
+                images.push(raw);
+            }
         } else {
-            images.push(fileMatch[0]);
+            if (!seenFiles.has(key)) {
+                seenFiles.add(key);
+                files.push(raw);
+            }
         }
     }
 
@@ -223,13 +250,19 @@ export function extractLocalPathFromUri(uri: string): string | null {
     } else if (clean.startsWith('asset://localhost/')) {
         clean = clean.slice('asset://localhost/'.length);
     } else if (clean.startsWith('file:///')) {
-        clean = clean.slice(7);
-        // On Windows with drive letter, e.g. '/C:/...', strip leading slash
-        if (/^\/[a-zA-Z]:[\\/]/.test(clean)) {
-            clean = clean.slice(1);
+        if (/^file:\/\/\/[a-zA-Z]:[\\/]/.test(clean)) {
+            clean = clean.slice(8);
+        } else {
+            clean = clean.slice(7);
+            if (/^\/[a-zA-Z]:[\\/]/.test(clean)) {
+                clean = clean.slice(1);
+            }
         }
     } else if (clean.startsWith('file://')) {
         clean = clean.slice(7);
+        if (/^\/[a-zA-Z]:[\\/]/.test(clean)) {
+            clean = clean.slice(1);
+        }
     }
 
     // If it was an external remote web URL (not asset.localhost), do not treat as local path

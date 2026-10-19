@@ -58,7 +58,7 @@ export function InstanceCardProjects({ api, inst }: { api: InstancePageApi; inst
                             isConversationOwnedByInstance(c.instance_id, inst.config, c.instance_seq_num ?? proj.instance_seq_num)
                         );
                         const totalTurns =
-                            instanceConvs.reduce((sum, c) => sum + Math.max(c.step_count || 1, 1), 0);
+                            instanceConvs.reduce((sum, c) => sum + Math.max(c.prompts?.length || 1, 1), 0);
 
                         return (
                             <div

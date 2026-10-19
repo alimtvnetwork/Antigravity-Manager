@@ -16,6 +16,44 @@ export interface ExtractedImage {
     alt: string;
 }
 
+/**
+ * Normalizes an image URI into a uniform lowercase path string for deduplication keys.
+ * Strips file:/// or file:// protocols, removes invalid leading slashes before Windows drive letters,
+ * decodes percent-encoded characters, and normalizes backslashes to forward slashes.
+ */
+export function normalizeMediaUri(uri: string): string {
+    if (!uri || !uri.trim()) return '';
+    let clean = uri.trim();
+    if (clean.startsWith('file:///')) {
+        if (/^file:\/\/\/[a-zA-Z]:[\\/]/.test(clean)) {
+            clean = clean.slice(8);
+        } else {
+            clean = clean.slice(7);
+            if (/^\/[a-zA-Z]:[\\/]/.test(clean)) {
+                clean = clean.slice(1);
+            }
+        }
+    } else if (clean.startsWith('file://')) {
+        clean = clean.slice(7);
+        if (/^\/[a-zA-Z]:[\\/]/.test(clean)) {
+            clean = clean.slice(1);
+        }
+    }
+
+    try {
+        clean = decodeURIComponent(clean);
+    } catch {
+        // Keep raw clean if decoding fails
+    }
+
+    clean = clean.replace(/\\/g, '/');
+    if (/^\/[a-zA-Z]:\//.test(clean)) {
+        clean = clean.slice(1);
+    }
+
+    return clean.toLowerCase();
+}
+
 function extractImagesFromPrompt(
     text: string,
     conv: AgmConversationNode
@@ -25,15 +63,18 @@ function extractImagesFromPrompt(
 
     // 1. From prompt turns
     if (conv.prompts && conv.prompts.length > 0) {
-        const turns = conv.selected_turn_number
+        const turns = conv.selected_turn_number != null
             ? conv.prompts.filter((t) => t.turn_number === conv.selected_turn_number)
-            : conv.prompts;
+            : conv.prompts.slice(0, 1);
         for (const t of turns) {
             if (t.media_paths) {
                 for (const p of t.media_paths) {
-                    if (p && !seen.has(p)) {
-                        seen.add(p);
-                        list.push({ src: p, alt: `Turn ${t.turn_number} Image` });
+                    if (p) {
+                        const key = normalizeMediaUri(p) || p;
+                        if (!seen.has(key)) {
+                            seen.add(key);
+                            list.push({ src: p, alt: `Turn ${t.turn_number} Image` });
+                        }
                     }
                 }
             }
@@ -46,9 +87,12 @@ function extractImagesFromPrompt(
     while ((match = imgRegex.exec(text)) !== null) {
         const alt = match[1] || 'Embedded Image';
         const src = match[2];
-        if (src && !seen.has(src)) {
-            seen.add(src);
-            list.push({ src, alt });
+        if (src) {
+            const key = normalizeMediaUri(src) || src;
+            if (!seen.has(key)) {
+                seen.add(key);
+                list.push({ src, alt });
+            }
         }
     }
 
@@ -76,7 +120,7 @@ function PromptThumbnailCard({ img, repoPath, onPreview, onContextMenu }: Prompt
         const isWeb = raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:');
         if (!isWeb) {
             let localPath = raw.startsWith('file:///')
-                ? raw.slice(7)
+                ? (/^file:\/\/\/[a-zA-Z]:[\\/]/.test(raw) ? raw.slice(8) : raw.slice(7))
                 : raw.startsWith('file://')
                   ? raw.slice(7)
                   : raw;
@@ -90,7 +134,7 @@ function PromptThumbnailCard({ img, repoPath, onPreview, onContextMenu }: Prompt
             }
             if (!/^[a-zA-Z]:[\\/]/.test(localPath) && !localPath.startsWith('/') && !localPath.startsWith('\\\\') && repoPath) {
                 const sep = repoPath.includes('/') ? '/' : '\\';
-                localPath = `${repoPath.replace(/[/\\]+$/, '')}${sep}${localPath.replace(/^[./\\]+/, '')}`;
+                localPath = `${repoPath.replace(/[/\\]+$/, '')}${sep}${localPath.replace(/^(\.[/\\]|[/\\])+/, '')}`;
             }
             try {
                 const base64Data = await invoke<string>('read_image_as_base64', { path: localPath });
@@ -236,7 +280,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
     );
 
     const turns = selectedConversation.prompts || [];
-    const totalTurns = turns.length > 0 ? turns.length : (selectedConversation.step_count || 1);
+    const totalTurns = selectedConversation.prompts?.length || 1;
 
     const isRunning = Boolean(selectedConversation.is_running) || turns.some((t) => Boolean(t.is_running));
     const isQueued = !isRunning && (

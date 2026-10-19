@@ -348,13 +348,23 @@ pub(crate) fn inspect_conversation_transcript(
             let s_source = val.get("source").and_then(|v| v.as_str()).unwrap_or("");
 
             // 1. User inputs
-            if s_type == "USER_INPUT" || s_source == "USER_EXPLICIT" {
+            let is_user_input = (s_type.eq_ignore_ascii_case("USER_INPUT")
+                || s_source.eq_ignore_ascii_case("USER_EXPLICIT")
+                || s_source.eq_ignore_ascii_case("USER"))
+                && !s_source.eq_ignore_ascii_case("SYSTEM");
+
+            if is_user_input {
                 if let Some(c) = val.get("content").and_then(|v| v.as_str()) {
                     let c_trim = c.trim();
-                    let is_system_msg = c_trim.starts_with("The following is a <SYSTEM_MESSAGE>")
+                    let c_lower = c_trim.to_lowercase();
+                    let is_system_msg = s_source.eq_ignore_ascii_case("SYSTEM")
+                        || c_trim.starts_with("The following is a <SYSTEM_MESSAGE>")
                         || c_trim.starts_with("[Message] timestamp=")
                         || c_trim.starts_with("Task id ")
-                        || c_trim.starts_with("<SYSTEM_MESSAGE>");
+                        || c_trim.starts_with("<SYSTEM_MESSAGE>")
+                        || c_lower.starts_with("the following is a <system_message>")
+                        || c_lower.starts_with("[message] timestamp=")
+                        || c_lower.starts_with("<system_message>");
                     if !is_system_msg {
                         let full_c = if val
                             .get("truncated_fields")
@@ -710,13 +720,13 @@ pub fn extract_conversation_prompt_turns(
         }
 
         // Fast string probe before full JSON deserialization to skip huge tool output lines
-        let is_user_candidate = trimmed.contains("\"USER_INPUT\"")
-            || trimmed.contains("\"USER_EXPLICIT\"")
-            || trimmed.contains("\"source\":\"USER\"")
-            || trimmed.contains("\"source\": \"USER\"");
-        let is_model_candidate = trimmed.contains("\"PLANNER_RESPONSE\"")
-            || trimmed.contains("\"source\":\"MODEL\"")
-            || trimmed.contains("\"source\": \"MODEL\"");
+        let is_user_candidate = trimmed.contains("USER_INPUT")
+            || trimmed.contains("USER_EXPLICIT")
+            || trimmed.contains("\"USER\"")
+            || trimmed.contains("\"user\"");
+        let is_model_candidate = trimmed.contains("PLANNER_RESPONSE")
+            || trimmed.contains("\"MODEL\"")
+            || trimmed.contains("\"model\"");
 
         if !is_user_candidate && !is_model_candidate {
             continue;
@@ -735,13 +745,23 @@ pub fn extract_conversation_prompt_turns(
             .map(|u| u as usize)
             .unwrap_or(line_idx);
 
-        if s_type == "USER_INPUT" || s_source == "USER_EXPLICIT" || s_source == "USER" {
+        let is_user_input = (s_type.eq_ignore_ascii_case("USER_INPUT")
+            || s_source.eq_ignore_ascii_case("USER_EXPLICIT")
+            || s_source.eq_ignore_ascii_case("USER"))
+            && !s_source.eq_ignore_ascii_case("SYSTEM");
+
+        if is_user_input {
             if let Some(c) = val.get("content").and_then(|v| v.as_str()) {
                 let c_trim = c.trim();
-                let is_internal = c_trim.starts_with("The following is a <SYSTEM_MESSAGE>")
+                let c_lower = c_trim.to_lowercase();
+                let is_internal = s_source.eq_ignore_ascii_case("SYSTEM")
+                    || c_trim.starts_with("The following is a <SYSTEM_MESSAGE>")
                     || c_trim.starts_with("[Message] timestamp=")
                     || c_trim.starts_with("Task id ")
-                    || c_trim.starts_with("<SYSTEM_MESSAGE>");
+                    || c_trim.starts_with("<SYSTEM_MESSAGE>")
+                    || c_lower.starts_with("the following is a <system_message>")
+                    || c_lower.starts_with("[message] timestamp=")
+                    || c_lower.starts_with("<system_message>");
                 if !is_internal {
                     let clean = extract_clean_user_prompt(c);
                     if !clean.trim().is_empty() {
@@ -769,16 +789,8 @@ pub fn extract_conversation_prompt_turns(
                             for m in media_arr {
                                 if let Some(uri) = m.get("uri").and_then(|u| u.as_str()) {
                                     let clean_uri = uri.trim();
-                                    let file_path = if let Some(stripped) =
-                                        clean_uri.strip_prefix("file:///")
-                                    {
-                                        stripped.to_string()
-                                    } else if let Some(stripped) = clean_uri.strip_prefix("file://")
-                                    {
-                                        stripped.to_string()
-                                    } else {
-                                        clean_uri.to_string()
-                                    };
+                                    let file_path =
+                                        crate::modules::repo_db::failed_commands::decode_uri_to_path(clean_uri);
                                     let p = std::path::Path::new(&file_path);
                                     let resolved_path = if p.exists() {
                                         file_path.clone()

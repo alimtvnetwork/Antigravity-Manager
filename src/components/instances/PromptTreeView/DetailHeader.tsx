@@ -468,7 +468,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                     {/* Scope Breadcrumb Badge (only shown when a specific turn is selected) */}
                     {activeTurnNumber !== null && (
                         <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded-md border border-purple-500/20 font-semibold shrink-0">
-                            ↳ Turn {activeTurnNumber} of {selectedConversation.prompts?.length || selectedConversation.step_count || 1}
+                            ↳ Turn {activeTurnNumber} of {selectedConversation.prompts?.length || 1}
                         </span>
                     )}
 

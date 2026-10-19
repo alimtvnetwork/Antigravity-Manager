@@ -400,59 +400,66 @@ export function usePromptTreeData({
 
                 setTreeData(finalData);
 
-                if (isInitialLoad) {
-                    const targetArchived = overrideArchivedIds || archivedProjectIdsRef.current;
-                    const targetPinned = overridePinnedIds || pinnedProjectIdsRef.current;
-                    performAutoSelection(finalData, targetArchived, targetPinned);
-                } else {
-                    // Background sync: match existing selected conversation in place
-                    const currentConv = selectedConversationRef.current;
-                    const currentProj = selectedProjectRef.current;
-                    const currentActiveText = activePromptTextRef.current;
+                // Retain active selection across loads and background sync cycles
+                const currentConv = selectedConversationRef.current;
+                const currentProj = selectedProjectRef.current;
+                const currentActiveText = activePromptTextRef.current;
 
-                    if (currentConv && currentProj) {
-                        const updatedProj = finalData.find((p) => p.project_id === currentProj.project_id);
-                        if (updatedProj) {
-                            setSelectedProject(updatedProj);
-                            const updatedConv = updatedProj.conversations.find(
-                                (c) => c.conversation_id === currentConv.conversation_id
-                            );
-                            if (updatedConv) {
-                                if (typeof currentConv.selected_turn_number === 'number') {
-                                    const matchingTurn = updatedConv.prompts?.find(
-                                        (t) => t.turn_number === currentConv.selected_turn_number
-                                    );
-                                    if (matchingTurn) {
-                                        const turnConv: AgmConversationNode = {
-                                            ...updatedConv,
-                                            prompt_preview_200w: matchingTurn.preview_200w || matchingTurn.prompt_text.slice(0, 200),
-                                            full_prompt_text: matchingTurn.prompt_text,
-                                            latest_step_summary: `Turn ${matchingTurn.turn_number} · ${matchingTurn.status}`,
-                                            is_running: matchingTurn.is_running,
-                                            is_queued: matchingTurn.is_queued,
-                                            status: matchingTurn.status,
-                                            selected_turn_number: matchingTurn.turn_number,
-                                        };
-                                        setSelectedConversation(turnConv);
-                                        const freshText = matchingTurn.prompt_text || '';
-                                        setActivePromptText(freshText);
-                                        setEditedPromptText((prev) => (prev === currentActiveText ? freshText : prev));
-                                    } else {
-                                        const freshText = resolveConversationPromptText(updatedConv, null);
-                                        setSelectedConversation(updatedConv);
-                                        setActivePromptText(freshText);
-                                        setEditedPromptText((prev) => (prev === currentActiveText ? freshText : prev));
-                                    }
+                let hasRetainedSelection = false;
+                if (currentConv) {
+                    const currentId = currentConv.conversation_id;
+                    const currentTurn = currentConv.selected_turn_number;
+                    const updatedProj = finalData.find((p) =>
+                        (currentProj && p.project_id === currentProj.project_id) ||
+                        p.conversations.some((c) => c.conversation_id === currentId)
+                    );
+                    if (updatedProj) {
+                        setSelectedProject(updatedProj);
+                        const updatedConv = updatedProj.conversations.find(
+                            (c) => c.conversation_id === currentId
+                        );
+                        if (updatedConv) {
+                            hasRetainedSelection = true;
+                            if (typeof currentTurn === 'number' && updatedConv.prompts?.length) {
+                                const matchingTurn = updatedConv.prompts.find(
+                                    (t) => t.turn_number === currentTurn
+                                );
+                                if (matchingTurn) {
+                                    const turnConv: AgmConversationNode = {
+                                        ...updatedConv,
+                                        prompt_preview_200w: matchingTurn.preview_200w || matchingTurn.prompt_text.slice(0, 200),
+                                        full_prompt_text: matchingTurn.prompt_text,
+                                        latest_step_summary: `Turn ${matchingTurn.turn_number} · ${matchingTurn.status}`,
+                                        is_running: matchingTurn.is_running,
+                                        is_queued: matchingTurn.is_queued,
+                                        status: matchingTurn.status,
+                                        selected_turn_number: matchingTurn.turn_number,
+                                    };
+                                    setSelectedConversation(turnConv);
+                                    const freshText = matchingTurn.prompt_text || '';
+                                    setActivePromptText(freshText);
+                                    setEditedPromptText((prev) => (prev === currentActiveText ? freshText : prev));
                                 } else {
                                     const freshText = resolveConversationPromptText(updatedConv, null);
                                     setSelectedConversation(updatedConv);
                                     setActivePromptText(freshText);
-                                    // Do not clobber user's dirty textarea edits
                                     setEditedPromptText((prev) => (prev === currentActiveText ? freshText : prev));
                                 }
+                            } else {
+                                const freshText = resolveConversationPromptText(updatedConv, null);
+                                setSelectedConversation(updatedConv);
+                                setActivePromptText(freshText);
+                                // Do not clobber user's dirty textarea edits
+                                setEditedPromptText((prev) => (prev === currentActiveText ? freshText : prev));
                             }
                         }
                     }
+                }
+
+                if (isInitialLoad && !hasRetainedSelection) {
+                    const targetArchived = overrideArchivedIds || archivedProjectIdsRef.current;
+                    const targetPinned = overridePinnedIds || pinnedProjectIdsRef.current;
+                    performAutoSelection(finalData, targetArchived, targetPinned);
                 }
             } catch (err: unknown) {
                 if (isInitialLoad) {
@@ -487,23 +494,31 @@ export function usePromptTreeData({
         ]
     );
 
+    const hasInitializedRef = useRef(false);
+
     // Modal open effect: Check SWR in-memory cache first for instant 0ms perceived render
     useEffect(() => {
-        if (isOpen) {
-            const cacheKey = instanceId || 'default';
-            const cached = promptTreeSwrCache.get(cacheKey);
-            const latestArchived = getArchivedProjectsForInstance(instanceId);
-            const latestPinned = (() => {
-                try {
-                    const stored = localStorage.getItem(`agm_pinned_projects_${instanceId || 'default'}`);
-                    return stored ? JSON.parse(stored) : [];
-                } catch {
-                    return [];
-                }
-            })();
-            setArchivedProjectIds(latestArchived);
-            setPinnedProjectIds(latestPinned);
+        if (!isOpen) {
+            hasInitializedRef.current = false;
+            return;
+        }
 
+        const cacheKey = instanceId || 'default';
+        const cached = promptTreeSwrCache.get(cacheKey);
+        const latestArchived = getArchivedProjectsForInstance(instanceId);
+        const latestPinned = (() => {
+            try {
+                const stored = localStorage.getItem(`agm_pinned_projects_${instanceId || 'default'}`);
+                return stored ? JSON.parse(stored) : [];
+            } catch {
+                return [];
+            }
+        })();
+        setArchivedProjectIds(latestArchived);
+        setPinnedProjectIds(latestPinned);
+
+        if (!hasInitializedRef.current) {
+            hasInitializedRef.current = true;
             if (cached && cached.data.length > 0) {
                 // Immediate SWR render
                 setTreeData(cached.data);

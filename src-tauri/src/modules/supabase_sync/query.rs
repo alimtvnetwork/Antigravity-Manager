@@ -62,7 +62,73 @@ pub(crate) fn build_ssh_mesh_machine_info(
     }
 }
 
-/// Build local machine info plus all registered SSH fleet nodes
+/// Collect all known peer connections from SSH connections, candidate gitmap-ssh-nodes.json paths, and GitMap cluster nodes
+pub(crate) fn collect_all_peer_connections() -> Vec<crate::modules::ssh_manager::SshConnectionRecord>
+{
+    let mut all_conns = Vec::new();
+    let mut seen_aliases = HashSet::new();
+    let mut seen_ips = HashSet::new();
+
+    // 1. Load from ssh_manager registry
+    if let Ok(conns) = crate::modules::ssh_manager::load_ssh_connections() {
+        for c in conns {
+            let a_norm = c.alias.trim().to_ascii_lowercase();
+            let ip_norm = c.ip_address.trim().to_string();
+            if !a_norm.is_empty() && !seen_aliases.contains(&a_norm) {
+                seen_aliases.insert(a_norm);
+                if !ip_norm.is_empty() {
+                    seen_ips.insert(ip_norm);
+                }
+                all_conns.push(c);
+            }
+        }
+    }
+
+    // 2. Load from candidate gitmap-ssh-nodes.json files
+    for seed_path in crate::modules::ssh_manager::candidate_seed_node_paths() {
+        if let Ok(raw) = std::fs::read_to_string(&seed_path) {
+            if let Ok(conns) = crate::modules::ssh_manager::decode_connections_from_json(&raw) {
+                for c in conns {
+                    let a_norm = c.alias.trim().to_ascii_lowercase();
+                    let ip_norm = c.ip_address.trim().to_string();
+                    if !a_norm.is_empty() && !seen_aliases.contains(&a_norm) {
+                        seen_aliases.insert(a_norm);
+                        if !ip_norm.is_empty() {
+                            seen_ips.insert(ip_norm);
+                        }
+                        all_conns.push(c);
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Load from GitMap cluster nodes CLI (gitmap cluster nodes --json / status)
+    for gm_node in crate::modules::telegram_inbound::cluster::query_gitmap_cluster_nodes() {
+        let a_norm = gm_node.alias.trim().to_ascii_lowercase();
+        let ip_norm = gm_node.ip_address.trim().to_string();
+        if !a_norm.is_empty() && !seen_aliases.contains(&a_norm) {
+            seen_aliases.insert(a_norm);
+            if !ip_norm.is_empty() && ip_norm != "Cluster Mesh" {
+                seen_ips.insert(ip_norm.clone());
+            }
+            all_conns.push(crate::modules::ssh_manager::SshConnectionRecord {
+                alias: gm_node.alias.clone(),
+                ip_address: gm_node.ip_address.clone(),
+                port: 22,
+                username: "Administrator".to_string(),
+                key_path: String::new(),
+                os: "Windows".to_string(),
+                auth_type: "key".to_string(),
+                password_encrypted: None,
+            });
+        }
+    }
+
+    all_conns
+}
+
+/// Build local machine info plus all registered SSH fleet and GitMap nodes
 pub fn build_local_and_ssh_fleet() -> Vec<FleetMachineInfo> {
     let mut machines = build_local_fallback_machine();
     let local_ip = machines
@@ -75,13 +141,12 @@ pub fn build_local_and_ssh_fleet() -> Vec<FleetMachineInfo> {
         .unwrap_or_default();
     let now = Utc::now().timestamp();
 
-    if let Ok(ssh_conns) = crate::modules::ssh_manager::load_ssh_connections() {
-        for conn in ssh_conns {
-            if conn.ip_address == local_ip || conn.alias.eq_ignore_ascii_case(&local_alias) {
-                continue;
-            }
-            machines.push(build_ssh_mesh_machine_info(&conn, now));
+    let all_conns = collect_all_peer_connections();
+    for conn in all_conns {
+        if conn.ip_address == local_ip || conn.alias.eq_ignore_ascii_case(&local_alias) {
+            continue;
         }
+        machines.push(build_ssh_mesh_machine_info(&conn, now));
     }
 
     machines.sort_by(|a, b| {
@@ -460,18 +525,17 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
         }
     }
 
-    // Merge registered SSH mesh nodes that are not present in Supabase
+    // Merge registered SSH mesh nodes and GitMap peer nodes that are not present in Supabase
     let now = Utc::now().timestamp();
-    if let Ok(ssh_conns) = crate::modules::ssh_manager::load_ssh_connections() {
-        for conn in ssh_conns {
-            let is_dup = machines.iter().any(|m| {
-                m.ip_address == conn.ip_address
-                    || m.node_alias.eq_ignore_ascii_case(&conn.alias)
-                    || m.alias.eq_ignore_ascii_case(&conn.alias)
-            });
-            if !is_dup {
-                machines.push(build_ssh_mesh_machine_info(&conn, now));
-            }
+    let all_conns = collect_all_peer_connections();
+    for conn in all_conns {
+        let is_dup = machines.iter().any(|m| {
+            m.ip_address == conn.ip_address
+                || m.node_alias.eq_ignore_ascii_case(&conn.alias)
+                || m.alias.eq_ignore_ascii_case(&conn.alias)
+        });
+        if !is_dup {
+            machines.push(build_ssh_mesh_machine_info(&conn, now));
         }
     }
 

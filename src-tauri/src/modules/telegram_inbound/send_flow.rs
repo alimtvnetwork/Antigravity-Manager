@@ -8,6 +8,7 @@
 //! process-local, keyed by Telegram chat id, with the same 10-minute TTL as
 //! the `/target` aim in `ui_remote.rs`.
 
+use chrono::{Local, Utc};
 use once_cell::sync::Lazy;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -1103,13 +1104,21 @@ async fn dispatch_turn_rerun_execution(
 
     let (preview_200w, word_count) =
         crate::modules::repo_db::extract_prompt_words_preview(&injected_text, 200);
+    let now_utc = Utc::now();
+    let utc_str = now_utc.to_rfc3339();
+    let local_str = Local::now().format("%Y-%m-%d %I:%M:%S %p").to_string();
+    let (_, detected_images) =
+        crate::modules::repo_db::extract_image_payload_or_path(&injected_text);
+    let media_count = detected_images.len();
 
     let reply = format!(
-        "{icon} <b>Prompt {action} Dispatched</b>\n\
+        "{icon} <b>Prompt {action} Dispatched & Acknowledged</b>\n\
         ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        • <b>Dispatched At:</b> <code>{utc_str}</code> ({local_str})\n\
         • <b>Target:</b> <code>[AGM:{seq} | {gm}]</code> · <code>#{c_seq}</code> (<code>{cid8}</code>)\n\
         • <b>Instance:</b> <code>{inst}</code> · <b>Workspace:</b> <code>{ws}</code>\n\
         • <b>Turn:</b> #{turn} ({words} words)\n\
+        • <b>Attached Media:</b> {media_count} image(s)\n\
         • <b>Mode:</b> {mode}\n\n\
         <b>Dispatched Prompt:</b>\n\
         <blockquote expandable><pre><code class=\"language-markdown\">{preview}</code></pre></blockquote>\n\n\
@@ -1166,21 +1175,45 @@ async fn dispatch_send_prompt(
     let injected = execute_prompt_injection(&args).await;
     let proof = super::open_shot::capture_and_send_proof_shot(&target).await;
     let ide_line = ide_exe_line_for(instance).unwrap_or_default();
+    let now_utc = Utc::now();
+    let utc_str = now_utc.to_rfc3339();
+    let local_str = Local::now().format("%Y-%m-%d %I:%M:%S %p").to_string();
+    let (_, detected_images) = crate::modules::repo_db::extract_image_payload_or_path(prompt);
+    let media_count = detected_images.len();
+
     let reply = if ide_line.is_empty() {
         format!(
-            "✅ <b>Prompt delivered</b> to {} · {} · {}\n\n{}\n\n{}",
+            "✅ <b>Prompt Dispatched & Acknowledged</b>\n\
+            • <b>Dispatched At:</b> <code>{}</code> ({})\n\
+            • <b>Target Node:</b> <code>{}</code>\n\
+            • <b>Instance:</b> <code>{}</code>\n\
+            • <b>Conversation:</b> <code>{}</code>\n\
+            • <b>Attached Media:</b> {} image(s)\n\n\
+            {}\n\n{}",
+            utc_str,
+            local_str,
             clean_for_telegram_html(machine, 48),
             clean_for_telegram_html(instance, 48),
             clean_for_telegram_html(conversation, 64),
+            media_count,
             injected,
             proof
         )
     } else {
         format!(
-            "✅ <b>Prompt delivered</b> to {} · {} · {}\n{}{}\n\n{}",
+            "✅ <b>Prompt Dispatched & Acknowledged</b>\n\
+            • <b>Dispatched At:</b> <code>{}</code> ({})\n\
+            • <b>Target Node:</b> <code>{}</code>\n\
+            • <b>Instance:</b> <code>{}</code>\n\
+            • <b>Conversation:</b> <code>{}</code>\n\
+            • <b>Attached Media:</b> {} image(s)\n\
+            {}{}\n\n{}",
+            utc_str,
+            local_str,
             clean_for_telegram_html(machine, 48),
             clean_for_telegram_html(instance, 48),
             clean_for_telegram_html(conversation, 64),
+            media_count,
             ide_line,
             injected,
             proof

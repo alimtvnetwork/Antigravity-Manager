@@ -95,7 +95,7 @@ export function DetailsModal(props: DetailsModalProps) {
     const seqCode = selectedConversation?.seq_code || 'CONV';
     const convNumberMatch = seqCode.match(/\d+/);
     const convNumberDisplay = convNumberMatch ? convNumberMatch[0] : null;
-    const turnCount = selectedConversation?.prompts?.length || selectedConversation?.step_count || 1;
+    const turnCount = selectedConversation?.prompts?.length || 1;
 
     const handleCopyField = async (field: string, value: string) => {
         try {

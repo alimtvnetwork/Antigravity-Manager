@@ -13,6 +13,57 @@ const TOKEN_REGEX =
 // Maximum bytes cap for inline regex parsing to protect UI thread and prevent virtual DOM bloat
 const MAX_INLINE_BLOCK_BYTES = 50 * 1024; // 50 KB
 
+interface MarkdownImageProps {
+    src: string;
+    alt?: string;
+    className?: string;
+    onClick?: (src: string, alt?: string) => void;
+    onContextMenu?: (e: React.MouseEvent, src: string, alt?: string) => void;
+}
+
+export function MarkdownImage({
+    src,
+    alt,
+    className,
+    onClick,
+    onContextMenu,
+}: MarkdownImageProps) {
+    const [hasError, setHasError] = useState(false);
+    const resolvedImgSrc = useMemo(() => resolveImageSrc(src), [src]);
+
+    if (hasError) {
+        return (
+            <span
+                onClick={() => onClick?.(resolvedImgSrc, alt)}
+                onContextMenu={(e) => onContextMenu?.(e, resolvedImgSrc, alt)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 my-1 rounded-md text-[11px] font-mono bg-slate-100/90 dark:bg-[#120a1f]/90 text-amber-600 dark:text-amber-400 border border-amber-500/30 backdrop-blur-md shadow-2xs cursor-pointer hover:bg-amber-500/10 transition-colors"
+                title={`Image: ${src} (Preview Unavailable - Click to inspect)`}
+            >
+                <span>📷</span>
+                <span className="font-semibold">Image (Preview Unavailable)</span>
+                {alt && <span className="text-slate-400 dark:text-slate-500 font-normal">· {alt}</span>}
+            </span>
+        );
+    }
+
+    return (
+        <img
+            src={resolvedImgSrc}
+            alt={alt || ''}
+            onClick={() => onClick?.(resolvedImgSrc, alt)}
+            onContextMenu={(e) => {
+                if (onContextMenu) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onContextMenu(e, resolvedImgSrc, alt);
+                }
+            }}
+            className={className}
+            onError={() => setHasError(true)}
+        />
+    );
+}
+
 function parseInlineMarkdown(
     text: string,
     onToggleExpand?: () => void,

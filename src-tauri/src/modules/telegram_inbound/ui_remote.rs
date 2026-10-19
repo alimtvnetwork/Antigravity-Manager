@@ -11,6 +11,7 @@ use crate::error::AppError;
 use crate::modules::audit::{
     record_ui_interaction, InteractionActor, InteractionTrigger, RecordInteractionInput,
 };
+use chrono::{Local, Utc};
 use serde_json::{json, Value};
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -754,11 +755,40 @@ async fn run_ui_verb(verb: UiVerb) -> LocalUiAction {
                     format!("Screenshot unavailable: {}", escape_html(&err)),
                 ),
             };
+            let now_utc = Utc::now();
+            let utc_str = now_utc.to_rfc3339();
+            let local_str = Local::now().format("%Y-%m-%d %I:%M:%S %p").to_string();
+            let (_, detected_images) =
+                crate::modules::repo_db::extract_image_payload_or_path(&text);
+            let media_count = detected_images.len();
+            let (target_node, target_instance) = if instance.contains(':') {
+                let (m_part, i_part) = instance.split_once(':').unwrap_or(("local", "default"));
+                (m_part.to_string(), i_part.to_string())
+            } else if !(conversation.to_uppercase().starts_with('C')
+                || conversation.to_uppercase().starts_with('P')
+                || conversation.to_uppercase().starts_with("GM:"))
+                && crate::modules::instance::resolve_instance_id(&conversation).is_ok()
+            {
+                (instance.clone(), conversation.clone())
+            } else {
+                ("local".to_string(), instance.clone())
+            };
+
             LocalUiAction {
                 reply: format!(
-                    "✅ <b>Prompt delivered</b> to <code>{}</code> on <code>{}</code>\n{}\n\n{}",
+                    "✅ <b>Prompt Dispatched & Acknowledged</b>\n\
+                    • <b>Dispatched At:</b> <code>{}</code> ({})\n\
+                    • <b>Target Node:</b> <code>{}</code>\n\
+                    • <b>Instance:</b> <code>{}</code>\n\
+                    • <b>Conversation:</b> <code>{}</code>\n\
+                    • <b>Attached Media:</b> {} image(s)\n\
+                    {}\n\n{}",
+                    utc_str,
+                    local_str,
+                    escape_html(&target_node),
+                    escape_html(&target_instance),
                     escape_html(&conversation),
-                    escape_html(&instance),
+                    media_count,
                     note,
                     injected
                 ),
