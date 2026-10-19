@@ -100,7 +100,7 @@ export function AlgorithmScoreCell({
             {isHovered && (
                 <div
                     className={cn(
-                        "pointer-events-none absolute z-50 backdrop-blur-md bg-white/95 dark:bg-[#13111c]/95 border border-slate-200 dark:border-[#40285e] shadow-2xl rounded-xl p-3 text-xs w-72 right-0 transition-opacity animate-in fade-in duration-150",
+                        "pointer-events-none absolute z-50 backdrop-blur-md bg-white/95 dark:bg-[#13111c]/95 border border-slate-200 dark:border-[#40285e] shadow-2xl rounded-xl p-3.5 text-xs w-96 max-w-[calc(100vw-2rem)] right-0 transition-opacity animate-in fade-in duration-150 whitespace-normal",
                         showAbove ? "bottom-full mb-2" : "top-full mt-2"
                     )}
                 >
@@ -125,8 +125,8 @@ export function AlgorithmScoreCell({
                     </div>
 
                     {/* Formula */}
-                    <div className="font-mono text-[10px] px-2 py-1 rounded bg-slate-100 dark:bg-[#1a1626] border border-slate-200/80 dark:border-[#40285e]/60 text-slate-700 dark:text-slate-300 mb-2.5">
-                        <span className="text-slate-400 dark:text-slate-500 select-none mr-1">Formula:</span>
+                    <div className="font-mono text-[10px] px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-[#1a1626] border border-slate-200/80 dark:border-[#40285e]/60 text-slate-700 dark:text-slate-300 mb-2.5 leading-relaxed break-words whitespace-normal">
+                        <span className="text-slate-400 dark:text-slate-500 select-none mr-1.5">Formula:</span>
                         <span className="font-semibold text-slate-900 dark:text-slate-100">{result.mathBreakdown.formulaString}</span>
                     </div>
 

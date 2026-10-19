@@ -8,7 +8,7 @@ import { PromptImagePreviewModal } from './PromptImagePreviewModal';
 import { PromptImageContextMenu } from './PromptImageContextMenu';
 import { resolveImageSrc } from './clipboard';
 import { useErrorStore } from '../../../stores/error-store';
-import { formatDateTime, formatDateOnly } from '../../../utils/date';
+import { formatDateOnly } from '../../../utils/date';
 
 export interface ExtractedImage {
     src: string;
