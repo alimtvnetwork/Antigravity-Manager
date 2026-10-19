@@ -5,7 +5,7 @@
 #>
 
 param(
-    [int]$TargetCallerPid = 10076
+    [int]$TargetCallerPid = 32
 )
 
 $ErrorActionPreference = "Stop"
@@ -53,7 +53,7 @@ function Parse-CliJson {
 }
 
 # ---------------------------------------------------------------------------
-# 0. Safety Invariant Check: Verify & Protect Caller Session PID 10076
+# 0. Safety Invariant Check: Verify & Protect Caller Session PID 32
 # ---------------------------------------------------------------------------
 Write-Host "`n[STEP 0] Verifying caller session PID $TargetCallerPid protection..." -ForegroundColor Yellow
 $callerProc = Get-Process -Id $TargetCallerPid -ErrorAction SilentlyContinue
