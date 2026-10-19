@@ -1,5 +1,20 @@
 # Changelog
 
+## [v4.237.0] - 2026-10-19
+
+### Added
+- **Strict Release Asset Verification Before Update Prompting**: Added `verify_tag_has_platform_asset` in `src-tauri/src/modules/update_checker/channels.rs` performing HTTP HEAD requests against the GitHub Release API to ensure that native platform installer binaries (`agm-alim-setup.exe`, `.dmg`, `.deb`) actually exist and are downloadable before notifying users of updates, eliminating 404 installation errors when tags exist before assets finish compiling. (Thanks to @aukgit)
+- **Combined Running & Queued Backup / Restore with 5s Countdown HUD**: Added direct combined export for both running and enqueued prompts (`Export Running & Queued Prompts (.json)`) and direct backup restoration in `src/components/instances/PromptTreeView/ImportExportMenu.tsx` and `usePromptTreeCoreActions.ts`; displays an interactive 5-second countdown HUD banner ("Waiting time: Xs remaining · Next action: Resume and dispatch restored prompt(s) to instance ...") before automatic prompt dispatching. (Thanks to @aukgit)
+- **Telegram Multimodal Remote Dispatch & Session 0 Display Fallback**: Preserved `saved_media_opt` during `/send` flows in `src-tauri/src/modules/telegram_inbound/send_flow.rs` and `injection.rs`, populating `active_prompts.image_payload` with attached media counts and timestamps; implemented an anti-aliased synthetic dispatch card in `open_shot.rs` when running under non-interactive Windows OpenSSH Session 0 without display station access. (Thanks to @aukgit)
+
+### Fixed
+- **Prompt Tree Selection Anti-Flapping & Turn Persistence**: Locked the actively selected turn (`selected_turn_number`) and project selection across background SWR sync intervals in `src/components/instances/PromptTreeView/usePromptTreeData.ts` and `ConversationNode.tsx`, preventing title and prompt text from glitching or alternating between conversation summaries and raw turn prompts during active inspection. (Thanks to @aukgit)
+- **Modal Outside-Click & Double-Click Dismissal**: Added explicit `onClick` and `onDoubleClick` backdrop event handlers on the backdrop container in `src/components/instances/PromptTreeView/PromptTreeViewModal.tsx` to cleanly dismiss the modal when clicking outside. (Thanks to @aukgit)
+- **Rich Dual-MIME Image Copying & Visual Fallback Cards**: Upgraded image processing in `PromptInstructionView.tsx`, `markdown.tsx`, and `clipboard.ts`; images now render with local base64 and asset protocol fallback cards (`PromptThumbnailCard`), and support rich multi-format clipboard copying (`image/png` binary blob + `text/html`) through `copyPromptWithRichImages` with deduplicated URI extraction and Windows drive letter decoding. (Thanks to @aukgit)
+- **GitMap SSH Mesh & Fleet Node Schema Alignment**: Reconciled `SshConnectionRecord` field schemas across `src-tauri/src/modules/supabase_sync/query.rs` and `src/components/instances/fleet/useFleetMachines.ts`, eliminating all Rust compilation, Clippy, and TypeScript linter errors across all supported OS matrix targets. (Thanks to @aukgit)
+
+---
+
 ## [v4.236.0] - 2026-10-19
 
 ### Added
@@ -811,6 +826,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.237.0 (2026-10-19)**:
+        -   **[App Update Verification, Prompt Tree Selection Stability, Image Clipboard & Import-Export Restoral] Release Asset Verification Before Update Notification, Anti-Flapping Turn Locking, Rich Clipboard Copy, Running & Queued JSON Backup/Restore with Countdown HUD, and Telegram Remote Multimodal Dispatch (Thanks to @aukgit)**:
+            -   **Description**: Added `verify_tag_has_platform_asset` in `src-tauri/src/modules/update_checker/channels.rs` performing HTTP HEAD requests against the GitHub Release API to ensure that native platform installer binaries (`agm-alim-setup.exe`, `.dmg`, `.deb`) actually exist and are downloadable before notifying users of updates, eliminating 404 installation errors when tags exist before assets finish compiling; locked the actively selected turn (`selected_turn_number`) and project selection across background SWR sync intervals in `src/components/instances/PromptTreeView/usePromptTreeData.ts` and `ConversationNode.tsx`, preventing title and prompt text from glitching or alternating between conversation summaries and raw turn prompts during active inspection; added explicit `onClick` and `onDoubleClick` backdrop event handlers on the backdrop container in `src/components/instances/PromptTreeView/PromptTreeViewModal.tsx` to cleanly dismiss the modal when clicking outside; upgraded image processing in `PromptInstructionView.tsx`, `markdown.tsx`, and `clipboard.ts` with local base64 and asset protocol fallback cards (`PromptThumbnailCard`), and support rich multi-format clipboard copying (`image/png` binary blob + `text/html`) through `copyPromptWithRichImages` with deduplicated URI extraction and Windows drive letter decoding; added direct combined export for both running and enqueued prompts (`Export Running & Queued Prompts (.json)`) and direct backup restoration in `src/components/instances/PromptTreeView/ImportExportMenu.tsx` and `usePromptTreeCoreActions.ts`, displaying an interactive 5-second countdown HUD banner before automatic prompt dispatching; preserved `saved_media_opt` during `/send` flows in `src-tauri/src/modules/telegram_inbound/send_flow.rs` and `injection.rs`, populating `active_prompts.image_payload` with attached media counts and timestamps; implemented an anti-aliased synthetic dispatch card in `open_shot.rs` when running under non-interactive Windows OpenSSH Session 0 without display station access; and reconciled `SshConnectionRecord` field schemas across `src-tauri/src/modules/supabase_sync/query.rs` and `src/components/instances/fleet/useFleetMachines.ts`, eliminating all Rust compilation, Clippy, and TypeScript linter errors across all supported OS matrix targets. (Thanks to @aukgit)
+
+
     *   **v4.236.0 (2026-10-19)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
