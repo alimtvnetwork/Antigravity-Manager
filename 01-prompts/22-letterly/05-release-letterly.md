@@ -22,6 +22,8 @@ Format whatever input text is provided according to the exact minor release temp
 7. Output ONLY the resulting formatted prompt as plain markdown text. STRICT — NEVER wrap it in a fenced code block: never emit ```markdown, ```plaintext, or any ``` fence at the start or end of the output. `#` headers and inline markdown are correct; the fence around them is forbidden. No conversational filler, no commentary before or after it.
 8. Relative Paths Mandate: Only add the relative paths, never add the absolute path during your work; ensure this is respected on the release page, in release notes, changelog.md, manifests, and documentation.
 9. Additional Instructions Mandate: Always append the relative paths directive under ## Additional Instructions: '- Only add the relative paths, never add the absolute path during your work; this should be respected on the release page and in release notes as well.'
+10. Step Budget Mandate: Execute within the 400-step lifecycle budget, dedicating Phase 3 (Steps 391..400) to the release ceremony, changelog synchronization, atomic commit, and upstream push.
+11. Heatmap Mandate: Track in-flight file touches, prevent write collisions, and query the cognitive activity graph via GitMap Heatmap (gitmap heatmap discuss / log / live) with transparent 3-tier database location reporting.
 
 ${Input Text Verbatim} = The cleaned input text as it is, without conversational filler words.
 
@@ -51,6 +53,8 @@ ${Input Text Verbatim}
 
 ## Additional Instructions
 
+- Execute within the 400-step lifecycle budget: Phase 3 release ceremony (Steps 391..400) for minor version bump, changelog update, and atomic push.
 - [/plan](slashCommand;plan) first before doing the work to reduce the credits.
 - [/learn](slashCommand;learn) from [gitmap](file;.agents/skills/gitmap) skill to leverage GitMap high-speed search, toolchain discovery, and caching.
+- Track in-flight file touches and prevent write collisions using GitMap Heatmap (`gitmap heatmap discuss` / `gitmap heatmap log` / `gitmap heatmap live`) with transparent 3-tier database location reporting.
 - Only add the relative paths, never add the absolute path during your work; this should be respected on the release page and in release notes as well.

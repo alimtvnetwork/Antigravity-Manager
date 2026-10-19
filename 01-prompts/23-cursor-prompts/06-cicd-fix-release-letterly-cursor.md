@@ -23,6 +23,8 @@ Format whatever input text is provided according to the exact CI/CD fix and mino
 7. Output ONLY the resulting formatted prompt as plain markdown text. STRICT — NEVER wrap it in a fenced code block: never emit ```markdown, ```plaintext, or any ``` fence at the start or end of the output. `#` headers and inline markdown are correct; the fence around them is forbidden. No conversational filler, no commentary before or after it.
 8. Relative Paths Mandate: Only add the relative paths, never add the absolute path during your work; ensure this is respected on the release page and in release notes as well.
 9. Additional Instructions Mandate: Always append the relative paths directive under ## Additional Instructions: '- Only add the relative paths, never add the absolute path during your work; this should be respected on the release page and in release notes as well.'
+10. Step Budget Mandate: Execute within the 400-step lifecycle budget (Phase 1: 100 plan/diagnosis, Phase 2: 150 intermediate fixes/rca, Phase 3: 150 verification/bump/push).
+11. Heatmap Mandate: Track in-flight file touches, prevent write collisions, and query the cognitive activity graph via GitMap Heatmap (gitmap heatmap discuss / log / live) with transparent 3-tier database location reporting.
 
 ${Input Text Verbatim} = The cleaned input text as it is, without conversational filler words.
 
@@ -53,6 +55,8 @@ ${Input Text Verbatim}
 
 ## Additional Instructions
 
+- Execute within the 400-step lifecycle budget: 100 plan, 150 intermediate/archival, 150 implementation/sync.
 - [/plan](slashCommand;plan) first before doing the work to reduce the credits.
 - [/learn](slashCommand;learn) from [gitmap](file;.cursor/skills/gitmap) skill to leverage GitMap live telemetry, pipeline self-healing, and toolchain caching.
+- Track in-flight file touches and prevent write collisions using GitMap Heatmap (`gitmap heatmap discuss` / `gitmap heatmap log` / `gitmap heatmap live`) with transparent 3-tier database location reporting.
 - Only add the relative paths, never add the absolute path during your work; this should be respected on the release page and in release notes as well.

@@ -20,6 +20,8 @@ Format whatever input text is provided according to the exact high-priority exec
 7. Make sure all the action items are listed and nothing pending.
 8. Relative Paths Mandate: Only add the relative paths, never add the absolute path during your work; ensure this is respected on the release page and in release notes as well.
 9. Additional Instructions Mandate: Always append the relative paths directive under ## Additional Instructions: '- Only add the relative paths, never add the absolute path during your work; this should be respected on the release page and in release notes as well.'
+10. Step Budget Mandate: Execute within the 400-step lifecycle budget (Phase 1: 100 plan, Phase 2: 150 intermediate/archival, Phase 3: 150 implementation/verification).
+11. Heatmap & Agent Task Mandate: Track in-flight file touches, prevent write collisions, and query the cognitive activity graph via GitMap RC Heatmap (gitmap rc heatmap status / tables / query / tree / live / sync). Ensure automatic RC vault creation if not present, link the execution roadmap to heatmap telemetry, and verify task existence and prompt MD5 hash to prevent redundant reads and enable instant dynamic subagent join.
 
 ${Input Text Verbatim} = The cleaned input text as it is, without conversational filler words.
 
@@ -47,6 +49,8 @@ ${Input Text Verbatim}
 
 ## Additional Instructions
 
+- Execute within the 400-step lifecycle budget: Phase 1 (Steps 1..100) planning and spec authoring, Phase 2 (Steps 101..250) sanitization, archival, and prerequisites, Phase 3 (Steps 251..400) worker swarm implementation, targeted checks, and retrospective verification.
 - [/plan](slashCommand;plan) first before doing the work to reduce the credits.
 - [/learn](slashCommand;learn) from [gitmap](file;.agents/skills/gitmap) skill to leverage GitMap high-speed search, toolchain discovery, and caching.
+- Track in-flight file touches, prevent write collisions, and query the cognitive graph via GitMap RC Heatmap (`gitmap rc heatmap status` / `gitmap rc heatmap tree` / `gitmap rc heatmap live` / `gitmap rc heatmap sync`). If RC does not exist, auto-provision it linked to the mission folder; connect the roadmap to the heatmap command so newly spawned subagents can join dynamically without redundant reads; verify prior task existence and prompt MD5 hash code before initialization.
 - Only add the relative paths, never add the absolute path during your work; this should be respected on the release page and in release notes as well.
