@@ -23,6 +23,7 @@ use super::gemini_dirs::gemini_dirs_tagged;
 use super::models::{ActivePrompt, AgmPromptTurnNode, CascadeRunStatusType};
 use super::project_queries::list_all_prompts;
 use super::schema::connect_db;
+use super::text_utils::StrExt;
 use super::transcript::{extract_conversation_prompt_turns, inspect_conversation_transcript};
 use super::tree_node_conv::*;
 use crate::modules::repo_db::dispatch::parse_flexible_timestamp;
@@ -206,28 +207,27 @@ pub(crate) fn collect_tree_conversation_items(
             let prompt_category = if inspection.is_subagent {
                 "subagent".to_string()
             } else {
-                let p_lower = effective_prompt.to_lowercase();
-                let t_lower = title.to_lowercase();
-                if t_lower.contains("subagent")
-                    || t_lower.contains("research")
-                    || t_lower.contains("worker")
-                    || t_lower.contains("author")
-                    || p_lower.contains("you are research")
-                    || p_lower.contains("you are worker")
-                    || p_lower.contains("invoked by a caller agent")
-                    || p_lower.contains("execute enhanced read memory")
-                    || p_lower.contains("<subagent_reminder>")
-                    || p_lower.contains("<system_message>")
-                    || p_lower.contains("internal subagent")
-                {
+                const TITLE_KEYWORDS: &[&str] = &["subagent", "research", "worker", "author"];
+                const PROMPT_KEYWORDS: &[&str] = &[
+                    "you are research",
+                    "you are worker",
+                    "invoked by a caller agent",
+                    "execute enhanced read memory",
+                    "<subagent_reminder>",
+                    "<system_message>",
+                    "internal subagent",
+                ];
+                let is_sub = title.has_any_word_ignore_case(TITLE_KEYWORDS)
+                    || effective_prompt.has_any_word_ignore_case(PROMPT_KEYWORDS);
+                if is_sub {
                     "subagent".to_string()
                 } else {
                     "user".to_string()
                 }
             };
 
-            let is_queued = status.to_lowercase().contains("queue")
-                || status.to_lowercase().contains("pending");
+            const QUEUE_STATUSES: &[&str] = &["queue", "pending"];
+            let is_queued = status.has_any_word_ignore_case(QUEUE_STATUSES);
             let latest_step_summary = inspection.latest_step_summary;
 
             // Ghost conversation filter: skip untitled / empty title with empty prompt AND zero turns

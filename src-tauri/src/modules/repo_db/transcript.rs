@@ -1,7 +1,7 @@
 //! Repo DB: transcript
 
 use super::models::{AgmPromptTurnNode, TranscriptInspection};
-use super::text_utils::extract_clean_user_prompt;
+use super::text_utils::{extract_clean_user_prompt, StrExt};
 use chrono::Utc;
 use std::collections::HashMap;
 use std::fs;
@@ -20,15 +20,16 @@ pub(crate) fn is_subagent_prompt_text(txt: &str) -> bool {
     if is_caller_invoked {
         return true;
     }
-    let txt_lower = txt.to_ascii_lowercase();
-    let has_role_identity = txt_lower.contains("subagent")
-        || txt_lower.contains("worker")
-        || txt_lower.contains("author")
-        || txt_lower.contains("research")
-        || txt_lower.contains("debugger");
-    let has_execution_signature = txt_lower.contains("invoked by a caller agent")
-        || txt_lower.contains("execute enhanced read memory");
-    has_role_identity || has_execution_signature
+    const SUBAGENT_KEYWORDS: &[&str] = &[
+        "subagent",
+        "worker",
+        "author",
+        "research",
+        "debugger",
+        "invoked by a caller agent",
+        "execute enhanced read memory",
+    ];
+    txt.has_any_word_ignore_case(SUBAGENT_KEYWORDS)
 }
 
 /// Returns true if the transcript step type represents telemetry or heartbeat metadata.
@@ -53,11 +54,8 @@ pub(crate) fn is_tool_execution_step(
 
 /// Determines if a status token represents a terminal turn state (DONE, COMPLETED, IDLE, ERROR).
 pub(crate) fn is_terminal_status(status: &str) -> bool {
-    let clean = status.trim();
-    clean.eq_ignore_ascii_case("done")
-        || clean.eq_ignore_ascii_case("completed")
-        || clean.eq_ignore_ascii_case("idle")
-        || clean.eq_ignore_ascii_case("error")
+    const TERMINAL_STATUSES: &[&str] = &["done", "completed", "idle", "error"];
+    status.trim().equals_any_ignore_case(TERMINAL_STATUSES)
 }
 
 /// Evaluates whether a planner response has completed without pending tool invocations.
@@ -74,8 +72,8 @@ pub(crate) fn is_genuine_user_input(s_type: &str, s_source: &str) -> bool {
         return false;
     }
     let is_user_type = s_type.eq_ignore_ascii_case("USER_INPUT");
-    let is_user_source =
-        s_source.eq_ignore_ascii_case("USER_EXPLICIT") || s_source.eq_ignore_ascii_case("USER");
+    const USER_SOURCES: &[&str] = &["USER_EXPLICIT", "USER"];
+    let is_user_source = s_source.equals_any_ignore_case(USER_SOURCES);
     is_user_type || is_user_source
 }
 
@@ -84,13 +82,13 @@ pub(crate) fn is_system_prompt_message(s_source: &str, content: &str) -> bool {
     if s_source.eq_ignore_ascii_case("SYSTEM") {
         return true;
     }
-    let trimmed = content.trim();
-    let lower = trimmed.to_ascii_lowercase();
-    let has_system_tag = lower.starts_with("<system_message>")
-        || lower.starts_with("the following is a <system_message>");
-    let has_envelope_header =
-        lower.starts_with("[message] timestamp=") || trimmed.starts_with("Task id ");
-    has_system_tag || has_envelope_header
+    const SYSTEM_PREFIXES: &[&str] = &[
+        "<system_message>",
+        "the following is a <system_message>",
+        "[message] timestamp=",
+        "task id ",
+    ];
+    content.trim().starts_with_any_ignore_case(SYSTEM_PREFIXES)
 }
 
 /// Evaluates whether a transcript step records content truncation requiring full transcript lookup.
@@ -103,14 +101,16 @@ pub(crate) fn is_content_truncated(val: &serde_json::Value) -> bool {
 
 /// Pre-filters raw transcript lines for candidate user or planner markers prior to JSON parsing.
 pub(crate) fn is_relevant_turn_candidate(trimmed: &str) -> bool {
-    let has_user_marker = trimmed.contains("USER_INPUT")
-        || trimmed.contains("USER_EXPLICIT")
-        || trimmed.contains("\"USER\"")
-        || trimmed.contains("\"user\"");
-    let has_model_marker = trimmed.contains("PLANNER_RESPONSE")
-        || trimmed.contains("\"MODEL\"")
-        || trimmed.contains("\"model\"");
-    has_user_marker || has_model_marker
+    const CANDIDATE_MARKERS: &[&str] = &[
+        "USER_INPUT",
+        "USER_EXPLICIT",
+        "\"USER\"",
+        "\"user\"",
+        "PLANNER_RESPONSE",
+        "\"MODEL\"",
+        "\"model\"",
+    ];
+    trimmed.has_any_word(CANDIDATE_MARKERS)
 }
 
 /// Inspect early lines of transcript to determine if conversation was initiated

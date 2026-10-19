@@ -6,14 +6,13 @@ use super::sequences::{
     ensure_conversation_sequence_in_conn, extract_prompt_tail_snippet, extract_prompt_words_preview,
 };
 use super::state::get_active_agy_workers;
-use super::text_utils::extract_smart_prompt_summary;
+use super::text_utils::{extract_smart_prompt_summary, StrExt};
 use rusqlite::Connection;
 
 /// Returns true if the instance ID represents the default instance or its copies/aliases.
 pub(crate) fn is_default_instance_match(inst_id: &str) -> bool {
-    let is_exact_default = inst_id == "default" || inst_id == "__default__";
-    let is_alias_default = inst_id.is_empty() || inst_id.starts_with("default-copy");
-    is_exact_default || is_alias_default
+    const DEFAULT_IDS: &[&str] = &["default", "__default__", ""];
+    inst_id.equals_any(DEFAULT_IDS) || inst_id.starts_with("default-copy")
 }
 
 /// Returns true if inst_id matches the project's instance directly or via default alias compatibility.
@@ -49,9 +48,10 @@ pub(crate) fn is_vacant_ghost_conversation(
     if title_clean.is_empty() {
         return true;
     }
-    let title_lower = title_clean.to_lowercase();
-    let is_untitled = title_lower.starts_with("untitled");
-    let is_new_conv = title_lower == "new conversation";
+    const UNTITLED_PREFIXES: &[&str] = &["untitled"];
+    const NEW_CONV_NAMES: &[&str] = &["new conversation"];
+    let is_untitled = title_clean.starts_with_any_ignore_case(UNTITLED_PREFIXES);
+    let is_new_conv = title_clean.equals_any_ignore_case(NEW_CONV_NAMES);
     is_untitled || is_new_conv
 }
 
@@ -98,7 +98,7 @@ pub(crate) fn is_owning_instance_alive(
     if let Some(inst) = registry
         .instances
         .iter()
-        .find(|i| i.id == owning_inst_id || i.name == owning_inst_id)
+        .find(|i| owning_inst_id.equals_any(&[&i.id, &i.name]))
     {
         let is_inst_running =
             crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
@@ -327,12 +327,10 @@ pub(crate) fn build_active_prompt_conv_nodes(
 
             if let Some(idx) = target_idx {
                 let target_conv = &mut conv_nodes[idx];
-                let ap_status_lower = ap.status.to_lowercase();
-                let is_pending_stage =
-                    ap_status_lower.contains("queue") || ap_status_lower.contains("pending");
-                let is_active_stage = ap_status_lower.contains("running")
-                    || ap_status_lower.contains("dispatched")
-                    || ap_status_lower.contains("in_flight");
+                const PENDING_STAGES: &[&str] = &["queue", "pending"];
+                const ACTIVE_STAGES: &[&str] = &["running", "dispatched", "in_flight"];
+                let is_pending_stage = ap.status.has_any_word_ignore_case(PENDING_STAGES);
+                let is_active_stage = ap.status.has_any_word_ignore_case(ACTIVE_STAGES);
                 let is_relevant_status = is_pending_stage || is_active_stage;
 
                 if is_relevant_status {
@@ -494,10 +492,11 @@ pub(crate) fn build_active_prompt_conv_nodes(
 
             let has_confirmed_running = has_active_worker || has_non_idle_summary;
 
-            let is_ap_queued = ap.status == "queued" || ap.status == "pending";
+            const QUEUED_STATUSES: &[&str] = &["queued", "pending"];
+            const RUNNING_STATUSES: &[&str] = &["running", "in_flight", "dispatched"];
+            let is_ap_queued = ap.status.equals_any(QUEUED_STATUSES);
             let max_allowed_ttl = if has_active_worker { 300 } else { 45 };
-            let is_running_status =
-                ap.status == "running" || ap.status == "in_flight" || ap.status == "dispatched";
+            let is_running_status = ap.status.equals_any(RUNNING_STATUSES);
             let is_within_ttl = (now - ap.updated_at) <= max_allowed_ttl;
             let is_status_fresh = is_running_status && is_within_ttl;
             let is_executing = is_inst_alive && has_confirmed_running;

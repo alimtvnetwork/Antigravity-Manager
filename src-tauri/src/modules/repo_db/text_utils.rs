@@ -291,6 +291,87 @@ pub fn format_friendly_workspace_label(
     label
 }
 
+/// Extension trait adding fluent string inspection methods (mirroring .NET / C# StringExtensions).
+///
+/// Enables idiomatic, affirmative, and declarative pattern matching without chained `||` expressions.
+pub trait StrExt {
+    /// Returns true if `self` contains any of the provided candidate substrings.
+    fn has_any_word(&self, words: &[&str]) -> bool;
+
+    /// Case-insensitive check: returns true if `self` contains any of the candidate substrings.
+    fn has_any_word_ignore_case(&self, words: &[&str]) -> bool;
+
+    /// Returns true if `self` starts with any of the provided prefixes.
+    fn starts_with_any(&self, prefixes: &[&str]) -> bool;
+
+    /// Case-insensitive check: returns true if `self` starts with any of the provided prefixes.
+    fn starts_with_any_ignore_case(&self, prefixes: &[&str]) -> bool;
+
+    /// Returns true if `self` ends with any of the provided suffixes.
+    fn ends_with_any(&self, suffixes: &[&str]) -> bool;
+
+    /// Returns true if `self` exactly equals any of the provided candidate strings.
+    fn equals_any(&self, candidates: &[&str]) -> bool;
+
+    /// Case-insensitive equality: returns true if `self` equals any of the candidates (ASCII).
+    fn equals_any_ignore_case(&self, candidates: &[&str]) -> bool;
+}
+
+impl StrExt for str {
+    #[inline]
+    fn has_any_word(&self, words: &[&str]) -> bool {
+        words.iter().any(|&w| self.contains(w))
+    }
+
+    #[inline]
+    fn has_any_word_ignore_case(&self, words: &[&str]) -> bool {
+        let lower = self.to_ascii_lowercase();
+        words.iter().any(|&w| {
+            if w.chars()
+                .all(|c| c.is_ascii_lowercase() || !c.is_ascii_alphabetic())
+            {
+                lower.contains(w)
+            } else {
+                lower.contains(&w.to_ascii_lowercase())
+            }
+        })
+    }
+
+    #[inline]
+    fn starts_with_any(&self, prefixes: &[&str]) -> bool {
+        prefixes.iter().any(|&p| self.starts_with(p))
+    }
+
+    #[inline]
+    fn starts_with_any_ignore_case(&self, prefixes: &[&str]) -> bool {
+        let lower = self.to_ascii_lowercase();
+        prefixes.iter().any(|&p| {
+            if p.chars()
+                .all(|c| c.is_ascii_lowercase() || !c.is_ascii_alphabetic())
+            {
+                lower.starts_with(p)
+            } else {
+                lower.starts_with(&p.to_ascii_lowercase())
+            }
+        })
+    }
+
+    #[inline]
+    fn ends_with_any(&self, suffixes: &[&str]) -> bool {
+        suffixes.iter().any(|&s| self.ends_with(s))
+    }
+
+    #[inline]
+    fn equals_any(&self, candidates: &[&str]) -> bool {
+        candidates.iter().any(|&c| self == c)
+    }
+
+    #[inline]
+    fn equals_any_ignore_case(&self, candidates: &[&str]) -> bool {
+        candidates.iter().any(|&c| self.eq_ignore_ascii_case(c))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -326,5 +407,41 @@ mod tests {
             "d:/work/Antigravity-Manager",
         );
         assert!(label.starts_with("Antigravity-Manager"));
+    }
+
+    #[test]
+    fn test_str_ext_has_any_word() {
+        let sample = "You are an autonomous subagent working on tasks";
+        assert!(sample.has_any_word(&["subagent", "lead"]));
+        assert!(!sample.has_any_word(&["supervisor", "director"]));
+    }
+
+    #[test]
+    fn test_str_ext_has_any_word_ignore_case() {
+        let sample = "You Are An Autonomous SUBAGENT Working On Tasks";
+        assert!(sample.has_any_word_ignore_case(&["subagent", "lead"]));
+        assert!(sample.has_any_word_ignore_case(&["WORKER", "AUTONOMOUS"]));
+        assert!(!sample.has_any_word_ignore_case(&["supervisor", "director"]));
+    }
+
+    #[test]
+    fn test_str_ext_starts_with_any() {
+        let title = "system: initialize memory";
+        assert!(title.starts_with_any(&["system:", "[system]"]));
+        assert!(!title.starts_with_any(&["user:", "bot:"]));
+
+        let title_upper = "SYSTEM: INITIALIZE MEMORY";
+        assert!(title_upper.starts_with_any_ignore_case(&["system:", "[system]"]));
+        assert!(!title_upper.starts_with_any_ignore_case(&["user:", "bot:"]));
+    }
+
+    #[test]
+    fn test_str_ext_equals_any() {
+        let inst = "default";
+        assert!(inst.equals_any(&["default", "__default__", ""]));
+        assert!(!inst.equals_any(&["custom-1", "custom-2"]));
+
+        let inst_upper = "DEFAULT";
+        assert!(inst_upper.equals_any_ignore_case(&["default", "__default__"]));
     }
 }

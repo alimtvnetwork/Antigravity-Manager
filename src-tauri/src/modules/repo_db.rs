@@ -95,7 +95,7 @@ pub use prompts_crud::{insert_active_prompt, list_active_prompts, save_or_requeu
 // ---- text_utils ----
 pub use text_utils::{
     extract_clean_user_prompt, extract_smart_prompt_summary, format_friendly_workspace_label,
-    get_git_branch_for_path, lookup_conversation_title, strip_internal_id_wrappers,
+    get_git_branch_for_path, lookup_conversation_title, strip_internal_id_wrappers, StrExt,
 };
 // ---- agy ----
 pub use agy::{

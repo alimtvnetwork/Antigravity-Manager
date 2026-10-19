@@ -17,6 +17,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::open_shot::{local_machine_label, OpenShotTarget};
 use super::*;
+use crate::modules::repo_db::StrExt;
 
 const SEND_FLOW_TTL_SECS: u64 = 600;
 /// Telegram caps `callback_data` at 64 bytes; stay comfortably below it.
@@ -88,8 +89,8 @@ pub(crate) fn is_valid_send_token(token: &str) -> bool {
     if clean.is_empty() {
         return false;
     }
-    let has_separator = clean.contains('|') || clean.contains(':');
-    !has_separator
+    const SEPARATORS: &[&str] = &["|", ":"];
+    !clean.has_any_word(SEPARATORS)
 }
 
 /// Backward compatibility wrapper for `is_valid_send_token`.
@@ -161,8 +162,8 @@ pub(crate) fn is_matching_machine_alias(entry_alias: &str, input_alias: &str) ->
     if entry_alias.eq_ignore_ascii_case(input_alias) {
         return true;
     }
-    let is_local_keyword =
-        input_alias.eq_ignore_ascii_case("local") || input_alias.eq_ignore_ascii_case("localhost");
+    const LOCAL_KEYWORDS: &[&str] = &["local", "localhost"];
+    let is_local_keyword = input_alias.equals_any_ignore_case(LOCAL_KEYWORDS);
     let is_entry_current = super::node_label::is_current_machine(entry_alias);
     is_local_keyword && is_entry_current
 }
@@ -183,11 +184,8 @@ pub(crate) fn is_likely_prompt_text(trimmed: &str) -> bool {
     if has_multiple_words {
         return true;
     }
-    let lower = trimmed.to_ascii_lowercase();
-    lower.starts_with("please")
-        || lower.starts_with("fix")
-        || lower.starts_with("implement")
-        || lower.starts_with("add")
+    const PROMPT_VERBS: &[&str] = &["please", "fix", "implement", "add"];
+    trimmed.starts_with_any_ignore_case(PROMPT_VERBS)
 }
 
 /// Fleet machines the picker can address: this machine plus GitMap cluster nodes.

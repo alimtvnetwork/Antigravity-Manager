@@ -2,6 +2,7 @@
 
 use super::models::{CascadeRunStatusType, RunningProject};
 use super::schema::connect_db;
+use super::text_utils::StrExt;
 use super::tree_node_conv::*;
 use crate::commands::instance::list_running_projects;
 use crate::modules::repo_db::dispatch::parse_flexible_timestamp;
@@ -68,7 +69,7 @@ pub(crate) fn query_tree_projects(target: Option<&str>) -> Vec<RunningProject> {
         all_projects
             .into_iter()
             .filter(|p| {
-                let is_exact_match = p.instance_id == target_id || p.instance_id == norm_target;
+                let is_exact_match = p.instance_id.equals_any(&[target_id, &norm_target]);
                 if is_exact_match {
                     return true;
                 }
@@ -268,7 +269,7 @@ pub(crate) fn discover_fallback_projects(
                         repo_name,
                         repo_path: raw_repo_path,
                         workspace_storage_path: None,
-                        is_running: status == "running" || status == "in_flight",
+                        is_running: status.equals_any(&["running", "in_flight"]),
                         last_detected_at: if updated_at > 0 { updated_at } else { now_fb },
                     });
                 }
