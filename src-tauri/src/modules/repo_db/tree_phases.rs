@@ -1,15 +1,15 @@
 //! Repo DB: tree build phases
 
-use super::discovery::discover_running_prompts_from_antigravity;
 use super::models::{CascadeRunStatusType, RunningProject};
 use super::schema::connect_db;
+use super::tree_node_conv::*;
 use crate::commands::instance::list_running_projects;
 use crate::modules::repo_db::dispatch::parse_flexible_timestamp;
 use crate::modules::repo_db::failed_commands::decode_uri_to_path;
 use crate::modules::repo_db::gemini_dirs::gemini_dirs_tagged;
 use crate::modules::repo_db::project_queries::normalize_path_for_compare;
 use chrono::Utc;
-use rusqlite::{params, Connection};
+use rusqlite::Connection;
 use std::path::Path;
 
 pub(crate) fn transition_stale_inflight_prompts(now: i64) {
@@ -63,30 +63,26 @@ pub(crate) fn query_tree_projects(target: Option<&str>) -> Vec<RunningProject> {
     if let Some(target_id) = target {
         let norm_target = crate::modules::instance::resolve_instance_id(target_id)
             .unwrap_or_else(|_| target_id.to_string());
-        let is_target_default = target_id == "default"
-            || target_id == "__default__"
-            || norm_target == "default"
-            || norm_target == "default-copy-5597";
+        let is_target_default =
+            is_default_instance_match(target_id) || is_default_instance_match(&norm_target);
         all_projects
             .into_iter()
             .filter(|p| {
-                if p.instance_id == target_id || p.instance_id == norm_target {
+                let is_exact_match = p.instance_id == target_id || p.instance_id == norm_target;
+                if is_exact_match {
                     return true;
                 }
-                if is_target_default
-                    && (p.instance_id == "default"
-                        || p.instance_id == "__default__"
-                        || p.instance_id == "default-copy-5597")
-                {
-                    return true;
-                }
-                false
+                let is_p_default = is_default_instance_match(&p.instance_id);
+                is_target_default && is_p_default
             })
             .collect()
     } else {
         all_projects
             .into_iter()
-            .filter(|p| !p.instance_id.trim().is_empty())
+            .filter(|p| {
+                let is_defined = !p.instance_id.trim().is_empty();
+                is_defined
+            })
             .collect()
     }
 }
@@ -114,24 +110,7 @@ pub(crate) fn discover_fallback_projects(
     for (owning_inst_id, base) in &candidate_dirs_fb {
         // Verify if the owning instance process is actually alive on the OS
         let registry = crate::modules::instance::registry::load_registry().unwrap_or_default();
-        let is_owning_inst_alive = if owning_inst_id == "default" || owning_inst_id == "__default__"
-        {
-            crate::modules::process::is_antigravity_running(None) || {
-                let def_dir = crate::modules::instance::get_default_antigravity_data_dir();
-                !crate::modules::instance::find_pids_for_data_dir(&def_dir.to_string_lossy(), true)
-                    .is_empty()
-            }
-        } else if let Some(inst) = registry
-            .instances
-            .iter()
-            .find(|i| i.id == *owning_inst_id || i.name == *owning_inst_id)
-        {
-            let (is_running, _, _) =
-                crate::modules::instance::is_instance_process_running_smart(&inst.id);
-            is_running
-        } else {
-            false
-        };
+        let is_owning_inst_alive = is_owning_instance_alive(owning_inst_id, &registry);
 
         let summaries_db = base.join("conversation_summaries.db");
         if !summaries_db.exists() {
@@ -170,24 +149,27 @@ pub(crate) fn discover_fallback_projects(
                     let cascade_status = CascadeRunStatusType::from_status_str(&status);
                     let last_time_epoch = parse_flexible_timestamp(&last_time_str);
                     let is_recent = last_time_epoch > 0 && (now_fb - last_time_epoch <= 120);
-                    let is_running = !cascade_status.is_idle_or_terminal()
-                        && is_owning_inst_alive
-                        && cascade_status.is_running()
-                        && not_fully_idle > 0
-                        && is_recent;
+
+                    let is_active_status = cascade_status.is_running();
+                    let is_terminal = cascade_status.is_idle_or_terminal();
+                    let is_status_runnable = is_active_status && !is_terminal;
+
+                    let has_activity = not_fully_idle > 0 && is_recent;
+                    let is_node_active = is_owning_inst_alive && has_activity;
+
+                    let is_running = is_status_runnable && is_node_active;
                     let uris: Vec<String> = serde_json::from_str(&ws_uris_raw).unwrap_or_default();
                     for uri in uris {
                         let raw_path = decode_uri_to_path(&uri);
                         if raw_path.len() < 4 {
                             continue;
                         }
-                        let norm_inst =
-                            if owning_inst_id == "__default__" || owning_inst_id.is_empty() {
-                                "default".to_string()
-                            } else {
-                                crate::modules::instance::resolve_instance_id(owning_inst_id)
-                                    .unwrap_or_else(|_| owning_inst_id.clone())
-                            };
+                        let norm_inst = if is_default_instance_match(owning_inst_id) {
+                            "default".to_string()
+                        } else {
+                            crate::modules::instance::resolve_instance_id(owning_inst_id)
+                                .unwrap_or_else(|_| owning_inst_id.clone())
+                        };
                         let norm_path_cmp = normalize_path_for_compare(&raw_path);
                         if !seen_fb.insert((norm_inst.clone(), norm_path_cmp)) {
                             continue;
@@ -249,16 +231,21 @@ pub(crate) fn discover_fallback_projects(
                     );
                     if let Some(target_id) = target {
                         let target_clean = target_id.trim();
-                        if !target_clean.is_empty() && !target_clean.eq_ignore_ascii_case("all") {
-                            let norm_target =
-                                if target_clean == "default" || target_clean == "__default__" {
-                                    "default".to_string()
-                                } else {
-                                    crate::modules::instance::resolve_instance_id(target_clean)
-                                        .unwrap_or_else(|_| target_clean.to_string())
-                                };
-                            if norm_target == "default" {
-                                if norm_inst != "default" && norm_inst != "__default__" {
+                        let has_target = !target_clean.is_empty();
+                        let is_universal_target = target_clean.eq_ignore_ascii_case("all");
+                        let is_scoped_target = has_target && !is_universal_target;
+
+                        if is_scoped_target {
+                            let norm_target = if is_default_instance_match(target_clean) {
+                                "default".to_string()
+                            } else {
+                                crate::modules::instance::resolve_instance_id(target_clean)
+                                    .unwrap_or_else(|_| target_clean.to_string())
+                            };
+                            let is_target_default = is_default_instance_match(&norm_target);
+                            if is_target_default {
+                                let is_norm_default = is_default_instance_match(&norm_inst);
+                                if !is_norm_default {
                                     continue;
                                 }
                             } else if norm_inst != norm_target {
@@ -318,9 +305,7 @@ pub(crate) fn log_tree_telemetry_probe(
 ) {
     // Telemetry probe logging for instance liveness
     if let Some(target_id) = target {
-        let (inst_name, data_dir, pids, is_alive) = if target_id == "default"
-            || target_id == "__default__"
-        {
+        let (inst_name, data_dir, pids, is_alive) = if is_default_instance_match(target_id) {
             let is_running = crate::modules::process::is_antigravity_running(None);
             (
                 "default".to_string(),

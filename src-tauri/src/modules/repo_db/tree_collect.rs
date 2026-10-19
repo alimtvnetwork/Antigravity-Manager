@@ -23,18 +23,15 @@ use super::gemini_dirs::gemini_dirs_tagged;
 use super::models::{ActivePrompt, AgmPromptTurnNode, CascadeRunStatusType};
 use super::project_queries::list_all_prompts;
 use super::schema::connect_db;
-use super::transcript::{
-    extract_conversation_prompt_turns, inspect_conversation_transcript, resolve_transcript_path,
-};
+use super::transcript::{extract_conversation_prompt_turns, inspect_conversation_transcript};
+use super::tree_node_conv::*;
 use crate::modules::repo_db::dispatch::parse_flexible_timestamp;
 use crate::modules::repo_db::failed_commands::decode_uri_to_path;
 use crate::modules::repo_db::project_queries::normalize_path_for_compare;
 use crate::modules::repo_db::sequences::extract_prompt_words_preview;
-use chrono::Utc;
 use rusqlite::Connection;
-use std::collections::HashMap;
-use std::path::PathBuf;
 
+#[allow(clippy::type_complexity)]
 pub(crate) fn collect_tree_conversation_items(
     target: Option<&str>,
 ) -> (
@@ -58,7 +55,7 @@ pub(crate) fn collect_tree_conversation_items(
                 continue;
             }
             let key = normalize_path_for_compare(&ap.repo_path);
-            let inst = if ap.instance_id == "default" || ap.instance_id == "__default__" {
+            let inst = if is_default_instance_match(&ap.instance_id) {
                 "default".to_string()
             } else {
                 crate::modules::instance::resolve_instance_id(&ap.instance_id)
@@ -100,23 +97,7 @@ pub(crate) fn collect_tree_conversation_items(
         };
 
         let registry = crate::modules::instance::registry::load_registry().unwrap_or_default();
-        let is_owning_inst_alive = if owning_inst_id == "default" || owning_inst_id == "__default__"
-        {
-            crate::modules::process::is_antigravity_running(None) || {
-                let def_dir = crate::modules::instance::get_default_antigravity_data_dir();
-                !crate::modules::instance::find_pids_for_data_dir(&def_dir.to_string_lossy(), true)
-                    .is_empty()
-            }
-        } else if let Some(inst) = registry
-            .instances
-            .iter()
-            .find(|i| i.id == *owning_inst_id || i.name == *owning_inst_id)
-        {
-            crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid)
-                || (inst.is_default && crate::modules::process::is_antigravity_running(None))
-        } else {
-            crate::modules::process::is_antigravity_running(None)
-        };
+        let is_owning_inst_alive = is_owning_instance_alive(owning_inst_id, &registry);
 
         // Justification: busy_timeout on a third-party read-only database is a nicety; reads continue with the default
         crate::error::record_ignored(
@@ -150,7 +131,7 @@ pub(crate) fn collect_tree_conversation_items(
         for item in rows.flatten() {
             let (cid, title, preview, status, not_fully_idle, ws_uris_opt, last_time_str) = item;
 
-            let norm_owning_inst = if owning_inst_id == "__default__" || owning_inst_id.is_empty() {
+            let norm_owning_inst = if is_default_instance_match(owning_inst_id) {
                 "default".to_string()
             } else {
                 crate::modules::instance::resolve_instance_id(owning_inst_id)
@@ -169,21 +150,23 @@ pub(crate) fn collect_tree_conversation_items(
 
             let inspection = inspect_conversation_transcript(base, &cid);
 
-            let is_conv_running = if is_owning_inst_alive
-                && inspection.is_recent_active
-                && !inspection.is_terminal_done
-            {
+            let is_terminal = is_explicit_idle || inspection.is_terminal_done;
+            let is_live_active = inspection.is_recent_active && !inspection.is_terminal_done;
+            let has_live_supremacy = is_owning_inst_alive && is_live_active;
+
+            let has_activity_marker = not_fully_idle > 0 && is_recent;
+            let is_active_fallback = is_owning_inst_alive && has_activity_marker;
+
+            let is_conv_running = if has_live_supremacy {
                 // Live transcript activity supremacy: if the instance process is alive
                 // and the transcript was written within the last 15 seconds without a terminal done record,
                 // the conversation is actively running in real life regardless of stale database status.
                 true
-            } else if is_explicit_idle || inspection.is_terminal_done {
+            } else if is_terminal {
                 // Explicit Idle: unreset not_fully_idle artifacts must not override terminal status
                 false
-            } else if is_owning_inst_alive && not_fully_idle > 0 && is_recent {
-                true
             } else {
-                false
+                is_active_fallback
             };
             let prompt_turns = extract_conversation_prompt_turns(base, &cid, is_conv_running);
             let steps = inspection.step_count;
@@ -195,11 +178,14 @@ pub(crate) fn collect_tree_conversation_items(
                 .filter(|s| !s.trim().is_empty())
                 .unwrap_or_else(|| preview.clone());
 
-            let has_meaningful_title = !title.trim().is_empty()
-                && !title.to_lowercase().starts_with("untitled")
-                && title.to_lowercase() != "new conversation";
+            let title_clean = title.trim();
+            let title_lower = title_clean.to_lowercase();
+            let is_placeholder_title =
+                title_lower.starts_with("untitled") || title_lower == "new conversation";
+            let has_meaningful_title = !title_clean.is_empty() && !is_placeholder_title;
 
-            if effective_prompt.trim().is_empty() && has_meaningful_title {
+            let is_effective_prompt_empty = effective_prompt.trim().is_empty();
+            if is_effective_prompt_empty && has_meaningful_title {
                 effective_prompt = title.clone();
             }
 
@@ -207,11 +193,13 @@ pub(crate) fn collect_tree_conversation_items(
                 !effective_prompt.trim().is_empty() || !prompt_turns.is_empty();
 
             // Non-prompt filter: skip internal background hooks or non-prompts if not running AND no meaningful title or prompts
-            if inspection.is_non_prompt
-                && !is_conv_running
-                && !has_meaningful_title
-                && !has_prompt_content
-            {
+            let should_retain = should_retain_prompt_candidate(
+                inspection.is_non_prompt,
+                is_conv_running,
+                has_meaningful_title,
+                has_prompt_content,
+            );
+            if !should_retain {
                 continue;
             }
 
@@ -243,14 +231,11 @@ pub(crate) fn collect_tree_conversation_items(
             let latest_step_summary = inspection.latest_step_summary;
 
             // Ghost conversation filter: skip untitled / empty title with empty prompt AND zero turns
-            let is_untitled_candidate = title.trim().is_empty()
-                || title.to_lowercase().starts_with("untitled")
-                || title.to_lowercase() == "new conversation";
             let (_, eff_wc) = extract_prompt_words_preview(&effective_prompt, 5);
-            if is_untitled_candidate
-                && (effective_prompt.trim().is_empty() || eff_wc == 0)
-                && prompt_turns.is_empty()
-            {
+            let has_zero_turns = prompt_turns.is_empty();
+            let is_ghost =
+                is_vacant_ghost_conversation(&title, &effective_prompt, eff_wc, has_zero_turns);
+            if is_ghost {
                 continue;
             }
 
@@ -266,10 +251,11 @@ pub(crate) fn collect_tree_conversation_items(
             }
 
             // Prefix-length / valid path guard: if marked running with assigned paths but no decodable path >= 6 chars, force idle
-            let is_conv_running = if is_conv_running
-                && !assigned_paths.is_empty()
-                && !assigned_paths.iter().any(|p| p.len() >= 6)
-            {
+            let has_assigned_paths = !assigned_paths.is_empty();
+            let has_valid_prefix = assigned_paths.iter().any(|p| p.len() >= 6);
+            let has_invalid_paths = has_assigned_paths && !has_valid_prefix;
+
+            let is_conv_running = if is_conv_running && has_invalid_paths {
                 false
             } else {
                 is_conv_running
@@ -289,10 +275,7 @@ pub(crate) fn collect_tree_conversation_items(
                             "RUNNING".to_string()
                         } else if is_queued {
                             "QUEUED".to_string()
-                        } else if inspection.is_terminal_done
-                            || is_explicit_idle
-                            || cascade_status.is_running()
-                        {
+                        } else if is_terminal || cascade_status.is_running() {
                             "IDLE".to_string()
                         } else {
                             status.clone()

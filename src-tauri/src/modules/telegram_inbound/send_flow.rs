@@ -82,9 +82,19 @@ fn cancel_markup() -> Value {
 }
 
 /// Callback payloads use `|` as separator; entries containing it (or `:`)
-/// would corrupt parsing, so they are excluded from pickers.
+/// corrupt parsing, so they are excluded from pickers.
+pub(crate) fn is_valid_send_token(token: &str) -> bool {
+    let clean = token.trim();
+    if clean.is_empty() {
+        return false;
+    }
+    let has_separator = clean.contains('|') || clean.contains(':');
+    !has_separator
+}
+
+/// Backward compatibility wrapper for `is_valid_send_token`.
 fn picker_safe(token: &str) -> bool {
-    !token.is_empty() && !token.contains('|') && !token.contains(':')
+    is_valid_send_token(token)
 }
 
 fn typed_project_index(text: &str) -> Option<usize> {
@@ -103,8 +113,81 @@ fn callback_fits(text: &str) -> bool {
 /// A machine label is picker-usable when it round-trips through a
 /// `send:m:<label>` callback payload: no separator characters and inside
 /// Telegram's 64-byte `callback_data` cap.
+pub(crate) fn is_machine_entry_usable(label: &str) -> bool {
+    let is_safe = is_valid_send_token(label);
+    let payload = format!("send:m:{label}");
+    let has_fitting_payload = callback_fits(&payload);
+    is_safe && has_fitting_payload
+}
+
+/// Backward compatibility wrapper for `is_machine_entry_usable`.
 fn machine_entry_usable(label: &str) -> bool {
-    picker_safe(label) && callback_fits(&format!("send:m:{label}"))
+    is_machine_entry_usable(label)
+}
+
+/// Returns true if an IP string is non-empty and not the "Unknown IP" sentinel.
+pub(crate) fn is_known_ip(ip: &str) -> bool {
+    let trimmed = ip.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    !trimmed.eq_ignore_ascii_case("unknown ip")
+}
+
+/// Evaluates whether candidate machine alias matches target machine label,
+/// accounting for local machine identity.
+pub(crate) fn is_matching_target_machine(machine_candidate: &str, target: &str) -> bool {
+    let is_exact = machine_candidate.eq_ignore_ascii_case(target);
+    let is_both_current = super::node_label::is_current_machine(machine_candidate)
+        && super::node_label::is_current_machine(target);
+    is_exact || is_both_current
+}
+
+/// Debounce guard: determines if chat already has a fresh Step 2 flow for this machine (<3s).
+pub(crate) fn is_duplicate_send_machine_tap(
+    existing_machine: &str,
+    candidate_alias: &str,
+    stage: SendStage,
+    elapsed_secs: u64,
+) -> bool {
+    let is_pick_instance = stage == SendStage::PickInstance;
+    let is_same_machine = is_matching_target_machine(existing_machine, candidate_alias);
+    let is_within_debounce = elapsed_secs < 3;
+    is_pick_instance && is_same_machine && is_within_debounce
+}
+
+/// Resolves whether an entry alias matches user-specified alias or local aliases.
+pub(crate) fn is_matching_machine_alias(entry_alias: &str, input_alias: &str) -> bool {
+    if entry_alias.eq_ignore_ascii_case(input_alias) {
+        return true;
+    }
+    let is_local_keyword =
+        input_alias.eq_ignore_ascii_case("local") || input_alias.eq_ignore_ascii_case("localhost");
+    let is_entry_current = super::node_label::is_current_machine(entry_alias);
+    is_local_keyword && is_entry_current
+}
+
+/// Determines if an active prompt's instance conflicts with the target instance filter.
+pub(crate) fn is_instance_mismatch(prompt_instance_id: &str, target_instance_id: &str) -> bool {
+    let has_prompt_instance = !prompt_instance_id.trim().is_empty();
+    let has_target_instance = !target_instance_id.trim().is_empty();
+    let is_both_specified = has_prompt_instance && has_target_instance;
+    let is_different = !prompt_instance_id.eq_ignore_ascii_case(target_instance_id);
+    is_both_specified && is_different
+}
+
+/// Evaluates whether text typed in Step 3 is likely a prompt rather than a conversation ID.
+pub(crate) fn is_likely_prompt_text(trimmed: &str) -> bool {
+    let word_count = trimmed.split_whitespace().count();
+    let has_multiple_words = word_count > 3;
+    if has_multiple_words {
+        return true;
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    lower.starts_with("please")
+        || lower.starts_with("fix")
+        || lower.starts_with("implement")
+        || lower.starts_with("add")
 }
 
 /// Fleet machines the picker can address: this machine plus GitMap cluster nodes.
@@ -116,7 +199,7 @@ fn machine_entries() -> Vec<String> {
     // The local entry anchors the whole flow, but an unusable label must not
     // silently poison the picker: it is held to the same guards as fleet
     // nodes, and the empty state is reported to the user by `start_send_flow`.
-    if machine_entry_usable(&local) {
+    if is_machine_entry_usable(&local) {
         entries.push(local);
         has_current_machine = true;
     } else {
@@ -126,7 +209,7 @@ fn machine_entries() -> Vec<String> {
     }
     for node in query_gitmap_cluster_nodes() {
         let alias = node.alias.trim();
-        if !machine_entry_usable(alias) {
+        if !is_machine_entry_usable(alias) {
             continue;
         }
 
@@ -151,7 +234,7 @@ fn machine_entries() -> Vec<String> {
     if let Ok(ssh_conns) = crate::modules::ssh_manager::load_ssh_connections() {
         for conn in ssh_conns {
             let alias = conn.alias.trim();
-            if !machine_entry_usable(alias) {
+            if !is_machine_entry_usable(alias) {
                 continue;
             }
 
@@ -194,7 +277,8 @@ fn machine_entries() -> Vec<String> {
         } else {
             m.node_alias.trim()
         };
-        if alias.is_empty() || !machine_entry_usable(alias) {
+        let has_usable_alias = !alias.is_empty() && is_machine_entry_usable(alias);
+        if !has_usable_alias {
             continue;
         }
 
@@ -236,7 +320,7 @@ fn path_ending(path: &str) -> String {
 }
 
 fn format_instance_choice(index: usize, inst: &PickerInstance, machine: &str, ip: &str) -> String {
-    let host_tag = if !ip.is_empty() && ip != "Unknown IP" {
+    let host_tag = if is_known_ip(ip) {
         format!(" \u{2022} <i>{machine} [{ip}]</i>")
     } else if !machine.is_empty() {
         format!(" \u{2022} <i>{machine}</i>")
@@ -271,7 +355,7 @@ fn instance_entries() -> Vec<PickerInstance> {
         Ok(reg) => reg
             .instances
             .iter()
-            .filter(|i| picker_safe(&i.id))
+            .filter(|i| is_valid_send_token(&i.id))
             .map(|i| PickerInstance {
                 id: i.id.clone(),
                 name: i.name.clone(),
@@ -349,7 +433,7 @@ fn instance_picker_markup(machine: &str, instances: &[PickerInstance]) -> Value 
         .iter()
         .filter(|inst| callback_fits(&format!("send:i:{machine}|{}", inst.id)))
         .map(|inst| {
-            let label = if !ip.is_empty() && ip != "Unknown IP" {
+            let label = if is_known_ip(&ip) {
                 format!("🏷️ {} ({} \u{2022} {})", inst.name, node_alias, ip)
             } else {
                 format!("🏷️ {} ({})", inst.name, node_alias)
@@ -549,13 +633,8 @@ fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
     // 1. Debounce guard: if chat already has a fresh Step 2 flow for this machine (<3s), suppress duplicate message.
     if let Ok(flows) = SEND_FLOWS.lock() {
         if let Some(existing) = flows.get(&chat_id) {
-            let is_same_machine = existing.machine.eq_ignore_ascii_case(alias)
-                || (super::node_label::is_current_machine(alias)
-                    && super::node_label::is_current_machine(&existing.machine));
-            if existing.stage == SendStage::PickInstance
-                && is_same_machine
-                && now_secs().saturating_sub(existing.updated_at) < 3
-            {
+            let elapsed = now_secs().saturating_sub(existing.updated_at);
+            if is_duplicate_send_machine_tap(&existing.machine, alias, existing.stage, elapsed) {
                 tracing::info!(
                     "Suppressing duplicate send:m:{} callback within debounce window for chat {}",
                     alias,
@@ -566,11 +645,10 @@ fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
         }
     }
 
-    let canonical = match machine_entries().into_iter().find(|e| {
-        e.eq_ignore_ascii_case(alias)
-            || (alias.eq_ignore_ascii_case("local") && super::node_label::is_current_machine(e))
-            || (alias.eq_ignore_ascii_case("localhost") && super::node_label::is_current_machine(e))
-    }) {
+    let canonical = match machine_entries()
+        .into_iter()
+        .find(|e| is_matching_machine_alias(e, alias))
+    {
         Some(e) => e,
         None => {
             if super::node_label::is_current_machine(alias) {
@@ -724,7 +802,7 @@ fn recent_prompts_for_destination(
     let mut matching: Vec<_> = all
         .into_iter()
         .filter(|p| {
-            if !p.instance_id.is_empty() && !instance.is_empty() && p.instance_id != instance {
+            if is_instance_mismatch(&p.instance_id, instance) {
                 return false;
             }
             if let Some(ref s) = p.session_id {
@@ -1310,7 +1388,13 @@ pub async fn consume_send_prompt(
     saved_media_opt: &Option<(std::path::PathBuf, Option<String>)>,
 ) -> Option<SendDispatch> {
     let trimmed = text.trim();
-    if (trimmed.is_empty() && saved_media_opt.is_none()) || trimmed.starts_with('/') {
+    if trimmed.starts_with('/') {
+        return None;
+    }
+    let has_text = !trimmed.is_empty();
+    let has_media = saved_media_opt.is_some();
+    let has_payload = has_text || has_media;
+    if !has_payload {
         return None;
     }
     // Scope the lock: extract what the await needs, then drop the guard
@@ -1351,11 +1435,7 @@ pub async fn consume_send_prompt(
                 }
             }
             SendStage::TypeConversation => {
-                let is_likely_prompt = trimmed.split_whitespace().count() > 3
-                    || trimmed.to_lowercase().starts_with("please")
-                    || trimmed.to_lowercase().starts_with("fix")
-                    || trimmed.to_lowercase().starts_with("implement")
-                    || trimmed.to_lowercase().starts_with("add");
+                let is_likely_prompt = is_likely_prompt_text(trimmed);
 
                 if is_likely_prompt {
                     // Gracefully route directly to the default project rather than naming the conversation the entire prompt!
@@ -1436,10 +1516,15 @@ mod tests {
 
     #[test]
     fn picker_safety_rejects_separators() {
+        assert!(is_valid_send_token("W3"));
         assert!(picker_safe("W3"));
+        assert!(is_valid_send_token("default"));
         assert!(picker_safe("default"));
+        assert!(!is_valid_send_token("a|b"));
         assert!(!picker_safe("a|b"));
+        assert!(!is_valid_send_token("a:b"));
         assert!(!picker_safe("a:b"));
+        assert!(!is_valid_send_token(""));
         assert!(!picker_safe(""));
     }
 
@@ -1629,15 +1714,75 @@ mod tests {
 
     #[test]
     fn machine_entry_usable_guards_picker_payloads() {
+        assert!(is_machine_entry_usable("W3"));
         assert!(machine_entry_usable("W3"));
+        assert!(is_machine_entry_usable("antigravity-node"));
         assert!(machine_entry_usable("antigravity-node"));
         // Separator characters would corrupt `|`-split parsing.
+        assert!(!is_machine_entry_usable("node|evil"));
         assert!(!machine_entry_usable("node|evil"));
+        assert!(!is_machine_entry_usable("node:evil"));
         assert!(!machine_entry_usable("node:evil"));
+        assert!(!is_machine_entry_usable(""));
         assert!(!machine_entry_usable(""));
         // `send:m:` is 7 bytes; the alias must leave room under the 64-byte cap.
+        assert!(!is_machine_entry_usable(&"n".repeat(60)));
         assert!(!machine_entry_usable(&"n".repeat(60)));
+        assert!(is_machine_entry_usable(&"n".repeat(50)));
         assert!(machine_entry_usable(&"n".repeat(50)));
+    }
+
+    #[test]
+    fn test_affirmative_send_helpers() {
+        assert!(is_known_ip("192.168.1.1"));
+        assert!(!is_known_ip("Unknown IP"));
+        assert!(!is_known_ip("unknown ip"));
+        assert!(!is_known_ip(""));
+
+        assert!(is_matching_target_machine("worker1", "worker1"));
+        assert!(is_matching_target_machine("local", "localhost"));
+        assert!(!is_matching_target_machine("worker1", "worker2"));
+
+        assert!(is_duplicate_send_machine_tap(
+            "worker1",
+            "worker1",
+            SendStage::PickInstance,
+            2
+        ));
+        assert!(!is_duplicate_send_machine_tap(
+            "worker1",
+            "worker1",
+            SendStage::PickInstance,
+            4
+        ));
+        assert!(!is_duplicate_send_machine_tap(
+            "worker1",
+            "worker2",
+            SendStage::PickInstance,
+            1
+        ));
+        assert!(!is_duplicate_send_machine_tap(
+            "worker1",
+            "worker1",
+            SendStage::PickConversation,
+            1
+        ));
+
+        assert!(is_matching_machine_alias("worker1", "worker1"));
+        assert!(is_matching_machine_alias("local", "localhost"));
+        assert!(!is_matching_machine_alias("worker1", "worker2"));
+
+        assert!(is_instance_mismatch("inst1", "inst2"));
+        assert!(!is_instance_mismatch("inst1", "inst1"));
+        assert!(!is_instance_mismatch("", "inst2"));
+        assert!(!is_instance_mismatch("inst1", ""));
+
+        assert!(is_likely_prompt_text("one two three four"));
+        assert!(is_likely_prompt_text("please fix this"));
+        assert!(is_likely_prompt_text("fix bug"));
+        assert!(is_likely_prompt_text("implement feature"));
+        assert!(is_likely_prompt_text("add item"));
+        assert!(!is_likely_prompt_text("conversation1"));
     }
 
     #[test]

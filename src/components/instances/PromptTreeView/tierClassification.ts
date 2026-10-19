@@ -2,6 +2,170 @@ import { PromptOriginTier } from './types';
 import type { AgmConversationNode, TierClassificationResult, HierarchicalConversationNode } from './types';
 import { getConversationStatus } from './conversationGuards';
 
+/**
+ * Evaluates whether text and title indicate diagnostic or tool output.
+ */
+export function isToolOutputPayload(text: string, cleanTitle: string): boolean {
+    const isResultPrefix = text.startsWith('[Tool Result]') || text.startsWith('Tool returned:');
+    if (isResultPrefix) return true;
+
+    const isJsonCallId = text.startsWith('{"tool_call_id":');
+    if (isJsonCallId) return true;
+
+    const hasToolTags = text.includes('<tool_response>') || text.includes('<tool_calls>');
+    if (hasToolTags) return true;
+
+    const isCodeBlock = text.startsWith('```');
+    const hasOutputKeyword = cleanTitle.includes('output') || cleanTitle.includes('result');
+    return isCodeBlock && hasOutputKeyword;
+}
+
+/**
+ * Detects presence of explicit user request tags or section markers.
+ */
+export function hasUserContent(text: string): boolean {
+    const hasUserTag = text.includes('<USER_REQUEST>') || text.includes('<user_request>');
+    const hasUserHeader = text.includes('User Requests') || text.includes('# User Requests');
+    return hasUserTag || hasUserHeader;
+}
+
+/**
+ * Evaluates whether a payload constitutes a system-level initialization directive.
+ */
+export function isSystemMessageDirective(text: string, cleanTitle: string): boolean {
+    const hasSystemPrefix = text.startsWith('<SYSTEM_MESSAGE>') || text.startsWith('System:');
+    const hasTitlePrefix = cleanTitle.startsWith('system:');
+    const isCandidate = hasSystemPrefix || hasTitlePrefix;
+
+    if (!isCandidate) {
+        return false;
+    }
+    if (hasUserContent(text)) {
+        return false;
+    }
+    const isCallerPreamble = text.includes('invoked by a caller agent') || text.includes('You are');
+    return !isCallerPreamble;
+}
+
+/**
+ * Checks whether the normalized conversation title indicates a subagent or worker.
+ */
+export function isSubagentTitle(cleanTitle: string): boolean {
+    const isSubagentPrefix =
+        cleanTitle.startsWith('subagent:') ||
+        cleanTitle.startsWith('subagent-') ||
+        cleanTitle.startsWith('subagent ') ||
+        cleanTitle.startsWith('[subagent]');
+    if (isSubagentPrefix) return true;
+
+    const isWorkerPrefix =
+        cleanTitle.startsWith('worker:') ||
+        cleanTitle.startsWith('worker-') ||
+        cleanTitle.startsWith('worker ');
+    return isWorkerPrefix;
+}
+
+/**
+ * Detects multi-agent invocation signatures and operational reminders in prompt text.
+ */
+export function hasSubagentSignature(text: string): boolean {
+    const hasInvocationMarker =
+        text.includes('invoked by a caller agent') ||
+        text.includes('<subagent_reminder>') ||
+        text.includes('send_message to communicate all results');
+    if (hasInvocationMarker) return true;
+
+    const rolePattern = /Role:\s*(?:Codebase Researcher|Database Debugger|QA Tester|Subagent|Worker|Architect)/i;
+    return rolePattern.test(text);
+}
+
+/**
+ * Evaluates whether conversation metadata indicates a subagent.
+ */
+export function isSubagentMetadata(metadata?: Record<string, any>): boolean {
+    const isMetadataFlagged = Boolean(metadata?.is_subagent);
+    const isCategorySubagent = metadata?.prompt_category === 'subagent';
+    return isMetadataFlagged || isCategorySubagent;
+}
+
+/**
+ * Determines whether the message originates from an autonomous subagent worker.
+ */
+export function isSubagentDirective(
+    text: string,
+    cleanTitle: string,
+    metadata?: Record<string, any>
+): boolean {
+    if (hasSubagentSignature(text)) {
+        return true;
+    }
+    if (isSubagentTitle(cleanTitle)) {
+        return true;
+    }
+    return isSubagentMetadata(metadata);
+}
+
+/**
+ * Checks if a child conversation's timestamp falls within the correlation window of a root prompt.
+ */
+export function isRecentChildTurn(
+    nodeTime: number,
+    rootTime: number,
+    maxGapMs: number = 2 * 3600 * 1000
+): boolean {
+    if (rootTime === 0 || nodeTime === 0) {
+        return false;
+    }
+    const timeDelta = Math.abs(nodeTime - rootTime);
+    return timeDelta <= maxGapMs;
+}
+
+/**
+ * Evaluates whether a hierarchical root node or any attached subagents are actively running.
+ */
+export function isHierarchicalNodeRunning(node: HierarchicalConversationNode): boolean {
+    const isPrimaryRunning = getConversationStatus(node.primaryNode).isRunning;
+    if (isPrimaryRunning) {
+        return true;
+    }
+    return node.subagents.some((s) => getConversationStatus(s.primaryNode).isRunning);
+}
+
+/**
+ * Evaluates whether a hierarchical root node or any attached subagents are in queued status.
+ */
+export function isHierarchicalNodeQueued(node: HierarchicalConversationNode): boolean {
+    const isPrimaryQueued = getConversationStatus(node.primaryNode).isQueued;
+    if (isPrimaryQueued) {
+        return true;
+    }
+    return node.subagents.some((s) => getConversationStatus(s.primaryNode).isQueued);
+}
+
+/**
+ * Sorts hierarchical nodes by running status first, queued status second, and newest time third.
+ */
+export function compareHierarchicalNodes(
+    a: HierarchicalConversationNode,
+    b: HierarchicalConversationNode
+): number {
+    const isARunning = isHierarchicalNodeRunning(a);
+    const isBRunning = isHierarchicalNodeRunning(b);
+    if (isARunning !== isBRunning) {
+        return isARunning ? -1 : 1;
+    }
+
+    const isAQueued = isHierarchicalNodeQueued(a);
+    const isBQueued = isHierarchicalNodeQueued(b);
+    if (isAQueued !== isBQueued) {
+        return isAQueued ? -1 : 1;
+    }
+
+    const aTime = new Date(a.primaryNode.last_modified).getTime() || 0;
+    const bTime = new Date(b.primaryNode.last_modified).getTime() || 0;
+    return bTime - aTime;
+}
+
 export function classifyPromptTier(
     text?: string,
     title?: string,
@@ -11,15 +175,7 @@ export function classifyPromptTier(
     const cleanTitle = (title || '').trim().toLowerCase();
 
     // 1. Tool Output Classification (Highest Specificity)
-    const isToolOutput =
-        raw.startsWith('[Tool Result]') ||
-        raw.startsWith('{"tool_call_id":') ||
-        raw.startsWith('Tool returned:') ||
-        raw.includes('<tool_response>') ||
-        raw.includes('<tool_calls>') ||
-        (raw.startsWith('```') && (cleanTitle.includes('output') || cleanTitle.includes('result')));
-
-    if (isToolOutput) {
+    if (isToolOutputPayload(raw, cleanTitle)) {
         return {
             tier: PromptOriginTier.ToolOutput,
             category: PromptOriginTier.ToolOutput,
@@ -36,19 +192,11 @@ export function classifyPromptTier(
     }
 
     // 2. System Message Classification
-    const hasUserContent =
-        raw.includes('<USER_REQUEST>') ||
-        raw.includes('<user_request>') ||
-        raw.includes('User Requests') ||
-        raw.includes('# User Requests');
+    if (isSystemMessageDirective(raw, cleanTitle)) {
+        const isRunning = Boolean(metadata?.is_running);
+        const isQueued = Boolean(metadata?.is_queued);
+        const isMetadataActive = isRunning || isQueued;
 
-    const isSystemMessage =
-        (raw.startsWith('<SYSTEM_MESSAGE>') ||
-            raw.startsWith('System:') ||
-            cleanTitle.startsWith('system:')) &&
-        !hasUserContent;
-
-    if (isSystemMessage && !raw.includes('invoked by a caller agent') && !raw.includes('You are')) {
         return {
             tier: PromptOriginTier.SystemMessage,
             category: PromptOriginTier.SystemMessage,
@@ -57,7 +205,7 @@ export function classifyPromptTier(
             badgeStyle: 'bg-zinc-500/15 text-zinc-700 dark:text-zinc-300 border-zinc-400/30',
             iconName: 'terminal',
             isSubagent: false,
-            isNonPrompt: !(Boolean(metadata?.is_running) || Boolean(metadata?.is_queued)),
+            isNonPrompt: !isMetadataActive,
             confidence: 0.95,
             matchedPattern: 'system_message_tag',
             description: 'System initialization directives and environment preambles',
@@ -65,27 +213,12 @@ export function classifyPromptTier(
     }
 
     // 3. AI Subagent Instruction Classification
-    const subagentRoleMatch =
-        raw.match(/Role:\s*([A-Za-z0-9_\-\s]{3,30})/i) ||
-        raw.match(/You are (?:the )?([A-Za-z0-9_\-\s]{3,30}) for Task/i) ||
-        raw.match(/You are an? ([A-Za-z0-9_\-\s]{3,30}) agent/i);
+    if (isSubagentDirective(raw, cleanTitle, metadata)) {
+        const subagentRoleMatch =
+            raw.match(/Role:\s*([A-Za-z0-9_\-\s]{3,30})/i) ||
+            raw.match(/You are (?:the )?([A-Za-z0-9_\-\s]{3,30}) for Task/i) ||
+            raw.match(/You are an? ([A-Za-z0-9_\-\s]{3,30}) agent/i);
 
-    const isSubagent =
-        raw.includes('invoked by a caller agent') ||
-        raw.includes('<subagent_reminder>') ||
-        raw.includes('send_message to communicate all results') ||
-        /Role:\s*(?:Codebase Researcher|Database Debugger|QA Tester|Subagent|Worker|Architect)/i.test(raw) ||
-        cleanTitle.startsWith('subagent:') ||
-        cleanTitle.startsWith('subagent-') ||
-        cleanTitle.startsWith('subagent ') ||
-        cleanTitle.startsWith('[subagent]') ||
-        cleanTitle.startsWith('worker:') ||
-        cleanTitle.startsWith('worker-') ||
-        cleanTitle.startsWith('worker ') ||
-        metadata?.is_subagent === true ||
-        metadata?.prompt_category === 'subagent';
-
-    if (isSubagent) {
         let detectedRole = 'Subagent';
         if (subagentRoleMatch) {
             detectedRole = subagentRoleMatch[1].trim();
@@ -140,7 +273,6 @@ export function detectPromptCategory(
     return classifyPromptTier(text, title, conv as unknown as Record<string, unknown> | undefined);
 }
 
-
 export function assembleConversationHierarchy(
     conversations: AgmConversationNode[]
 ): HierarchicalConversationNode[] {
@@ -167,9 +299,9 @@ export function assembleConversationHierarchy(
         if (classification.tier === PromptOriginTier.SubagentInstruction) {
             const rootTime = currentRoot ? (new Date(currentRoot.primaryNode.last_modified).getTime() || 0) : 0;
             const nodeTime = new Date(conv.last_modified).getTime() || 0;
-            const isRecentChild = currentRoot && Math.abs(nodeTime - rootTime) <= 2 * 3600 * 1000;
+            const isRecentChild = currentRoot !== null && isRecentChildTurn(nodeTime, rootTime);
 
-            if (currentRoot && isRecentChild) {
+            if (isRecentChild && currentRoot) {
                 // Attach as child sub-point to active root prompt
                 currentRoot.subagents.push(node);
             } else {
@@ -187,21 +319,7 @@ export function assembleConversationHierarchy(
 
     // Reverse rootNodes so newest user prompt appears at top,
     // and sort running and queued roots to the top
-    return rootNodes.reverse().sort((a, b) => {
-        const aStatus = getConversationStatus(a.primaryNode);
-        const bStatus = getConversationStatus(b.primaryNode);
-        const aRunning = aStatus.isRunning || a.subagents.some((s) => getConversationStatus(s.primaryNode).isRunning);
-        const bRunning = bStatus.isRunning || b.subagents.some((s) => getConversationStatus(s.primaryNode).isRunning);
-        if (aRunning !== bRunning) return aRunning ? -1 : 1;
-
-        const aQueued = aStatus.isQueued || a.subagents.some((s) => getConversationStatus(s.primaryNode).isQueued);
-        const bQueued = bStatus.isQueued || b.subagents.some((s) => getConversationStatus(s.primaryNode).isQueued);
-        if (aQueued !== bQueued) return aQueued ? -1 : 1;
-
-        const aTime = new Date(a.primaryNode.last_modified).getTime() || 0;
-        const bTime = new Date(b.primaryNode.last_modified).getTime() || 0;
-        return bTime - aTime;
-    });
+    return rootNodes.reverse().sort(compareHierarchicalNodes);
 }
 
 export function normalizePromptForGrouping(conv: AgmConversationNode): string {
@@ -214,17 +332,20 @@ export function isAutomatedConversation(conv: AgmConversationNode): boolean {
     const title = (conv.title || '').toLowerCase();
     const cat = classifyPromptTier(conv.prompt_preview_200w, conv.title, conv);
 
-    if (cat.tier === PromptOriginTier.SystemMessage || cat.tier === PromptOriginTier.ToolOutput) {
+    const isSystemTier = cat.tier === PromptOriginTier.SystemMessage || cat.tier === PromptOriginTier.ToolOutput;
+    if (isSystemTier) {
         return true;
     }
-    if (preview.includes('<system_message>') || preview.includes('system_message')) {
+    const hasSystemMarker = preview.includes('<system_message>') || preview.includes('system_message');
+    if (hasSystemMarker) {
         return true;
     }
-    if (title.includes('heartbeat') || preview.includes('heartbeat') || title.startsWith('system:')) {
+    const hasHeartbeat = title.includes('heartbeat') || preview.includes('heartbeat');
+    const isSystemTitle = title.startsWith('system:');
+    if (hasHeartbeat || isSystemTitle) {
         return true;
     }
-    if (preview.includes('token_usage') || preview.includes('telemetry') || title.includes('telemetry')) {
-        return true;
-    }
-    return false;
+    const hasTelemetryPreview = preview.includes('token_usage') || preview.includes('telemetry');
+    const hasTelemetryTitle = title.includes('telemetry');
+    return hasTelemetryPreview || hasTelemetryTitle;
 }

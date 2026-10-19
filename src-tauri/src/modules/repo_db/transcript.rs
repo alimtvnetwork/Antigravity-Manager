@@ -14,6 +14,105 @@ use std::io::{Read, Seek, SeekFrom};
 const MAX_TAIL_BYTES: u64 = 256 * 1024; // 256 KB
 const MAX_TAIL_LINES: usize = 100;
 
+/// Evaluates whether text content contains known subagent role or instruction markers.
+pub(crate) fn is_subagent_prompt_text(txt: &str) -> bool {
+    let is_caller_invoked = txt.contains("You are ");
+    if is_caller_invoked {
+        return true;
+    }
+    let txt_lower = txt.to_ascii_lowercase();
+    let has_role_identity = txt_lower.contains("subagent")
+        || txt_lower.contains("worker")
+        || txt_lower.contains("author")
+        || txt_lower.contains("research")
+        || txt_lower.contains("debugger");
+    let has_execution_signature = txt_lower.contains("invoked by a caller agent")
+        || txt_lower.contains("execute enhanced read memory");
+    has_role_identity || has_execution_signature
+}
+
+/// Returns true if the transcript step type represents telemetry or heartbeat metadata.
+pub(crate) fn is_telemetry_event(s_type: &str) -> bool {
+    matches!(
+        s_type,
+        "TOKEN_USAGE" | "TELEMETRY" | "HEARTBEAT" | "PROGRESS" | "METRICS" | "SYSTEM_LOG"
+    )
+}
+
+/// Evaluates whether a transcript step represents an intermediate tool execution rather than turn completion.
+pub(crate) fn is_tool_execution_step(
+    s_type: &str,
+    s_source: &str,
+    val: &serde_json::Value,
+) -> bool {
+    let is_tool_type = matches!(s_type, "GENERIC" | "TOOL_OUTPUT" | "TOOL_RESPONSE");
+    let is_tool_source = s_source.eq_ignore_ascii_case("TOOL");
+    let has_tool_call_id = val.get("tool_call_id").is_some();
+    is_tool_type || is_tool_source || has_tool_call_id
+}
+
+/// Determines if a status token represents a terminal turn state (DONE, COMPLETED, IDLE, ERROR).
+pub(crate) fn is_terminal_status(status: &str) -> bool {
+    let clean = status.trim();
+    clean.eq_ignore_ascii_case("done")
+        || clean.eq_ignore_ascii_case("completed")
+        || clean.eq_ignore_ascii_case("idle")
+        || clean.eq_ignore_ascii_case("error")
+}
+
+/// Evaluates whether a planner response has completed without pending tool invocations.
+pub(crate) fn is_planner_turn_completed(has_open_tools: bool, s_status: &str) -> bool {
+    if has_open_tools {
+        return false;
+    }
+    s_status.is_empty() || is_terminal_status(s_status)
+}
+
+/// Determines whether an entry represents genuine user input rather than internal system events.
+pub(crate) fn is_genuine_user_input(s_type: &str, s_source: &str) -> bool {
+    if s_source.eq_ignore_ascii_case("SYSTEM") {
+        return false;
+    }
+    let is_user_type = s_type.eq_ignore_ascii_case("USER_INPUT");
+    let is_user_source =
+        s_source.eq_ignore_ascii_case("USER_EXPLICIT") || s_source.eq_ignore_ascii_case("USER");
+    is_user_type || is_user_source
+}
+
+/// Determines whether message content represents internal system prompts or subagent instructions.
+pub(crate) fn is_system_prompt_message(s_source: &str, content: &str) -> bool {
+    if s_source.eq_ignore_ascii_case("SYSTEM") {
+        return true;
+    }
+    let trimmed = content.trim();
+    let lower = trimmed.to_ascii_lowercase();
+    let has_system_tag = lower.starts_with("<system_message>")
+        || lower.starts_with("the following is a <system_message>");
+    let has_envelope_header =
+        lower.starts_with("[message] timestamp=") || trimmed.starts_with("Task id ");
+    has_system_tag || has_envelope_header
+}
+
+/// Evaluates whether a transcript step records content truncation requiring full transcript lookup.
+pub(crate) fn is_content_truncated(val: &serde_json::Value) -> bool {
+    val.get("truncated_fields")
+        .and_then(|tf| tf.as_array())
+        .map(|arr| arr.iter().any(|v| v.as_str() == Some("content")))
+        .unwrap_or(false)
+}
+
+/// Pre-filters raw transcript lines for candidate user or planner markers prior to JSON parsing.
+pub(crate) fn is_relevant_turn_candidate(trimmed: &str) -> bool {
+    let has_user_marker = trimmed.contains("USER_INPUT")
+        || trimmed.contains("USER_EXPLICIT")
+        || trimmed.contains("\"USER\"")
+        || trimmed.contains("\"user\"");
+    let has_model_marker = trimmed.contains("PLANNER_RESPONSE")
+        || trimmed.contains("\"MODEL\"")
+        || trimmed.contains("\"model\"");
+    has_user_marker || has_model_marker
+}
+
 /// Inspect early lines of transcript to determine if conversation was initiated
 /// as an autonomous subagent without loading the whole file into RAM.
 fn inspect_first_line_is_subagent(path: &Path) -> bool {
@@ -43,15 +142,7 @@ fn inspect_first_line_is_subagent(path: &Path) -> bool {
                         .get("content")
                         .and_then(|c| c.as_str())
                         .unwrap_or("");
-                    let txt_lower = txt.to_lowercase();
-                    return txt.contains("You are ")
-                        || txt_lower.contains("subagent")
-                        || txt_lower.contains("worker")
-                        || txt_lower.contains("author")
-                        || txt_lower.contains("research")
-                        || txt_lower.contains("debugger")
-                        || txt_lower.contains("invoked by a caller agent")
-                        || txt_lower.contains("execute enhanced read memory");
+                    return is_subagent_prompt_text(txt);
                 } else {
                     break;
                 }
@@ -114,7 +205,9 @@ fn read_bounded_tail_lines(path: &Path, max_bytes: u64, max_lines: usize) -> (Ve
     let mut all_lines: Vec<&str> = content_slice.lines().collect();
 
     // Discard initial partial line if we sought into middle of the file
-    if !is_full_file && !all_lines.is_empty() {
+    let is_partial_read = !is_full_file;
+    let has_lines = !all_lines.is_empty();
+    if is_partial_read && has_lines {
         all_lines.remove(0);
     }
 
@@ -276,24 +369,13 @@ pub(crate) fn inspect_conversation_transcript(
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
             let s_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("");
             let s_source = val.get("source").and_then(|v| v.as_str()).unwrap_or("");
-            if s_type == "TOKEN_USAGE"
-                || s_type == "TELEMETRY"
-                || s_type == "HEARTBEAT"
-                || s_type == "PROGRESS"
-                || s_type == "METRICS"
-                || s_type == "SYSTEM_LOG"
-            {
+            if is_telemetry_event(s_type) {
                 continue;
             }
 
             // Step-level outputs (tool execution results) report status: "DONE" on the step itself.
             // These indicate tool completion, NOT turn completion. Skip them.
-            let is_tool_step = s_type == "GENERIC"
-                || s_type == "TOOL_OUTPUT"
-                || s_type == "TOOL_RESPONSE"
-                || s_source == "TOOL"
-                || val.get("tool_call_id").is_some();
-            if is_tool_step {
+            if is_tool_execution_step(s_type, s_source, &val) {
                 continue;
             }
 
@@ -308,23 +390,14 @@ pub(crate) fn inspect_conversation_transcript(
                         .and_then(|t| t.as_array())
                         .map(|a| !a.is_empty())
                         .unwrap_or(false);
-                    if !has_tool_calls
-                        && (s_status.is_empty()
-                            || s_status.eq_ignore_ascii_case("done")
-                            || s_status.eq_ignore_ascii_case("completed")
-                            || s_status.eq_ignore_ascii_case("idle")
-                            || s_status.eq_ignore_ascii_case("error"))
-                    {
+                    if is_planner_turn_completed(has_tool_calls, s_status) {
                         is_completed_or_waiting = true;
                         break;
                     }
                 } else if s_type == "USER_INPUT" || s_source == "USER_EXPLICIT" {
                     // If the most recent meaningful event is user input awaiting AI, turn is active (not completed)
                     break;
-                } else if s_status.eq_ignore_ascii_case("completed")
-                    || s_status.eq_ignore_ascii_case("error")
-                    || s_status.eq_ignore_ascii_case("idle")
-                {
+                } else if is_terminal_status(s_status) {
                     is_completed_or_waiting = true;
                     break;
                 }
@@ -335,8 +408,10 @@ pub(crate) fn inspect_conversation_transcript(
     }
 
     // Adaptive 10-Minute Thinking Window: Expand timestamp window to 600s (10 minutes) when mtime is fresh
-    let is_mtime_fresh = mtime_epoch > 0 && (now_epoch - mtime_epoch <= 600);
-    let is_recent_active = !is_completed_or_waiting && is_mtime_fresh;
+    let is_within_freshness_window = now_epoch - mtime_epoch <= 600;
+    let is_mtime_fresh = mtime_epoch > 0 && is_within_freshness_window;
+    let is_turn_in_flight = !is_completed_or_waiting;
+    let is_recent_active = is_turn_in_flight && is_mtime_fresh;
 
     let mut latest_prompt: Option<String> = None;
     let mut latest_response: Option<String> = None;
@@ -355,30 +430,14 @@ pub(crate) fn inspect_conversation_transcript(
             let s_source = val.get("source").and_then(|v| v.as_str()).unwrap_or("");
 
             // 1. User inputs
-            let is_user_input = (s_type.eq_ignore_ascii_case("USER_INPUT")
-                || s_source.eq_ignore_ascii_case("USER_EXPLICIT")
-                || s_source.eq_ignore_ascii_case("USER"))
-                && !s_source.eq_ignore_ascii_case("SYSTEM");
+            let is_user_input = is_genuine_user_input(s_type, s_source);
 
             if is_user_input {
                 if let Some(c) = val.get("content").and_then(|v| v.as_str()) {
                     let c_trim = c.trim();
-                    let c_lower = c_trim.to_lowercase();
-                    let is_system_msg = s_source.eq_ignore_ascii_case("SYSTEM")
-                        || c_trim.starts_with("The following is a <SYSTEM_MESSAGE>")
-                        || c_trim.starts_with("[Message] timestamp=")
-                        || c_trim.starts_with("Task id ")
-                        || c_trim.starts_with("<SYSTEM_MESSAGE>")
-                        || c_lower.starts_with("the following is a <system_message>")
-                        || c_lower.starts_with("[message] timestamp=")
-                        || c_lower.starts_with("<system_message>");
+                    let is_system_msg = is_system_prompt_message(s_source, c);
                     if !is_system_msg {
-                        let full_c = if val
-                            .get("truncated_fields")
-                            .and_then(|tf| tf.as_array())
-                            .map(|arr| arr.iter().any(|v| v.as_str() == Some("content")))
-                            .unwrap_or(false)
-                            && transcript_full_path.exists()
+                        let full_c = if is_content_truncated(&val) && transcript_full_path.exists()
                         {
                             let target_idx = val
                                 .get("step_index")
@@ -399,7 +458,7 @@ pub(crate) fn inspect_conversation_transcript(
                             latest_prompt = Some(clean);
                             has_real_user_prompt = true;
                         }
-                    } else if c_trim.contains("subagent") || c_trim.contains("Worker") {
+                    } else if is_subagent_prompt_text(c_trim) {
                         is_subagent = true;
                     }
                 }
@@ -421,11 +480,7 @@ pub(crate) fn inspect_conversation_transcript(
                 if let Some(resp_txt) = val.get("content").and_then(|v| v.as_str()) {
                     let resp_trim = resp_txt.trim();
                     if !resp_trim.is_empty() {
-                        let full_resp = if val
-                            .get("truncated_fields")
-                            .and_then(|tf| tf.as_array())
-                            .map(|arr| arr.iter().any(|v| v.as_str() == Some("content")))
-                            .unwrap_or(false)
+                        let full_resp = if is_content_truncated(&val)
                             && transcript_full_path.exists()
                         {
                             let target_idx = val
@@ -447,12 +502,7 @@ pub(crate) fn inspect_conversation_transcript(
             }
 
             // 3. Tool results / Generic output / Tool call steps
-            if s_type == "GENERIC"
-                || s_type == "TOOL_OUTPUT"
-                || s_type == "TOOL_RESPONSE"
-                || s_source == "TOOL"
-                || val.get("tool_call_id").is_some()
-            {
+            if is_tool_execution_step(s_type, s_source, &val) {
                 if let Some(tool_out) = val.get("content").and_then(|v| v.as_str()) {
                     let out_trim = tool_out.trim();
                     if !out_trim.is_empty() && out_trim.len() > 5 {
@@ -473,24 +523,13 @@ pub(crate) fn inspect_conversation_transcript(
             let s_source = val.get("source").and_then(|v| v.as_str()).unwrap_or("");
 
             // Bypass pure telemetry / token usage metadata
-            if s_type == "TOKEN_USAGE"
-                || s_type == "TELEMETRY"
-                || s_type == "HEARTBEAT"
-                || s_type == "PROGRESS"
-                || s_type == "METRICS"
-                || s_type == "SYSTEM_LOG"
-            {
+            if is_telemetry_event(s_type) {
                 continue;
             }
 
             // Step-level outputs (tool execution results) report status: "DONE" on the step itself.
             // These indicate tool completion, NOT turn completion. Skip them.
-            let is_tool_step = s_type == "GENERIC"
-                || s_type == "TOOL_OUTPUT"
-                || s_type == "TOOL_RESPONSE"
-                || s_source == "TOOL"
-                || val.get("tool_call_id").is_some();
-            if is_tool_step {
+            if is_tool_execution_step(s_type, s_source, &val) {
                 continue;
             }
 
@@ -548,14 +587,12 @@ pub(crate) fn inspect_conversation_transcript(
                     }
                     break;
                 } else {
-                    let is_explicit_done = s_status.eq_ignore_ascii_case("DONE")
-                        || s_status.eq_ignore_ascii_case("COMPLETED")
-                        || s_status.eq_ignore_ascii_case("IDLE")
-                        || s_status.eq_ignore_ascii_case("ERROR");
+                    let is_explicit_done = is_terminal_status(s_status);
                     // Guard: Intermediate planner turns without tool calls must NOT set is_terminal_done = true
                     // when subsequent turns or steps exist in the transcript.
                     // Only flag is_terminal_done if this step is at the very tail of the transcript.
-                    if is_explicit_done && (step_idx + 1 >= step_count as u64) {
+                    let is_tail_step = step_idx + 1 >= step_count as u64;
+                    if is_explicit_done && is_tail_step {
                         is_terminal_done = true;
                     }
                 }
@@ -655,10 +692,7 @@ pub(crate) fn inspect_conversation_transcript(
                     if let Ok(val) = serde_json::from_str::<serde_json::Value>(trimmed) {
                         let s_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("");
                         let s_source = val.get("source").and_then(|v| v.as_str()).unwrap_or("");
-                        let is_user = (s_type.eq_ignore_ascii_case("USER_INPUT")
-                            || s_source.eq_ignore_ascii_case("USER_EXPLICIT")
-                            || s_source.eq_ignore_ascii_case("USER"))
-                            && !s_source.eq_ignore_ascii_case("SYSTEM");
+                        let is_user = is_genuine_user_input(s_type, s_source);
                         if is_user {
                             if let Some(c) = val.get("content").and_then(|v| v.as_str()) {
                                 let clean = extract_clean_user_prompt(c);
@@ -691,7 +725,8 @@ pub(crate) fn inspect_conversation_transcript(
         None
     };
 
-    let is_non_prompt = !has_real_user_prompt && !is_subagent;
+    let has_identified_prompt = has_real_user_prompt || is_subagent;
+    let is_non_prompt = !has_identified_prompt;
     let terminal_done = is_terminal_done || is_completed_or_waiting;
     let effective_recent_active = if terminal_done {
         false
@@ -760,15 +795,7 @@ pub fn extract_conversation_prompt_turns(
         }
 
         // Fast string probe before full JSON deserialization to skip huge tool output lines
-        let is_user_candidate = trimmed.contains("USER_INPUT")
-            || trimmed.contains("USER_EXPLICIT")
-            || trimmed.contains("\"USER\"")
-            || trimmed.contains("\"user\"");
-        let is_model_candidate = trimmed.contains("PLANNER_RESPONSE")
-            || trimmed.contains("\"MODEL\"")
-            || trimmed.contains("\"model\"");
-
-        if !is_user_candidate && !is_model_candidate {
+        if !is_relevant_turn_candidate(trimmed) {
             continue;
         }
 
@@ -785,23 +812,11 @@ pub fn extract_conversation_prompt_turns(
             .map(|u| u as usize)
             .unwrap_or(line_idx);
 
-        let is_user_input = (s_type.eq_ignore_ascii_case("USER_INPUT")
-            || s_source.eq_ignore_ascii_case("USER_EXPLICIT")
-            || s_source.eq_ignore_ascii_case("USER"))
-            && !s_source.eq_ignore_ascii_case("SYSTEM");
+        let is_user_input = is_genuine_user_input(s_type, s_source);
 
         if is_user_input {
             if let Some(c) = val.get("content").and_then(|v| v.as_str()) {
-                let c_trim = c.trim();
-                let c_lower = c_trim.to_lowercase();
-                let is_internal = s_source.eq_ignore_ascii_case("SYSTEM")
-                    || c_trim.starts_with("The following is a <SYSTEM_MESSAGE>")
-                    || c_trim.starts_with("[Message] timestamp=")
-                    || c_trim.starts_with("Task id ")
-                    || c_trim.starts_with("<SYSTEM_MESSAGE>")
-                    || c_lower.starts_with("the following is a <system_message>")
-                    || c_lower.starts_with("[message] timestamp=")
-                    || c_lower.starts_with("<system_message>");
+                let is_internal = is_system_prompt_message(s_source, c);
                 if !is_internal {
                     let clean = extract_clean_user_prompt(c);
                     if !clean.trim().is_empty() {
@@ -851,9 +866,9 @@ pub fn extract_conversation_prompt_turns(
                                             file_path.clone()
                                         }
                                     };
-                                    if !resolved_path.is_empty()
-                                        && !media_paths.contains(&resolved_path)
-                                    {
+                                    let has_resolved_path = !resolved_path.is_empty();
+                                    let is_new_media = !media_paths.contains(&resolved_path);
+                                    if has_resolved_path && is_new_media {
                                         media_paths.push(resolved_path.clone());
                                         media_thumbnails.push(resolved_path);
                                     }
@@ -876,10 +891,7 @@ pub fn extract_conversation_prompt_turns(
             let tool_calls = val.get("tool_calls").and_then(|tc| tc.as_array());
             let has_open_tools = tool_calls.map(|tc| !tc.is_empty()).unwrap_or(false);
             let s_status = val.get("status").and_then(|v| v.as_str()).unwrap_or("");
-            let is_done = !has_open_tools
-                && (s_status.eq_ignore_ascii_case("DONE")
-                    || s_status.eq_ignore_ascii_case("COMPLETED")
-                    || s_status.eq_ignore_ascii_case("IDLE"));
+            let is_done = is_planner_turn_completed(has_open_tools, s_status);
             last_model_step_idx = Some(step_idx);
             last_model_is_done = is_done;
             if is_done {
@@ -961,4 +973,123 @@ pub fn extract_conversation_prompt_turns(
     }
 
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_subagent_prompt_text() {
+        assert!(is_subagent_prompt_text("You are Worker 02"));
+        assert!(is_subagent_prompt_text("Task delegated to subagent"));
+        assert!(is_subagent_prompt_text(
+            "invoked by a caller agent to run tasks"
+        ));
+        assert!(is_subagent_prompt_text(
+            "execute enhanced read memory protocol"
+        ));
+        assert!(!is_subagent_prompt_text(
+            "Please fix the bug in this function"
+        ));
+    }
+
+    #[test]
+    fn test_is_telemetry_event() {
+        assert!(is_telemetry_event("TOKEN_USAGE"));
+        assert!(is_telemetry_event("TELEMETRY"));
+        assert!(is_telemetry_event("HEARTBEAT"));
+        assert!(is_telemetry_event("PROGRESS"));
+        assert!(is_telemetry_event("METRICS"));
+        assert!(is_telemetry_event("SYSTEM_LOG"));
+        assert!(!is_telemetry_event("USER_INPUT"));
+        assert!(!is_telemetry_event("PLANNER_RESPONSE"));
+    }
+
+    #[test]
+    fn test_is_tool_execution_step() {
+        let empty_val = serde_json::json!({});
+        let tool_val = serde_json::json!({ "tool_call_id": "call_123" });
+
+        assert!(is_tool_execution_step("GENERIC", "", &empty_val));
+        assert!(is_tool_execution_step("TOOL_OUTPUT", "", &empty_val));
+        assert!(is_tool_execution_step("TOOL_RESPONSE", "", &empty_val));
+        assert!(is_tool_execution_step("", "TOOL", &empty_val));
+        assert!(is_tool_execution_step("", "", &tool_val));
+        assert!(!is_tool_execution_step("USER_INPUT", "USER", &empty_val));
+    }
+
+    #[test]
+    fn test_is_terminal_status() {
+        assert!(is_terminal_status("DONE"));
+        assert!(is_terminal_status("done"));
+        assert!(is_terminal_status("COMPLETED"));
+        assert!(is_terminal_status("completed"));
+        assert!(is_terminal_status("IDLE"));
+        assert!(is_terminal_status("idle"));
+        assert!(is_terminal_status("ERROR"));
+        assert!(is_terminal_status("error"));
+        assert!(!is_terminal_status("RUNNING"));
+        assert!(!is_terminal_status(""));
+    }
+
+    #[test]
+    fn test_is_planner_turn_completed() {
+        assert!(is_planner_turn_completed(false, "DONE"));
+        assert!(is_planner_turn_completed(false, ""));
+        assert!(!is_planner_turn_completed(true, "DONE"));
+        assert!(!is_planner_turn_completed(false, "RUNNING"));
+    }
+
+    #[test]
+    fn test_is_genuine_user_input() {
+        assert!(is_genuine_user_input("USER_INPUT", "USER"));
+        assert!(is_genuine_user_input("SOMETHING", "USER_EXPLICIT"));
+        assert!(!is_genuine_user_input("USER_INPUT", "SYSTEM"));
+        assert!(!is_genuine_user_input("PLANNER_RESPONSE", "MODEL"));
+    }
+
+    #[test]
+    fn test_is_system_prompt_message() {
+        assert!(is_system_prompt_message("SYSTEM", "Any text"));
+        assert!(is_system_prompt_message(
+            "USER",
+            "<system_message>System prompt</system_message>"
+        ));
+        assert!(is_system_prompt_message(
+            "USER",
+            "The following is a <system_message>"
+        ));
+        assert!(is_system_prompt_message("USER", "[message] timestamp=123"));
+        assert!(is_system_prompt_message("USER", "Task id 123"));
+        assert!(!is_system_prompt_message(
+            "USER",
+            "Hello, please write a test"
+        ));
+    }
+
+    #[test]
+    fn test_is_content_truncated() {
+        let val_truncated = serde_json::json!({ "truncated_fields": ["content", "thinking"] });
+        let val_other = serde_json::json!({ "truncated_fields": ["thinking"] });
+        let val_none = serde_json::json!({});
+
+        assert!(is_content_truncated(&val_truncated));
+        assert!(!is_content_truncated(&val_other));
+        assert!(!is_content_truncated(&val_none));
+    }
+
+    #[test]
+    fn test_is_relevant_turn_candidate() {
+        assert!(is_relevant_turn_candidate(r#"{"type":"USER_INPUT"}"#));
+        assert!(is_relevant_turn_candidate(r#"{"source":"USER_EXPLICIT"}"#));
+        assert!(is_relevant_turn_candidate(r#"{"source":"USER"}"#));
+        assert!(is_relevant_turn_candidate(r#"{"source":"user"}"#));
+        assert!(is_relevant_turn_candidate(r#"{"type":"PLANNER_RESPONSE"}"#));
+        assert!(is_relevant_turn_candidate(r#"{"source":"MODEL"}"#));
+        assert!(is_relevant_turn_candidate(r#"{"source":"model"}"#));
+        assert!(!is_relevant_turn_candidate(
+            r#"{"type":"GENERIC","source":"TOOL"}"#
+        ));
+    }
 }

@@ -37,16 +37,43 @@ interface PromptTreeSwrEntry {
 // Module-level in-memory SWR cache across modal mount/unmount lifecycles
 const promptTreeSwrCache = new Map<string, PromptTreeSwrEntry>();
 
+/**
+ * Evaluates whether an instance identifier is empty or matches default instance aliases.
+ */
+export function isDefaultInstanceAlias(instanceId?: string | null): boolean {
+    if (!instanceId) {
+        return true;
+    }
+    const normalized = instanceId.trim().toLowerCase();
+    const isDefaultExact = normalized === 'default' || normalized === '__default__';
+    const hasDefaultSubstring = normalized.includes('default');
+    return isDefaultExact || hasDefaultSubstring;
+}
+
+/**
+ * Resolves cache keys for SWR invalidation and optimistic updates.
+ */
+export function resolveInstanceCacheKeys(targetInstanceId?: string | null): string[] {
+    if (!targetInstanceId) {
+        return Array.from(promptTreeSwrCache.keys());
+    }
+    if (isDefaultInstanceAlias(targetInstanceId)) {
+        const defaultKeys = new Set([targetInstanceId, 'default', '__default__']);
+        return Array.from(defaultKeys);
+    }
+    return [targetInstanceId];
+}
+
 /** Invalidate in-memory SWR cache across instances or for a specific instance */
 export function invalidatePromptTreeCache(targetInstanceId?: string): void {
-    if (targetInstanceId) {
-        promptTreeSwrCache.delete(targetInstanceId);
-        if (targetInstanceId === 'default' || targetInstanceId === '__default__') {
-            promptTreeSwrCache.delete('default');
-            promptTreeSwrCache.delete('__default__');
-        }
-    } else {
+    if (!targetInstanceId) {
         promptTreeSwrCache.clear();
+        return;
+    }
+    promptTreeSwrCache.delete(targetInstanceId);
+    if (isDefaultInstanceAlias(targetInstanceId)) {
+        promptTreeSwrCache.delete('default');
+        promptTreeSwrCache.delete('__default__');
     }
 }
 
@@ -58,9 +85,7 @@ export function renameConversationOptimistic(
     newTitle: string,
     targetInstanceId?: string
 ): void {
-    const keys = targetInstanceId
-        ? [targetInstanceId, ...(targetInstanceId === 'default' || targetInstanceId === '__default__' ? ['default', '__default__'] : [])]
-        : Array.from(promptTreeSwrCache.keys());
+    const keys = resolveInstanceCacheKeys(targetInstanceId);
 
     for (const key of keys) {
         const entry = promptTreeSwrCache.get(key);
@@ -107,11 +132,97 @@ export const promptTreeLoadingEmitter = {
     },
 };
 
-function isValidConversation(c: AgmConversationNode): boolean {
-    return (
-        !isGhostConversation(c) &&
-        !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
-    );
+/**
+ * Evaluates whether a conversation node has a non-empty prompt or preview.
+ */
+export function hasMeaningfulPrompt(c: AgmConversationNode): boolean {
+    const hasWordCount = c.prompt_word_count > 0;
+    const hasPreview = Boolean(c.prompt_preview_200w && c.prompt_preview_200w.trim());
+    return hasWordCount || hasPreview;
+}
+
+/**
+ * Evaluates whether a conversation node is valid and not a ghost or empty node.
+ */
+export function isValidConversation(c: AgmConversationNode): boolean {
+    if (isGhostConversation(c)) {
+        return false;
+    }
+    return hasMeaningfulPrompt(c);
+}
+
+/**
+ * Evaluates whether the instance filter targets all instances without profile scoping.
+ */
+export function isAllInstancesFilter(instanceId?: string | null): boolean {
+    if (!instanceId) {
+        return true;
+    }
+    return instanceId.trim().toLowerCase() === 'all';
+}
+
+/**
+ * Determines whether a node's instance identifier matches the active instance target.
+ * Resolves exact matches and cross-alias default compatibility.
+ */
+export function isInstanceCompatible(
+    nodeInstanceId?: string | null,
+    targetInstanceId?: string | null
+): boolean {
+    if (nodeInstanceId === targetInstanceId) {
+        return true;
+    }
+    const isTargetDefault = isDefaultInstanceAlias(targetInstanceId);
+    const isNodeDefault = isDefaultInstanceAlias(nodeInstanceId);
+    return isTargetDefault && isNodeDefault;
+}
+
+/**
+ * Returns true if a project is marked running or contains any active conversations.
+ */
+export function isProjectRunning(project: AgmProjectTreeNode): boolean {
+    const isNodeRunning = Boolean(project.is_running);
+    const hasRunningConversation = (project.conversations || []).some((c) => Boolean(c.is_running));
+    return isNodeRunning || hasRunningConversation;
+}
+
+/**
+ * Resolves the newest modification timestamp among conversations belonging to a project.
+ */
+export function getProjectLatestTimestamp(project: AgmProjectTreeNode): number {
+    if (!project.conversations || project.conversations.length === 0) {
+        return 0;
+    }
+    return Math.max(0, ...project.conversations.map((c) => new Date(c.last_modified).getTime() || 0));
+}
+
+/**
+ * Comparator sorting projects by pinned status, running activity, last modified time, and name.
+ */
+export function compareProjectsPriority(
+    a: AgmProjectTreeNode,
+    b: AgmProjectTreeNode,
+    pinnedProjectIds: string[]
+): number {
+    const isAPinned = pinnedProjectIds.includes(a.project_id);
+    const isBPinned = pinnedProjectIds.includes(b.project_id);
+    if (isAPinned !== isBPinned) {
+        return isAPinned ? -1 : 1;
+    }
+
+    const isARunning = isProjectRunning(a);
+    const isBRunning = isProjectRunning(b);
+    if (isARunning !== isBRunning) {
+        return isARunning ? -1 : 1;
+    }
+
+    const aLatest = getProjectLatestTimestamp(a);
+    const bLatest = getProjectLatestTimestamp(b);
+    if (bLatest !== aLatest) {
+        return bLatest - aLatest;
+    }
+
+    return a.repo_name.localeCompare(b.repo_name);
 }
 
 function sortByLastModifiedDesc(convs: AgmConversationNode[]): AgmConversationNode[] {
@@ -138,13 +249,20 @@ export function resolveConversationPromptText(
                 return matchedTurn.prompt_text;
             }
         }
-        const runningTurn = conv.prompts.find((p) => p.is_running && p.prompt_text && p.prompt_text.trim());
+        const runningTurn = conv.prompts.find((p) => {
+            const isRunning = Boolean(p.is_running);
+            const hasText = Boolean(p.prompt_text && p.prompt_text.trim());
+            return isRunning && hasText;
+        });
         if (runningTurn?.prompt_text) {
             return runningTurn.prompt_text;
         }
         const lastTurnWithText = [...conv.prompts]
             .reverse()
-            .find((p) => p.prompt_text && p.prompt_text.trim().length > text.trim().length);
+            .find((p) => {
+                const textLength = p.prompt_text ? p.prompt_text.trim().length : 0;
+                return textLength > text.trim().length;
+            });
         if (lastTurnWithText?.prompt_text) {
             return lastTurnWithText.prompt_text;
         }
@@ -191,8 +309,10 @@ export function usePromptTreeData({
             setSelectedProject(project);
             let effectiveConv = conv;
             let effectiveTurnNum = conv.selected_turn_number;
-            if (effectiveTurnNum == null && conv.prompts && conv.prompts.length > 0) {
-                const runningTurn = conv.prompts.find((p) => p.is_running) || conv.prompts[conv.prompts.length - 1];
+            const hasNoTurn = effectiveTurnNum == null;
+            const hasPrompts = Boolean(conv.prompts && conv.prompts.length > 0);
+            if (hasNoTurn && hasPrompts && conv.prompts) {
+                const runningTurn = conv.prompts.find((p) => Boolean(p.is_running)) || conv.prompts[conv.prompts.length - 1];
                 if (runningTurn) {
                     effectiveTurnNum = runningTurn.turn_number;
                     effectiveConv = {
@@ -242,9 +362,10 @@ export function usePromptTreeData({
                     setExpandedProjects({ [target.project_id]: true });
                     setSelectedProject(target);
                     if (target.conversations && target.conversations.length > 0) {
-                        const runningConv = target.conversations.find(
-                            (c) => Boolean(c.is_running) && isValidConversation(c)
-                        );
+                        const runningConv = target.conversations.find((c) => {
+                            const isRunning = Boolean(c.is_running);
+                            return isRunning && isValidConversation(c);
+                        });
                         if (runningConv) {
                             selectConversation(runningConv, target);
                             setExpandedStaleGroups(
@@ -273,27 +394,16 @@ export function usePromptTreeData({
             const nonArchived = data.filter((p) => !currentArchivedIds.includes(p.project_id));
             const targetPool = nonArchived.length > 0 ? nonArchived : data;
 
-            const prioritized = [...targetPool].sort((a, b) => {
-                const aPinned = currentPinnedIds.includes(a.project_id);
-                const bPinned = currentPinnedIds.includes(b.project_id);
-                if (aPinned !== bPinned) return aPinned ? -1 : 1;
-
-                const aRunning = Boolean(a.is_running) || a.conversations.some((c) => Boolean(c.is_running));
-                const bRunning = Boolean(b.is_running) || b.conversations.some((c) => Boolean(c.is_running));
-                if (aRunning !== bRunning) return aRunning ? -1 : 1;
-
-                const aLatest = Math.max(0, ...a.conversations.map((c) => new Date(c.last_modified).getTime() || 0));
-                const bLatest = Math.max(0, ...b.conversations.map((c) => new Date(c.last_modified).getTime() || 0));
-                if (bLatest !== aLatest) return bLatest - aLatest;
-
-                return a.repo_name.localeCompare(b.repo_name);
-            });
+            const prioritized = [...targetPool].sort((a, b) =>
+                compareProjectsPriority(a, b, currentPinnedIds)
+            );
 
             // 1. Look for actively running conversation across non-archived projects
             const runningCandidates: RunningCand[] = [];
             for (const proj of prioritized) {
                 for (const conv of proj.conversations) {
-                    if (Boolean(conv.is_running) && isValidConversation(conv)) {
+                    const isRunning = Boolean(conv.is_running);
+                    if (isRunning && isValidConversation(conv)) {
                         runningCandidates.push({
                             conv,
                             proj,
@@ -315,8 +425,12 @@ export function usePromptTreeData({
                 return;
             }
 
-            // 2. If no conversation is running, check if any non-archived project has Boolean(p.is_running)
-            const runningProj = prioritized.find((p) => Boolean(p.is_running) && p.conversations.length > 0);
+            // 2. If no conversation is running, check if any non-archived project is running
+            const runningProj = prioritized.find((p) => {
+                const isRunning = isProjectRunning(p);
+                const hasConversations = p.conversations.length > 0;
+                return isRunning && hasConversations;
+            });
             if (runningProj) {
                 const candidateConvs = runningProj.conversations.filter(isValidConversation);
                 if (candidateConvs.length > 0) {
@@ -382,27 +496,16 @@ export function usePromptTreeData({
                     onlyRunning: false,
                     force: isForce,
                 });
-                const isTargetDefault = !instanceId || instanceId === 'default' || instanceId === '__default__' || instanceId === 'all' || instanceId.includes('default');
-                const isFilterAll = !instanceId || instanceId === 'all';
+                const isFilterAll = isAllInstancesFilter(instanceId);
                 const relevant = isFilterAll
                     ? data
                     : data
-                          .filter((p) => {
-                              if (p.instance_id === instanceId) return true;
-                              if (isTargetDefault && (!p.instance_id || p.instance_id === 'default' || p.instance_id === '__default__' || p.instance_id.includes('default'))) {
-                                  return true;
-                              }
-                              return false;
-                          })
+                          .filter((p) => isInstanceCompatible(p.instance_id, instanceId))
                           .map((p) => ({
                               ...p,
-                              conversations: (p.conversations || []).filter((c) => {
-                                  if (c.instance_id === instanceId) return true;
-                                  if (isTargetDefault && (!c.instance_id || c.instance_id === 'default' || c.instance_id === '__default__' || c.instance_id.includes('default'))) {
-                                      return true;
-                                  }
-                                  return false;
-                              }),
+                              conversations: (p.conversations || []).filter((c) =>
+                                  isInstanceCompatible(c.instance_id, instanceId)
+                              ),
                           }));
                 const finalData = relevant;
 
@@ -424,10 +527,11 @@ export function usePromptTreeData({
                 if (currentConv) {
                     const currentId = currentConv.conversation_id;
                     const currentTurn = currentConv.selected_turn_number;
-                    const updatedProj = finalData.find((p) =>
-                        (currentProj && p.project_id === currentProj.project_id) ||
-                        p.conversations.some((c) => c.conversation_id === currentId)
-                    );
+                    const updatedProj = finalData.find((p) => {
+                        const isSameProject = Boolean(currentProj && p.project_id === currentProj.project_id);
+                        const hasMatchingConversation = p.conversations.some((c) => c.conversation_id === currentId);
+                        return isSameProject || hasMatchingConversation;
+                    });
                     if (updatedProj) {
                         setSelectedProject(updatedProj);
                         const updatedConv = updatedProj.conversations.find(
@@ -435,7 +539,9 @@ export function usePromptTreeData({
                         );
                         if (updatedConv) {
                             hasRetainedSelection = true;
-                            if (typeof currentTurn === 'number' && updatedConv.prompts?.length) {
+                            const hasSelectedTurn = typeof currentTurn === 'number';
+                            const hasPrompts = Boolean(updatedConv.prompts && updatedConv.prompts.length > 0);
+                            if (hasSelectedTurn && hasPrompts && updatedConv.prompts) {
                                 const matchingTurn = updatedConv.prompts.find(
                                     (t) => t.turn_number === currentTurn
                                 );
