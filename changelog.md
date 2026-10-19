@@ -1,5 +1,20 @@
 # Changelog
 
+## [v4.236.0] - 2026-10-19
+
+### Added
+- **Collapsible Session Overview Card with Memory**: Converted the session overview dashboard in `src/components/instances/PromptTreeView/PromptInstructionView.tsx` to be collapsed by default into a sleek single-line summary bar (~36px); added subtle low-profile purple expander trigger (`ChevronDown`/`ChevronUp`); persisted collapse/expand state in `localStorage` (`agm_prompt_overview_expanded`) across sessions; removed redundant title, sequence badge (`C211`), and conversation ID repetitions from inside the overview card. (Thanks to @aukgit)
+- **Centralized 24-Hour Date/Time Formatting & Duration Seconds Suppression**: Implemented centralized date formatting in `src/utils/date.ts` supporting `DD-MMM-YYYY HH:mm` in 24-hour clock using the local system timezone, with relative time indicators and duration seconds suppression when hours or minutes exist; added user-configurable `date_format_mode` toggle with strictly typed `DateFormatModeType` enum (`TwentyFourHour = '24h'`, `TwelveHour = '12h'`, `Iso = 'iso'`) in `src/types/config.ts` and Settings. (Thanks to @aukgit)
+- **Metadata Clarification & DetailsModal Restructuring**: Clarified sequential conversation index (`C211` = Conversation #211) and interaction turns (`turns` = user/assistant request-response cycles) with dedicated labels and explanations in `src/components/instances/PromptTreeView/DetailsModal.tsx`; formatted `Last Modified` into localized 24-hour clock (`DD-MMM-YYYY HH:mm`) accompanied by relative recency delta ("ran 5 minutes ago", "ran 1 day ago"). (Thanks to @aukgit)
+- **SSH Multi-Instance & Account-Centric Discovery with 1-Click Remote Dispatch**: Upgraded `get_cluster_instances_and_balances` in `src-tauri/src/modules/ssh_manager/exec.rs` to query real multi-instances and bound Google account emails via SSH; elevated Account Email and Instance Name to primary prominent columns in `FleetMachinesTable.tsx` and `SshGitmapSection.tsx` while demoting raw IP into an interactive hover badge; added dynamic instance `<select>` dropdown with transparent borderless styling and 1-click remote prompt dispatching. (Thanks to @aukgit)
+
+### Fixed
+- **Expand Full / Fold Tab Switch Persistence**: Fixed UI bug in `src/components/instances/PromptTreeView/DetailTabs.tsx` where switching from the Input to Output tab caused the `Expand Full` toggle to unmount; decoupled `hasExpandToggle` so output text can be expanded to full height seamlessly. (Thanks to @aukgit)
+- **Prompt Tree Image Rendering & Queued/Running Visibility Protection**: Added Tauri v2 `core:asset:default` capability permission in `src-tauri/capabilities/default.json` and resolved relative image paths against project `repo_path` before passing to `convertFileSrc` in `clipboard.ts` and `PromptMarkdownPreview.tsx`; protected queued prompts from stale conversation demotion in `conversationGuards.ts`; synthesized running/queued projects from `active_prompts` in `src-tauri/src/modules/repo_db/tree_phases.rs`, ensuring the left panel is never empty when prompts are in flight. (Thanks to @aukgit)
+- **Cold-Start IDE 5-Second Stabilization Ladder & Send Reliability**: Upgraded `src-tauri/src/modules/instance/smart_run.rs` and `src-tauri/src/modules/repo_db/agy.rs` with an adaptive 5-second process stabilization ladder and CDP retry mechanism for cold-started IDE instances, eliminating lost prompts when dispatching to closed IDEs. (Thanks to @aukgit)
+
+---
+
 ## [v4.235.0] - 2026-10-19
 
 ### Added
@@ -796,6 +811,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.236.0 (2026-10-19)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.235.0 (2026-10-19)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
