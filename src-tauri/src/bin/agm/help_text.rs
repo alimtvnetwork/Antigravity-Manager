@@ -132,7 +132,8 @@ pub(crate) fn print_help_json() {
                     { "name": "errors list", "aliases": ["errors ls"], "flags": ["--limit <N>", "--severity <S>", "--json"], "description": "List captured errors with timestamp, severity, code, source, and message" },
                     { "name": "errors fix", "aliases": ["errors heal"], "flags": ["--dry-run", "--json"], "description": "Surgically resolve stale lockfiles, permissions, corrupted configs, and database WAL locks" },
                     { "name": "errors clear", "aliases": ["errors clean"], "flags": ["--json"], "description": "Purge all error history from errors.db" },
-                    { "name": "failed-commands", "aliases": ["fc", "failed-command", "unknown-commands", "fcc"], "flags": ["[N]", "count", "clear", "--json"], "description": "Inspect undetected or failed terminal commands with frequency metrics and suggestions" }
+                    { "name": "failed-commands", "aliases": ["fc", "failed-command", "unknown-commands", "fcc"], "flags": ["[N]", "count", "clear", "--json"], "description": "Inspect undetected or failed terminal commands with frequency metrics and suggestions" },
+                    { "name": "paths", "aliases": ["dirs", "path"], "flags": ["--json"], "description": "Display AGM data directory, database paths, log locations, and binary paths" }
                 ]
             },
             {

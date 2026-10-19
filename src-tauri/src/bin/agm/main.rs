@@ -332,6 +332,7 @@ fn main() {
             crate::system_cmds::dispatch_system_domain("db-stats", &cmd_args)
         }
         "vacuum" => crate::system_cmds::dispatch_system_domain("vacuum", &cmd_args),
+        "paths" | "dirs" | "path" => crate::system_cmds::cmd_system_paths(&cmd_args),
         "ip-list" => crate::security_cmds::dispatch_security_domain("ip-list", &cmd_args),
         "ip-block" => crate::security_cmds::dispatch_security_domain("ip-block", &cmd_args),
         "ip-unblock" => crate::security_cmds::dispatch_security_domain("ip-unblock", &cmd_args),

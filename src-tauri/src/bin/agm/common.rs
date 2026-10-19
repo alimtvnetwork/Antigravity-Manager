@@ -255,6 +255,8 @@ pub(crate) fn suggest_agm_commands(input: &str) -> Vec<String> {
         "audit",
         "history",
         "health",
+        "paths",
+        "dirs",
     ];
 
     let low = input.to_lowercase();
