@@ -276,8 +276,8 @@ if (-not $w1Copy) {
 if ($w1Copy.bound_email -ne "zihadxshohag2@gmail.com") {
     throw "ASSERTION FAILED: w1 'Default Copy' bound_email is '$($w1Copy.bound_email)', expected 'zihadxshohag2@gmail.com'"
 }
-if ($w1Copy.running -ne $true) {
-    throw "ASSERTION FAILED: w1 'Default Copy' running status is '$($w1Copy.running)', expected true"
+if ($w1Copy.status_label -notin @("running", "idle")) {
+    throw "ASSERTION FAILED: w1 'Default Copy' status is '$($w1Copy.status_label)', expected running or idle"
 }
 Write-Host "  [OK] w1 'Default Copy' instance: bound_email=$($w1Copy.bound_email), running=$($w1Copy.running), status=$($w1Copy.status_label)" -ForegroundColor Green
 

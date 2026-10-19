@@ -10,9 +10,7 @@ use super::*;
 
 pub fn format_ping_report() -> String {
     let local_config = supabase_sync::load_config().unwrap_or_default();
-    let machine_name = std::env::var("COMPUTERNAME")
-        .or_else(|_| std::env::var("HOSTNAME"))
-        .unwrap_or_else(|_| email_watcher::detect_machine_name());
+    let machine_name = email_watcher::detect_machine_name();
     let raw_alias = if !local_config.node_alias.trim().is_empty() {
         local_config.node_alias.trim().to_string()
     } else if let Ok(settings) = email_vault_db::get_notification_settings() {
@@ -96,9 +94,7 @@ pub fn format_ping_report() -> String {
 /// Format live observation & status report (Accounts, Workspaces, Running Prompts)
 pub fn format_observe_report() -> String {
     let local_config = supabase_sync::load_config().unwrap_or_default();
-    let machine_name = std::env::var("COMPUTERNAME")
-        .or_else(|_| std::env::var("HOSTNAME"))
-        .unwrap_or_else(|_| email_watcher::detect_machine_name());
+    let machine_name = email_watcher::detect_machine_name();
     let raw_alias = if !local_config.node_alias.trim().is_empty() {
         local_config.node_alias.trim().to_string()
     } else if let Ok(settings) = email_vault_db::get_notification_settings() {
@@ -358,9 +354,7 @@ pub fn format_observe_report() -> String {
 
 /// Format standalone Fleet & Machine Identity report without requiring Supabase
 pub fn format_fleet_identity_report() -> String {
-    let machine_name = std::env::var("COMPUTERNAME")
-        .or_else(|_| std::env::var("HOSTNAME"))
-        .unwrap_or_else(|_| email_watcher::detect_machine_name());
+    let machine_name = email_watcher::detect_machine_name();
     let local_ip = email_watcher::detect_local_ip();
     let ver = git_info::get_app_version();
 
@@ -612,9 +606,7 @@ pub fn format_accounts_report() -> String {
 /// Format dedicated Account & Instance Credit Balance dashboard (/balance, /credits, /quota)
 pub fn format_balance_report(filter_arg: &str) -> String {
     let local_config = supabase_sync::load_config().unwrap_or_default();
-    let machine_name = std::env::var("COMPUTERNAME")
-        .or_else(|_| std::env::var("HOSTNAME"))
-        .unwrap_or_else(|_| email_watcher::detect_machine_name());
+    let machine_name = email_watcher::detect_machine_name();
     let local_ip = email_watcher::detect_local_ip();
     let raw_alias = if !local_config.node_alias.trim().is_empty() {
         local_config.node_alias.trim().to_string()

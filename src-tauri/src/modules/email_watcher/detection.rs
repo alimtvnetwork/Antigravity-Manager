@@ -18,11 +18,43 @@ pub fn detect_local_ip() -> String {
 
 /// Detect local machine hostname or saved custom node name
 pub fn detect_machine_name() -> String {
-    if let Ok(settings) = email_vault_db::get_notification_settings() {
-        if !settings.local_machine_name.trim().is_empty() {
-            return settings.local_machine_name.trim().to_string();
+    let local_ip = detect_local_ip();
+    let has_valid_local_ip = !local_ip.is_empty() && local_ip != "127.0.0.1";
+
+    // 1. Cluster-IP primacy: if local IP matches a configured cluster node, that alias is authoritative
+    if has_valid_local_ip {
+        if let Ok(conns) = crate::modules::ssh_manager::load_ssh_connections() {
+            if let Some(c) = conns
+                .iter()
+                .find(|c| c.ip_address.trim() == local_ip.trim() && !c.alias.trim().is_empty())
+            {
+                return c.alias.trim().to_string();
+            }
+        }
+        for &(alias, ip, _, _) in crate::modules::ssh_manager::GITMAP_CLUSTER_NODES {
+            if ip == local_ip.trim() {
+                return alias.to_string();
+            }
         }
     }
+
+    // 2. Explicit user setting from email_vault_db (ensuring no collision with a different remote node's IP)
+    if let Ok(settings) = email_vault_db::get_notification_settings() {
+        let trimmed_alias = settings.local_machine_name.trim();
+        if !trimmed_alias.is_empty() {
+            let is_remote_conflict = has_valid_local_ip
+                && crate::modules::ssh_manager::GITMAP_CLUSTER_NODES
+                    .iter()
+                    .any(|&(alias, ip, _, _)| {
+                        alias.eq_ignore_ascii_case(trimmed_alias) && ip != local_ip.trim()
+                    });
+            if !is_remote_conflict {
+                return trimmed_alias.to_string();
+            }
+        }
+    }
+
+    // 3. Fallback to OS hostname env vars
     if let Ok(name) = std::env::var("COMPUTERNAME") {
         if !name.trim().is_empty() {
             return name.trim().to_string();

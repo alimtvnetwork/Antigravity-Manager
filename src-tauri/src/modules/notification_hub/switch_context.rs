@@ -172,9 +172,7 @@ pub struct SwitchNotificationDetails {
 
 /// Resolve the current node's physical and instance identity for telemetry broadcasting
 pub fn resolve_current_telemetry_identity() -> (String, String, String, String) {
-    let hostname = std::env::var("COMPUTERNAME")
-        .or_else(|_| std::env::var("HOSTNAME"))
-        .unwrap_or_else(|_| crate::modules::email_watcher::detect_machine_name());
+    let hostname = crate::modules::email_watcher::detect_machine_name();
     let ip = crate::modules::email_watcher::detect_local_ip();
 
     let mut instance_id = DEFAULT_INSTANCE_ID.to_string();
