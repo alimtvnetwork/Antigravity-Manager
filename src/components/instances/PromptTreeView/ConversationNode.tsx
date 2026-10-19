@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Bot, User, Terminal, Wrench, Clock, ChevronRight, ChevronDown } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../../utils/cn';
@@ -48,6 +48,13 @@ export function ConversationNode({
     const [editingTitle, setEditingTitle] = useState(conv.title || '');
     const [selectedTurnNumber, setSelectedTurnNumber] = useState<number | null>(() => conv.selected_turn_number ?? null);
     const [isExpanded, setIsExpanded] = useState<boolean>(() => Boolean(conv.is_running) || isConversationOrTurnQueued(conv));
+    const activeTurnRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        if (isSelected && activeTurnRef.current) {
+            activeTurnRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    }, [isSelected, selectedTurnNumber, isExpanded]);
 
     useEffect(() => {
         if (isSelected) {
@@ -297,6 +304,8 @@ export function ConversationNode({
                         const isLastTurn = tIdx === conv.prompts!.length - 1;
                         const hasImages = turn.media_paths && turn.media_paths.length > 0;
                         const isTurnActive = isSelected && selectedTurnNumber === turn.turn_number;
+                        const isTurnRunning = Boolean(turn.is_running);
+                        const shouldAttachRef = isTurnActive || (selectedTurnNumber === null && isTurnRunning);
                         const createTurnConv = (): AgmConversationNode => ({
                             ...conv,
                             prompt_preview_200w: turn.preview_200w || turn.prompt_text.slice(0, 200),
@@ -311,6 +320,7 @@ export function ConversationNode({
                         return (
                             <div
                                 key={`turn-${turn.step_index}-${turn.turn_number}`}
+                                ref={shouldAttachRef ? activeTurnRef : undefined}
                                 tabIndex={0}
                                 onClick={(e) => {
                                     e.stopPropagation();

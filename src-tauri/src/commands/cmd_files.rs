@@ -31,7 +31,6 @@ fn is_sensitive_path(path: &Path) -> bool {
         "c:\\windows",
         "c:\\program files",
         "c:\\program files (x86)",
-        "c:\\users\\administrator",
         "c:\\pagefile.sys",
     ];
 
@@ -320,5 +319,34 @@ mod prompt_backup_path_tests {
         assert!(res.is_ok());
         let uri = res.unwrap();
         assert!(uri.starts_with("data:image/png;base64,"));
+    }
+
+    #[test]
+    fn test_is_sensitive_path_permits_administrator_user_profile() {
+        use super::is_sensitive_path;
+        use std::path::Path;
+
+        // Administrator user home directory must NOT be blocked
+        assert!(!is_sensitive_path(Path::new(
+            r"C:\Users\Administrator\Pictures\screenshot.png"
+        )));
+        assert!(!is_sensitive_path(Path::new(
+            r"C:\Users\Administrator\.gemini\antigravity\test.json"
+        )));
+        assert!(!is_sensitive_path(Path::new(
+            r"c:\users\administrator\workspace\repo\image.webp"
+        )));
+
+        // Windows and OS critical system directories MUST still be blocked
+        assert!(is_sensitive_path(Path::new(r"C:\Windows\System32\cmd.exe")));
+        assert!(is_sensitive_path(Path::new(
+            r"C:\Program Files\Antigravity\app.exe"
+        )));
+        assert!(is_sensitive_path(Path::new(
+            r"C:\Program Files (x86)\App\binary.dll"
+        )));
+        assert!(is_sensitive_path(Path::new(r"/etc/shadow")));
+        assert!(is_sensitive_path(Path::new(r"/root/.ssh/id_rsa")));
+        assert!(is_sensitive_path(Path::new(r"C:\pagefile.sys")));
     }
 }

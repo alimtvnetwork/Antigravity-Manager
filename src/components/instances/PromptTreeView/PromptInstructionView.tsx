@@ -7,9 +7,9 @@ import { RichMarkdownRenderer } from './markdown';
 import { countWords, formatPromptForMarkdown } from './formatters';
 import { PromptImagePreviewModal } from './PromptImagePreviewModal';
 import { PromptImageContextMenu } from './PromptImageContextMenu';
-import { resolveImageSrc } from './clipboard';
+import { resolveImageSrc, extractLocalPathFromUri } from './clipboard';
 import { useErrorStore } from '../../../stores/error-store';
-import { formatDateOnly } from '../../../utils/date';
+import { formatDateTime, formatDateOnly } from '../../../utils/date';
 
 export interface ExtractedImage {
     src: string;
@@ -117,25 +117,18 @@ function PromptThumbnailCard({ img, repoPath, onPreview, onContextMenu }: Prompt
 
     const handleImgError = async () => {
         const raw = img.src.trim();
-        const isWeb = raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:');
-        if (!isWeb) {
-            let localPath = raw.startsWith('file:///')
-                ? (/^file:\/\/\/[a-zA-Z]:[\\/]/.test(raw) ? raw.slice(8) : raw.slice(7))
-                : raw.startsWith('file://')
-                  ? raw.slice(7)
-                  : raw;
-            if (/^\/[a-zA-Z]:[\\/]/.test(localPath)) {
-                localPath = localPath.slice(1);
-            }
-            try {
-                localPath = decodeURIComponent(localPath);
-            } catch {
-                // Keep raw localPath if decoding fails
-            }
-            if (!/^[a-zA-Z]:[\\/]/.test(localPath) && !localPath.startsWith('/') && !localPath.startsWith('\\\\') && repoPath) {
+        let localPath = extractLocalPathFromUri(raw);
+        if (!localPath && !raw.startsWith('data:') && !raw.startsWith('http://') && !raw.startsWith('https://')) {
+            localPath = raw;
+        }
+
+        if (localPath) {
+            const isAbsolute = /^[a-zA-Z]:[\\/]/.test(localPath) || localPath.startsWith('/') || localPath.startsWith('\\\\');
+            if (!isAbsolute && repoPath && repoPath.trim().length > 0) {
                 const sep = repoPath.includes('/') ? '/' : '\\';
                 localPath = `${repoPath.replace(/[/\\]+$/, '')}${sep}${localPath.replace(/^(\.[/\\]|[/\\])+/, '')}`;
             }
+
             try {
                 const base64Data = await invoke<string>('read_image_as_base64', { path: localPath });
                 if (base64Data && base64Data.startsWith('data:image/')) {
@@ -143,8 +136,11 @@ function PromptThumbnailCard({ img, repoPath, onPreview, onContextMenu }: Prompt
                     setHasFailed(false);
                     return;
                 }
-            } catch {
-                // read_image_as_base64 failed, show placeholder card
+            } catch (err: unknown) {
+                useErrorStore.getState().trackWarning(err, {
+                    source: 'PromptThumbnailCard.handleImgError',
+                    triggerAction: 'read_image_as_base64_fallback',
+                });
             }
         }
         setHasFailed(true);
@@ -356,6 +352,34 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         return { timestampRange: range, durationDisplay: durationStr };
     }, [turns, selectedConversation.last_modified]);
 
+    const inspectedTurnNumber = activeTurnPreview ?? selectedTurnNumber;
+    const inspectedTurn = useMemo(() => {
+        if (inspectedTurnNumber === null) return null;
+        return turns.find((t) => t.turn_number === inspectedTurnNumber) || null;
+    }, [turns, inspectedTurnNumber]);
+
+    const inspectedTurnSent = useMemo(() => {
+        if (!inspectedTurn) return null;
+        const ts = inspectedTurn.created_at || (inspectedTurn.timestamp ? new Date(inspectedTurn.timestamp).getTime() : 0);
+        if (!ts) return null;
+        return formatDateTime(ts);
+    }, [inspectedTurn]);
+
+    const turnElapsed = useMemo(() => {
+        if (!inspectedTurn) return null;
+        if (inspectedTurn.is_running) {
+            const ts = inspectedTurn.created_at || (inspectedTurn.timestamp ? new Date(inspectedTurn.timestamp).getTime() : 0);
+            if (ts) {
+                const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+                if (diffSec < 60) return `${diffSec}s`;
+                if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ${diffSec % 60}s`;
+                return `${Math.floor(diffSec / 3600)}h ${Math.floor((diffSec % 3600) / 60)}m`;
+            }
+            return 'Running';
+        }
+        return inspectedTurn.status || 'COMPLETED';
+    }, [inspectedTurn]);
+
     return (
         <div className="space-y-3">
             {/* Single Prompt Turn View Scope Banner */}
@@ -485,16 +509,25 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                 </span>
                             </div>
                             <div className="p-2 rounded-lg bg-white/80 dark:bg-[#1a1228]/80 border border-slate-200/60 dark:border-[#382352]/60">
-                                <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">Time Range</span>
-                                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 font-mono truncate block">
-                                    {timestampRange}
+                                <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">
+                                    {inspectedTurn ? `Turn T${inspectedTurn.turn_number} Sent` : 'Time Range'}
+                                </span>
+                                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 font-mono truncate block" title={inspectedTurnSent || timestampRange}>
+                                    {inspectedTurnSent || timestampRange}
                                 </span>
                             </div>
                             <div className="p-2 rounded-lg bg-white/80 dark:bg-[#1a1228]/80 border border-slate-200/60 dark:border-[#382352]/60">
-                                <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">Duration</span>
-                                <span className="text-sm font-bold text-slate-800 dark:text-slate-100 font-mono">
-                                    {durationDisplay}
+                                <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">
+                                    {inspectedTurn ? 'Turn Execution' : 'Session Timespan'}
                                 </span>
+                                <span className="text-sm font-bold text-slate-800 dark:text-slate-100 font-mono" title={inspectedTurn ? `Total session span: ${durationDisplay}` : undefined}>
+                                    {inspectedTurn ? turnElapsed : durationDisplay}
+                                </span>
+                                {inspectedTurn && (
+                                    <span className="text-[9px] text-slate-400 block truncate font-mono">
+                                        Session: {durationDisplay}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -645,20 +678,6 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                             onImageClick={handleOpenPreview}
                             onImageContextMenu={handleImageContextMenu}
                         />
-                        {(isTruncated || activePromptText.trim().endsWith('...') || activePromptText.trim().endsWith('…') || showAllWords) && (
-                            <div className="mt-3 pt-2 border-t border-slate-200/50 dark:border-[#40285e]/50 flex items-center">
-                                <span
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setShowAllWords(!showAllWords);
-                                    }}
-                                    title="Click to expand or collapse full prompt text"
-                                    className="cursor-pointer text-xs font-semibold text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1 select-none"
-                                >
-                                    {showAllWords ? 'Collapse full text' : 'Expand full text'}
-                                </span>
-                            </div>
-                        )}
                     </div>
 
                     {/* Truncation & Copy Controls */}
