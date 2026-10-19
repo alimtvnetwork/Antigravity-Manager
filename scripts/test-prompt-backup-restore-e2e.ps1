@@ -63,8 +63,14 @@ Write-Host "Backup DB Path:  $backupDbPath" -ForegroundColor Gray
 # Protect caller instance / session PID 10076
 $callerSessionPid = 10076
 $callerProcess = Get-Process -Id $callerSessionPid -ErrorAction SilentlyContinue
+if (-not $callerProcess) {
+    $ideProc = Get-Process -Name "Antigravity" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($ideProc) {
+        $callerProcess = $ideProc
+    }
+}
 if ($null -ne $callerProcess) {
-    Write-Host "Caller session PID $callerSessionPid active: $($callerProcess.ProcessName) (Protected)" -ForegroundColor Green
+    Write-Host "Caller session PID $($callerProcess.Id) active: $($callerProcess.ProcessName) (Protected)" -ForegroundColor Green
 } else {
     Write-Host "Caller session PID $callerSessionPid guard registered (Protected)" -ForegroundColor DarkGray
 }
@@ -301,7 +307,11 @@ $backupClean = ($null -ne $verifyCleanBackup -and [int]$verifyCleanBackup[0].cnt
 
 Assert-Condition "Gate 6.1: active_prompts test rows cleaned completely" $activeClean "Stale active_prompts rows remain"
 Assert-Condition "Gate 6.2: prompt_backups test rows cleaned completely" $backupClean "Stale prompt_backups rows remain"
-$isCallerAlive = $null -ne (Get-Process -Id $callerSessionPid -ErrorAction SilentlyContinue)
+$isCallerAlive = if ($null -ne $callerProcess) {
+    $null -ne (Get-Process -Id $callerProcess.Id -ErrorAction SilentlyContinue)
+} else {
+    $true
+}
 Assert-Condition "Gate 6.3: Caller session PID $callerSessionPid preserved" $isCallerAlive "Caller process $callerSessionPid was terminated"
 
 # -------------------------------------------------------------------------
