@@ -5,6 +5,7 @@ import { cn } from '../../../utils/cn';
 import type { AgmConversationNode, AgmProjectTreeNode } from './types';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
+import { formatDateTime, formatRelativeTime } from '../../../utils/date';
 
 export interface DetailsModalProps {
     isOpen: boolean;
@@ -314,9 +315,16 @@ export function DetailsModal(props: DetailsModalProps) {
                         </div>
                         <div className="pt-1 border-t border-slate-200/50 dark:border-[#40285e]/50">
                             <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-mono">Last Modified</span>
-                            <span className="font-mono text-[11px] text-slate-700 dark:text-slate-300">
-                                {selectedConversation?.last_modified || 'N/A'}
-                            </span>
+                            <div className="flex flex-col gap-0.5 mt-0.5">
+                                <span className="font-mono text-[11px] font-semibold text-slate-800 dark:text-slate-200">
+                                    {selectedConversation?.last_modified ? formatDateTime(selectedConversation.last_modified) : 'N/A'}
+                                </span>
+                                {selectedConversation?.last_modified && (
+                                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                                        {formatRelativeTime(selectedConversation.last_modified, { prefixRan: true })}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

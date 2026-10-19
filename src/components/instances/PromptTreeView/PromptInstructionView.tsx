@@ -8,6 +8,7 @@ import { PromptImagePreviewModal } from './PromptImagePreviewModal';
 import { PromptImageContextMenu } from './PromptImageContextMenu';
 import { resolveImageSrc } from './clipboard';
 import { useErrorStore } from '../../../stores/error-store';
+import { formatDateTime, formatDateOnly } from '../../../utils/date';
 
 export interface ExtractedImage {
     src: string;
@@ -169,12 +170,18 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
     }, [turns]);
 
     const { timestampRange, durationDisplay } = useMemo(() => {
+        const formatTime24 = (d: Date): string => {
+            const h = String(d.getHours()).padStart(2, '0');
+            const m = String(d.getMinutes()).padStart(2, '0');
+            return `${h}:${m}`;
+        };
+
         if (turns.length === 0) {
             let formatted = 'N/A';
             if (selectedConversation.last_modified) {
                 const d = new Date(selectedConversation.last_modified);
                 if (!isNaN(d.getTime())) {
-                    formatted = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    formatted = `${formatDateOnly(d)} ${formatTime24(d)}`;
                 }
             }
             return { timestampRange: formatted, durationDisplay: 'Single prompt' };
@@ -190,7 +197,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
             if (selectedConversation.last_modified) {
                 const d = new Date(selectedConversation.last_modified);
                 if (!isNaN(d.getTime())) {
-                    formatted = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    formatted = `${formatDateOnly(d)} ${formatTime24(d)}`;
                 }
             }
             return { timestampRange: formatted, durationDisplay: 'Active session' };
@@ -198,10 +205,16 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
 
         const first = new Date(timestamps[0]);
         const last = new Date(timestamps[timestamps.length - 1]);
-        const timeFormat: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
+
+        const isSameDay = first.getFullYear() === last.getFullYear() &&
+                          first.getMonth() === last.getMonth() &&
+                          first.getDate() === last.getDate();
+
         const range = timestamps.length === 1
-            ? first.toLocaleTimeString([], timeFormat)
-            : `${first.toLocaleTimeString([], timeFormat)} → ${last.toLocaleTimeString([], timeFormat)}`;
+            ? `${formatDateOnly(first)} ${formatTime24(first)}`
+            : isSameDay
+                ? `${formatTime24(first)} → ${formatTime24(last)}`
+                : `${formatDateOnly(first)} ${formatTime24(first)} → ${formatDateOnly(last)} ${formatTime24(last)}`;
 
         const diffSeconds = Math.max(0, Math.floor((last.getTime() - first.getTime()) / 1000));
         let durationStr = '';
