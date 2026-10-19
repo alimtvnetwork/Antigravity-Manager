@@ -8,6 +8,7 @@ import {
     FileDown,
     FileJson,
     FileUp,
+    RotateCcw,
     Upload,
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
@@ -22,6 +23,10 @@ export interface ImportExportMenuProps {
     onImportSqlite: () => void;
     /** Import a JSON tree backup (existing handler). */
     onImportJson: () => void;
+    /** Restore prompts from a JSON backup and dispatch to instance. */
+    onRestore?: () => void;
+    /** Export both running and queued prompts combined into a JSON file. */
+    onExportRunningAndQueuedJson?: () => void;
     /** Copy ALL prompts across every project in the tree to the clipboard. */
     onCopyAllTree: () => Promise<void> | void;
     isLoading: boolean;
@@ -39,6 +44,8 @@ export function ImportExportMenu(props: ImportExportMenuProps) {
         onExportJson,
         onImportSqlite,
         onImportJson,
+        onRestore,
+        onExportRunningAndQueuedJson,
         onCopyAllTree,
         isLoading,
     } = props;
@@ -225,6 +232,27 @@ export function ImportExportMenu(props: ImportExportMenuProps) {
                             <span className="text-[10px] text-slate-400 font-mono">.json</span>
                         </button>
 
+                        <button
+                            type="button"
+                            disabled={isLoading}
+                            onClick={() => {
+                                close();
+                                if (onExportRunningAndQueuedJson) {
+                                    onExportRunningAndQueuedJson();
+                                } else {
+                                    void downloadPromptTreeStatusJson('running_and_queued');
+                                }
+                            }}
+                            className={menuItemClass}
+                            title="Download JSON for both running and queued prompts, from the tree already loaded"
+                        >
+                            <div className="flex items-center gap-2">
+                                <FileJson className="w-3.5 h-3.5 text-purple-500" />
+                                <span>Export Running & Queued</span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-mono">.json</span>
+                        </button>
+
                         <div className="border-t border-slate-100 dark:border-[#40285e]/60 my-1" />
                         <div className="px-2.5 pt-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
                             Import
@@ -262,6 +290,28 @@ export function ImportExportMenu(props: ImportExportMenuProps) {
                             <div className="flex items-center gap-2">
                                 <Upload className="w-3.5 h-3.5 text-teal-500" />
                                 <span>Import Tree from JSON</span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-mono">.json</span>
+                        </button>
+
+                        {/* Restore Prompts from Backup */}
+                        <button
+                            type="button"
+                            disabled={isLoading}
+                            onClick={() => {
+                                close();
+                                if (onRestore) {
+                                    onRestore();
+                                } else {
+                                    onImportJson();
+                                }
+                            }}
+                            className={menuItemClass}
+                            title="Restore prompts from a backup file and resume dispatch to instance"
+                        >
+                            <div className="flex items-center gap-2">
+                                <RotateCcw className="w-3.5 h-3.5 text-emerald-500" />
+                                <span>Restore Prompts from Backup</span>
                             </div>
                             <span className="text-[10px] text-slate-400 font-mono">.json</span>
                         </button>

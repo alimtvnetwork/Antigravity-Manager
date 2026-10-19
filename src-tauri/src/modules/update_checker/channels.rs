@@ -270,8 +270,7 @@ async fn check_updater_json_channel(channel: UpdateChannel) -> Result<UpdateInfo
     let current_version = CURRENT_VERSION.to_string();
     let is_newer = compare_versions(&latest_version, &current_version);
     let has_asset = if is_newer {
-        has_platform_asset_in_updater_json(&updater_info.platforms)
-            || verify_tag_has_platform_asset(&latest_version).await
+        verify_tag_has_platform_asset(&latest_version).await
     } else {
         false
     };

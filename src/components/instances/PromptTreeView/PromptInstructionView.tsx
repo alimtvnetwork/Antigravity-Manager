@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
-import { Check, RotateCcw, ChevronUp, ChevronDown, Clock } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Check, RotateCcw, ChevronUp, ChevronDown, Clock, Image as LucideImage } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../../utils/cn';
 import { PromptViewMode, type AgmConversationNode, type AgmProjectTreeNode, type ViewMode } from './types';
 import { RichMarkdownRenderer } from './markdown';
@@ -52,6 +53,86 @@ function extractImagesFromPrompt(
     }
 
     return list;
+}
+
+interface PromptThumbnailCardProps {
+    img: ExtractedImage;
+    repoPath?: string;
+    onPreview: (src: string, alt?: string) => void;
+    onContextMenu: (e: React.MouseEvent, src: string, alt?: string, rawSrc?: string) => void;
+}
+
+function PromptThumbnailCard({ img, repoPath, onPreview, onContextMenu }: PromptThumbnailCardProps) {
+    const [resolvedSrc, setResolvedSrc] = useState<string>(() => resolveImageSrc(img.src, repoPath));
+    const [hasFailed, setHasFailed] = useState(false);
+
+    useEffect(() => {
+        setResolvedSrc(resolveImageSrc(img.src, repoPath));
+        setHasFailed(false);
+    }, [img.src, repoPath]);
+
+    const handleImgError = async () => {
+        const raw = img.src.trim();
+        const isWeb = raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:');
+        if (!isWeb) {
+            let localPath = raw.startsWith('file:///')
+                ? raw.slice(7)
+                : raw.startsWith('file://')
+                  ? raw.slice(7)
+                  : raw;
+            if (/^\/[a-zA-Z]:[\\/]/.test(localPath)) {
+                localPath = localPath.slice(1);
+            }
+            try {
+                localPath = decodeURIComponent(localPath);
+            } catch {
+                // Keep raw localPath if decoding fails
+            }
+            if (!/^[a-zA-Z]:[\\/]/.test(localPath) && !localPath.startsWith('/') && !localPath.startsWith('\\\\') && repoPath) {
+                const sep = repoPath.includes('/') ? '/' : '\\';
+                localPath = `${repoPath.replace(/[/\\]+$/, '')}${sep}${localPath.replace(/^[./\\]+/, '')}`;
+            }
+            try {
+                const base64Data = await invoke<string>('read_image_as_base64', { path: localPath });
+                if (base64Data && base64Data.startsWith('data:image/')) {
+                    setResolvedSrc(base64Data);
+                    setHasFailed(false);
+                    return;
+                }
+            } catch {
+                // read_image_as_base64 failed, show placeholder card
+            }
+        }
+        setHasFailed(true);
+    };
+
+    return (
+        <div
+            className="relative group shrink-0"
+            onClick={() => onPreview(resolvedSrc, img.alt)}
+            onContextMenu={(e) => onContextMenu(e, resolvedSrc, img.alt, img.src)}
+        >
+            {!hasFailed ? (
+                <img
+                    src={resolvedSrc}
+                    alt={img.alt}
+                    onError={handleImgError}
+                    className="h-16 w-24 object-cover rounded-md border border-slate-200 dark:border-[#40285e] hover:border-blue-500 dark:hover:border-blue-400 cursor-pointer shadow-2xs transition-all hover:scale-102 bg-slate-100 dark:bg-[#090611]"
+                />
+            ) : (
+                <div
+                    className="h-16 w-24 flex flex-col items-center justify-center rounded-md border border-dashed border-amber-500/40 bg-amber-500/5 text-amber-600 dark:text-amber-400 p-1 text-center cursor-pointer shadow-2xs hover:border-amber-500 transition-all hover:scale-102"
+                    title={`Image: ${img.src} (Click to preview · Right-click for options)`}
+                >
+                    <LucideImage className="w-5 h-5 mb-0.5 opacity-70" />
+                    <span className="text-[9px] font-mono truncate w-full px-0.5">{img.alt || 'Attached Image'}</span>
+                </div>
+            )}
+            <div className="absolute bottom-0 inset-x-0 bg-black/60 text-[9px] text-white truncate px-1 py-0.5 rounded-b-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                {img.alt}
+            </div>
+        </div>
+    );
 }
 
 export interface PromptInstructionViewProps {
@@ -493,24 +574,13 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                     </div>
                     <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5">
                         {attachedImages.map((img, idx) => (
-                            <div
+                            <PromptThumbnailCard
                                 key={`img-strip-${idx}`}
-                                className="relative group shrink-0"
-                            >
-                                <img
-                                    src={resolveImageSrc(img.src)}
-                                    alt={img.alt}
-                                    onClick={() => handleOpenPreview(resolveImageSrc(img.src), img.alt)}
-                                    onContextMenu={(e) => handleImageContextMenu(e, resolveImageSrc(img.src), img.alt, img.src)}
-                                    className="h-16 w-24 object-cover rounded-md border border-slate-200 dark:border-[#40285e] hover:border-blue-500 dark:hover:border-blue-400 cursor-pointer shadow-2xs transition-all hover:scale-102 bg-slate-100 dark:bg-[#090611]"
-                                    onError={(e) => {
-                                        (e.target as HTMLElement).style.display = 'none';
-                                    }}
-                                />
-                                <div className="absolute bottom-0 inset-x-0 bg-black/60 text-[9px] text-white truncate px-1 py-0.5 rounded-b-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                                    {img.alt}
-                                </div>
-                            </div>
+                                img={img}
+                                repoPath={selectedProject?.repo_path}
+                                onPreview={handleOpenPreview}
+                                onContextMenu={handleImageContextMenu}
+                            />
                         ))}
                     </div>
                 </div>
@@ -699,7 +769,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                 imageSrc={contextMenu.imageSrc}
                 altText={contextMenu.altText}
                 rawPath={contextMenu.rawPath}
-                allImages={attachedImages.map((img) => resolveImageSrc(img.src))}
+                allImages={attachedImages.map((img) => resolveImageSrc(img.src, selectedProject?.repo_path))}
                 onClose={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}
                 onOpenPreview={handleOpenPreview}
             />

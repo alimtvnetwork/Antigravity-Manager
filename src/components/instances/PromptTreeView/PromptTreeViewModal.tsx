@@ -638,6 +638,16 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
 
     const modalContent = (
         <div
+            onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                    onClose();
+                }
+            }}
+            onDoubleClick={(e) => {
+                if (e.target === e.currentTarget) {
+                    onClose();
+                }
+            }}
             className={`fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 ${isFullscreen ? "p-0" : "p-4 sm:p-6"}`}
         >
             {/* Draggable Top Region */}

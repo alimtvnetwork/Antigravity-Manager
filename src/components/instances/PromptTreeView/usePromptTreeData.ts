@@ -122,6 +122,36 @@ function sortByLastModifiedDesc(convs: AgmConversationNode[]): AgmConversationNo
     });
 }
 
+/**
+ * Resolves the appropriate prompt text for a conversation node, respecting an explicitly
+ * selected turn, any running turn, or falling back to the last turn with substantial text.
+ */
+export function resolveConversationPromptText(
+    conv: AgmConversationNode,
+    selectedTurnNumber?: number | null
+): string {
+    let text = conv.full_prompt_text || conv.prompt_preview_200w || '';
+    if (conv.prompts && conv.prompts.length > 0) {
+        if (typeof selectedTurnNumber === 'number') {
+            const matchedTurn = conv.prompts.find((p) => p.turn_number === selectedTurnNumber);
+            if (matchedTurn?.prompt_text) {
+                return matchedTurn.prompt_text;
+            }
+        }
+        const runningTurn = conv.prompts.find((p) => p.is_running && p.prompt_text && p.prompt_text.trim());
+        if (runningTurn?.prompt_text) {
+            return runningTurn.prompt_text;
+        }
+        const lastTurnWithText = [...conv.prompts]
+            .reverse()
+            .find((p) => p.prompt_text && p.prompt_text.trim().length > text.trim().length);
+        if (lastTurnWithText?.prompt_text) {
+            return lastTurnWithText.prompt_text;
+        }
+    }
+    return text;
+}
+
 export function usePromptTreeData({
     state,
     instanceId,
@@ -160,27 +190,7 @@ export function usePromptTreeData({
         (conv: AgmConversationNode, project: AgmProjectTreeNode) => {
             setSelectedProject(project);
             setSelectedConversation(conv);
-            let text = conv.full_prompt_text || conv.prompt_preview_200w || '';
-            if (conv.prompts && conv.prompts.length > 0) {
-                if (typeof conv.selected_turn_number === 'number') {
-                    const matchedTurn = conv.prompts.find((p) => p.turn_number === conv.selected_turn_number);
-                    if (matchedTurn?.prompt_text) {
-                        text = matchedTurn.prompt_text;
-                    }
-                } else {
-                    const runningTurn = conv.prompts.find((p) => p.is_running && p.prompt_text && p.prompt_text.trim());
-                    if (runningTurn?.prompt_text) {
-                        text = runningTurn.prompt_text;
-                    } else {
-                        const lastTurnWithText = [...conv.prompts]
-                            .reverse()
-                            .find((p) => p.prompt_text && p.prompt_text.trim().length > text.trim().length);
-                        if (lastTurnWithText?.prompt_text) {
-                            text = lastTurnWithText.prompt_text;
-                        }
-                    }
-                }
-            }
+            const text = resolveConversationPromptText(conv, conv.selected_turn_number);
             setActivePromptText(text);
             setEditedPromptText(text);
             setShowAllWords(false);
@@ -408,11 +418,38 @@ export function usePromptTreeData({
                                 (c) => c.conversation_id === currentConv.conversation_id
                             );
                             if (updatedConv) {
-                                setSelectedConversation(updatedConv);
-                                const freshText = updatedConv.full_prompt_text || updatedConv.prompt_preview_200w || '';
-                                setActivePromptText(freshText);
-                                // Do not clobber user's dirty textarea edits
-                                setEditedPromptText((prev) => (prev === currentActiveText ? freshText : prev));
+                                if (typeof currentConv.selected_turn_number === 'number') {
+                                    const matchingTurn = updatedConv.prompts?.find(
+                                        (t) => t.turn_number === currentConv.selected_turn_number
+                                    );
+                                    if (matchingTurn) {
+                                        const turnConv: AgmConversationNode = {
+                                            ...updatedConv,
+                                            prompt_preview_200w: matchingTurn.preview_200w || matchingTurn.prompt_text.slice(0, 200),
+                                            full_prompt_text: matchingTurn.prompt_text,
+                                            latest_step_summary: `Turn ${matchingTurn.turn_number} · ${matchingTurn.status}`,
+                                            is_running: matchingTurn.is_running,
+                                            is_queued: matchingTurn.is_queued,
+                                            status: matchingTurn.status,
+                                            selected_turn_number: matchingTurn.turn_number,
+                                        };
+                                        setSelectedConversation(turnConv);
+                                        const freshText = matchingTurn.prompt_text || '';
+                                        setActivePromptText(freshText);
+                                        setEditedPromptText((prev) => (prev === currentActiveText ? freshText : prev));
+                                    } else {
+                                        const freshText = resolveConversationPromptText(updatedConv, null);
+                                        setSelectedConversation(updatedConv);
+                                        setActivePromptText(freshText);
+                                        setEditedPromptText((prev) => (prev === currentActiveText ? freshText : prev));
+                                    }
+                                } else {
+                                    const freshText = resolveConversationPromptText(updatedConv, null);
+                                    setSelectedConversation(updatedConv);
+                                    setActivePromptText(freshText);
+                                    // Do not clobber user's dirty textarea edits
+                                    setEditedPromptText((prev) => (prev === currentActiveText ? freshText : prev));
+                                }
                             }
                         }
                     }

@@ -115,6 +115,7 @@ export function ModalHeader(props: ModalHeaderProps) {
                         onExportJson={onBackup}
                         onImportSqlite={onImportSqlite}
                         onImportJson={onRestore}
+                        onRestore={onRestore}
                         onCopyAllTree={onCopyAllTreePrompts}
                         isLoading={isLoading}
                     />

@@ -46,8 +46,16 @@ export function ConversationNode({
 }: ConversationNodeProps) {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editingTitle, setEditingTitle] = useState(conv.title || '');
-    const [selectedTurnNumber, setSelectedTurnNumber] = useState<number | null>(null);
+    const [selectedTurnNumber, setSelectedTurnNumber] = useState<number | null>(() => conv.selected_turn_number ?? null);
     const [isExpanded, setIsExpanded] = useState<boolean>(() => Boolean(conv.is_running) || isConversationOrTurnQueued(conv));
+
+    useEffect(() => {
+        if (isSelected) {
+            setSelectedTurnNumber(typeof conv.selected_turn_number === 'number' ? conv.selected_turn_number : null);
+        } else {
+            setSelectedTurnNumber(null);
+        }
+    }, [isSelected, conv.selected_turn_number]);
 
     useEffect(() => {
         if (Boolean(conv.is_running) || isConversationOrTurnQueued(conv)) {

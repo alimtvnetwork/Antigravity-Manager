@@ -24,6 +24,7 @@ import {
     exportConversationAsYaml,
     exportConversationAsSqlite,
 } from './usePromptTreePromptActions';
+import { copyPromptWithRichImages } from './clipboard';
 import { stripImagesFromPrompt } from './formatters';
 
 export type TreeContextMenuType = 'project' | 'conversation' | 'turn';
@@ -163,7 +164,19 @@ export function PromptTreeContextMenu(props: PromptTreeContextMenuProps) {
         e.stopPropagation();
         const text = conversationNode?.full_prompt_text || conversationNode?.prompt_preview_200w || currentTitle;
         if (!text) return;
-        await copyToClipboard(text);
+        const mediaPaths: string[] = [];
+        if (conversationNode?.prompts) {
+            for (const t of conversationNode.prompts) {
+                if (t.media_paths) {
+                    for (const p of t.media_paths) {
+                        if (p && !mediaPaths.includes(p)) {
+                            mediaPaths.push(p);
+                        }
+                    }
+                }
+            }
+        }
+        await copyPromptWithRichImages(text, undefined, undefined, mediaPaths.length > 0 ? mediaPaths : undefined);
         setIsPromptCopied(true);
         setTimeout(() => onClose(), 400);
     };

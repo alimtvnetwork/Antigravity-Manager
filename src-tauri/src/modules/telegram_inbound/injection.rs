@@ -232,6 +232,7 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
 
     let prompt_id = format!("p-{}", &uuid::Uuid::new_v4().to_string()[..8]);
     let resolved_prompt = wrap_telegram_prompt(&prompt_text);
+    let (extracted_img, _img_paths) = repo_db::extract_image_payload_or_path(&prompt_text);
     let active_prompt = repo_db::ActivePrompt {
         id: prompt_id.clone(),
         project_id: final_proj_id.clone(),
@@ -243,7 +244,7 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
         status: "running".to_string(),
         created_at: Utc::now().timestamp(),
         updated_at: Utc::now().timestamp(),
-        image_payload: None,
+        image_payload: extracted_img,
     };
 
     if let Err(e) = repo_db::save_or_requeue_prompt(&active_prompt) {

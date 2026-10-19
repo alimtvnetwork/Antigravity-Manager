@@ -25,6 +25,7 @@ export interface PromptTreeCoreActions {
     handleImportSqlite: () => Promise<void>;
     handleExportRunningJson: () => Promise<void>;
     handleExportQueuedJson: () => Promise<void>;
+    handleExportRunningAndQueuedJson: () => Promise<void>;
     handleResendQueued: () => Promise<void>;
     isResendingQueued: boolean;
 
@@ -69,7 +70,7 @@ interface ResendQueuedOutcome {
     failures: string[];
 }
 
-export type PromptTreeStatusExport = 'running' | 'queued';
+export type PromptTreeStatusExport = 'running' | 'queued' | 'running_and_queued';
 
 interface LoadedPromptTreeBinding {
     tree: AgmProjectTreeNode[];
@@ -96,8 +97,10 @@ function conversationMatchesStatus(
     const status = (conv.status || '').toLowerCase();
     const running = Boolean(conv.is_running) || status === 'running' || status.includes('running');
     if (kind === 'running') return running;
-    const queued = Boolean(conv.is_queued) || status === 'queued' || status.includes('queue');
-    return queued && !running;
+    const queued = (Boolean(conv.is_queued) || status === 'queued' || status.includes('queue')) && !running;
+    if (kind === 'queued') return queued;
+    if (kind === 'running_and_queued') return running || queued;
+    return false;
 }
 
 function collectStatusPrompts(
@@ -143,6 +146,7 @@ function downloadJsonBlob(fileName: string, json: string): void {
 export async function downloadPromptTreeStatusJson(kind: PromptTreeStatusExport): Promise<void> {
     const projects = collectStatusPrompts(loadedPromptTree.tree, kind);
     const promptCount = projects.reduce((sum, project) => sum + project.conversations.length, 0);
+    const label = kind === 'running_and_queued' ? 'running & queued' : kind;
     const payload = {
         version: '1.0',
         filter: kind,
@@ -152,12 +156,13 @@ export async function downloadPromptTreeStatusJson(kind: PromptTreeStatusExport)
         projects,
     };
     const jsonStr = JSON.stringify(payload, null, 2);
-    const fileName = `prompts-${kind}-${Date.now()}.json`;
+    const fileSlug = kind === 'running_and_queued' ? 'running-and-queued' : kind;
+    const fileName = `prompts-${fileSlug}-${Date.now()}.json`;
     try {
-        loadedPromptTree.notify(`Exporting ${kind} prompts...`);
+        loadedPromptTree.notify(`Exporting ${label} prompts...`);
         if (!isTauri()) {
             downloadJsonBlob(fileName, jsonStr);
-            loadedPromptTree.notify(`Exported ${promptCount} ${kind} prompt(s) as JSON.`);
+            loadedPromptTree.notify(`Exported ${promptCount} ${label} prompt(s) as JSON.`);
             window.setTimeout(() => loadedPromptTree.notify(null), 3000);
             return;
         }
@@ -171,7 +176,7 @@ export async function downloadPromptTreeStatusJson(kind: PromptTreeStatusExport)
             return;
         }
         await invoke('write_prompt_backup_file', { path: selected, content: jsonStr });
-        loadedPromptTree.notify(`Exported ${promptCount} ${kind} prompt(s) to ${selected}`);
+        loadedPromptTree.notify(`Exported ${promptCount} ${label} prompt(s) to ${selected}`);
         window.setTimeout(() => loadedPromptTree.notify(null), 4000);
     } catch (err: unknown) {
         useErrorStore.getState().captureError(err, {
@@ -403,11 +408,18 @@ export function usePromptTreeCoreActions({
             JSON.parse(content);
             setActionMsg('Importing prompts backup...');
             const restoredCount = await invoke<number>('restore_prompts_backup', { backupJson: content });
+            
+            const targetInst = instanceId || 'default';
+            for (let remaining = 3; remaining > 0; remaining--) {
+                setActionMsg(`⏳ Waiting time: ${remaining}s remaining · Next action: Resume and dispatch restored prompt(s) to instance ${targetInst}`);
+                await new Promise((r) => setTimeout(r, 1000));
+            }
+
             let dispatched = 0;
             let dispatchError = '';
             try {
                 dispatched = await invoke<number>('dispatch_backed_up_prompts', {
-                    instanceId: instanceId || 'default',
+                    instanceId: targetInst,
                 });
             } catch (err: unknown) {
                 dispatchError = err instanceof Error ? err.message : String(err);
@@ -418,7 +430,7 @@ export function usePromptTreeCoreActions({
             }
             const dispatchNote = dispatchError
                 ? ` Import saved ${restoredCount} prompt(s), but sending them failed: ${dispatchError}`
-                : ` Restored ${restoredCount} prompt(s) and sent ${dispatched} to the instance.`;
+                : ` Restored ${restoredCount} prompt(s) and sent ${dispatched} to instance ${targetInst}.`;
             setActionMsg(dispatchNote.trim());
             await loadTree(true, true);
             setTimeout(() => setActionMsg(null), 5000);
@@ -770,6 +782,10 @@ export function usePromptTreeCoreActions({
         await downloadPromptTreeStatusJson('queued');
     }, []);
 
+    const handleExportRunningAndQueuedJson = useCallback(async () => {
+        await downloadPromptTreeStatusJson('running_and_queued');
+    }, []);
+
     const [isResendingQueued, setIsResendingQueued] = useState(false);
 
     /**
@@ -997,6 +1013,7 @@ export function usePromptTreeCoreActions({
         handleImportSqlite,
         handleExportRunningJson,
         handleExportQueuedJson,
+        handleExportRunningAndQueuedJson,
         handleResendQueued,
         isResendingQueued,
         isExportModalOpen,

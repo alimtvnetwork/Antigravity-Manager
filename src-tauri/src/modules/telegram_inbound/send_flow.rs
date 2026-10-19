@@ -1195,9 +1195,14 @@ async fn dispatch_send_prompt(
 /// Consume a plain-text message for the `/send` flow when a destination is
 /// pending for this chat. Returns `None` for commands, empty text, and when
 /// no flow is waiting for typed input — those fall through to normal routing.
-pub async fn consume_send_prompt(_token: &str, chat_id: i64, text: &str) -> Option<SendDispatch> {
+pub async fn consume_send_prompt(
+    _token: &str,
+    chat_id: i64,
+    text: &str,
+    saved_media_opt: &Option<(std::path::PathBuf, Option<String>)>,
+) -> Option<SendDispatch> {
     let trimmed = text.trim();
-    if trimmed.is_empty() || trimmed.starts_with('/') {
+    if (trimmed.is_empty() && saved_media_opt.is_none()) || trimmed.starts_with('/') {
         return None;
     }
     // Scope the lock: extract what the await needs, then drop the guard
@@ -1303,7 +1308,17 @@ pub async fn consume_send_prompt(_token: &str, chat_id: i64, text: &str) -> Opti
             machine,
             instance,
             conversation,
-        } => Some(dispatch_send_prompt(&machine, &instance, &conversation, trimmed).await),
+        } => {
+            let prompt_text = match (trimmed.is_empty(), saved_media_opt) {
+                (false, Some((path, _))) => {
+                    format!("{}\n\n![Attached Image]({})", trimmed, path.display())
+                }
+                (true, Some((path, _))) => format!("![Attached Image]({})", path.display()),
+                (false, None) => trimmed.to_string(),
+                (true, None) => return None,
+            };
+            Some(dispatch_send_prompt(&machine, &instance, &conversation, &prompt_text).await)
+        }
     }
 }
 

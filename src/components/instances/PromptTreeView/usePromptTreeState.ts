@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import type { SyncInterval } from '../../../services/instanceService';
 import { getPromptTreeSyncInterval } from '../../../services/instanceService';
 import { getArchivedProjectsForInstance } from '../../../services/instanceService';
@@ -28,6 +28,8 @@ export interface PromptTreeState {
     setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
     activeFilter: 'all' | 'running' | 'queued' | 'latest_conv' | 'latest_prompt' | 'pinned' | 'archived';
     setActiveFilter: React.Dispatch<React.SetStateAction<'all' | 'running' | 'queued' | 'latest_conv' | 'latest_prompt' | 'pinned' | 'archived'>>;
+    selectedFilter: 'all' | 'running' | 'queued' | 'latest_conv' | 'latest_prompt' | 'pinned' | 'archived';
+    setSelectedFilter: React.Dispatch<React.SetStateAction<'all' | 'running' | 'queued' | 'latest_conv' | 'latest_prompt' | 'pinned' | 'archived'>>;
     categoryFilter: 'all' | 'user' | 'subagent' | 'system';
     setCategoryFilter: React.Dispatch<React.SetStateAction<'all' | 'user' | 'subagent' | 'system'>>;
     restoreFileInputRef: React.RefObject<HTMLInputElement | null>;
@@ -55,6 +57,13 @@ export interface PromptTreeState {
     setSelectedProjectScope: React.Dispatch<React.SetStateAction<string>>;
     isDetailsModalOpen: boolean;
     setIsDetailsModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    isDetailsOpen: boolean;
+    setIsDetailsOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    setIsExpandedFull: React.Dispatch<React.SetStateAction<boolean>>;
+    activeTab: 'instruction' | 'results';
+    setActiveTab: React.Dispatch<React.SetStateAction<'instruction' | 'results'>>;
+    isRerunMenuOpen: boolean;
+    setIsRerunMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
     isFocusing: boolean;
     setIsFocusing: React.Dispatch<React.SetStateAction<boolean>>;
     copiedField: string | null;
@@ -116,8 +125,17 @@ export function usePromptTreeState(instanceId: string): PromptTreeState {
     const [isAutoSyncing, setIsAutoSyncing] = useState(false);
     const [syncInterval, setSyncInterval] = useState<SyncInterval>(() => getPromptTreeSyncInterval());
     const [error, setError] = useState<string | null>(null);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [activeFilter, setActiveFilter] = useState<'all' | 'running' | 'queued' | 'latest_conv' | 'latest_prompt' | 'pinned' | 'archived'>('all');
+    const [searchQuery, _setSearchQuery] = useState('');
+    const setSearchQuery = useCallback((val: React.SetStateAction<string>) => {
+        _setSearchQuery(val);
+    }, []);
+
+    const [activeFilter, _setActiveFilter] = useState<'all' | 'running' | 'queued' | 'latest_conv' | 'latest_prompt' | 'pinned' | 'archived'>('all');
+    const setActiveFilter = useCallback((val: React.SetStateAction<'all' | 'running' | 'queued' | 'latest_conv' | 'latest_prompt' | 'pinned' | 'archived'>) => {
+        _setActiveFilter(val);
+    }, []);
+    const setSelectedFilter = setActiveFilter;
+
     const [categoryFilter, setCategoryFilter] = useState<'all' | 'user' | 'subagent' | 'system'>('all');
     const [isTreeCollapsed, setIsTreeCollapsed] = useState<boolean>(true);
     const [isAutomatedHidden, setIsAutomatedHidden] = useState<boolean>(true);
@@ -149,7 +167,12 @@ export function usePromptTreeState(instanceId: string): PromptTreeState {
     const [isCopiedRaw, setIsCopiedRaw] = useState(false);
 
     const [selectedProjectScope, setSelectedProjectScope] = useState<string>('all');
-    const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+    const [isDetailsModalOpen, _setIsDetailsModalOpen] = useState(false);
+    const setIsDetailsModalOpen = useCallback((val: React.SetStateAction<boolean>) => {
+        _setIsDetailsModalOpen(val);
+    }, []);
+    const setIsDetailsOpen = setIsDetailsModalOpen;
+
     const [isFocusing, setIsFocusing] = useState(false);
     const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -168,7 +191,7 @@ export function usePromptTreeState(instanceId: string): PromptTreeState {
             return false;
         }
     });
-    const setShowAllWords: React.Dispatch<React.SetStateAction<boolean>> = (val) => {
+    const setShowAllWords: React.Dispatch<React.SetStateAction<boolean>> = useCallback((val) => {
         _setShowAllWords((prev) => {
             const next = typeof val === 'function' ? val(prev) : val;
             try {
@@ -176,8 +199,15 @@ export function usePromptTreeState(instanceId: string): PromptTreeState {
             } catch {}
             return next;
         });
-    };
-    const [previewTab, setPreviewTab] = useState<'instruction' | 'results'>('instruction');
+    }, []);
+    const setIsExpandedFull = setShowAllWords;
+
+    const [previewTab, _setPreviewTab] = useState<'instruction' | 'results'>('instruction');
+    const setPreviewTab = useCallback((val: React.SetStateAction<'instruction' | 'results'>) => {
+        _setPreviewTab(val);
+    }, []);
+    const setActiveTab = setPreviewTab;
+
     const [isCopiedResults, setIsCopiedResults] = useState(false);
 
     const [isCopied, setIsCopied] = useState(false);
@@ -187,41 +217,59 @@ export function usePromptTreeState(instanceId: string): PromptTreeState {
     const [isCopyMenuOpen, _setIsCopyMenuOpen] = useState(false);
     const [isSendMenuOpen, _setIsSendMenuOpen] = useState(false);
     const [isEnqueueMenuOpen, _setIsEnqueueMenuOpen] = useState(false);
+    const [isRerunMenuOpen, _setIsRerunMenuOpen] = useState(false);
     const [actionMsg, setActionMsg] = useState<string | null>(null);
 
-    // Single-active menu invariant: opening one menu closes the other two
-    const setIsCopyMenuOpen: React.Dispatch<React.SetStateAction<boolean>> = (val) => {
+    // Single-active menu invariant: opening one menu closes the other menus
+    const setIsCopyMenuOpen: React.Dispatch<React.SetStateAction<boolean>> = useCallback((val) => {
         _setIsCopyMenuOpen((prev) => {
             const next = typeof val === 'function' ? val(prev) : val;
             if (next) {
                 _setIsSendMenuOpen(false);
                 _setIsEnqueueMenuOpen(false);
+                _setIsRerunMenuOpen(false);
             }
             return next;
         });
-    };
+    }, []);
 
-    const setIsSendMenuOpen: React.Dispatch<React.SetStateAction<boolean>> = (val) => {
+    const setIsSendMenuOpen: React.Dispatch<React.SetStateAction<boolean>> = useCallback((val) => {
         _setIsSendMenuOpen((prev) => {
             const next = typeof val === 'function' ? val(prev) : val;
             if (next) {
                 _setIsCopyMenuOpen(false);
                 _setIsEnqueueMenuOpen(false);
+                _setIsRerunMenuOpen(false);
             }
             return next;
         });
-    };
+    }, []);
 
-    const setIsEnqueueMenuOpen: React.Dispatch<React.SetStateAction<boolean>> = (val) => {
+    const setIsEnqueueMenuOpen: React.Dispatch<React.SetStateAction<boolean>> = useCallback((val) => {
         _setIsEnqueueMenuOpen((prev) => {
             const next = typeof val === 'function' ? val(prev) : val;
             if (next) {
                 _setIsCopyMenuOpen(false);
                 _setIsSendMenuOpen(false);
+                _setIsRerunMenuOpen(false);
             }
             return next;
         });
-    };
+    }, []);
+
+    const setIsRerunMenuOpen: React.Dispatch<React.SetStateAction<boolean>> = useCallback((val) => {
+        _setIsRerunMenuOpen((prev) => {
+            const next = typeof val === 'function' ? val(prev) : val;
+            if (next) {
+                _setIsCopyMenuOpen(false);
+                _setIsSendMenuOpen(false);
+                _setIsEnqueueMenuOpen(false);
+            }
+            return next;
+        });
+    }, []);
+
+    const setIsExportMenuOpen = setIsCopyMenuOpen;
 
     // Live refs to prevent closure staleness in background auto-sync timer
     const selectedConversationRef = useRef(selectedConversation);

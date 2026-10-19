@@ -134,7 +134,9 @@ async fn deliver_ui_or_command(
 ) -> Option<String> {
     // `/send` two-step flow: once the destination is locked, the next plain-text
     // message is the prompt. Commands (leading `/`) always pass through.
-    if let Some(send) = super::send_flow::consume_send_prompt(token, chat_id, text_raw).await {
+    if let Some(send) =
+        super::send_flow::consume_send_prompt(token, chat_id, text_raw, saved_media_opt).await
+    {
         // Justification: the send-flow reply is already computed; a Telegram
         // send failure is logged and does not change the dispatched prompt.
         crate::error::record_ignored(
