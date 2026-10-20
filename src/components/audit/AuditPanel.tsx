@@ -11,12 +11,15 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
     AlertTriangle,
+    ArrowRight,
     Bot,
     Check,
     ChevronDown,
     Copy,
     FileJson,
     FileText,
+    Layers,
+    MousePointerClick,
     RefreshCw,
     Terminal,
     Trash2,
@@ -155,7 +158,11 @@ const METHOD_LABELS: Record<string, string> = {
     'quota-milestone-node': 'Quota Milestone Node',
 };
 
-function humanMethodLabel(methodName: string, uiName?: unknown): string {
+function humanMethodLabel(methodName: string, params: Record<string, unknown> = {}): string {
+    if (typeof params.cleanMethodLabel === 'string' && params.cleanMethodLabel) {
+        return params.cleanMethodLabel;
+    }
+    const uiName = params.uiName;
     if (typeof uiName === 'string' && uiName) {
         if (METHOD_LABELS[uiName]) return METHOD_LABELS[uiName];
         return uiName
@@ -166,9 +173,45 @@ function humanMethodLabel(methodName: string, uiName?: unknown): string {
     if (METHOD_LABELS[methodName]) {
         return METHOD_LABELS[methodName];
     }
+    if (methodName.startsWith('scroll:')) {
+        const route = methodName.slice(7) || '/';
+        return `Scroll: ${route} Page`;
+    }
     if (methodName.startsWith('click:')) {
         const sub = methodName.slice(6);
         if (METHOD_LABELS[sub]) return `Click: ${METHOD_LABELS[sub]}`;
+
+        // Match structured targets
+        const btnMatch = sub.match(/^button\("(.+)"\)$/);
+        if (btnMatch) return `Click: "${btnMatch[1]}" Button`;
+
+        const instMatch = sub.match(/^instance-card\("(.+)"\)$/);
+        if (instMatch) return `Click: Instance "${instMatch[1]}"`;
+
+        const projMatch = sub.match(/^project\("(.+)"\)$/);
+        if (projMatch) return `Click: Project "${projMatch[1]}"`;
+
+        const quoteMatch = sub.match(/^"(.+)"$/);
+        if (quoteMatch) return `Click: "${quoteMatch[1]}"`;
+
+        // Clean up legacy class names like div.grid, div.group, span.truncate, Button.P 1.5
+        if (sub === 'div.grid' || sub === 'instances-grid-area') {
+            return 'Click: Instances Grid Area';
+        }
+        if (sub === 'div.group') {
+            const containerName = typeof params.container === 'string' ? params.container : 'Instance Card';
+            const textSnippet = typeof params.textSnippet === 'string' ? `"${params.textSnippet}"` : '';
+            return `Click: ${containerName} ${textSnippet}`.trim();
+        }
+        if (sub === 'span.truncate') {
+            const textSnippet = typeof params.textSnippet === 'string' ? params.textSnippet : '';
+            return textSnippet ? `Click: "${textSnippet}"` : 'Click: Label Item';
+        }
+        if (sub.toLowerCase().includes('button.p-') || sub === 'Button.P 1.5') {
+            const label = (params.title as string) || (params.ariaLabel as string) || (params.textSnippet as string) || 'Action Button';
+            return `Click: "${label}" Button`;
+        }
+
         if (sub.includes('-')) {
             const formatted = sub
                 .replace(/-(btn|tab|menu|card|item|view)$/, '')
@@ -189,7 +232,7 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
     const [expanded, setExpanded] = useState(false);
     const params = useMemo(() => parseParams(entry.params), [entry.params]);
     const methodName = entry.methodName || entry.method_name || 'CLICK';
-    const methodLabel = humanMethodLabel(methodName, params.uiName);
+    const methodLabel = humanMethodLabel(methodName, params);
     const uiTarget = entry.uiTarget || entry.ui_target || '-';
 
     const stackTrace = params.stackTrace || params.stack || (params.metadata as Record<string, unknown> | undefined)?.stackTrace;
@@ -209,11 +252,11 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
                 </td>
                 <td className="px-2 py-1.5"><ActorBadge actor={entry.actor} /></td>
                 <td className="px-2 py-1.5">
-                    <span className="inline-block rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] text-slate-300">
+                    <span className="inline-block rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] text-slate-300 font-mono">
                         {entry.trigger}
                     </span>
                 </td>
-                <td className="px-2 py-1.5 text-[10px] text-slate-200 max-w-[220px] truncate" title={methodName}>
+                <td className="px-2 py-1.5 text-[10px] text-slate-200 max-w-[220px] truncate font-medium" title={methodName}>
                     {methodLabel}
                 </td>
                 <td className="px-2 py-1.5 font-mono text-[10px] text-slate-400 max-w-[260px] truncate" title={uiTarget}>
@@ -232,7 +275,82 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
             </tr>
             {expanded && (
                 <tr className="border-b border-slate-700/40 bg-slate-900/60">
-                    <td colSpan={7} className="px-3 py-3 space-y-2">
+                    <td colSpan={7} className="px-3 py-3 space-y-3">
+                        {/* 1. Step Performed & Execution Path Card */}
+                        <div className="rounded-xl border border-sky-500/30 bg-gradient-to-r from-sky-950/40 via-slate-900/60 to-purple-950/30 p-3.5 shadow-lg space-y-3">
+                            <div className="flex items-center justify-between gap-2 border-b border-sky-500/20 pb-2.5">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="p-1.5 rounded-lg bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                                        <MousePointerClick className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-mono uppercase tracking-wider text-sky-400 font-bold block">
+                                            Step Performed
+                                        </span>
+                                        <h4 className="text-xs font-semibold text-slate-100">
+                                            {typeof params.stepSummary === 'string'
+                                                ? params.stepSummary
+                                                : `${String(entry.actor).toUpperCase()} performed ${entry.trigger} on ${uiTarget}`}
+                                        </h4>
+                                    </div>
+                                </div>
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-sky-500/15 text-sky-300 border border-sky-500/30 font-bold">
+                                    {entry.trigger.toUpperCase()}
+                                </span>
+                            </div>
+
+                            {/* Execution Step Path / Breadcrumb Trail */}
+                            <div>
+                                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
+                                    <Layers className="w-3.5 h-3.5 text-sky-400" />
+                                    Interaction Execution Path
+                                </span>
+                                <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium">
+                                    {(Array.isArray(params.elementHierarchy) && params.elementHierarchy.length > 0
+                                        ? (params.elementHierarchy as string[])
+                                        : [
+                                              `Route: ${String(params.route || uiTarget?.split('|')[0]?.trim() || '/instances')}`,
+                                              `Action: ${methodLabel}`,
+                                          ]
+                                    ).map((step, idx, arr) => (
+                                        <div key={idx} className="flex items-center gap-1.5">
+                                            <span className="px-2 py-1 rounded-md bg-slate-800/80 text-slate-200 border border-slate-700/60 text-[11px] shadow-2xs font-mono">
+                                                {step}
+                                            </span>
+                                            {idx < arr.length - 1 && (
+                                                <ArrowRight className="w-3 h-3 text-sky-400 shrink-0" />
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Contextual Target Properties Grid */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px] font-mono">
+                                <div className="p-2 rounded-lg bg-slate-950/50 border border-slate-800/80">
+                                    <span className="text-[9px] text-slate-500 block uppercase">Target Tag</span>
+                                    <span className="text-slate-200">{String(params.tag || entry.trigger || 'unknown')}</span>
+                                </div>
+                                <div className="p-2 rounded-lg bg-slate-950/50 border border-slate-800/80">
+                                    <span className="text-[9px] text-slate-500 block uppercase">Label / Text</span>
+                                    <span className="text-emerald-400 truncate block" title={String(params.textSnippet || params.text || params.title || params.ariaLabel || '')}>
+                                        {String(params.textSnippet || params.text || params.title || params.ariaLabel || '—')}
+                                    </span>
+                                </div>
+                                <div className="p-2 rounded-lg bg-slate-950/50 border border-slate-800/80">
+                                    <span className="text-[9px] text-slate-500 block uppercase">Container / Card</span>
+                                    <span className="text-cyan-300 truncate block" title={String(params.container || '')}>
+                                        {String(params.container || 'Workspace Area')}
+                                    </span>
+                                </div>
+                                <div className="p-2 rounded-lg bg-slate-950/50 border border-slate-800/80">
+                                    <span className="text-[9px] text-slate-500 block uppercase">Route Target</span>
+                                    <span className="text-sky-300 truncate block" title={String(params.route || uiTarget)}>
+                                        {String(params.route || uiTarget)}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
                         {Boolean(params.machine_name || params.node_alias || params.agm_version) && (
                             <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-cyan-300 bg-cyan-950/40 px-2.5 py-1.5 rounded-md border border-cyan-500/20">
                                 <Terminal className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
@@ -349,7 +467,7 @@ export function AuditPanel() {
                 const time = formatTimestamp(e.timestamp);
                 const p = parseParams(e.params);
                 const mName = e.methodName || e.method_name || 'CLICK';
-                const label = humanMethodLabel(mName, p.uiName);
+                const label = humanMethodLabel(mName, p);
                 const target = e.uiTarget || e.ui_target || '-';
                 return `  ${idx + 1}. [${time}] [${e.actor.toUpperCase()}] [${e.result.toUpperCase()}] ${label} (${target})`;
             });
