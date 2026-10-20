@@ -13,15 +13,37 @@ function readWeeklyQuota(groups: QuotaGroup[] | undefined): { percentage: number
     const group =
         groups.find((item) => {
             const name = (item.display_name || '').toLowerCase();
-            return name.includes('gemini') || (!name.includes('claude') && !name.includes('gpt'));
+            const isGemini = name.includes('gemini');
+            if (isGemini) {
+                return true;
+            }
+            const isClaude = name.includes('claude');
+            if (isClaude) {
+                return false;
+            }
+            const isGpt = name.includes('gpt');
+            if (isGpt) {
+                return false;
+            }
+            return true;
         }) || groups[0];
     const bucket = (group?.buckets || []).find((item: QuotaBucket) => {
         const windowName = (item.window || '').toLowerCase();
+        const isWeekWindow = windowName.includes('week');
+        if (isWeekWindow) {
+            return true;
+        }
         const bucketId = (item.bucket_id || '').toLowerCase();
-        return windowName.includes('week') || bucketId.includes('week');
+        return bucketId.includes('week');
     });
-    if (!bucket || typeof bucket.remaining_fraction !== 'number' || !Number.isFinite(bucket.remaining_fraction)) {
-        return { percentage: null, resetTime: bucket?.reset_time };
+    if (!bucket) {
+        return { percentage: null };
+    }
+    const isNumber = typeof bucket.remaining_fraction === 'number';
+    const isFiniteFraction = Number.isFinite(bucket.remaining_fraction);
+    const isValidFraction = isNumber && isFiniteFraction;
+    if (!isValidFraction) {
+        return { percentage: null, resetTime: bucket.reset_time };
     }
     return {
         percentage: Math.min(100, Math.max(0, bucket.remaining_fraction * 100)),
@@ -137,7 +159,10 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape' && !isAnySwitching) {
+            if (isAnySwitching) {
+                return;
+            }
+            if (e.key === 'Escape') {
                 close();
             }
         };

@@ -1,11 +1,17 @@
 import type { InstanceActionType } from '../../components/instances/InstanceTable';
-import type { AgmProjectTreeNode } from '../../components/instances/PromptTreeViewModal';
+import type { AgmConversationNode, AgmProjectTreeNode } from '../../components/instances/PromptTreeView/types';
+import { isGhostConversation } from '../../components/instances/PromptTreeView/conversationGuards';
 
 export { type InstanceActionType };
 
 export function truncatePath(fullPath?: string | null): string {
-    const hasFullPath = Boolean(fullPath && fullPath.length > 0);
-    if (!hasFullPath || !fullPath) return '';
+    if (!fullPath) {
+        return '';
+    }
+    const hasContent = fullPath.length > 0;
+    if (!hasContent) {
+        return '';
+    }
     const isWindows = fullPath.includes('\\') || /^[a-zA-Z]:/.test(fullPath);
     const sep = isWindows ? '\\' : '/';
     const parts = fullPath.split(/[\\/]/).filter(Boolean);
@@ -65,11 +71,8 @@ export const isNodeOwnedByInstance = (
     if (isExactIdMatch) {
         return true;
     }
-    const isDefaultInstance = Boolean(
-        instConfig.is_default ||
-        instConfig.id === DEFAULT_INSTANCE_ID ||
-        instConfig.id === DEFAULT_INSTANCE_ALIAS
-    );
+    const isDefaultId = instConfig.id === DEFAULT_INSTANCE_ID || instConfig.id === DEFAULT_INSTANCE_ALIAS;
+    const isDefaultInstance = Boolean(instConfig.is_default) || isDefaultId;
     if (isDefaultInstance) {
         return isDefaultOwned(node.instance_id, instConfig.id);
     }
@@ -77,11 +80,8 @@ export const isNodeOwnedByInstance = (
     if (isNodeDefaultAlias) {
         return false;
     }
-    const hasMatchingSeqNum = Boolean(
-        typeof instConfig.seq_num === 'number' &&
-        instConfig.seq_num > 1 &&
-        node.instance_seq_num === instConfig.seq_num
-    );
+    const isValidSeqNum = typeof instConfig.seq_num === 'number' && instConfig.seq_num > 1;
+    const hasMatchingSeqNum = isValidSeqNum && node.instance_seq_num === instConfig.seq_num;
     if (hasMatchingSeqNum) {
         return true;
     }
@@ -101,19 +101,13 @@ export function isConversationOwnedByInstance(
     if (isExactIdMatch) {
         return true;
     }
-    const hasMatchingSeqNum = Boolean(
-        typeof instConfig.seq_num === 'number' &&
-        instConfig.seq_num > 1 &&
-        convInstSeqNum === instConfig.seq_num
-    );
+    const isValidSeqNum = typeof instConfig.seq_num === 'number' && instConfig.seq_num > 1;
+    const hasMatchingSeqNum = isValidSeqNum && convInstSeqNum === instConfig.seq_num;
     if (hasMatchingSeqNum) {
         return true;
     }
-    const isDefaultInst = Boolean(
-        instConfig.is_default ||
-        instConfig.id === DEFAULT_INSTANCE_ID ||
-        instConfig.id === DEFAULT_INSTANCE_ALIAS
-    );
+    const isDefaultId = instConfig.id === DEFAULT_INSTANCE_ID || instConfig.id === DEFAULT_INSTANCE_ALIAS;
+    const isDefaultInst = Boolean(instConfig.is_default) || isDefaultId;
     if (isDefaultInst) {
         return isDefaultOwned(convInstId, instConfig.id);
     }
@@ -122,6 +116,34 @@ export function isConversationOwnedByInstance(
         return false;
     }
     return false;
+}
+
+export function isConversationGenuinelyRunning(
+    conv: AgmConversationNode,
+    instConfig: { id: string; is_default?: boolean; seq_num?: number },
+    fallbackSeqNum?: number
+): boolean {
+    const isConvRunning = Boolean(conv.is_running);
+    if (!isConvRunning) {
+        return false;
+    }
+    const seqNum = conv.instance_seq_num ?? fallbackSeqNum;
+    const isOwned = isConversationOwnedByInstance(conv.instance_id, instConfig, seqNum);
+    if (!isOwned) {
+        return false;
+    }
+    const isGhost = isGhostConversation(conv);
+    if (isGhost) {
+        return false;
+    }
+    const hasWordCount = conv.prompt_word_count > 0;
+    const previewText = conv.prompt_preview_200w?.trim() ?? '';
+    const hasPreviewContent = previewText.length > 0;
+    const hasPromptContent = hasWordCount || hasPreviewContent;
+    if (!hasPromptContent) {
+        return false;
+    }
+    return true;
 }
 
 export interface InstanceTheme {

@@ -15,9 +15,7 @@ import {
 import { invoke } from '@tauri-apps/api/core';
 import { isTauri } from '../../utils/env';
 import type { AgmProjectTreeNode } from '../../components/instances/PromptTreeViewModal';
-import { isGhostConversation } from '../../components/instances/PromptTreeViewModal';
-import { isNodeOwnedByInstance } from './instancePageUtils';
-import { isConversationOwnedByInstance } from './instanceCardData';
+import { isNodeOwnedByInstance, isConversationGenuinelyRunning } from './instancePageUtils';
 import type { InstanceActionType } from './instancePageUtils';
 import type { InstancePageApi } from './instancePageTypes';
 import { createPageActions } from './instancePageActions';
@@ -302,32 +300,35 @@ export function useInstancePage(): InstancePageApi {
     };
 
     const filteredInstances = instances.filter((inst) => {
-        if (!searchQuery.trim()) return true;
-        const q = searchQuery.trim().toLowerCase();
-        return (
-            inst.config.name.toLowerCase().includes(q) ||
-            (inst.config.bound_email || '').toLowerCase().includes(q) ||
-            inst.config.id.toLowerCase().includes(q)
-        );
+        const query = searchQuery.trim().toLowerCase();
+        if (!query) return true;
+        const isNameMatch = inst.config.name.toLowerCase().includes(query);
+        const isEmailMatch = (inst.config.bound_email || '').toLowerCase().includes(query);
+        const isProfileMatch = isNameMatch || isEmailMatch;
+        const isIdMatch = inst.config.id.toLowerCase().includes(query);
+        return isProfileMatch || isIdMatch;
     });
 
     const runningCount = instances.filter((i) => i.is_running).length;
 
     const hasActiveTaskFor = (inst: InstanceStatus): boolean => {
-        return (
-            Boolean(inst.is_running) &&
-            runningTreeNodes.some((node) => {
-                const isInstanceMatch = isNodeOwnedByInstance(node, inst.config);
-                const hasGenuineRunningConv = (node.conversations || []).some(
-                    (c) =>
-                        Boolean(c.is_running) &&
-                        isConversationOwnedByInstance(c.instance_id, inst.config, c.instance_seq_num ?? node.instance_seq_num) &&
-                        !isGhostConversation(c) &&
-                        !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
-                );
-                return isInstanceMatch && Boolean(node.is_running) && hasGenuineRunningConv;
-            })
-        );
+        const isInstanceRunning = Boolean(inst.is_running);
+        if (!isInstanceRunning) {
+            return false;
+        }
+        return runningTreeNodes.some((node) => {
+            const isNodeRunning = Boolean(node.is_running);
+            if (!isNodeRunning) {
+                return false;
+            }
+            const isInstanceMatch = isNodeOwnedByInstance(node, inst.config);
+            if (!isInstanceMatch) {
+                return false;
+            }
+            return (node.conversations || []).some((c) =>
+                isConversationGenuinelyRunning(c, inst.config, node.instance_seq_num)
+            );
+        });
     };
 
     const pageActions = createPageActions({

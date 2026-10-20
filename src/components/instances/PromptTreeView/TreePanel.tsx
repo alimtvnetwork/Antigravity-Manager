@@ -248,7 +248,7 @@ export function TreePanel(props: TreePanelProps) {
     };
 
     return (
-        <div className="w-[460px] lg:w-[520px] shrink-0 flex flex-col border-r border-slate-200 dark:border-[#40285e] bg-slate-50/50 dark:bg-[#090611]/60">
+        <div className="w-full flex-1 min-h-0 flex flex-col overflow-hidden">
             {/* Search Input & Filter Controls */}
             <div className="p-3 border-b border-slate-200 dark:border-[#40285e] shrink-0 space-y-2">
                 {/* Project Scope Dropdown & Quick Pin Header */}
@@ -370,7 +370,7 @@ export function TreePanel(props: TreePanelProps) {
                 </div>
 
                 {/* Row 2: Status Filter Segmented Capsule & Archive Scope */}
-                <div className="flex items-center justify-between gap-1 pt-0.5">
+                <div className="flex items-center justify-between gap-1.5 pt-0.5 flex-wrap">
                     <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-[#40285e] bg-white/80 dark:bg-[#171025]/80 backdrop-blur-xs p-0.5 shadow-2xs divide-x divide-slate-200 dark:divide-[#40285e]">
                         <button
                             type="button"

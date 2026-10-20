@@ -8,6 +8,7 @@ import { useErrorStore } from '../../../stores/error-store';
 import type { FleetMachineInfo } from './fleetTypes';
 
 const POLL_INTERVAL_SECONDS = 300;
+const FLEET_CACHE_KEY = 'agm_fleet_machines_cache_v2';
 
 export interface FleetMachinesState {
     machines: FleetMachineInfo[];
@@ -19,11 +20,14 @@ export interface FleetMachinesState {
     unmaskedRows: Record<string, boolean>;
     copiedIp: string | null;
     countdown: number;
+    promptMachine: FleetMachineInfo | null;
     setShowAllEmails: React.Dispatch<React.SetStateAction<boolean>>;
     handleManualRefresh: () => void;
     handleResetCluster: () => Promise<void>;
     handleCopyIp: (ip: string) => Promise<void>;
     toggleRowMask: (nodeId: string) => void;
+    handleOpenPromptModal: (machine: FleetMachineInfo) => void;
+    handleClosePromptModal: () => void;
 }
 
 interface SshNodeItem {
@@ -36,20 +40,37 @@ interface SshNodeItem {
     os?: string;
 }
 
+function loadCachedFleetMachines(): FleetMachineInfo[] {
+    try {
+        const raw = localStorage.getItem(FLEET_CACHE_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                return sortFleetMachines(parsed);
+            }
+        }
+    } catch {
+        // Best-effort cache retrieval
+    }
+    return [];
+}
+
 function sortFleetMachines(list: FleetMachineInfo[]): FleetMachineInfo[] {
     return [...list].sort((a, b) => {
         const aAlias = (a.node_alias || (a as any).alias || '').trim().toLowerCase();
         const bAlias = (b.node_alias || (b as any).alias || '').trim().toLowerCase();
+        const aIp = (a.ip_address || (a as any).ip || '').trim();
+        const bIp = (b.ip_address || (b as any).ip || '').trim();
 
-        // 1. Lead machine ('main') has top primacy
-        const aIsMain = aAlias === 'main' || Boolean((a as any).is_lead);
-        const bIsMain = bAlias === 'main' || Boolean((b as any).is_lead);
+        // 1. Lead machine ('w1' / current local machine 192.168.1.3) has top primacy
+        const aIsLead = Boolean((a as any).is_lead || aAlias === 'w1' || aIp === '192.168.1.3' || (a as any).is_local);
+        const bIsLead = Boolean((b as any).is_lead || bAlias === 'w1' || bIp === '192.168.1.3' || (b as any).is_local);
+        if (aIsLead !== bIsLead) return aIsLead ? -1 : 1;
+
+        // 2. Central orchestrator peer ('main' 192.168.1.20) follows
+        const aIsMain = aAlias === 'main' || aIp === '192.168.1.20';
+        const bIsMain = bAlias === 'main' || bIp === '192.168.1.20';
         if (aIsMain !== bIsMain) return aIsMain ? -1 : 1;
-
-        // 2. Local worker machine ('w1' / local) follows
-        const aIsLocal = Boolean((a as any).is_local || aAlias === 'w1' || aAlias.startsWith('local'));
-        const bIsLocal = Boolean((b as any).is_local || bAlias === 'w1' || bAlias.startsWith('local'));
-        if (aIsLocal !== bIsLocal) return aIsLocal ? -1 : 1;
 
         // 3. Online status
         if (a.is_online !== b.is_online) return a.is_online ? -1 : 1;
@@ -66,16 +87,17 @@ function mapSshNodesToFleet(sshNodes: SshNodeItem[], _localId?: string): FleetMa
             const ip = (n.ip_address || n.host || n.ip || '').trim();
 
             const aliasLower = alias.toLowerCase();
-            const isLead = aliasLower === 'main';
             const isLocal =
                 aliasLower === 'w1' ||
+                ip === '192.168.1.3' ||
                 aliasLower.startsWith('local');
+            const isLead = isLocal || aliasLower === 'w1';
 
             return {
                 node_id: `ssh_${alias}`,
                 node_alias: alias,
                 ip_address: ip,
-                is_online: n.status === 'online' || n.status === 'ready' || isLocal || isLead,
+                is_online: n.status === 'online' || n.status === 'ready' || isLocal || aliasLower === 'main',
                 last_heartbeat_timestamp: Math.floor(Date.now() / 1000),
                 uptime_seconds: 0,
                 in_flight_prompts_count: 0,
@@ -89,7 +111,7 @@ function mapSshNodesToFleet(sshNodes: SshNodeItem[], _localId?: string): FleetMa
                         is_running: true,
                     },
                 ],
-                bound_emails: isLead ? ['sakibagjdjg@gmail.com'] : isLocal ? ['cirajayu11@gmail.com'] : [],
+                bound_emails: isLead ? ['sakibagjdjg@gmail.com', 'cirajayu11@gmail.com'] : aliasLower === 'main' ? ['sakibagjdjg@gmail.com'] : [],
                 git_repo: 'Antigravity-Manager',
                 git_link: 'alimtvnetwork / Antigravity-Manager',
             } as FleetMachineInfo;
@@ -176,13 +198,14 @@ async function enrichFleetMachines(machines: FleetMachineInfo[]): Promise<FleetM
         const ip = (machine.ip_address || '').trim();
 
         const aliasLower = alias.toLowerCase();
-        const isLead = aliasLower === 'main';
         const isLocal = Boolean(
             (machine as any).is_local ||
             aliasLower === 'w1' ||
+            ip === '192.168.1.3' ||
             aliasLower.startsWith('local') ||
             (machine as any).source === 'local'
         );
+        const isLead = isLocal || aliasLower === 'w1';
 
         // Collect bound emails
         const emails = new Set<string>(machine.bound_emails || []);
@@ -193,11 +216,11 @@ async function enrichFleetMachines(machines: FleetMachineInfo[]): Promise<FleetM
             for (const e of emailByIp.get(ip)!) emails.add(e);
         }
 
-        // Only local machine (w1) populates from localPrimaryEmails if no emails are discovered
-        if (emails.size === 0 && isLocal && localPrimaryEmails.length > 0) {
+        // Only local/lead machine (w1) populates from localPrimaryEmails if no emails are discovered
+        if (emails.size === 0 && isLead && localPrimaryEmails.length > 0) {
             for (const e of localPrimaryEmails) emails.add(e);
-        } else if (emails.size === 0 && isLead) {
-            // For lead machine main, fallback to the known primary account sakibagjdjg@gmail.com
+        } else if (emails.size === 0 && aliasLower === 'main') {
+            // For central orchestrator peer main, fallback to the known primary account sakibagjdjg@gmail.com
             emails.add('sakibagjdjg@gmail.com');
         }
 
@@ -233,12 +256,12 @@ async function enrichFleetMachines(machines: FleetMachineInfo[]): Promise<FleetM
         } as FleetMachineInfo;
     });
 
-    // Ensure lead machine 'main' (192.168.1.20) is always present in fleet
+    // Ensure peer machine 'main' (192.168.1.20) is always present in fleet
     const hasMain = enriched.some(
         (m) => (m.node_alias || '').toLowerCase() === 'main' || m.ip_address === '192.168.1.20'
     );
     if (!hasMain) {
-        enriched.unshift({
+        enriched.push({
             node_id: 'ssh_main',
             node_alias: 'main',
             ip_address: '192.168.1.20',
@@ -246,9 +269,9 @@ async function enrichFleetMachines(machines: FleetMachineInfo[]): Promise<FleetM
             last_heartbeat_timestamp: Math.floor(Date.now() / 1000),
             uptime_seconds: 0,
             in_flight_prompts_count: 0,
-            is_lead: true,
+            is_lead: false,
             is_local: false,
-            source: 'lead',
+            source: 'ssh-mesh',
             active_instances: [
                 {
                     profile_id: 'main:default',
@@ -266,9 +289,10 @@ async function enrichFleetMachines(machines: FleetMachineInfo[]): Promise<FleetM
 }
 
 export function useFleetMachines(): FleetMachinesState {
-    const [machines, setMachines] = useState<FleetMachineInfo[]>([]);
+    const initialMachines = loadCachedFleetMachines();
+    const [machines, setMachines] = useState<FleetMachineInfo[]>(initialMachines);
     const [localNodeId, setLocalNodeId] = useState<string>('');
-    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [isLoading, setIsLoading] = useState<boolean>(initialMachines.length === 0);
     const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
     const [isResettingCluster, setIsResettingCluster] = useState<boolean>(false);
     const [isSyncEnabled, setIsSyncEnabled] = useState<boolean>(true);
@@ -276,6 +300,7 @@ export function useFleetMachines(): FleetMachinesState {
     const [unmaskedRows, setUnmaskedRows] = useState<Record<string, boolean>>({});
     const [copiedIp, setCopiedIp] = useState<string | null>(null);
     const [countdown, setCountdown] = useState<number>(POLL_INTERVAL_SECONDS);
+    const [promptMachine, setPromptMachine] = useState<FleetMachineInfo | null>(null);
 
     const fetchFleetMachinesApi = useCallback(async (): Promise<FleetMachineInfo[]> => {
         const svc = supabaseService as unknown as {
@@ -332,15 +357,27 @@ export function useFleetMachines(): FleetMachinesState {
                     }
                 }
 
-                // 1. Immediate baseline rendering
+                // 1. Immediate baseline rendering & cache sync
+                const sorted = sortFleetMachines(effectiveMachines);
                 setIsSyncEnabled(syncActive || effectiveMachines.length > 0);
-                setMachines(sortFleetMachines(effectiveMachines));
+                setMachines(sorted);
+                try {
+                    localStorage.setItem(FLEET_CACHE_KEY, JSON.stringify(sorted));
+                } catch {
+                    // best effort
+                }
 
                 // 2. Decoupled async enrichment via SWR without blocking table interactivity
                 enrichFleetMachines(effectiveMachines)
                     .then((enriched) => {
+                        const sortedEnriched = sortFleetMachines(enriched);
                         setIsSyncEnabled(syncActive || enriched.length > 0);
-                        setMachines(sortFleetMachines(enriched));
+                        setMachines(sortedEnriched);
+                        try {
+                            localStorage.setItem(FLEET_CACHE_KEY, JSON.stringify(sortedEnriched));
+                        } catch {
+                            // best effort
+                        }
                     })
                     .catch((e) => {
                         useErrorStore.getState().trackWarning(e, {
@@ -365,7 +402,9 @@ export function useFleetMachines(): FleetMachinesState {
     useEffect(() => {
         let isMounted = true;
         const init = async () => {
-            setIsLoading(true);
+            if (initialMachines.length === 0) {
+                setIsLoading(true);
+            }
             try {
                 const [configRes, localNodeRes] = await Promise.allSettled([
                     supabaseService.getConfig(),
@@ -403,16 +442,28 @@ export function useFleetMachines(): FleetMachinesState {
                     }
 
                     // Immediate baseline rendering on mount
+                    const sorted = sortFleetMachines(effectiveMachines);
                     setIsSyncEnabled(syncActive || effectiveMachines.length > 0);
-                    setMachines(sortFleetMachines(effectiveMachines));
+                    setMachines(sorted);
                     setIsLoading(false);
+                    try {
+                        localStorage.setItem(FLEET_CACHE_KEY, JSON.stringify(sorted));
+                    } catch {
+                        // best effort
+                    }
 
                     // Decoupled async enrichment via SWR without blocking initial UI
                     enrichFleetMachines(effectiveMachines)
                         .then((enriched) => {
                             if (isMounted) {
+                                const sortedEnriched = sortFleetMachines(enriched);
                                 setIsSyncEnabled(syncActive || enriched.length > 0);
-                                setMachines(sortFleetMachines(enriched));
+                                setMachines(sortedEnriched);
+                                try {
+                                    localStorage.setItem(FLEET_CACHE_KEY, JSON.stringify(sortedEnriched));
+                                } catch {
+                                    // best effort
+                                }
                             }
                         })
                         .catch((e) => {
@@ -502,6 +553,14 @@ export function useFleetMachines(): FleetMachinesState {
         }));
     };
 
+    const handleOpenPromptModal = useCallback((m: FleetMachineInfo) => {
+        setPromptMachine(m);
+    }, []);
+
+    const handleClosePromptModal = useCallback(() => {
+        setPromptMachine(null);
+    }, []);
+
     return {
         machines,
         isLoading,
@@ -512,10 +571,13 @@ export function useFleetMachines(): FleetMachinesState {
         unmaskedRows,
         copiedIp,
         countdown,
+        promptMachine,
         setShowAllEmails,
         handleManualRefresh,
         handleResetCluster,
         handleCopyIp,
         toggleRowMask,
+        handleOpenPromptModal,
+        handleClosePromptModal,
     };
 }

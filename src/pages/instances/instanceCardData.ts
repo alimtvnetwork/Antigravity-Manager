@@ -3,13 +3,16 @@ import { useConfigStore } from '../../stores/useConfigStore';
 import { useInstanceStore } from '../../stores/useInstanceStore';
 import type { InstanceStatus } from '../../services/instanceService';
 import { findQuotaModel } from '../../config/modelConfig';
-import { isGhostConversation } from '../../components/instances/PromptTreeViewModal';
 import type { AgmProjectTreeNode } from '../../components/instances/PromptTreeViewModal';
-import { isNodeOwnedByInstance, isConversationOwnedByInstance } from './instancePageUtils';
+import {
+    isNodeOwnedByInstance,
+    isConversationOwnedByInstance,
+    isConversationGenuinelyRunning,
+} from './instancePageUtils';
 import type { InstanceActionType } from './instancePageUtils';
 import type { Account } from '../../types/account';
 
-export { isConversationOwnedByInstance };
+export { isConversationOwnedByInstance, isConversationGenuinelyRunning };
 
 export interface InstanceCardData {
     boundAccount: Account | null;
@@ -60,13 +63,29 @@ export function useInstanceCardData(
     const weeklyBucket = (boundAccount?.quota?.quota_groups || [])
         .find((item) => {
             const name = (item.display_name || '').toLowerCase();
-            return name.includes('gemini') || (!name.includes('claude') && !name.includes('gpt'));
+            const isGemini = name.includes('gemini');
+            if (isGemini) {
+                return true;
+            }
+            const isClaude = name.includes('claude');
+            if (isClaude) {
+                return false;
+            }
+            const isGpt = name.includes('gpt');
+            if (isGpt) {
+                return false;
+            }
+            return true;
         })
-        ?.buckets?.find(
-            (item) =>
-                (item.window || '').toLowerCase().includes('week') ||
-                (item.bucket_id || '').toLowerCase().includes('week')
-        );
+        ?.buckets?.find((item) => {
+            const windowName = (item.window || '').toLowerCase();
+            const isWeekWindow = windowName.includes('week');
+            if (isWeekWindow) {
+                return true;
+            }
+            const bucketId = (item.bucket_id || '').toLowerCase();
+            return bucketId.includes('week');
+        });
 
     const weeklyQuota = weeklyBucket
         ? {
@@ -75,18 +94,21 @@ export function useInstanceCardData(
           }
         : ((boundAccount?.quota as { weekly?: { percentage: number; resetTime?: string } | null })?.weekly || null);
 
+    const isInstanceRunning = Boolean(inst.is_running);
     const hasActiveTask =
-        Boolean(inst.is_running) &&
+        isInstanceRunning &&
         runningTreeNodes.some((node) => {
+            const isNodeRunning = Boolean(node.is_running);
+            if (!isNodeRunning) {
+                return false;
+            }
             const isInstanceMatch = isNodeOwnedByInstance(node, inst.config);
-            const hasGenuineRunningConv = (node.conversations || []).some(
-                (c) =>
-                    Boolean(c.is_running) &&
-                    isConversationOwnedByInstance(c.instance_id, inst.config, c.instance_seq_num ?? node.instance_seq_num) &&
-                    !isGhostConversation(c) &&
-                    !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+            if (!isInstanceMatch) {
+                return false;
+            }
+            return (node.conversations || []).some((c) =>
+                isConversationGenuinelyRunning(c, inst.config, node.instance_seq_num)
             );
-            return isInstanceMatch && Boolean(node.is_running) && hasGenuineRunningConv;
         });
 
     const cfg = config as { antigravity_ide_executable?: string; antigravity_executable?: string } | null;

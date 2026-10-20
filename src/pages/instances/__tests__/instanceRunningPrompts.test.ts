@@ -15,6 +15,7 @@ import {
     isNodeOwnedByInstance,
     isDefaultOwned,
     isConversationOwnedByInstance,
+    isConversationGenuinelyRunning,
 } from '../instancePageUtils';
 import {
     isGhostConversation,
@@ -108,8 +109,9 @@ function sortInstanceProjects(
     return [...instanceProjects].sort((a, b) => {
         const isARunning = Boolean(instIsRunning) && Boolean(a.is_running);
         const isBRunning = Boolean(instIsRunning) && Boolean(b.is_running);
-        if (isARunning && !isBRunning) return -1;
-        if (isBRunning && !isARunning) return 1;
+        if (isARunning !== isBRunning) {
+            return isARunning ? -1 : 1;
+        }
         const aLatest = Math.max(0, ...(a.conversations || []).map((c) => new Date(c.last_modified).getTime() || 0));
         const bLatest = Math.max(0, ...(b.conversations || []).map((c) => new Date(c.last_modified).getTime() || 0));
         if (bLatest !== aLatest) return bLatest - aLatest;
@@ -125,20 +127,23 @@ function checkHasActiveTask(
     inst: { is_running?: boolean; config: { id: string; is_default?: boolean; seq_num?: number } },
     runningTreeNodes: AgmProjectTreeNode[]
 ): boolean {
-    return (
-        Boolean(inst.is_running) &&
-        runningTreeNodes.some((node) => {
-            const isInstanceMatch = isNodeOwnedByInstance(node, inst.config);
-            const hasGenuineRunningConv = (node.conversations || []).some(
-                (c) =>
-                    Boolean(c.is_running) &&
-                    isConversationOwnedByInstance(c.instance_id, inst.config, c.instance_seq_num ?? node.instance_seq_num) &&
-                    !isGhostConversation(c) &&
-                    !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
-            );
-            return isInstanceMatch && Boolean(node.is_running) && hasGenuineRunningConv;
-        })
-    );
+    const isInstanceRunning = Boolean(inst.is_running);
+    if (!isInstanceRunning) {
+        return false;
+    }
+    return runningTreeNodes.some((node) => {
+        const isNodeRunning = Boolean(node.is_running);
+        if (!isNodeRunning) {
+            return false;
+        }
+        const isInstanceMatch = isNodeOwnedByInstance(node, inst.config);
+        if (!isInstanceMatch) {
+            return false;
+        }
+        return (node.conversations || []).some((c) =>
+            isConversationGenuinelyRunning(c, inst.config, node.instance_seq_num)
+        );
+    });
 }
 
 // ===========================================================================

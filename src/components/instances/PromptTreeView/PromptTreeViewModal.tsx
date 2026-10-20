@@ -716,7 +716,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                 onDoubleClick={(e) => e.stopPropagation()}
                 className={`flex flex-col overflow-hidden bg-white dark:bg-[#0c0817]/95 backdrop-blur-2xl shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-slate-200 dark:border-purple-900/40 transition-all relative z-10 ${isFullscreen
                     ? "h-full w-full rounded-none border-0"
-                    : "h-[88vh] w-full max-w-6xl rounded-2xl"
+                    : "h-[90vh] w-full max-w-7xl rounded-2xl"
                     }`}
             >
                 <ModalHeader
@@ -807,7 +807,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                 {/* Main Split View */}
                 <div className="flex flex-1 overflow-hidden">
                     {!isTreeCollapsed ? (
-                        <div className="w-80 sm:w-96 shrink-0 flex flex-col border-r border-slate-200 dark:border-[#40285e] bg-slate-50/50 dark:bg-[#090611]/60">
+                        <div className="w-[420px] sm:w-[450px] lg:w-[480px] shrink-0 flex flex-col border-r border-slate-200 dark:border-[#40285e] bg-slate-50/50 dark:bg-[#090611]/60 overflow-hidden">
                             <NowRunningUpNext
                                 items={runningUpNext.items}
                                 isLoading={runningUpNext.isLoading}

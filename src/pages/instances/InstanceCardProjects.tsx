@@ -1,19 +1,21 @@
 import { Folder } from 'lucide-react';
 import type { InstanceStatus } from '../../services/instanceService';
 import type { AgmProjectTreeNode } from '../../components/instances/PromptTreeViewModal';
-import { isGhostConversation } from '../../components/instances/PromptTreeViewModal';
-import { isNodeOwnedByInstance } from './instancePageUtils';
-import { isConversationOwnedByInstance } from './instanceCardData';
+import { isNodeOwnedByInstance, isConversationGenuinelyRunning, isConversationOwnedByInstance } from './instancePageUtils';
 import type { InstancePageApi } from './instancePageTypes';
 
 export function isProjectRunningForInstance(proj: AgmProjectTreeNode, inst: InstanceStatus): boolean {
-    if (!inst.is_running || !proj.is_running) return false;
-    return (proj.conversations || []).some(
-        (c) =>
-            Boolean(c.is_running) &&
-            isConversationOwnedByInstance(c.instance_id, inst.config, c.instance_seq_num ?? proj.instance_seq_num) &&
-            !isGhostConversation(c) &&
-            !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+    const isInstanceRunning = Boolean(inst.is_running);
+    if (!isInstanceRunning) {
+        return false;
+    }
+    const isProjectRunning = Boolean(proj.is_running);
+    if (!isProjectRunning) {
+        return false;
+    }
+    const conversations = proj.conversations || [];
+    return conversations.some((c) =>
+        isConversationGenuinelyRunning(c, inst.config, proj.instance_seq_num)
     );
 }
 
@@ -27,8 +29,9 @@ export function InstanceCardProjects({ api, inst }: { api: InstancePageApi; inst
     const sortedProjects = [...instanceProjects].sort((a, b) => {
         const isARunning = isProjectRunningForInstance(a, inst);
         const isBRunning = isProjectRunningForInstance(b, inst);
-        if (isARunning && !isBRunning) return -1;
-        if (isBRunning && !isARunning) return 1;
+        if (isARunning !== isBRunning) {
+            return isARunning ? -1 : 1;
+        }
         const aLatest = Math.max(0, ...(a.conversations || []).map((c) => new Date(c.last_modified).getTime() || 0));
         const bLatest = Math.max(0, ...(b.conversations || []).map((c) => new Date(c.last_modified).getTime() || 0));
         if (bLatest !== aLatest) return bLatest - aLatest;
