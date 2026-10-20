@@ -208,6 +208,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         state,
         instanceId,
         selectConversation,
+        loadTree,
     });
 
     const [projectContextMenu, setProjectContextMenu] = useState<{
@@ -761,7 +762,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                         setIsResetting(true);
                         setActionMsg('Wiping database & regenerating prompt tree from disk transcripts...');
                         try {
-                            invalidatePromptTreeCache(instanceId);
+                            invalidatePromptTreeCache();
                             setSearchQuery('');
                             setActiveFilter('all');
                             setCategoryFilter('all');

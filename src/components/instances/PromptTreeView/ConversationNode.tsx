@@ -338,6 +338,8 @@ export function ConversationNode({
                             is_queued: turn.is_queued,
                             status: turn.status,
                             selected_turn_number: turn.turn_number,
+                            media_paths: turn.media_paths || [],
+                            media_thumbnails: turn.media_thumbnails || [],
                         });
 
                         return (

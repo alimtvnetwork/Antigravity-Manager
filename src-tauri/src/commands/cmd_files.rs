@@ -89,24 +89,27 @@ pub fn copy_text_to_clipboard(text: String) -> Result<(), String> {
 /// (CF_DIB / CF_BITMAP on Windows). This guarantees pasting into OneNote, Paint, Word, Antigravity, etc.
 #[tauri::command]
 pub fn copy_image_to_clipboard(path: String) -> Result<(), String> {
-    let clean_path = crate::modules::repo_db::failed_commands::decode_uri_to_path(&path);
-    let trimmed = clean_path.trim().replace(r"\\?\", "").replace(r"\?\", "");
-
-    let target_file_path: PathBuf = if trimmed.starts_with("data:image/") {
+    let raw = path.trim();
+    let target_file_path: PathBuf = if raw.starts_with("data:image/") {
         // Decode base64 and write to temp file
-        let comma_pos = trimmed
+        let comma_pos = raw
             .find(',')
             .ok_or_else(|| "invalid data URI: missing comma".to_string())?;
-        let b64_str = &trimmed[comma_pos + 1..];
+        let b64_str = &raw[comma_pos + 1..];
         use base64::Engine;
         let bytes = base64::engine::general_purpose::STANDARD
             .decode(b64_str.trim())
             .map_err(|e| format!("failed to decode base64 image: {e}"))?;
-        let temp_path = std::env::temp_dir().join("agm_clipboard_image.png");
+        let temp_path = std::env::temp_dir().join(format!(
+            "agm_clipboard_{}.png",
+            &uuid::Uuid::new_v4().to_string()[..8]
+        ));
         std::fs::write(&temp_path, &bytes)
             .map_err(|e| format!("failed to write temp clipboard image: {e}"))?;
         temp_path
     } else {
+        let clean_path = crate::modules::repo_db::failed_commands::decode_uri_to_path(raw);
+        let trimmed = clean_path.trim().replace(r"\\?\", "").replace(r"\?\", "");
         let p = PathBuf::from(&trimmed);
         if !p.exists() {
             return Err(format!("Image file does not exist: {trimmed}"));
@@ -120,11 +123,11 @@ pub fn copy_image_to_clipboard(path: String) -> Result<(), String> {
     {
         use std::os::windows::process::CommandExt;
         let script = format!(
-            "Add-Type -AssemblyName System.Windows.Forms; $img = [System.Drawing.Image]::FromFile('{}'); [System.Windows.Forms.Clipboard]::SetImage($img); $img.Dispose()",
-            abs_str.replace('\'', "''")
+            "Add-Type -AssemblyName System.Drawing; Add-Type -AssemblyName System.Windows.Forms; $img = [System.Drawing.Image]::FromFile('{abs_esc}'); $data = New-Object System.Windows.Forms.DataObject; $data.SetImage($img); [System.Windows.Forms.Clipboard]::SetDataObject($data, $true); $img.Dispose()",
+            abs_esc = abs_str.replace('\'', "''")
         );
         let mut cmd = std::process::Command::new("powershell");
-        cmd.args(["-NoProfile", "-NonInteractive", "-Command", &script]);
+        cmd.args(["-NoProfile", "-NonInteractive", "-Sta", "-Command", &script]);
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
         let status = cmd
             .status()

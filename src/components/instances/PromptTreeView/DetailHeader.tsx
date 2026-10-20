@@ -508,16 +508,16 @@ export function DetailHeader(props: DetailHeaderProps) {
                             onBlur={() => void handleCommitTitle()}
                             onClick={(e) => e.stopPropagation()}
                             onDoubleClick={(e) => e.stopPropagation()}
-                            className="px-2 py-0.5 text-base md:text-lg font-bold font-ubuntu rounded bg-white dark:bg-[#120a1f] border border-purple-500/50 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500 max-w-sm md:max-w-md lg:max-w-lg shadow-inner"
+                            className="px-2.5 py-1 text-lg md:text-xl font-bold font-ubuntu rounded-md bg-white dark:bg-[#120a1f] border border-purple-500/50 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500 max-w-md md:max-w-xl lg:max-w-2xl shadow-inner"
                         />
                     ) : (
-                        <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
                             <h3
                                 onDoubleClick={(e) => {
                                     e.stopPropagation();
                                     setIsEditingTitle(true);
                                 }}
-                                className="text-base md:text-lg font-bold font-ubuntu text-slate-900 dark:text-white truncate max-w-sm md:max-w-md lg:max-w-lg cursor-pointer hover:text-purple-600 dark:hover:text-purple-300 transition-colors"
+                                className="text-lg md:text-xl font-bold font-ubuntu text-slate-900 dark:text-white truncate max-w-md md:max-w-xl lg:max-w-2xl cursor-pointer hover:text-purple-600 dark:hover:text-purple-300 transition-colors tracking-tight"
                                 title={`${selectedConversation.title || selectedConversation.short_id} (Double-click to rename)`}
                             >
                                 {selectedConversation.title || selectedConversation.short_id}
@@ -530,9 +530,9 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 title="Copy conversation title"
                             >
                                 {isTitleCopied ? (
-                                    <Check className="w-3.5 h-3.5 text-emerald-500 animate-in zoom-in-75 duration-150" />
+                                    <Check className="w-4 h-4 text-emerald-500 animate-in zoom-in-75 duration-150" />
                                 ) : (
-                                    <Copy className="w-3.5 h-3.5" />
+                                    <Copy className="w-4 h-4" />
                                 )}
                             </button>
                         </div>

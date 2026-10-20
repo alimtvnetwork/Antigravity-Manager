@@ -912,6 +912,24 @@ export async function copyPromptWithRichImages(
             const firstImg = images[0];
             const base64First = srcMap.get(firstImg) || firstImg;
             pngBlob = await convertImageUriToPngBlob(base64First);
+
+            if (isTauriEnvironment()) {
+                try {
+                    if (base64First.startsWith('data:image/')) {
+                        await invoke('copy_image_to_clipboard', { path: base64First });
+                    } else {
+                        const localPath = extractLocalPathFromUri(base64First);
+                        if (localPath) {
+                            await invoke('copy_image_to_clipboard', { path: localPath });
+                        }
+                    }
+                } catch (nativeErr) {
+                    useErrorStore.getState().trackWarning(nativeErr, {
+                        source: 'clipboard.copyPromptWithRichImages.native',
+                        triggerAction: 'copy_image_to_clipboard',
+                    });
+                }
+            }
         }
 
         let isWritten = false;

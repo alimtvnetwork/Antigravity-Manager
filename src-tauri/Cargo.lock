@@ -45,7 +45,7 @@ dependencies = [
 
 [[package]]
 name = "agm-ui"
-version = "4.240.1"
+version = "4.241.0"
 dependencies = [
  "aes-gcm",
  "anyhow",

@@ -160,12 +160,11 @@ pub fn spawn_or_replace_prompt_via_agy(
         return Ok(());
     }
 
-    let ws_dir = PathBuf::from(&prompt.repo_path);
-    if !ws_dir.exists() {
-        let message = format!("workspace directory does not exist: '{}'", prompt.repo_path);
-        crate::modules::logger::log_warn(&format!("[RepoDB] {message}"));
-        return Err(message);
-    }
+    let ws_dir = if !prompt.repo_path.trim().is_empty() && Path::new(&prompt.repo_path).exists() {
+        PathBuf::from(&prompt.repo_path)
+    } else {
+        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+    };
 
     let clean_prompt = extract_clean_user_prompt(&prompt.prompt_content);
     let prompt_to_run = if clean_prompt.trim().is_empty() {
@@ -1124,6 +1123,8 @@ pub fn wipe_and_rescan_repo_db(instance_id: Option<&str>) -> Result<usize, Strin
             .map_err(|e| format!("Failed to clear agm_conversation_sequences: {e}"))?;
         conn.execute("DELETE FROM agm_project_sequences", [])
             .map_err(|e| format!("Failed to clear agm_project_sequences: {e}"))?;
+        conn.execute("DELETE FROM media_vault", [])
+            .map_err(|e| format!("Failed to clear media_vault: {e}"))?;
     } else {
         let raw_id = instance_id.unwrap().trim();
         let norm_id = crate::modules::instance::resolve_instance_id(raw_id)
@@ -1159,7 +1160,18 @@ pub fn wipe_and_rescan_repo_db(instance_id: Option<&str>) -> Result<usize, Strin
             rusqlite::params![raw_id, &norm_id],
         )
         .map_err(|e| format!("Failed to clear agm_project_sequences for instance: {e}"))?;
+
+        conn.execute(
+            "DELETE FROM media_vault WHERE instance_id = ?1 OR instance_id = ?2",
+            rusqlite::params![raw_id, &norm_id],
+        )
+        .map_err(|e| format!("Failed to clear media_vault for instance: {e}"))?;
     }
+
+    if let Ok(mut map) = super::state::get_memory_prompts_map().lock() {
+        map.clear();
+    }
+    super::state::reset_dispatched_prompts_cache();
 
     conn.execute_batch("PRAGMA foreign_keys = ON;")
         .map_err(|e| format!("Failed to re-enable foreign keys: {e}"))?;

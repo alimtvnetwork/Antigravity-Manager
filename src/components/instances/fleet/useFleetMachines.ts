@@ -94,9 +94,9 @@ function mapSshNodesToFleet(sshNodes: SshNodeItem[], _localId?: string): FleetMa
                         is_running: true,
                     },
                 ],
-                bound_emails: isLead ? ['sakibagjdjg@gmail.com'] : [],
-                git_repo: isLead ? 'gitmap' : 'Antigravity-Manager',
-                git_link: isLead ? 'gitmap / gitmap' : 'gitmap / Antigravity-Manager',
+                bound_emails: isLead ? ['sakibagjdjg@gmail.com'] : isLocal ? ['cirajayu11@gmail.com'] : [],
+                git_repo: 'Antigravity-Manager',
+                git_link: 'alimtvnetwork / Antigravity-Manager',
             } as FleetMachineInfo;
         });
 }
@@ -228,8 +228,8 @@ async function enrichFleetMachines(machines: FleetMachineInfo[]): Promise<FleetM
             }
         }
 
-        const gitRepo = isLead ? 'gitmap' : ((machine as any).git_repo || 'Antigravity-Manager');
-        const gitLink = isLead ? 'gitmap / gitmap' : ((machine as any).git_link || `gitmap / ${gitRepo}`);
+        const gitRepo = ((machine as any).git_repo || 'Antigravity-Manager');
+        const gitLink = ((machine as any).git_link || 'alimtvnetwork / Antigravity-Manager');
 
         return {
             ...machine,
@@ -269,8 +269,8 @@ async function enrichFleetMachines(machines: FleetMachineInfo[]): Promise<FleetM
                 },
             ],
             bound_emails: ['sakibagjdjg@gmail.com'],
-            git_repo: 'gitmap',
-            git_link: 'gitmap / gitmap',
+            git_repo: 'Antigravity-Manager',
+            git_link: 'alimtvnetwork / Antigravity-Manager',
         } as FleetMachineInfo);
     }
 

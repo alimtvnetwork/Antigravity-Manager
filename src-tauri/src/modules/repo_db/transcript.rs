@@ -1038,7 +1038,7 @@ mod tests {
     #[test]
     fn test_is_planner_turn_completed() {
         assert!(is_planner_turn_completed(false, "DONE"));
-        assert!(is_planner_turn_completed(false, ""));
+        assert!(!is_planner_turn_completed(false, ""));
         assert!(!is_planner_turn_completed(true, "DONE"));
         assert!(!is_planner_turn_completed(false, "RUNNING"));
     }
