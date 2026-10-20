@@ -8,6 +8,7 @@
 - **Mixed Operator Elimination & 2-Operand Decomposition**: Decomposed mixed `&&`/`||` operators into intermediate named booleans in `instancePageUtils.ts` (`isDefaultInstance`, `hasMatchingSeqNum`), `instanceCardData.ts` (`weeklyBucket` resolution), and `useInstancePage.ts` (`filteredInstances` search filtering). (Thanks to @aukgit)
 
 ### Fixed
+- **Prompt Tree View Modal Sidebar Overflow & Title Width**: Fixed CSS layout defect where the left sidebar (`TreePanel`) overflowed 136px across the vertical divider line into the detail view by removing redundant fixed width constraints on `TreePanel`, adding `overflow-hidden` to the modal sidebar container, wrapping filter capsules cleanly, and expanding title truncation threshold to `max-w-3xl`. (Thanks to @aukgit)
 - **Instance Running Task Liveness & Ghost Filtering Accuracy**: Standardized conversation running checks to respect authentic task status, instance ID ownership, and ghost conversation suppression, verified across all 32 test cases in `src/pages/instances/__tests__/instanceRunningPrompts.test.ts`. (Thanks to @aukgit)
 
 ---
