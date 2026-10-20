@@ -159,7 +159,10 @@ function ConversationListWithGrouping({
                                         key={subNode.primaryNode.conversation_id}
                                         tabIndex={0}
                                         onClick={() => onSelectConversation(subNode.primaryNode, project)}
-                                        onDoubleClick={() => onOpenInspector(subNode.primaryNode, project.repo_path)}
+                                        onDoubleClick={() => {
+                                            onSelectConversation(subNode.primaryNode, project);
+                                            onOpenInspector(subNode.primaryNode, project.repo_path);
+                                        }}
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter' || e.key === ' ') {
                                                 e.preventDefault();
@@ -189,9 +192,9 @@ function ConversationListWithGrouping({
                                         title={`AI Subagent Task · ${subNode.primaryNode.title || 'Subagent'} · ${subNode.primaryNode.step_count || 1} steps · Click to view`}
                                     >
                                         <div className="flex items-center gap-1.5 min-w-0">
-                                            {/* Tree Branch Connector Glyph: ↳ or └── */}
+                                            {/* Tree Branch Connector Glyph: ├── or └── */}
                                             <span className="text-purple-400 dark:text-purple-400 font-mono text-[11px] select-none shrink-0">
-                                                {isLast ? '└──' : '↳'}
+                                                {isLast ? '└──' : '├──'}
                                             </span>
                                             <span title={subNode.classification.roleBadge || 'Subagent'} className="shrink-0 flex items-center">
                                                 <Bot

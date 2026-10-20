@@ -21,19 +21,19 @@ pub fn detect_machine_name() -> String {
     let local_ip = detect_local_ip();
     let has_valid_local_ip = !local_ip.is_empty() && local_ip != "127.0.0.1";
 
-    // 1. Cluster-IP primacy: if local IP matches a configured cluster node, that alias is authoritative
+    // 1. Cluster-IP primacy: canonical GitMap cluster nodes take absolute primacy
     if has_valid_local_ip {
+        for &(alias, ip, _, _) in crate::modules::ssh_manager::GITMAP_CLUSTER_NODES {
+            if ip == local_ip.trim() {
+                return alias.to_string();
+            }
+        }
         if let Ok(conns) = crate::modules::ssh_manager::load_ssh_connections() {
             if let Some(c) = conns
                 .iter()
                 .find(|c| c.ip_address.trim() == local_ip.trim() && !c.alias.trim().is_empty())
             {
                 return c.alias.trim().to_string();
-            }
-        }
-        for &(alias, ip, _, _) in crate::modules::ssh_manager::GITMAP_CLUSTER_NODES {
-            if ip == local_ip.trim() {
-                return alias.to_string();
             }
         }
     }

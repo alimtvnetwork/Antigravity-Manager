@@ -83,7 +83,8 @@ export function invalidatePromptTreeCache(targetInstanceId?: string): void {
 export function renameConversationOptimistic(
     conversationId: string,
     newTitle: string,
-    targetInstanceId?: string
+    targetInstanceId?: string,
+    onSelectionUpdate?: (conv: AgmConversationNode) => void
 ): void {
     const keys = resolveInstanceCacheKeys(targetInstanceId);
 
@@ -92,6 +93,7 @@ export function renameConversationOptimistic(
         if (!entry) continue;
 
         let modified = false;
+        let updatedConvNode: AgmConversationNode | null = null;
         const updatedProjects = entry.data.map((proj) => {
             const hasConv = proj.conversations.some((c) => c.conversation_id === conversationId);
             if (!hasConv) return proj;
@@ -101,7 +103,9 @@ export function renameConversationOptimistic(
                 ...proj,
                 conversations: proj.conversations.map((conv) => {
                     if (conv.conversation_id === conversationId) {
-                        return { ...conv, title: newTitle };
+                        const updated = { ...conv, title: newTitle };
+                        updatedConvNode = updated;
+                        return updated;
                     }
                     return conv;
                 }),
@@ -113,10 +117,34 @@ export function renameConversationOptimistic(
                 ...entry,
                 data: updatedProjects,
             });
+            if (updatedConvNode && onSelectionUpdate) {
+                onSelectionUpdate(updatedConvNode);
+            }
         }
     }
 }
 
+// Shared image filter toggle emitter across header toolbar and tree panel
+export const imageFilterEmitter = {
+    isActive: false,
+    listeners: new Set<(active: boolean) => void>(),
+    get(): boolean {
+        return this.isActive;
+    },
+    set(active: boolean) {
+        this.isActive = active;
+        this.listeners.forEach((fn) => fn(active));
+    },
+    toggle() {
+        this.set(!this.isActive);
+    },
+    subscribe(fn: (active: boolean) => void) {
+        this.listeners.add(fn);
+        return () => {
+            this.listeners.delete(fn);
+        };
+    },
+};
 
 // Shared loading state emitter so TreePanel can observe initial load and render skeletons
 export const promptTreeLoadingEmitter = {
@@ -128,7 +156,9 @@ export const promptTreeLoadingEmitter = {
     },
     subscribe(fn: (loading: boolean) => void) {
         this.listeners.add(fn);
-        return () => this.listeners.delete(fn);
+        return () => {
+            this.listeners.delete(fn);
+        };
     },
 };
 

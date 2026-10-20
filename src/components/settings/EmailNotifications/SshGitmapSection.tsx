@@ -31,6 +31,7 @@ import {
     type SshGitmapStatus,
     type SshNodeRecord,
 } from '../../../services/sshService';
+import { launchInstance } from '../../../services/instanceService/lifecycle';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { showToast } from '../../common/ToastContainer';
 import { useErrorStore } from '../../../stores/error-store';
@@ -356,6 +357,81 @@ export function SshGitmapSection() {
             showToast(`Failed to export CSV: ${err?.message || err}`, 'error');
         } finally {
             setIsExportingCsv(false);
+        }
+    };
+
+    const handleSendToInstance = (item: ClusterInstanceBalanceItem) => {
+        const cleanId = item.instance_id || 'default';
+        setTargetMachine(item.machine_alias);
+        setTargetInstance(cleanId);
+        if (promptText.trim()) {
+            handleDispatchRemotePrompt(
+                item.machine_alias,
+                cleanId,
+                promptText
+            );
+        } else {
+            const displayEmail = item.bound_email ? maskEmailAddress(item.bound_email) : '';
+            showToast(
+                `Target locked to ${item.machine_alias}:${cleanId}${displayEmail ? ` (${displayEmail})` : ''} — enter prompt below to send`,
+                'info'
+            );
+            const promptInput = document.getElementById('remote-prompt-input');
+            if (promptInput) {
+                promptInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                promptInput.focus();
+            }
+        }
+    };
+
+    const handleLaunchInstance = async (item: ClusterInstanceBalanceItem) => {
+        const cleanId = item.instance_id || 'default';
+        if (item.is_local) {
+            try {
+                await launchInstance(cleanId);
+                showToast(`Launched local instance ${cleanId}`, 'success');
+            } catch (err: any) {
+                useErrorStore.getState().trackWarning(err, {
+                    source: 'SshGitmapSection.handleLaunchInstance.local',
+                    triggerAction: 'launch_instance',
+                });
+                showToast(`Failed to launch local instance: ${err?.message || err}`, 'error');
+            }
+        } else {
+            try {
+                const res = await sshService.sendRemoteSshPrompt({
+                    node_alias: item.machine_alias,
+                    instance_target: cleanId,
+                    prompt_text: `agm instances start ${cleanId}`,
+                });
+                if (res.success) {
+                    showToast(`Launched instance ${cleanId} on ${item.machine_alias}`, 'success');
+                } else {
+                    showToast(`Remote launch dispatched to ${item.machine_alias}`, 'info');
+                }
+            } catch (err: any) {
+                useErrorStore.getState().trackWarning(err, {
+                    source: 'SshGitmapSection.handleLaunchInstance.remote',
+                    triggerAction: 'send_remote_ssh_prompt',
+                });
+                showToast(`Failed to dispatch launch to ${item.machine_alias}: ${err?.message || err}`, 'error');
+            }
+        }
+    };
+
+    const handleCopyTargetCommand = async (item: ClusterInstanceBalanceItem) => {
+        const cleanId = item.instance_id || 'default';
+        const targetSpecifier = `${item.machine_alias}:${cleanId}`;
+        const cmd = `agm ssh run ${item.machine_alias} "agm prompt ${cleanId} 'Hello'"`;
+        try {
+            await copyToClipboard(`${cmd}\n# Target: ${targetSpecifier}`);
+            showToast(`Target command copied to clipboard: ${targetSpecifier}`, 'success');
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'SshGitmapSection.handleCopyTargetCommand',
+                triggerAction: 'copy_to_clipboard',
+            });
+            showToast(`Failed to copy command: ${err}`, 'error');
         }
     };
 
@@ -1165,35 +1241,37 @@ export function SshGitmapSection() {
                                                 )}
                                             </td>
                                             <td className="py-2 px-3 text-right">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const cleanId = item.instance_id || 'default';
-                                                        setTargetMachine(item.machine_alias);
-                                                        setTargetInstance(cleanId);
-                                                        if (promptText.trim()) {
-                                                            handleDispatchRemotePrompt(
-                                                                item.machine_alias,
-                                                                cleanId,
-                                                                promptText
-                                                            );
-                                                        } else {
-                                                            showToast(
-                                                                `Target locked to ${item.machine_alias}:${cleanId} (${displayEmail || 'unbound'}) — enter prompt below to send`,
-                                                                'info'
-                                                            );
-                                                            const promptInput = document.getElementById('remote-prompt-input');
-                                                            if (promptInput) {
-                                                                promptInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                                                promptInput.focus();
-                                                            }
-                                                        }
-                                                    }}
-                                                    className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 inline-flex items-center gap-1 cursor-pointer"
-                                                >
-                                                    <Send className="w-3 h-3" />
-                                                    <span>Prompt This Instance</span>
-                                                </button>
+                                                <div className="inline-flex items-center rounded-full border border-slate-200/80 dark:border-white/10 bg-slate-100/80 dark:bg-black/40 backdrop-blur-md p-0.5 shadow-sm divide-x divide-slate-200/60 dark:divide-white/10">
+                                                    {/* 1. Prompt / Send Button */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleSendToInstance(item)}
+                                                        className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-200/60 dark:hover:bg-white/10 rounded-l-full transition-colors cursor-pointer"
+                                                        title={`Prompt ${item.machine_alias}:${item.instance_id || 'default'}`}
+                                                    >
+                                                        <Send className="w-3.5 h-3.5" />
+                                                    </button>
+
+                                                    {/* 2. Run / Launch Instance Button */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleLaunchInstance(item)}
+                                                        className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                                                        title={`Launch / Run ${item.machine_alias}:${item.instance_id || 'default'}`}
+                                                    >
+                                                        <Play className="w-3.5 h-3.5" />
+                                                    </button>
+
+                                                    {/* 3. Copy Target & SSH CLI Command Button */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleCopyTargetCommand(item)}
+                                                        className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-slate-200/60 dark:hover:bg-white/10 rounded-r-full transition-colors cursor-pointer"
+                                                        title="Copy target identifier and SSH dispatch command"
+                                                    >
+                                                        <Copy className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     );

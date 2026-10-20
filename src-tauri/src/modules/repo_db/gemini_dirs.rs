@@ -22,6 +22,34 @@ pub fn get_canonical_host_home() -> Option<PathBuf> {
     None
 }
 
+/// Helper to determine if an instance identifier or name refers to the default instance or its copies/aliases.
+pub fn is_default_instance_match(inst_id: &str) -> bool {
+    let clean = inst_id.trim();
+    if clean.is_empty()
+        || clean.eq_ignore_ascii_case("default")
+        || clean.eq_ignore_ascii_case("__default__")
+        || clean.starts_with("default-copy")
+    {
+        return true;
+    }
+    let lower = clean.to_ascii_lowercase();
+    if lower == "#1 default"
+        || lower == "1 default"
+        || lower == "#1 (default)"
+        || lower == "default (active)"
+        || lower == "#1 default (active)"
+        || (lower.starts_with("#1") && lower.contains("default"))
+    {
+        return true;
+    }
+    let stripped = lower
+        .trim_start_matches('#')
+        .trim_start_matches("ins-")
+        .trim_start_matches("instance-")
+        .trim();
+    stripped == "default" || stripped == "1 default"
+}
+
 /// Helper to verify whether a path belongs to an isolated secondary instance sandbox
 fn is_secondary_sandbox_path(path: &Path) -> bool {
     if let Ok(instances_dir) = crate::modules::instance::get_instances_dir() {
@@ -34,7 +62,9 @@ fn is_secondary_sandbox_path(path: &Path) -> bool {
     }
     if let Ok(registry) = crate::modules::instance::load_registry() {
         for inst in &registry.instances {
-            let is_default = inst.is_default || inst.id == "default" || inst.id == "__default__";
+            let is_default = inst.is_default
+                || is_default_instance_match(&inst.id)
+                || is_default_instance_match(&inst.name);
             if !is_default {
                 let data_path = PathBuf::from(&inst.data_dir);
                 if path.starts_with(&data_path) {

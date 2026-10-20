@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import {
     X,
     Layers,
@@ -13,6 +14,7 @@ import { cn } from '../../../utils/cn';
 import type { SyncInterval } from '../../../services/instanceService';
 import { setPromptTreeSyncInterval } from '../../../services/instanceService';
 import { ImportExportMenu } from './ImportExportMenu';
+import { imageFilterEmitter } from './usePromptTreeData';
 
 export interface ModalHeaderProps {
     instanceName: string;
@@ -76,6 +78,21 @@ export function ModalHeader(props: ModalHeaderProps) {
         isRefreshing,
         isResetting,
     } = props;
+
+    const [isImageFilterActive, setIsImageFilterActive] = useState<boolean>(() => imageFilterEmitter.get());
+
+    useEffect(() => {
+        const unsub = imageFilterEmitter.subscribe((active) => {
+            setIsImageFilterActive(active);
+        });
+        return () => {
+            unsub();
+        };
+    }, []);
+
+    const handleToggleImageFilter = () => {
+        imageFilterEmitter.toggle();
+    };
 
     return (
         <div className="relative z-40 flex items-center justify-between border-b border-slate-200/80 dark:border-purple-900/40 px-4 py-2.5 bg-slate-50/80 dark:bg-[#0c0817]/95 backdrop-blur-xl shrink-0">
@@ -152,6 +169,22 @@ export function ModalHeader(props: ModalHeaderProps) {
                     >
                         <RefreshCw className={cn("w-3.5 h-3.5 text-blue-500", (isLoading || isAutoSyncing || isRefreshing) && "animate-spin")} />
                         <span>Refresh</span>
+                    </button>
+
+                    {/* Segment 3.5: Image Filter Toggle Button */}
+                    <button
+                        type="button"
+                        onClick={handleToggleImageFilter}
+                        className={cn(
+                            "flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
+                            isImageFilterActive
+                                ? "bg-sky-600 text-white shadow-2xs"
+                                : "text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90"
+                        )}
+                        title={isImageFilterActive ? "Showing only conversations with images" : "Filter conversations with images"}
+                    >
+                        <span>🖼️</span>
+                        <span>Images</span>
                     </button>
 
                     {/* Segment 4: Sync Interval Selector with Transparent Inline Styling */}

@@ -37,20 +37,20 @@ pub fn resolve_local_node_alias() -> String {
     let has_valid_ip = !local_ip.is_empty() && local_ip != "127.0.0.1";
 
     if has_valid_ip {
-        // 1. Matches against stored SSH connections
+        // 1. Matches against canonical GitMap cluster nodes FIRST (Cluster-IP primacy)
+        for &(alias, ip, _, _) in crate::modules::ssh_manager::GITMAP_CLUSTER_NODES {
+            if ip == local_ip.trim() {
+                return alias.to_string();
+            }
+        }
+
+        // 2. Matches against stored SSH connections only after canonical check
         if let Ok(conns) = crate::modules::ssh_manager::load_ssh_connections() {
             if let Some(c) = conns
                 .iter()
                 .find(|c| c.ip_address.trim() == local_ip.trim() && !c.alias.trim().is_empty())
             {
                 return c.alias.trim().to_string();
-            }
-        }
-
-        // 2. Matches against canonical GitMap cluster nodes
-        for &(alias, ip, _, _) in crate::modules::ssh_manager::GITMAP_CLUSTER_NODES {
-            if ip == local_ip.trim() {
-                return alias.to_string();
             }
         }
     }

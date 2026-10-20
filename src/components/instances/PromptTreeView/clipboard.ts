@@ -295,12 +295,37 @@ export function extractLocalPathFromUri(uri: string): string | null {
 }
 
 /**
+ * Resolves a URI to a canonical absolute local path if it refers to a local file,
+ * resolving relative paths (e.g. `./.antigravity/attachments/...`) against `repoPath`.
+ */
+export function resolveToAbsolutePath(uri: string, repoPath?: string): string | null {
+    if (!uri || !uri.trim()) return null;
+    let clean = uri.trim();
+    if (clean.startsWith('data:') || clean.startsWith('blob:')) return null;
+    if (clean.startsWith('http://') || clean.startsWith('https://')) {
+        if (!clean.includes('asset.localhost')) return null;
+    }
+    const extracted = extractLocalPathFromUri(clean);
+    if (extracted) return extracted;
+
+    // Check if it's a relative path and repoPath is available
+    const isAbsolute = /^[a-zA-Z]:[\\/]/.test(clean) || clean.startsWith('/') || clean.startsWith('\\\\');
+    if (!isAbsolute && repoPath && repoPath.trim().length > 0) {
+        const sep = repoPath.includes('/') ? '/' : '\\';
+        const normRepo = repoPath.replace(/[/\\]+$/, '');
+        const normChild = clean.replace(/^(\.[/\\]|[/\\])+/, '');
+        return `${normRepo}${sep}${normChild}`;
+    }
+    return null;
+}
+
+/**
  * Converts an image URI (Base64 data URI, HTTP URL, file path, or blob URI)
  * into a full Base64 data URI (data:image/<ext>;base64,...) for embedding into HTML.
  * Uses native Tauri backend command `read_image_as_base64` for local files to eliminate
  * CORS/taint canvas security errors in WebView2.
  */
-export async function convertImageUriToBase64(imageUri: string): Promise<string | null> {
+export async function convertImageUriToBase64(imageUri: string, repoPath?: string): Promise<string | null> {
     try {
         if (!imageUri || !imageUri.trim()) return null;
         const cleanUri = imageUri.trim();
@@ -311,7 +336,7 @@ export async function convertImageUriToBase64(imageUri: string): Promise<string 
         }
 
         // 2. Local filesystem path or Tauri asset URL -> invoke native backend
-        const localPath = extractLocalPathFromUri(cleanUri);
+        const localPath = resolveToAbsolutePath(cleanUri, repoPath) || extractLocalPathFromUri(cleanUri);
         if (localPath && isTauriEnvironment()) {
             try {
                 const b64DataUri = await invoke<string>('read_image_as_base64', { path: localPath });
@@ -327,7 +352,7 @@ export async function convertImageUriToBase64(imageUri: string): Promise<string 
         }
 
         // 3. Fallback to offscreen HTML Image canvas rendering (for remote web URLs or non-Tauri)
-        const resolvedSrc = resolveImageSrc(cleanUri);
+        const resolvedSrc = resolveImageSrc(cleanUri, repoPath);
         return await new Promise<string | null>((resolve) => {
             const timeout = setTimeout(() => resolve(null), 5000);
             const img = new Image();
@@ -418,13 +443,13 @@ export async function transcodeSrcToPngBlob(src: string): Promise<Blob | null> {
  * Invokes native `read_image_as_base64` and transcodes directly through an offscreen canvas
  * to ensure 100% valid PNG magic bytes and eliminate CORS failures.
  */
-export async function convertImageUriToPngBlob(imageUri: string): Promise<Blob | null> {
+export async function convertImageUriToPngBlob(imageUri: string, repoPath?: string): Promise<Blob | null> {
     try {
         if (!imageUri || !imageUri.trim()) return null;
         const cleanUri = imageUri.trim();
 
         // 1. If it's a local file or asset URL, invoke native backend read_image_as_base64
-        const localPath = extractLocalPathFromUri(cleanUri);
+        const localPath = resolveToAbsolutePath(cleanUri, repoPath) || extractLocalPathFromUri(cleanUri);
         if (localPath && isTauriEnvironment()) {
             try {
                 const b64DataUri = await invoke<string>('read_image_as_base64', { path: localPath });
@@ -457,7 +482,7 @@ export async function convertImageUriToPngBlob(imageUri: string): Promise<Blob |
         }
 
         // 3. Remote URL or resolved src
-        const resolvedSrc = resolveImageSrc(cleanUri);
+        const resolvedSrc = resolveImageSrc(cleanUri, repoPath);
         return await transcodeSrcToPngBlob(resolvedSrc);
     } catch {
         return null;
@@ -473,7 +498,8 @@ export async function convertImageUriToPngBlob(imageUri: string): Promise<Blob |
 export async function writePureImageToClipboard(
     imageUriOrBlob: string | Blob,
     onSuccess?: (msg: string) => void,
-    onError?: (err: unknown) => void
+    onError?: (err: unknown) => void,
+    repoPath?: string
 ): Promise<boolean> {
     try {
         let pngBlob: Blob | null = null;
@@ -489,7 +515,7 @@ export async function writePureImageToClipboard(
                 }
             }
         } else if (typeof imageUriOrBlob === 'string') {
-            pngBlob = await convertImageUriToPngBlob(imageUriOrBlob);
+            pngBlob = await convertImageUriToPngBlob(imageUriOrBlob, repoPath);
         }
         if (!pngBlob) {
             throw new Error('Failed to convert image to valid PNG binary blob');
@@ -569,13 +595,14 @@ export async function writePureImageToClipboard(
 /**
  * Loads an image URI into an HTMLImageElement safely across Tauri and web environments.
  * Uses native Tauri read_image_as_base64 or convertFileSrc to bypass WebView2 local file CORS restrictions.
+ * Resolves relative image paths against repoPath to prevent WebView2 canvas tainting.
  */
-async function loadImageElement(uri: string): Promise<HTMLImageElement | null> {
+async function loadImageElement(uri: string, repoPath?: string): Promise<HTMLImageElement | null> {
     if (!uri || !uri.trim()) return null;
     const cleanUri = uri.trim();
 
     let loadSrc = cleanUri;
-    const localPath = extractLocalPathFromUri(cleanUri);
+    const localPath = resolveToAbsolutePath(cleanUri, repoPath) || extractLocalPathFromUri(cleanUri);
     if (localPath && isTauriEnvironment()) {
         try {
             const b64 = await invoke<string>('read_image_as_base64', { path: localPath });
@@ -585,10 +612,10 @@ async function loadImageElement(uri: string): Promise<HTMLImageElement | null> {
                 loadSrc = convertFileSrc(localPath);
             }
         } catch {
-            loadSrc = resolveImageSrc(cleanUri);
+            loadSrc = resolveImageSrc(cleanUri, repoPath);
         }
     } else {
-        loadSrc = resolveImageSrc(cleanUri);
+        loadSrc = resolveImageSrc(cleanUri, repoPath);
     }
 
     return await new Promise<HTMLImageElement | null>((resolve) => {
@@ -614,14 +641,14 @@ async function loadImageElement(uri: string): Promise<HTMLImageElement | null> {
  * returning a clean binary PNG Blob.
  * This allows pasting all images at once into applications like OneNote or Antigravity.
  */
-export async function stitchImagesToCompositePng(imageUris: string[]): Promise<Blob | null> {
+export async function stitchImagesToCompositePng(imageUris: string[], repoPath?: string): Promise<Blob | null> {
     if (!imageUris || imageUris.length === 0) return null;
     const cleanUris = imageUris.map((u) => u.trim()).filter(Boolean);
     if (cleanUris.length === 0) return null;
 
     try {
         const loadedImages: HTMLImageElement[] = [];
-        const results = await Promise.all(cleanUris.map((u) => loadImageElement(u)));
+        const results = await Promise.all(cleanUris.map((u) => loadImageElement(u, repoPath)));
         for (const img of results) {
             if (img && (img.naturalWidth || img.width) > 0 && (img.naturalHeight || img.height) > 0) {
                 loadedImages.push(img);
@@ -630,11 +657,22 @@ export async function stitchImagesToCompositePng(imageUris: string[]): Promise<B
 
         if (loadedImages.length === 0) return null;
 
+        const MAX_COMPOSITE_WIDTH = 4096;
+        const MAX_COMPOSITE_HEIGHT = 16384;
+        const GAP = 16;
+
         if (loadedImages.length === 1) {
             const single = loadedImages[0];
             const canvas = document.createElement('canvas');
-            const w = single.naturalWidth || single.width;
-            const h = single.naturalHeight || single.height;
+            const naturalW = single.naturalWidth || single.width;
+            const naturalH = single.naturalHeight || single.height;
+            const scale = Math.min(
+                1,
+                MAX_COMPOSITE_WIDTH / naturalW,
+                MAX_COMPOSITE_HEIGHT / naturalH
+            );
+            const w = Math.max(1, Math.round(naturalW * scale));
+            const h = Math.max(1, Math.round(naturalH * scale));
             canvas.width = w;
             canvas.height = h;
             const ctx = canvas.getContext('2d');
@@ -645,7 +683,6 @@ export async function stitchImagesToCompositePng(imageUris: string[]): Promise<B
             });
         }
 
-        const GAP = 16;
         let maxWidth = 0;
         let totalHeight = 0;
 
@@ -660,21 +697,34 @@ export async function stitchImagesToCompositePng(imageUris: string[]): Promise<B
             }
         }
 
+        let scale = 1;
+        if (maxWidth > MAX_COMPOSITE_WIDTH || totalHeight > MAX_COMPOSITE_HEIGHT) {
+            const scaleW = MAX_COMPOSITE_WIDTH / maxWidth;
+            const scaleH = MAX_COMPOSITE_HEIGHT / totalHeight;
+            scale = Math.min(scaleW, scaleH);
+        }
+
+        const canvasWidth = Math.max(1, Math.round(maxWidth * scale));
+        const canvasHeight = Math.max(1, Math.round(totalHeight * scale));
+        const scaledGap = Math.round(GAP * scale);
+
         const canvas = document.createElement('canvas');
-        canvas.width = Math.min(maxWidth, 16384);
-        canvas.height = Math.min(totalHeight, 16384);
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
         const ctx = canvas.getContext('2d');
         if (!ctx) return null;
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
         let currentY = 0;
         for (const img of loadedImages) {
-            const w = img.naturalWidth || img.width;
-            const h = img.naturalHeight || img.height;
-            const x = Math.max(0, Math.round((maxWidth - w) / 2));
-            ctx.drawImage(img, x, currentY, w, h);
-            currentY += h + GAP;
+            const naturalW = img.naturalWidth || img.width;
+            const naturalH = img.naturalHeight || img.height;
+            const drawW = Math.round(naturalW * scale);
+            const drawH = Math.round(naturalH * scale);
+            const drawX = Math.max(0, Math.round((canvasWidth - drawW) / 2));
+            ctx.drawImage(img, drawX, currentY, drawW, drawH);
+            currentY += drawH + scaledGap;
         }
 
         return await new Promise<Blob | null>((resolve) => {
@@ -696,16 +746,33 @@ export async function stitchImagesToCompositePng(imageUris: string[]): Promise<B
  */
 export async function copyAllImagesToClipboard(
     imageUris: string[],
-    onSuccess?: (msg: string) => void,
+    repoPathOrOnSuccess?: string | ((msg: string) => void),
+    onSuccessOrOnError?: ((msg: string) => void) | ((err: unknown) => void),
     onError?: (err: unknown) => void
 ): Promise<boolean> {
     if (!imageUris || imageUris.length === 0) return false;
     const cleanUris = imageUris.map((u) => u.trim()).filter(Boolean);
     if (cleanUris.length === 0) return false;
 
+    let repoPath: string | undefined;
+    let onSuccess: ((msg: string) => void) | undefined;
+    let actualOnError: ((err: unknown) => void) | undefined = onError;
+
+    if (typeof repoPathOrOnSuccess === 'string') {
+        repoPath = repoPathOrOnSuccess;
+        if (typeof onSuccessOrOnError === 'function') {
+            onSuccess = onSuccessOrOnError as (msg: string) => void;
+        }
+    } else if (typeof repoPathOrOnSuccess === 'function') {
+        onSuccess = repoPathOrOnSuccess;
+        if (typeof onSuccessOrOnError === 'function') {
+            actualOnError = onSuccessOrOnError as (err: unknown) => void;
+        }
+    }
+
     try {
         // 1. Primary path: Vertical composite PNG blob (pure binary to prevent Chromium drop bug)
-        const compositeBlob = await stitchImagesToCompositePng(cleanUris);
+        const compositeBlob = await stitchImagesToCompositePng(cleanUris, repoPath);
         if (compositeBlob) {
             if (isTauriEnvironment()) {
                 try {
@@ -752,7 +819,7 @@ export async function copyAllImagesToClipboard(
         }
 
         // 2. Secondary path: Rich HTML with embedded Base64 <img> tags
-        const richHtmlOk = await copyAllImagesAsRichHtml(cleanUris, onSuccess, onError);
+        const richHtmlOk = await copyAllImagesAsRichHtml(cleanUris, onSuccess, actualOnError);
         if (richHtmlOk) return true;
 
         // 3. Tertiary fallback: Markdown references
@@ -770,7 +837,7 @@ export async function copyAllImagesToClipboard(
             source: 'clipboard.copyAllImagesToClipboard',
             triggerAction: 'copy_all_images',
         });
-        onError?.(err);
+        actualOnError?.(err);
         return false;
     }
 }

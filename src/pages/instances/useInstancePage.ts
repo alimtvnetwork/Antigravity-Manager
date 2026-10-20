@@ -128,12 +128,12 @@ export function useInstancePage(): InstancePageApi {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
-    const fetchRunningTasks = async () => {
+    const fetchRunningTasks = async (force: boolean = false) => {
         try {
             const data = await invoke<AgmProjectTreeNode[]>('get_project_conversation_tree', {
                 maxWords: 50,
                 onlyRunning: false,
-                force: false,
+                force,
             });
             if (Array.isArray(data)) {
                 setProjectTreeNodes(data);
@@ -180,7 +180,7 @@ export function useInstancePage(): InstancePageApi {
                     fetchInstances(true),
                     fetchSwitcherStatus(),
                     fetchAccounts(),
-                    fetchRunningTasks(),
+                    fetchRunningTasks(true),
                     fetchDaemonTelemetry(),
                 ]);
                 lastPollTimestamp = Date.now();
@@ -225,7 +225,7 @@ export function useInstancePage(): InstancePageApi {
                         fetchInstances(true),
                         fetchSwitcherStatus(),
                         fetchAccounts(),
-                        fetchRunningTasks(),
+                        fetchRunningTasks(true),
                         fetchDaemonTelemetry(),
                     ]);
                 } catch (err) {

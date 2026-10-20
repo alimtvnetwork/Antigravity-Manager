@@ -28,7 +28,9 @@ export interface FleetMachinesState {
 
 interface SshNodeItem {
     alias: string;
-    ip: string;
+    ip_address?: string;
+    ip?: string;
+    host?: string;
     status?: string;
     port?: number;
     os?: string;
@@ -60,15 +62,8 @@ function mapSshNodesToFleet(sshNodes: SshNodeItem[], _localId?: string): FleetMa
     return sshNodes
         .filter((n) => Boolean(n.alias))
         .map((n) => {
-            let alias = n.alias.trim();
-            let ip = n.ip?.trim() || '';
-
-            // Fix inverted or mislabeled SSH host alias between main and w1
-            if (alias.toLowerCase() === 'main' && ip === '192.168.1.3') {
-                ip = '192.168.1.20';
-            } else if (alias.toLowerCase() === 'w1' && ip === '192.168.1.20') {
-                alias = 'main';
-            }
+            const alias = n.alias.trim();
+            const ip = (n.ip_address || n.host || n.ip || '').trim();
 
             const aliasLower = alias.toLowerCase();
             const isLead = aliasLower === 'main';
@@ -177,15 +172,8 @@ async function enrichFleetMachines(machines: FleetMachineInfo[]): Promise<FleetM
     }
 
     let enriched = machines.map((machine) => {
-        let alias = (machine.node_alias || (machine as any).alias || '').trim();
-        let ip = (machine.ip_address || '').trim();
-
-        // Fix inverted or mislabeled SSH host alias between main and w1
-        if (alias.toLowerCase() === 'main' && ip === '192.168.1.3') {
-            ip = '192.168.1.20';
-        } else if (alias.toLowerCase() === 'w1' && ip === '192.168.1.20') {
-            alias = 'main';
-        }
+        const alias = (machine.node_alias || (machine as any).alias || '').trim();
+        const ip = (machine.ip_address || '').trim();
 
         const aliasLower = alias.toLowerCase();
         const isLead = aliasLower === 'main';
@@ -344,9 +332,22 @@ export function useFleetMachines(): FleetMachinesState {
                     }
                 }
 
-                const enriched = await enrichFleetMachines(effectiveMachines);
-                setIsSyncEnabled(syncActive || enriched.length > 0);
-                setMachines(sortFleetMachines(enriched));
+                // 1. Immediate baseline rendering
+                setIsSyncEnabled(syncActive || effectiveMachines.length > 0);
+                setMachines(sortFleetMachines(effectiveMachines));
+
+                // 2. Decoupled async enrichment via SWR without blocking table interactivity
+                enrichFleetMachines(effectiveMachines)
+                    .then((enriched) => {
+                        setIsSyncEnabled(syncActive || enriched.length > 0);
+                        setMachines(sortFleetMachines(enriched));
+                    })
+                    .catch((e) => {
+                        useErrorStore.getState().trackWarning(e, {
+                            source: 'useFleetMachines.asyncEnrich',
+                            triggerAction: 'enrich_fleet_machines',
+                        });
+                    });
             } catch (err) {
                 // Tracked in the error module; stale list kept, retried on next refresh.
                 useErrorStore.getState().trackWarning(err, {
@@ -401,9 +402,25 @@ export function useFleetMachines(): FleetMachinesState {
                         }
                     }
 
-                    const enriched = await enrichFleetMachines(effectiveMachines);
-                    setIsSyncEnabled(syncActive || enriched.length > 0);
-                    setMachines(sortFleetMachines(enriched));
+                    // Immediate baseline rendering on mount
+                    setIsSyncEnabled(syncActive || effectiveMachines.length > 0);
+                    setMachines(sortFleetMachines(effectiveMachines));
+                    setIsLoading(false);
+
+                    // Decoupled async enrichment via SWR without blocking initial UI
+                    enrichFleetMachines(effectiveMachines)
+                        .then((enriched) => {
+                            if (isMounted) {
+                                setIsSyncEnabled(syncActive || enriched.length > 0);
+                                setMachines(sortFleetMachines(enriched));
+                            }
+                        })
+                        .catch((e) => {
+                            useErrorStore.getState().trackWarning(e, {
+                                source: 'useFleetMachines.initAsyncEnrich',
+                                triggerAction: 'enrich_fleet_machines',
+                            });
+                        });
                 }
             } catch (err) {
                 // Tracked in the error module; loading spinner cleared, empty state shown.

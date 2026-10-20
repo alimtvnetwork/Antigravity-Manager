@@ -58,12 +58,16 @@ export function FleetMachineRow({
         git_link?: string;
     };
     const aliasLower = (machine.node_alias || mExt.alias || '').trim().toLowerCase();
-    const isLeadNode = Boolean(mExt.is_lead || aliasLower === 'main');
     const isLocalNode = Boolean(
         mExt.is_local ||
         aliasLower === 'w1' ||
         aliasLower.startsWith('local') ||
         mExt.source === 'local'
+    );
+    const isLeadNode = Boolean(
+        mExt.is_lead ||
+        aliasLower === 'main' ||
+        ((aliasLower === 'w1' || machine.ip_address === '192.168.1.3') && isLocalNode)
     );
 
     return (
@@ -97,7 +101,7 @@ export function FleetMachineRow({
                                     Lead
                                 </span>
                             )}
-                            {isLocalNode && !isLeadNode && (
+                            {isLocalNode && (
                                 <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 shadow-[0_0_8px_rgba(6,182,212,0.15)]">
                                     Local
                                 </span>

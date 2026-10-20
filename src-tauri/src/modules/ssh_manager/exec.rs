@@ -13,6 +13,18 @@ use super::*;
 pub static SSH_LIVENESS_CACHE: Lazy<RwLock<HashMap<String, (bool, Instant)>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
+/// Thread-safe 30-second TTL cache for cluster instances and quota balances
+pub static CLUSTER_BALANCES_CACHE: Lazy<
+    RwLock<Option<(Vec<ClusterInstanceBalanceItem>, Instant)>>,
+> = Lazy::new(|| RwLock::new(None));
+
+/// Invalidate cluster balances cache on demand (e.g. cluster reset or instance update)
+pub fn invalidate_cluster_balances_cache() {
+    if let Ok(mut cache) = CLUSTER_BALANCES_CACHE.write() {
+        *cache = None;
+    }
+}
+
 /// Invalidate cached SSH liveness for a specific host or all nodes
 pub fn invalidate_ssh_liveness_cache(host: Option<&str>, port: Option<u16>) {
     if let Ok(mut cache) = SSH_LIVENESS_CACHE.write() {
@@ -868,6 +880,14 @@ pub(crate) fn extract_clean_json(raw: &str) -> Option<&str> {
 
 /// Return multi-machine instance & bound account balances across local machine and SSH/GitMap nodes
 pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalanceItem>, String> {
+    if let Ok(cache) = CLUSTER_BALANCES_CACHE.read() {
+        if let Some((ref cached_items, timestamp)) = *cache {
+            if timestamp.elapsed() < Duration::from_secs(30) {
+                return Ok(cached_items.clone());
+            }
+        }
+    }
+
     let mut items = Vec::new();
 
     let local_machine = crate::modules::email_watcher::detect_machine_name();
@@ -1478,6 +1498,10 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
 
     for node_group in remote_items {
         items.extend(node_group);
+    }
+
+    if let Ok(mut cache) = CLUSTER_BALANCES_CACHE.write() {
+        *cache = Some((items.clone(), Instant::now()));
     }
 
     Ok(items)

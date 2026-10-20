@@ -177,7 +177,10 @@ pub fn build_local_and_ssh_fleet() -> Vec<FleetMachineInfo> {
 
     let all_conns = collect_all_peer_connections();
     for conn in all_conns {
-        if conn.ip_address == local_ip || conn.alias.eq_ignore_ascii_case(&local_alias) {
+        let is_self = conn.ip_address == local_ip
+            || (conn.alias.eq_ignore_ascii_case(&local_alias)
+                && (local_ip.is_empty() || conn.ip_address == local_ip));
+        if is_self {
             if let Some(local_machine) = machines.first_mut() {
                 local_machine.node_alias = conn.alias.clone();
                 local_machine.alias = conn.alias;
@@ -573,8 +576,8 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
     for conn in all_conns {
         let is_dup = machines.iter().any(|m| {
             m.ip_address == conn.ip_address
-                || m.node_alias.eq_ignore_ascii_case(&conn.alias)
-                || m.alias.eq_ignore_ascii_case(&conn.alias)
+                || (m.node_alias.eq_ignore_ascii_case(&conn.alias)
+                    && m.ip_address == conn.ip_address)
         });
         if !is_dup {
             machines.push(build_ssh_mesh_machine_info(&conn, now));

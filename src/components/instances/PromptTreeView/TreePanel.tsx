@@ -19,13 +19,14 @@ import { cn } from '../../../utils/cn';
 import type { AgmConversationNode, AgmProjectTreeNode } from './types';
 import { ProjectNode, type ProjectNodeProps } from './ProjectNode';
 import { PromptTreeContextMenu, type PromptTreeContextMenuProps } from './PromptTreeContextMenu';
-import { promptTreeLoadingEmitter } from './usePromptTreeData';
+import { promptTreeLoadingEmitter, imageFilterEmitter } from './usePromptTreeData';
 
 export type ActiveFilter = 'all' | 'running' | 'queued' | 'latest_conv' | 'latest_prompt' | 'pinned' | 'archived';
 export type CategoryFilter = 'all' | 'user' | 'subagent' | 'system';
 
 export interface TreePanelProps {
     isLoading?: boolean;
+    isImageFilterActive?: boolean;
     treeData: AgmProjectTreeNode[];
     activeProjects: AgmProjectTreeNode[];
     archivedProjects: AgmProjectTreeNode[];
@@ -126,6 +127,16 @@ export function TreePanel(props: TreePanelProps) {
     const [subLoading, setSubLoading] = useState(promptTreeLoadingEmitter.isLoading);
     const [internalAutomatedHidden, setInternalAutomatedHidden] = useState(isAutomatedHidden);
     const [activeContextMenu, setActiveContextMenu] = useState<PromptTreeContextMenuProps | null>(null);
+    const [internalImageFilter, setInternalImageFilter] = useState(() => imageFilterEmitter.get());
+
+    useEffect(() => {
+        const unsub = imageFilterEmitter.subscribe((active) => setInternalImageFilter(active));
+        return () => {
+            unsub();
+        };
+    }, []);
+
+    const effectiveImageFilter = props.isImageFilterActive !== undefined ? props.isImageFilterActive : internalImageFilter;
 
     const handleOpenContextMenu = (menuProps: PromptTreeContextMenuProps) => {
         setActiveContextMenu(menuProps);
@@ -159,7 +170,7 @@ export function TreePanel(props: TreePanelProps) {
 
     const isScopedSingleProject = selectedProjectScope !== 'all';
 
-    const isFilterActive = searchQuery !== '' || activeFilter !== 'all' || categoryFilter !== 'all' || selectedProjectScope !== 'all';
+    const isFilterActive = searchQuery !== '' || activeFilter !== 'all' || categoryFilter !== 'all' || selectedProjectScope !== 'all' || effectiveImageFilter;
     const isQueuedView = activeFilter === 'queued' && Boolean(onResendQueued);
 
     const handleResetFilters = () => {
@@ -167,7 +178,26 @@ export function TreePanel(props: TreePanelProps) {
         setActiveFilter('all');
         setCategoryFilter('all');
         setSelectedProjectScope('all');
+        imageFilterEmitter.set(false);
     };
+
+    const conversationHasImages = (c: AgmConversationNode): boolean => {
+        const hasDirect = Boolean((c.media_paths && c.media_paths.length > 0) || (c.media_thumbnails && c.media_thumbnails.length > 0));
+        if (hasDirect) return true;
+        return Boolean(
+            c.prompts?.some((turn) =>
+                Boolean((turn.media_paths && turn.media_paths.length > 0) || (turn.media_thumbnails && turn.media_thumbnails.length > 0))
+            )
+        );
+    };
+
+    const filterByImage = (p: AgmProjectTreeNode) => {
+        if (!effectiveImageFilter) return true;
+        return (p.conversations || []).some(conversationHasImages);
+    };
+
+    const effectiveActiveProjects = activeProjects.filter(filterByImage);
+    const effectiveArchivedProjects = archivedProjects.filter(filterByImage);
 
     const handleProjectContextMenu = onProjectContextMenu
         ? (e: React.MouseEvent, repoName: string, project?: AgmProjectTreeNode) => {
@@ -175,41 +205,50 @@ export function TreePanel(props: TreePanelProps) {
           }
         : undefined;
 
-    const renderProject = (project: AgmProjectTreeNode) => (
-        <ProjectNodeWithMenu
-            key={project.project_id}
-            project={project}
-            isExpanded={isScopedSingleProject || Boolean(expandedProjects[project.project_id])}
-            isScopedSingleProject={isScopedSingleProject}
-            isSelected={selectedProjectId === project.project_id}
-            isPinned={pinnedProjectIds.includes(project.project_id)}
-            isArchived={archivedProjectIds.includes(project.project_id)}
-            isRefreshing={refreshingProjectId === project.project_id}
-            isStaleGroupExpanded={Boolean(expandedStaleGroups[project.project_id])}
-            activeFilter={activeFilter}
-            categoryFilter={categoryFilter}
-            searchQuery={searchQuery}
-            isAutomatedHidden={effectiveAutomatedHidden}
-            selectedConversationId={selectedConversationId}
-            onSelectProject={onSelectProject}
-            onToggleExpand={onToggleProjectExpand}
-            onToggleStaleGroup={onToggleStaleGroup}
-            onSelectConversation={onSelectConversation}
-            onOpenInspector={onOpenInspector}
-            onRefresh={onRefreshProject}
-            onTogglePin={onTogglePin}
-            onToggleArchive={onToggleArchive}
-            onProjectContextMenu={handleProjectContextMenu}
-            onOpenContextMenu={handleOpenContextMenu}
-            onRenameConversation={onRenameConversation}
-            onResendPrompts={onResendPrompts}
-            onEnqueue={onEnqueue}
-            onRerunConversation={onRerunConversation}
-        />
-    );
+    const renderProject = (project: AgmProjectTreeNode) => {
+        const displayedProject = effectiveImageFilter
+            ? {
+                  ...project,
+                  conversations: (project.conversations || []).filter(conversationHasImages),
+              }
+            : project;
+
+        return (
+            <ProjectNodeWithMenu
+                key={displayedProject.project_id}
+                project={displayedProject}
+                isExpanded={isScopedSingleProject || Boolean(expandedProjects[displayedProject.project_id])}
+                isScopedSingleProject={isScopedSingleProject}
+                isSelected={selectedProjectId === displayedProject.project_id}
+                isPinned={pinnedProjectIds.includes(displayedProject.project_id)}
+                isArchived={archivedProjectIds.includes(displayedProject.project_id)}
+                isRefreshing={refreshingProjectId === displayedProject.project_id}
+                isStaleGroupExpanded={Boolean(expandedStaleGroups[displayedProject.project_id])}
+                activeFilter={activeFilter}
+                categoryFilter={categoryFilter}
+                searchQuery={searchQuery}
+                isAutomatedHidden={effectiveAutomatedHidden}
+                selectedConversationId={selectedConversationId}
+                onSelectProject={onSelectProject}
+                onToggleExpand={onToggleProjectExpand}
+                onToggleStaleGroup={onToggleStaleGroup}
+                onSelectConversation={onSelectConversation}
+                onOpenInspector={onOpenInspector}
+                onRefresh={onRefreshProject}
+                onTogglePin={onTogglePin}
+                onToggleArchive={onToggleArchive}
+                onProjectContextMenu={handleProjectContextMenu}
+                onOpenContextMenu={handleOpenContextMenu}
+                onRenameConversation={onRenameConversation}
+                onResendPrompts={onResendPrompts}
+                onEnqueue={onEnqueue}
+                onRerunConversation={onRerunConversation}
+            />
+        );
+    };
 
     return (
-        <div className="w-80 sm:w-96 flex flex-col border-r border-slate-200 dark:border-[#40285e] bg-slate-50/50 dark:bg-[#090611]/60">
+        <div className="w-[460px] lg:w-[520px] shrink-0 flex flex-col border-r border-slate-200 dark:border-[#40285e] bg-slate-50/50 dark:bg-[#090611]/60">
             {/* Search Input & Filter Controls */}
             <div className="p-3 border-b border-slate-200 dark:border-[#40285e] shrink-0 space-y-2">
                 {/* Project Scope Dropdown & Quick Pin Header */}
@@ -377,43 +416,37 @@ export function TreePanel(props: TreePanelProps) {
                         </button>
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#120d20]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-900/50 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-900/40 shadow-2xs">
                         <button
                             type="button"
                             onClick={handleToggleAutomated}
                             className={cn(
-                                "px-2.5 py-0.5 text-[10px] font-semibold rounded-md transition-colors cursor-pointer flex items-center gap-1 border shadow-2xs",
+                                "flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-semibold rounded-l-full transition-colors cursor-pointer",
                                 effectiveAutomatedHidden
-                                    ? "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-400/40"
-                                    : "bg-slate-100 dark:bg-[#201538] text-slate-500 dark:text-slate-400 border-slate-200 dark:border-[#40285e] hover:text-slate-800 dark:hover:text-slate-200"
+                                    ? "bg-purple-500/15 text-purple-700 dark:text-purple-300"
+                                    : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                             )}
-                            aria-label={
-                                effectiveAutomatedHidden
-                                    ? "Automated heartbeat & system prompts are hidden. Click to show."
-                                    : "Automated heartbeat & system prompts are shown. Click to hide."
-                            }
+                            aria-label="Toggle automated prompts"
                         >
                             {effectiveAutomatedHidden ? (
-                                <EyeOff className="w-2.5 h-2.5 shrink-0 text-purple-500" />
+                                <EyeOff className="w-3 h-3 text-purple-500" />
                             ) : (
-                                <Eye className="w-2.5 h-2.5 shrink-0 text-slate-400" />
+                                <Eye className="w-3 h-3 text-slate-400" />
                             )}
                             <span>{effectiveAutomatedHidden ? 'Hide Auto' : 'Show Auto'}</span>
                         </button>
 
-                        {/* Scope / State Dropdown (All vs Archived) */}
-                        <select
-                            value={activeFilter === 'archived' ? 'archived' : 'all'}
-                            onChange={(e) => {
-                                const val = e.target.value;
-                                if (val === 'archived') setActiveFilter('archived');
-                                else setActiveFilter('all');
-                            }}
-                            className="text-[10px] font-medium bg-transparent border-0 focus:ring-0 focus:outline-none text-slate-700 dark:text-slate-300 rounded-md px-1 py-0.5 cursor-pointer"
-                        >
-                            <option value="all" className="dark:bg-[#171025]">All ({treeData.length})</option>
-                            <option value="archived" className="dark:bg-[#171025]">Archived ({archivedCount})</option>
-                        </select>
+                        <div className="relative flex items-center px-2 py-0.5">
+                            <select
+                                value={activeFilter === 'archived' ? 'archived' : 'all'}
+                                onChange={(e) => setActiveFilter(e.target.value as ActiveFilter)}
+                                className="appearance-none bg-transparent border-0 focus:ring-0 focus:outline-none text-[10px] font-semibold text-slate-700 dark:text-slate-300 cursor-pointer pr-3 py-0"
+                            >
+                                <option value="all" className="bg-white dark:bg-[#171025]">All ({treeData.length})</option>
+                                <option value="archived" className="bg-white dark:bg-[#171025]">Archived ({archivedCount})</option>
+                            </select>
+                            <ChevronDown className="w-2.5 h-2.5 text-slate-400 pointer-events-none absolute right-1 top-1/2 -translate-y-1/2" />
+                        </div>
                     </div>
                 </div>
 
@@ -453,14 +486,14 @@ export function TreePanel(props: TreePanelProps) {
             </div>
 
             {/* Tree Items List */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-1">
+            <div className="flex-1 overflow-y-auto p-3 space-y-3.5">
                 {activeFilter === 'archived' ? (
-                    archivedProjects.length === 0 ? (
+                    effectiveArchivedProjects.length === 0 ? (
                         <div className="py-12 text-center text-xs text-slate-400">
                             No archived projects found.
                         </div>
                     ) : (
-                        archivedProjects.map((project) => renderProject(project))
+                        effectiveArchivedProjects.map((project) => renderProject(project))
                     )
                 ) : isEffectiveLoading && treeData.length === 0 ? (
                     /* Animated Skeleton Shimmer replacing jarring false-empty flash */
@@ -481,7 +514,7 @@ export function TreePanel(props: TreePanelProps) {
                     </div>
                 ) : (
                     <>
-                        {activeProjects.length === 0 && archivedProjects.length === 0 ? (
+                        {effectiveActiveProjects.length === 0 && effectiveArchivedProjects.length === 0 ? (
                             treeData.length === 0 ? (
                                 <div className="py-16 text-center space-y-3 px-6">
                                     <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-[#171025] flex items-center justify-center mx-auto text-slate-400">
@@ -523,10 +556,10 @@ export function TreePanel(props: TreePanelProps) {
                             )
                         ) : (
                             <>
-                                {activeProjects.map((project) => renderProject(project))}
+                                {effectiveActiveProjects.map((project) => renderProject(project))}
 
                                 {/* Collapsed at bottom: Archived Projects */}
-                                {archivedProjects.length > 0 && (
+                                {effectiveArchivedProjects.length > 0 && (
                                     <div className="space-y-0.5 mt-2 pt-2 border-t border-slate-200 dark:border-[#40285e]">
                                         <div
                                             onClick={() => setIsArchivedProjectsExpanded(!isArchivedProjectsExpanded)}
@@ -540,10 +573,10 @@ export function TreePanel(props: TreePanelProps) {
                                                     <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                                                 )}
                                                 <Archive className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                                                <span className="truncate">Archived Projects ({archivedProjects.length})</span>
+                                                <span className="truncate">Archived Projects ({effectiveArchivedProjects.length})</span>
                                             </div>
                                             <span className="text-[10px] font-mono text-slate-400">
-                                                {archivedProjects.length}
+                                                {effectiveArchivedProjects.length}
                                             </span>
                                         </div>
 

@@ -15,17 +15,12 @@ use std::collections::HashSet;
 use std::path::Path;
 
 fn check_memory_prompts_running(
-    is_terminal_override: bool,
     norm_inst: &str,
     project_id: &str,
     resolved_name: &str,
     host_pid: Option<u32>,
     now: i64,
 ) -> bool {
-    if is_terminal_override {
-        return false;
-    }
-
     let Ok(mut map) = get_memory_prompts_map().lock() else {
         return false;
     };
@@ -242,65 +237,9 @@ pub fn is_prompt_running_for_project_with_summaries(
         return false;
     }
 
-    // Check if the prompt has already transitioned to a terminal status ('completed' / 'failed')
-    let in_memory_terminal = if let Ok(map) = get_memory_prompts_map().lock() {
-        map.values().any(|p| {
-            let matches_inst = if norm_inst == "default" {
-                p.instance_id == "default" || p.instance_id == "__default__"
-            } else {
-                p.instance_id == norm_inst
-            };
-            let proj_suffix = p.project_id.split("__").nth(1).unwrap_or("");
-            let is_suffix_mismatch = !proj_suffix.is_empty()
-                && if norm_inst == "default" {
-                    proj_suffix != "default" && proj_suffix != "__default__"
-                } else {
-                    proj_suffix != norm_inst
-                };
-            if is_suffix_mismatch {
-                return false;
-            }
-            matches_inst
-                && (p.project_id == project_id || p.repo_path == project_id)
-                && (p.status == "completed" || p.status == "failed")
-        })
-    } else {
-        false
-    };
-
-    let db_terminal = if let Ok(conn) = connect_db() {
-        conn.query_row(
-            "SELECT status FROM active_prompts 
-             WHERE (project_id = ?1 OR repo_path = ?1 OR project_id LIKE ?1 || '__%') 
-               AND (
-                 ?2 = 'all' 
-                 OR (
-                   (?2 = 'default' AND (instance_id = 'default' OR instance_id = '__default__') AND (project_id NOT LIKE '%__%' OR project_id LIKE '%__default' OR project_id LIKE '%____default__'))
-                   OR (instance_id = ?2 AND (project_id NOT LIKE '%__%' OR project_id LIKE '%__' || ?2))
-                 )
-               )
-             ORDER BY updated_at DESC, created_at DESC LIMIT 1",
-            params![project_id, norm_inst],
-            |r| r.get::<_, String>(0),
-        )
-        .map(|s| s == "completed" || s == "failed")
-        .unwrap_or(false)
-    } else {
-        false
-    };
-
-    let has_terminal_transition = in_memory_terminal || db_terminal;
-
     // 1. Check in-memory active prompts map
-    let is_terminal_override = has_terminal_transition;
-    let has_memory_running = check_memory_prompts_running(
-        is_terminal_override,
-        norm_inst,
-        project_id,
-        &resolved_name,
-        host_pid,
-        now,
-    );
+    let has_memory_running =
+        check_memory_prompts_running(norm_inst, project_id, &resolved_name, host_pid, now);
     if has_memory_running {
         return true;
     }
@@ -363,29 +302,28 @@ pub fn is_prompt_running_for_project_with_summaries(
     }
 
     // 3. Check SQLite active_prompts for 'running' (strictly require status = 'running' with active TTL updated_at >= now - 300)
+    // Strictly enforce FIFO ordering (ORDER BY created_at ASC, id ASC)
     if let Ok(conn) = connect_db() {
-        let running_count: usize = if has_terminal_transition {
-            0
-        } else {
-            conn.query_row(
-                "SELECT COUNT(*) FROM active_prompts 
+        let running_found: bool = conn
+            .query_row(
+                "SELECT id FROM active_prompts 
                  WHERE (project_id = ?1 OR repo_path = ?1 OR project_id LIKE ?1 || '__%') 
                    AND (
                      ?2 = 'all' 
                      OR (
-                       (?2 = 'default' AND (instance_id = 'default' OR instance_id = '__default__') AND (project_id NOT LIKE '%__%' OR project_id LIKE '%__default' OR project_id LIKE '%____default__'))
+                       (?2 = 'default' AND (instance_id = 'default' OR instance_id = '__default__' OR instance_id = '' OR instance_id IS NULL) AND (project_id NOT LIKE '%__%' OR project_id LIKE '%__default' OR project_id LIKE '%____default__'))
                        OR (instance_id = ?2 AND (project_id NOT LIKE '%__%' OR project_id LIKE '%__' || ?2))
                      )
                    )
                    AND status = 'running'
-                   AND updated_at >= ?3",
-                params![project_id, norm_inst, now - 45],
-                |r| r.get(0),
+                   AND updated_at >= ?3
+                 ORDER BY created_at ASC, id ASC LIMIT 1",
+                params![project_id, norm_inst, now - 300],
+                |_| Ok(true),
             )
-            .unwrap_or(0)
-        };
-        let has_running_prompts = running_count > 0;
-        if has_running_prompts {
+            .unwrap_or(false);
+
+        if running_found {
             crate::modules::logger::log_instance_prompt_audit(
                 norm_inst,
                 &resolved_name,

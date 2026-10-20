@@ -5,6 +5,7 @@ use super::text_utils::extract_clean_user_prompt;
 use chrono::Utc;
 use rusqlite::params;
 use rusqlite::Connection;
+use std::path::Path;
 
 /// Batch item for conversation sequence operations
 #[derive(Debug, Clone)]
@@ -553,12 +554,65 @@ pub fn update_conversation_title(
         );
     }
 
-    // 3. Invalidate prompt tree cache
+    // 3. Synchronize title into IDE persistent workspace storage (state.vscdb)
+    let data_dir =
+        if crate::modules::repo_db::gemini_dirs::is_default_instance_match(&resolved_inst) {
+            crate::modules::instance::get_default_antigravity_data_dir()
+        } else if let Ok(reg) = crate::modules::instance::load_registry() {
+            reg.instances
+                .iter()
+                .find(|i| i.id == resolved_inst)
+                .map(|i| std::path::PathBuf::from(&i.data_dir))
+                .unwrap_or_else(crate::modules::instance::get_default_antigravity_data_dir)
+        } else {
+            crate::modules::instance::get_default_antigravity_data_dir()
+        };
+    // Justification: syncing conversation title to state.vscdb is best-effort IDE storage sync
+    crate::error::record_ignored(
+        sync_title_to_state_vscdb(&data_dir, clean_cid, clean_title),
+        "sync title to state.vscdb",
+    );
+
+    // 4. Invalidate prompt tree cache
     super::tree::invalidate_prompt_tree_cache(Some(&resolved_inst));
     if resolved_inst != "all" {
         super::tree::invalidate_prompt_tree_cache(Some("all"));
     }
 
+    Ok(())
+}
+
+/// Synchronize conversation title to Antigravity IDE global/workspace state.vscdb
+pub fn sync_title_to_state_vscdb(
+    data_dir: &Path,
+    conversation_id: &str,
+    new_title: &str,
+) -> Result<(), crate::error::AppError> {
+    let vscdb_path = data_dir
+        .join("User")
+        .join("globalStorage")
+        .join("state.vscdb");
+    if !vscdb_path.exists() {
+        return Ok(());
+    }
+    let conn = Connection::open(&vscdb_path).map_err(crate::error::AppError::Database)?;
+    // Justification: busy_timeout on IDE database is a nicety; continues with default if failed
+    crate::error::record_ignored(
+        conn.pragma_update(None, "busy_timeout", 3000),
+        "set busy_timeout on state.vscdb",
+    );
+    // Best-effort update of matching conversation title keys
+    // Justification: updating conversation title in state.vscdb is best-effort metadata synchronization
+    crate::error::record_ignored(
+        conn.execute(
+            "UPDATE ItemTable SET value = ?1 WHERE key = ?2",
+            params![
+                new_title,
+                format!("antigravity.conversation.title.{}", conversation_id)
+            ],
+        ),
+        "update title in state.vscdb ItemTable",
+    );
     Ok(())
 }
 

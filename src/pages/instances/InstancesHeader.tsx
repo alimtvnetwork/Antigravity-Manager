@@ -244,21 +244,41 @@ export function InstancesHeader({ api }: { api: InstancePageApi }) {
                         <RotateCw className={cn('w-3.5 h-3.5 text-blue-500', isLoading && 'animate-spin')} />
                         <span>{t('common.refresh', 'Refresh')}</span>
                     </button>
-                    {instances.length - runningCount > 0 && (
-                        <button
-                            type="button"
-                            onClick={handleLaunchAll}
-                            disabled={isLoading || isLaunchingAll}
-                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/40 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                            title={`Start all ${instances.length - runningCount} stopped instance(s)`}
-                        >
-                            <Play className={cn('w-3.5 h-3.5 text-emerald-500', isLaunchingAll && 'animate-spin')} />
-                            <span>Start All</span>
-                            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
-                                {instances.length - runningCount}
-                            </span>
-                        </button>
-                    )}
+                    {(() => {
+                        const stoppedCount = Math.max(0, instances.length - runningCount);
+                        const isAllRunning = stoppedCount === 0;
+                        return (
+                            <button
+                                type="button"
+                                onClick={handleLaunchAll}
+                                disabled={isLoading || isLaunchingAll || isAllRunning}
+                                className={cn(
+                                    'flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-none transition-all duration-150 ease-out active:scale-[0.98]',
+                                    isAllRunning
+                                        ? 'text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50'
+                                        : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/40 cursor-pointer'
+                                )}
+                                title={
+                                    isAllRunning
+                                        ? 'All instances are currently running'
+                                        : `Start all ${stoppedCount} stopped instance(s)`
+                                }
+                            >
+                                <Play className={cn('w-3.5 h-3.5 text-emerald-500', isLaunchingAll && 'animate-spin')} />
+                                <span>Start All</span>
+                                <span
+                                    className={cn(
+                                        'px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold',
+                                        isAllRunning
+                                            ? 'bg-slate-200/50 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                                            : 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                                    )}
+                                >
+                                    {stoppedCount}
+                                </span>
+                            </button>
+                        );
+                    })()}
                     <button
                         type="button"
                         onClick={handleSyncAll}

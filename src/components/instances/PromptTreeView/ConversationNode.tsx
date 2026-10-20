@@ -92,7 +92,9 @@ export function ConversationNode({
         // Optimistic local update
         conv.title = trimmed;
         setEditingTitle(trimmed);
-        renameConversationOptimistic(conv.conversation_id, trimmed, targetInst);
+        renameConversationOptimistic(conv.conversation_id, trimmed, targetInst, (updated) => {
+            onSelect(updated, project);
+        });
 
         try {
             if (onRenameConversation) {
@@ -109,7 +111,9 @@ export function ConversationNode({
             // Rollback on failure
             conv.title = prevTitle;
             setEditingTitle(prevTitle || '');
-            renameConversationOptimistic(conv.conversation_id, prevTitle || '', targetInst);
+            renameConversationOptimistic(conv.conversation_id, prevTitle || '', targetInst, (updated) => {
+                onSelect(updated, project);
+            });
             useErrorStore.getState().captureException(err instanceof Error ? err : String(err), {
                 source: 'ConversationNode.handleSaveTitle',
                 triggerAction: 'rename_conversation',
@@ -128,7 +132,14 @@ export function ConversationNode({
                     setSelectedTurnNumber(defaultTurnNum);
                     onSelect({ ...conv, selected_turn_number: defaultTurnNum }, project);
                 }}
-                onDoubleClick={() => onOpenInspector(conv, project.repo_path)}
+                onDoubleClick={() => {
+                    const runningTurn = conv.prompts?.find((p) => p.is_running) || conv.prompts?.[conv.prompts.length - 1];
+                    const defaultTurnNum = runningTurn ? runningTurn.turn_number : null;
+                    setSelectedTurnNumber(defaultTurnNum);
+                    const effectiveConv = { ...conv, selected_turn_number: defaultTurnNum };
+                    onSelect(effectiveConv, project);
+                    onOpenInspector(effectiveConv, project.repo_path);
+                }}
                 onKeyDown={(e) => {
                     if (isSelected && e.key === 'F2') {
                         e.preventDefault();
@@ -178,6 +189,11 @@ export function ConversationNode({
                                 <ChevronRight className="w-3 h-3" />
                             )}
                         </button>
+                    )}
+                    {promptCategory.tier === PromptOriginTier.SubagentInstruction && (
+                        <span className="text-purple-400 dark:text-purple-400 font-mono text-[10px] select-none shrink-0" title="AI Subagent Instruction">
+                            └── ↳
+                        </span>
                     )}
                     <span title={promptCategory.roleBadge || promptCategory.tier} className="shrink-0 flex items-center">
                         <IconComponent
@@ -354,7 +370,10 @@ export function ConversationNode({
                                 }}
                                 onDoubleClick={(e) => {
                                     e.stopPropagation();
-                                    onOpenInspector(createTurnConv(), project.repo_path);
+                                    const turnConv = createTurnConv();
+                                    setSelectedTurnNumber(turn.turn_number);
+                                    onSelect(turnConv, project);
+                                    onOpenInspector(turnConv, project.repo_path);
                                 }}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' || e.key === ' ') {
@@ -390,7 +409,7 @@ export function ConversationNode({
                                 <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
                                     {/* Branch connector glyph */}
                                     <span className="text-slate-300 dark:text-purple-400 font-mono text-[10px] select-none shrink-0">
-                                        {isLastTurn ? '└──' : '↳'}
+                                        {isLastTurn ? '└──' : '├──'}
                                     </span>
                                     {/* Turn ID badge */}
                                     <span className="font-mono text-[9px] px-1 py-0.2 rounded-xs bg-slate-200 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold shrink-0">

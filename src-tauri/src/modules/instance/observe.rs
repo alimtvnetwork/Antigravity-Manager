@@ -72,6 +72,26 @@ pub fn observe_instance(instance_id: &str) -> Result<ObservedInstanceState, Stri
     })
 }
 
+/// Normalize an instance query specifier string to a clean canonical string.
+pub fn normalize_instance_specifier(specifier: &str) -> &str {
+    let clean = specifier.trim();
+    let lower = clean.to_ascii_lowercase();
+    if clean.is_empty()
+        || lower == "default"
+        || lower == "__default__"
+        || lower == "#1 default"
+        || lower == "1 default"
+        || lower == "#1 (default)"
+        || lower == "default (active)"
+        || lower == "#1 default (active)"
+        || (lower.starts_with("#1") && lower.contains("default"))
+    {
+        "default"
+    } else {
+        clean
+    }
+}
+
 /// Resolve an instance query string (seq_num like "1", ID like "inst-xyz", name like "Instance 1", or "default"/"active")
 /// to a valid concrete instance ID.
 pub fn resolve_instance_id(specifier: &str) -> Result<String, String> {
@@ -80,7 +100,16 @@ pub fn resolve_instance_id(specifier: &str) -> Result<String, String> {
     if clean.is_empty() || clean.eq_ignore_ascii_case("active") {
         return get_active_instance_id();
     }
-    if clean.eq_ignore_ascii_case("default") {
+    let lower = clean.to_ascii_lowercase();
+    if lower == "default"
+        || lower == "__default__"
+        || lower == "#1 default"
+        || lower == "1 default"
+        || lower == "#1 (default)"
+        || lower == "default (active)"
+        || lower == "#1 default (active)"
+        || (lower.starts_with("#1") && lower.contains("default"))
+    {
         if let Some(def) = registry
             .instances
             .iter()
@@ -193,4 +222,24 @@ pub(crate) fn verify_instance_relaunched(
             ));
     }
     running
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_instance_specifier() {
+        assert_eq!(normalize_instance_specifier(""), "default");
+        assert_eq!(normalize_instance_specifier("default"), "default");
+        assert_eq!(normalize_instance_specifier("__default__"), "default");
+        assert_eq!(normalize_instance_specifier("#1 Default"), "default");
+        assert_eq!(normalize_instance_specifier("1 Default"), "default");
+        assert_eq!(normalize_instance_specifier("#1 (Default)"), "default");
+        assert_eq!(
+            normalize_instance_specifier("default-copy-5597"),
+            "default-copy-5597"
+        );
+        assert_eq!(normalize_instance_specifier("instance-2"), "instance-2");
+    }
 }

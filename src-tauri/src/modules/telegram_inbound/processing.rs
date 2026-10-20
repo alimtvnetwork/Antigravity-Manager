@@ -266,8 +266,17 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
         "gitmap" | "gm" => Some(execute_gitmap_subcommand(rest)),
         "agm" => Some(execute_agm_subcommand(rest)),
         "api" | "proxy" => Some(execute_api_status_command().await),
-        "backup" | "backpack" => Some(execute_backup_command(rest)),
-        "restore" => Some(execute_backup_command("restore")),
+        "backup" | "backpack" | "backup_prompt" | "backup_prompts" | "backup_running" | "brp" => {
+            Some(execute_backup_command(rest))
+        }
+        "restore" | "rrp" | "resend" => {
+            let sub = if rest.is_empty() {
+                "restore".to_string()
+            } else {
+                format!("restore {}", rest)
+            };
+            Some(execute_backup_command(&sub))
+        }
         "email" | "mail" => Some(execute_email_command(rest)),
         "snapshot" | "cluster" => Some(format_cluster_nodes_report().await),
         "ff" | "rotate" => {
@@ -312,6 +321,14 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                     return Some(format_node_scoped_prompts(trimmed).await);
                 }
                 return Some(format_active_prompts_report().await);
+            }
+            if lower_full.starts_with("backup prompt")
+                || lower_full.starts_with("backup prompts")
+                || lower_full.starts_with("backup running")
+                || lower_full.starts_with("brp ")
+            {
+                let sub = lower_full.trim();
+                return Some(execute_backup_command(sub));
             }
             if lower_full.starts_with("ff:") {
                 let backup_count = repo_db::backup_running_prompts("default").unwrap_or(0);

@@ -75,7 +75,7 @@ export interface InstancePageApi {
     wipeModalTarget: InstanceStatus | null;
     setWipeModalTarget: (v: InstanceStatus | null) => void;
     fetchInstances: (silent?: boolean) => Promise<void>;
-    fetchRunningTasks: () => Promise<void>;
+    fetchRunningTasks: (force?: boolean) => Promise<void>;
     fetchSwitcherStatus: () => Promise<void>;
     handleSetViewMode: (mode: 'card' | 'list') => void;
     handleSetCardDensity: (density: 'normal' | 'compact') => void;

@@ -189,61 +189,158 @@ pub async fn execute_api_status_command() -> String {
 
 /// Execute Prompt Backup ("Backpack") or Restore command
 pub fn execute_backup_command(args_str: &str) -> String {
-    let sub = args_str.trim().to_lowercase();
-    if sub == "ls" || sub == "list" || sub == "status" {
+    let trimmed = args_str.trim();
+    let normalized = if let Some(stripped) = trimmed.strip_prefix("backup prompt ") {
+        stripped.trim()
+    } else if let Some(stripped) = trimmed.strip_prefix("backup prompts ") {
+        stripped.trim()
+    } else if let Some(stripped) = trimmed.strip_prefix("backup running ") {
+        stripped.trim()
+    } else if let Some(stripped) = trimmed.strip_prefix("brp ") {
+        stripped.trim()
+    } else if let Some(stripped) = trimmed.strip_prefix("backup ") {
+        stripped.trim()
+    } else if trimmed.eq_ignore_ascii_case("backup prompt")
+        || trimmed.eq_ignore_ascii_case("backup prompts")
+        || trimmed.eq_ignore_ascii_case("backup running")
+        || trimmed.eq_ignore_ascii_case("backup")
+        || trimmed.eq_ignore_ascii_case("brp")
+    {
+        ""
+    } else {
+        trimmed
+    };
+
+    let tokens: Vec<&str> = normalized.split_whitespace().collect();
+    let first = tokens.first().copied().unwrap_or("").to_lowercase();
+
+    if first == "ls" || first == "list" || first == "status" {
+        let limit = tokens
+            .get(1)
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(8);
         match backup_prompts_db::list_backup_batches(None) {
             Ok(batches) => {
                 if batches.is_empty() {
-                    return "No prompt backups stored.".to_string();
+                    return "📦 <b>No prompt backups stored.</b>".to_string();
                 }
                 let mut rows = String::new();
-                for (i, b) in batches.iter().take(8).enumerate() {
+                for (i, b) in batches.iter().take(limit).enumerate() {
+                    let id_short = b.id.get(..8).unwrap_or(&b.id);
+                    let restored_badge = if b.is_fully_restored {
+                        "✅ restored"
+                    } else {
+                        "⏳ pending"
+                    };
                     rows.push_str(&format!(
-                        "{}. <code>{}</code> — {} prompt(s) [restored: {}]\n",
+                        "{}. <code>{}</code> — <b>{}</b> prompt(s) [{}]\n",
                         i + 1,
-                        clean_for_telegram_html(&b.id, 32),
+                        clean_for_telegram_html(id_short, 16),
                         b.prompts_count,
-                        b.is_fully_restored
+                        restored_badge
                     ));
                 }
-                format!("📦 Prompt backups ({}):\n\n{}", batches.len(), rows)
+                format!(
+                    "📦 <b>Prompt Backups ({}):</b>\n\n{}\n💡 <i>Send <code>/restore [instance]</code> or <code>/rrp</code> anytime to resume prompts.</i>",
+                    batches.len(),
+                    rows
+                )
             }
             Err(e) => format!(
-                "Couldn't read prompt backups: {}",
+                "❌ <b>Couldn't read prompt backups:</b> <code>{}</code>",
                 clean_for_telegram_html(&e, 200)
             ),
         }
-    } else if sub == "restore" || sub == "rrp" || sub == "resend" {
+    } else if first == "restore" || first == "rrp" || first == "resend" {
+        let target_inst = tokens
+            .get(1)
+            .map(|s| s.trim_matches(|c: char| c == '\'' || c == '"' || c == '/' || c == '\\'))
+            .filter(|s| !s.is_empty())
+            .unwrap_or("default");
+
         let repo_resent = repo_db::resend_all_running_commands(20).unwrap_or_default();
         // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
         crate::error::record_ignored(
-            repo_db::dispatch_running_prompts("default"),
+            repo_db::dispatch_running_prompts(target_inst),
             "dispatch_running_prompts",
         );
-        match backup_prompts_db::restore_running_prompts(Some("default"), false, None) {
+        match backup_prompts_db::restore_running_prompts(Some(target_inst), false, None) {
             Ok(records) => format!(
-                "♻️ Restored {} prompts from backup; {} re-sent to their workspaces.",
+                "♻️ <b>Prompt Restore Completed</b>\n\n\
+                • <b>Target Instance:</b> <code>{}</code>\n\
+                • <b>Restored Prompts:</b> <b>{}</b>\n\
+                • <b>Re-sent Commands:</b> <b>{}</b> command(s) queued\n\
+                • <b>Timestamp:</b> <code>{}</code>\n\n\
+                💡 <i>Execution resumed in target workspace.</i>",
+                clean_for_telegram_html(target_inst, 64),
                 records.len(),
-                repo_resent.len()
+                repo_resent.len(),
+                Utc::now().to_rfc3339()
             ),
-            Err(e) => format!("Restore failed: {}", clean_for_telegram_html(&e, 200)),
+            Err(e) => format!(
+                "❌ <b>Restore Failed:</b> <code>{}</code>",
+                clean_for_telegram_html(&e, 200)
+            ),
         }
     } else {
+        let raw_target = tokens.first().copied().unwrap_or("default");
+        let target_inst =
+            raw_target.trim_matches(|c: char| c == '\'' || c == '"' || c == '/' || c == '\\');
+        let target_inst = if target_inst.is_empty() {
+            "default"
+        } else {
+            target_inst
+        };
+
         // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
         crate::error::record_ignored(
-            repo_db::backup_running_prompts("default"),
+            repo_db::backup_running_prompts(target_inst),
             "backup_running_prompts",
         );
-        match backup_prompts_db::backup_active_running_prompts(Some("default"), None) {
+        match backup_prompts_db::backup_active_running_prompts(Some(target_inst), None) {
             Ok((batch, records)) => {
-                let id8 = batch.id.get(..8).unwrap_or(&batch.id);
+                let count = records.len();
+                let mut image_count = 0;
+                for p in &records {
+                    if let Some(payload) = &p.images_payload {
+                        let uris = crate::modules::repo_db::detection::parse_image_uris(payload);
+                        if !uris.is_empty() {
+                            image_count += uris.len();
+                        } else if p.has_images {
+                            image_count += 1;
+                        }
+                    } else if p.has_images {
+                        let (uris, paths) =
+                            crate::modules::repo_db::detection::extract_image_uris_or_paths(
+                                &p.prompt_text,
+                            );
+                        let c = uris.len() + paths.len();
+                        image_count += if c > 0 { c } else { 1 };
+                    }
+                }
+                let batch_id_short = batch.id.get(..8).unwrap_or(&batch.id);
+                let iso_time = Utc::now().to_rfc3339();
+
                 format!(
-                    "✅ Backed up {} running prompts (backup {}). Send /restore anytime to resume them.",
-                    records.len(),
-                    clean_for_telegram_html(id8, 16)
+                    "📦 <b>Prompt Backup Successful</b>\n\n\
+                    • <b>Target Instance:</b> <code>{}</code>\n\
+                    • <b>Backup Batch ID:</b> <code>{}</code>\n\
+                    • <b>Backed Up Prompts:</b> <b>{}</b>\n\
+                    • <b>Multimodal Images:</b> <b>{}</b> image(s) attached\n\
+                    • <b>Timestamp:</b> <code>{}</code>\n\n\
+                    💡 <i>Prompts are safely preserved in offline SQLite storage. Send <code>/restore {}</code> or <code>/rrp</code> anytime to resume execution.</i>",
+                    clean_for_telegram_html(target_inst, 64),
+                    clean_for_telegram_html(batch_id_short, 32),
+                    count,
+                    image_count,
+                    iso_time,
+                    clean_for_telegram_html(target_inst, 64)
                 )
             }
-            Err(e) => format!("Backup failed: {}", clean_for_telegram_html(&e, 200)),
+            Err(e) => format!(
+                "❌ <b>Backup Failed:</b> <code>{}</code>",
+                clean_for_telegram_html(&e, 200)
+            ),
         }
     }
 }

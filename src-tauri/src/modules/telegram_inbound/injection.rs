@@ -17,9 +17,10 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
         return "⚠️ <b>Missing Arguments:</b>\nUsage:\n• <code>/prompt C001 &lt;prompt text&gt;</code>\n• <code>/prompt P001 --instance #2 &lt;prompt text&gt;</code>\n• <code>/prompt C001 --instance default --node worker-1 &lt;prompt text&gt;</code>".to_string();
     }
 
-    // Extract optional `--instance <id>` / `ins:<id>` and `--node <node>` / `node:<node>` anywhere in the command
+    // Extract optional `--instance <id>` / `ins:<id>`, `--node <node>` / `node:<node>`, and `--base64 <b64>` anywhere in the command
     let mut explicit_instance: Option<String> = None;
     let mut explicit_node: Option<String> = None;
+    let mut explicit_base64: Option<String> = None;
     let mut filtered_tokens: Vec<&str> = Vec::new();
     let raw_tokens: Vec<&str> = trimmed.split_whitespace().collect();
     let mut idx = 0;
@@ -38,6 +39,12 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
         } else if tok.eq_ignore_ascii_case("--node") {
             if idx + 1 < raw_tokens.len() {
                 explicit_node = Some(raw_tokens[idx + 1].to_string());
+                idx += 2;
+                continue;
+            }
+        } else if tok.eq_ignore_ascii_case("--base64") || tok.eq_ignore_ascii_case("-b64") {
+            if idx + 1 < raw_tokens.len() {
+                explicit_base64 = Some(raw_tokens[idx + 1].to_string());
                 idx += 2;
                 continue;
             }
@@ -127,7 +134,7 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
                 && !super::node_label::is_current_machine(&n.alias)
         }));
 
-    let (target_node, target_project, prompt_text) = if let Some(exp_node) = explicit_node {
+    let (target_node, target_project, mut prompt_text) = if let Some(exp_node) = explicit_node {
         let proj = filtered_tokens[0];
         let text = filtered_tokens[1..].join(" ");
         (exp_node, proj.to_string(), text)
@@ -159,6 +166,16 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
             ("local".to_string(), proj.to_string(), text)
         }
     };
+
+    if let Some(b64) = explicit_base64 {
+        use base64::Engine;
+        let clean_b64 = b64.trim().trim_matches('"').trim_matches('\'');
+        if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(clean_b64.as_bytes()) {
+            if let Ok(decoded) = String::from_utf8(bytes) {
+                prompt_text = decoded;
+            }
+        }
+    }
 
     if prompt_text.trim().is_empty() {
         return "Your prompt text is empty — nothing was sent.".to_string();
@@ -308,10 +325,8 @@ pub async fn execute_remote_prompt_injection(
     explicit_instance: Option<&str>,
     local_config: &supabase_sync::SupabaseConfig,
 ) -> String {
-    let escaped_prompt = prompt_text
-        .replace('\"', "\\\"")
-        .replace('\r', "")
-        .replace('\n', " ");
+    use base64::Engine;
+    let b64_prompt = base64::engine::general_purpose::STANDARD.encode(prompt_text.as_bytes());
     let inst_flag = explicit_instance
         .map(|i| format!(" --instance {}", i.trim()))
         .unwrap_or_default();
@@ -339,7 +354,7 @@ pub async fn execute_remote_prompt_injection(
             })
     };
     let agm_bin = if is_windows { "agm.exe" } else { "agm" };
-    let remote_cmd = format!("{agm_bin} prompt {target_proj}{inst_flag} \"{escaped_prompt}\"");
+    let remote_cmd = format!("{agm_bin} prompt {target_proj}{inst_flag} --base64 \"{b64_prompt}\"");
 
     let mut dispatched_gitmap = false;
 

@@ -9,10 +9,22 @@ use super::state::get_active_agy_workers;
 use super::text_utils::{extract_smart_prompt_summary, StrExt};
 use rusqlite::Connection;
 
-/// Returns true if the instance ID represents the default instance or its copies/aliases.
+/// Returns true if the instance ID represents the default instance or its aliases.
 pub(crate) fn is_default_instance_match(inst_id: &str) -> bool {
-    const DEFAULT_IDS: &[&str] = &["default", "__default__", ""];
-    inst_id.equals_any(DEFAULT_IDS) || inst_id.starts_with("default-copy")
+    const DEFAULT_IDS: &[&str] = &[
+        "default",
+        "__default__",
+        "",
+        "#1 default",
+        "1 default",
+        "#1 (default)",
+        "default (active)",
+        "#1 default (active)",
+    ];
+    let clean = inst_id.trim();
+    clean.equals_any_ignore_case(DEFAULT_IDS)
+        || (clean.starts_with_any_ignore_case(&["#1"])
+            && clean.has_any_word_ignore_case(&["default"]))
 }
 
 /// Returns true if inst_id matches the project's instance directly or via default alias compatibility.
@@ -630,8 +642,12 @@ mod tests {
         assert!(is_default_instance_match("default"));
         assert!(is_default_instance_match("__default__"));
         assert!(is_default_instance_match(""));
-        assert!(is_default_instance_match("default-copy"));
-        assert!(is_default_instance_match("default-copy-5597"));
+        assert!(is_default_instance_match("#1 Default"));
+        assert!(is_default_instance_match("1 Default"));
+        assert!(is_default_instance_match("#1 (Default)"));
+        assert!(is_default_instance_match("default (active)"));
+        assert!(!is_default_instance_match("default-copy"));
+        assert!(!is_default_instance_match("default-copy-5597"));
         assert!(!is_default_instance_match("instance-1"));
         assert!(!is_default_instance_match("custom_inst"));
     }
@@ -640,7 +656,7 @@ mod tests {
     fn test_is_instance_compatible() {
         assert!(is_instance_compatible("default", "default", true));
         assert!(is_instance_compatible("__default__", "default", true));
-        assert!(is_instance_compatible("default-copy-1", "default", true));
+        assert!(!is_instance_compatible("default-copy-1", "default", true));
         assert!(is_instance_compatible("worker_1", "worker_1", false));
         assert!(!is_instance_compatible("worker_2", "worker_1", false));
         assert!(!is_instance_compatible("worker_2", "default", true));

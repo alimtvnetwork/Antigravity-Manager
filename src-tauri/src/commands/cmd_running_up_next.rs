@@ -63,7 +63,10 @@ fn instance_predicate(target: &str) -> (&'static str, Option<String>) {
         target.to_string()
     });
 
-    if target == "default" || target == "__default__" {
+    let is_default = crate::modules::repo_db::gemini_dirs::is_default_instance_match(target)
+        || crate::modules::repo_db::gemini_dirs::is_default_instance_match(&resolved);
+
+    if is_default {
         if resolved != "default" && resolved != "__default__" && !resolved.trim().is_empty() {
             (
                 "(instance_id = 'default' OR instance_id = '__default__' OR instance_id = '' OR instance_id IS NULL OR instance_id = ?1)",
@@ -75,11 +78,6 @@ fn instance_predicate(target: &str) -> (&'static str, Option<String>) {
                 None,
             )
         }
-    } else if resolved == "default" || resolved == "__default__" {
-        (
-            "(instance_id = 'default' OR instance_id = '__default__' OR instance_id = '' OR instance_id IS NULL)",
-            None,
-        )
     } else {
         ("instance_id = ?1", Some(resolved))
     }
@@ -143,16 +141,66 @@ fn query_up_next_total(conn: &Connection, target: &str) -> Result<i64, String> {
 /// timestamp. Powers the prompt tree "Now Running + Up Next" panel.
 #[tauri::command]
 pub fn get_running_and_up_next(instance_id: Option<String>) -> Result<RunningAndUpNext, String> {
-    let target = instance_id
+    let raw_target = instance_id
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
         .unwrap_or("default");
+    let target = crate::modules::instance::observe::normalize_instance_specifier(raw_target);
 
     let conn = crate::modules::repo_db::schema::connect_db()
         .map_err(|e| format!("Failed to open repo DB: {e}"))?;
 
-    let now_running = query_now_running(&conn, target)?;
+    let mut now_running = query_now_running(&conn, target)?;
+
+    // Heartbeat scan fallback for active IDE sessions if SQLite active_prompts has no running row
+    if now_running.is_none() {
+        let resolved = crate::modules::instance::resolve_instance_id(target)
+            .unwrap_or_else(|_| target.to_string());
+        let data_dir = if crate::modules::repo_db::gemini_dirs::is_default_instance_match(&resolved)
+        {
+            crate::modules::instance::get_default_antigravity_data_dir()
+        } else if let Ok(reg) = crate::modules::instance::load_registry() {
+            reg.instances
+                .iter()
+                .find(|i| i.id == resolved)
+                .map(|i| std::path::PathBuf::from(&i.data_dir))
+                .unwrap_or_else(crate::modules::instance::get_default_antigravity_data_dir)
+        } else {
+            crate::modules::instance::get_default_antigravity_data_dir()
+        };
+        let workspaces = crate::modules::instance::get_instance_workspace_folders(
+            &resolved,
+            &data_dir.to_string_lossy(),
+        );
+        let (is_running, _hb_file, last_line) =
+            crate::modules::repo_db::inspect_prompt_goal_status(&resolved, &workspaces);
+
+        if is_running {
+            let prompt_id = last_line
+                .as_deref()
+                .and_then(|line| {
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
+                        val.get("prompt_id")
+                            .and_then(|v| v.as_str())
+                            .map(ToString::to_string)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| "live-ide-prompt".to_string());
+
+            now_running = Some(PromptQueueRow {
+                id: prompt_id,
+                instance_id: target.to_string(),
+                status: "running".to_string(),
+                origin_tier: "USER_PROMPT".to_string(),
+                created_at: Utc::now().timestamp(),
+                has_images: false,
+            });
+        }
+    }
+
     let up_next = query_up_next(&conn, target)?;
     let up_next_total = query_up_next_total(&conn, target)?;
 

@@ -7,7 +7,7 @@ import { isConversationOwnedByInstance } from './instanceCardData';
 import type { InstancePageApi } from './instancePageTypes';
 
 export function isProjectRunningForInstance(proj: AgmProjectTreeNode, inst: InstanceStatus): boolean {
-    if (!inst.is_running) return false;
+    if (!inst.is_running || !proj.is_running) return false;
     return (proj.conversations || []).some(
         (c) =>
             Boolean(c.is_running) &&

@@ -136,7 +136,7 @@ pub fn copy_image_to_clipboard(path: String) -> Result<(), String> {
             $data.SetImage($bmp); \
             $data.SetData([System.Windows.Forms.DataFormats]::Dib, $dibStream); \
             $data.SetData('PNG', $msPng); \
-            [System.Windows.Forms.Clipboard]::SetDataObject($data, $true); \
+            [System.Windows.Forms.Clipboard]::SetDataObject($data, $true, 10, 100); \
             $img.Dispose(); \
             $bmp.Dispose()",
             abs_esc = abs_str.replace('\'', "''")
