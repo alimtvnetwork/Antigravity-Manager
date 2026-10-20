@@ -52,11 +52,8 @@ pub(crate) fn collect_tree_conversation_items(
     > = std::collections::HashMap::new();
     if let Ok(active_list) = list_all_prompts() {
         for ap in active_list {
-            if ap.instance_id.trim().is_empty() {
-                continue;
-            }
             let key = normalize_path_for_compare(&ap.repo_path);
-            let inst = if is_default_instance_match(&ap.instance_id) {
+            let inst = if is_default_instance_match(ap.instance_id.trim()) {
                 "default".to_string()
             } else {
                 crate::modules::instance::resolve_instance_id(&ap.instance_id)

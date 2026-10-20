@@ -28,6 +28,8 @@ export interface PageActionContext {
     setActionState: React.Dispatch<React.SetStateAction<Record<string, InstanceActionType>>>;
     setDeletingId: (v: string | null) => void;
     setIsSyncingAll: (v: boolean) => void;
+    isLaunchingAll: boolean;
+    setIsLaunchingAll: (v: boolean) => void;
     setSyncingInstanceIds: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
     setNewInstanceName: (v: string) => void;
     setNewInstanceBoundAccount: (v: string) => void;
@@ -53,6 +55,7 @@ export interface PageActionContext {
     deleteInstance: (id: string) => Promise<void>;
     wipeSession: (id: string) => Promise<void>;
     launchInstance: (id: string) => Promise<void>;
+    launchAllInstances: () => Promise<string[]>;
     stopInstance: (id: string, targetPid?: number) => Promise<void>;
     restartInstance: (id: string) => Promise<InstanceStatus>;
     fastForwardInstance: (id: string) => Promise<string>;
@@ -76,6 +79,7 @@ export interface PageActions {
     handleWipeSession: (id: string) => void;
     handleConfirmWipe: () => Promise<void>;
     handleLaunch: (id: string) => Promise<void>;
+    handleLaunchAll: () => Promise<void>;
     handleStop: (id: string, targetPid?: number) => Promise<void>;
     handleRestart: (id: string) => Promise<void>;
     handleFastForward: (id: string) => Promise<void>;
@@ -113,6 +117,8 @@ export function createPageActions(ctx: PageActionContext): PageActions {
         setActionState,
         setDeletingId,
         setIsSyncingAll,
+        isLaunchingAll,
+        setIsLaunchingAll,
         setSyncingInstanceIds,
         setNewInstanceName,
         setNewInstanceBoundAccount,
@@ -138,6 +144,7 @@ export function createPageActions(ctx: PageActionContext): PageActions {
         deleteInstance,
         wipeSession,
         launchInstance,
+        launchAllInstances,
         stopInstance,
         restartInstance,
         fastForwardInstance,
@@ -291,6 +298,20 @@ export function createPageActions(ctx: PageActionContext): PageActions {
         };
 
         const handleLaunch = (id: string) => runGuardedAction(id, 'launch', () => launchInstance(id));
+        const handleLaunchAll = async () => {
+            if (isLaunchingAll) return;
+            setIsLaunchingAll(true);
+            setActionError(null);
+            try {
+                const launched = await launchAllInstances();
+                showToast(`Launched ${launched.length} instance(s)`, 'success');
+                await fetchInstances(true);
+            } catch (e: unknown) {
+                setActionError(actionErrorMessage(e) || 'Failed to launch all instances');
+            } finally {
+                setIsLaunchingAll(false);
+            }
+        };
         const handleStop = (id: string, targetPid?: number) =>
             runGuardedAction(id, 'stop', () => stopInstance(id, targetPid));
         const handleRestart = (id: string) =>
@@ -409,6 +430,7 @@ export function createPageActions(ctx: PageActionContext): PageActions {
         handleWipeSession,
         handleConfirmWipe,
         handleLaunch,
+        handleLaunchAll,
         handleStop,
         handleRestart,
         handleFastForward,

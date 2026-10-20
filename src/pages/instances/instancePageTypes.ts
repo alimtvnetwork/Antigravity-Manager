@@ -93,6 +93,8 @@ export interface InstancePageApi {
     handleFastForward: (id: string) => Promise<void>;
     handleSync: (id: string) => Promise<void>;
     handleCloneExecutable: (id: string) => Promise<void>;
+    handleLaunchAll: () => Promise<void>;
+    isLaunchingAll: boolean;
     handleSyncAll: () => Promise<void>;
     handleCleanRestart: () => Promise<void>;
     handleToggleAutoSwitcher: () => Promise<void>;

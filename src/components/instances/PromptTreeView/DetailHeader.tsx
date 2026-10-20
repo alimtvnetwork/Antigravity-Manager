@@ -88,6 +88,7 @@ export interface DetailHeaderProps {
     /** Optional repo path used as the rerun dispatch target (falls back to ''). */
     rerunRepoPath?: string;
     onOpenInspector: (conv: AgmConversationNode) => void;
+    onRenameConversation?: (conversationId: string, newTitle: string, instId?: string) => Promise<void>;
     selectedTurnNumber?: number | null;
     setIsDetailsModalOpen?: (v: boolean) => void;
 }
@@ -111,8 +112,8 @@ export function DetailHeader(props: DetailHeaderProps) {
         onCopyAllWithRichImages, onCopyCleanText, onCopyImageAsText,
         onCopyImageForOneNoteOrIde, onCopySingleImagePng,
         onCopyWithImages, onSaveImages, onExport, onFocusIde, onResend, onEnqueue, rerunRepoPath, onOpenInspector,
+        onRenameConversation,
         selectedTurnNumber,
-        setIsDetailsModalOpen,
     } = props;
 
     const [localNewConvTitle, setLocalNewConvTitle] = useState('');
@@ -165,12 +166,17 @@ export function DetailHeader(props: DetailHeaderProps) {
             return;
         }
         try {
-            await invoke('rename_conversation', {
-                instanceId: selectedConversation.instance_id || 'default',
-                conversationId: selectedConversation.conversation_id,
-                newTitle: trimmed,
-            });
-            selectedConversation.title = trimmed;
+            const targetInst = selectedConversation.instance_id || 'default';
+            if (onRenameConversation) {
+                await onRenameConversation(selectedConversation.conversation_id, trimmed, targetInst);
+            } else {
+                await invoke('rename_conversation', {
+                    instanceId: targetInst,
+                    conversationId: selectedConversation.conversation_id,
+                    newTitle: trimmed,
+                });
+                selectedConversation.title = trimmed;
+            }
         } catch (err) {
             reportPromptActionError(err, 'DetailHeader.renameConversation');
         }
@@ -579,7 +585,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 ) : (
                                     <Copy className="w-3 h-3 text-purple-500 shrink-0" />
                                 )}
-                                <span>{isCopiedAllActive ? 'Copied!' : 'Copy All / Includes Image'}</span>
+                                <span>{isCopiedAllActive ? 'Copied!' : 'Copy All (Include Images)'}</span>
                             </button>
 
                             {/* Dropdown Chevron for Clean Text, Image Saving, and Exports */}
@@ -678,30 +684,12 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 onClick={() => setIsRerunMenuOpen((prev) => !prev)}
                                 data-ui-name="prompt-rerun-options-btn"
                                 data-ui-id={`prompt-rerun-options-${selectedConversation.conversation_id}`}
-                                className={cn(
-                                    "flex items-center justify-center px-1.5 py-1 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
-                                    !setIsDetailsModalOpen && "rounded-r-md"
-                                )}
+                                className="flex items-center justify-center px-1.5 py-1 rounded-r-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 aria-label="Rerun configuration: count and message"
                             >
                                 <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isRerunMenuOpen && "rotate-180")} />
                             </button>
                         </div>
-
-                        {/* Segment 4: Details Button */}
-                        {setIsDetailsModalOpen && (
-                            <button
-                                type="button"
-                                onClick={() => setIsDetailsModalOpen(true)}
-                                data-ui-name="prompt-details-btn"
-                                data-ui-id={`prompt-details-${selectedConversation.conversation_id}`}
-                                className="flex items-center gap-1.5 px-3 py-1 rounded-r-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                                aria-label="Open Conversation & Instance Details"
-                            >
-                                <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                                <span>Details</span>
-                            </button>
-                        )}
 
                         {/* Flyout 1: Copy Options Menu */}
                         {isCopyMenuOpen && (
@@ -722,7 +710,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 >
                                     <div className="flex items-center gap-2">
                                         {isCopiedAllActive ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-purple-500" />}
-                                        <span>{isCopiedAllActive ? 'Copied!' : 'Copy All / Includes Image'}</span>
+                                        <span>{isCopiedAllActive ? 'Copied!' : 'Copy All (Include Images)'}</span>
                                     </div>
                                     <span className="text-[10px] text-purple-600 dark:text-purple-300 font-mono px-1.5 py-0.2 rounded-md bg-purple-500/10 border border-purple-500/20">includes image</span>
                                 </button>

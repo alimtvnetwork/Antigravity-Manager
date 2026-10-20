@@ -242,3 +242,63 @@ pub fn import_ssh_from_gitmap() -> Result<(String, NodeSyncStats), String> {
     let stats = sync_ssh_connections_locally(&all_discovered)?;
     Ok((sources.join(" + "), stats))
 }
+
+/// Reset SSH connections to the canonical 6-node GitMap cluster topology (w1, main, u1, w2, w3, w4)
+pub fn reset_ssh_cluster_nodes() -> Result<NodeSyncStats, String> {
+    // 1. Clear stale cache: truncate node_display_cache.db and delete ssh_nodes.json
+    if let Ok(data_dir) = crate::modules::account::get_data_dir() {
+        let cache_db = data_dir.join("node_display_cache.db");
+        if cache_db.exists() {
+            if let Ok(conn) = rusqlite::Connection::open(&cache_db) {
+                // Justification: best-effort truncate node display cache before re-seeding
+                crate::error::record_ignored(
+                    conn.execute("DELETE FROM node_display_cache", []),
+                    "truncate node_display_cache",
+                );
+            }
+        }
+        let nodes_json = data_dir.join("ssh_nodes.json");
+        if nodes_json.exists() {
+            // Justification: best effort remove stale ssh_nodes.json before re-seeding
+            crate::error::record_ignored(
+                fs::remove_file(&nodes_json),
+                "remove stale ssh_nodes.json",
+            );
+        }
+    }
+
+    // 2. Re-seed all 6 canonical GitMap cluster nodes
+    let mut canonical_records = Vec::new();
+    let now = chrono::Utc::now().to_rfc3339();
+
+    for &(alias, ip, user, os) in GITMAP_CLUSTER_NODES {
+        canonical_records.push(SshConnectionRecord {
+            alias: alias.to_string(),
+            ip_address: ip.to_string(),
+            port: 22,
+            username: user.to_string(),
+            key_path: String::new(),
+            os: os.to_string(),
+            encrypted_password: String::new(),
+            encryption_algo: "RSA-2048".to_string(),
+            os_group: Some(if os.eq_ignore_ascii_case("windows") {
+                "Windows".to_string()
+            } else {
+                "Linux".to_string()
+            }),
+            os_version: None,
+            build_version: None,
+            first_run_at: Some(now.clone()),
+            created_at: Some(now.clone()),
+        });
+    }
+
+    let stats = sync_ssh_connections_locally(&canonical_records)?;
+    // Ensure OpenSSH config reflects canonical entries
+    // Justification: best-effort sync to ~/.ssh/config; logged
+    crate::error::record_ignored(
+        update_ssh_config(false),
+        "reset_ssh_cluster update_ssh_config",
+    );
+    Ok(stats)
+}

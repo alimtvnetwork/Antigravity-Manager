@@ -378,6 +378,87 @@ pub fn extract_prompt_tail_snippet(raw_text: &str, tail_word_count: usize) -> St
     }
 }
 
+/// Helper to update conversation_summaries.db and conversations_fts.
+fn update_summaries_in_db(
+    db_path: &std::path::Path,
+    clean_title: &str,
+    now_iso: &str,
+    clean_cid: &str,
+) -> usize {
+    let Ok(conn) = Connection::open(db_path) else {
+        return 0;
+    };
+    // Justification: busy_timeout on summaries database is a nicety; continues with default if failed
+    crate::error::record_ignored(
+        conn.pragma_update(None, "busy_timeout", 5000),
+        "set busy_timeout on conversation_summaries.db",
+    );
+    // Justification: journal_mode WAL on summaries database is a performance optimization; continues with default if failed
+    crate::error::record_ignored(
+        conn.pragma_update(None, "journal_mode", "WAL"),
+        "set journal_mode WAL on conversation_summaries.db",
+    );
+
+    let mut count = conn
+        .execute(
+            "UPDATE conversation_summaries SET title = ?1, last_modified_time = ?2 WHERE conversation_id = ?3",
+            params![clean_title, now_iso, clean_cid],
+        )
+        .or_else(|_| {
+            conn.execute(
+                "UPDATE conversation_summaries SET title = ?1 WHERE conversation_id = ?2",
+                params![clean_title, clean_cid],
+            )
+        })
+        .unwrap_or(0);
+
+    if count == 0 {
+        let pattern = format!("%{}%", clean_cid);
+        count = conn
+            .execute(
+                "UPDATE conversation_summaries SET title = ?1, last_modified_time = ?2 WHERE conversation_id LIKE ?3",
+                params![clean_title, now_iso, &pattern],
+            )
+            .or_else(|_| {
+                conn.execute(
+                    "UPDATE conversation_summaries SET title = ?1 WHERE conversation_id LIKE ?2",
+                    params![clean_title, &pattern],
+                )
+            })
+            .unwrap_or(0);
+    }
+
+    // Also update conversations_fts virtual table if present
+    let fts_res = conn.execute(
+        "UPDATE conversations_fts SET title = ?1 WHERE conversation_id = ?2",
+        params![clean_title, clean_cid],
+    );
+    match fts_res {
+        Ok(fts_count) => {
+            if fts_count == 0 {
+                let pattern = format!("%{}%", clean_cid);
+                // Justification: updating conversations_fts via LIKE fallback is best-effort full-text sync
+                crate::error::record_ignored(
+                    conn.execute(
+                        "UPDATE conversations_fts SET title = ?1 WHERE conversation_id LIKE ?2",
+                        params![clean_title, &pattern],
+                    ),
+                    "update title in conversations_fts like fallback",
+                );
+            }
+        }
+        Err(e) => {
+            // Justification: conversations_fts is an optional virtual table not present in all SQLite versions or databases
+            crate::error::record_ignored(
+                Err::<(), _>(e),
+                "update title in conversations_fts (table may not exist)",
+            );
+        }
+    }
+
+    count
+}
+
 /// Update conversation title across both instance conversation_summaries.db and AGM repo_prompts.db.
 /// Invalidates the prompt tree cache upon success.
 pub fn update_conversation_title(
@@ -403,6 +484,8 @@ pub fn update_conversation_title(
         .map(|s| crate::modules::instance::resolve_instance_id(s).unwrap_or_else(|_| s.to_string()))
         .unwrap_or_else(|| "default".to_string());
 
+    let mut updated_summaries_count = 0;
+
     // 1. Locate instance's conversation_summaries.db and update
     let candidate_dirs = super::gemini_dirs::gemini_dirs_for_instance(&resolved_inst);
     let now_iso = Utc::now().to_rfc3339();
@@ -415,44 +498,30 @@ pub fn update_conversation_title(
 
         for db_path in db_candidates {
             if db_path.exists() {
-                if let Ok(conn) = Connection::open(&db_path) {
-                    crate::error::record_ignored(
-                        conn.pragma_update(None, "busy_timeout", 5000),
-                        "set busy_timeout on conversation_summaries.db",
-                    );
-                    crate::error::record_ignored(
-                        conn.pragma_update(None, "journal_mode", "WAL"),
-                        "set journal_mode WAL on conversation_summaries.db",
-                    );
+                updated_summaries_count +=
+                    update_summaries_in_db(&db_path, clean_title, &now_iso, clean_cid);
+            }
+        }
+    }
 
-                    let count = conn
-                        .execute(
-                            "UPDATE conversation_summaries SET title = ?1, last_modified_time = ?2 WHERE conversation_id = ?3",
-                            params![clean_title, &now_iso, clean_cid],
-                        )
-                        .or_else(|_| {
-                            conn.execute(
-                                "UPDATE conversation_summaries SET title = ?1 WHERE conversation_id = ?2",
-                                params![clean_title, clean_cid],
-                            )
-                        })
-                        .unwrap_or(0);
-
-                    if count == 0 {
-                        let pattern = format!("%{}%", clean_cid);
-                        let _ = conn
-                            .execute(
-                                "UPDATE conversation_summaries SET title = ?1, last_modified_time = ?2 WHERE conversation_id LIKE ?3",
-                                params![clean_title, &now_iso, &pattern],
-                            )
-                            .or_else(|_| {
-                                conn.execute(
-                                    "UPDATE conversation_summaries SET title = ?1 WHERE conversation_id LIKE ?2",
-                                    params![clean_title, &pattern],
-                                )
-                            });
+    // Fallback: If 0 rows updated in the target instance dirs, scan across all candidate dirs
+    if updated_summaries_count == 0 {
+        for (_tag, dir) in super::gemini_dirs::gemini_dirs_tagged(None) {
+            let db_candidates = [
+                dir.join("conversation_summaries.db"),
+                dir.join("antigravity").join("conversation_summaries.db"),
+            ];
+            for db_path in db_candidates {
+                if db_path.exists() {
+                    let count = update_summaries_in_db(&db_path, clean_title, &now_iso, clean_cid);
+                    if count > 0 {
+                        updated_summaries_count += count;
+                        break;
                     }
                 }
+            }
+            if updated_summaries_count > 0 {
+                break;
             }
         }
     }
@@ -460,10 +529,12 @@ pub fn update_conversation_title(
     // 2. Open repo_prompts.db, execute: UPDATE agm_conversation_sequences SET title = ?1, updated_at = ?2 WHERE conversation_id = ?3
     let now_ts = Utc::now().timestamp();
     if let Ok(repo_conn) = super::schema::connect_db() {
+        // Justification: busy_timeout on repo_prompts.db is a nicety; continues with default if failed
         crate::error::record_ignored(
             repo_conn.pragma_update(None, "busy_timeout", 5000),
             "set busy_timeout on repo_prompts.db",
         );
+        // Justification: updating conversation sequence title is best-effort metadata synchronization
         crate::error::record_ignored(
             repo_conn.execute(
                 "UPDATE agm_conversation_sequences SET title = ?1, updated_at = ?2 WHERE conversation_id = ?3",
@@ -472,6 +543,7 @@ pub fn update_conversation_title(
             "update title in agm_conversation_sequences",
         );
         // Also update active_prompts if untitled
+        // Justification: updating active prompt preview is best-effort synchronization
         crate::error::record_ignored(
             repo_conn.execute(
                 "UPDATE active_prompts SET preview_raw = ?1, preview_clean = ?1 WHERE session_id = ?2 AND (preview_raw IS NULL OR preview_raw = '' OR preview_raw LIKE 'Untitled%')",

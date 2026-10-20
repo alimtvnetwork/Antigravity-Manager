@@ -63,7 +63,9 @@ pub(crate) fn is_planner_turn_completed(has_open_tools: bool, s_status: &str) ->
     if has_open_tools {
         return false;
     }
-    s_status.is_empty() || is_terminal_status(s_status)
+    // An empty s_status indicates an in-flight, streaming, or non-finalized turn.
+    // Only explicit terminal statuses (done, completed, idle, error) indicate turn completion.
+    !s_status.trim().is_empty() && is_terminal_status(s_status)
 }
 
 /// Determines whether an entry represents genuine user input rather than internal system events.

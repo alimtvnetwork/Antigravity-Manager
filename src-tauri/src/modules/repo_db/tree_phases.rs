@@ -269,7 +269,7 @@ pub(crate) fn discover_fallback_projects(
                         repo_name,
                         repo_path: raw_repo_path,
                         workspace_storage_path: None,
-                        is_running: status.equals_any(&["running", "in_flight"]),
+                        is_running: status.equals_any(&["running", "in_flight", "dispatched"]),
                         last_detected_at: if updated_at > 0 { updated_at } else { now_fb },
                     });
                 }

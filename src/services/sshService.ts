@@ -294,6 +294,22 @@ export const sshService = {
         }
     },
 
+    async resetSshCluster(): Promise<SshNodeRecord[]> {
+        try {
+            return await invoke<SshNodeRecord[]>('reset_ssh_cluster');
+        } catch (err) {
+            useErrorStore.getState().captureError(err, {
+                source: 'sshService.resetSshCluster',
+                triggerAction: 'reset_ssh_cluster',
+            });
+            throw err;
+        }
+    },
+
+    async resetClusterNodes(): Promise<SshNodeRecord[]> {
+        return await this.resetSshCluster();
+    },
+
     async deployEncryptedSshBundle(targetAliases?: string[]): Promise<MeshDeploySummary> {
         try {
             return await invoke<MeshDeploySummary>('deploy_encrypted_ssh_bundle', {

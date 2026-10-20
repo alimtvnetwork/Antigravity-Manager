@@ -853,7 +853,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                 <div className="space-y-3">
                     <div
                         onDoubleClick={() => openInspector(selectedConversation, selectedProject?.repo_path || '')}
-                        className="rounded-xl border border-slate-200 dark:border-purple-500/25 bg-slate-50 dark:bg-[#0c0514]/95 p-5 text-xs text-slate-800 dark:text-slate-100 leading-relaxed max-h-[460px] overflow-y-auto cursor-pointer hover:border-purple-400 dark:hover:border-purple-500/50 transition-colors shadow-inner"
+                        className="rounded-xl border border-slate-200 dark:border-purple-500/25 bg-slate-50 dark:bg-[#19191c] p-5 text-xs text-slate-800 dark:text-slate-100 leading-relaxed max-h-[460px] overflow-y-auto cursor-pointer hover:border-purple-400 dark:hover:border-purple-500/50 transition-colors shadow-inner"
                     >
                         <RichMarkdownRenderer
                             content={displayedMarkdown}
@@ -902,7 +902,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
             {/* Tab 2: Raw Mode (Monospace Clean Text with Explicit <br /> Line Gaps) */}
             {viewMode === PromptViewMode.Raw && (
                 <div className="space-y-3">
-                    <div className="rounded-xl border border-slate-200 dark:border-purple-500/25 bg-slate-50 dark:bg-[#0c0514]/95 p-5 font-mono text-xs text-slate-800 dark:text-slate-100 leading-relaxed whitespace-pre-wrap break-words max-h-[460px] overflow-y-auto select-text shadow-inner">
+                    <div className="rounded-xl border border-slate-200 dark:border-purple-500/25 bg-slate-50 dark:bg-[#19191c] p-5 font-mono text-xs text-slate-800 dark:text-slate-100 leading-relaxed whitespace-pre-wrap break-words max-h-[460px] overflow-y-auto select-text shadow-inner">
                         {activePromptText ? (
                             formatPromptForMarkdown(activePromptText).split('\n').map((line, idx, arr) => (
                                 <span key={`raw-line-${idx}`} className="block">
@@ -929,7 +929,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                     <textarea
                         value={editedPromptText}
                         onChange={(e) => setEditedPromptText(e.target.value)}
-                        className="w-full h-80 rounded-xl border border-slate-200 dark:border-purple-500/25 bg-slate-50 dark:bg-[#0c0514]/95 p-4 font-mono text-xs text-slate-900 dark:text-slate-100 leading-relaxed focus:outline-none focus:ring-2 focus:ring-purple-500/40 resize-y"
+                        className="w-full h-80 rounded-xl border border-slate-200 dark:border-purple-500/25 bg-slate-50 dark:bg-[#19191c] p-4 font-mono text-xs text-slate-900 dark:text-slate-100 leading-relaxed focus:outline-none focus:ring-2 focus:ring-purple-500/40 resize-y"
                         placeholder="Type or modify prompt instruction here..."
                     />
                     <div className="flex items-center justify-between pt-1">

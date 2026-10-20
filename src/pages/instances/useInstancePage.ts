@@ -10,6 +10,7 @@ import {
     setInstanceCardDensity,
     getAutoSwitcherDaemonStatus,
     type AutoSwitcherDaemonStatus,
+    launchAllInstances,
 } from '../../services/instanceService';
 import { invoke } from '@tauri-apps/api/core';
 import { isTauri } from '../../utils/env';
@@ -73,6 +74,7 @@ export function useInstancePage(): InstancePageApi {
     const [actionError, setActionError] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [isSyncingAll, setIsSyncingAll] = useState(false);
+    const [isLaunchingAll, setIsLaunchingAll] = useState(false);
     const [syncingInstanceIds, setSyncingInstanceIds] = useState<Record<string, boolean>>({});
     const [auditModalInstance, setAuditModalInstance] = useState<InstancePageApi['auditModalInstance']>(null);
     const [actionState, setActionState] = useState<Record<string, InstanceActionType>>({});
@@ -348,6 +350,8 @@ export function useInstancePage(): InstancePageApi {
         setActionState,
         setDeletingId,
         setIsSyncingAll,
+        isLaunchingAll,
+        setIsLaunchingAll,
         setSyncingInstanceIds,
         setNewInstanceName,
         setNewInstanceBoundAccount,
@@ -373,6 +377,7 @@ export function useInstancePage(): InstancePageApi {
         deleteInstance,
         wipeSession,
         launchInstance,
+        launchAllInstances,
         stopInstance,
         restartInstance,
         fastForwardInstance,
@@ -470,6 +475,8 @@ export function useInstancePage(): InstancePageApi {
         handleWipeSession: pageActions.handleWipeSession,
         handleConfirmWipe: pageActions.handleConfirmWipe,
         handleLaunch: pageActions.handleLaunch,
+        handleLaunchAll: pageActions.handleLaunchAll,
+        isLaunchingAll,
         handleStop: pageActions.handleStop,
         handleRestart: pageActions.handleRestart,
         handleFastForward: pageActions.handleFastForward,

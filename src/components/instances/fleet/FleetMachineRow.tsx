@@ -49,6 +49,13 @@ export function FleetMachineRow({
 
     const cleanAlias = sanitizeAdminText(machine.node_alias) || 'Unnamed Worker';
     const cleanOsInfo = sanitizeAdminText(machine.os_info);
+    const mExt = machine as { is_local?: boolean; alias?: string; source?: string };
+    const isLocalNode = Boolean(
+        mExt.is_local ||
+        machine.node_alias?.toLowerCase() === 'w1' ||
+        mExt.alias?.toLowerCase() === 'w1' ||
+        mExt.source === 'local'
+    );
 
     return (
         <tr key={machine.node_id} className="hover:bg-slate-800/30 transition-colors duration-150">
@@ -76,6 +83,11 @@ export function FleetMachineRow({
                             >
                                 {cleanAlias}
                             </span>
+                            {isLocalNode && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 shadow-[0_0_8px_rgba(6,182,212,0.15)]">
+                                    Local
+                                </span>
+                            )}
                             {machine.is_online ? (
                                 <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
                                     ONLINE

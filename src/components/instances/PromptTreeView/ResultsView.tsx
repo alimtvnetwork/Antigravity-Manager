@@ -195,7 +195,7 @@ export function ResultsView(props: ResultsViewProps) {
                 {/* 1. Assistant Text Response */}
                 {selectedConversation.latest_response && (
                     <div className={cn(
-                        "rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#090611] p-5 text-xs text-slate-800 dark:text-slate-200 leading-relaxed overflow-y-auto shadow-inner",
+                        "rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#19191c] p-5 text-xs text-slate-800 dark:text-slate-200 leading-relaxed overflow-y-auto shadow-inner",
                         showAllWords ? "max-h-none" : "max-h-[460px]"
                     )}>
                         <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-slate-200/60 dark:border-[#40285e]/60 text-emerald-600 dark:text-emerald-400 font-bold text-xs">

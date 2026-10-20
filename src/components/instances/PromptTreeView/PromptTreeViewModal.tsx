@@ -228,8 +228,8 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         }
     };
 
-    const handleRenameConversation = async (conversationId: string, newTitle: string) => {
-        const targetInst = selectedProject?.instance_id || instanceId || 'default';
+    const handleRenameConversation = async (conversationId: string, newTitle: string, instId?: string) => {
+        const targetInst = instId || selectedConversation?.instance_id || selectedProject?.instance_id || instanceId || 'default';
         await invoke('rename_conversation', {
             instanceId: targetInst,
             conversationId,
@@ -243,6 +243,18 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                 ),
             }))
         );
+        setSelectedConversation((prev) =>
+            prev?.conversation_id === conversationId ? { ...prev, title: newTitle } : prev
+        );
+        setSelectedProject((prev) => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                conversations: prev.conversations.map((c) =>
+                    c.conversation_id === conversationId ? { ...c, title: newTitle } : c
+                ),
+            };
+        });
     };
 
     const handleResendPrompts = () => {
@@ -926,6 +938,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                         onResend={promptActions.handleResendPrompt}
                                         onEnqueue={promptActions.handleEnqueuePrompt}
                                         rerunRepoPath={selectedProject?.repo_path || ''}
+                                        onRenameConversation={handleRenameConversation}
                                         onOpenInspector={(conv) => promptActions.openInspector(conv, selectedProject?.repo_path || '')}
                                     />
 

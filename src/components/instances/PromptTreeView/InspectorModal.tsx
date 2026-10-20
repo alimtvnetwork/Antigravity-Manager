@@ -399,7 +399,7 @@ export function InspectorModal({
                                     <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">
                                         Instruction Body
                                     </span>
-                                    <div className="flex-1 rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#100a1c] p-4 text-xs text-slate-900 dark:text-slate-100 overflow-y-auto select-text shadow-inner">
+                                    <div className="flex-1 rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#19191c] p-4 text-xs text-slate-900 dark:text-slate-100 overflow-y-auto select-text shadow-inner">
                                         <PromptMarkdownPreview
                                             content={promptText}
                                             showAllWords={showAllWords}
@@ -447,7 +447,7 @@ export function InspectorModal({
                                 <div className="flex-1 overflow-y-auto space-y-3 min-h-[300px]">
                                     {/* 1. Assistant Text Response */}
                                     {(inspectorPrompt as any).latest_response ? (
-                                        <div className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#100a1c] p-4 text-xs text-slate-800 dark:text-slate-200 shadow-inner">
+                                        <div className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#19191c] p-4 text-xs text-slate-800 dark:text-slate-200 shadow-inner">
                                             <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-slate-200/60 dark:border-[#40285e]/60 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
                                                 <Sparkles className="w-3.5 h-3.5" />
                                                 <span>AI Assistant Response</span>
@@ -456,7 +456,7 @@ export function InspectorModal({
                                         </div>
                                     ) : hasExecutionOutput ? (
                                         /* Extract response or markdown from prompt */
-                                        <div className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#100a1c] p-4 text-xs text-slate-800 dark:text-slate-200 shadow-inner">
+                                        <div className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#19191c] p-4 text-xs text-slate-800 dark:text-slate-200 shadow-inner">
                                             <PromptMarkdownPreview content={promptText} />
                                         </div>
                                     ) : (

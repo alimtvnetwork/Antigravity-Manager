@@ -141,8 +141,7 @@ pub async fn migrate_database_data(
 /// Build local fallback machine telemetry when sync is disabled or Supabase is unreachable
 pub fn build_local_fallback_machine() -> Vec<FleetMachineInfo> {
     let node_id = get_local_node_id();
-    let config = load_config().unwrap_or_default();
-    let node_alias = config.node_alias;
+    let node_alias = resolve_local_node_alias();
     let ip_address = get_local_ip();
     let uptime_seconds = get_uptime_seconds();
     let now = Utc::now().timestamp();

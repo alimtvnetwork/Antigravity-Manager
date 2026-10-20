@@ -32,9 +32,9 @@ pub struct PromptQueueRow {
 /// Payload for `get_running_and_up_next` (spec §6.1).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunningAndUpNext {
-    /// The now-running prompt (status = `running`, FIFO earliest).
+    /// The now-running prompt (status in 'running'/'dispatched', FIFO earliest).
     pub now_running: Option<PromptQueueRow>,
-    /// Up to 4 queued prompts (status in `queued`/`pending`/`dispatched`, FIFO).
+    /// Up to 4 queued prompts (status in 'queued'/'pending', FIFO).
     pub up_next: Vec<PromptQueueRow>,
     /// Full queued count ("four or whatever the queue holds").
     pub up_next_total: i64,
@@ -72,7 +72,7 @@ fn query_now_running(conn: &Connection, target: &str) -> Result<Option<PromptQue
     let sql = format!(
         "SELECT id, instance_id, status, created_at, image_payload IS NOT NULL \
          FROM active_prompts \
-         WHERE status = 'running' AND {pred} \
+         WHERE status IN ('running', 'dispatched') AND {pred} \
          ORDER BY created_at ASC, id ASC LIMIT 1"
     );
     let result = match param {
@@ -91,7 +91,7 @@ fn query_up_next(conn: &Connection, target: &str) -> Result<Vec<PromptQueueRow>,
     let sql = format!(
         "SELECT id, instance_id, status, created_at, image_payload IS NOT NULL \
          FROM active_prompts \
-         WHERE status IN ('queued', 'pending', 'dispatched') AND {pred} \
+         WHERE status IN ('queued', 'pending') AND {pred} \
          ORDER BY created_at ASC, id ASC LIMIT 4"
     );
     let mut stmt = conn
@@ -110,7 +110,7 @@ fn query_up_next_total(conn: &Connection, target: &str) -> Result<i64, String> {
     let (pred, param) = instance_predicate(target);
     let sql = format!(
         "SELECT COUNT(*) FROM active_prompts \
-         WHERE status IN ('queued', 'pending', 'dispatched') AND {pred}"
+         WHERE status IN ('queued', 'pending') AND {pred}"
     );
     let total: i64 = match param {
         Some(p) => conn.query_row(&sql, params![p], |r| r.get(0)),

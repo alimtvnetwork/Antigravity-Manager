@@ -17,6 +17,20 @@ export async function launchInstance(instanceId: string): Promise<void> {
     }
 }
 
+export async function launchAllInstances(): Promise<string[]> {
+    try {
+        return await invoke<string[]>('launch_all_instances');
+    } catch (e: any) {
+        const captured = useErrorStore.getState().captureError(e, {
+            source: 'instanceService.launchAllInstances',
+            endpoint: 'launch_all_instances',
+            triggerAction: 'launch_all_instances',
+        });
+        useErrorStore.getState().openErrorModal(captured);
+        throw e;
+    }
+}
+
 export async function focusOrLaunchInstance(instanceId: string, workspacePath?: string): Promise<boolean> {
     try {
         return await invoke('focus_or_launch_instance', { instanceId, workspacePath });

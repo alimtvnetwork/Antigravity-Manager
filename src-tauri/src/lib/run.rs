@@ -305,6 +305,7 @@ pub fn run() {
             commands::delete_instance,
             commands::wipe_instance_session,
             commands::launch_instance,
+            commands::launch_all_instances,
             commands::focus_or_launch_instance,
             commands::focus_instance_workspace,
             commands::clone_instance_executable,
@@ -431,6 +432,7 @@ pub fn run() {
             commands::get_cluster_instances_and_balances,
             commands::send_remote_ssh_prompt,
             commands::export_system_data_csv,
+            commands::reset_ssh_cluster,
             // Toolchain Installer commands
             commands::toolchain_list_items,
             commands::toolchain_check,

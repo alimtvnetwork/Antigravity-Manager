@@ -191,6 +191,17 @@ pub async fn import_ssh_nodes_from_gitmap() -> Result<Vec<SshNodeRecord>, String
 }
 
 #[tauri::command]
+pub async fn reset_ssh_cluster() -> Result<Vec<SshNodeRecord>, String> {
+    tokio::task::spawn_blocking(|| {
+        let _stats = ssh_manager::reset_ssh_cluster_nodes()?;
+        let conns = ssh_manager::load_ssh_connections()?;
+        Ok(conns.iter().map(ssh_manager::to_ssh_node_record).collect())
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))?
+}
+
+#[tauri::command]
 pub async fn deploy_encrypted_ssh_bundle(
     target_aliases: Option<Vec<String>>,
 ) -> Result<MeshDeploySummary, String> {

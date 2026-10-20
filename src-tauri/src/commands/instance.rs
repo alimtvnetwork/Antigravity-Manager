@@ -259,6 +259,64 @@ pub fn launch_instance(instance_id: String) -> Result<(), crate::error::AppError
 }
 
 #[tauri::command]
+pub fn launch_all_instances() -> Result<Vec<String>, crate::error::AppError> {
+    let mut audit = crate::modules::task_history_db::AuditTask::start(
+        crate::modules::audit_action::AuditAction::StartInstance,
+        "Launch all stopped instances",
+        None,
+    );
+
+    let instances = instance::list_instances().map_err(crate::error::AppError::Process)?;
+    let mut launched = Vec::new();
+    let mut errors = Vec::new();
+
+    for inst in instances {
+        if !inst.is_running {
+            match instance::launch_instance(&inst.config.id) {
+                Ok(_) => {
+                    launched.push(inst.config.id.clone());
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "[Instance] Failed to launch instance '{}' during launch_all: {}",
+                        inst.config.id,
+                        e
+                    );
+                    errors.push(format!("{}: {}", inst.config.id, e));
+                }
+            }
+        }
+    }
+
+    if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
+        use tauri::Emitter;
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("instances://refreshed", ()),
+            "emit instances://refreshed",
+        );
+    }
+
+    if errors.is_empty() {
+        audit.succeed(&format!("Launched {} instance(s)", launched.len()));
+    } else if launched.is_empty() {
+        audit.fail(&format!(
+            "Failed to launch stopped instance(s): {}",
+            errors.join("; ")
+        ));
+    } else {
+        audit.succeed(&format!(
+            "Launched {} instance(s) with {} failure(s): {}",
+            launched.len(),
+            errors.len(),
+            errors.join("; ")
+        ));
+    }
+
+    Ok(launched)
+}
+
+#[tauri::command]
 pub fn focus_or_launch_instance(
     instance_id: String,
     workspace_path: Option<String>,

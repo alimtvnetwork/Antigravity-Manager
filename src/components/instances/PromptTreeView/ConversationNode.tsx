@@ -18,7 +18,7 @@ export interface ConversationNodeProps {
     isSelected: boolean;
     onSelect: (conv: AgmConversationNode, project: AgmProjectTreeNode) => void;
     onOpenInspector: (conv: AgmConversationNode, repoPath: string) => void;
-    onRenameConversation?: (conversationId: string, newTitle: string) => Promise<void> | void;
+    onRenameConversation?: (conversationId: string, newTitle: string, targetInst?: string) => Promise<void> | void;
     onResendPrompts?: (count: number | 'all') => void;
     onEnqueue?: () => void;
     onRerunConversation?: (convoId: string, nudgeType: string) => void;
@@ -96,7 +96,7 @@ export function ConversationNode({
 
         try {
             if (onRenameConversation) {
-                await onRenameConversation(conv.conversation_id, trimmed);
+                await onRenameConversation(conv.conversation_id, trimmed, targetInst);
             } else {
                 await invoke('rename_conversation', {
                     instanceId: targetInst || null,

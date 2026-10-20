@@ -130,6 +130,35 @@ pub(crate) fn collect_all_peer_connections() -> Vec<crate::modules::ssh_manager:
         }
     }
 
+    // 4. Canonical fallback: ensure all 6 GitMap cluster nodes (w1, main, u1, w2, w3, w4) are present
+    for &(alias, ip, user, os) in crate::modules::ssh_manager::GITMAP_CLUSTER_NODES {
+        let a_norm = alias.trim().to_ascii_lowercase();
+        let ip_norm = ip.trim().to_string();
+        if !a_norm.is_empty() && !seen_aliases.contains(&a_norm) && !seen_ips.contains(&ip_norm) {
+            seen_aliases.insert(a_norm);
+            seen_ips.insert(ip_norm.clone());
+            all_conns.push(crate::modules::ssh_manager::SshConnectionRecord {
+                alias: alias.to_string(),
+                ip_address: ip.to_string(),
+                port: 22,
+                username: user.to_string(),
+                key_path: String::new(),
+                os: os.to_string(),
+                encrypted_password: String::new(),
+                encryption_algo: "RSA-2048".to_string(),
+                os_group: Some(if os.eq_ignore_ascii_case("windows") {
+                    "Windows".to_string()
+                } else {
+                    "Linux".to_string()
+                }),
+                os_version: None,
+                build_version: None,
+                first_run_at: None,
+                created_at: None,
+            });
+        }
+    }
+
     all_conns
 }
 
@@ -149,6 +178,10 @@ pub fn build_local_and_ssh_fleet() -> Vec<FleetMachineInfo> {
     let all_conns = collect_all_peer_connections();
     for conn in all_conns {
         if conn.ip_address == local_ip || conn.alias.eq_ignore_ascii_case(&local_alias) {
+            if let Some(local_machine) = machines.first_mut() {
+                local_machine.node_alias = conn.alias.clone();
+                local_machine.alias = conn.alias;
+            }
             continue;
         }
         machines.push(build_ssh_mesh_machine_info(&conn, now));
@@ -391,19 +424,23 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
         if is_local {
             has_local = true;
         }
-        let mut node_alias = n
-            .get("alias")
-            .and_then(|v| v.as_str())
-            .unwrap_or_default()
-            .to_string();
-        if is_local && node_alias.is_empty() {
-            node_alias = config.node_alias.clone();
-        }
         let ip_address = n
             .get("ip_address")
             .and_then(|v| v.as_str())
             .unwrap_or_default()
             .to_string();
+        let mut node_alias = n
+            .get("alias")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        if (is_local || ip_address == get_local_ip())
+            && (node_alias.is_empty()
+                || node_alias == "agm-node-local"
+                || node_alias.starts_with("Node-"))
+        {
+            node_alias = resolve_local_node_alias();
+        }
         let uptime_seconds = if is_local {
             get_uptime_seconds()
         } else {

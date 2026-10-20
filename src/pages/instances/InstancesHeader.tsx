@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
     Laptop,
+    Play,
     RotateCw,
     Plus,
     FolderSync,
@@ -45,6 +46,8 @@ export function InstancesHeader({ api }: { api: InstancePageApi }) {
         handleSetViewMode,
         handleSetCardDensity,
         handleSyncAll,
+        handleLaunchAll,
+        isLaunchingAll,
         handleCleanRestart,
         handleToggleAutoSwitcher,
         handleTriggerRotation,
@@ -241,6 +244,21 @@ export function InstancesHeader({ api }: { api: InstancePageApi }) {
                         <RotateCw className={cn('w-3.5 h-3.5 text-blue-500', isLoading && 'animate-spin')} />
                         <span>{t('common.refresh', 'Refresh')}</span>
                     </button>
+                    {instances.length - runningCount > 0 && (
+                        <button
+                            type="button"
+                            onClick={handleLaunchAll}
+                            disabled={isLoading || isLaunchingAll}
+                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/40 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                            title={`Start all ${instances.length - runningCount} stopped instance(s)`}
+                        >
+                            <Play className={cn('w-3.5 h-3.5 text-emerald-500', isLaunchingAll && 'animate-spin')} />
+                            <span>Start All</span>
+                            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                                {instances.length - runningCount}
+                            </span>
+                        </button>
+                    )}
                     <button
                         type="button"
                         onClick={handleSyncAll}

@@ -122,10 +122,9 @@ pub async fn list_active_account_leases() -> AppResult<Vec<WorkspaceLease>> {
 
 #[tauri::command]
 pub async fn get_local_node_info() -> AppResult<LocalNodeInfo> {
-    let config = supabase_sync::load_config().unwrap_or_default();
     Ok(LocalNodeInfo {
         node_id: supabase_sync::get_local_node_id(),
-        node_alias: config.node_alias,
+        node_alias: supabase_sync::resolve_local_node_alias(),
         ip_address: supabase_sync::get_local_ip(),
         uptime_seconds: supabase_sync::get_uptime_seconds(),
     })

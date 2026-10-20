@@ -1,4 +1,4 @@
-import { Eye, Code, Edit3, ChevronUp, ChevronDown, MessageSquare, Terminal } from 'lucide-react';
+import { Eye, Code, Edit3, FileText, ChevronUp, ChevronDown, MessageSquare, Terminal } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { PromptViewMode, type AgmConversationNode, type ViewMode } from './types';
 
@@ -30,6 +30,7 @@ export function DetailTabs(props: DetailTabsProps) {
         setShowAllWords,
         viewMode,
         setViewMode,
+        setIsDetailsModalOpen,
     } = props;
 
     return (
@@ -67,7 +68,8 @@ export function DetailTabs(props: DetailTabsProps) {
                         type="button"
                         onClick={() => setViewMode(PromptViewMode.Edit)}
                         className={cn(
-                            'p-1.5 px-2 rounded-r-md transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer',
+                            'p-1.5 px-2 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer',
+                            setIsDetailsModalOpen ? 'rounded-none' : 'rounded-r-md',
                             viewMode === PromptViewMode.Edit
                                 ? 'bg-blue-600 text-white shadow-2xs'
                                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60'
@@ -76,6 +78,20 @@ export function DetailTabs(props: DetailTabsProps) {
                     >
                         <Edit3 className="w-3.5 h-3.5" />
                     </button>
+                    {setIsDetailsModalOpen && (
+                        <button
+                            type="button"
+                            onClick={() => setIsDetailsModalOpen(true)}
+                            className="p-1.5 px-2.5 rounded-r-md flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60 text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            title="Open Conversation & Instance Details"
+                        >
+                            <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                            <span>Details</span>
+                            {selectedConversation?.is_running && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] shadow-[0_0_4px_rgba(26,241,141,0.9)] animate-pulse shrink-0" />
+                            )}
+                        </button>
+                    )}
                 </div>
             </div>
 

@@ -1,4 +1,4 @@
-import { Server, RotateCw, Eye, EyeOff } from 'lucide-react';
+import { Server, RotateCw, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { useFleetMachines } from './fleet/useFleetMachines';
 import { FleetMachineRow } from './fleet/FleetMachineRow';
@@ -13,6 +13,7 @@ export function FleetMachinesTable() {
         machines,
         isLoading,
         isRefreshing,
+        isResettingCluster,
         isSyncEnabled,
         showAllEmails,
         unmaskedRows,
@@ -20,6 +21,7 @@ export function FleetMachinesTable() {
         countdown,
         setShowAllEmails,
         handleManualRefresh,
+        handleResetCluster,
         handleCopyIp,
         toggleRowMask,
     } = useFleetMachines();
@@ -87,6 +89,18 @@ export function FleetMachinesTable() {
                             <Eye className="w-3.5 h-3.5 text-slate-400" />
                         )}
                         <span>{showAllEmails ? 'Mask' : 'Reveal'}</span>
+                    </button>
+
+                    {/* Reset Cluster button */}
+                    <button
+                        type="button"
+                        onClick={handleResetCluster}
+                        disabled={isResettingCluster || isRefreshing}
+                        className="px-2.5 py-1 text-slate-300 hover:text-white hover:bg-slate-700/50 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        title="Reset Cluster Nodes to Canonical Defaults (w1, main, u1, w2, w3, w4)"
+                    >
+                        <RotateCcw className={cn('w-3.5 h-3.5 text-amber-400', isResettingCluster && 'animate-spin')} />
+                        <span>Reset Cluster</span>
                     </button>
 
                     {/* Manual refresh button */}
