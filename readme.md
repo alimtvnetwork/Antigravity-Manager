@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.238.4-3B82F6?style=flat-square" alt="Version v4.238.4">
+    <img src="https://img.shields.io/badge/Version-v4.238.7-3B82F6?style=flat-square" alt="Version v4.238.7">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -115,7 +115,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.238.4)**
+**Bar 2: Version-Based Installation (v4.238.7)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -583,6 +583,8 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 > Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
 
 ## 📝 Changelog
+
+> Latest version **v4.238.7**: Multimodal Prompt Backup & Restore E2E Suite, GitMap Delegation Parity, 10s Settling Invariant, SQLite Constraint & File-Lock Fixes — Implemented a comprehensive 25-assertion, 8-gate end-to-end test suite (`scripts/test-agm-gitmap-running-backup-e2e.ps1`) covering running prompt inspection, multimodal deep analysis image attachments (Base64 data URIs, local fixtures, screenshot tokens), Split SQLite snapshot backup (`backup_prompts.db:prompt_backups`), and strict FIFO queue restoration with status transitioning to `'dispatched'`; verified full command parity across `agm running`, `agm backup running`, `agm restore running`, `gitmap agy running`, `gitmap agy ff`, `gitmap backup-running-prompts`, and `gitmap restore-running-prompts`; enforced mandatory `post_switch_resume_delay_seconds = 10` in `src-tauri/src/modules/repo_db/post_switch_resume.rs` ensuring Electron webview, extension host, and CDP debugger endpoints (`DevToolsActivePort`) are ready before prompt re-injection; hardened caller process detection (`agm instances whoami`) with Exit Code 2 refusal on caller stopping or mutation to protect active developer workspaces; fixed SQLite runtime constraint failure in `src-tauri/src/modules/instance/create.rs` (`NOT NULL constraint failed: instance_processes.pid`) preserving historical process ID while clearing active state; implemented `remove_dir_all_force` in `src-tauri/src/utils/fs.rs` with Win32 attribute stripping (`FILE_ATTRIBUTE_NORMAL`), eliminating `os error 5 (Access is denied)` during Chromium cache removal; and passed 8/8 diagnostic probes in `agm errors fix` self-healing engine. (Thanks to @aukgit)
 
 > Latest version **v4.238.4**: Pure PNG Clipboard Copy, Image Attachment Forwarding, Turn Status Badges & GitMap Node Resolution — Implemented `writePureImageToClipboard` in `src/components/instances/PromptTreeView/clipboard.ts` writing strictly single-MIME `'image/png'` with canvas-based PNG header transcoding (`transcodeSrcToPngBlob`), eliminating multi-MIME format collisions that previously caused Microsoft OneNote, Slack, Discord, and Telegram to strip images or paste empty placeholders; added 1-click `[ 📋 Copy Image (PNG) ]` and sequential `[ 📋 Copy Images (N) ]` buttons in the "Attached Images" gallery header, plus hover-activated 1-click copy badges on individual thumbnails in `PromptInstructionView.tsx`; decoupled immediate session injection (`handleSendPromptNow` / `sendPromptNow`) from queue scheduling (`handleEnqueuePrompt`) in `usePromptTreePromptActions.ts` and `DetailHeader.tsx`; preserved and appended attached conversation images (`media_paths`) in markdown image syntax (`![Attached Image N](<path>)`) across Rerun, Send, and Enqueue flows so IDE sessions receive complete image attachments without data loss; refactored status evaluation in `src-tauri/src/modules/repo_db/tree_collect.rs` so live transcript activity (`is_owning_inst_alive && inspection.is_recent_active && !inspection.is_terminal_done`) takes precedence over stale SQLite idle summaries, accurately displaying emerald pulse `RUNNING` for active turns and amber `QUEUED` for pending turns; upgraded `src-tauri/src/modules/telegram_inbound/node_label.rs` to parse `~/.gitmap/gitmap-ssh-nodes.json` and `./gitmap-ssh-nodes.json` when the machine alias is `none` or auto-generated `Node-*`, matching local IP `192.168.1.3` to alias `w1` and annotating as `w1 (collected from gitmap)`; separated `Machine:` and `Instance:` onto distinct lines across all Telegram status reports in `reports_b.rs`, `system.rs`, `telegram_alerts.rs`, and `telemetry.rs`; and upgraded preview, raw markdown, and edit mode containers in `PromptInstructionView.tsx` to `dark:bg-[#0c0514]/95` with `dark:border-purple-500/25` subtle borders. (Thanks to @aukgit)
 
