@@ -414,7 +414,12 @@ export function usePromptTreePromptActions({
             if (mediaList.length > 0) {
                 const missing = mediaList.filter((p) => p && !promptContent.includes(p));
                 if (missing.length > 0) {
-                    promptContent += '\n\n' + missing.map((p, idx) => `![Attached Image ${idx + 1}](${p})`).join('\n\n');
+                    const imagesBlock = '\n\n' + missing.map((p, idx) => `![Attached Image ${idx + 1}](${p})`).join('\n\n');
+                    if (promptContent.includes('</USER_REQUEST>')) {
+                        promptContent = promptContent.replace('</USER_REQUEST>', imagesBlock + '\n</USER_REQUEST>');
+                    } else {
+                        promptContent += imagesBlock;
+                    }
                 }
             }
 
@@ -444,6 +449,28 @@ export function usePromptTreePromptActions({
             if (dispatchOk) {
                 setActionMsg("Prompt dispatched to IDE & copied to clipboard!");
                 setTimeout(() => setActionMsg(null), 3000);
+                if (isTauri()) {
+                    try {
+                        await invoke('invalidate_prompt_tree_cache', { instanceId: targetInstId }).catch(async () => {
+                            await invoke('reset_prompt_tree_cache', { instanceId: targetInstId });
+                        });
+                    } catch (cacheErr) {
+                        useErrorStore.getState().trackWarning(cacheErr, {
+                            source: 'usePromptTreePromptActions.handleResendPrompt',
+                            triggerAction: 'invalidate_prompt_tree_cache',
+                        });
+                    }
+                }
+                if (loadTree) {
+                    try {
+                        await loadTree(true, true);
+                    } catch (loadErr) {
+                        useErrorStore.getState().trackWarning(loadErr, {
+                            source: 'usePromptTreePromptActions.handleResendPrompt',
+                            triggerAction: 'loadTree',
+                        });
+                    }
+                }
             } else {
                 const errorObj = dispatchErr instanceof Error ? dispatchErr : new Error(String(dispatchErr) || 'dispatch rejected');
                 setError(`Send failed: ${errorObj.message} — prompt copied to clipboard; paste it into the IDE manually.`);
@@ -619,24 +646,19 @@ ${activePromptText}
             if (mediaList.length > 0) {
                 const missing = mediaList.filter((p) => p && !promptContent.includes(p));
                 if (missing.length > 0) {
-                    promptContent += '\n\n' + missing.map((p, idx) => `![Attached Image ${idx + 1}](${p})`).join('\n\n');
+                    const imagesBlock = '\n\n' + missing.map((p, idx) => `![Attached Image ${idx + 1}](${p})`).join('\n\n');
+                    if (promptContent.includes('</USER_REQUEST>')) {
+                        promptContent = promptContent.replace('</USER_REQUEST>', imagesBlock + '\n</USER_REQUEST>');
+                    } else {
+                        promptContent += imagesBlock;
+                    }
                 }
             }
 
             // Enqueue prompt into FIFO queue (preserving real Base64 image data URIs and file paths)
             await enqueuePrompt(targetInstId, repoPath, promptContent, targetConvId);
 
-            // Trigger immediate tree refresh and cache invalidation so tree view reflects enqueued turn
-            if (loadTree) {
-                try {
-                    await loadTree(true, true);
-                } catch (loadErr) {
-                    useErrorStore.getState().trackWarning(loadErr, {
-                        source: 'usePromptTreePromptActions.handleEnqueuePrompt',
-                        triggerAction: 'loadTree',
-                    });
-                }
-            }
+            // Invalidate prompt tree cache first so tree reload fetches fresh state including enqueued turn
             if (isTauri()) {
                 try {
                     await invoke('invalidate_prompt_tree_cache', { instanceId: targetInstId }).catch(async () => {
@@ -646,6 +668,18 @@ ${activePromptText}
                     useErrorStore.getState().trackWarning(cacheErr, {
                         source: 'usePromptTreePromptActions.handleEnqueuePrompt',
                         triggerAction: 'invalidate_prompt_tree_cache',
+                    });
+                }
+            }
+
+            // Trigger immediate tree refresh so tree view reflects enqueued turn
+            if (loadTree) {
+                try {
+                    await loadTree(true, true);
+                } catch (loadErr) {
+                    useErrorStore.getState().trackWarning(loadErr, {
+                        source: 'usePromptTreePromptActions.handleEnqueuePrompt',
+                        triggerAction: 'loadTree',
                     });
                 }
             }

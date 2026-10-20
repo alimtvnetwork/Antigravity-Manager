@@ -57,6 +57,7 @@ pub fn strip_internal_id_wrappers(raw: &str) -> String {
 
 /// Extract clean prompt text by stripping <USER_REQUEST> / <ADDITIONAL_METADATA> tags if present.
 /// If stripping XML tags results in an empty string, falls back to returning the original trimmed prompt.
+/// Attached markdown images (![...](...)) present anywhere in `raw` are preserved.
 pub fn extract_clean_user_prompt(raw: &str) -> String {
     let mut text = raw.trim();
     if let Some(start) = text.find("<USER_REQUEST>") {
@@ -74,11 +75,33 @@ pub fn extract_clean_user_prompt(raw: &str) -> String {
         text = &text[..end];
     }
     let cleaned = strip_internal_id_wrappers(text.trim());
-    if cleaned.trim().is_empty() && !raw.trim().is_empty() {
+    let mut result = if cleaned.trim().is_empty() && !raw.trim().is_empty() {
         raw.trim().to_string()
     } else {
         cleaned
+    };
+
+    // Preserve any markdown images in raw that were placed outside <USER_REQUEST>
+    let mut cursor = raw;
+    while let Some(img_start) = cursor.find("![") {
+        let after_start = &cursor[img_start..];
+        if let Some(open_paren) = after_start.find("](") {
+            if let Some(close_paren) = after_start[open_paren + 2..].find(')') {
+                let full_img = &after_start[..open_paren + 2 + close_paren + 1];
+                if !result.contains(full_img) {
+                    if !result.is_empty() {
+                        result.push_str("\n\n");
+                    }
+                    result.push_str(full_img);
+                }
+                cursor = &after_start[open_paren + 2 + close_paren + 1..];
+                continue;
+            }
+        }
+        cursor = &after_start[2..];
     }
+
+    result
 }
 
 /// Extract smart, readable summary of a prompt for display in CLI and Telegram.
@@ -457,6 +480,12 @@ mod tests {
 
         let stripped_empty = "<ADDITIONAL_METADATA>only meta</ADDITIONAL_METADATA>";
         assert_eq!(extract_clean_user_prompt(stripped_empty), stripped_empty);
+
+        let with_img =
+            "<USER_REQUEST>\nFix the button\n</USER_REQUEST>\n\n![Attached Image 1](C:/test.png)";
+        let clean_img = extract_clean_user_prompt(with_img);
+        assert!(clean_img.contains("Fix the button"));
+        assert!(clean_img.contains("![Attached Image 1](C:/test.png)"));
     }
 
     #[test]

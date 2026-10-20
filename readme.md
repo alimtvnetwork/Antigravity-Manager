@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.241.0-3B82F6?style=flat-square" alt="Version v4.241.0">
+    <img src="https://img.shields.io/badge/Version-v4.242.0-3B82F6?style=flat-square" alt="Version v4.242.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -115,7 +115,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.241.0)**
+**Bar 2: Version-Based Installation (v4.242.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -583,6 +583,8 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 > Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
 
 ## 📝 Changelog
+
+> Latest version **v4.242.0**: Win32 CF_DIB Clipboard Engine, Prompt Tree Image Attachment Splicing, Instant Enqueue Cache Invalidation & DetailHeader Title Polish — Upgraded `copy_image_to_clipboard` backend command in `src-tauri/src/commands/cmd_files.rs` to extract raw bitmap bytes and strip the 14-byte `BITMAPFILEHEADER`, registering native `DeviceIndependentBitmap` (`CF_DIB`) alongside `PNG` streams on `System.Windows.Forms.DataObject` to ensure images pasted into Microsoft OneNote desktop, Word, Paint, Discord, and Google Antigravity IDE render 100% reliably; updated regex parsing in `extract_clean_user_prompt` (`src-tauri/src/modules/repo_db/text_utils.rs`) to collect and preserve markdown images located outside `<USER_REQUEST>`; updated `usePromptTreePromptActions.ts` (`handleResendPrompt` and `handleEnqueuePrompt`) to splice missing conversation images inside `<USER_REQUEST>` before prompt submission; inverted execution order in `src/components/instances/PromptTreeView/usePromptTreePromptActions.ts` so `invalidate_prompt_tree_cache` executes before `loadTree`, guaranteeing newly enqueued turns immediately appear with amber `QUEUED` badges without stale cache reads; added multi-image aggregation in `src/components/instances/PromptTreeView/ConversationContextMenu.tsx`, invoking `copyAllImagesToClipboard` to composite multiple images into a stitched canvas with native `CF_DIB` and `PNG` clipboard writes; standardized button labels strictly to "Copy" and "Copy Images" (eliminating "Copy including image"); stripped all turn/origin prefix badges preceding conversation titles in `src/components/instances/PromptTreeView/DetailHeader.tsx` and enlarged title typography to `text-xl md:text-2xl font-bold font-ubuntu tracking-tight`; and verified complete sandbox isolation via `agm instances test-create` and `agm instances test-clean` alongside 74 passing Telegram inbound tests. (Thanks to @aukgit)
 
 > Latest version **v4.241.0**: Native Win32 DIB Image Clipboard, Prompt Tree Send & Enqueue Restoral, DetailHeader Title Polish, SQLite Reset & Rescan & Fleet Lead Alignment — Repaired `copy_image_to_clipboard` backend command in `src-tauri/src/commands/cmd_files.rs` by checking `data:image/` before path normalization, running PowerShell in `-Sta` mode with `[System.Windows.Forms.Clipboard]::SetDataObject($data, $true)` to ensure persistent native `CF_DIB`/`CF_BITMAP` clipboard memory for Microsoft OneNote, Google Antigravity IDE, Word, and Paint; hooked native clipboard priming into `copyPromptWithRichImages` in `src/components/instances/PromptTreeView/clipboard.ts`; restored attached media preservation during turn selection in `createTurnConv` (`src/components/instances/PromptTreeView/ConversationNode.tsx`); passed `loadTree` callback from `PromptTreeViewModal.tsx` to `usePromptTreePromptActions` to trigger immediate tree refresh upon enqueuing; added current working directory fallback in `src-tauri/src/modules/repo_db/agy.rs` for prompts with empty workspace paths; stripped noisy turn badges preceding conversation titles in `src/components/instances/PromptTreeView/DetailHeader.tsx` and enlarged title typography to `text-lg md:text-xl font-bold font-ubuntu tracking-tight`; enhanced `wipe_and_rescan_repo_db` in `src-tauri/src/modules/repo_db/agy.rs` to wipe `media_vault`, in-memory tracking maps, and dispatched prompts cache alongside `invalidatePromptTreeCache()` on reset; and aligned cluster lead node `main` (`192.168.1.20`) and local node `w1` (`192.168.1.3`) in `src/components/instances/fleet/useFleetMachines.ts` and `FleetMachineRow.tsx` to reflect the authentic Git origin `alimtvnetwork / Antigravity-Manager` with bound accounts `sakibagjdjg@gmail.com` and `cirajayu11@gmail.com`. (Thanks to @aukgit)
 

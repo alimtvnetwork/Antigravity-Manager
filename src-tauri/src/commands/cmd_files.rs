@@ -123,7 +123,22 @@ pub fn copy_image_to_clipboard(path: String) -> Result<(), String> {
     {
         use std::os::windows::process::CommandExt;
         let script = format!(
-            "Add-Type -AssemblyName System.Drawing; Add-Type -AssemblyName System.Windows.Forms; $img = [System.Drawing.Image]::FromFile('{abs_esc}'); $data = New-Object System.Windows.Forms.DataObject; $data.SetImage($img); [System.Windows.Forms.Clipboard]::SetDataObject($data, $true); $img.Dispose()",
+            "Add-Type -AssemblyName System.Drawing; Add-Type -AssemblyName System.Windows.Forms; \
+            $img = [System.Drawing.Image]::FromFile('{abs_esc}'); \
+            $bmp = New-Object System.Drawing.Bitmap($img); \
+            $msPng = New-Object System.IO.MemoryStream; \
+            $bmp.Save($msPng, [System.Drawing.Imaging.ImageFormat]::Png); \
+            $msBmp = New-Object System.IO.MemoryStream; \
+            $bmp.Save($msBmp, [System.Drawing.Imaging.ImageFormat]::Bmp); \
+            $bytes = $msBmp.ToArray(); \
+            $dibStream = New-Object System.IO.MemoryStream(@(,$bytes[14..($bytes.Length - 1)])); \
+            $data = New-Object System.Windows.Forms.DataObject; \
+            $data.SetImage($bmp); \
+            $data.SetData([System.Windows.Forms.DataFormats]::Dib, $dibStream); \
+            $data.SetData('PNG', $msPng); \
+            [System.Windows.Forms.Clipboard]::SetDataObject($data, $true); \
+            $img.Dispose(); \
+            $bmp.Dispose()",
             abs_esc = abs_str.replace('\'', "''")
         );
         let mut cmd = std::process::Command::new("powershell");

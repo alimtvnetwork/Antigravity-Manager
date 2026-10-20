@@ -508,7 +508,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                             onBlur={() => void handleCommitTitle()}
                             onClick={(e) => e.stopPropagation()}
                             onDoubleClick={(e) => e.stopPropagation()}
-                            className="px-2.5 py-1 text-lg md:text-xl font-bold font-ubuntu rounded-md bg-white dark:bg-[#120a1f] border border-purple-500/50 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500 max-w-md md:max-w-xl lg:max-w-2xl shadow-inner"
+                            className="px-2.5 py-1 text-xl md:text-2xl font-bold font-ubuntu rounded-md bg-white dark:bg-[#120a1f] border border-purple-500/50 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500 max-w-md md:max-w-xl lg:max-w-2xl shadow-inner"
                         />
                     ) : (
                         <div className="flex items-center gap-2 min-w-0">
@@ -517,7 +517,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     e.stopPropagation();
                                     setIsEditingTitle(true);
                                 }}
-                                className="text-lg md:text-xl font-bold font-ubuntu text-slate-900 dark:text-white truncate max-w-md md:max-w-xl lg:max-w-2xl cursor-pointer hover:text-purple-600 dark:hover:text-purple-300 transition-colors tracking-tight"
+                                className="text-xl md:text-2xl font-bold font-ubuntu text-slate-900 dark:text-white truncate max-w-md md:max-w-xl lg:max-w-2xl cursor-pointer hover:text-purple-600 dark:hover:text-purple-300 transition-colors tracking-tight"
                                 title={`${selectedConversation.title || selectedConversation.short_id} (Double-click to rename)`}
                             >
                                 {selectedConversation.title || selectedConversation.short_id}

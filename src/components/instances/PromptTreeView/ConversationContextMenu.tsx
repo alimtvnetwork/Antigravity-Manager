@@ -38,7 +38,7 @@ import {
 import { enqueuePrompt } from '../../../services/instanceService';
 import { cn } from '../../../utils/cn';
 import { DetailsModal } from './DetailsModal';
-import { copyPromptWithRichImages, writeNativeImageToClipboard } from './clipboard';
+import { copyPromptWithRichImages, copyAllImagesToClipboard, writePureImageToClipboard } from './clipboard';
 
 export interface ConversationContextMenuProps {
     x: number;
@@ -344,25 +344,37 @@ export function ConversationContextMenu({
             setTimeout(() => onClose(), 400);
             return;
         }
-        let imageUri = '';
+        const allImageUris: string[] = [];
         if (conversationNode?.prompts) {
             for (const p of conversationNode.prompts) {
-                if (p.media_paths && p.media_paths.length > 0) {
-                    imageUri = p.media_paths[0];
-                    break;
+                if (p.media_paths) {
+                    for (const m of p.media_paths) {
+                        if (m && !allImageUris.includes(m)) allImageUris.push(m);
+                    }
+                }
+                if (p.media_thumbnails) {
+                    for (const m of p.media_thumbnails) {
+                        if (m && !allImageUris.includes(m)) allImageUris.push(m);
+                    }
                 }
             }
         }
-        if (!imageUri) {
-            const text = conversationNode
-                ? (conversationNode.full_prompt_text || conversationNode.prompt_preview_200w || '')
-                : '';
-            const match = /!\[.*?\]\((.*?)\)/.exec(text);
-            if (match && match[1]) {
-                imageUri = match[1];
+        if (conversationNode?.media_paths) {
+            for (const m of conversationNode.media_paths) {
+                if (m && !allImageUris.includes(m)) allImageUris.push(m);
             }
         }
-        if (!imageUri) {
+        const text = conversationNode
+            ? (conversationNode.full_prompt_text || conversationNode.prompt_preview_200w || '')
+            : '';
+        const mdMatches = Array.from(text.matchAll(/!\[.*?\]\((.*?)\)/g));
+        for (const match of mdMatches) {
+            if (match[1] && !allImageUris.includes(match[1])) {
+                allImageUris.push(match[1]);
+            }
+        }
+
+        if (allImageUris.length === 0) {
             useErrorStore.getState().trackWarning('No images found in conversation to copy', {
                 source: 'ConversationContextMenu.handleCopyImageToClipboard',
                 triggerAction: 'copy_image_to_clipboard',
@@ -370,8 +382,13 @@ export function ConversationContextMenu({
             onClose();
             return;
         }
+
         try {
-            await writeNativeImageToClipboard(imageUri);
+            if (allImageUris.length === 1) {
+                await writePureImageToClipboard(allImageUris[0]);
+            } else {
+                await copyAllImagesToClipboard(allImageUris);
+            }
             setIsCopyImageDone(true);
             setTimeout(() => onClose(), 400);
         } catch (err) {
@@ -881,12 +898,12 @@ export function ConversationContextMenu({
                 <span className="text-[9px] font-mono text-slate-400">Plain</span>
             </button>
 
-            {/* Copy Image to Clipboard */}
+            {/* Copy Images to Clipboard */}
             <button
                 type="button"
                 className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-[#251b3a] cursor-pointer"
                 onClick={handleCopyImageToClipboard}
-                title="Copy the first attached image to clipboard as native PNG"
+                title="Copy attached images to clipboard as native PNG (composite PNG if multiple)"
             >
                 <div className="flex items-center gap-2.5">
                     {isCopyImageDone ? (
@@ -894,7 +911,7 @@ export function ConversationContextMenu({
                     ) : (
                         <Image className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
                     )}
-                    <span>{isCopyImageDone ? 'Copied Native PNG!' : 'Copy Image to Clipboard'}</span>
+                    <span>{isCopyImageDone ? 'Copied Native PNG!' : 'Copy Images'}</span>
                 </div>
                 <span className="text-[9px] font-mono text-cyan-400">PNG</span>
             </button>

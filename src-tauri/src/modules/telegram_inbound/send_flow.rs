@@ -673,6 +673,7 @@ fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
         instance_entries()
     } else {
         let mut rem_instances = Vec::new();
+        #[cfg(not(test))]
         if let Ok(cluster_items) = crate::modules::ssh_manager::get_cluster_instances_and_balances()
         {
             for item in cluster_items {
