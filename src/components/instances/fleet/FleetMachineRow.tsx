@@ -153,11 +153,11 @@ export function FleetMachineRow({
                             {(mExt.git_repo || mExt.git_link || isLeadNode || isLocalNode) && (
                                 <span
                                     className="inline-flex items-center gap-1 font-mono text-[9px] text-cyan-400 bg-cyan-950/40 px-1.5 py-0.2 rounded border border-cyan-800/40"
-                                    title={`Git Link: ${mExt.git_link || mExt.git_repo || 'Antigravity-Manager'}`}
+                                    title={`Git Link: ${mExt.git_link || (isLeadNode ? 'gitmap / gitmap' : (mExt.git_repo || 'Antigravity-Manager'))}`}
                                 >
                                     <GitBranch className="w-2.5 h-2.5 text-cyan-400 shrink-0" />
                                     <span className="truncate max-w-[120px]">
-                                        {mExt.git_repo || mExt.git_link || 'Antigravity-Manager'}
+                                        {mExt.git_repo || (isLeadNode ? 'gitmap' : 'Antigravity-Manager')}
                                     </span>
                                 </span>
                             )}

@@ -203,7 +203,7 @@ export function usePromptTreePromptActions({
     );
 
     const handleCopyAllWithRichImages = useCallback(async () => {
-        const text = editedPromptText.trim() || activePromptTextRef.current || activePromptText || selectedConversation?.prompt_preview_200w || '';
+        const text = editedPromptText.trim() || activePromptTextRef.current || activePromptText || selectedConversation?.full_prompt_text || selectedConversation?.prompt_preview_200w || '';
         if (!text) {
             setActionMsg('No prompt content to copy');
             setTimeout(() => setActionMsg(null), 2000);
@@ -383,8 +383,11 @@ export function usePromptTreePromptActions({
             setIsResending(true);
             setActionMsg('Dispatching prompt to running instance...');
             let promptContent = (!selectedConversation && conv)
-                ? (conv.prompt_preview_200w || '')
-                : (editedPromptText.trim() || activePromptTextRef.current || activePromptText || conv?.prompt_preview_200w || '');
+                ? (conv.full_prompt_text || conv.prompt_preview_200w || '')
+                : (editedPromptText.trim() || activePromptTextRef.current || activePromptText || conv?.full_prompt_text || conv?.prompt_preview_200w || '');
+            if (!promptContent && conv) {
+                promptContent = resolvePromptBody(conv);
+            }
             const repoPath = proj?.repo_path || selectedProject?.repo_path || (conv as { repo_path?: string })?.repo_path || '';
             const targetInstId = selectedConversation?.instance_id || conv?.instance_id || proj?.instance_id || instanceId || 'default';
             const targetConvId = conversationTargetMode === 'new'
@@ -586,7 +589,10 @@ ${activePromptText}
         try {
             setIsEnqueueing(true);
             setActionMsg('Enqueueing prompt into FIFO scheduler queue...');
-            let promptContent = editedPromptText.trim() || activePromptTextRef.current || activePromptText || conv.prompt_preview_200w || '';
+            let promptContent = editedPromptText.trim() || activePromptTextRef.current || activePromptText || conv.full_prompt_text || conv.prompt_preview_200w || '';
+            if (!promptContent && conv) {
+                promptContent = resolvePromptBody(conv);
+            }
             const repoPath = proj?.repo_path || selectedProject?.repo_path || (conv as { repo_path?: string })?.repo_path || '';
             const targetInstId = selectedConversation?.instance_id || conv.instance_id || proj?.instance_id || instanceId || 'default';
             const targetConvId = conversationTargetMode === 'new'

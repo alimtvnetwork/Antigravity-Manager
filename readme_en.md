@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.240.0)
+> Professional AI Account Management & Protocol Proxy System (v4.240.1)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.240.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.240.1-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -505,6 +505,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.240.1**: Prompt Tree Buttons Repair, Native OS DIB Image Clipboard, DetailHeader Title Prominence, Full SQLite Reset & Rescan, Fleet Lead Node Alignment & agy CLI Path Resolution — Restored independent `[ Send N | v ]` and `[ Enqueue | v ]` buttons in `src/components/instances/PromptTreeView/DetailHeader.tsx` (now in distinct Segment 2 and Segment 3 capsules), ensuring full prompt text `conv.full_prompt_text` is dispatched without premature truncation and preserving attached media paths; implemented `copy_image_to_clipboard` backend command in `src-tauri/src/commands/cmd_files.rs` and `src-tauri/src/lib/run.rs` setting native Windows `CF_DIB`/`CF_BITMAP` format via PowerShell `System.Windows.Forms.Clipboard::SetImage` alongside pure PNG binary Blob to guarantee pasted images render 100% reliably in Microsoft OneNote, Paint, Word, and Antigravity IDE; normalized single-image copy button in `src/components/instances/PromptTreeView/PromptInstructionView.tsx` strictly to "Copy" (eliminating "Copy including image"), and implemented `handleCopyImagesUnified` on the main copy button so clicking it when multiple images exist automatically stitches all attached images into a single vertical composite PNG canvas and writes to the system clipboard; added `~/.gemini/bin/agy.exe` and `~/.antigravity/bin/agy.exe` to `get_antigravity_cli_executable_path` in `src-tauri/src/modules/process/locations.rs` so CLI prompt dispatch resolves the installed `agy` binary reliably; expanded CDP composer selector ladder (`div.monaco-editor`, `div.interactive-input-editor`, `textarea.monaco-mouse-cursor-text`) and send button selectors in `src-tauri/src/modules/instance/cdp_onboarding.rs`; polished `DetailHeader.tsx` by stripping all noisy turn prefix badges preceding the title, enlarging conversation title text (`text-base md:text-lg font-bold font-ubuntu`), keeping Copy Title button adjacent, and positioning the status capsule strictly after the title; connected `onResetTree` in `src/components/instances/PromptTreeView/PromptTreeViewModal.tsx` to `wipe_and_rescan_repo_db` and frontend `loadTree(true, true)` to completely purge SQLite prompt caches, terminate stale workers, rescan disk `transcript_full.jsonl` files fresh, and rebuild the tree with live spinner feedback; and corrected cluster lead node `main` (`192.168.1.20`) in `src/components/instances/fleet/useFleetMachines.ts` and `FleetMachineRow.tsx` to reflect its authentic Git origin `gitmap / gitmap` and bound account `sakibagjdjg@gmail.com` without leaking local machine `w1` (`192.168.1.3`, `Antigravity-Manager`) accounts. (Thanks to @aukgit)
 
 > Latest version **v4.240.0**: Prompt Tree Button Repairs, Pure PNG Clipboard Pipeline, DetailHeader Clean Title Polish, SQLite Database Full Wipe & Rescan, Fleet Lead Node Alignment & Telegram Prompt Inbound Fix — Restored prompt and image dispatch across Prompt Tree Send and Enqueue actions without stripping image URIs into non-existent paths, with project path resolution fallbacks; upgraded image clipboard copying to write strictly single-MIME `'image/png'` binary blobs without conflicting HTML to guarantee pasting into Microsoft OneNote, Paint, and Antigravity; added vertical composite multi-image canvas stitching and 1-click `[ Copy All Images ]` batch copying; cleaned DetailHeader by stripping prefix turn badges, enlarging conversation titles, and repositioning the status capsule; added backend `wipe_and_rescan_repo_db` command with live progress feedback to completely rebuild the SQLite prompt database and regenerate the tree view; aligned Fleet lead node `main` (`192.168.1.20`) and `w1` (`192.168.1.3`) SSH host alias mappings with Git repository badge display; and fixed Telegram inbound `/prompt` route collision where conversation seek shadowed prompt execution. (Thanks to @aukgit)
 

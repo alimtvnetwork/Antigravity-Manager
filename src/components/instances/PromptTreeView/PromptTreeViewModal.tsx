@@ -765,13 +765,13 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                             setSearchQuery('');
                             setActiveFilter('all');
                             setCategoryFilter('all');
-                            await invoke('reset_prompt_tree_cache', { instanceId: instanceId || null });
-                            await loadTree(false, true);
+                            await invoke('wipe_and_rescan_repo_db', { instanceId: instanceId || null });
+                            await loadTree(true, true);
                             setActionMsg('Prompt tree wiped & regenerated successfully');
                         } catch (err) {
                             useErrorStore.getState().captureException(
                                 err instanceof Error ? err : new Error(String(err)),
-                                { source: 'PromptTreeViewModal.onResetTree', triggerAction: 'reset_prompt_tree_cache' }
+                                { source: 'PromptTreeViewModal.onResetTree', triggerAction: 'wipe_and_rescan_repo_db' }
                             );
                             setActionMsg('Failed to reset & regenerate prompt tree');
                         } finally {

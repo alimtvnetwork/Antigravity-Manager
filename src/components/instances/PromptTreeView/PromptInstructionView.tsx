@@ -428,6 +428,15 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         }
     };
 
+    const handleCopyImagesUnified = async () => {
+        if (!attachedImages || attachedImages.length === 0) return;
+        if (attachedImages.length === 1) {
+            await handleCopyFirstImage();
+        } else {
+            await handleCopyAllImages();
+        }
+    };
+
     const turns = selectedConversation.prompts || [];
     const totalTurns = selectedConversation.prompts?.length || 1;
 
@@ -815,25 +824,14 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                         <div className="flex items-center gap-1.5">
                             <button
                                 type="button"
-                                onClick={handleCopyFirstImage}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40 transition-colors shadow-2xs cursor-pointer"
-                                title="Copy image to clipboard as pure PNG (ready to paste directly into OneNote or chat)"
+                                onClick={handleCopyImagesUnified}
+                                disabled={isCopyingAllImages}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+                                title={attachedImages.length > 1 ? `Copy all ${attachedImages.length} images to clipboard as composite PNG (ready for OneNote or chat)` : "Copy image to clipboard as pure PNG (ready to paste directly into OneNote or chat)"}
                             >
-                                {copiedPureImageIdx === 0 ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-purple-600 dark:text-purple-400" />}
-                                <span>{copiedPureImageIdx === 0 ? 'Copied' : 'Copy'}</span>
+                                {(isCopiedAllImages || copiedPureImageIdx !== null) ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-purple-600 dark:text-purple-400" />}
+                                <span>{(isCopiedAllImages || copiedPureImageIdx !== null) ? 'Copied' : 'Copy'}</span>
                             </button>
-                            {attachedImages.length > 1 && (
-                                <button
-                                    type="button"
-                                    onClick={handleCopyAllImages}
-                                    disabled={isCopyingAllImages}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
-                                    title={`Copy all ${attachedImages.length} images vertically stitched as a single composite PNG (ready for OneNote or chat)`}
-                                >
-                                    {isCopiedAllImages ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-purple-600 dark:text-purple-400" />}
-                                    <span>{isCopiedAllImages ? 'Copied All' : `Copy All Images (${attachedImages.length})`}</span>
-                                </button>
-                            )}
                             <span className="text-[10px] text-slate-400 font-normal ml-1 hidden sm:inline">
                                 Click to preview
                             </span>

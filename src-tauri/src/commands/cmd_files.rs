@@ -85,6 +85,102 @@ pub fn copy_text_to_clipboard(text: String) -> Result<(), String> {
     crate::modules::repo_db::copy_text_to_clipboard_sync(&text)
 }
 
+/// Copy an image file or base64 image data directly to system clipboard as native OS image format
+/// (CF_DIB / CF_BITMAP on Windows). This guarantees pasting into OneNote, Paint, Word, Antigravity, etc.
+#[tauri::command]
+pub fn copy_image_to_clipboard(path: String) -> Result<(), String> {
+    let clean_path = crate::modules::repo_db::failed_commands::decode_uri_to_path(&path);
+    let trimmed = clean_path.trim().replace(r"\\?\", "").replace(r"\?\", "");
+
+    let target_file_path: PathBuf = if trimmed.starts_with("data:image/") {
+        // Decode base64 and write to temp file
+        let comma_pos = trimmed
+            .find(',')
+            .ok_or_else(|| "invalid data URI: missing comma".to_string())?;
+        let b64_str = &trimmed[comma_pos + 1..];
+        use base64::Engine;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(b64_str.trim())
+            .map_err(|e| format!("failed to decode base64 image: {e}"))?;
+        let temp_path = std::env::temp_dir().join("agm_clipboard_image.png");
+        std::fs::write(&temp_path, &bytes)
+            .map_err(|e| format!("failed to write temp clipboard image: {e}"))?;
+        temp_path
+    } else {
+        let p = PathBuf::from(&trimmed);
+        if !p.exists() {
+            return Err(format!("Image file does not exist: {trimmed}"));
+        }
+        p
+    };
+
+    let abs_str = target_file_path.to_string_lossy().to_string();
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        let script = format!(
+            "Add-Type -AssemblyName System.Windows.Forms; $img = [System.Drawing.Image]::FromFile('{}'); [System.Windows.Forms.Clipboard]::SetImage($img); $img.Dispose()",
+            abs_str.replace('\'', "''")
+        );
+        let mut cmd = std::process::Command::new("powershell");
+        cmd.args(["-NoProfile", "-NonInteractive", "-Command", &script]);
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        let status = cmd
+            .status()
+            .map_err(|e| format!("Failed to run Windows image clipboard helper: {e}"))?;
+        if status.success() {
+            return Ok(());
+        } else {
+            return Err(format!(
+                "Windows image clipboard helper exited with {status}"
+            ));
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let script = format!(
+            "set the clipboard to (read (POSIX file \"{}\") as JPEG picture)",
+            abs_str.replace('"', "\\\"")
+        );
+        let mut cmd = std::process::Command::new("osascript");
+        cmd.args(["-e", &script]);
+        let status = cmd
+            .status()
+            .map_err(|e| format!("macOS osascript clipboard helper failed: {e}"))?;
+        if status.success() {
+            return Ok(());
+        } else {
+            return Err(format!("macOS clipboard helper exited with {status}"));
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(file) = std::fs::File::open(&target_file_path) {
+            let mut cmd = std::process::Command::new("wl-copy");
+            cmd.args(["-t", "image/png"]).stdin(file);
+            if let Ok(status) = cmd.status() {
+                if status.success() {
+                    return Ok(());
+                }
+            }
+        }
+        let mut cmd2 = std::process::Command::new("xclip");
+        cmd2.args(["-selection", "clipboard", "-t", "image/png", "-i", &abs_str]);
+        if let Ok(status) = cmd2.status() {
+            if status.success() {
+                return Ok(());
+            }
+        }
+        return Err("Linux image clipboard helpers (wl-copy, xclip) failed".to_string());
+    }
+
+    #[allow(unreachable_code)]
+    Err("Image clipboard not supported on this operating system".to_string())
+}
+
 /// 保存文本文件 (绕过前端 Scope 限制)
 #[tauri::command]
 pub async fn save_text_file(path: String, content: String) -> Result<(), String> {

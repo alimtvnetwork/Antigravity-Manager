@@ -145,8 +145,12 @@ export function DetailHeader(props: DetailHeaderProps) {
     };
 
     const [localIsSendMenuOpen, setLocalIsSendMenuOpen] = useState(false);
-    const isSendMenuOpen = propIsSendMenuOpen ?? propIsEnqueueMenuOpen ?? localIsSendMenuOpen;
-    const setIsSendMenuOpen = propSetIsSendMenuOpen ?? propSetIsEnqueueMenuOpen ?? setLocalIsSendMenuOpen;
+    const isSendMenuOpen = propIsSendMenuOpen ?? localIsSendMenuOpen;
+    const setIsSendMenuOpen = propSetIsSendMenuOpen ?? setLocalIsSendMenuOpen;
+
+    const [localIsEnqueueMenuOpen, setLocalIsEnqueueMenuOpen] = useState(false);
+    const isEnqueueMenuOpen = propIsEnqueueMenuOpen ?? localIsEnqueueMenuOpen;
+    const setIsEnqueueMenuOpen = propSetIsEnqueueMenuOpen ?? setLocalIsEnqueueMenuOpen;
 
     // Double-click inline title editing state
     const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -567,7 +571,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                 {/* Right: The Unified Segmented Dark-Glass Action Capsule */}
                 <div className="flex items-center shrink-0 ml-auto">
                     <div className="relative flex items-center rounded-lg bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
-                        {/* Segment 1: Copy Split Button [ Copy All / Includes Image | v ] */}
+                        {/* Segment 1: Copy Split Button [ Copy | v ] */}
                         <div className="flex items-center divide-x divide-slate-200/70 dark:divide-purple-500/20">
                             {/* Primary Button: Copy with images (Rich HTML + binary PNG) */}
                             <button
@@ -583,7 +587,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 ) : (
                                     <Copy className="w-3 h-3 text-purple-500 shrink-0" />
                                 )}
-                                <span>{isCopiedAllActive ? 'Copied!' : 'Copy All (Include Images)'}</span>
+                                <span>{isCopiedAllActive ? 'Copied!' : 'Copy'}</span>
                             </button>
 
                             {/* Dropdown Chevron for Clean Text, Image Saving, and Exports */}
@@ -599,56 +603,66 @@ export function DetailHeader(props: DetailHeaderProps) {
                             </button>
                         </div>
 
-                        {/* Segment 2: Unified Dispatch Split Button [ Send N | v ] */}
+                        {/* Segment 2: Send Split Button [ Send N | v ] */}
                         <div className="flex items-center divide-x divide-slate-200/70 dark:divide-purple-500/20">
-                            {/* Main Button: Quick Send (with N hotkey badge) */}
-                            {dispatchMode === 'enqueue' ? (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        void Promise.resolve(onEnqueue()).catch((err) => {
-                                            reportPromptActionError(err, 'DetailHeader.onEnqueue');
-                                        });
-                                    }}
-                                    disabled={isEnqueueing}
-                                    data-ui-name="prompt-enqueue-btn"
-                                    data-ui-id={`prompt-enqueue-${selectedConversation.conversation_id}`}
-                                    className="flex items-center gap-1.5 px-3 py-1 text-amber-800 dark:text-amber-300 hover:bg-amber-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                                    aria-label="Enqueue prompt into FIFO background scheduler queue"
-                                >
-                                    <ListPlus className={cn('w-3 h-3 text-amber-500 dark:text-amber-400', isEnqueueing && 'animate-pulse')} />
-                                    <span>Enqueue</span>
-                                </button>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        void Promise.resolve(onResend()).catch((err) => {
-                                            reportPromptActionError(err, 'DetailHeader.onResend');
-                                        });
-                                    }}
-                                    disabled={isResending}
-                                    data-ui-name="prompt-send-btn"
-                                    data-ui-id={`prompt-send-${selectedConversation.conversation_id}`}
-                                    className="flex items-center gap-1.5 px-3 py-1 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                                    aria-label="Immediately inject prompt to running instance (Hotkey: N)"
-                                >
-                                    <RotateCw className={cn('w-3 h-3 text-emerald-500', isResending && 'animate-spin')} />
-                                    <span>Send</span>
-                                    <kbd className="ml-0.5 px-1 py-0.2 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded text-[8.5px] font-mono font-bold">N</kbd>
-                                </button>
-                            )}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    void Promise.resolve(onResend()).catch((err) => {
+                                        reportPromptActionError(err, 'DetailHeader.onResend');
+                                    });
+                                }}
+                                disabled={isResending}
+                                data-ui-name="prompt-send-btn"
+                                data-ui-id={`prompt-send-${selectedConversation.conversation_id}`}
+                                className="flex items-center gap-1.5 px-3 py-1 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                                aria-label="Immediately inject prompt to running instance (Hotkey: N)"
+                            >
+                                <RotateCw className={cn('w-3 h-3 text-emerald-500', isResending && 'animate-spin')} />
+                                <span>Send</span>
+                                <kbd className="ml-0.5 px-1 py-0.2 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded text-[8.5px] font-mono font-bold">N</kbd>
+                            </button>
 
-                            {/* Split ChevronDown: Unified Dispatch Configuration Popover/Menu */}
                             <button
                                 type="button"
                                 onClick={() => setIsSendMenuOpen((prev) => !prev)}
                                 data-ui-name="prompt-dispatch-options-btn"
                                 data-ui-id={`prompt-dispatch-options-${selectedConversation.conversation_id}`}
-                                className="flex items-center justify-center px-1.5 py-1 rounded-none text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                className="flex items-center justify-center px-1.5 py-1 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 aria-label="Unified dispatch configuration popover"
                             >
                                 <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isSendMenuOpen && "rotate-180")} />
+                            </button>
+                        </div>
+
+                        {/* Segment 3: Enqueue Split Button [ Enqueue | v ] */}
+                        <div className="flex items-center divide-x divide-slate-200/70 dark:divide-purple-500/20">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    void Promise.resolve(onEnqueue()).catch((err) => {
+                                        reportPromptActionError(err, 'DetailHeader.onEnqueue');
+                                    });
+                                }}
+                                disabled={isEnqueueing}
+                                data-ui-name="prompt-enqueue-btn"
+                                data-ui-id={`prompt-enqueue-${selectedConversation.conversation_id}`}
+                                className="flex items-center gap-1.5 px-3 py-1 text-amber-800 dark:text-amber-300 hover:bg-amber-100/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                                aria-label="Enqueue prompt into FIFO background scheduler queue"
+                            >
+                                <ListPlus className={cn('w-3 h-3 text-amber-500 dark:text-amber-400', isEnqueueing && 'animate-pulse')} />
+                                <span>Enqueue</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setIsEnqueueMenuOpen?.((prev) => !prev)}
+                                data-ui-name="prompt-enqueue-options-btn"
+                                data-ui-id={`prompt-enqueue-options-${selectedConversation.conversation_id}`}
+                                className="flex items-center justify-center px-1.5 py-1 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                                aria-label="Enqueue options popover"
+                            >
+                                <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isEnqueueMenuOpen && "rotate-180")} />
                             </button>
                         </div>
 
@@ -708,9 +722,9 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 >
                                     <div className="flex items-center gap-2">
                                         {isCopiedAllActive ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-purple-500" />}
-                                        <span>{isCopiedAllActive ? 'Copied!' : 'Copy All (Include Images)'}</span>
+                                        <span>{isCopiedAllActive ? 'Copied!' : 'Copy Full Prompt'}</span>
                                     </div>
-                                    <span className="text-[10px] text-purple-600 dark:text-purple-300 font-mono px-1.5 py-0.2 rounded-md bg-purple-500/10 border border-purple-500/20">includes image</span>
+                                    <span className="text-[10px] text-purple-600 dark:text-purple-300 font-mono px-1.5 py-0.2 rounded-md bg-purple-500/10 border border-purple-500/20">Rich Format</span>
                                 </button>
 
                                 {/* Option 1b: Copy Prompt (Local File Links) */}

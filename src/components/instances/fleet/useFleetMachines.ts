@@ -94,9 +94,9 @@ function mapSshNodesToFleet(sshNodes: SshNodeItem[], _localId?: string): FleetMa
                         is_running: true,
                     },
                 ],
-                bound_emails: [],
-                git_repo: 'Antigravity-Manager',
-                git_link: 'gitmap / Antigravity-Manager',
+                bound_emails: isLead ? ['sakibagjdjg@gmail.com'] : [],
+                git_repo: isLead ? 'gitmap' : 'Antigravity-Manager',
+                git_link: isLead ? 'gitmap / gitmap' : 'gitmap / Antigravity-Manager',
             } as FleetMachineInfo;
         });
 }
@@ -205,9 +205,12 @@ async function enrichFleetMachines(machines: FleetMachineInfo[]): Promise<FleetM
             for (const e of emailByIp.get(ip)!) emails.add(e);
         }
 
-        // If lead (main) or local (w1) has no emails, populate from local primary accounts
-        if (emails.size === 0 && (isLead || isLocal) && localPrimaryEmails.length > 0) {
+        // Only local machine (w1) populates from localPrimaryEmails if no emails are discovered
+        if (emails.size === 0 && isLocal && localPrimaryEmails.length > 0) {
             for (const e of localPrimaryEmails) emails.add(e);
+        } else if (emails.size === 0 && isLead) {
+            // For lead machine main, fallback to the known primary account sakibagjdjg@gmail.com
+            emails.add('sakibagjdjg@gmail.com');
         }
 
         // Active instances
@@ -225,8 +228,8 @@ async function enrichFleetMachines(machines: FleetMachineInfo[]): Promise<FleetM
             }
         }
 
-        const gitRepo = (machine as any).git_repo || 'Antigravity-Manager';
-        const gitLink = (machine as any).git_link || `gitmap / ${gitRepo}`;
+        const gitRepo = isLead ? 'gitmap' : ((machine as any).git_repo || 'Antigravity-Manager');
+        const gitLink = isLead ? 'gitmap / gitmap' : ((machine as any).git_link || `gitmap / ${gitRepo}`);
 
         return {
             ...machine,
@@ -265,9 +268,9 @@ async function enrichFleetMachines(machines: FleetMachineInfo[]): Promise<FleetM
                     is_running: true,
                 },
             ],
-            bound_emails: localPrimaryEmails.slice(0, 1),
-            git_repo: 'Antigravity-Manager',
-            git_link: 'gitmap / Antigravity-Manager',
+            bound_emails: ['sakibagjdjg@gmail.com'],
+            git_repo: 'gitmap',
+            git_link: 'gitmap / gitmap',
         } as FleetMachineInfo);
     }
 

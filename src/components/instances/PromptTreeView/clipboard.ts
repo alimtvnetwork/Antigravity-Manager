@@ -495,6 +495,35 @@ export async function writePureImageToClipboard(
             throw new Error('Failed to convert image to valid PNG binary blob');
         }
 
+        // 0. Native Tauri OS Clipboard Path: Write native bitmap/DIB on Windows, osascript on macOS, wl-copy/xclip on Linux
+        if (isTauriEnvironment()) {
+            try {
+                let pathToPass = '';
+                if (typeof imageUriOrBlob === 'string' && !imageUriOrBlob.startsWith('blob:') && !imageUriOrBlob.startsWith('data:')) {
+                    pathToPass = imageUriOrBlob;
+                } else if (pngBlob) {
+                    const reader = new FileReader();
+                    const b64Promise = new Promise<string>((res) => {
+                        reader.onloadend = () => res(reader.result as string);
+                        reader.readAsDataURL(pngBlob!);
+                    });
+                    pathToPass = await b64Promise;
+                }
+                if (pathToPass) {
+                    await invoke('copy_image_to_clipboard', { path: pathToPass });
+                    const msg = 'Image copied to system clipboard!';
+                    onSuccess?.(msg);
+                    showToast({ message: msg, type: 'success' });
+                    return true;
+                }
+            } catch (tauriErr) {
+                useErrorStore.getState().trackWarning(tauriErr, {
+                    source: 'clipboard.writePureImageToClipboard.tauri',
+                    triggerAction: 'copy_image_to_clipboard',
+                });
+            }
+        }
+
         ensureDocumentFocus();
         const hasFocus = typeof document !== 'undefined' && typeof document.hasFocus === 'function' ? document.hasFocus() : true;
         if (hasFocus && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
@@ -678,6 +707,29 @@ export async function copyAllImagesToClipboard(
         // 1. Primary path: Vertical composite PNG blob (pure binary to prevent Chromium drop bug)
         const compositeBlob = await stitchImagesToCompositePng(cleanUris);
         if (compositeBlob) {
+            if (isTauriEnvironment()) {
+                try {
+                    const reader = new FileReader();
+                    const b64Promise = new Promise<string>((res) => {
+                        reader.onloadend = () => res(reader.result as string);
+                        reader.readAsDataURL(compositeBlob);
+                    });
+                    const b64 = await b64Promise;
+                    if (b64) {
+                        await invoke('copy_image_to_clipboard', { path: b64 });
+                        const msg = `Copied ${cleanUris.length} image(s) as composite PNG to system clipboard!`;
+                        onSuccess?.(msg);
+                        showToast({ message: msg, type: 'success' });
+                        return true;
+                    }
+                } catch (tauriErr) {
+                    useErrorStore.getState().trackWarning(tauriErr, {
+                        source: 'clipboard.copyAllImagesToClipboard.tauri',
+                        triggerAction: 'copy_image_to_clipboard',
+                    });
+                }
+            }
+
             ensureDocumentFocus();
             const hasFocus = typeof document !== 'undefined' && typeof document.hasFocus === 'function' ? document.hasFocus() : true;
             if (hasFocus && navigator.clipboard && typeof ClipboardItem !== 'undefined') {

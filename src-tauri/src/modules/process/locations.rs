@@ -396,6 +396,17 @@ pub fn get_antigravity_cli_executable_path() -> Option<std::path::PathBuf> {
             }
         }
 
+        // Check ~/.gemini/bin/agy.exe or ~/.gemini/bin/agy
+        let gemini_top_bin = home.join(".gemini").join("bin");
+        let gemini_top_path = if cfg!(target_os = "windows") {
+            gemini_top_bin.join("agy.exe")
+        } else {
+            gemini_top_bin.join("agy")
+        };
+        if gemini_top_path.exists() {
+            return Some(gemini_top_path);
+        }
+
         // Check ~/.gemini/antigravity/bin/agy.exe
         let gemini_bin = home.join(".gemini").join("antigravity").join("bin");
         let gemini_path = if cfg!(target_os = "windows") {
@@ -405,6 +416,17 @@ pub fn get_antigravity_cli_executable_path() -> Option<std::path::PathBuf> {
         };
         if gemini_path.exists() {
             return Some(gemini_path);
+        }
+
+        // Check ~/.antigravity/bin/agy.exe or ~/.antigravity/bin/agy
+        let antigravity_bin = home.join(".antigravity").join("bin");
+        let antigravity_path = if cfg!(target_os = "windows") {
+            antigravity_bin.join("agy.exe")
+        } else {
+            antigravity_bin.join("agy")
+        };
+        if antigravity_path.exists() {
+            return Some(antigravity_path);
         }
     }
 

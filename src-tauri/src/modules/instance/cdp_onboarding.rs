@@ -502,14 +502,32 @@ fn submit_prompt_on_ws(ws_url: &str, prompt_text: &str) -> bool {
 
     // 1. Focus the message input and clear any draft text
     let focus_js = r#"(() => {
-        const el = document.querySelector('[aria-label="Message input"], [role="combobox"][contenteditable="true"]');
+        const selectorLadder = [
+            '[aria-label="Message input"]',
+            '[role="combobox"][contenteditable="true"]',
+            'div.monaco-editor [contenteditable="true"]',
+            'div.interactive-input-editor [contenteditable="true"]',
+            '[role="textbox"][contenteditable="true"]',
+            'textarea.monaco-mouse-cursor-text',
+            'textarea[placeholder*="Ask"]',
+            'div[contenteditable="true"]',
+        ];
+        let el = null;
+        for (const sel of selectorLadder) {
+            el = document.querySelector(sel);
+            if (el) break;
+        }
         if (!el) return 'no_input';
         el.focus();
-        const sel = window.getSelection();
-        const range = document.createRange();
-        range.selectNodeContents(el);
-        sel.removeAllRanges();
-        sel.addRange(range);
+        try {
+            const sel = window.getSelection();
+            if (sel) {
+                const range = document.createRange();
+                range.selectNodeContents(el);
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+        } catch (_) {}
         return 'focused';
     })()"#;
     let Some(focus_res) = cdp_send_and_recv(
@@ -544,12 +562,29 @@ fn submit_prompt_on_ws(ws_url: &str, prompt_text: &str) -> bool {
 
     std::thread::sleep(Duration::from_millis(120));
 
-    // 3. Click the Send message button
+    // 3. Click the Send message button or dispatch Enter key
     let send_js = r#"(() => {
-        const btn = document.querySelector('button[aria-label="Send message"]');
-        if (!btn || btn.disabled) return 'not_ready';
-        btn.click();
-        return 'sent';
+        const btnSelectors = [
+            'button[aria-label="Send message"]',
+            'button[aria-label="Send Prompt"]',
+            'button[aria-label="Send"]',
+            'button[title*="Send"]',
+            'button.codicon-send',
+        ];
+        for (const sel of btnSelectors) {
+            const btn = document.querySelector(sel);
+            if (btn && !btn.disabled) {
+                btn.click();
+                return 'sent';
+            }
+        }
+        // Fallback: Dispatch Enter key event to active element
+        const active = document.activeElement;
+        if (active) {
+            active.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+            return 'sent';
+        }
+        return 'not_ready';
     })()"#;
     let Some(send_res) = cdp_send_and_recv(
         &mut stream,
