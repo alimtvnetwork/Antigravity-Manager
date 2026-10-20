@@ -1,5 +1,21 @@
 # Changelog
 
+## [v4.239.0] - 2026-10-20
+
+### Added
+- **Fleet SSH Cluster Reset & Toolbar Action**: Added `reset_ssh_cluster` backend command and UI toolbar button `[ 🔄 Reset Cluster ]` in `src-tauri/src/commands/ssh.rs` and `FleetMachinesTable.tsx` to safely clear stale connection pools and re-synchronize cluster nodes from GitMap. (Thanks to @aukgit)
+- **Start All Instances Control**: Added `[ 🚀 Start All ]` button to the main instances management toolbar in `src/pages/instances/useInstancePage.ts` and `InstanceTable.tsx` to launch or resume all configured instances in one click. (Thanks to @aukgit)
+- **Audit Log Execution Breadcrumbs & Step Inspection**: Added an interactive "Step Performed & Interaction Execution Path" inspection card to `AuditPanel.tsx`, displaying intent summary sentences, connected DOM hierarchy breadcrumbs, and a 4-tier contextual target grid. (Thanks to @aukgit)
+
+### Fixed
+- **Fleet Machine Node Identity & IP Resolution**: Resolved local machine identity matching `192.168.1.3` to cluster node `w1` using Cluster-IP primacy in `src-tauri/src/modules/ssh_manager/exec.rs`, while preserving all 6 discovered GitMap nodes in `FleetMachinesTable.tsx`. (Thanks to @aukgit)
+- **Prompt Tree Running Prompt Detection**: Fixed running prompt liveness in `src-tauri/src/modules/repo_db/liveness.rs` and `detection.rs` to include `dispatched` status and cover default/unscoped instance records, ensuring active prompts in default instances are accurately detected. (Thanks to @aukgit)
+- **Conversation Rename Synchronization**: Ensured conversation title renames propagate synchronously across `conversations.title`, `conversation_summaries.summary`, and `conversations_fts.title` with live UI refresh. (Thanks to @aukgit)
+- **Audit Log Meaningful Action & Target Naming**: Replaced cryptic Tailwind utility class selectors (`div.grid`, `Button.P 1.5`, `div.group`, `span.truncate`, and raw `scroll:/instances`) in `useAuditRecorder.ts` and `AuditPanel.tsx` with human-readable semantic descriptors (`Click: "Open Settings" Button`, `Click: Instance "Default"`, `Click: Instances Grid Area`, `Scroll: /instances Page`). (Thanks to @aukgit)
+- **Prompt Tree Toolbar & Markdown View Polish**: Restored the Details button with its healthy status icon to row 2 next to the conversation title; standardized "Copy All (Include Images)" in the action toolbar; updated Markdown view background to `#19191c`; and converted verbose SSH settings helper text into compact icon buttons with hover tooltips. (Thanks to @aukgit)
+
+---
+
 ## [v4.238.7] - 2026-10-20
 
 ### Added
@@ -880,6 +896,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.239.0 (2026-10-20)**:
+        -   **[Fleet Machine Identity, Prompt Tree Liveness, Audit Log Semantic Hierarchy & UI Polish] Fleet SSH Node w1 Matching, Cluster Reset, Running Prompt Detection for Default Instances, Conversation Rename Sync, Meaningful Audit Log Naming with Interactive Step Breadcrumbs, Start All Instances, and Markdown View Background (Thanks to @aukgit)**:
+            -   **Description**: Resolved local machine identity matching `192.168.1.3` to cluster node `w1` using Cluster-IP primacy in `src-tauri/src/modules/ssh_manager/exec.rs` while preserving all 6 discovered GitMap nodes in `FleetMachinesTable.tsx`; added `reset_ssh_cluster` backend command and UI toolbar button `[ 🔄 Reset Cluster ]` to safely clear stale connection pools; fixed running prompt liveness in `src-tauri/src/modules/repo_db/liveness.rs` and `detection.rs` by including `dispatched` status and preserving empty instance records; ensured conversation title renames update synchronously across `conversations.title`, `conversation_summaries.summary`, and `conversations_fts.title` with live event notification; replaced cryptic Tailwind utility class names (`div.grid`, `Button.P 1.5`, `div.group`, `span.truncate`, `scroll:/instances`) in `useAuditRecorder.ts` and `AuditPanel.tsx` with human-readable semantic action descriptors; added an interactive "Step Performed & Interaction Execution Path" inspection card in `AuditPanel.tsx` featuring action summaries, connected DOM hierarchy breadcrumbs with arrow glyphs, and a 4-part target context grid; relocated the Details button with healthy status icon to row 2; standardized "Copy All (Include Images)" in the prompt tree toolbar; updated the Markdown view background to `#19191c`; converted verbose SSH settings text to icon buttons with hover tooltips; and added a "Start All" instances button in the main instance management toolbar. (Thanks to @aukgit)
+
+
     *   **v4.238.7 (2026-10-20)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
