@@ -221,6 +221,9 @@ export interface AppConfig {
     dismissed_thinking_cleanup_version?: string; // [NEW] 用户已确认或忽略建议的目标版本号
     instance_card_max_projects?: number; // [NEW] Maximum recent projects displayed on instance card (1-3, default 3)
     max_backup_prompts?: number; // [NEW] Maximum prompt snapshots retained in SQLite backup database (default 100, range 10-1000)
+    prompt_preview_max_words?: number; // [NEW] Maximum words retained in prompt preview snippet (100-200, default 100)
+    /** Maximum words displayed in conversation preview cards and tree leaves before truncation (default: 200 words, range: 50–500) */
+    prompt_preview_words?: number;
 }
 
 export interface ConversationCleanupConfig {

@@ -364,67 +364,7 @@ pub(crate) fn cmd_prompts_send(args: &[String]) {
 }
 
 pub(crate) fn cmd_prompts_running(args: &[String]) {
-    let ctx = CliContext::parse(args);
-    let target_instance = ctx
-        .resolve_target_instance()
-        .unwrap_or_else(|_| "default".to_string());
-    let resolved_inst =
-        instance::resolve_instance_id(&target_instance).unwrap_or_else(|_| target_instance.clone());
-
-    // Filter candidate prompts against dead PIDs and completed transcripts using is_terminal_done
-    let proc_opt = instance::get_or_detect_instance_process(&resolved_inst);
-    let is_instance_proc_alive = proc_opt.is_some() || {
-        let instances = instance::list_instances().unwrap_or_default();
-        instances
-            .iter()
-            .find(|i| {
-                i.config.id == resolved_inst || (resolved_inst == "default" && i.config.is_default)
-            })
-            .and_then(|i| i.pid)
-            .map(instance::is_pid_alive_targeted)
-            .unwrap_or(false)
-    };
-
-    let running: Vec<repo_db::ActivePrompt> = if !is_instance_proc_alive {
-        Vec::new()
-    } else {
-        let raw_running =
-            repo_db::list_running_prompts_for_instance(&resolved_inst).unwrap_or_default();
-        raw_running
-            .into_iter()
-            .filter(|p| {
-                let is_active =
-                    repo_db::is_prompt_running_for_project(&p.repo_path, &resolved_inst)
-                        || repo_db::is_prompt_running_for_project(&p.project_id, &resolved_inst);
-                let is_fresh_in_flight =
-                    p.status == "in_flight" && (chrono::Utc::now().timestamp() - p.updated_at) < 60;
-                is_active || is_fresh_in_flight
-            })
-            .collect()
-    };
-
-    if ctx.json_output {
-        CliEnvelope::ok("prompt running", Some(target_instance), running).print_and_exit();
-    }
-
-    if running.is_empty() {
-        println!("Instance '{}': 0 active/running prompts.", target_instance);
-    } else {
-        println!(
-            "Instance '{}': {} active/running prompt(s):",
-            target_instance,
-            running.len()
-        );
-        for (i, p) in running.iter().enumerate() {
-            println!(
-                "  [{}] {} ({}) - {}",
-                i + 1,
-                p.id,
-                p.status,
-                p.prompt_content.chars().take(60).collect::<String>()
-            );
-        }
-    }
+    crate::running_prompts_cmds::cmd_running_inspection(args);
 }
 
 pub(crate) fn cmd_prompts_queue(args: &[String]) {
@@ -567,46 +507,10 @@ pub(crate) fn cmd_prompts_history(args: &[String]) {
 }
 
 pub(crate) fn cmd_prompts_backup(args: &[String]) {
-    let ctx = CliContext::parse(args);
-    let target_instance = ctx
-        .resolve_target_instance()
-        .unwrap_or_else(|_| "default".to_string());
-    if ctx.json_output {
-        if is_daemon_running() {
-            let payload = serde_json::json!({ "instanceId": target_instance });
-            let _ = forward_to_local_rest::<serde_json::Value>(
-                reqwest::Method::POST,
-                "/prompts/backup",
-                Some(payload),
-            );
-        }
-        let _ = repo_db::backup_running_prompts(&target_instance);
-        let _ = backup_prompts_db::backup_active_running_prompts(Some(&target_instance), None);
-        let data = serde_json::json!({ "status": "backed_up", "instance_id": target_instance });
-        CliEnvelope::ok("prompts backup", Some(target_instance), data).print_and_exit();
-    }
     crate::running_backup_cmds::cmd_backup_running_prompts(args);
 }
 
 pub(crate) fn cmd_prompts_restore(args: &[String]) {
-    let ctx = CliContext::parse(args);
-    let target_instance = ctx
-        .resolve_target_instance()
-        .unwrap_or_else(|_| "default".to_string());
-    if ctx.json_output {
-        if is_daemon_running() {
-            let payload = serde_json::json!({ "instanceId": target_instance });
-            let _ = forward_to_local_rest::<serde_json::Value>(
-                reqwest::Method::POST,
-                "/prompts/restore",
-                Some(payload),
-            );
-        }
-        let _ = backup_prompts_db::restore_running_prompts(Some(&target_instance), false, None);
-        let _ = repo_db::resend_running_commands_for_instance(Some(&target_instance), 20);
-        let data = serde_json::json!({ "status": "restored", "instance_id": target_instance });
-        CliEnvelope::ok("prompts restore", Some(target_instance), data).print_and_exit();
-    }
     crate::running_backup_cmds::cmd_restore_running_prompts(args);
 }
 

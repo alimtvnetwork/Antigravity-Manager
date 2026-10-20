@@ -485,29 +485,37 @@ pub fn extract_image_payload_or_path(content: &str) -> (Option<String>, Vec<Stri
 
 /// Extract screenshot ID token (e.g. SS_ID_987654321, screenshot_id=..., screenshot_id:...) from text
 pub fn extract_screenshot_id_token(content: &str) -> Option<String> {
-    for token in content.split_whitespace() {
-        let clean = token.trim_matches(|c: char| {
-            c == '"'
-                || c == '\''
-                || c == '('
-                || c == ')'
-                || c == '['
-                || c == ']'
-                || c == '{'
-                || c == '}'
-                || c == '<'
-                || c == '>'
-                || c == ','
-                || c == ';'
-        });
-        if clean.starts_with("SS_ID_") || clean.starts_with("ss_id_") {
-            return Some(clean.to_string());
-        }
-        if clean.to_lowercase().starts_with("screenshot_id=") {
-            return Some(clean[14..].to_string());
-        }
-        if clean.to_lowercase().starts_with("screenshot_id:") {
-            return Some(clean[14..].to_string());
+    for part in content.split_whitespace() {
+        for token in part.split(';') {
+            let clean = token.trim_matches(|c: char| {
+                c == '"'
+                    || c == '\''
+                    || c == '('
+                    || c == ')'
+                    || c == '['
+                    || c == ']'
+                    || c == '{'
+                    || c == '}'
+                    || c == '<'
+                    || c == '>'
+                    || c == ','
+                    || c == ';'
+            });
+            if clean.starts_with("SS_ID_") || clean.starts_with("ss_id_") {
+                return Some(clean.to_string());
+            }
+            if clean.to_lowercase().starts_with("screenshot_id=") {
+                let val = clean[14..].trim();
+                if !val.is_empty() {
+                    return Some(val.to_string());
+                }
+            }
+            if clean.to_lowercase().starts_with("screenshot_id:") {
+                let val = clean[14..].trim();
+                if !val.is_empty() {
+                    return Some(val.to_string());
+                }
+            }
         }
     }
     None
@@ -639,5 +647,29 @@ mod tests {
         assert_eq!(doc["auto_boot"], true);
         assert_eq!(doc["status"], "dispatched");
         assert_eq!(doc["backed_up_at"], 1000);
+    }
+
+    #[test]
+    fn test_extract_screenshot_id_token() {
+        assert_eq!(
+            extract_screenshot_id_token("Test prompt with SS_ID_12345"),
+            Some("SS_ID_12345".to_string())
+        );
+        assert_eq!(
+            extract_screenshot_id_token("E2E verification with [SS_ID_12345] in brackets"),
+            Some("SS_ID_12345".to_string())
+        );
+        assert_eq!(
+            extract_screenshot_id_token("multimodal payload;screenshot_id=SS_ID_12345;format=png"),
+            Some("SS_ID_12345".to_string())
+        );
+        assert_eq!(
+            extract_screenshot_id_token("prompt screenshot_id:SS_ID_12345 done"),
+            Some("SS_ID_12345".to_string())
+        );
+        assert_eq!(
+            extract_screenshot_id_token("prompt with no screenshot token"),
+            None
+        );
     }
 }

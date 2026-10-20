@@ -372,6 +372,76 @@ impl StrExt for str {
     }
 }
 
+/// Retrieve the configured maximum words limit for prompt previews (clamped between 100 and 200, default 100).
+pub fn get_configured_prompt_preview_word_limit() -> usize {
+    crate::modules::config::load_app_config()
+        .map(|cfg| cfg.prompt_preview_max_words.clamp(100, 200))
+        .unwrap_or(100)
+}
+
+/// Truncate text to at most `limit` words while preserving paragraph structure (`\n\n`) and line breaks.
+/// Appends trailing `" ..."` if the total word count exceeds `limit`.
+/// Returns `(truncated_text, total_word_count)`.
+pub fn truncate_words_bounded(text: &str, limit: usize) -> (String, usize) {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return (String::new(), 0);
+    }
+
+    let total_words = trimmed.split_whitespace().count();
+    let max_words = limit.max(1);
+
+    if total_words <= max_words {
+        return (trimmed.to_string(), total_words);
+    }
+
+    let mut selected_lines: Vec<String> = Vec::new();
+    let mut words_collected = 0;
+    let mut reached_limit = false;
+
+    for line in trimmed.lines() {
+        let t = line.trim();
+        let line_words: Vec<&str> = t.split_whitespace().collect();
+        let count = line_words.len();
+
+        if !reached_limit {
+            if count == 0 {
+                // Preserve blank line between paragraphs
+                if !selected_lines.is_empty()
+                    && !selected_lines.last().map(|s| s.is_empty()).unwrap_or(false)
+                {
+                    selected_lines.push(String::new());
+                }
+            } else if words_collected + count <= max_words {
+                selected_lines.push(line.to_string());
+                words_collected += count;
+                if words_collected == max_words {
+                    reached_limit = true;
+                    if let Some(last) = selected_lines.last_mut() {
+                        *last = format!("{} ...", last);
+                    }
+                }
+            } else {
+                let remaining = max_words.saturating_sub(words_collected);
+                if remaining > 0 {
+                    let truncated_line = line_words[..remaining].join(" ");
+                    selected_lines.push(format!("{} ...", truncated_line));
+                } else if let Some(last) = selected_lines.last_mut() {
+                    *last = format!("{} ...", last);
+                }
+                words_collected = max_words;
+                reached_limit = true;
+            }
+        }
+    }
+
+    let mut preview = selected_lines.join("\n").trim().to_string();
+    if !preview.ends_with(" ...") && !preview.ends_with("...") {
+        preview.push_str(" ...");
+    }
+    (preview, total_words)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -443,5 +513,28 @@ mod tests {
 
         let inst_upper = "DEFAULT";
         assert!(inst_upper.equals_any_ignore_case(&["default", "__default__"]));
+    }
+
+    #[test]
+    fn test_truncate_words_bounded_within_limit() {
+        let text = "Paragraph one with some text.\n\nParagraph two here.";
+        let (out, count) = truncate_words_bounded(text, 100);
+        assert_eq!(count, 8);
+        assert_eq!(out, text);
+    }
+
+    #[test]
+    fn test_truncate_words_bounded_exceeds_limit() {
+        let text = "Line 1 has four words.\n\nLine 2 has four words.";
+        let (out, count) = truncate_words_bounded(text, 6);
+        assert_eq!(count, 10);
+        assert!(out.ends_with(" ..."));
+        assert!(out.contains("\n\n"));
+    }
+
+    #[test]
+    fn test_get_configured_prompt_preview_word_limit() {
+        let limit = get_configured_prompt_preview_word_limit();
+        assert!((100..=200).contains(&limit));
     }
 }

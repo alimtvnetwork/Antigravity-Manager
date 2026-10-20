@@ -214,8 +214,8 @@ fn main() {
         "is-low-credit-for-switch" | "is-low-credit" | "ilc" => {
             crate::switch_check_cmds::cmd_is_low_credit_for_switch(&cmd_args);
         }
-        "which-prompts-running" | "wpr" => {
-            crate::prompt_cmds::dispatch_prompt_domain("running", &cmd_args)
+        "which-prompts-running" => {
+            crate::running_prompts_cmds::cmd_running_prompts(&cmd_args);
         }
         "prompts" => crate::prompt_cmds::dispatch_prompt_domain_from_args(&cmd_args),
         "prompt" => {
@@ -241,13 +241,13 @@ fn main() {
             crate::prompt_cmds::dispatch_prompt_domain("copy", &cmd_args);
         }
         "backup-running-prompts" | "brp" | "backup-prompts" | "backup" | "backpack" => {
-            crate::prompt_cmds::dispatch_prompt_domain("backup", &cmd_args);
+            crate::running_backup_cmds::cmd_backup_running_prompts(&cmd_args);
         }
         "queue-scheduler" | "queue_scheduler" | "scheduler" | "qs" => {
             crate::scheduler_cmds::cmd_queue_scheduler(&cmd_args);
         }
         "restore-running-prompts" | "rrp" | "restore-prompts" | "restore" => {
-            crate::prompt_cmds::dispatch_prompt_domain("restore", &cmd_args);
+            crate::running_backup_cmds::cmd_restore_running_prompts(&cmd_args);
         }
         "export-compact" | "compact-export" | "ec" => {
             crate::compact_cmds::cmd_export_compact(&cmd_args);
@@ -271,9 +271,6 @@ fn main() {
             } else {
                 crate::compact_cmds::cmd_export_compact(&cmd_args);
             }
-        }
-        "running-prompts" => {
-            crate::prompt_cmds::dispatch_prompt_domain("running", &cmd_args);
         }
         "running-projects" => {
             crate::green_cmds::cmd_running_projects(&cmd_args);
@@ -308,12 +305,8 @@ fn main() {
         "query" | "search" | "find" => {
             crate::prompt_mgmt::cmd_prompts_query(&cmd_args);
         }
-        "active" | "running" => {
-            if cmd_args.is_empty() {
-                crate::prompt_cmds::dispatch_prompt_domain("tree", &[]);
-            } else {
-                crate::misc_cmds::cmd_agy(&cmd_args);
-            }
+        "active" | "running" | "running-prompts" | "wpr" => {
+            crate::running_prompts_cmds::cmd_running_prompts(&cmd_args);
         }
         "queues" | "queue" | "enqueue" | "qe" => {
             crate::prompt_cmds::dispatch_prompt_domain("queue", &cmd_args);

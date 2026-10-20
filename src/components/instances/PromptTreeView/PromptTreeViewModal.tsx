@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { AlertTriangle, PanelLeftOpen } from 'lucide-react';
 import { useErrorStore } from '../../../stores/error-store';
 import { useInstanceStore } from '../../../stores/useInstanceStore';
+import { useConfigStore } from '../../../stores/useConfigStore';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { getTruncatedText, countWords, stripImagesFromPrompt } from './formatters';
 import type { PromptTreeViewModalProps } from './types';
@@ -110,6 +111,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
     } = props;
 
     const { instances } = useInstanceStore();
+    const { config } = useConfigStore();
     const state = usePromptTreeState(instanceId);
     const [appVersion, setAppVersion] = useState<string>('');
 
@@ -635,10 +637,11 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         return { activeProjects: active, archivedProjects: archived };
     }, [treeData, searchQuery, selectedProjectScope, activeFilter, archivedProjectIds, pinnedProjectIds]);
 
-    // Active prompt truncation for Preview mode (default preview word threshold: 120 words)
+    // Active prompt truncation for Preview mode (configured preview word threshold: default 200 words)
+    const promptPreviewWords = config?.prompt_preview_words ?? 200;
     const { displayText: previewDisplayText, isTruncated, totalWords } = useMemo(() => {
-        return getTruncatedText(activePromptText, 120);
-    }, [activePromptText]);
+        return getTruncatedText(activePromptText, promptPreviewWords);
+    }, [activePromptText, promptPreviewWords]);
 
     const displayedMarkdown = showAllWords || !isTruncated ? activePromptText : previewDisplayText;
     const activeWordCount = totalWords || countWords(activePromptText);
@@ -647,8 +650,19 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
     }, [activePromptText]);
 
     const hasImages = useMemo(() => {
+        if (selectedConversation?.media_paths && selectedConversation.media_paths.length > 0) {
+            return true;
+        }
+        if (selectedConversation?.prompts && selectedConversation.prompts.some((p) => p.media_paths && p.media_paths.length > 0)) {
+            return true;
+        }
+        if (selectedConversation?.sub_runs && selectedConversation.sub_runs.some((s) => s.media_paths && s.media_paths.length > 0)) {
+            return true;
+        }
         const text = activePromptText || selectedConversation?.prompt_preview_200w || '';
-        return /!\[.*?\]\((?:https?:\/\/.*?|data:image\/.*?;base64,.*?|[^\s)]+)\)/.test(text);
+        return /!\[.*?\]\((?:https?:\/\/.*?|data:image\/.*?;base64,.*?|[^\s)]+)\)/.test(text) ||
+            /<img\s+[^>]*?src=["'].*?["']/i.test(text) ||
+            /data:image\/[a-zA-Z0-9.+_-]+;base64,/.test(text);
     }, [activePromptText, selectedConversation]);
 
     const instanceSeqNum = selectedConversation?.instance_seq_num
@@ -955,6 +969,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                             activeByteCount={activeByteCount}
                                             setActivePromptText={setActivePromptText}
                                             setActionMsg={setActionMsg}
+                                            promptPreviewWords={promptPreviewWords}
                                         />
                                     ) : (
                                         <ResultsView

@@ -58,6 +58,18 @@ pub struct AppConfig {
     pub dismissed_thinking_cleanup_version: Option<String>, // [NEW] 用户已确认或忽略建议的目标版本号
     #[serde(default = "default_max_backup_prompts")]
     pub max_backup_prompts: usize,
+    #[serde(default = "default_prompt_preview_max_words")]
+    pub prompt_preview_max_words: usize,
+    #[serde(default = "default_prompt_preview_words")]
+    pub prompt_preview_words: usize,
+}
+
+fn default_prompt_preview_words() -> usize {
+    200
+}
+
+fn default_prompt_preview_max_words() -> usize {
+    100
 }
 
 fn default_max_backup_prompts() -> usize {
@@ -260,6 +272,16 @@ impl AppConfig {
             thinking_cleanup_dismissed: None,
             dismissed_thinking_cleanup_version: None,
             max_backup_prompts: 100,
+            prompt_preview_max_words: 100,
+            prompt_preview_words: 200,
+        }
+    }
+
+    pub fn get_clamped_prompt_preview_words(&self) -> usize {
+        if self.prompt_preview_words == 0 {
+            200
+        } else {
+            self.prompt_preview_words.clamp(50, 500)
         }
     }
 }
@@ -488,5 +510,39 @@ mod tests {
         assert!(restored.auto_sync);
         assert!(restored.auto_sync_migrated);
         assert_eq!(restored.sync_interval, 5);
+    }
+
+    #[test]
+    fn test_prompt_preview_max_words_default() {
+        let config = AppConfig::new();
+        assert_eq!(config.prompt_preview_max_words, 100);
+
+        let json_str =
+            r#"{"language":"en","theme":"system","auto_refresh":true,"refresh_interval":15}"#;
+        let restored: AppConfig = serde_json::from_str(json_str).unwrap();
+        assert_eq!(restored.prompt_preview_max_words, 100);
+    }
+
+    #[test]
+    fn test_prompt_preview_words_default_and_clamping() {
+        let config = AppConfig::new();
+        assert_eq!(config.prompt_preview_words, 200);
+        assert_eq!(config.get_clamped_prompt_preview_words(), 200);
+
+        let mut clamped = config.clone();
+        clamped.prompt_preview_words = 10;
+        assert_eq!(clamped.get_clamped_prompt_preview_words(), 50);
+
+        clamped.prompt_preview_words = 600;
+        assert_eq!(clamped.get_clamped_prompt_preview_words(), 500);
+
+        clamped.prompt_preview_words = 150;
+        assert_eq!(clamped.get_clamped_prompt_preview_words(), 150);
+
+        // Deserializing JSON without prompt_preview_words defaults to 200
+        let json_str =
+            r#"{"language":"en","theme":"system","auto_refresh":true,"refresh_interval":15}"#;
+        let restored: AppConfig = serde_json::from_str(json_str).unwrap();
+        assert_eq!(restored.prompt_preview_words, 200);
     }
 }

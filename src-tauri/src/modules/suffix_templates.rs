@@ -196,7 +196,6 @@ fn seed_default_templates_if_empty(conn: &Connection) -> Result<(), String> {
         return Ok(());
     }
 
-    let now = Utc::now().to_rfc3339();
     let defaults = [
         (
             "is-it-done",
@@ -264,11 +263,13 @@ fn seed_default_templates_if_empty(conn: &Connection) -> Result<(), String> {
         ),
     ];
 
-    for (id, name, desc, cat, template, is_def) in defaults {
+    let base_time = Utc::now();
+    for (idx, (id, name, desc, cat, template, is_def)) in defaults.into_iter().enumerate() {
+        let item_now = (base_time + chrono::Duration::seconds(idx as i64)).to_rfc3339();
         conn.execute(
             "INSERT INTO prompt_suffix_templates (id, name, description, category, template, is_default, created_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![id, name, desc, cat, template, is_def, now, now],
+            params![id, name, desc, cat, template, is_def, item_now, item_now],
         )
         .map_err(|e| format!("Failed to seed suffix template {id}: {e}"))?;
     }
@@ -289,7 +290,6 @@ fn seed_default_resend_as_if_empty(conn: &Connection) -> Result<(), String> {
         return Ok(());
     }
 
-    let now = Utc::now().to_rfc3339();
     let defaults = [
         (
             "verify",
@@ -333,11 +333,13 @@ fn seed_default_resend_as_if_empty(conn: &Connection) -> Result<(), String> {
         ),
     ];
 
-    for (id, name, pattern, mode, suffix, is_def) in defaults {
+    let base_time = Utc::now();
+    for (idx, (id, name, pattern, mode, suffix, is_def)) in defaults.into_iter().enumerate() {
+        let item_time = (base_time + chrono::Duration::seconds(idx as i64)).to_rfc3339();
         conn.execute(
             "INSERT INTO prompt_resend_as_templates (id, name, title_pattern, target_mode, suffix_id, is_default, created_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![id, name, pattern, mode, suffix, is_def, now, now],
+            params![id, name, pattern, mode, suffix, is_def, item_time, item_time],
         )
         .map_err(|e| format!("Failed to seed resend-as preset {id}: {e}"))?;
     }

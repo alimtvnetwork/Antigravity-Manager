@@ -9,6 +9,7 @@ import { PromptImagePreviewModal } from './PromptImagePreviewModal';
 import { PromptImageContextMenu } from './PromptImageContextMenu';
 import { resolveImageSrc, extractLocalPathFromUri, writePureImageToClipboard } from './clipboard';
 import { useErrorStore } from '../../../stores/error-store';
+import { useConfigStore } from '../../../stores/useConfigStore';
 import { formatDateTime, formatDateOnly } from '../../../utils/date';
 
 export interface ExtractedImage {
@@ -81,6 +82,19 @@ function extractImagesFromPrompt(
         }
     }
 
+    // 1.5 From conversation-level media_paths
+    if (conv.media_paths && conv.media_paths.length > 0) {
+        for (const p of conv.media_paths) {
+            if (p) {
+                const key = normalizeMediaUri(p) || p;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    list.push({ src: p, alt: 'Attached Image' });
+                }
+            }
+        }
+    }
+
     // 2. From markdown text ![alt](url)
     const imgRegex = /!\[(.*?)\]\((.*?)\)/g;
     let match: RegExpExecArray | null;
@@ -92,6 +106,49 @@ function extractImagesFromPrompt(
             if (!seen.has(key)) {
                 seen.add(key);
                 list.push({ src, alt });
+            }
+        }
+    }
+
+    // 3. From HTML <img> tags
+    const htmlImgRegex = /<img\s+[^>]*?src=["'](.*?)["'][^>]*?>/gi;
+    while ((match = htmlImgRegex.exec(text)) !== null) {
+        const src = match[1];
+        if (src) {
+            const key = normalizeMediaUri(src) || src;
+            if (!seen.has(key)) {
+                seen.add(key);
+                list.push({ src, alt: 'HTML Image' });
+            }
+        }
+    }
+
+    // 4. From standalone raw data:image/... URIs
+    const rawDataUriRegex = /(data:image\/[a-zA-Z0-9.+_-]+;base64,[A-Za-z0-9+/=]+)/g;
+    while ((match = rawDataUriRegex.exec(text)) !== null) {
+        const src = match[1];
+        if (src) {
+            const key = normalizeMediaUri(src) || src;
+            if (!seen.has(key)) {
+                seen.add(key);
+                list.push({ src, alt: 'Base64 Image' });
+            }
+        }
+    }
+
+    // 5. From sub_runs / sub-prompts (sub-image tracking)
+    if (conv.sub_runs && conv.sub_runs.length > 0) {
+        for (const sub of conv.sub_runs) {
+            if (sub.media_paths) {
+                for (const p of sub.media_paths) {
+                    if (p) {
+                        const key = normalizeMediaUri(p) || p;
+                        if (!seen.has(key)) {
+                            seen.add(key);
+                            list.push({ src: p, alt: `Sub-agent (${sub.title || sub.short_id || 'child'}) Image` });
+                        }
+                    }
+                }
             }
         }
     }
@@ -253,6 +310,7 @@ export interface PromptInstructionViewProps {
     activeByteCount: number;
     setActivePromptText: (v: string) => void;
     setActionMsg: (v: string | null) => void;
+    promptPreviewWords?: number;
 }
 
 export function PromptInstructionView(props: PromptInstructionViewProps) {
@@ -263,7 +321,11 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         isTruncated, totalWords, activeWordCount, formatByteSize,
         openInspector, selectedProject, activeByteCount,
         setActivePromptText, setActionMsg,
+        promptPreviewWords,
     } = props;
+
+    const { config } = useConfigStore();
+    const effectiveWordLimit = promptPreviewWords ?? config?.prompt_preview_words ?? 200;
 
     const selectedTurnNumber = selectedTurnNumberProp !== undefined
         ? selectedTurnNumberProp
@@ -817,12 +879,12 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                     type="button"
                                     onClick={() => setShowAllWords(!showAllWords)}
                                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-blue-50 dark:bg-[#171025] text-blue-600 dark:text-cyan-300 border border-blue-200 dark:border-[#40285e] hover:bg-blue-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
-                                    title={showAllWords ? 'Collapse preview to 120 words' : 'Expand full prompt'}
+                                    title={showAllWords ? `Collapse preview to ${effectiveWordLimit} words` : 'Expand full prompt'}
                                 >
                                     {showAllWords ? (
                                         <>
                                             <ChevronUp className="w-3.5 h-3.5" />
-                                            <span>Show Less</span>
+                                            <span>Show Less ({effectiveWordLimit}w)</span>
                                         </>
                                     ) : (
                                         <>

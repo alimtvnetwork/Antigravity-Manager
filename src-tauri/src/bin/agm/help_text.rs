@@ -56,7 +56,7 @@ pub(crate) fn print_help_json() {
                 "group": "Account Rotation & Quota Governance",
                 "items": [
                     { "name": "status", "aliases": ["credits"], "flags": ["--json"], "description": "Show node status, immediate & weekly credits" },
-                    { "name": "ff", "aliases": ["smart-switch", "fast-forward"], "flags": [], "description": "Trigger fast-forward rotation to freshest 100% quota account" },
+                    { "name": "ff", "aliases": ["smart-switch", "fast-forward"], "flags": ["[instance]"], "description": "Fast-forward instance account rotation with pre-switch prompt snapshot and 10s settling" },
                     { "name": "switch-if-low-credit", "aliases": ["swlc", "sfc"], "flags": ["-t <pct>", "--json", "-f [file]", "--force"], "description": "Check live quota & rotate if quota <= threshold" },
                     { "name": "is-low-credit-for-switch", "aliases": ["ilc"], "flags": ["-t <pct>", "--json", "-f [file]"], "description": "Check if active quota <= threshold" },
                     { "name": "accounts", "aliases": ["acc"], "flags": ["--active", "--json"], "description": "List registered accounts, tiers, and quotas" },
@@ -79,6 +79,9 @@ pub(crate) fn print_help_json() {
             {
                 "group": "Parallel Prompt Backup & Workspace Restoration",
                 "items": [
+                    { "name": "running", "aliases": ["active", "wpr"], "flags": ["--words <W>", "--limit <Y>", "--full", "-i <instance>", "--json"], "description": "Inspect active and queued prompts under each instance with sequence numbers, word limit, image counts, and --json" },
+                    { "name": "backup running [instance]", "aliases": ["backup", "backpack", "brp", "backup-running-prompts"], "flags": ["-f <file>", "--json"], "description": "Multimodal running prompts snapshot and FIFO restoration with image tracing and positional instance support" },
+                    { "name": "restore running [instance]", "aliases": ["restore", "rrp", "restore-running-prompts"], "flags": ["--keep", "-f <file>", "--json"], "description": "Multimodal running prompts snapshot and FIFO restoration with image tracing and positional instance support" },
                     { "name": "backup", "aliases": ["backpack", "brp", "backup-running-prompts"], "flags": ["ls", "clean", "-f <file>", "--json"], "description": "Parallel snapshot of active prompts across all workspaces to split SQLite DB" },
                     { "name": "restore", "aliases": ["rrp", "restore-running-prompts", "resend-running"], "flags": ["--keep", "--json", "-f <file>"], "description": "Restore and re-enqueue in-flight prompts into active workspaces" },
                     { "name": "export-compact", "aliases": ["compact-export", "ec"], "flags": ["-f <file>", "-w <work-dir>", "--no-pinned", "--absolute"], "description": "Export portable workspace compaction snapshot to JSON envelope v2.0 or SQLite DB" },
@@ -171,7 +174,9 @@ pub(crate) fn print_help() {
     println!("    status, credits [--json]");
     println!("        Show node status, immediate & weekly credits, active account");
     println!("    ff, smart-switch, fast-forward [instance]");
-    println!("        Trigger fast-forward rotation to freshest 100% quota account (for instance or all)");
+    println!(
+        "        Fast-forward instance account rotation with pre-switch prompt snapshot and 10s settling"
+    );
     println!("    switch, switch-account <email|prefix|id|#seq> [--instance <id|alias>]");
     println!(
         "        Directly switch active profile (or specified instance) without GUI intervention"
@@ -231,6 +236,20 @@ pub(crate) fn print_help() {
     println!("  ────────────────────────────────────────────────────────────────────────────");
     println!("  PARALLEL PROMPT BACKUP & WORKSPACE RESTORATION");
     println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "    running, active, wpr [--words <W>] [--limit <Y>] [--full] [-i <instance>] [--json]"
+    );
+    println!(
+        "        Inspect active and queued prompts under each instance with sequence numbers, word limit, image counts, and --json"
+    );
+    println!("    backup running [instance], backup, backpack, backup-running-prompts [-f file] [--json]");
+    println!(
+        "        Multimodal running prompts snapshot and FIFO restoration with image tracing and positional instance support"
+    );
+    println!("    restore running [instance], restore, restore-running-prompts [--keep] [-f file] [--json]");
+    println!(
+        "        Multimodal running prompts snapshot and FIFO restoration with image tracing and positional instance support"
+    );
     println!("    backup, backpack, backup-running-prompts [ls|clean] [-f file] [--json]");
     println!(
         "        Parallel snapshot of active prompts across all workspaces to split SQLite DB"
@@ -395,7 +414,16 @@ pub(crate) fn print_help() {
     println!("    gitmap agy prompt-project P001 -n is-done -t \"Check build\"");
     println!();
     println!("    # 3. Backup & Restore Running Storage Prompts + FPUG / SUG (AGM & GitMap):");
+    println!("    agm running --json                  # List instances and running prompts with image counts in JSON");
+    println!("    agm backup running default --json   # Snapshot active prompts for default instance with image tracing");
+    println!("    agm restore running default --json  # FIFO restore prompts for default instance with image reconstruction");
     println!("    agm backup && agm backup ls && agm restore");
+    println!("    gitmap agy running --json           # GitMap parity running prompts inspection");
+    println!(
+        "    gitmap agy ff                       # GitMap parity fast-forward account rotation"
+    );
+    println!("    gitmap agy backup rp                # GitMap parity running prompt snapshot");
+    println!("    gitmap ag restore rp                # GitMap parity running prompt FIFO restore");
     println!("    gitmap agy running-prompts ls | backup | restore");
     println!("    gitmap backup-running-prompts && gitmap restore-running-prompts");
     println!("    agm agy fpug ls && agm agy sug ls");
@@ -527,6 +555,30 @@ pub(crate) fn print_commands_table() {
         "List Running Prompts",
         format!("cmd: {} | agm running-prompts ls", node_alias),
         "agm running-prompts ls"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Inspect Running Prompts",
+        format!("cmd: {} | agm running", node_alias),
+        "agm running [--json]"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Fast-Forward Switch",
+        format!("cmd: {} | agm ff", node_alias),
+        "agm ff [instance]"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Backup Running Prompts",
+        format!("cmd: {} | agm backup running", node_alias),
+        "agm backup running [instance]"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Restore Running Prompts",
+        format!("cmd: {} | agm restore running", node_alias),
+        "agm restore running [instance]"
     );
     println!(
         "  {:<26} {:<36} {:<32}",
