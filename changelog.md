@@ -1,5 +1,22 @@
 # Changelog
 
+## [v4.240.0] - 2026-10-20
+
+### Added
+- **Multi-Image Composite Clipboard Canvas**: Implemented `stitchImagesToCompositePng` and `copyAllImagesToClipboard` in `src/components/instances/PromptTreeView/clipboard.ts` to vertically composite multiple images into a single PNG binary blob with clean margins and write directly to the system clipboard, plus rich markdown copy referencing local `file:///...` paths and Base64 data URIs. (Thanks to @aukgit)
+- **Prompt Tree SQLite Full Wipe & Rescan Engine**: Added `wipe_and_rescan_repo_db` in `src-tauri/src/modules/repo_db/agy.rs` and registered in `src-tauri/src/commands/instance.rs`, truncating `prompt_tree_cache`, `active_prompts`, `running_projects`, `agm_conversation_sequences`, and `agm_project_sequences`, terminating stale `agy` workers, and rescanning disk `transcript_full.jsonl` files to completely rebuild the database and tree view with live progress spinner feedback in `ModalHeader.tsx`. (Thanks to @aukgit)
+- **Fleet Lead Node Primacy & Git Repository Badges**: Added lead machine badge and Git repository indicators in `FleetMachineRow.tsx` and `useFleetMachines.ts`, prioritizing primary workstation `main` (`192.168.1.20`) with lead primacy, correcting inverted SSH host alias mappings with `w1` (`192.168.1.3`), and displaying account sync status instead of unassigned placeholders. (Thanks to @aukgit)
+
+### Fixed
+- **Prompt Tree Send & Enqueue Button Restoral**: Fixed prompt dispatching in `usePromptTreePromptActions.ts` by removing image stripping that generated phantom `./.antigravity/attachments/...` paths, preserving authentic data URIs and attached media paths, and implementing project resolution fallbacks so `repoPath` is never empty when enqueuing turns. (Thanks to @aukgit)
+- **Pure Single-MIME Image Clipboard Pipeline**: Refactored `writePureImageToClipboard` in `src/components/instances/PromptTreeView/clipboard.ts` to write strictly single-MIME `'image/png'` binary blobs without conflicting `text/html` or `text/plain` payloads, resolving silent paste drops across Microsoft OneNote, Paint, and Antigravity IDE. (Thanks to @aukgit)
+- **Single-Image Gallery Button Labeling**: Normalized image copy button in `PromptInstructionView.tsx` strictly to "Copy" (eliminating "Copy including image"), and added a "Copy All Images" header action when multiple attachments are present. (Thanks to @aukgit)
+- **DetailHeader Title Prominence & Prefix Stripping**: Cleaned `DetailHeader.tsx` by stripping all prefix badges (`Turn T40`, `↳ Turn 40 of 40`, and origin pill) preceding conversation titles, enlarging title text to `text-base md:text-lg font-bold font-ubuntu`, keeping the Copy Title button adjacent, and repositioning the status capsule after the title. (Thanks to @aukgit)
+- **Telegram Inbound Prompt Routing**: Fixed pattern match collision in `src-tauri/src/modules/telegram_inbound/processing.rs` where conversation seek shadowed prompt injection commands (`/prompt`, `/p`, `/prompts`), restoring Telegram prompt injection functionality with 74 passing tests. (Thanks to @aukgit)
+- **Strict FIFO Prompt Queue Invariant**: Enforced `ORDER BY created_at ASC, id ASC` in `src-tauri/src/commands/cmd_running_up_next.rs` and added canonical instance ID alias resolution for default instance queries. (Thanks to @aukgit)
+
+---
+
 ## [v4.239.0] - 2026-10-20
 
 ### Added
@@ -896,6 +913,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.240.0 (2026-10-20)**:
+        -   **[Prompt Tree Buttons Repair, Pure PNG Image Clipboard, DetailHeader Title Polish, SQLite Full DB Wipe & Rescan, Fleet Lead Node Alignment & Telegram Inbound Prompt Fix] Prompt Tree Send & Enqueue Restoral, Multi-Image Composite Canvas Copy, DetailHeader Prefix Stripping & Title Polish, Full SQLite Reset & Rescan, Fleet Machine Alias Alignment, and Telegram Prompt Routing (Thanks to @aukgit)**:
+            -   **Description**: Restored prompt and image dispatch across Prompt Tree Send and Enqueue actions without stripping image URIs into non-existent paths, with project path resolution fallbacks; upgraded image clipboard copying to write strictly single-MIME `'image/png'` binary blobs without conflicting HTML to guarantee pasting into Microsoft OneNote, Paint, and Antigravity; added vertical composite multi-image canvas stitching and 1-click `[ Copy All Images ]` batch copying; cleaned DetailHeader by stripping prefix turn badges, enlarging conversation titles, and repositioning the status capsule; added backend `wipe_and_rescan_repo_db` command with live progress feedback to completely rebuild the SQLite prompt database and regenerate the tree view; aligned Fleet lead node `main` (`192.168.1.20`) and `w1` (`192.168.1.3`) SSH host alias mappings with Git repository badge display; and fixed Telegram inbound `/prompt` route collision where conversation seek shadowed prompt execution. (Thanks to @aukgit)
+
+
     *   **v4.239.0 (2026-10-20)**:
         -   **[Fleet Machine Identity, Prompt Tree Liveness, Audit Log Semantic Hierarchy & UI Polish] Fleet SSH Node w1 Matching, Cluster Reset, Running Prompt Detection for Default Instances, Conversation Rename Sync, Meaningful Audit Log Naming with Interactive Step Breadcrumbs, Start All Instances, and Markdown View Background (Thanks to @aukgit)**:
             -   **Description**: Resolved local machine identity matching `192.168.1.3` to cluster node `w1` using Cluster-IP primacy in `src-tauri/src/modules/ssh_manager/exec.rs` while preserving all 6 discovered GitMap nodes in `FleetMachinesTable.tsx`; added `reset_ssh_cluster` backend command and UI toolbar button `[ 🔄 Reset Cluster ]` to safely clear stale connection pools; fixed running prompt liveness in `src-tauri/src/modules/repo_db/liveness.rs` and `detection.rs` by including `dispatched` status and preserving empty instance records; ensured conversation title renames update synchronously across `conversations.title`, `conversation_summaries.summary`, and `conversations_fts.title` with live event notification; replaced cryptic Tailwind utility class names (`div.grid`, `Button.P 1.5`, `div.group`, `span.truncate`, `scroll:/instances`) in `useAuditRecorder.ts` and `AuditPanel.tsx` with human-readable semantic action descriptors; added an interactive "Step Performed & Interaction Execution Path" inspection card in `AuditPanel.tsx` featuring action summaries, connected DOM hierarchy breadcrumbs with arrow glyphs, and a 4-part target context grid; relocated the Details button with healthy status icon to row 2; standardized "Copy All (Include Images)" in the prompt tree toolbar; updated the Markdown view background to `#19191c`; converted verbose SSH settings text to icon buttons with hover tooltips; and added a "Start All" instances button in the main instance management toolbar. (Thanks to @aukgit)

@@ -1,4 +1,4 @@
-import { Copy, Check, Eye, EyeOff, Zap, Clock } from 'lucide-react';
+import { Copy, Check, Eye, EyeOff, Zap, Clock, GitBranch } from 'lucide-react';
 import { maskEmailAddress, formatRelativeHeartbeat, toDisplayTimestamp } from './fleetFormatUtils';
 import type { FleetMachineInfo } from './fleetTypes';
 
@@ -49,11 +49,20 @@ export function FleetMachineRow({
 
     const cleanAlias = sanitizeAdminText(machine.node_alias) || 'Unnamed Worker';
     const cleanOsInfo = sanitizeAdminText(machine.os_info);
-    const mExt = machine as { is_local?: boolean; alias?: string; source?: string };
+    const mExt = machine as {
+        is_local?: boolean;
+        alias?: string;
+        source?: string;
+        is_lead?: boolean;
+        git_repo?: string;
+        git_link?: string;
+    };
+    const aliasLower = (machine.node_alias || mExt.alias || '').trim().toLowerCase();
+    const isLeadNode = Boolean(mExt.is_lead || aliasLower === 'main');
     const isLocalNode = Boolean(
         mExt.is_local ||
-        machine.node_alias?.toLowerCase() === 'w1' ||
-        mExt.alias?.toLowerCase() === 'w1' ||
+        aliasLower === 'w1' ||
+        aliasLower.startsWith('local') ||
         mExt.source === 'local'
     );
 
@@ -83,7 +92,12 @@ export function FleetMachineRow({
                             >
                                 {cleanAlias}
                             </span>
-                            {isLocalNode && (
+                            {isLeadNode && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30 shadow-[0_0_8px_rgba(168,85,247,0.15)]">
+                                    Lead
+                                </span>
+                            )}
+                            {isLocalNode && !isLeadNode && (
                                 <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 shadow-[0_0_8px_rgba(6,182,212,0.15)]">
                                     Local
                                 </span>
@@ -124,7 +138,7 @@ export function FleetMachineRow({
                                 </div>
                             )}
                         </div>
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5 font-mono">
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5 font-mono flex-wrap">
                             {cleanOsInfo && (
                                 <span className="truncate max-w-[130px]" title={cleanOsInfo}>
                                     {cleanOsInfo}
@@ -136,6 +150,17 @@ export function FleetMachineRow({
                             >
                                 #{machine.node_id.slice(0, 8)}
                             </span>
+                            {(mExt.git_repo || mExt.git_link || isLeadNode || isLocalNode) && (
+                                <span
+                                    className="inline-flex items-center gap-1 font-mono text-[9px] text-cyan-400 bg-cyan-950/40 px-1.5 py-0.2 rounded border border-cyan-800/40"
+                                    title={`Git Link: ${mExt.git_link || mExt.git_repo || 'Antigravity-Manager'}`}
+                                >
+                                    <GitBranch className="w-2.5 h-2.5 text-cyan-400 shrink-0" />
+                                    <span className="truncate max-w-[120px]">
+                                        {mExt.git_repo || mExt.git_link || 'Antigravity-Manager'}
+                                    </span>
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -169,6 +194,10 @@ export function FleetMachineRow({
                             )}
                         </button>
                     </div>
+                ) : isLeadNode ? (
+                    <span className="text-amber-400/80 italic text-xs" title="Lead machine awaiting account sync">
+                        Awaiting Account Sync
+                    </span>
                 ) : (
                     <span className="text-slate-500 italic text-xs">Unassigned</span>
                 )}

@@ -716,6 +716,9 @@ pub fn send_prompt_now_for_instance(
 
     let (extracted_img, img_paths) = extract_image_payload_or_path(prompt_content);
     let mut initial_img = extracted_img.clone();
+    if initial_img.is_none() && !img_paths.is_empty() {
+        initial_img = Some(img_paths.join(";"));
+    }
     if let Some(ss_token) = extract_screenshot_id_token(prompt_content) {
         if let Some(ref cur) = initial_img {
             if !cur.contains(&ss_token) {
@@ -898,6 +901,9 @@ pub fn enqueue_prompt_for_instance(
 
     let (extracted_img, img_paths) = extract_image_payload_or_path(prompt_content);
     let mut initial_img = extracted_img.clone();
+    if initial_img.is_none() && !img_paths.is_empty() {
+        initial_img = Some(img_paths.join(";"));
+    }
     if let Some(ss_token) = extract_screenshot_id_token(prompt_content) {
         if let Some(ref cur) = initial_img {
             if !cur.contains(&ss_token) {
@@ -1082,6 +1088,148 @@ pub fn drain_next_queued_prompt_for_workspace(instance_id: &str, repo_path: &str
         ));
     }
     invalidate_prompt_tree_cache(Some(instance_id));
+}
+
+/// Completely wipe prompt tree tables (`prompt_tree_cache`, `active_prompts`, `running_projects`,
+/// `agm_conversation_sequences`, `agm_project_sequences`) in SQLite `repo_prompts.db`,
+/// re-run workspace storage detection and Antigravity core transcript discovery,
+/// and scan disk `transcript_full.jsonl` files fresh to completely regenerate the database and prompt tree.
+pub fn wipe_and_rescan_repo_db(instance_id: Option<&str>) -> Result<usize, String> {
+    let is_all = match instance_id {
+        None => true,
+        Some(id) => id.trim().is_empty() || id == "all",
+    };
+
+    if is_all {
+        terminate_all_active_agy_workers();
+    } else if let Some(raw_id) = instance_id {
+        terminate_agy_workers_for_instance(raw_id);
+    }
+
+    let conn = super::schema::connect_db()
+        .map_err(|e| format!("Failed to connect repo database for wipe: {e}"))?;
+
+    // Disable foreign keys temporarily during wipe to allow atomic clean deletion
+    conn.execute_batch("PRAGMA foreign_keys = OFF;")
+        .map_err(|e| format!("Failed to toggle foreign keys for wipe: {e}"))?;
+
+    if is_all {
+        conn.execute("DELETE FROM prompt_tree_cache", [])
+            .map_err(|e| format!("Failed to clear prompt_tree_cache: {e}"))?;
+        conn.execute("DELETE FROM active_prompts", [])
+            .map_err(|e| format!("Failed to clear active_prompts: {e}"))?;
+        conn.execute("DELETE FROM running_projects", [])
+            .map_err(|e| format!("Failed to clear running_projects: {e}"))?;
+        conn.execute("DELETE FROM agm_conversation_sequences", [])
+            .map_err(|e| format!("Failed to clear agm_conversation_sequences: {e}"))?;
+        conn.execute("DELETE FROM agm_project_sequences", [])
+            .map_err(|e| format!("Failed to clear agm_project_sequences: {e}"))?;
+    } else {
+        let raw_id = instance_id.unwrap().trim();
+        let norm_id = crate::modules::instance::resolve_instance_id(raw_id)
+            .unwrap_or_else(|_| raw_id.to_string());
+        let pattern1 = format!("%:{}%", raw_id);
+        let pattern2 = format!("%:{}%", norm_id);
+
+        conn.execute(
+            "DELETE FROM prompt_tree_cache WHERE instance_id = ?1 OR instance_id = ?2 OR instance_id = 'all' OR cache_key LIKE ?3 OR cache_key LIKE ?4",
+            rusqlite::params![raw_id, &norm_id, pattern1, pattern2],
+        ).map_err(|e| format!("Failed to clear prompt_tree_cache for instance: {e}"))?;
+
+        conn.execute(
+            "DELETE FROM active_prompts WHERE instance_id = ?1 OR instance_id = ?2",
+            rusqlite::params![raw_id, &norm_id],
+        )
+        .map_err(|e| format!("Failed to clear active_prompts for instance: {e}"))?;
+
+        conn.execute(
+            "DELETE FROM running_projects WHERE instance_id = ?1 OR instance_id = ?2",
+            rusqlite::params![raw_id, &norm_id],
+        )
+        .map_err(|e| format!("Failed to clear running_projects for instance: {e}"))?;
+
+        conn.execute(
+            "DELETE FROM agm_conversation_sequences WHERE instance_id = ?1 OR instance_id = ?2",
+            rusqlite::params![raw_id, &norm_id],
+        )
+        .map_err(|e| format!("Failed to clear agm_conversation_sequences for instance: {e}"))?;
+
+        conn.execute(
+            "DELETE FROM agm_project_sequences WHERE instance_id = ?1 OR instance_id = ?2",
+            rusqlite::params![raw_id, &norm_id],
+        )
+        .map_err(|e| format!("Failed to clear agm_project_sequences for instance: {e}"))?;
+    }
+
+    conn.execute_batch("PRAGMA foreign_keys = ON;")
+        .map_err(|e| format!("Failed to re-enable foreign keys: {e}"))?;
+
+    // Determine target instances to rescan
+    let registry = crate::modules::instance::load_registry().unwrap_or_default();
+    let target_instances: Vec<String> = if is_all {
+        let mut ids: Vec<String> = registry.instances.iter().map(|i| i.id.clone()).collect();
+        if !ids.iter().any(|id| id == "default" || id == "__default__") {
+            ids.insert(0, "default".to_string());
+        }
+        ids
+    } else {
+        vec![instance_id.unwrap().trim().to_string()]
+    };
+
+    // Re-run detection::detect_running_projects and discover_running_prompts_from_antigravity
+    for inst in &target_instances {
+        let _ = super::detection::detect_running_projects(inst);
+        let ag_prompts = super::discovery::discover_running_prompts_from_antigravity(inst);
+        for p in ag_prompts {
+            let _ = super::prompts_crud::save_or_requeue_prompt(&p);
+        }
+    }
+
+    // Completely rebuild the prompt tree and sequences by scanning disk transcript_full.jsonl
+    let tree_nodes = super::compute_project_conversation_tree(instance_id, 200, false);
+    let project_count = tree_nodes.len();
+    let conv_count: usize = tree_nodes.iter().map(|p| p.conversations.len()).sum();
+
+    // Cache the regenerated tree
+    let now = Utc::now().timestamp();
+    let inst_key = instance_id.unwrap_or("all");
+    let cache_key = format!(
+        "tree:v{}:{}:{}:{}",
+        env!("CARGO_PKG_VERSION"),
+        inst_key,
+        200,
+        false
+    );
+    if let Ok(json_str) = serde_json::to_string(&tree_nodes) {
+        crate::error::record_ignored(
+            conn.execute(
+                "INSERT INTO prompt_tree_cache (cache_key, instance_id, tree_json, project_count, conversation_count, updated_at, ttl_seconds)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, 120)
+                 ON CONFLICT(cache_key) DO UPDATE SET
+                    instance_id = excluded.instance_id,
+                    tree_json = excluded.tree_json,
+                    project_count = excluded.project_count,
+                    conversation_count = excluded.conversation_count,
+                    updated_at = excluded.updated_at,
+                    ttl_seconds = excluded.ttl_seconds",
+                rusqlite::params![
+                    &cache_key,
+                    inst_key,
+                    &json_str,
+                    project_count as i64,
+                    conv_count as i64,
+                    now,
+                ],
+            ),
+            "cache regenerated prompt tree",
+        );
+    }
+
+    crate::modules::logger::log_info(&format!(
+        "[RepoDB] wipe_and_rescan_repo_db completed for instance '{inst_key}': {project_count} projects, {conv_count} conversations regenerated from disk transcripts"
+    ));
+
+    Ok(project_count)
 }
 
 #[cfg(test)]

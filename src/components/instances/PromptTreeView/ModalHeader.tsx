@@ -4,6 +4,7 @@ import {
     Maximize2,
     Minimize2,
     RefreshCw,
+    RotateCcw,
     PanelLeftClose,
     PanelLeftOpen,
     ChevronDown,
@@ -37,6 +38,7 @@ export interface ModalHeaderProps {
     onToggleTree?: () => void;
     isAutoSyncing?: boolean;
     isRefreshing?: boolean;
+    isResetting?: boolean;
 }
 
 const SYNC_INTERVALS: { value: SyncInterval; label: string }[] = [
@@ -72,6 +74,7 @@ export function ModalHeader(props: ModalHeaderProps) {
         onToggleTree,
         isAutoSyncing,
         isRefreshing,
+        isResetting,
     } = props;
 
     return (
@@ -131,11 +134,12 @@ export function ModalHeader(props: ModalHeaderProps) {
                     <button
                         type="button"
                         onClick={onResetTree}
-                        disabled={isLoading}
-                        className="flex items-center gap-1 h-7 px-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                        title="Clear the prompt tree cache and reload"
+                        disabled={isLoading || isResetting}
+                        className="flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                        title="Wipe database and regenerate prompt tree and sequences fresh from disk transcripts"
                     >
-                        <span>Reset</span>
+                        <RotateCcw className={cn("w-3.5 h-3.5 text-amber-500", isResetting && "animate-spin")} />
+                        <span>{isResetting ? 'Resetting...' : 'Reset'}</span>
                     </button>
 
                     {/* Segment 3: Refresh Button */}

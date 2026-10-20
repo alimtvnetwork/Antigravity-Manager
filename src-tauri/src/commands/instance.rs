@@ -775,14 +775,33 @@ pub async fn get_project_conversation_tree(
 }
 
 #[tauri::command]
-pub fn reset_prompt_tree_cache(instance_id: Option<String>) -> Result<String, String> {
-    crate::modules::repo_db::invalidate_prompt_tree_cache(instance_id.as_deref());
-    tracing::info!(
-        target: "prompt_tree",
-        instance_id = instance_id.as_deref().unwrap_or("all"),
-        "reset prompt tree cache"
-    );
-    Ok("prompt tree cache cleared".to_string())
+pub async fn reset_prompt_tree_cache(instance_id: Option<String>) -> Result<String, String> {
+    let id_clone = instance_id.clone();
+    tokio::task::spawn_blocking(move || {
+        let count = crate::modules::repo_db::wipe_and_rescan_repo_db(id_clone.as_deref())?;
+        tracing::info!(
+            target: "prompt_tree",
+            instance_id = id_clone.as_deref().unwrap_or("all"),
+            count = count,
+            "wiped database and regenerated prompt tree from disk transcripts"
+        );
+        Ok(format!(
+            "Prompt tree wiped and regenerated ({} projects)",
+            count
+        ))
+    })
+    .await
+    .map_err(|e| format!("wipe_and_rescan_repo_db task failed: {e}"))?
+}
+
+#[tauri::command]
+pub async fn wipe_and_rescan_repo_db(instance_id: Option<String>) -> Result<usize, String> {
+    let id_clone = instance_id.clone();
+    tokio::task::spawn_blocking(move || {
+        crate::modules::repo_db::wipe_and_rescan_repo_db(id_clone.as_deref())
+    })
+    .await
+    .map_err(|e| format!("wipe_and_rescan_repo_db task failed: {e}"))?
 }
 
 #[tauri::command]

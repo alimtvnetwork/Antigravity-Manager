@@ -55,15 +55,33 @@ fn map_queue_row(row: &rusqlite::Row) -> rusqlite::Result<PromptQueueRow> {
 }
 
 /// Instance predicate shared by the three queries.
-/// Returns `(where_sql, param)`; `param` is `None` for the default scope.
+/// Returns `(where_sql, param)`; `param` is `None` for the default scope when no resolved ID is needed.
 fn instance_predicate(target: &str) -> (&'static str, Option<String>) {
+    let resolved = crate::modules::instance::resolve_instance_id(target).unwrap_or_else(|e| {
+        // Justification: fallback to literal target when instance registry cannot resolve ID
+        tracing::debug!(target: "prompt_queue", target_id = target, error = %e, "resolve_instance_id fallback to target literal");
+        target.to_string()
+    });
+
     if target == "default" || target == "__default__" {
+        if resolved != "default" && resolved != "__default__" && !resolved.trim().is_empty() {
+            (
+                "(instance_id = 'default' OR instance_id = '__default__' OR instance_id = '' OR instance_id IS NULL OR instance_id = ?1)",
+                Some(resolved),
+            )
+        } else {
+            (
+                "(instance_id = 'default' OR instance_id = '__default__' OR instance_id = '' OR instance_id IS NULL)",
+                None,
+            )
+        }
+    } else if resolved == "default" || resolved == "__default__" {
         (
             "(instance_id = 'default' OR instance_id = '__default__' OR instance_id = '' OR instance_id IS NULL)",
             None,
         )
     } else {
-        ("instance_id = ?1", Some(target.to_string()))
+        ("instance_id = ?1", Some(resolved))
     }
 }
 

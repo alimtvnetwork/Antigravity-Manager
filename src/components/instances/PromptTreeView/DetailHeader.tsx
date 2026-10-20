@@ -1,13 +1,12 @@
 import { copyToClipboard } from '../../../utils/clipboard';
-import { copyImageAsMarkdownText, writePureImageToClipboard, copyPromptWithRichImages, extractAssets, stripImagesFromPrompt } from './clipboard';
+import { copyImageAsMarkdownText, writePureImageToClipboard, copyPromptWithRichImages, extractAssets, stripImagesFromPrompt, copyAllImagesToClipboard, copyPromptWithLocalFileLinks, copyPromptWithBase64Images } from './clipboard';
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { formatRelativeRecency } from './formatters';
-import { User, Bot, Terminal, Wrench, Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat } from 'lucide-react';
+import { Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat } from 'lucide-react';
 import { cn } from '../../../utils/cn';
-import { PromptOriginTier, CopyFormat, type AgmConversationNode } from './types';
+import { CopyFormat, type AgmConversationNode } from './types';
 import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, RERUN_MESSAGE_OPTIONS, RERUN_RANDOM_MESSAGE_SET, RERUN_DEFAULT_COUNT, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
-import { classifyPromptTier } from './tierClassification';
 import { isGhostConversation } from './conversationGuards';
 import { persistClientCrash } from '../../../lib/error-listener';
 import { useErrorStore } from '../../../stores/error-store';
@@ -113,7 +112,7 @@ export function DetailHeader(props: DetailHeaderProps) {
         onCopyImageForOneNoteOrIde, onCopySingleImagePng,
         onCopyWithImages, onSaveImages, onExport, onFocusIde, onResend, onEnqueue, rerunRepoPath, onOpenInspector,
         onRenameConversation,
-        selectedTurnNumber,
+        selectedTurnNumber: _selectedTurnNumber,
     } = props;
 
     const [localNewConvTitle, setLocalNewConvTitle] = useState('');
@@ -356,6 +355,46 @@ export function DetailHeader(props: DetailHeaderProps) {
     const [localCopiedImageText, setLocalCopiedImageText] = useState(false);
     const [localCopiedOneNote, setLocalCopiedOneNote] = useState(false);
     const [localCopiedSinglePng, setLocalCopiedSinglePng] = useState(false);
+    const [localCopiedAllImages, setLocalCopiedAllImages] = useState(false);
+    const [localCopiedLocalLinks, setLocalCopiedLocalLinks] = useState(false);
+    const [localCopiedBase64, setLocalCopiedBase64] = useState(false);
+
+    const handleCopyAllImages = async () => {
+        try {
+            const promptText = activePromptText || selectedConversation?.full_prompt_text || selectedConversation?.prompt_preview_200w || '';
+            const { images } = extractAssets(promptText);
+            const allImages = Array.from(new Set([...images, ...(selectedConversation?.media_paths || [])]));
+            if (allImages.length > 0) {
+                await copyAllImagesToClipboard(allImages);
+                setLocalCopiedAllImages(true);
+                setTimeout(() => setLocalCopiedAllImages(false), 2000);
+            }
+        } catch (err) {
+            reportPromptActionError(err, 'DetailHeader.onCopyAllImages');
+        }
+    };
+
+    const handleCopyPromptLocalLinks = async () => {
+        try {
+            const promptText = activePromptText || selectedConversation?.full_prompt_text || selectedConversation?.prompt_preview_200w || '';
+            await copyPromptWithLocalFileLinks(promptText, selectedConversation?.media_paths);
+            setLocalCopiedLocalLinks(true);
+            setTimeout(() => setLocalCopiedLocalLinks(false), 2000);
+        } catch (err) {
+            reportPromptActionError(err, 'DetailHeader.onCopyPromptLocalLinks');
+        }
+    };
+
+    const handleCopyPromptBase64 = async () => {
+        try {
+            const promptText = activePromptText || selectedConversation?.full_prompt_text || selectedConversation?.prompt_preview_200w || '';
+            await copyPromptWithBase64Images(promptText, selectedConversation?.media_paths);
+            setLocalCopiedBase64(true);
+            setTimeout(() => setLocalCopiedBase64(false), 2000);
+        } catch (err) {
+            reportPromptActionError(err, 'DetailHeader.onCopyPromptBase64');
+        }
+    };
 
     const handleCopyImageAsText = async () => {
         try {
@@ -435,84 +474,14 @@ export function DetailHeader(props: DetailHeaderProps) {
         }
     };
 
-    const activeTurnNumber = selectedTurnNumber ?? selectedConversation.selected_turn_number ?? null;
     const enqueuedCount = selectedConversation.prompts?.filter((p) => p.is_queued || p.status === 'QUEUED').length || (selectedConversation.is_queued ? 1 : 0);
 
     return (
         <div className="pb-2.5 border-b border-slate-200 dark:border-[#40285e] shrink-0 relative z-30">
             {/* Header Row: Identity & Badges & Breadcrumb Context (Left) + Action Capsule (Right) */}
             <div className="flex items-center justify-between gap-2.5 flex-wrap min-w-0">
-                {/* Left: Indicator 1 (Sequence + Tier), Indicator 2 (Status Capsule), Title, Instance Context */}
-                <div className="flex items-center gap-2 flex-wrap min-w-0">
-                    {/* Indicator 1: Clean Origin Tier Icon & Label */}
-                    {(() => {
-                        const tierInfo = classifyPromptTier(activePromptText, selectedConversation.title);
-                        const isTurnSelected = activeTurnNumber !== null;
-
-                        // Preview Header Decluttering: remove redundant "User Prompt" plain badges
-                        if (tierInfo.tier === PromptOriginTier.UserPrompt && !isTurnSelected) {
-                            return null;
-                        }
-
-                        return (
-                            <span
-                                className={cn(
-                                    "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border cursor-help transition-colors",
-                                    isTurnSelected
-                                        ? "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30 shadow-2xs"
-                                        : "bg-blue-500/10 text-blue-600 dark:text-cyan-400 border-blue-500/20 hover:border-blue-500/50"
-                                )}
-                                title={
-                                    isTurnSelected
-                                        ? `Turn T${activeTurnNumber} · ${tierInfo.tier}`
-                                        : `${tierInfo.tier} (Click details to view metadata)`
-                                }
-                            >
-                                {tierInfo.tier === PromptOriginTier.UserPrompt && <User className="w-2.5 h-2.5 text-sky-500 shrink-0" />}
-                                {tierInfo.tier === PromptOriginTier.SubagentInstruction && <Bot className="w-2.5 h-2.5 text-purple-500 shrink-0" />}
-                                {tierInfo.tier === PromptOriginTier.SystemMessage && <Terminal className="w-2.5 h-2.5 text-slate-500 shrink-0" />}
-                                {tierInfo.tier === PromptOriginTier.ToolOutput && <Wrench className="w-2.5 h-2.5 text-amber-500 shrink-0" />}
-                                <span>{isTurnSelected ? `Turn T${activeTurnNumber}` : (tierInfo.tier === PromptOriginTier.SubagentInstruction ? 'Subagent' : tierInfo.tier === PromptOriginTier.SystemMessage ? 'System' : 'Tool Output')}</span>
-                            </span>
-                        );
-                    })()}
-
-                    {/* Scope Breadcrumb Badge (only shown when a specific turn is selected) */}
-                    {activeTurnNumber !== null && (
-                        <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded-md border border-purple-500/20 font-semibold shrink-0">
-                            ↳ Turn {activeTurnNumber} of {selectedConversation.prompts?.length || 1}
-                        </span>
-                    )}
-
-                    {/* Indicator 2: Unified Status Capsule (normalized rounded-md) */}
-                    {Boolean(selectedConversation.is_running) && !isGhostConversation(selectedConversation) ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9.5px] font-bold font-mono bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border border-emerald-500/40 shadow-2xs animate-pulse">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] animate-pulse" />
-                            <span>RUNNING</span>
-                            {instancePid ? <span className="opacity-80">PID: {instancePid}</span> : null}
-                            <span className="border-l border-emerald-400/40 pl-1">{formatDuration(elapsedSeconds)}</span>
-                        </span>
-                    ) : Boolean(selectedConversation.is_queued) ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9.5px] font-bold font-mono bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs">
-                            <Clock className="w-2.5 h-2.5 text-amber-500" />
-                            <span>QUEUED</span>
-                        </span>
-                    ) : (
-                        (() => {
-                            const recency = formatRelativeRecency(selectedConversation.last_modified);
-                            return (
-                                <span
-                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-mono text-zinc-400 bg-zinc-900/60 border border-zinc-700/50 shadow-2xs cursor-default"
-                                    title={`Last active: ${recency.formattedTime}`}
-                                >
-                                    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", recency.dotClass)} />
-                                    <span>IDLE</span>
-                                    <span className="text-zinc-500 border-l border-zinc-700/60 pl-1">{recency.label}</span>
-                                </span>
-                            );
-                        })()
-                    )}
-
+                {/* Left: Title + Copy Title, followed by Status Capsule (nothing prefixes title) */}
+                <div className="flex items-center gap-2.5 flex-wrap min-w-0 flex-1">
                     {/* Title with Double-Click Inline Rename and 1-Click Header Copy Button */}
                     {isEditingTitle ? (
                         <input
@@ -535,7 +504,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                             onBlur={() => void handleCommitTitle()}
                             onClick={(e) => e.stopPropagation()}
                             onDoubleClick={(e) => e.stopPropagation()}
-                            className="px-1.5 py-0.5 text-xs font-bold font-ubuntu rounded bg-white dark:bg-[#120a1f] border border-purple-500/50 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500 max-w-[200px] md:max-w-xs shadow-inner"
+                            className="px-2 py-0.5 text-base md:text-lg font-bold font-ubuntu rounded bg-white dark:bg-[#120a1f] border border-purple-500/50 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500 max-w-sm md:max-w-md lg:max-w-lg shadow-inner"
                         />
                     ) : (
                         <div className="flex items-center gap-1.5 min-w-0">
@@ -544,7 +513,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     e.stopPropagation();
                                     setIsEditingTitle(true);
                                 }}
-                                className="text-xs font-bold font-ubuntu text-slate-900 dark:text-white truncate max-w-[200px] md:max-w-xs cursor-pointer hover:text-purple-600 dark:hover:text-purple-300 transition-colors"
+                                className="text-base md:text-lg font-bold font-ubuntu text-slate-900 dark:text-white truncate max-w-sm md:max-w-md lg:max-w-lg cursor-pointer hover:text-purple-600 dark:hover:text-purple-300 transition-colors"
                                 title={`${selectedConversation.title || selectedConversation.short_id} (Double-click to rename)`}
                             >
                                 {selectedConversation.title || selectedConversation.short_id}
@@ -563,6 +532,35 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 )}
                             </button>
                         </div>
+                    )}
+
+                    {/* Indicator 2: Unified Status Capsule (appears AFTER title) */}
+                    {Boolean(selectedConversation.is_running) && !isGhostConversation(selectedConversation) ? (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9.5px] font-bold font-mono bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border border-emerald-500/40 shadow-2xs animate-pulse shrink-0">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] animate-pulse" />
+                            <span>RUNNING</span>
+                            {instancePid ? <span className="opacity-80">PID: {instancePid}</span> : null}
+                            <span className="border-l border-emerald-400/40 pl-1">{formatDuration(elapsedSeconds)}</span>
+                        </span>
+                    ) : Boolean(selectedConversation.is_queued) ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9.5px] font-bold font-mono bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs shrink-0">
+                            <Clock className="w-2.5 h-2.5 text-amber-500" />
+                            <span>QUEUED</span>
+                        </span>
+                    ) : (
+                        (() => {
+                            const recency = formatRelativeRecency(selectedConversation.last_modified);
+                            return (
+                                <span
+                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-mono text-zinc-400 bg-zinc-900/60 border border-zinc-700/50 shadow-2xs cursor-default shrink-0"
+                                    title={`Last active: ${recency.formattedTime}`}
+                                >
+                                    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", recency.dotClass)} />
+                                    <span>IDLE</span>
+                                    <span className="text-zinc-500 border-l border-zinc-700/60 pl-1">{recency.label}</span>
+                                </span>
+                            );
+                        })()
                     )}
                 </div>
 
@@ -715,6 +713,42 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     <span className="text-[10px] text-purple-600 dark:text-purple-300 font-mono px-1.5 py-0.2 rounded-md bg-purple-500/10 border border-purple-500/20">includes image</span>
                                 </button>
 
+                                {/* Option 1b: Copy Prompt (Local File Links) */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        void handleCopyPromptLocalLinks();
+                                        setIsCopyMenuOpen(false);
+                                    }}
+                                    data-ui-name="prompt-menu-copy-local-links-btn"
+                                    data-ui-id={`prompt-menu-copy-local-links-${selectedConversation.conversation_id}`}
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        {localCopiedLocalLinks ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <FileText className="w-3.5 h-3.5 text-sky-400" />}
+                                        <span>{localCopiedLocalLinks ? 'Copied with local links!' : 'Copy Prompt (Local File Links)'}</span>
+                                    </div>
+                                    <span className="text-[10px] text-sky-600 dark:text-sky-300 font-mono px-1.5 py-0.2 rounded-md bg-sky-500/10 border border-sky-500/20">file:///</span>
+                                </button>
+
+                                {/* Option 1c: Copy Prompt (Base64) */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        void handleCopyPromptBase64();
+                                        setIsCopyMenuOpen(false);
+                                    }}
+                                    data-ui-name="prompt-menu-copy-base64-btn"
+                                    data-ui-id={`prompt-menu-copy-base64-${selectedConversation.conversation_id}`}
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        {localCopiedBase64 ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <FileText className="w-3.5 h-3.5 text-violet-400" />}
+                                        <span>{localCopiedBase64 ? 'Copied with Base64!' : 'Copy Prompt (Base64)'}</span>
+                                    </div>
+                                    <span className="text-[10px] text-violet-600 dark:text-violet-300 font-mono px-1.5 py-0.2 rounded-md bg-violet-500/10 border border-violet-500/20">data:uri</span>
+                                </button>
+
                                 {/* Option 2: Copy without image (text only) */}
                                 <button
                                     type="button"
@@ -732,6 +766,26 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     </div>
                                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono px-1.5 py-0.2 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">text only</span>
                                 </button>
+
+                                {/* Option 2b: Copy All Images (composite PNG) */}
+                                {hasImages && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            void handleCopyAllImages();
+                                            setIsCopyMenuOpen(false);
+                                        }}
+                                        data-ui-name="prompt-menu-copy-all-images-btn"
+                                        data-ui-id={`prompt-menu-copy-all-images-${selectedConversation.conversation_id}`}
+                                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            {localCopiedAllImages ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-purple-400" />}
+                                            <span>{localCopiedAllImages ? 'Copied all images!' : 'Copy All Images'}</span>
+                                        </div>
+                                        <span className="text-[10px] text-purple-600 dark:text-purple-300 font-mono px-1.5 py-0.2 rounded-md bg-purple-500/10 border border-purple-500/20">composite PNG</span>
+                                    </button>
+                                )}
 
                                 {/* Option 3: Copy Image as Text (Markdown) */}
                                 {hasImages && (

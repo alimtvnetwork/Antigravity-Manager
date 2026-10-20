@@ -125,6 +125,7 @@ interface UsePromptTreePromptActionsProps {
     state: PromptTreeState;
     instanceId: string;
     selectConversation: (conv: AgmConversationNode, project: import('./types').AgmProjectTreeNode) => void;
+    loadTree?: (isInitialLoad?: boolean, isForce?: boolean) => Promise<void>;
 }
 
 const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'svg'] as const;
@@ -133,6 +134,7 @@ export function usePromptTreePromptActions({
     state,
     instanceId,
     selectConversation,
+    loadTree,
 }: UsePromptTreePromptActionsProps): PromptTreePromptActions {
     const {
         treeData,
@@ -383,7 +385,7 @@ export function usePromptTreePromptActions({
             let promptContent = (!selectedConversation && conv)
                 ? (conv.prompt_preview_200w || '')
                 : (editedPromptText.trim() || activePromptTextRef.current || activePromptText || conv?.prompt_preview_200w || '');
-            const repoPath = proj?.repo_path || '';
+            const repoPath = proj?.repo_path || selectedProject?.repo_path || (conv as { repo_path?: string })?.repo_path || '';
             const targetInstId = selectedConversation?.instance_id || conv?.instance_id || proj?.instance_id || instanceId || 'default';
             const targetConvId = conversationTargetMode === 'new'
                 ? (newConversationTitle?.trim() || undefined)
@@ -401,8 +403,11 @@ export function usePromptTreePromptActions({
                 }
             }
 
-            // Append attached images from conversation media_paths if not already in markdown
-            const mediaList = selectedConversation?.media_paths || conv?.media_paths || [];
+            // Append attached images from conversation media_paths or media_thumbnails if not already in markdown
+            const mediaList: string[] = [
+                ...(selectedConversation?.media_paths || conv?.media_paths || []),
+                ...(selectedConversation?.media_thumbnails || conv?.media_thumbnails || []),
+            ].filter((p, idx, arr): p is string => Boolean(p && typeof p === 'string' && arr.indexOf(p) === idx));
             if (mediaList.length > 0) {
                 const missing = mediaList.filter((p) => p && !promptContent.includes(p));
                 if (missing.length > 0) {
@@ -410,23 +415,20 @@ export function usePromptTreePromptActions({
                 }
             }
 
-            // 1. Rewrite prompt to lightweight relative markdown links if Base64 images exist
-            const { rewrittenPrompt } = extractPromptImages(promptContent);
-
-            // 2. Dispatch rewritten prompt directly to running instance via sendPromptNow.
+            // Dispatch real prompt content directly to running instance via sendPromptNow without stripping Base64 images to non-existent relative attachments
             // Track real dispatch outcome: the backend returns Err when the agy
             // CLI spawn fails, and the success message must not show in that case.
             let dispatchOk = false;
             let dispatchErr: unknown = null;
             try {
-                await sendPromptNow(targetInstId, repoPath, rewrittenPrompt, targetConvId);
+                await sendPromptNow(targetInstId, repoPath, promptContent, targetConvId);
                 dispatchOk = true;
             } catch (sendErr) {
                 dispatchErr = sendErr;
                 persistClientCrash(sendErr, 'PromptTreeViewModal.handleSend');
             }
 
-            // 3. Prime system clipboard concurrently with dual-MIME rich HTML images for immediate pasting.
+            // Prime system clipboard concurrently with dual-MIME rich HTML images for immediate pasting.
             try {
                 await copyPromptWithRichImages(promptContent, undefined, undefined, mediaList);
             } catch (clipErr) {
@@ -441,7 +443,7 @@ export function usePromptTreePromptActions({
                 setTimeout(() => setActionMsg(null), 3000);
             } else {
                 const errorObj = dispatchErr instanceof Error ? dispatchErr : new Error(String(dispatchErr) || 'dispatch rejected');
-                setError(`Send failed: ${errorObj.message} â€” prompt copied to clipboard; paste it into the IDE manually.`);
+                setError(`Send failed: ${errorObj.message} — prompt copied to clipboard; paste it into the IDE manually.`);
             }
         } catch (err: unknown) {
             const errorObj = err instanceof Error ? err : new Error(String(err) || 'Failed to dispatch prompt');
@@ -539,6 +541,38 @@ ${activePromptText}
             }
         }
 
+        // Fallback 2: If selectedProject is null but conv exists, find and assign proj from treeData (so repoPath is NEVER empty "")
+        if (!proj && conv) {
+            for (const p of treeData) {
+                if (p.conversations.some((c) => c.conversation_id === conv?.conversation_id)) {
+                    proj = p;
+                    setSelectedProject(p);
+                    break;
+                }
+            }
+        }
+
+        // Fallback 3: If both conv and proj are null, pick newest valid conversation across non-archived projects
+        if (!conv && !proj && treeData.length > 0) {
+            for (const p of treeData) {
+                if (archivedProjectIds.includes(p.project_id)) continue;
+                const candidates = p.conversations.filter(
+                    (c) => !isGhostConversation(c) && !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+                );
+                if (candidates.length > 0) {
+                    proj = p;
+                    const sorted = [...candidates].sort((a, b) => {
+                        const aTime = new Date(a.last_modified).getTime() || 0;
+                        const bTime = new Date(b.last_modified).getTime() || 0;
+                        return bTime - aTime;
+                    });
+                    conv = sorted[0];
+                    selectConversation(conv, proj);
+                    break;
+                }
+            }
+        }
+
         if (!conv) {
             // Visible no-op guard: previously a silent return that made the
             // Queue button appear dead with no feedback.
@@ -553,7 +587,7 @@ ${activePromptText}
             setIsEnqueueing(true);
             setActionMsg('Enqueueing prompt into FIFO scheduler queue...');
             let promptContent = editedPromptText.trim() || activePromptTextRef.current || activePromptText || conv.prompt_preview_200w || '';
-            const repoPath = proj?.repo_path || selectedProject?.repo_path || '';
+            const repoPath = proj?.repo_path || selectedProject?.repo_path || (conv as { repo_path?: string })?.repo_path || '';
             const targetInstId = selectedConversation?.instance_id || conv.instance_id || proj?.instance_id || instanceId || 'default';
             const targetConvId = conversationTargetMode === 'new'
                 ? (newConversationTitle?.trim() || undefined)
@@ -571,8 +605,11 @@ ${activePromptText}
                 }
             }
 
-            // Append attached images from conversation media_paths if not already in markdown
-            const mediaList = selectedConversation?.media_paths || conv.media_paths || [];
+            // Append attached images from conversation media_paths or media_thumbnails if not already in markdown
+            const mediaList: string[] = [
+                ...(selectedConversation?.media_paths || conv.media_paths || []),
+                ...(selectedConversation?.media_thumbnails || conv.media_thumbnails || []),
+            ].filter((p, idx, arr): p is string => Boolean(p && typeof p === 'string' && arr.indexOf(p) === idx));
             if (mediaList.length > 0) {
                 const missing = mediaList.filter((p) => p && !promptContent.includes(p));
                 if (missing.length > 0) {
@@ -580,13 +617,34 @@ ${activePromptText}
                 }
             }
 
-            // 1. Rewrite prompt to lightweight relative markdown links if Base64 images exist
-            const { rewrittenPrompt } = extractPromptImages(promptContent);
+            // Enqueue prompt into FIFO queue (preserving real Base64 image data URIs and file paths)
+            await enqueuePrompt(targetInstId, repoPath, promptContent, targetConvId);
 
-            // 2. Enqueue rewritten prompt into FIFO queue
-            await enqueuePrompt(targetInstId, repoPath, rewrittenPrompt, targetConvId);
+            // Trigger immediate tree refresh and cache invalidation so tree view reflects enqueued turn
+            if (loadTree) {
+                try {
+                    await loadTree(true, true);
+                } catch (loadErr) {
+                    useErrorStore.getState().trackWarning(loadErr, {
+                        source: 'usePromptTreePromptActions.handleEnqueuePrompt',
+                        triggerAction: 'loadTree',
+                    });
+                }
+            }
+            if (isTauri()) {
+                try {
+                    await invoke('invalidate_prompt_tree_cache', { instanceId: targetInstId }).catch(async () => {
+                        await invoke('reset_prompt_tree_cache', { instanceId: targetInstId });
+                    });
+                } catch (cacheErr) {
+                    useErrorStore.getState().trackWarning(cacheErr, {
+                        source: 'usePromptTreePromptActions.handleEnqueuePrompt',
+                        triggerAction: 'invalidate_prompt_tree_cache',
+                    });
+                }
+            }
 
-            // 3. Prime system clipboard concurrently with dual-MIME rich HTML images for immediate pasting
+            // Prime system clipboard concurrently with dual-MIME rich HTML images for immediate pasting
             try {
                 await copyPromptWithRichImages(promptContent, undefined, undefined, mediaList);
             } catch (clipErr) {
@@ -611,9 +669,10 @@ ${activePromptText}
         }
     }, [
         selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef,
+        treeData, archivedProjectIds, setSelectedProject,
         editedPromptText, activePromptText, activePromptTextRef, confirmationSuffix,
         conversationTargetMode, newConversationTitle, instanceId, selectConversation,
-        setIsEnqueueing, setActionMsg, setError,
+        loadTree, setIsEnqueueing, setActionMsg, setError,
     ]);
 
     const handleFocusIde = useCallback(async () => {

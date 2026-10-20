@@ -7,7 +7,7 @@ import { RichMarkdownRenderer } from './markdown';
 import { countWords, formatPromptForMarkdown } from './formatters';
 import { PromptImagePreviewModal } from './PromptImagePreviewModal';
 import { PromptImageContextMenu } from './PromptImageContextMenu';
-import { resolveImageSrc, extractLocalPathFromUri, writePureImageToClipboard } from './clipboard';
+import { resolveImageSrc, extractLocalPathFromUri, writePureImageToClipboard, copyAllImagesToClipboard } from './clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 import { useConfigStore } from '../../../stores/useConfigStore';
 import { formatDateTime, formatDateOnly } from '../../../utils/date';
@@ -392,7 +392,8 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
     );
 
     const [copiedPureImageIdx, setCopiedPureImageIdx] = useState<number | null>(null);
-    const [activeSequenceCopyIdx, setActiveSequenceCopyIdx] = useState<number | null>(null);
+    const [isCopyingAllImages, setIsCopyingAllImages] = useState(false);
+    const [isCopiedAllImages, setIsCopiedAllImages] = useState(false);
 
     const handleCopyFirstImage = async () => {
         if (!attachedImages || attachedImages.length === 0) return;
@@ -408,15 +409,22 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         }
     };
 
-    const handleCopyAllImagesSequence = async () => {
+    const handleCopyAllImages = async () => {
         if (!attachedImages || attachedImages.length === 0) return;
-        const nextIdx = activeSequenceCopyIdx === null ? 0 : (activeSequenceCopyIdx + 1) % attachedImages.length;
-        const target = attachedImages[nextIdx];
-        const ok = await writePureImageToClipboard(target.src);
-        if (ok) {
-            setActiveSequenceCopyIdx(nextIdx);
-            setActionMsg?.(`Copied image ${nextIdx + 1} of ${attachedImages.length} (PNG)! Paste into OneNote, then click again for next.`);
-            setTimeout(() => setActionMsg?.(null), 3000);
+        setIsCopyingAllImages(true);
+        try {
+            const uris = attachedImages.map((img) => img.src);
+            const ok = await copyAllImagesToClipboard(uris);
+            if (ok) {
+                setIsCopiedAllImages(true);
+                setActionMsg?.(`Copied all ${attachedImages.length} images to clipboard!`);
+                setTimeout(() => {
+                    setIsCopiedAllImages(false);
+                    setActionMsg?.(null);
+                }, 2500);
+            }
+        } finally {
+            setIsCopyingAllImages(false);
         }
     };
 
@@ -809,24 +817,21 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                 type="button"
                                 onClick={handleCopyFirstImage}
                                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40 transition-colors shadow-2xs cursor-pointer"
-                                title="Copy first image to clipboard as pure PNG (ready to paste directly into OneNote or chat)"
+                                title="Copy image to clipboard as pure PNG (ready to paste directly into OneNote or chat)"
                             >
-                                <Copy className="w-3 h-3 text-purple-600 dark:text-purple-400" />
-                                <span>{copiedPureImageIdx === 0 ? '✓ Copied PNG' : 'Copy Image (PNG)'}</span>
+                                {copiedPureImageIdx === 0 ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-purple-600 dark:text-purple-400" />}
+                                <span>{copiedPureImageIdx === 0 ? 'Copied' : 'Copy'}</span>
                             </button>
                             {attachedImages.length > 1 && (
                                 <button
                                     type="button"
-                                    onClick={handleCopyAllImagesSequence}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-[#1f162e] dark:hover:bg-[#2b1f40] dark:text-slate-200 border border-slate-200 dark:border-[#3d2757] transition-colors shadow-2xs cursor-pointer"
-                                    title={`Copy images sequentially (currently ${activeSequenceCopyIdx !== null ? activeSequenceCopyIdx + 1 : 1}/${attachedImages.length}) - paste into OneNote and click again for next`}
+                                    onClick={handleCopyAllImages}
+                                    disabled={isCopyingAllImages}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+                                    title={`Copy all ${attachedImages.length} images vertically stitched as a single composite PNG (ready for OneNote or chat)`}
                                 >
-                                    <Copy className="w-3 h-3 text-slate-500" />
-                                    <span>
-                                        {activeSequenceCopyIdx !== null
-                                            ? `Next Image (${activeSequenceCopyIdx + 1}/${attachedImages.length})`
-                                            : `Copy Images (${attachedImages.length})`}
-                                    </span>
+                                    {isCopiedAllImages ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-purple-600 dark:text-purple-400" />}
+                                    <span>{isCopiedAllImages ? 'Copied All' : `Copy All Images (${attachedImages.length})`}</span>
                                 </button>
                             )}
                             <span className="text-[10px] text-slate-400 font-normal ml-1 hidden sm:inline">

@@ -374,25 +374,33 @@ export async function convertImageUriToBase64(imageUri: string): Promise<string 
 export async function transcodeSrcToPngBlob(src: string): Promise<Blob | null> {
     if (!src || !src.trim()) return null;
     return await new Promise<Blob | null>((resolve) => {
-        const timeout = setTimeout(() => resolve(null), 7000);
+        const timeout = setTimeout(() => resolve(null), 8000);
         const img = new Image();
-        img.crossOrigin = 'anonymous';
+        if (!src.startsWith('data:') && !src.startsWith('blob:')) {
+            img.crossOrigin = 'anonymous';
+        }
         img.onload = () => {
             clearTimeout(timeout);
             try {
                 const canvas = document.createElement('canvas');
-                canvas.width = img.naturalWidth || img.width || 300;
-                canvas.height = img.naturalHeight || img.height || 150;
+                const w = img.naturalWidth || img.width || 300;
+                const h = img.naturalHeight || img.height || 150;
+                canvas.width = w;
+                canvas.height = h;
                 const ctx = canvas.getContext('2d');
                 if (!ctx) {
                     resolve(null);
                     return;
                 }
-                ctx.drawImage(img, 0, 0);
+                ctx.drawImage(img, 0, 0, w, h);
                 canvas.toBlob((blob) => {
                     resolve(blob);
                 }, 'image/png');
-            } catch {
+            } catch (err) {
+                useErrorStore.getState().trackWarning(err, {
+                    source: 'clipboard.transcodeSrcToPngBlob.canvas',
+                    triggerAction: 'canvas_to_blob',
+                });
                 resolve(null);
             }
         };
@@ -423,9 +431,11 @@ export async function convertImageUriToPngBlob(imageUri: string): Promise<Blob |
                 if (b64DataUri && b64DataUri.startsWith('data:image/')) {
                     const transcoded = await transcodeSrcToPngBlob(b64DataUri);
                     if (transcoded) return transcoded;
-                    const commaIdx = b64DataUri.indexOf(',');
-                    const base64Payload = commaIdx !== -1 ? b64DataUri.slice(commaIdx + 1) : b64DataUri;
-                    return base64ToBlob(base64Payload, 'image/png');
+                    if (b64DataUri.startsWith('data:image/png')) {
+                        const commaIdx = b64DataUri.indexOf(',');
+                        const base64Payload = commaIdx !== -1 ? b64DataUri.slice(commaIdx + 1) : b64DataUri;
+                        return base64ToBlob(base64Payload, 'image/png');
+                    }
                 }
             } catch (backendErr) {
                 useErrorStore.getState().trackWarning(backendErr, {
@@ -439,9 +449,11 @@ export async function convertImageUriToPngBlob(imageUri: string): Promise<Blob |
         if (cleanUri.startsWith('data:image/')) {
             const transcoded = await transcodeSrcToPngBlob(cleanUri);
             if (transcoded) return transcoded;
-            const commaIdx = cleanUri.indexOf(',');
-            const base64Payload = commaIdx !== -1 ? cleanUri.slice(commaIdx + 1) : cleanUri;
-            return base64ToBlob(base64Payload, 'image/png');
+            if (cleanUri.startsWith('data:image/png')) {
+                const commaIdx = cleanUri.indexOf(',');
+                const base64Payload = commaIdx !== -1 ? cleanUri.slice(commaIdx + 1) : cleanUri;
+                return base64ToBlob(base64Payload, 'image/png');
+            }
         }
 
         // 3. Remote URL or resolved src
@@ -466,7 +478,16 @@ export async function writePureImageToClipboard(
     try {
         let pngBlob: Blob | null = null;
         if (imageUriOrBlob instanceof Blob) {
-            pngBlob = imageUriOrBlob;
+            if (imageUriOrBlob.type === 'image/png') {
+                pngBlob = imageUriOrBlob;
+            } else {
+                const blobUrl = URL.createObjectURL(imageUriOrBlob);
+                try {
+                    pngBlob = await transcodeSrcToPngBlob(blobUrl);
+                } finally {
+                    URL.revokeObjectURL(blobUrl);
+                }
+            }
         } else if (typeof imageUriOrBlob === 'string') {
             pngBlob = await convertImageUriToPngBlob(imageUriOrBlob);
         }
@@ -478,7 +499,8 @@ export async function writePureImageToClipboard(
         const hasFocus = typeof document !== 'undefined' && typeof document.hasFocus === 'function' ? document.hasFocus() : true;
         if (hasFocus && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
             try {
-                // Strictly single MIME type: 'image/png' ONLY. Zero text/plain, zero text/html.
+                // Strictly single MIME type: 'image/png' ONLY. Zero conflicting text/plain, zero text/html.
+                // Bundling text/html in the same item drops image/png on Chromium.
                 const item = new ClipboardItem({
                     'image/png': pngBlob,
                 });
@@ -509,6 +531,192 @@ export async function writePureImageToClipboard(
         useErrorStore.getState().trackWarning(err, {
             source: 'clipboard.writePureImageToClipboard',
             triggerAction: 'write_pure_image',
+        });
+        onError?.(err);
+        return false;
+    }
+}
+
+/**
+ * Loads an image URI into an HTMLImageElement safely across Tauri and web environments.
+ * Uses native Tauri read_image_as_base64 or convertFileSrc to bypass WebView2 local file CORS restrictions.
+ */
+async function loadImageElement(uri: string): Promise<HTMLImageElement | null> {
+    if (!uri || !uri.trim()) return null;
+    const cleanUri = uri.trim();
+
+    let loadSrc = cleanUri;
+    const localPath = extractLocalPathFromUri(cleanUri);
+    if (localPath && isTauriEnvironment()) {
+        try {
+            const b64 = await invoke<string>('read_image_as_base64', { path: localPath });
+            if (b64 && b64.startsWith('data:image/')) {
+                loadSrc = b64;
+            } else {
+                loadSrc = convertFileSrc(localPath);
+            }
+        } catch {
+            loadSrc = resolveImageSrc(cleanUri);
+        }
+    } else {
+        loadSrc = resolveImageSrc(cleanUri);
+    }
+
+    return await new Promise<HTMLImageElement | null>((resolve) => {
+        const timeout = setTimeout(() => resolve(null), 8000);
+        const img = new Image();
+        if (!loadSrc.startsWith('data:') && !loadSrc.startsWith('blob:')) {
+            img.crossOrigin = 'anonymous';
+        }
+        img.onload = () => {
+            clearTimeout(timeout);
+            resolve(img);
+        };
+        img.onerror = () => {
+            clearTimeout(timeout);
+            resolve(null);
+        };
+        img.src = loadSrc;
+    });
+}
+
+/**
+ * Stitches all provided image URIs vertically into a single composite PNG canvas,
+ * returning a clean binary PNG Blob.
+ * This allows pasting all images at once into applications like OneNote or Antigravity.
+ */
+export async function stitchImagesToCompositePng(imageUris: string[]): Promise<Blob | null> {
+    if (!imageUris || imageUris.length === 0) return null;
+    const cleanUris = imageUris.map((u) => u.trim()).filter(Boolean);
+    if (cleanUris.length === 0) return null;
+
+    try {
+        const loadedImages: HTMLImageElement[] = [];
+        const results = await Promise.all(cleanUris.map((u) => loadImageElement(u)));
+        for (const img of results) {
+            if (img && (img.naturalWidth || img.width) > 0 && (img.naturalHeight || img.height) > 0) {
+                loadedImages.push(img);
+            }
+        }
+
+        if (loadedImages.length === 0) return null;
+
+        if (loadedImages.length === 1) {
+            const single = loadedImages[0];
+            const canvas = document.createElement('canvas');
+            const w = single.naturalWidth || single.width;
+            const h = single.naturalHeight || single.height;
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return null;
+            ctx.drawImage(single, 0, 0, w, h);
+            return await new Promise<Blob | null>((resolve) => {
+                canvas.toBlob((blob) => resolve(blob), 'image/png');
+            });
+        }
+
+        const GAP = 16;
+        let maxWidth = 0;
+        let totalHeight = 0;
+
+        for (let i = 0; i < loadedImages.length; i++) {
+            const img = loadedImages[i];
+            const w = img.naturalWidth || img.width;
+            const h = img.naturalHeight || img.height;
+            if (w > maxWidth) maxWidth = w;
+            totalHeight += h;
+            if (i < loadedImages.length - 1) {
+                totalHeight += GAP;
+            }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.min(maxWidth, 16384);
+        canvas.height = Math.min(totalHeight, 16384);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        let currentY = 0;
+        for (const img of loadedImages) {
+            const w = img.naturalWidth || img.width;
+            const h = img.naturalHeight || img.height;
+            const x = Math.max(0, Math.round((maxWidth - w) / 2));
+            ctx.drawImage(img, x, currentY, w, h);
+            currentY += h + GAP;
+        }
+
+        return await new Promise<Blob | null>((resolve) => {
+            canvas.toBlob((blob) => resolve(blob), 'image/png');
+        });
+    } catch (err) {
+        useErrorStore.getState().trackWarning(err, {
+            source: 'clipboard.stitchImagesToCompositePng',
+            triggerAction: 'stitch_images',
+        });
+        return null;
+    }
+}
+
+/**
+ * Copies all images simultaneously via composite PNG blob, plus rich HTML with markdown fallback.
+ * Writes pure PNG binary blob of stitched composite images so pasting into OneNote or Antigravity
+ * pastes all images cleanly at once without Chromium dropping image/png due to conflicting text MIME types.
+ */
+export async function copyAllImagesToClipboard(
+    imageUris: string[],
+    onSuccess?: (msg: string) => void,
+    onError?: (err: unknown) => void
+): Promise<boolean> {
+    if (!imageUris || imageUris.length === 0) return false;
+    const cleanUris = imageUris.map((u) => u.trim()).filter(Boolean);
+    if (cleanUris.length === 0) return false;
+
+    try {
+        // 1. Primary path: Vertical composite PNG blob (pure binary to prevent Chromium drop bug)
+        const compositeBlob = await stitchImagesToCompositePng(cleanUris);
+        if (compositeBlob) {
+            ensureDocumentFocus();
+            const hasFocus = typeof document !== 'undefined' && typeof document.hasFocus === 'function' ? document.hasFocus() : true;
+            if (hasFocus && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+                try {
+                    const item = new ClipboardItem({
+                        'image/png': compositeBlob,
+                    });
+                    await navigator.clipboard.write([item]);
+                    const msg = `Copied ${cleanUris.length} image(s) as composite PNG to clipboard!`;
+                    onSuccess?.(msg);
+                    showToast({ message: msg, type: 'success' });
+                    return true;
+                } catch (clipErr) {
+                    useErrorStore.getState().trackWarning(clipErr, {
+                        source: 'clipboard.copyAllImagesToClipboard.navigator',
+                        triggerAction: 'write_composite_image',
+                    });
+                }
+            }
+        }
+
+        // 2. Secondary path: Rich HTML with embedded Base64 <img> tags
+        const richHtmlOk = await copyAllImagesAsRichHtml(cleanUris, onSuccess, onError);
+        if (richHtmlOk) return true;
+
+        // 3. Tertiary fallback: Markdown references
+        const mdFallback = cleanUris.map((u, idx) => `![Image ${idx + 1}](${u})`).join('\n\n');
+        const fallbackOk = await copyToClipboard(mdFallback);
+        if (fallbackOk) {
+            const msg = `Copied ${cleanUris.length} image Markdown reference(s) to clipboard!`;
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'info' });
+            return true;
+        }
+        return false;
+    } catch (err) {
+        useErrorStore.getState().trackWarning(err, {
+            source: 'clipboard.copyAllImagesToClipboard',
+            triggerAction: 'copy_all_images',
         });
         onError?.(err);
         return false;
@@ -1026,6 +1234,129 @@ export async function copySingleImageForOneNoteOrIde(
         useErrorStore.getState().trackWarning(err, {
             source: 'clipboard.copySingleImageForOneNoteOrIde',
             triggerAction: 'copy_image_onenote_ide',
+        });
+        onError?.(err);
+        return false;
+    }
+}
+
+/**
+ * Formats a markdown prompt so all image references point to normalized local file URLs (`file:///...`).
+ * Appends any turn mediaPaths not already present in the markdown.
+ */
+export function formatMarkdownWithLocalFileLinks(markdownText: string, mediaPaths?: string[]): string {
+    if (!markdownText && (!mediaPaths || mediaPaths.length === 0)) return '';
+
+    let text = markdownText || '';
+
+    // Append missing mediaPaths
+    if (mediaPaths && mediaPaths.length > 0) {
+        const missing = mediaPaths.filter((p) => p && !text.includes(p));
+        if (missing.length > 0) {
+            text = text.trim() + '\n\n' + missing.map((p, idx) => `![Turn Image ${idx + 1}](${p})`).join('\n\n');
+        }
+    }
+
+    // Replace all image tags with file:/// paths where possible
+    return text.replace(/!\[(.*?)\]\((.*?)\)/g, (fullMatch, alt, src) => {
+        const cleanSrc = src.trim();
+        const localPath = extractLocalPathFromUri(cleanSrc);
+        if (localPath) {
+            const normalizedPath = localPath.replace(/\\/g, '/');
+            const fileUrl = normalizedPath.startsWith('/') ? `file://${normalizedPath}` : `file:///${normalizedPath}`;
+            return `![${alt}](${fileUrl})`;
+        }
+        return fullMatch;
+    });
+}
+
+/**
+ * Copies prompt markdown referencing local file paths (`file:///...`) to clipboard.
+ */
+export async function copyPromptWithLocalFileLinks(
+    markdownText: string,
+    mediaPaths?: string[],
+    onSuccess?: (msg: string) => void,
+    onError?: (err: unknown) => void
+): Promise<boolean> {
+    try {
+        const formatted = formatMarkdownWithLocalFileLinks(markdownText, mediaPaths);
+        const ok = await copyToClipboard(formatted);
+        if (ok) {
+            const msg = 'Copied prompt with local file links to clipboard!';
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'success' });
+            return true;
+        }
+        return false;
+    } catch (err) {
+        useErrorStore.getState().trackWarning(err, {
+            source: 'clipboard.copyPromptWithLocalFileLinks',
+            triggerAction: 'copy_prompt_local_file_links',
+        });
+        onError?.(err);
+        return false;
+    }
+}
+
+/**
+ * Formats a markdown prompt by converting all referenced images (local files or URLs) into full Base64 data URIs.
+ * This creates a 100% portable, self-contained markdown document suitable for any LLM or web editor.
+ */
+export async function formatMarkdownWithBase64Images(markdownText: string, mediaPaths?: string[]): Promise<string> {
+    if (!markdownText && (!mediaPaths || mediaPaths.length === 0)) return '';
+
+    let text = markdownText || '';
+
+    // Append missing mediaPaths
+    if (mediaPaths && mediaPaths.length > 0) {
+        const missing = mediaPaths.filter((p) => p && !text.includes(p));
+        if (missing.length > 0) {
+            text = text.trim() + '\n\n' + missing.map((p, idx) => `![Turn Image ${idx + 1}](${p})`).join('\n\n');
+        }
+    }
+
+    const matches = Array.from(text.matchAll(/!\[(.*?)\]\((.*?)\)/g));
+    let result = text;
+    for (const match of matches) {
+        const full = match[0];
+        const alt = match[1];
+        const rawSrc = match[2].trim();
+        if (rawSrc.startsWith('data:image/')) {
+            continue;
+        }
+        const b64 = await convertImageUriToBase64(rawSrc);
+        if (b64) {
+            result = result.replace(full, `![${alt}](${b64})`);
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Copies prompt markdown with all images embedded as full Base64 data URIs to clipboard.
+ */
+export async function copyPromptWithBase64Images(
+    markdownText: string,
+    mediaPaths?: string[],
+    onSuccess?: (msg: string) => void,
+    onError?: (err: unknown) => void
+): Promise<boolean> {
+    try {
+        const formatted = await formatMarkdownWithBase64Images(markdownText, mediaPaths);
+        const ok = await copyToClipboard(formatted);
+        if (ok) {
+            const msg = 'Copied prompt with embedded Base64 images to clipboard!';
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'success' });
+            return true;
+        }
+        return false;
+    } catch (err) {
+        useErrorStore.getState().trackWarning(err, {
+            source: 'clipboard.copyPromptWithBase64Images',
+            triggerAction: 'copy_prompt_base64_images',
         });
         onError?.(err);
         return false;

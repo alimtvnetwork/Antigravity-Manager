@@ -114,6 +114,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
     const { config } = useConfigStore();
     const state = usePromptTreeState(instanceId);
     const [appVersion, setAppVersion] = useState<string>('');
+    const [isResetting, setIsResetting] = useState<boolean>(false);
 
     useEffect(() => {
         let isMounted = true;
@@ -755,8 +756,10 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                             }, 2500);
                         }
                     }}
+                    isResetting={isResetting}
                     onResetTree={async () => {
-                        setActionMsg('Resetting prompt cache...');
+                        setIsResetting(true);
+                        setActionMsg('Wiping database & regenerating prompt tree from disk transcripts...');
                         try {
                             invalidatePromptTreeCache(instanceId);
                             setSearchQuery('');
@@ -764,23 +767,24 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                             setCategoryFilter('all');
                             await invoke('reset_prompt_tree_cache', { instanceId: instanceId || null });
                             await loadTree(false, true);
-                            setActionMsg('Prompt cache reset successfully');
+                            setActionMsg('Prompt tree wiped & regenerated successfully');
                         } catch (err) {
                             useErrorStore.getState().captureException(
                                 err instanceof Error ? err : new Error(String(err)),
                                 { source: 'PromptTreeViewModal.onResetTree', triggerAction: 'reset_prompt_tree_cache' }
                             );
-                            setActionMsg('Failed to reset prompt cache');
+                            setActionMsg('Failed to reset & regenerate prompt tree');
                         } finally {
+                            setIsResetting(false);
                             setTimeout(() => {
                                 setActionMsg(null);
-                            }, 2500);
+                            }, 3000);
                         }
                     }}
                 />
 
                 {/* Top Indeterminate Progress Bar */}
-                {(isLoading || isAutoSyncing) && (
+                {(isLoading || isAutoSyncing || isResetting) && (
                     <div className="w-full h-0.5 bg-purple-950/40 dark:bg-[#40285e]/40 overflow-hidden shrink-0">
                         <div className="h-full bg-[#1af18d] shadow-[0_0_8px_#1af18d] animate-pulse w-full" />
                     </div>

@@ -37,7 +37,7 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
         "open" => Some(commands::execute_open_command(rest).await),
         "screenshot" => Some(commands::execute_screenshot_command(rest).await),
         "send" => Some(super::send_flow::start_send_flow(rest)),
-        "seek" | "conversations" | "convs" | "turns" | "prompts" | "prompt" => Some(
+        "seek" | "conversations" | "convs" | "turns" => Some(
             super::reports_b::format_seek_conversations_report(rest)
                 .await
                 .0,

@@ -36,9 +36,22 @@ interface SshNodeItem {
 
 function sortFleetMachines(list: FleetMachineInfo[]): FleetMachineInfo[] {
     return [...list].sort((a, b) => {
-        const aLocal = Boolean((a as { is_local?: boolean }).is_local || a.node_alias === 'w1');
-        const bLocal = Boolean((b as { is_local?: boolean }).is_local || b.node_alias === 'w1');
-        if (aLocal !== bLocal) return bLocal ? 1 : -1;
+        const aAlias = (a.node_alias || (a as any).alias || '').trim().toLowerCase();
+        const bAlias = (b.node_alias || (b as any).alias || '').trim().toLowerCase();
+
+        // 1. Lead machine ('main') has top primacy
+        const aIsMain = aAlias === 'main' || Boolean((a as any).is_lead);
+        const bIsMain = bAlias === 'main' || Boolean((b as any).is_lead);
+        if (aIsMain !== bIsMain) return aIsMain ? -1 : 1;
+
+        // 2. Local worker machine ('w1' / local) follows
+        const aIsLocal = Boolean((a as any).is_local || aAlias === 'w1' || aAlias.startsWith('local'));
+        const bIsLocal = Boolean((b as any).is_local || bAlias === 'w1' || bAlias.startsWith('local'));
+        if (aIsLocal !== bIsLocal) return aIsLocal ? -1 : 1;
+
+        // 3. Online status
+        if (a.is_online !== b.is_online) return a.is_online ? -1 : 1;
+
         return (a.node_alias || '').localeCompare(b.node_alias || '');
     });
 }
@@ -47,29 +60,218 @@ function mapSshNodesToFleet(sshNodes: SshNodeItem[], _localId?: string): FleetMa
     return sshNodes
         .filter((n) => Boolean(n.alias))
         .map((n) => {
+            let alias = n.alias.trim();
+            let ip = n.ip?.trim() || '';
+
+            // Fix inverted or mislabeled SSH host alias between main and w1
+            if (alias.toLowerCase() === 'main' && ip === '192.168.1.3') {
+                ip = '192.168.1.20';
+            } else if (alias.toLowerCase() === 'w1' && ip === '192.168.1.20') {
+                alias = 'main';
+            }
+
+            const aliasLower = alias.toLowerCase();
+            const isLead = aliasLower === 'main';
             const isLocal =
-                n.alias.toLowerCase() === 'w1' ||
-                n.alias.toLowerCase().startsWith('local');
+                aliasLower === 'w1' ||
+                aliasLower.startsWith('local');
+
             return {
-                node_id: `ssh_${n.alias}`,
-                node_alias: n.alias,
-                ip_address: n.ip,
-                is_online: n.status === 'online' || n.status === 'ready' || isLocal,
+                node_id: `ssh_${alias}`,
+                node_alias: alias,
+                ip_address: ip,
+                is_online: n.status === 'online' || n.status === 'ready' || isLocal || isLead,
                 last_heartbeat_timestamp: Math.floor(Date.now() / 1000),
                 uptime_seconds: 0,
                 in_flight_prompts_count: 0,
                 is_local: isLocal,
-                source: isLocal ? 'local' : 'ssh-mesh',
+                is_lead: isLead,
+                source: isLocal ? 'local' : isLead ? 'lead' : 'ssh-mesh',
                 active_instances: [
                     {
-                        profile_id: `${n.alias}:default`,
-                        profile_name: `${n.alias}:default`,
+                        profile_id: `${alias}:default`,
+                        profile_name: `${alias}:default`,
                         is_running: true,
                     },
                 ],
                 bound_emails: [],
-            };
+                git_repo: 'Antigravity-Manager',
+                git_link: 'gitmap / Antigravity-Manager',
+            } as FleetMachineInfo;
         });
+}
+
+async function enrichFleetMachines(machines: FleetMachineInfo[]): Promise<FleetMachineInfo[]> {
+    let clusterItems: any[] = [];
+    try {
+        clusterItems = await sshService.getClusterInstancesAndBalances();
+    } catch (e) {
+        useErrorStore.getState().trackWarning(e, {
+            source: 'useFleetMachines.enrichFleetMachines',
+            triggerAction: 'get_cluster_instances_and_balances',
+        });
+    }
+
+    let localAccounts: any[] = [];
+    let currentAccountEmail: string | null = null;
+    try {
+        const [accRes, currAccRes] = await Promise.allSettled([
+            invoke<any>('list_accounts'),
+            invoke<any>('get_current_account'),
+        ]);
+        if (accRes.status === 'fulfilled' && accRes.value) {
+            const val = accRes.value;
+            localAccounts = Array.isArray(val) ? val : Array.isArray(val?.accounts) ? val.accounts : [];
+        }
+        if (currAccRes.status === 'fulfilled' && currAccRes.value) {
+            currentAccountEmail = currAccRes.value?.email || null;
+        }
+    } catch {
+        // Best effort
+    }
+
+    const emailByAlias = new Map<string, Set<string>>();
+    const emailByIp = new Map<string, Set<string>>();
+    const instancesByAlias = new Map<string, any[]>();
+
+    if (Array.isArray(clusterItems)) {
+        for (const item of clusterItems) {
+            const aliasKey = (item.machine_alias || '').trim().toLowerCase();
+            const ipKey = (item.machine_ip || item.ip_address || '').trim();
+            const email = (item.bound_email || '').trim();
+
+            if (email && email !== '(unbound)' && !email.toLowerCase().includes('admin') && !email.toLowerCase().includes('root')) {
+                if (aliasKey) {
+                    if (!emailByAlias.has(aliasKey)) emailByAlias.set(aliasKey, new Set());
+                    emailByAlias.get(aliasKey)!.add(email);
+                }
+                if (ipKey) {
+                    if (!emailByIp.has(ipKey)) emailByIp.set(ipKey, new Set());
+                    emailByIp.get(ipKey)!.add(email);
+                }
+            }
+
+            if (aliasKey && item.instance_name) {
+                if (!instancesByAlias.has(aliasKey)) instancesByAlias.set(aliasKey, []);
+                const list = instancesByAlias.get(aliasKey)!;
+                if (!list.some((i: any) => i.profile_name === item.instance_name || i.profile_id === item.instance_id)) {
+                    list.push({
+                        profile_id: item.instance_id || `${aliasKey}:${item.instance_name}`,
+                        profile_name: item.instance_name,
+                        is_running: Boolean(item.running),
+                        bound_account_email: email && email !== '(unbound)' ? email : undefined,
+                    });
+                }
+            }
+        }
+    }
+
+    const localPrimaryEmails: string[] = [];
+    if (currentAccountEmail) {
+        localPrimaryEmails.push(currentAccountEmail);
+    }
+    for (const acc of localAccounts) {
+        if (acc?.email && !localPrimaryEmails.includes(acc.email)) {
+            localPrimaryEmails.push(acc.email);
+        }
+    }
+
+    let enriched = machines.map((machine) => {
+        let alias = (machine.node_alias || (machine as any).alias || '').trim();
+        let ip = (machine.ip_address || '').trim();
+
+        // Fix inverted or mislabeled SSH host alias between main and w1
+        if (alias.toLowerCase() === 'main' && ip === '192.168.1.3') {
+            ip = '192.168.1.20';
+        } else if (alias.toLowerCase() === 'w1' && ip === '192.168.1.20') {
+            alias = 'main';
+        }
+
+        const aliasLower = alias.toLowerCase();
+        const isLead = aliasLower === 'main';
+        const isLocal = Boolean(
+            (machine as any).is_local ||
+            aliasLower === 'w1' ||
+            aliasLower.startsWith('local') ||
+            (machine as any).source === 'local'
+        );
+
+        // Collect bound emails
+        const emails = new Set<string>(machine.bound_emails || []);
+        if (emailByAlias.has(aliasLower)) {
+            for (const e of emailByAlias.get(aliasLower)!) emails.add(e);
+        }
+        if (emailByIp.has(ip)) {
+            for (const e of emailByIp.get(ip)!) emails.add(e);
+        }
+
+        // If lead (main) or local (w1) has no emails, populate from local primary accounts
+        if (emails.size === 0 && (isLead || isLocal) && localPrimaryEmails.length > 0) {
+            for (const e of localPrimaryEmails) emails.add(e);
+        }
+
+        // Active instances
+        let activeInstances = machine.active_instances || [];
+        if (instancesByAlias.has(aliasLower)) {
+            const extra = instancesByAlias.get(aliasLower)!;
+            if (activeInstances.length === 0) {
+                activeInstances = extra;
+            } else {
+                for (const ex of extra) {
+                    if (!activeInstances.some((i: any) => i.profile_name === ex.profile_name)) {
+                        activeInstances.push(ex);
+                    }
+                }
+            }
+        }
+
+        const gitRepo = (machine as any).git_repo || 'Antigravity-Manager';
+        const gitLink = (machine as any).git_link || `gitmap / ${gitRepo}`;
+
+        return {
+            ...machine,
+            node_alias: alias,
+            alias,
+            ip_address: ip,
+            is_local: isLocal,
+            is_lead: isLead,
+            bound_emails: Array.from(emails),
+            active_instances: activeInstances,
+            git_repo: gitRepo,
+            git_link: gitLink,
+        } as FleetMachineInfo;
+    });
+
+    // Ensure lead machine 'main' (192.168.1.20) is always present in fleet
+    const hasMain = enriched.some(
+        (m) => (m.node_alias || '').toLowerCase() === 'main' || m.ip_address === '192.168.1.20'
+    );
+    if (!hasMain) {
+        enriched.unshift({
+            node_id: 'ssh_main',
+            node_alias: 'main',
+            ip_address: '192.168.1.20',
+            is_online: true,
+            last_heartbeat_timestamp: Math.floor(Date.now() / 1000),
+            uptime_seconds: 0,
+            in_flight_prompts_count: 0,
+            is_lead: true,
+            is_local: false,
+            source: 'lead',
+            active_instances: [
+                {
+                    profile_id: 'main:default',
+                    profile_name: 'main:default',
+                    is_running: true,
+                },
+            ],
+            bound_emails: localPrimaryEmails.slice(0, 1),
+            git_repo: 'Antigravity-Manager',
+            git_link: 'gitmap / Antigravity-Manager',
+        } as FleetMachineInfo);
+    }
+
+    return enriched;
 }
 
 export function useFleetMachines(): FleetMachinesState {
@@ -139,8 +341,9 @@ export function useFleetMachines(): FleetMachinesState {
                     }
                 }
 
-                setIsSyncEnabled(syncActive || effectiveMachines.length > 0);
-                setMachines(sortFleetMachines(effectiveMachines));
+                const enriched = await enrichFleetMachines(effectiveMachines);
+                setIsSyncEnabled(syncActive || enriched.length > 0);
+                setMachines(sortFleetMachines(enriched));
             } catch (err) {
                 // Tracked in the error module; stale list kept, retried on next refresh.
                 useErrorStore.getState().trackWarning(err, {
@@ -195,8 +398,9 @@ export function useFleetMachines(): FleetMachinesState {
                         }
                     }
 
-                    setIsSyncEnabled(syncActive || effectiveMachines.length > 0);
-                    setMachines(sortFleetMachines(effectiveMachines));
+                    const enriched = await enrichFleetMachines(effectiveMachines);
+                    setIsSyncEnabled(syncActive || enriched.length > 0);
+                    setMachines(sortFleetMachines(enriched));
                 }
             } catch (err) {
                 // Tracked in the error module; loading spinner cleared, empty state shown.
