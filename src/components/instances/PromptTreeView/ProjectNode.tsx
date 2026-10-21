@@ -109,11 +109,12 @@ function ConversationListWithGrouping({
     if (categoryFilter === 'subagent') {
         return (
             <>
-                {convList.map((conv) => (
+                {convList.map((conv, idx) => (
                     <ConversationNode
                         key={conv.conversation_id}
                         conv={conv}
                         project={project}
+                        isLastConv={idx === convList.length - 1}
                         isSelected={selectedConversationId === conv.conversation_id}
                         onSelect={onSelectConversation}
                         onOpenInspector={onOpenInspector}
@@ -132,11 +133,12 @@ function ConversationListWithGrouping({
 
     return (
         <>
-            {hierarchy.map((root) => (
+            {hierarchy.map((root, rIdx) => (
                 <div key={`root-${root.primaryNode.conversation_id}`} className="space-y-0.5">
                     <ConversationNode
                         conv={root.primaryNode}
                         project={project}
+                        isLastConv={rIdx === hierarchy.length - 1}
                         isSelected={selectedConversationId === root.primaryNode.conversation_id}
                         onSelect={onSelectConversation}
                         onOpenInspector={onOpenInspector}
@@ -437,7 +439,7 @@ export function ProjectNode(props: ProjectNodeProps) {
     };
 
     return (
-        <div key={project.project_id} className="space-y-0.5">
+        <div key={project.project_id} className={cn("space-y-1 transition-all", !isScopedSingleProject && "my-2.5 rounded-xl bg-slate-900/20 dark:bg-[#120a1f]/30 border border-slate-700/20 dark:border-purple-900/30 p-1.5 shadow-2xs")}>
             {/* Layer 1: Project Row (Hidden when a specific project is selected in the scope dropdown) */}
             {!isScopedSingleProject && (
                 <div
@@ -455,10 +457,10 @@ export function ProjectNode(props: ProjectNodeProps) {
                         }
                     }}
                     className={cn(
-                        'group flex items-center justify-between rounded-md px-2.5 py-1.5 text-xs font-semibold cursor-pointer transition-colors',
+                        'group flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold cursor-pointer transition-colors',
                         isSelected
                             ? 'bg-blue-100/70 text-blue-900 dark:bg-blue-950/60 dark:text-cyan-300'
-                            : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#171025]'
+                            : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-[#1a112a]'
                     )}
                     title={`Project: ${project.repo_name} · ${totalProjectPrompts} prompts total`}
                 >
@@ -556,8 +558,8 @@ export function ProjectNode(props: ProjectNodeProps) {
             {/* Layer 2: Conversations List */}
             {(isExpanded || isScopedSingleProject) && (
                 <div className={cn(
-                    "space-y-0.5 py-0.5",
-                    !isScopedSingleProject && "ml-4 pl-2 border-l border-slate-200 dark:border-[#40285e]/60"
+                    "space-y-1 py-1",
+                    !isScopedSingleProject && "ml-5 pl-3 border-l-2 border-slate-300/60 dark:border-purple-900/50"
                 )}>
                     {/* Active Conversations */}
                     <ConversationListWithGrouping convList={activeConversations} {...listProps} />

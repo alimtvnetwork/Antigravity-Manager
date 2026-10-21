@@ -16,6 +16,7 @@ export interface ConversationNodeProps {
     conv: AgmConversationNode;
     project: AgmProjectTreeNode;
     isSelected: boolean;
+    isLastConv?: boolean;
     onSelect: (conv: AgmConversationNode, project: AgmProjectTreeNode) => void;
     onOpenInspector: (conv: AgmConversationNode, repoPath: string) => void;
     onRenameConversation?: (conversationId: string, newTitle: string, targetInst?: string) => Promise<void> | void;
@@ -39,6 +40,7 @@ export function ConversationNode({
     conv,
     project,
     isSelected,
+    isLastConv = false,
     onSelect,
     onOpenInspector,
     onRenameConversation,
@@ -173,6 +175,10 @@ export function ConversationNode({
                 title={`${conv.title || 'Conversation'} · ${conv.step_count || 1} steps · Click to view (F2 to rename)`}
             >
                 <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
+                    {/* Branch connector glyph to project */}
+                    <span className="text-slate-400 dark:text-purple-400/80 font-mono text-[10px] select-none shrink-0" aria-hidden="true">
+                        {isLastConv ? '└──' : '├──'}
+                    </span>
                     {hasPrompts && (
                         <button
                             type="button"
@@ -338,7 +344,7 @@ export function ConversationNode({
 
             {/* Tier 3: Indented Prompt Subtree */}
             {hasPrompts && isExpanded && conv.prompts && (
-                <div className="border-l border-slate-200 dark:border-purple-900/40 ml-4 pl-2 space-y-1 mt-1">
+                <div className="border-l-2 border-slate-300/60 dark:border-purple-900/50 ml-6 pl-3 space-y-1 mt-1">
                     {conv.prompts.map((turn, tIdx) => {
                         const isLastTurn = tIdx === conv.prompts!.length - 1;
                         const hasImages = turn.media_paths && turn.media_paths.length > 0;

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
     Folder,
+    FolderPlus,
+    FolderMinus,
     Search,
     ChevronRight,
     ChevronDown,
@@ -66,6 +68,8 @@ export interface TreePanelProps {
     setIsAutomatedHidden?: (v: boolean | ((prev: boolean) => boolean)) => void;
     isCollapsed?: boolean;
     onToggleCollapse?: () => void;
+    onToggleExpandAll?: () => void;
+    isAllExpanded?: boolean;
     // Context menu handlers forwarded to ConversationNode
     onRenameConversation?: (conversationId: string, newTitle: string) => Promise<void> | void;
     onResendPrompts?: (count: number | 'all') => void;
@@ -98,6 +102,8 @@ export function TreePanel(props: TreePanelProps) {
         isAutomatedHidden = true,
         setIsAutomatedHidden,
         onToggleCollapse,
+        onToggleExpandAll,
+        isAllExpanded = false,
         instanceName,
         instanceId,
         expandedProjects,
@@ -284,6 +290,20 @@ export function TreePanel(props: TreePanelProps) {
                             <Pin className={cn("w-3.5 h-3.5", pinnedProjectIds.includes(selectedProjectScope) && "fill-current")} />
                         </button>
                     )}
+                    {onToggleExpandAll && (
+                        <button
+                            type="button"
+                            onClick={onToggleExpandAll}
+                            className="p-1 rounded-md text-slate-400 hover:text-purple-400 hover:bg-slate-100 dark:hover:bg-[#25173e] transition-colors cursor-pointer shrink-0"
+                            title={isAllExpanded ? "Collapse all projects" : "Expand all projects"}
+                        >
+                            {isAllExpanded ? (
+                                <FolderMinus className="w-3.5 h-3.5 text-purple-400" />
+                            ) : (
+                                <FolderPlus className="w-3.5 h-3.5 text-slate-400" />
+                            )}
+                        </button>
+                    )}
                     {onToggleCollapse && (
                         <button
                             type="button"
@@ -404,7 +424,7 @@ export function TreePanel(props: TreePanelProps) {
                             type="button"
                             onClick={() => setActiveFilter(activeFilter === 'pinned' ? 'all' : 'pinned')}
                             className={cn(
-                                "px-2 py-0.5 text-[10px] font-medium rounded-r-md transition-colors whitespace-nowrap cursor-pointer flex items-center gap-0.5",
+                                "px-2 py-0.5 text-[10px] font-medium transition-colors whitespace-nowrap cursor-pointer flex items-center gap-0.5",
                                 activeFilter === 'pinned'
                                     ? "bg-blue-600 text-white shadow-2xs font-semibold"
                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -414,6 +434,21 @@ export function TreePanel(props: TreePanelProps) {
                             <Pin className="w-2.5 h-2.5 shrink-0" />
                             <span>Pinned</span>
                         </button>
+                        <button
+                            type="button"
+                            onClick={() => imageFilterEmitter.set(!effectiveImageFilter)}
+                            className={cn(
+                                "px-2 py-0.5 text-[10px] font-medium rounded-r-md transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1",
+                                effectiveImageFilter
+                                    ? "bg-sky-600 text-white shadow-2xs font-semibold"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                            )}
+                            aria-label="Filter prompts with attached images"
+                            title={effectiveImageFilter ? "Showing only conversations with images (Click to clear)" : "Filter projects and prompts with images"}
+                        >
+                            <span className="text-[10px]">🖼️</span>
+                            <span>Images</span>
+                        </button>
                     </div>
 
                     <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#120d20]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-900/50 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-900/40 shadow-2xs">
@@ -421,7 +456,7 @@ export function TreePanel(props: TreePanelProps) {
                             type="button"
                             onClick={handleToggleAutomated}
                             className={cn(
-                                "flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-semibold rounded-l-full transition-colors cursor-pointer",
+                                "flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-l-full transition-colors cursor-pointer",
                                 effectiveAutomatedHidden
                                     ? "bg-purple-500/15 text-purple-700 dark:text-purple-300"
                                     : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"

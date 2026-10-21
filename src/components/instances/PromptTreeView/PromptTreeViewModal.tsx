@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, Component, type ErrorInfo, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, Component, type ErrorInfo, type ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, PanelLeftOpen } from 'lucide-react';
@@ -518,6 +518,22 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         return treeData.filter((p) => archivedProjectIds.includes(p.project_id)).length;
     }, [treeData, archivedProjectIds]);
 
+    const isAllExpanded = useMemo(() => {
+        return treeData.length > 0 && treeData.every((p) => expandedProjects[p.project_id]);
+    }, [treeData, expandedProjects]);
+
+    const handleToggleExpandAll = useCallback(() => {
+        if (isAllExpanded) {
+            setExpandedProjects({});
+        } else {
+            const next: Record<string, boolean> = {};
+            for (const p of treeData) {
+                next[p.project_id] = true;
+            }
+            setExpandedProjects(next);
+        }
+    }, [isAllExpanded, treeData, setExpandedProjects]);
+
     // Search filter & multi-tier sorting across projects, partitioned into active & archived
     const { activeProjects, archivedProjects } = useMemo(() => {
         let list = [...treeData];
@@ -839,6 +855,8 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                             setIsAutomatedHidden={setIsAutomatedHidden}
                             isCollapsed={isTreeCollapsed}
                             onToggleCollapse={() => setIsTreeCollapsed(true)}
+                            onToggleExpandAll={handleToggleExpandAll}
+                            isAllExpanded={isAllExpanded}
                             instanceName={instanceName}
                             instanceId={instanceId}
                             expandedProjects={expandedProjects}

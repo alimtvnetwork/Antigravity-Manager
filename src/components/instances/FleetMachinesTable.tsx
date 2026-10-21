@@ -3,6 +3,7 @@ import { cn } from '../../utils/cn';
 import { useFleetMachines } from './fleet/useFleetMachines';
 import { FleetMachineRow } from './fleet/FleetMachineRow';
 import { FleetDisabledState, FleetLoadingState, FleetEmptyState } from './fleet/FleetTableStates';
+import { SendFleetPromptModal } from './fleet/SendFleetPromptModal';
 
 // Re-exported for backward compatibility (tests + external consumers import from here).
 export { maskEmailAddress, formatRelativeHeartbeat } from './fleet/fleetFormatUtils';
@@ -19,11 +20,14 @@ export function FleetMachinesTable() {
         unmaskedRows,
         copiedIp,
         countdown,
+        promptMachine,
         setShowAllEmails,
         handleManualRefresh,
         handleResetCluster,
         handleCopyIp,
         toggleRowMask,
+        handleOpenPromptModal,
+        handleClosePromptModal,
     } = useFleetMachines();
 
     if (!isLoading && !isSyncEnabled && machines.length === 0) {
@@ -127,6 +131,7 @@ export function FleetMachinesTable() {
                             <th className="px-3.5 py-2.5 min-w-[200px]">Active Instance(s)</th>
                             <th className="px-3.5 py-2.5 min-w-[120px]">Running Prompts</th>
                             <th className="px-3.5 py-2.5 text-right min-w-[110px]">Last Seen</th>
+                            <th className="px-3.5 py-2.5 text-right min-w-[120px]">Action</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/40 font-medium">
@@ -138,11 +143,15 @@ export function FleetMachinesTable() {
                                 copiedIp={copiedIp}
                                 onCopyIp={handleCopyIp}
                                 onToggleMask={toggleRowMask}
+                                onOpenPromptModal={handleOpenPromptModal}
                             />
                         ))}
                     </tbody>
                 </table>
             </div>
+
+            {/* Cross-machine Prompt Dispatch Modal */}
+            <SendFleetPromptModal machine={promptMachine} onClose={handleClosePromptModal} />
         </div>
     );
 }

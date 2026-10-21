@@ -346,9 +346,9 @@ pub(crate) fn build_active_prompt_conv_nodes(
                 let is_relevant_status = is_pending_stage || is_active_stage;
 
                 if is_relevant_status {
-                    let is_queued = is_pending_stage;
                     let is_fresh = (now - ap.updated_at) <= 600;
                     let is_alive_and_fresh = is_inst_alive && is_fresh;
+                    let is_queued = is_alive_and_fresh && is_pending_stage;
                     let is_ap_run = is_alive_and_fresh && is_active_stage;
 
                     // Check if an existing turn already matches this prompt content

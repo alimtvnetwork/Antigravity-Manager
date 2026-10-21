@@ -1,5 +1,17 @@
 # Changelog
 
+## [v4.244.1] - 2026-10-21
+
+### Added
+- **Cross-Machine Prompt Dispatch in Fleet Management**: Added interactive `[ Send Prompt ]` action button to each cluster node row in `FleetMachinesTable.tsx` and `FleetMachineRow.tsx` powered by `SendFleetPromptModal.tsx`, allowing direct cross-machine prompt routing and remote SSH execution. (Thanks to @aukgit)
+- **Tree View Expand/Collapse All Toggle**: Added 1-click expand and collapse all projects toggle button (`handleToggleExpandAll`, `isAllExpanded`, `FolderPlus`, `FolderMinus`) in `PromptTreeViewModal.tsx` and `TreePanel.tsx`. (Thanks to @aukgit)
+
+### Changed
+- **Modernized Dark-Glass Sync Dropdown**: Replaced the native select dropdown for 30s auto-sync interval with a custom dark-glass popover capsule featuring active selection checkmarks (`Check`) in `ModalHeader.tsx`. (Thanks to @aukgit)
+- **Terminal Monospace Tree Branch Glyphs**: Added monospace tree branch connector glyphs (`├──`, `└──`) to `ConversationNode.tsx` and `ProjectNode.tsx` reflecting last-conversation position in the project hierarchy. (Thanks to @aukgit)
+
+---
+
 ## [v4.244.0] - 2026-10-21
 
 ### Changed
@@ -986,6 +998,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.244.1 (2026-10-21)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.244.0 (2026-10-21)**:
         -   **[Boolean Logic Modernization, Affirmative Guard Decomposition & Instance Task Liveness] Discrete Guard Clauses, Affirmative isConversationGenuinelyRunning Extraction, Mixed Operator Elimination, and Verified Liveness Accuracy (Thanks to @aukgit)**:
             -   **Description**: Refactored conditional logic across `src/pages/instances/` adhering strictly to `01-prompts/15-cg-execute/04-booleans-and-complex-conditions.md`; replaced compound negative checks such as `if (!inst.is_running || !proj.is_running) return false;` with discrete, single-variable affirmative guard clauses in `InstanceCardProjects.tsx`; extracted and centralized `isConversationGenuinelyRunning` in `src/pages/instances/instancePageUtils.ts`, enforcing discrete boolean decomposition (affirmative running checks, explicit instance ownership matching, active task validation, and ghost conversation filtering), eliminating 4-operand chained `.some(...)` predicates across `instanceCardData.ts` (`hasActiveTask`), `InstanceCardProjects.tsx` (`isProjectRunningForInstance`), and `useInstancePage.ts` (`hasActiveTaskFor`); decomposed mixed `&&`/`||` operators into intermediate named booleans in `instancePageUtils.ts` (`isDefaultInstance`, `hasMatchingSeqNum`), `instanceCardData.ts` (`weeklyBucket` resolution), and `useInstancePage.ts` (`filteredInstances` search filtering); and verified all 32 unit test assertions pass in `src/pages/instances/__tests__/instanceRunningPrompts.test.ts`. (Thanks to @aukgit)
