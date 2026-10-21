@@ -1,4 +1,5 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '../../../../utils/cn';
 import type { Account } from '../../../../types/account';
 import {
@@ -28,7 +29,7 @@ export function AlgorithmScoreCell({
     className,
 }: AlgorithmScoreCellProps) {
     const [isHovered, setIsHovered] = useState(false);
-    const [showAbove, setShowAbove] = useState(true);
+    const [tooltipCoords, setTooltipCoords] = useState<{ top: number; left: number } | null>(null);
     const cellRef = useRef<HTMLTableCellElement>(null);
     const instances = useInstanceStore((state) => state.instances);
 
@@ -53,15 +54,47 @@ export function AlgorithmScoreCell({
     const handleMouseEnter = () => {
         if (cellRef.current) {
             const rect = cellRef.current.getBoundingClientRect();
-            // If less than 220px to top of viewport, show below instead of above
-            setShowAbove(rect.top >= 220);
+            const TOOLTIP_HEIGHT = 290;
+            const TOOLTIP_WIDTH = 384; // w-96 = 24rem = 384px
+
+            // Positioning downward (top = rect.bottom + 8) unless spaceAbove >= 340
+            const spaceAbove = rect.top;
+            let top: number;
+            if (spaceAbove >= 340) {
+                top = rect.top - TOOLTIP_HEIGHT - 8;
+            } else {
+                top = rect.bottom + 8;
+            }
+
+            // Align to right edge of cell, clamped within viewport bounds
+            let left = rect.right - TOOLTIP_WIDTH;
+            if (left < 16) left = 16;
+            if (left + TOOLTIP_WIDTH > window.innerWidth - 16) {
+                left = Math.max(16, window.innerWidth - TOOLTIP_WIDTH - 16);
+            }
+
+            setTooltipCoords({ top, left });
         }
         setIsHovered(true);
     };
 
     const handleMouseLeave = () => {
         setIsHovered(false);
+        setTooltipCoords(null);
     };
+
+    // Close tooltip on any scroll event to prevent floating detachment
+    useEffect(() => {
+        if (!isHovered) return;
+        const handleScroll = () => {
+            setIsHovered(false);
+            setTooltipCoords(null);
+        };
+        window.addEventListener('scroll', handleScroll, true);
+        return () => {
+            window.removeEventListener('scroll', handleScroll, true);
+        };
+    }, [isHovered]);
 
     return (
         <td
@@ -96,13 +129,11 @@ export function AlgorithmScoreCell({
                 </div>
             </div>
 
-            {/* Interactive Dark-Glass Hover Tooltip */}
-            {isHovered && (
+            {/* Interactive Dark-Glass Hover Tooltip Portaled to document.body to prevent header sticking */}
+            {isHovered && tooltipCoords && typeof document !== 'undefined' && createPortal(
                 <div
-                    className={cn(
-                        "pointer-events-none absolute z-50 backdrop-blur-md bg-white/95 dark:bg-[#13111c]/95 border border-slate-200 dark:border-[#40285e] shadow-2xl rounded-xl p-3.5 text-xs w-96 max-w-[calc(100vw-2rem)] right-0 transition-opacity animate-in fade-in duration-150 whitespace-normal",
-                        showAbove ? "bottom-full mb-2" : "top-full mt-2"
-                    )}
+                    style={{ top: `${tooltipCoords.top}px`, left: `${tooltipCoords.left}px` }}
+                    className="pointer-events-none fixed z-[99999] backdrop-blur-md bg-white/95 dark:bg-[var(--app-surface,#18181b)]/95 border border-slate-200 dark:border-[var(--app-border,#334155)] shadow-2xl rounded-xl p-3.5 text-xs w-96 max-w-[calc(100vw-2rem)] transition-opacity animate-in fade-in duration-150 whitespace-normal select-none"
                 >
                     {/* Header: Title, Tier Badge, Readiness % */}
                     <div className="flex items-center justify-between gap-2 border-b border-slate-200/80 dark:border-slate-800/80 pb-2 mb-2">
@@ -125,7 +156,7 @@ export function AlgorithmScoreCell({
                     </div>
 
                     {/* Formula */}
-                    <div className="font-mono text-[10px] px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-[#1a1626] border border-slate-200/80 dark:border-[#40285e]/60 text-slate-700 dark:text-slate-300 mb-2.5 leading-relaxed break-words whitespace-normal">
+                    <div className="font-mono text-[10px] px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-[var(--app-surface-hover,#27272a)] border border-slate-200/80 dark:border-[var(--app-border,#334155)]/60 text-slate-700 dark:text-slate-300 mb-2.5 leading-relaxed break-words whitespace-normal">
                         <span className="text-slate-400 dark:text-slate-500 select-none mr-1.5">Formula:</span>
                         <span className="font-semibold text-slate-900 dark:text-slate-100">{result.mathBreakdown.formulaString}</span>
                     </div>
@@ -179,7 +210,8 @@ export function AlgorithmScoreCell({
                             </div>
                         )}
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </td>
     );

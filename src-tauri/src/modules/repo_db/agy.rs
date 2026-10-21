@@ -284,6 +284,7 @@ pub fn spawn_or_replace_prompt_via_agy(
                             let _ = crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
                                 &prompt.instance_id,
                                 &prompt_to_run,
+                                replace_existing,
                             );
                             return Ok(());
                         }
@@ -317,6 +318,7 @@ pub fn spawn_or_replace_prompt_via_agy(
                     crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
                         &prompt.instance_id,
                         &prompt_to_run,
+                        replace_existing,
                     );
                 crate::modules::logger::log_info(&format!(
                     "[RepoDB] Dispatched agy execution for prompt '{}' (PID: {:?}, inst: '{}') in '{}': {:.60}...",
@@ -653,6 +655,74 @@ fn run_clipboard_helper_result(
     }
 }
 
+/// Preemptively cancel any currently running prompt/task for a specific instance.
+/// 1. Terminates headless agy background CLI worker processes.
+/// 2. Stops any running goal workers.
+/// 3. Signals cancellation via live DevTools CDP to running IDE (Stop Generating / Escape).
+/// 4. Cancels pending post-switch resume timers.
+/// 5. Marks in-flight prompts in SQLite `active_prompts` table as 'cancelled'.
+/// 6. Purges memory prompts map.
+pub fn cancel_running_prompt_for_instance(
+    instance_id: &str,
+    _repo_path: Option<&str>,
+) -> Result<bool, String> {
+    let clean_inst = if instance_id.trim().is_empty() || instance_id == "__default__" {
+        "default"
+    } else {
+        instance_id.trim()
+    };
+    let canonical_inst = crate::modules::instance::resolve_instance_id(clean_inst)
+        .unwrap_or_else(|_| clean_inst.to_string());
+
+    // 1. Terminate agy background CLI workers
+    let terminated_agy = terminate_agy_workers_for_instance(&canonical_inst);
+
+    // 2. Stop prompt goal workers
+    if let Ok(reg) = crate::modules::instance::load_registry() {
+        if let Some(inst) = reg.instances.iter().find(|i| i.id == canonical_inst) {
+            super::goal_heartbeat::stop_prompt_goal_workers_for_instance(
+                &canonical_inst,
+                &inst.data_dir,
+            );
+        }
+    }
+
+    // 3. Signal cancellation to IDE via CDP
+    let cdp_cancelled =
+        crate::modules::instance::cdp_onboarding::cancel_active_task_via_cdp_for_instance(
+            &canonical_inst,
+        );
+
+    // 4. Cancel pending post-switch resume timer
+    crate::modules::instance::cancel_post_switch_resume(&canonical_inst, "preempted by Send");
+
+    // 5. Update active_prompts SQLite table to 'cancelled'
+    let now = chrono::Utc::now().timestamp();
+    if let Ok(conn) = super::schema::connect_db() {
+        // Justification: best-effort SQLite prompt cancellation before immediate dispatch
+        crate::error::record_ignored(
+            conn.execute(
+                "UPDATE active_prompts SET status = 'cancelled', updated_at = ?1 \
+                 WHERE instance_id = ?2 AND status IN ('running', 'dispatched', 'in_flight')",
+                rusqlite::params![now, canonical_inst],
+            ),
+            "cancel in-flight active prompts in repo_prompts.db",
+        );
+    }
+
+    // 6. Purge memory prompts map
+    if let Ok(mut map) = super::state::get_memory_prompts_map().lock() {
+        map.retain(|_, p| p.instance_id != canonical_inst || p.status == "queued");
+    }
+
+    super::tree::invalidate_prompt_tree_cache(Some(&canonical_inst));
+    crate::modules::logger::log_info(&format!(
+        "[RepoDB] Preemptively cancelled running tasks for instance '{}' (agy workers terminated: {}, cdp cancelled: {})",
+        canonical_inst, terminated_agy, cdp_cancelled
+    ));
+    Ok(true)
+}
+
 /// Send a prompt immediately for a specific instance, verifying process liveness,
 /// caching PID, updating SQLite split DB, writing .antigravity_resume_task.json, and executing via agy.
 /// Direct execution invariant: immediately executes and bypasses queued scheduler items.
@@ -671,6 +741,21 @@ pub fn send_prompt_now_for_instance(
     };
     let canonical_inst = crate::modules::instance::resolve_instance_id(clean_inst)
         .unwrap_or_else(|_| clean_inst.to_string());
+
+    // Preemption Invariant: "Send" must cancel whatever task is running right now so the new prompt executes immediately!
+    let _ = cancel_running_prompt_for_instance(&canonical_inst, Some(repo_path));
+    terminate_agy_workers_for_instance(&canonical_inst);
+    if let Ok(conn) = super::schema::connect_db() {
+        let now_cancel = Utc::now().timestamp();
+        crate::error::record_ignored(
+            conn.execute(
+                "UPDATE active_prompts SET status = 'cancelled', updated_at = ?1 \
+                 WHERE instance_id = ?2 AND status IN ('running', 'dispatched', 'in_flight')",
+                rusqlite::params![now_cancel, &canonical_inst],
+            ),
+            "cancel in-flight active prompts in repo_prompts.db before immediate dispatch",
+        );
+    }
 
     // 1. Ensure instance is running with smart process cache and adaptive cold-start stabilization
     let was_cold_started =
@@ -810,7 +895,10 @@ pub fn send_prompt_now_for_instance(
             if crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
                 &canonical_inst,
                 fallback_prompt,
-            ) {
+                true,
+            )
+            .is_ok()
+            {
                 dispatched_via_cdp = true;
                 break;
             }
@@ -949,6 +1037,36 @@ pub fn enqueue_prompt_for_instance(
         updated_at: now,
         image_payload: initial_img,
     };
+
+    // If instance is running, forward directly into Antigravity IDE UI queue via CDP (without cancelling running turn)
+    let (is_running, _, pids) =
+        crate::modules::instance::is_instance_process_running_smart(&canonical_inst);
+    if is_running {
+        crate::modules::instance::focus_running_instance(&pids, Some(repo_path));
+        let cdp_prompt = if clean_prompt.trim().is_empty() {
+            prompt_content.trim()
+        } else {
+            clean_prompt.as_str()
+        };
+        match crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
+            &canonical_inst,
+            cdp_prompt,
+            false,
+        ) {
+            Ok(()) => {
+                crate::modules::logger::log_info(&format!(
+                    "[RepoDB] enqueue_prompt_for_instance forwarded prompt directly to Antigravity IDE queue via CDP for instance '{}'",
+                    canonical_inst
+                ));
+            }
+            Err(e) => {
+                crate::modules::logger::log_warn(&format!(
+                    "[RepoDB] enqueue_prompt_for_instance CDP delivery warning for instance '{}': {}",
+                    canonical_inst, e
+                ));
+            }
+        }
+    }
 
     save_or_requeue_prompt(&active_prompt)?;
 

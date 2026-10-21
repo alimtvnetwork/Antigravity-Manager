@@ -65,10 +65,11 @@ export async function sendPromptNow(
     instanceId: string,
     repoPath: string,
     promptContent: string,
-    conversationId?: string
+    conversationId?: string,
+    mediaPaths?: string[]
 ): Promise<any> {
     try {
-        return await invoke('send_prompt_now', { instanceId, repoPath, promptContent, conversationId });
+        return await invoke('send_prompt_now', { instanceId, repoPath, promptContent, conversationId, mediaPaths });
     } catch (e: any) {
         useErrorStore.getState().captureError(e, {
             source: 'instanceService.sendPromptNow',
@@ -84,10 +85,12 @@ export async function enqueuePrompt(
     instanceId: string,
     repoPath: string,
     promptContent: string,
-    conversationId?: string
+    conversationId?: string,
+    projectId?: string,
+    mediaPaths?: string[]
 ): Promise<any> {
     try {
-        return await invoke('enqueue_prompt', { instanceId, repoPath, promptContent, conversationId });
+        return await invoke('enqueue_prompt', { instanceId, repoPath, promptContent, conversationId, projectId, mediaPaths });
     } catch (e: any) {
         useErrorStore.getState().captureError(e, {
             source: 'instanceService.enqueuePrompt',
@@ -96,6 +99,21 @@ export async function enqueuePrompt(
             context: { instanceId, repoPath },
         });
         throw e;
+    }
+}
+
+export async function cancelRunningPrompt(
+    instanceId: string,
+    repoPath?: string
+): Promise<boolean> {
+    try {
+        return await invoke('cancel_running_prompt', { instanceId, repoPath });
+    } catch (e: any) {
+        useErrorStore.getState().trackWarning(e, {
+            source: 'instanceService.cancelRunningPrompt',
+            triggerAction: 'cancel_running_prompt',
+        });
+        return false;
     }
 }
 

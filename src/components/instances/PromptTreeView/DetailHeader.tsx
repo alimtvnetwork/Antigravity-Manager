@@ -18,7 +18,7 @@ function DispatchFieldHint({ id, text }: { id: string; text: string }) {
         <span
             id={id}
             role="tooltip"
-            className="pointer-events-none absolute right-0 top-full z-30 mt-1 hidden max-w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-left text-[10px] font-medium leading-snug text-slate-800 shadow-md group-hover/field:block dark:border-[#40285e] dark:bg-[#0e0818] dark:text-slate-100"
+            className="pointer-events-none absolute right-0 top-full z-30 mt-1 hidden max-w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-left text-[10px] font-medium leading-snug text-slate-800 shadow-md group-hover/field:block dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
         >
             {text}
         </span>
@@ -96,6 +96,7 @@ export interface DetailHeaderProps {
     onRenameConversation?: (conversationId: string, newTitle: string, instId?: string) => Promise<void>;
     selectedTurnNumber?: number | null;
     setIsDetailsModalOpen?: (v: boolean) => void;
+    setActionMsg?: (msg: string | null) => void;
 }
 
 export function DetailHeader(props: DetailHeaderProps) {
@@ -121,6 +122,7 @@ export function DetailHeader(props: DetailHeaderProps) {
         onCopyWithImages, onSaveImages, onExport, onFocusIde, onResend, onEnqueue, rerunRepoPath, onOpenInspector,
         onRenameConversation,
         selectedTurnNumber: _selectedTurnNumber,
+        setActionMsg,
     } = props;
 
     const [primaryDispatchAction, setPrimaryDispatchAction] = useState<'send' | 'enqueue' | 'rerun'>(propDispatchMode || 'send');
@@ -180,6 +182,7 @@ export function DetailHeader(props: DetailHeaderProps) {
     // Double-click inline title editing state
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editedTitle, setEditedTitle] = useState(selectedConversation.title || selectedConversation.short_id || '');
+    const [titleSuccessFeedback, setTitleSuccessFeedback] = useState<string | null>(null);
 
     useEffect(() => {
         setEditedTitle(selectedConversation.title || selectedConversation.short_id || '');
@@ -205,6 +208,9 @@ export function DetailHeader(props: DetailHeaderProps) {
                 });
                 selectedConversation.title = trimmed;
             }
+            setTitleSuccessFeedback('Conversation title updated & synced with IDE!');
+            setActionMsg?.('Conversation title updated & synced with IDE!');
+            setTimeout(() => setTitleSuccessFeedback(null), 3000);
         } catch (err) {
             reportPromptActionError(err, 'DetailHeader.renameConversation');
         }
@@ -504,47 +510,8 @@ export function DetailHeader(props: DetailHeaderProps) {
 
     const enqueuedCount = selectedConversation.prompts?.filter((p) => p.is_queued || p.status === 'QUEUED').length || (selectedConversation.is_queued ? 1 : 0);
 
-    const handlePrimaryDispatch = () => {
-        if (primaryDispatchAction === 'send') {
-            void Promise.resolve(onResend()).catch((err) => {
-                reportPromptActionError(err, 'DetailHeader.onResend');
-            });
-        } else if (primaryDispatchAction === 'enqueue') {
-            void Promise.resolve(onEnqueue()).catch((err) => {
-                reportPromptActionError(err, 'DetailHeader.onEnqueue');
-            });
-        } else if (primaryDispatchAction === 'rerun') {
-            void handleRerun().catch((err) => {
-                reportPromptActionError(err, 'DetailHeader.rerunSection');
-            });
-        }
-    };
-
-    const isPrimaryActionDisabled =
-        primaryDispatchAction === 'send' ? isResending :
-        primaryDispatchAction === 'enqueue' ? isEnqueueing :
-        isRerunning;
-
-    const renderPrimaryActionIcon = () => {
-        if (primaryDispatchAction === 'send') {
-            return <RotateCw className={cn('w-3 h-3 text-emerald-500 shrink-0', isResending && 'animate-spin')} />;
-        }
-        if (primaryDispatchAction === 'enqueue') {
-            return <ListPlus className={cn('w-3 h-3 text-amber-500 dark:text-amber-400 shrink-0', isEnqueueing && 'animate-pulse')} />;
-        }
-        if (rerunFlash) {
-            return <Check className="w-3 h-3 text-emerald-500 shrink-0" />;
-        }
-        return <Repeat className={cn('w-3 h-3 text-sky-500 shrink-0', isRerunning && 'animate-spin')} />;
-    };
-
-    const primaryActionLabel =
-        primaryDispatchAction === 'send' ? (isResending ? 'Sending…' : 'Send') :
-        primaryDispatchAction === 'enqueue' ? (isEnqueueing ? 'Queueing…' : 'Enqueue') :
-        (isRerunning ? 'Rerunning…' : (rerunFlash ?? `Rerun ×${rerunCount}`));
-
     return (
-        <div className="pb-2.5 border-b border-slate-200 dark:border-[#40285e] shrink-0 relative z-30">
+        <div className="pb-2.5 border-b border-slate-200 dark:border-slate-800 shrink-0 relative z-30">
             {/* Header Row: Identity & Badges & Breadcrumb Context (Left) + Action Capsule (Right) */}
             <div className="flex items-center justify-between gap-2.5 flex-wrap min-w-0">
                 {/* Left: Title + Copy Title, followed by Status Capsule (nothing prefixes title) */}
@@ -571,7 +538,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                             onBlur={() => void handleCommitTitle()}
                             onClick={(e) => e.stopPropagation()}
                             onDoubleClick={(e) => e.stopPropagation()}
-                            className="px-2.5 py-1 text-xl md:text-2xl font-bold font-ubuntu rounded-md bg-white dark:bg-[#120a1f] border border-purple-500/50 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500 max-w-md md:max-w-xl lg:max-w-3xl shadow-inner"
+                            className="px-2.5 py-1 text-xl md:text-2xl font-bold font-ubuntu rounded-md bg-white dark:bg-slate-900 border border-purple-500/50 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500 max-w-md md:max-w-xl lg:max-w-3xl shadow-inner"
                         />
                     ) : (
                         <div className="flex items-center gap-2 min-w-0">
@@ -598,6 +565,11 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     <Copy className="w-4 h-4" />
                                 )}
                             </button>
+                            {titleSuccessFeedback && (
+                                <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 animate-in fade-in duration-150 shrink-0">
+                                    {titleSuccessFeedback}
+                                </span>
+                            )}
                         </div>
                     )}
 
@@ -634,14 +606,14 @@ export function DetailHeader(props: DetailHeaderProps) {
                 {/* Right: The Unified Segmented Dark-Glass Action Capsule */}
                 <div className="flex items-center shrink-0 ml-auto gap-2">
                     {/* Capsule A: Copy Split Button [ Copy | v ] */}
-                    <div className="relative flex items-center rounded-lg bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
+                    <div className="relative flex items-center rounded-lg bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
                         {/* Primary Button: Copy with images (Rich HTML + binary PNG) */}
                         <button
                             type="button"
                             onClick={handleCopyAll}
                             data-ui-name="prompt-copy-all-btn"
                             data-ui-id={`prompt-copy-all-${selectedConversation.conversation_id}`}
-                            className="flex items-center gap-1.5 px-3 py-1 rounded-l-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="flex items-center gap-1.5 px-3 py-1 rounded-l-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             aria-label="Copy prompt text and all embedded images (rich HTML + binary PNG)"
                         >
                             {isCopiedAllActive ? (
@@ -658,7 +630,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                             onClick={() => setIsCopyMenuOpen((prev) => !prev)}
                             data-ui-name="prompt-copy-options-btn"
                             data-ui-id={`prompt-copy-options-${selectedConversation.conversation_id}`}
-                            className="flex items-center justify-center px-1.5 py-1 rounded-r-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="flex items-center justify-center px-1.5 py-1 rounded-r-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             aria-label="More copy and export options"
                         >
                             <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isCopyMenuOpen && "rotate-180")} />
@@ -667,7 +639,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                         {/* Flyout 1: Copy Options Menu */}
                         {isCopyMenuOpen && (
                             <div
-                                className="absolute right-0 top-full mt-1.5 z-50 w-80 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-1"
+                                className="absolute right-0 top-full mt-1.5 z-50 w-80 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-1"
                                 onMouseLeave={() => setIsCopyMenuOpen(false)}
                             >
                                 {/* Option 1: Copy All / Rich Media */}
@@ -679,7 +651,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     }}
                                     data-ui-name="prompt-menu-copy-full-text-btn"
                                     data-ui-id={`prompt-menu-copy-full-text-${selectedConversation.conversation_id}`}
-                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg text-left cursor-pointer transition-colors"
                                 >
                                     <div className="flex items-center gap-2">
                                         {isCopiedAllActive ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-purple-500" />}
@@ -697,7 +669,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     }}
                                     data-ui-name="prompt-menu-copy-local-links-btn"
                                     data-ui-id={`prompt-menu-copy-local-links-${selectedConversation.conversation_id}`}
-                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg text-left cursor-pointer transition-colors"
                                 >
                                     <div className="flex items-center gap-2">
                                         {localCopiedLocalLinks ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <FileText className="w-3.5 h-3.5 text-sky-400" />}
@@ -715,7 +687,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     }}
                                     data-ui-name="prompt-menu-copy-base64-btn"
                                     data-ui-id={`prompt-menu-copy-base64-${selectedConversation.conversation_id}`}
-                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg text-left cursor-pointer transition-colors"
                                 >
                                     <div className="flex items-center gap-2">
                                         {localCopiedBase64 ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <FileText className="w-3.5 h-3.5 text-violet-400" />}
@@ -733,7 +705,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     }}
                                     data-ui-name="prompt-menu-copy-clean-text-btn"
                                     data-ui-id={`prompt-menu-copy-clean-${selectedConversation.conversation_id}`}
-                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg text-left cursor-pointer transition-colors"
                                 >
                                     <div className="flex items-center gap-2">
                                         {isCopiedTextActive ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <FileText className="w-3.5 h-3.5 text-slate-400" />}
@@ -752,7 +724,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         }}
                                         data-ui-name="prompt-menu-copy-all-images-btn"
                                         data-ui-id={`prompt-menu-copy-all-images-${selectedConversation.conversation_id}`}
-                                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg text-left cursor-pointer transition-colors"
                                     >
                                         <div className="flex items-center gap-2">
                                             {localCopiedAllImages ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-purple-400" />}
@@ -772,7 +744,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         }}
                                         data-ui-name="prompt-menu-copy-image-text-btn"
                                         data-ui-id={`prompt-menu-copy-image-text-${selectedConversation.conversation_id}`}
-                                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg text-left cursor-pointer transition-colors"
                                     >
                                         <div className="flex items-center gap-2">
                                             {localCopiedImageText ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <FileText className="w-3.5 h-3.5 text-sky-400" />}
@@ -792,7 +764,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         }}
                                         data-ui-name="prompt-menu-copy-onenote-btn"
                                         data-ui-id={`prompt-menu-copy-onenote-${selectedConversation.conversation_id}`}
-                                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg text-left cursor-pointer transition-colors"
                                     >
                                         <div className="flex items-center gap-2">
                                             {localCopiedOneNote ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <FileText className="w-3.5 h-3.5 text-indigo-400" />}
@@ -812,7 +784,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         }}
                                         data-ui-name="prompt-menu-copy-single-png-btn"
                                         data-ui-id={`prompt-menu-copy-single-png-${selectedConversation.conversation_id}`}
-                                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg text-left cursor-pointer transition-colors"
                                     >
                                         <div className="flex items-center gap-2">
                                             {localCopiedSinglePng ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-purple-400" />}
@@ -834,7 +806,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                             }
                                             setIsCopyMenuOpen(false);
                                         }}
-                                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg text-left cursor-pointer transition-colors"
                                     >
                                         <div className="flex items-center gap-2">
                                             <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
@@ -844,12 +816,12 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     </button>
                                 )}
 
-                                <div className="border-t border-slate-100 dark:border-[#40285e]/60 my-1" />
+                                <div className="border-t border-slate-100 dark:border-slate-800 my-1" />
 
                                 <button
                                     type="button"
                                     onClick={() => copyPromptAndAi('json')}
-                                    className="group/field relative w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    className="group/field relative w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg text-left cursor-pointer transition-colors"
                                     aria-describedby="copy-ai-json-hint"
                                 >
                                     <DispatchFieldHint id="copy-ai-json-hint" text="Copy latest_response and execution_results as JSON" />
@@ -863,7 +835,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 <button
                                     type="button"
                                     onClick={() => copyPromptAndAi('text')}
-                                    className="group/field relative w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    className="group/field relative w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg text-left cursor-pointer transition-colors"
                                     aria-describedby="copy-ai-text-hint"
                                 >
                                     <DispatchFieldHint id="copy-ai-text-hint" text="Copy the prompt body and AI text as plain text" />
@@ -877,7 +849,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 <button
                                     type="button"
                                     onClick={() => copyPromptAndAi('md')}
-                                    className="group/field relative w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    className="group/field relative w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg text-left cursor-pointer transition-colors"
                                     aria-describedby="copy-ai-md-hint"
                                 >
                                     <DispatchFieldHint id="copy-ai-md-hint" text="Copy the prompt body and AI text as markdown" />
@@ -888,7 +860,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     <span className="text-[10px] text-slate-400 font-mono">.md</span>
                                 </button>
 
-                                <div className="border-t border-slate-100 dark:border-[#40285e]/60 my-1" />
+                                <div className="border-t border-slate-100 dark:border-slate-800 my-1" />
 
                                 {/* Sub-item 4: Export as Markdown */}
                                 <button
@@ -897,7 +869,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         onExport('md');
                                         setIsCopyMenuOpen(false);
                                     }}
-                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg text-left cursor-pointer transition-colors"
                                 >
                                     <div className="flex items-center gap-2">
                                         <FileText className="w-3.5 h-3.5 text-cyan-500" />
@@ -913,7 +885,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         onExport('json');
                                         setIsCopyMenuOpen(false);
                                     }}
-                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-lg text-left cursor-pointer transition-colors"
                                 >
                                     <div className="flex items-center gap-2">
                                         <Code className="w-3.5 h-3.5 text-amber-500" />
@@ -925,42 +897,56 @@ export function DetailHeader(props: DetailHeaderProps) {
                         )}
                     </div>
 
-                    {/* Capsule B: Unified Dispatch Split Button [ Primary Action | v ] */}
-                    <div className="relative flex items-center rounded-lg bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
-                        {/* Primary Action Button */}
+                    {/* Capsule B: Unified Dispatch Capsule [ Send (Preempt) | Enqueue (FIFO) | v (Options) ] */}
+                    <div className="relative flex items-center rounded-lg bg-slate-100/90 dark:bg-[var(--ui-canvas,#090611)]/90 backdrop-blur-md border border-slate-200/80 dark:border-[var(--ui-border-subtle,rgba(255,255,255,0.12))] p-0.5 divide-x divide-slate-200/70 dark:divide-[var(--ui-border-subtle,rgba(255,255,255,0.08))] shadow-2xs shrink-0">
+                        {/* 1. Send (Preempt): Cancels any running task and executes immediately */}
                         <button
                             type="button"
-                            onClick={handlePrimaryDispatch}
-                            disabled={isPrimaryActionDisabled}
-                            data-ui-name="prompt-primary-dispatch-btn"
-                            data-ui-id={`prompt-primary-dispatch-${selectedConversation.conversation_id}`}
-                            className={cn(
-                                "flex items-center gap-1.5 px-3 py-1 rounded-l-md text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50",
-                                primaryDispatchAction === 'send' && "text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-[#40285e]",
-                                primaryDispatchAction === 'enqueue' && "text-amber-800 dark:text-amber-300 hover:bg-amber-100/80 dark:hover:bg-[#40285e]",
-                                primaryDispatchAction === 'rerun' && "text-sky-700 dark:text-sky-300 hover:bg-sky-100/80 dark:hover:bg-[#40285e]"
-                            )}
-                            aria-label={
-                                primaryDispatchAction === 'send' ? "Immediately inject prompt to running instance (Hotkey: N)" :
-                                primaryDispatchAction === 'enqueue' ? "Enqueue prompt into FIFO background scheduler queue" :
-                                `Dispatch the chosen rerun nudge ${rerunCount} time(s) to the running instance`
-                            }
+                            onClick={() => {
+                                void Promise.resolve(onResend()).catch((err) => {
+                                    reportPromptActionError(err, 'DetailHeader.onResend');
+                                });
+                            }}
+                            disabled={isResending}
+                            data-ui-name="prompt-send-preempt-btn"
+                            data-ui-id={`prompt-send-preempt-${selectedConversation.conversation_id}`}
+                            className="flex items-center gap-1.5 px-3 py-1 rounded-l-md text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-emerald-950/40 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                            title="Send (Preempt): Cancels any running task to execute immediately (Hotkey: N)"
+                            aria-label="Send (Preempt): Cancels any running task to execute immediately (Hotkey: N)"
                         >
-                            {renderPrimaryActionIcon()}
-                            <span>{primaryActionLabel}</span>
-                            {primaryDispatchAction === 'send' && (
-                                <kbd className="ml-0.5 px-1 py-0.2 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded text-[8.5px] font-mono font-bold">N</kbd>
-                            )}
+                            <RotateCw className={cn('w-3 h-3 text-emerald-500 shrink-0', isResending && 'animate-spin')} />
+                            <span>{isResending ? 'Sending…' : 'Send'}</span>
+                            <kbd className="ml-0.5 px-1 py-0.2 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded text-[8.5px] font-mono font-bold">N</kbd>
                         </button>
 
-                        {/* Dropdown Chevron for Unified Dispatch Menu */}
+                        {/* 2. Enqueue (FIFO): Stages prompt into background FIFO queue without cancelling active task */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                void Promise.resolve(onEnqueue()).catch((err) => {
+                                    reportPromptActionError(err, 'DetailHeader.onEnqueue');
+                                });
+                            }}
+                            disabled={isEnqueueing}
+                            data-ui-name="prompt-enqueue-fifo-btn"
+                            data-ui-id={`prompt-enqueue-fifo-${selectedConversation.conversation_id}`}
+                            className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-100/80 dark:hover:bg-amber-950/40 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                            title="Enqueue (FIFO): Queues prompt behind active task in IDE without interrupting"
+                            aria-label="Enqueue (FIFO): Queues prompt behind active task in IDE without interrupting"
+                        >
+                            <ListPlus className={cn('w-3 h-3 text-amber-500 dark:text-amber-400 shrink-0', isEnqueueing && 'animate-pulse')} />
+                            <span>{isEnqueueing ? 'Queueing…' : 'Enqueue'}</span>
+                        </button>
+
+                        {/* 3. Dropdown Chevron for Unified Dispatch Menu (Rerun, Target, Templates) */}
                         <button
                             type="button"
                             onClick={handleToggleDispatchMenu}
                             data-ui-name="prompt-dispatch-options-btn"
                             data-ui-id={`prompt-dispatch-options-${selectedConversation.conversation_id}`}
-                            className="flex items-center justify-center px-1.5 py-1 rounded-r-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="flex items-center justify-center px-1.5 py-1 rounded-r-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[var(--ui-surface-hover,#2a1c3f)] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             aria-label="Unified dispatch configuration popover"
+                            title="Dispatch options & Rerun settings"
                         >
                             <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isMenuOpen && "rotate-180")} />
                         </button>
@@ -968,11 +954,11 @@ export function DetailHeader(props: DetailHeaderProps) {
                         {/* Flyout 2: Unified Dispatch Configuration Popover */}
                         {isMenuOpen && (
                             <div
-                                className="absolute right-0 top-full mt-1.5 z-50 w-80 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-xl p-2.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-2"
+                                className="absolute right-0 top-full mt-1.5 z-50 w-80 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl p-2.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-2"
                                 onMouseLeave={handleCloseDispatchMenu}
                             >
                                 {/* Menu Header */}
-                                <div className="px-2 pt-0.5 pb-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 select-none border-b border-slate-100 dark:border-[#40285e]/60 flex items-center justify-between">
+                                <div className="px-2 pt-0.5 pb-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 select-none border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                                     <span>Dispatch Configuration</span>
                                     <span className="text-[9px] text-slate-400">AGM:P001</span>
                                 </div>
@@ -982,30 +968,32 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
                                         Mode:
                                     </span>
-                                    <div className="inline-flex rounded-lg bg-slate-100 dark:bg-purple-950/40 p-0.5 border border-slate-200/80 dark:border-purple-500/20 text-[11px]">
+                                    <div className="inline-flex rounded-lg bg-slate-100 dark:bg-[var(--ui-canvas,rgba(0,0,0,0.3))] p-0.5 border border-slate-200/80 dark:border-[var(--ui-border-subtle,rgba(255,255,255,0.1))] text-[11px]">
                                         <button
                                             type="button"
                                             onClick={() => handleSwitchDispatchMode('send')}
+                                            title="Cancel & Send / Send (Preempt): Cancels any running task to execute immediately"
                                             className={cn(
                                                 "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
                                                 primaryDispatchAction === 'send'
-                                                    ? "bg-white dark:bg-[#2c1a4d] text-emerald-600 dark:text-emerald-400 shadow-2xs font-semibold"
+                                                    ? "bg-white dark:bg-[var(--ui-surface-hover,rgba(255,255,255,0.1))] text-emerald-600 dark:text-emerald-400 shadow-2xs font-semibold"
                                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                                             )}
                                         >
-                                            Send Now
+                                            Send (Preempt)
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => handleSwitchDispatchMode('enqueue')}
+                                            title="Enqueue (FIFO): Queues prompt behind active task in IDE"
                                             className={cn(
                                                 "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
                                                 primaryDispatchAction === 'enqueue'
-                                                    ? "bg-white dark:bg-[#2c1a4d] text-amber-600 dark:text-amber-400 shadow-2xs font-semibold"
+                                                    ? "bg-white dark:bg-[var(--ui-surface-hover,rgba(255,255,255,0.1))] text-amber-600 dark:text-amber-400 shadow-2xs font-semibold"
                                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                                             )}
                                         >
-                                            Enqueue FIFO
+                                            Enqueue (FIFO)
                                         </button>
                                         <button
                                             type="button"
@@ -1013,7 +1001,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                             className={cn(
                                                 "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
                                                 primaryDispatchAction === 'rerun'
-                                                    ? "bg-white dark:bg-[#2c1a4d] text-sky-600 dark:text-sky-400 shadow-2xs font-semibold"
+                                                    ? "bg-white dark:bg-[var(--ui-surface-hover,rgba(255,255,255,0.1))] text-sky-600 dark:text-sky-400 shadow-2xs font-semibold"
                                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                                             )}
                                         >
@@ -1036,8 +1024,8 @@ export function DetailHeader(props: DetailHeaderProps) {
                                                 className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:ring-0 focus:outline-none cursor-pointer py-0.5 text-right"
                                                 aria-describedby="dispatch-destination-hint"
                                             >
-                                                <option value="current" className="bg-white dark:bg-[#171025]">Current Conv</option>
-                                                <option value="new" className="bg-white dark:bg-[#171025]">New Conv</option>
+                                                <option value="current" className="bg-white dark:bg-slate-900">Current Conv</option>
+                                                <option value="new" className="bg-white dark:bg-slate-900">New Conv</option>
                                             </select>
                                             <DispatchFieldHint id="dispatch-destination-hint" text="Destination conversation mode" />
                                         </div>
@@ -1053,7 +1041,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                                     value={newConversationTitle}
                                                     onChange={(e) => setNewConversationTitle(e.target.value)}
                                                     placeholder="e.g. Bugfix auth refresh, Feature draft..."
-                                                    className="w-full px-2 py-1 text-xs bg-white dark:bg-[#120a1f] border border-slate-200 dark:border-purple-500/30 rounded-md text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                                                    className="w-full px-2 py-1 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-purple-500/30 rounded-md text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500/50"
                                                 />
                                             </div>
                                         )}
@@ -1083,10 +1071,10 @@ export function DetailHeader(props: DetailHeaderProps) {
 
                                                         {isSuffixPopoverOpen && (
                                                             <div
-                                                                className="absolute right-0 top-full mt-1.5 z-50 w-64 rounded-xl bg-white dark:bg-[#171025] border border-slate-200 dark:border-[#40285e] shadow-2xl p-1.5 space-y-1 backdrop-blur-md max-h-72 overflow-y-auto animate-in fade-in zoom-in-95 duration-100"
+                                                                className="absolute right-0 top-full mt-1.5 z-50 w-64 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-1.5 space-y-1 backdrop-blur-md max-h-72 overflow-y-auto animate-in fade-in zoom-in-95 duration-100"
                                                                 onMouseLeave={() => setIsSuffixPopoverOpen(false)}
                                                             >
-                                                                <div className="px-2 py-0.5 text-[9.5px] font-mono uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-[#40285e]/60">
+                                                                <div className="px-2 py-0.5 text-[9.5px] font-mono uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
                                                                     Built-in Presets
                                                                 </div>
                                                                 {VERIFICATION_OPTIONS.map((opt) => {
@@ -1103,7 +1091,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                                                                 "w-full flex items-center justify-between px-2 py-1 rounded-lg text-left text-xs transition-colors cursor-pointer",
                                                                                 isSelected
                                                                                     ? "bg-purple-500/15 text-purple-700 dark:text-purple-300 font-semibold"
-                                                                                    : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#40285e]"
+                                                                                    : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80"
                                                                             )}
                                                                         >
                                                                             <span className="truncate">{opt.dropdownLabel || opt.label}</span>
@@ -1114,7 +1102,7 @@ export function DetailHeader(props: DetailHeaderProps) {
 
                                                                 {customTemplates.length > 0 && (
                                                                     <>
-                                                                        <div className="px-2 pt-1.5 pb-0.5 text-[9.5px] font-mono uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-[#40285e]/60 mt-1">
+                                                                        <div className="px-2 pt-1.5 pb-0.5 text-[9.5px] font-mono uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800 mt-1">
                                                                             Custom Templates
                                                                         </div>
                                                                         {customTemplates.map((ct) => {
@@ -1131,7 +1119,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                                                                         "w-full flex items-center justify-between px-2 py-1 rounded-lg text-left text-xs transition-colors cursor-pointer",
                                                                                         isSelected
                                                                                             ? "bg-purple-500/15 text-purple-700 dark:text-purple-300 font-semibold"
-                                                                                            : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#40285e]"
+                                                                                            : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80"
                                                                                     )}
                                                                                 >
                                                                                     <span className="truncate">{ct.name}</span>
@@ -1142,7 +1130,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                                                     </>
                                                                 )}
 
-                                                                <div className="pt-1 border-t border-slate-100 dark:border-[#40285e]/60">
+                                                                <div className="pt-1 border-t border-slate-100 dark:border-slate-800">
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => {
@@ -1209,7 +1197,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                                             "w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-lg text-left cursor-pointer transition-colors border",
                                                             active
                                                                 ? "bg-sky-500/10 border-sky-500/40 text-slate-800 dark:text-slate-100"
-                                                                : "border-transparent text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e]"
+                                                                : "border-transparent text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80"
                                                         )}
                                                         title={opt.hint}
                                                     >
@@ -1292,7 +1280,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     </>
                                 )}
 
-                                <div className="border-t border-slate-100 dark:border-[#40285e]/60 my-1" />
+                                <div className="border-t border-slate-100 dark:border-slate-800 my-1" />
 
                                 {/* Focus IDE Window option */}
                                 <button
@@ -1302,7 +1290,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         handleCloseDispatchMenu();
                                     }}
                                     disabled={isFocusing}
-                                    className="w-full flex items-center justify-between px-2 py-1.5 text-xs text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors disabled:opacity-50"
+                                    className="w-full flex items-center justify-between px-2 py-1.5 text-xs text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-slate-800/80 rounded-lg text-left cursor-pointer transition-colors disabled:opacity-50"
                                 >
                                     <div className="flex items-center gap-2">
                                         <ExternalLink className={cn('w-3.5 h-3.5 text-sky-500 shrink-0', isFocusing && 'animate-spin')} />
@@ -1318,7 +1306,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         onOpenInspector(selectedConversation);
                                         handleCloseDispatchMenu();
                                     }}
-                                    className="w-full flex items-center justify-between px-2 py-1.5 text-xs text-blue-700 dark:text-cyan-300 hover:bg-blue-50 dark:hover:bg-[#40285e] rounded-lg text-left cursor-pointer transition-colors"
+                                    className="w-full flex items-center justify-between px-2 py-1.5 text-xs text-blue-700 dark:text-cyan-300 hover:bg-blue-50 dark:hover:bg-slate-800/80 rounded-lg text-left cursor-pointer transition-colors"
                                 >
                                     <div className="flex items-center gap-2">
                                         <Maximize2 className="w-3.5 h-3.5 text-blue-500 dark:text-cyan-400 shrink-0" />
@@ -1328,7 +1316,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 </button>
 
                                 {/* Dispatch Action Button inside dropdown */}
-                                <div className="pt-1 border-t border-slate-100 dark:border-[#40285e]/60">
+                                <div className="pt-1 border-t border-slate-100 dark:border-slate-800">
                                     {primaryDispatchAction === 'enqueue' ? (
                                         <button
                                             type="button"
@@ -1339,10 +1327,11 @@ export function DetailHeader(props: DetailHeaderProps) {
                                                 handleCloseDispatchMenu();
                                             }}
                                             disabled={isEnqueueing}
+                                            title="Enqueue (FIFO): Queues prompt behind active task in IDE"
                                             className="w-full flex items-center justify-center gap-2 py-1.5 px-3 bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
                                         >
                                             <ListPlus className={cn('w-3.5 h-3.5 text-amber-500', isEnqueueing && 'animate-pulse')} />
-                                            <span>Enqueue to FIFO Queue</span>
+                                            <span>Enqueue (FIFO)</span>
                                         </button>
                                     ) : primaryDispatchAction === 'rerun' ? (
                                         <button
@@ -1356,7 +1345,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                             className="w-full flex items-center justify-center gap-2 py-1.5 px-3 bg-sky-500/15 hover:bg-sky-500/25 text-sky-700 dark:text-sky-300 border border-sky-500/30 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
                                         >
                                             <Repeat className={cn('w-3.5 h-3.5 text-sky-500', isRerunning && 'animate-spin')} />
-                                            <span>{isRerunning ? 'Rerunning…' : `Rerun ×${rerunCount} Now`}</span>
+                                            <span>{isRerunning ? 'Rerunning…' : (rerunFlash ?? `Rerun ×${rerunCount} Now`)}</span>
                                         </button>
                                     ) : (
                                         <button
@@ -1368,10 +1357,11 @@ export function DetailHeader(props: DetailHeaderProps) {
                                                 handleCloseDispatchMenu();
                                             }}
                                             disabled={isResending}
+                                            title="Cancel & Send / Send (Preempt): Cancels any running task to execute immediately"
                                             className="w-full flex items-center justify-center gap-2 py-1.5 px-3 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
                                         >
                                             <RotateCw className={cn('w-3.5 h-3.5 text-emerald-500', isResending && 'animate-spin')} />
-                                            <span>Send Immediately</span>
+                                            <span>Cancel &amp; Send</span>
                                         </button>
                                     )}
                                 </div>

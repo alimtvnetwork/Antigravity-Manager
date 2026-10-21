@@ -349,6 +349,7 @@ pub fn run() {
             commands::resume_recent_project_prompts,
             commands::send_prompt_now,
             commands::enqueue_prompt,
+            commands::cancel_running_prompt,
             commands::resend_queued_prompts,
             commands::backup_queued_prompts,
             commands::resend_running_prompts,

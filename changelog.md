@@ -1,5 +1,19 @@
 # Changelog
 
+## [v4.250.0] - 2026-10-21
+
+### Added
+- **Explicit Send (Preempt) & Enqueue (FIFO) Action Capsule (`DetailHeader.tsx`, `usePromptTreePromptActions.ts`)**: Replaced hidden mode switcher with side-by-side Send and Enqueue buttons within Capsule B. `Send` immediately cancels any actively running task on the target instance (terminating `agy` workers, stopping goal workers, and executing CDP active task preemption) to execute the chosen prompt right now (Hotkey: `N`). `Enqueue` safely stages prompts into the background SQLite FIFO queue without interrupting current execution. (Thanks to @aukgit)
+- **Continuously Resizable Prompt Tree View (`PromptTreeViewModal.tsx`)**: Implemented dynamic draggable vertical splitter divider (`cursor-col-resize`) allowing users to expand or reduce the left-hand Prompt Tree column width between 220px and 680px at any time, with persistent state stored in `localStorage` under `agm_prompt_tree_width`. (Thanks to @aukgit)
+- **Real-Time Conversation Title Rename Sync (`sequences.rs`, `DetailHeader.tsx`)**: Wired double-click inline conversation title renaming directly to Antigravity's live filesystem watcher via `<gemini_dir>/annotations/<conversation_id>.pbtxt` and updated `conversation_summaries.db` (`title` and `preview` columns), enabling instant real-time title reflection inside the Antigravity IDE without requiring IDE restart. (Thanks to @aukgit)
+- **Dynamic Theme Adaptability & One Dark Pro Support (`ThemeManager.tsx`, `PromptTreeDetail.tsx`, `App.css`)**: Removed hardcoded purple hex values across the middle Prompt Tree panels. Synchronized `--ui-*` design tokens (`--ui-canvas`, `--ui-surface-1`, `--ui-surface-hover`, `--ui-border-subtle`, `--ui-interactive`) in `ThemeManager.tsx` whenever non-purple themes (such as One Dark Pro, VS Code Dark+, Tokyo Night, Nordic Mint) are selected, allowing the middle portion and hover accents to seamlessly adapt to the active theme palette. (Thanks to @aukgit)
+
+### Fixed
+- **Stationary Non-Displacing InstanceCard Hover (`InstanceCard.tsx`)**: Eliminated layout displacement jitter (`hover:-translate-y-0.5` and `scale-x-95`), replacing positional movement with a smooth 0.3s CSS3 color and contrast transition (`hover:bg-slate-50/90 dark:hover:bg-[var(--ui-surface-hover)]`, `hover:border-gray-300/80 dark:hover:border-[var(--ui-interactive-40)]`, `hover:shadow-md`). (Thanks to @aukgit)
+- **Scoreboard Algorithm Tooltip Collision Guard (`AlgorithmScoreCell.tsx`)**: Portaled the candidate score breakdown tooltip to `document.body` via React `createPortal` and implemented dynamic boundary collision detection (`spaceAbove >= TOOLTIP_HEIGHT + 16`), preventing the popover from getting stuck against or overlapping the sticky table header. (Thanks to @aukgit)
+
+---
+
 ## [v4.247.0] - 2026-10-21
 
 ### Added
@@ -1055,6 +1069,16 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.250.0 (2026-10-21)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
+    *   **v4.249.0 (2026-10-21)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.248.0 (2026-10-21)**:
         -   **[Repo DB & Diagnostics] Elimination of E9001 Media Vault Column Error on Instance Tree Cache Wipe (Thanks to @aukgit)**:
             -   **Description**: Resolved diagnostic error `E9001` (`no such column: instance_id in DELETE FROM media_vault WHERE instance_id = ...`) in `src-tauri/src/modules/repo_db/agy.rs` during per-instance prompt tree cache invalidation and reset; enforced architectural invariant establishing `media_vault` as an immutable, content-addressed SHA-256 media cache decoupled from workspace instance tenancy; added unit test `test_media_vault_schema_and_column_invariant` verifying schema column invariants and `test_wipe_and_rescan_single_instance_does_not_fail` verifying single-instance wipe stability; cleared error diagnostics history via `agm errors clear`, verified zero errors in `errors.db`, and documented comprehensive 4-part RCA in `02-spec/22-app-issues/36-media-vault-missing-instance-id-wipe-rca.md`. (Thanks to @aukgit)

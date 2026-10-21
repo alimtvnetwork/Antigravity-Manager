@@ -304,7 +304,7 @@ fn read_ws_frame(stream: &mut TcpStream) -> std::io::Result<(u8, Vec<u8>)> {
     Ok((opcode, data))
 }
 
-fn evaluate_dismiss_on_ws(ws_url: &str) -> Option<serde_json::Value> {
+fn connect_ws_stream(ws_url: &str) -> Option<TcpStream> {
     let (port, path) = parse_ws_url(ws_url)?;
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port);
     let mut stream = TcpStream::connect_timeout(&addr, Duration::from_millis(800)).ok()?;
@@ -340,6 +340,11 @@ fn evaluate_dismiss_on_ws(ws_url: &str) -> Option<serde_json::Value> {
     if !header_str.contains("101") {
         return None;
     }
+    Some(stream)
+}
+
+fn evaluate_dismiss_on_ws(ws_url: &str) -> Option<serde_json::Value> {
+    let mut stream = connect_ws_stream(ws_url)?;
 
     let cmd = serde_json::json!({
         "id": 1,
@@ -455,49 +460,59 @@ fn cdp_send_and_recv(
     None
 }
 
-fn submit_prompt_on_ws(ws_url: &str, prompt_text: &str) -> bool {
-    let Some((port, path)) = parse_ws_url(ws_url) else {
-        return false;
-    };
-    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port);
-    let Ok(mut stream) = TcpStream::connect_timeout(&addr, Duration::from_millis(800)) else {
-        return false;
-    };
-    // Justification: best-effort socket timeout configuration on loopback CDP WebSocket
-    crate::error::record_ignored(
-        stream.set_read_timeout(Some(Duration::from_millis(2500))),
-        "set CDP WS read timeout for prompt submit",
-    );
-    // Justification: best-effort socket timeout configuration on loopback CDP WebSocket
-    crate::error::record_ignored(
-        stream.set_write_timeout(Some(Duration::from_millis(1000))),
-        "set CDP WS write timeout for prompt submit",
-    );
-
-    let handshake = format!(
-        "GET {} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n",
-        path, port
-    );
-    if stream.write_all(handshake.as_bytes()).is_err() {
-        return false;
-    }
-
-    let mut header_bytes = Vec::with_capacity(256);
-    let mut byte = [0u8; 1];
-    while !header_bytes.ends_with(b"\r\n\r\n") {
-        let Ok(n) = stream.read(&mut byte) else {
-            return false;
-        };
-        if n == 0 {
-            return false;
-        }
-        header_bytes.push(byte[0]);
-        if header_bytes.len() > 8192 {
-            return false;
+const CANCEL_ACTIVE_TASK_JS: &str = r#"(() => {
+    const cancelBtn = document.querySelector('button[data-tooltip-id="input-send-button-cancel-tooltip"], button[aria-label*="Cancel"]');
+    if (cancelBtn) { cancelBtn.click(); return 'cancelled_via_button'; }
+    const el = document.querySelector('[data-testid="send-button"]') || document.querySelector('[aria-label="Message input"]');
+    if (el) {
+        const key = Object.keys(el).find(k => k.startsWith('__reactFiber$'));
+        let fiber = key ? el[key] : null;
+        while (fiber) {
+            if (fiber.memoizedProps?.cancelInvocation && fiber.memoizedProps?.isRunning) {
+                fiber.memoizedProps.cancelInvocation();
+                return 'cancelled_via_fiber';
+            }
+            fiber = fiber.return;
         }
     }
-    if !String::from_utf8_lossy(&header_bytes).contains("101") {
-        return false;
+    return 'not_running';
+})()"#;
+
+fn submit_prompt_on_ws(ws_url: &str, prompt_text: &str, cancel_running_first: bool) -> bool {
+    let mut stream = match connect_ws_stream(ws_url) {
+        Some(s) => s,
+        None => return false,
+    };
+
+    let mut msg_id = 1;
+
+    // When cancel_running_first == true (Send mode):
+    // Execute JavaScript in the Antigravity IDE webview to cancel the active task before typing
+    if cancel_running_first {
+        if let Some(cancel_res) = cdp_send_and_recv(
+            &mut stream,
+            msg_id,
+            "Runtime.evaluate",
+            serde_json::json!({
+                "expression": CANCEL_ACTIVE_TASK_JS,
+                "returnByValue": true
+            }),
+        ) {
+            let cancel_val = cancel_res
+                .get("result")
+                .and_then(|r| r.get("result"))
+                .and_then(|r| r.get("value"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            if cancel_val == "cancelled_via_button" || cancel_val == "cancelled_via_fiber" {
+                crate::modules::logger::log_info(&format!(
+                    "[Instance] Cancelled active task via CDP ({cancel_val}) before dispatching prompt"
+                ));
+                // If cancelled, sleep 250ms for the agent to cancel and UI to settle to idle
+                std::thread::sleep(Duration::from_millis(250));
+            }
+        }
+        msg_id += 1;
     }
 
     // 1. Focus the message input and clear any draft text
@@ -532,12 +547,13 @@ fn submit_prompt_on_ws(ws_url: &str, prompt_text: &str) -> bool {
     })()"#;
     let Some(focus_res) = cdp_send_and_recv(
         &mut stream,
-        1,
+        msg_id,
         "Runtime.evaluate",
         serde_json::json!({ "expression": focus_js, "returnByValue": true }),
     ) else {
         return false;
     };
+    msg_id += 1;
     let focus_val = focus_res
         .get("result")
         .and_then(|r| r.get("result"))
@@ -551,7 +567,7 @@ fn submit_prompt_on_ws(ws_url: &str, prompt_text: &str) -> bool {
     // 2. Insert text via CDP Input.insertText so Lexical/React state updates properly
     if cdp_send_and_recv(
         &mut stream,
-        2,
+        msg_id,
         "Input.insertText",
         serde_json::json!({ "text": prompt_text }),
     )
@@ -559,6 +575,7 @@ fn submit_prompt_on_ws(ws_url: &str, prompt_text: &str) -> bool {
     {
         return false;
     }
+    msg_id += 1;
 
     std::thread::sleep(Duration::from_millis(120));
 
@@ -588,7 +605,7 @@ fn submit_prompt_on_ws(ws_url: &str, prompt_text: &str) -> bool {
     })()"#;
     let Some(send_res) = cdp_send_and_recv(
         &mut stream,
-        3,
+        msg_id,
         "Runtime.evaluate",
         serde_json::json!({ "expression": send_js, "returnByValue": true }),
     ) else {
@@ -605,10 +622,15 @@ fn submit_prompt_on_ws(ws_url: &str, prompt_text: &str) -> bool {
 
 /// Submit a prompt directly into the running Antigravity IDE's conversation composer
 /// via CDP (`Input.insertText` + clicking `button[aria-label="Send message"]`).
-pub fn submit_prompt_via_cdp_for_instance(instance_id: &str, prompt_text: &str) -> bool {
+/// When `cancel_running_first` is true, cancels any active task before typing.
+pub fn submit_prompt_via_cdp_for_instance(
+    instance_id: &str,
+    prompt_text: &str,
+    cancel_running_first: bool,
+) -> Result<(), String> {
     let trimmed = prompt_text.trim();
     if trimmed.is_empty() {
-        return false;
+        return Err("Prompt text is empty".to_string());
     }
     let data_dir =
         if instance_id.is_empty() || instance_id == "default" || instance_id == "__default__" {
@@ -623,17 +645,110 @@ pub fn submit_prompt_via_cdp_for_instance(instance_id: &str, prompt_text: &str) 
             super::storage::get_default_antigravity_data_dir()
         };
 
-    for port in read_active_ports(&data_dir) {
+    let ports = read_active_ports(&data_dir);
+    if ports.is_empty() {
+        return Err(format!(
+            "No active DevTools port found for instance '{}' (data_dir: {:?})",
+            instance_id, data_dir
+        ));
+    }
+
+    for port in ports {
         for ws_url in fetch_page_ws_urls(port) {
-            if submit_prompt_on_ws(&ws_url, trimmed) {
+            if submit_prompt_on_ws(&ws_url, trimmed, cancel_running_first) {
                 crate::modules::logger::log_info(&format!(
-                    "[Instance] Submitted prompt ({} chars) into live Antigravity conversation via CDP for instance '{}'",
+                    "[Instance] Submitted prompt ({} chars, cancel_first: {}) into live Antigravity conversation via CDP for instance '{}'",
                     trimmed.len(),
+                    cancel_running_first,
                     instance_id
                 ));
-                return true;
+                return Ok(());
             }
         }
     }
-    false
+    Err(format!(
+        "Failed to submit prompt via CDP for instance '{}': DevTools page targets did not accept input",
+        instance_id
+    ))
+}
+
+/// Cancel any currently active task/generating turn via CDP by clicking
+/// 'Stop Generating' / 'Stop' button or dispatching Escape key.
+pub fn cancel_active_task_on_ws(ws_url: &str) -> bool {
+    let mut stream = match connect_ws_stream(ws_url) {
+        Some(s) => s,
+        None => return false,
+    };
+
+    let cancel_js = r#"(() => {
+        const stopSelectors = [
+            'button[aria-label="Stop Generating"]',
+            'button[aria-label="Stop generation"]',
+            'button[aria-label="Stop"]',
+            'button[title*="Stop Generating"]',
+            'button[title*="Stop"]',
+            'button.codicon-stop-circle',
+            'button.codicon-debug-stop'
+        ];
+        for (const sel of stopSelectors) {
+            const btn = document.querySelector(sel);
+            if (btn && !btn.disabled) {
+                btn.click();
+                return 'stopped';
+            }
+        }
+        // Fallback: Dispatch Escape key event to active element to cancel execution
+        const active = document.activeElement;
+        if (active) {
+            active.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true }));
+            return 'escaped';
+        }
+        return 'not_found';
+    })()"#;
+
+    let Some(eval_res) = cdp_send_and_recv(
+        &mut stream,
+        1,
+        "Runtime.evaluate",
+        serde_json::json!({ "expression": cancel_js, "returnByValue": true }),
+    ) else {
+        return false;
+    };
+    let val = eval_res
+        .get("result")
+        .and_then(|r| r.get("result"))
+        .and_then(|r| r.get("value"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    val == "stopped" || val == "escaped"
+}
+
+/// Cancel active tasks for an instance via live Chrome DevTools Protocol.
+pub fn cancel_active_task_via_cdp_for_instance(instance_id: &str) -> bool {
+    let data_dir =
+        if instance_id.is_empty() || instance_id == "default" || instance_id == "__default__" {
+            super::storage::get_default_antigravity_data_dir()
+        } else if let Ok(reg) = super::load_registry() {
+            reg.instances
+                .iter()
+                .find(|i| i.id == instance_id || i.name == instance_id)
+                .map(|i| PathBuf::from(&i.data_dir))
+                .unwrap_or_else(super::storage::get_default_antigravity_data_dir)
+        } else {
+            super::storage::get_default_antigravity_data_dir()
+        };
+
+    let mut cancelled = false;
+    for port in read_active_ports(&data_dir) {
+        for ws_url in fetch_page_ws_urls(port) {
+            if cancel_active_task_on_ws(&ws_url) {
+                crate::modules::logger::log_info(&format!(
+                    "[Instance] Cancelled active task via CDP for instance '{}'",
+                    instance_id
+                ));
+                cancelled = true;
+            }
+        }
+    }
+    cancelled
 }

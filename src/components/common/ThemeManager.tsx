@@ -73,6 +73,27 @@ export default function ThemeManager() {
             root.style.setProperty('--app-primary-hover', primaryHover);
             root.style.setProperty('--app-border-hover', borderHover);
 
+            // Synchronize --ui-* product tokens with active theme palette
+            if (palette.id === 'dark' || palette.id === 'system') {
+                root.style.setProperty('--ui-canvas', '#090611');
+                root.style.setProperty('--ui-surface-1', '#171025');
+                root.style.setProperty('--ui-surface-2', '#211631');
+                root.style.setProperty('--ui-surface-hover', '#2a1c3f');
+                root.style.setProperty('--ui-border-subtle', '#40285e');
+                root.style.setProperty('--ui-border-emphasis', '#7c3aed');
+                root.style.setProperty('--ui-interactive', '#7c3aed');
+                root.style.setProperty('--ui-text-primary', '#f5f0ff');
+            } else {
+                root.style.setProperty('--ui-canvas', palette.bg);
+                root.style.setProperty('--ui-surface-1', palette.surface);
+                root.style.setProperty('--ui-surface-2', surfaceHover);
+                root.style.setProperty('--ui-surface-hover', surfaceHover);
+                root.style.setProperty('--ui-border-subtle', isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)');
+                root.style.setProperty('--ui-border-emphasis', palette.primary);
+                root.style.setProperty('--ui-interactive', palette.primary);
+                root.style.setProperty('--ui-text-primary', palette.fg);
+            }
+
             // Set Tauri window background color
             // Skip on Linux due to crash with transparent windows + softbuffer
             try {

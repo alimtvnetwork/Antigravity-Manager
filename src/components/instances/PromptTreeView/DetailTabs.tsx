@@ -37,7 +37,7 @@ export function DetailTabs(props: DetailTabsProps) {
         <div className="flex items-center justify-between gap-2.5 flex-wrap py-0.5 min-h-[32px]">
             {/* Left: View Mode Controls Capsule (Preview, Raw, Edit) */}
             <div className="flex items-center gap-2.5 shrink-0">
-                <div className="inline-flex items-center rounded-md bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200 dark:border-[#40285e] p-0.5 divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs shrink-0">
+                <div className="inline-flex items-center rounded-md bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-0.5 divide-x divide-slate-200 dark:divide-slate-800 shadow-2xs shrink-0">
                     <button
                         type="button"
                         onClick={() => setViewMode(PromptViewMode.Preview)}
@@ -45,7 +45,7 @@ export function DetailTabs(props: DetailTabsProps) {
                             'p-1.5 px-2 rounded-l-md transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer',
                             viewMode === PromptViewMode.Preview
                                 ? 'bg-blue-600 text-white shadow-2xs'
-                                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60'
+                                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/80'
                         )}
                         aria-label="Preview"
                     >
@@ -58,7 +58,7 @@ export function DetailTabs(props: DetailTabsProps) {
                             'p-1.5 px-2 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer',
                             viewMode === PromptViewMode.Raw
                                 ? 'bg-blue-600 text-white shadow-2xs'
-                                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60'
+                                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/80'
                         )}
                         aria-label="Raw"
                     >
@@ -72,7 +72,7 @@ export function DetailTabs(props: DetailTabsProps) {
                             setIsDetailsModalOpen ? 'rounded-none' : 'rounded-r-md',
                             viewMode === PromptViewMode.Edit
                                 ? 'bg-blue-600 text-white shadow-2xs'
-                                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60'
+                                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/80'
                         )}
                         aria-label="Edit"
                     >
@@ -82,7 +82,7 @@ export function DetailTabs(props: DetailTabsProps) {
                         <button
                             type="button"
                             onClick={() => setIsDetailsModalOpen(true)}
-                            className="p-1.5 px-2.5 rounded-r-md flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60 text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="p-1.5 px-2.5 rounded-r-md flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/80 text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             title="Open Conversation & Instance Details"
                         >
                             <Activity className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
@@ -103,7 +103,7 @@ export function DetailTabs(props: DetailTabsProps) {
                     </span>
                 )}
 
-                <div className="inline-flex items-center rounded-md bg-slate-100/90 dark:bg-[#120a1f]/90 backdrop-blur-md border border-slate-200 dark:border-[#40285e] p-0.5 divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs shrink-0">
+                <div className="inline-flex items-center rounded-md bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-0.5 divide-x divide-slate-200 dark:divide-slate-800 shadow-2xs shrink-0">
                     {setPreviewTab && (
                         <>
                             <button
@@ -157,7 +157,7 @@ export function DetailTabs(props: DetailTabsProps) {
                             setPreviewTab ? "rounded-r-md" : "rounded-md",
                             showAllWords
                                 ? "bg-cyan-500/20 text-cyan-700 dark:text-cyan-300"
-                                : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60"
+                                : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/80"
                         )}
                         aria-label={showAllWords ? 'Collapse full prompt text' : 'Expand full prompt text'}
                     >

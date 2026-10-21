@@ -237,7 +237,10 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
             if crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
                 &target_inst,
                 fallback_prompt,
-            ) {
+                false,
+            )
+            .is_ok()
+            {
                 crate::modules::logger::log_info(&format!(
                     "[RepoDB] CDP prompt submission fallback succeeded for prompt '{}' on instance '{}'",
                     prompt.id, target_inst

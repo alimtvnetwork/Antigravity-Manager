@@ -1158,7 +1158,9 @@ async fn dispatch_turn_rerun_execution(
     let _cdp_ok = crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
         instance_id,
         &injected_text,
-    );
+        true,
+    )
+    .is_ok();
 
     // Capture visual proof of delivery
     let proof = super::open_shot::capture_and_send_proof_shot(&OpenShotTarget::Local).await;

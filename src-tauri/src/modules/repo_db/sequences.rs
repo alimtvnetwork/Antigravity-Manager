@@ -402,9 +402,33 @@ fn update_summaries_in_db(
 
     let mut count = conn
         .execute(
-            "UPDATE conversation_summaries SET title = ?1, last_modified_time = ?2 WHERE conversation_id = ?3",
+            "UPDATE conversation_summaries SET title = ?1, raw_summary = NULL, preview = ?1, last_modified_time = ?2 WHERE conversation_id = ?3",
             params![clean_title, now_iso, clean_cid],
         )
+        .or_else(|_| {
+            conn.execute(
+                "UPDATE conversation_summaries SET title = ?1, raw_summary = NULL, last_modified_time = ?2 WHERE conversation_id = ?3",
+                params![clean_title, now_iso, clean_cid],
+            )
+        })
+        .or_else(|_| {
+            conn.execute(
+                "UPDATE conversation_summaries SET title = ?1, preview = ?1, last_modified_time = ?2 WHERE conversation_id = ?3",
+                params![clean_title, now_iso, clean_cid],
+            )
+        })
+        .or_else(|_| {
+            conn.execute(
+                "UPDATE conversation_summaries SET title = ?1, raw_summary = NULL, preview = ?1 WHERE conversation_id = ?2",
+                params![clean_title, clean_cid],
+            )
+        })
+        .or_else(|_| {
+            conn.execute(
+                "UPDATE conversation_summaries SET title = ?1, raw_summary = NULL WHERE conversation_id = ?2",
+                params![clean_title, clean_cid],
+            )
+        })
         .or_else(|_| {
             conn.execute(
                 "UPDATE conversation_summaries SET title = ?1 WHERE conversation_id = ?2",
@@ -417,9 +441,21 @@ fn update_summaries_in_db(
         let pattern = format!("%{}%", clean_cid);
         count = conn
             .execute(
-                "UPDATE conversation_summaries SET title = ?1, last_modified_time = ?2 WHERE conversation_id LIKE ?3",
+                "UPDATE conversation_summaries SET title = ?1, raw_summary = NULL, preview = ?1, last_modified_time = ?2 WHERE conversation_id LIKE ?3",
                 params![clean_title, now_iso, &pattern],
             )
+            .or_else(|_| {
+                conn.execute(
+                    "UPDATE conversation_summaries SET title = ?1, raw_summary = NULL, last_modified_time = ?2 WHERE conversation_id LIKE ?3",
+                    params![clean_title, now_iso, &pattern],
+                )
+            })
+            .or_else(|_| {
+                conn.execute(
+                    "UPDATE conversation_summaries SET title = ?1, preview = ?1, last_modified_time = ?2 WHERE conversation_id LIKE ?3",
+                    params![clean_title, now_iso, &pattern],
+                )
+            })
             .or_else(|_| {
                 conn.execute(
                     "UPDATE conversation_summaries SET title = ?1 WHERE conversation_id LIKE ?2",
@@ -554,26 +590,32 @@ pub fn update_conversation_title(
         );
     }
 
-    // 3. Synchronize title into IDE persistent workspace storage (state.vscdb)
-    let data_dir =
-        if crate::modules::repo_db::gemini_dirs::is_default_instance_match(&resolved_inst) {
-            crate::modules::instance::get_default_antigravity_data_dir()
-        } else if let Ok(reg) = crate::modules::instance::load_registry() {
-            reg.instances
-                .iter()
-                .find(|i| i.id == resolved_inst)
-                .map(|i| std::path::PathBuf::from(&i.data_dir))
-                .unwrap_or_else(crate::modules::instance::get_default_antigravity_data_dir)
-        } else {
-            crate::modules::instance::get_default_antigravity_data_dir()
-        };
-    // Justification: syncing conversation title to state.vscdb is best-effort IDE storage sync
-    crate::error::record_ignored(
-        sync_title_to_state_vscdb(&data_dir, clean_cid, clean_title),
-        "sync title to state.vscdb",
-    );
+    // 3. Synchronize title into Antigravity native annotations (<gemini_dir>/annotations/<conversation_id>.pbtxt)
+    // Antigravity IDE keeps a live filesystem watcher on annotations/ and reloads the title in the GUI immediately!
+    sync_title_to_antigravity_annotations(&candidate_dirs, clean_cid, clean_title);
+    let all_tagged_dirs: Vec<std::path::PathBuf> = super::gemini_dirs::gemini_dirs_tagged(None)
+        .into_iter()
+        .map(|(_, d)| d)
+        .collect();
+    sync_title_to_antigravity_annotations(&all_tagged_dirs, clean_cid, clean_title);
 
-    // 4. Invalidate prompt tree cache
+    // 4. Update backup_prompts.db: UPDATE prompt_backups SET conversation_name = ?1 WHERE conversation_id = ?2
+    if let Ok(backup_conn) = crate::modules::backup_prompts_db::connect_backup_db(None) {
+        // Justification: updating conversation_name in backup_prompts.db is best-effort backup synchronization
+        crate::error::record_ignored(
+            backup_conn.execute(
+                "UPDATE prompt_backups SET conversation_name = ?1 WHERE conversation_id = ?2",
+                params![clean_title, clean_cid],
+            ),
+            "update conversation_name in prompt_backups",
+        );
+    }
+
+    // 5. Touch conversations/<conversation_id>.db to trigger fsnotify watcher in Antigravity language_server.exe
+    touch_conversation_db_files(&candidate_dirs, clean_cid);
+    touch_conversation_db_files(&all_tagged_dirs, clean_cid);
+
+    // 6. Invalidate prompt tree cache
     super::tree::invalidate_prompt_tree_cache(Some(&resolved_inst));
     if resolved_inst != "all" {
         super::tree::invalidate_prompt_tree_cache(Some("all"));
@@ -582,38 +624,85 @@ pub fn update_conversation_title(
     Ok(())
 }
 
-/// Synchronize conversation title to Antigravity IDE global/workspace state.vscdb
-pub fn sync_title_to_state_vscdb(
-    data_dir: &Path,
+/// Synchronize conversation title to Antigravity IDE annotations protobuf text file.
+/// Antigravity IDE maintains a live filesystem watcher on annotations/ and updates the title immediately in the IDE UI.
+pub fn sync_title_to_antigravity_annotations(
+    gemini_dirs: &[std::path::PathBuf],
     conversation_id: &str,
     new_title: &str,
-) -> Result<(), crate::error::AppError> {
-    let vscdb_path = data_dir
-        .join("User")
-        .join("globalStorage")
-        .join("state.vscdb");
-    if !vscdb_path.exists() {
-        return Ok(());
+) {
+    let now_secs = chrono::Utc::now().timestamp();
+    for dir in gemini_dirs {
+        let annotations_dir = if dir.ends_with("antigravity") || dir.ends_with("antigravity-ide") {
+            dir.join("annotations")
+        } else {
+            dir.join("antigravity").join("annotations")
+        };
+
+        let direct_annotations = dir.join("annotations");
+        for target_dir in [annotations_dir, direct_annotations] {
+            if let Some(parent) = target_dir.parent() {
+                if !parent.exists() {
+                    continue;
+                }
+            }
+            // Justification: creating annotations dir is best-effort for title sync
+            crate::error::record_ignored(
+                std::fs::create_dir_all(&target_dir),
+                "create annotations dir for title sync",
+            );
+            let pbtxt_file = target_dir.join(format!("{}.pbtxt", conversation_id));
+
+            if pbtxt_file.exists() {
+                if let Ok(content) = std::fs::read_to_string(&pbtxt_file) {
+                    let re = regex::Regex::new(r#"title:\s*"[^"]*""#);
+                    let updated = match re {
+                        Ok(ref r) if r.is_match(&content) => r
+                            .replace(&content, format!("title:\"{}\"", new_title))
+                            .to_string(),
+                        _ => format!("title:\"{}\" {}", new_title, content),
+                    };
+                    // Justification: updating annotations file triggers IDE filesystem watcher for live rename
+                    crate::error::record_ignored(
+                        std::fs::write(&pbtxt_file, updated),
+                        "update conversation title in annotations pbtxt",
+                    );
+                }
+            } else {
+                let initial = format!(
+                    "title:\"{}\" last_user_view_time:{{seconds:{} nanos:0}}\n",
+                    new_title, now_secs
+                );
+                // Justification: creating annotations file triggers IDE filesystem watcher for live rename
+                crate::error::record_ignored(
+                    std::fs::write(&pbtxt_file, initial),
+                    "create conversation annotations pbtxt with title",
+                );
+            }
+        }
     }
-    let conn = Connection::open(&vscdb_path).map_err(crate::error::AppError::Database)?;
-    // Justification: busy_timeout on IDE database is a nicety; continues with default if failed
-    crate::error::record_ignored(
-        conn.pragma_update(None, "busy_timeout", 3000),
-        "set busy_timeout on state.vscdb",
-    );
-    // Best-effort update of matching conversation title keys
-    // Justification: updating conversation title in state.vscdb is best-effort metadata synchronization
-    crate::error::record_ignored(
-        conn.execute(
-            "UPDATE ItemTable SET value = ?1 WHERE key = ?2",
-            params![
-                new_title,
-                format!("antigravity.conversation.title.{}", conversation_id)
-            ],
-        ),
-        "update title in state.vscdb ItemTable",
-    );
-    Ok(())
+}
+
+/// Touch conversations/<conversation_id>.db across candidate gemini directories
+/// to trigger fsnotify watcher in Antigravity's language_server.exe
+pub fn touch_conversation_db_files(gemini_dirs: &[std::path::PathBuf], conversation_id: &str) {
+    let now = std::time::SystemTime::now();
+    for dir in gemini_dirs {
+        let candidates = [
+            dir.join("conversations")
+                .join(format!("{}.db", conversation_id)),
+            dir.join("antigravity")
+                .join("conversations")
+                .join(format!("{}.db", conversation_id)),
+        ];
+        for path in candidates {
+            if path.exists() {
+                if let Ok(file) = std::fs::OpenOptions::new().write(true).open(&path) {
+                    let _ = file.set_modified(now);
+                }
+            }
+        }
+    }
 }
 
 #[inline]

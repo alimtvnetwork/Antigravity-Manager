@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef, Component, type Erro
 import { invoke } from '@tauri-apps/api/core';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, PanelLeftOpen } from 'lucide-react';
+import { cn } from '../../../utils/cn';
 import { useErrorStore } from '../../../stores/error-store';
 import { useInstanceStore } from '../../../stores/useInstanceStore';
 import { useConfigStore } from '../../../stores/useConfigStore';
@@ -72,14 +73,14 @@ class PromptTreeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundar
     public override render(): ReactNode {
         if (this.state.hasError) {
             return (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-3 bg-white dark:bg-[#171025]">
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-3 bg-white dark:bg-slate-900">
                     <div className="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center">
                         <AlertTriangle className="w-6 h-6" />
                     </div>
                     <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">
                         Conversation Transcript Error
                     </h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md font-mono bg-slate-50 dark:bg-[#211631] p-3 rounded-lg border border-slate-200 dark:border-[#40285e] overflow-x-auto text-left">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md font-mono bg-slate-50 dark:bg-slate-800/60 p-3 rounded-lg border border-slate-200 dark:border-slate-800 overflow-x-auto text-left">
                         {this.state.error?.message || 'An unexpected error occurred while parsing this conversation transcript.'}
                     </p>
                     <button
@@ -217,6 +218,70 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         project: AgmProjectTreeNode;
     } | null>(null);
 
+    const DEFAULT_TREE_WIDTH = 450;
+    const MIN_TREE_WIDTH = 280;
+    const MAX_TREE_WIDTH = 760;
+
+    const [treeWidth, setTreeWidth] = useState<number>(() => {
+        try {
+            const saved = localStorage.getItem('agm_prompt_tree_panel_width');
+            const parsed = saved ? parseInt(saved, 10) : DEFAULT_TREE_WIDTH;
+            return isNaN(parsed) ? DEFAULT_TREE_WIDTH : Math.max(MIN_TREE_WIDTH, Math.min(MAX_TREE_WIDTH, parsed));
+        } catch {
+            return DEFAULT_TREE_WIDTH;
+        }
+    });
+    const [isResizingTree, setIsResizingTree] = useState(false);
+    const treeSplitterRef = useRef<HTMLDivElement>(null);
+    const dragStartXRef = useRef<number>(0);
+    const startWidthRef = useRef<number>(DEFAULT_TREE_WIDTH);
+
+    const handleSplitterMouseDown = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        setIsResizingTree(true);
+        dragStartXRef.current = e.clientX;
+        startWidthRef.current = treeWidth;
+    }, [treeWidth]);
+
+    const handleSplitterDoubleClick = useCallback(() => {
+        setTreeWidth(DEFAULT_TREE_WIDTH);
+        try {
+            localStorage.setItem('agm_prompt_tree_panel_width', String(DEFAULT_TREE_WIDTH));
+        } catch {
+            // best-effort
+        }
+    }, [DEFAULT_TREE_WIDTH]);
+
+    useEffect(() => {
+        if (!isResizingTree) return;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const delta = e.clientX - dragStartXRef.current;
+            const clampedWidth = Math.max(MIN_TREE_WIDTH, Math.min(MAX_TREE_WIDTH, startWidthRef.current + delta));
+            setTreeWidth(clampedWidth);
+        };
+
+        const handleMouseUp = () => {
+            setIsResizingTree(false);
+            try {
+                localStorage.setItem('agm_prompt_tree_panel_width', String(treeWidth));
+            } catch {
+                // best-effort
+            }
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+    }, [isResizingTree, treeWidth, MIN_TREE_WIDTH, MAX_TREE_WIDTH]);
+
     const handleProjectContextMenu = (e: React.MouseEvent, repoName: string, project?: AgmProjectTreeNode) => {
         e.preventDefault();
         e.stopPropagation();
@@ -257,6 +322,8 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                 ),
             };
         });
+        setActionMsg('Conversation title updated & synced with IDE!');
+        setTimeout(() => setActionMsg(null), 3000);
     };
 
     const handleResendPrompts = () => {
@@ -730,7 +797,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             <div
                 onClick={(e) => e.stopPropagation()}
                 onDoubleClick={(e) => e.stopPropagation()}
-                className={`flex flex-col overflow-hidden bg-white dark:bg-[#0c0817]/95 backdrop-blur-2xl shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-slate-200 dark:border-purple-900/40 transition-all relative z-10 ${isFullscreen
+                className={`flex flex-col overflow-hidden bg-white dark:bg-[var(--app-bg,#090611)]/95 backdrop-blur-2xl shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-slate-200 dark:border-[var(--app-border,#334155)]/60 transition-all relative z-10 ${isFullscreen
                     ? "h-full w-full rounded-none border-0"
                     : "h-[90vh] w-full max-w-7xl rounded-2xl"
                     }`}
@@ -821,78 +888,108 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                 )}
 
                 {/* Main Split View */}
-                <div className="flex flex-1 overflow-hidden">
+                <div className="flex flex-1 overflow-hidden relative">
                     {!isTreeCollapsed ? (
-                        <div className="w-[420px] sm:w-[450px] lg:w-[480px] shrink-0 flex flex-col border-r border-slate-200 dark:border-[#40285e] bg-slate-50/50 dark:bg-[#090611]/60 overflow-hidden">
-                            <NowRunningUpNext
-                                items={runningUpNext.items}
-                                isLoading={runningUpNext.isLoading}
-                                lastSyncAt={runningUpNext.lastSyncAt}
-                                hasError={runningUpNext.hasError}
-                                upNextTotal={runningUpNext.upNextTotal}
-                                onSelectPrompt={handleStripSelectPrompt}
-                                onRerun={handleStripRerun}
-                                onResendWithImage={handleStripResendWithImage}
-                                onRefresh={runningUpNext.onRefresh}
-                            />
-                            <div className="flex-1 min-h-0 flex flex-col [&>div]:h-full [&>div]:border-r-0">
-                                <TreePanel
-                            treeData={treeData}
-                            activeProjects={activeProjects}
-                            archivedProjects={archivedProjects}
-                            archivedCount={archivedCount}
-                            searchQuery={searchQuery}
-                            setSearchQuery={setSearchQuery}
-                            activeFilter={activeFilter}
-                            setActiveFilter={setActiveFilter}
-                            categoryFilter={categoryFilter}
-                            setCategoryFilter={setCategoryFilter}
-                            selectedProjectScope={selectedProjectScope}
-                            setSelectedProjectScope={setSelectedProjectScope}
-                            isArchivedProjectsExpanded={isArchivedProjectsExpanded}
-                            setIsArchivedProjectsExpanded={setIsArchivedProjectsExpanded}
-                            isAutomatedHidden={isAutomatedHidden}
-                            setIsAutomatedHidden={setIsAutomatedHidden}
-                            isCollapsed={isTreeCollapsed}
-                            onToggleCollapse={() => setIsTreeCollapsed(true)}
-                            onToggleExpandAll={handleToggleExpandAll}
-                            isAllExpanded={isAllExpanded}
-                            instanceName={instanceName}
-                            instanceId={instanceId}
-                            expandedProjects={expandedProjects}
-                            expandedStaleGroups={expandedStaleGroups}
-                            pinnedProjectIds={pinnedProjectIds}
-                            archivedProjectIds={archivedProjectIds}
-                            refreshingProjectId={refreshingProjectId}
-                            selectedProjectId={selectedProject?.project_id}
-                            selectedConversationId={selectedConversation?.conversation_id}
-                            onSelectProject={(p) => {
-                                setSelectedProject(p);
-                                setShowAllWords(false);
-                            }}
-                            onToggleProjectExpand={(pid) => setExpandedProjects((prev) => ({ ...prev, [pid]: !prev[pid] }))}
-                            onToggleStaleGroup={(pid) => setExpandedStaleGroups((prev) => ({ ...prev, [pid]: !prev[pid] }))}
-                            onSelectConversation={selectConversation}
-                            onOpenInspector={promptActions.openInspector}
-                            onRefreshProject={coreActions.handleRefreshSingleProject}
-                            onTogglePin={coreActions.togglePinProject}
-                            onToggleArchive={coreActions.toggleArchiveProject}
-                            onResendQueued={coreActions.handleResendQueued}
-                            isResendingQueued={coreActions.isResendingQueued}
-                            onProjectContextMenu={handleProjectContextMenu}
-                            onRenameConversation={handleRenameConversation}
-                            onResendPrompts={handleResendPrompts}
-                            onEnqueue={handleEnqueue}
-                            onRerunConversation={handleRerunConversation}
+                        <>
+                            <div
+                                style={{ width: `${treeWidth}px` }}
+                                className="shrink-0 flex flex-col border-r border-slate-200 dark:border-[var(--app-border,#334155)] bg-slate-50/50 dark:bg-[var(--app-bg,#090611)]/60 overflow-hidden select-none"
+                            >
+                                <NowRunningUpNext
+                                    items={runningUpNext.items}
+                                    isLoading={runningUpNext.isLoading}
+                                    lastSyncAt={runningUpNext.lastSyncAt}
+                                    hasError={runningUpNext.hasError}
+                                    upNextTotal={runningUpNext.upNextTotal}
+                                    onSelectPrompt={handleStripSelectPrompt}
+                                    onRerun={handleStripRerun}
+                                    onResendWithImage={handleStripResendWithImage}
+                                    onRefresh={runningUpNext.onRefresh}
                                 />
+                                <div className="flex-1 min-h-0 flex flex-col [&>div]:h-full [&>div]:border-r-0">
+                                    <TreePanel
+                                        treeData={treeData}
+                                        activeProjects={activeProjects}
+                                        archivedProjects={archivedProjects}
+                                        archivedCount={archivedCount}
+                                        searchQuery={searchQuery}
+                                        setSearchQuery={setSearchQuery}
+                                        activeFilter={activeFilter}
+                                        setActiveFilter={setActiveFilter}
+                                        categoryFilter={categoryFilter}
+                                        setCategoryFilter={setCategoryFilter}
+                                        selectedProjectScope={selectedProjectScope}
+                                        setSelectedProjectScope={setSelectedProjectScope}
+                                        isArchivedProjectsExpanded={isArchivedProjectsExpanded}
+                                        setIsArchivedProjectsExpanded={setIsArchivedProjectsExpanded}
+                                        isAutomatedHidden={isAutomatedHidden}
+                                        setIsAutomatedHidden={setIsAutomatedHidden}
+                                        isCollapsed={isTreeCollapsed}
+                                        onToggleCollapse={() => setIsTreeCollapsed(true)}
+                                        onToggleExpandAll={handleToggleExpandAll}
+                                        isAllExpanded={isAllExpanded}
+                                        instanceName={instanceName}
+                                        instanceId={instanceId}
+                                        expandedProjects={expandedProjects}
+                                        expandedStaleGroups={expandedStaleGroups}
+                                        pinnedProjectIds={pinnedProjectIds}
+                                        archivedProjectIds={archivedProjectIds}
+                                        refreshingProjectId={refreshingProjectId}
+                                        selectedProjectId={selectedProject?.project_id}
+                                        selectedConversationId={selectedConversation?.conversation_id}
+                                        onSelectProject={(p) => {
+                                            setSelectedProject(p);
+                                            setShowAllWords(false);
+                                        }}
+                                        onToggleProjectExpand={(pid) => setExpandedProjects((prev) => ({ ...prev, [pid]: !prev[pid] }))}
+                                        onToggleStaleGroup={(pid) => setExpandedStaleGroups((prev) => ({ ...prev, [pid]: !prev[pid] }))}
+                                        onSelectConversation={selectConversation}
+                                        onOpenInspector={promptActions.openInspector}
+                                        onRefreshProject={coreActions.handleRefreshSingleProject}
+                                        onTogglePin={coreActions.togglePinProject}
+                                        onToggleArchive={coreActions.toggleArchiveProject}
+                                        onResendQueued={coreActions.handleResendQueued}
+                                        isResendingQueued={coreActions.isResendingQueued}
+                                        onProjectContextMenu={handleProjectContextMenu}
+                                        onRenameConversation={handleRenameConversation}
+                                        onResendPrompts={handleResendPrompts}
+                                        onEnqueue={handleEnqueue}
+                                        onRerunConversation={handleRerunConversation}
+                                    />
+                                </div>
                             </div>
-                        </div>
+
+                            {/* Vertical Draggable Splitter Divider */}
+                            <div
+                                ref={treeSplitterRef}
+                                role="separator"
+                                aria-orientation="vertical"
+                                aria-valuenow={treeWidth}
+                                aria-valuemin={MIN_TREE_WIDTH}
+                                aria-valuemax={MAX_TREE_WIDTH}
+                                tabIndex={0}
+                                onMouseDown={handleSplitterMouseDown}
+                                onDoubleClick={handleSplitterDoubleClick}
+                                className={cn(
+                                    "w-1.5 hover:w-2 -ml-0.5 cursor-col-resize flex items-center justify-center transition-all group z-30 select-none shrink-0",
+                                    isResizingTree
+                                        ? "bg-blue-500 w-2 cursor-col-resize"
+                                        : "hover:bg-blue-500/50 bg-slate-200 dark:bg-[var(--app-border,#334155)]/50"
+                                )}
+                                title="Drag to resize tree panel (280px - 760px) · Double-click to reset (450px)"
+                            >
+                                <div className={cn(
+                                    "w-0.5 h-6 rounded-full transition-colors",
+                                    isResizingTree ? "bg-white" : "bg-slate-400/60 dark:bg-slate-500/60 group-hover:bg-blue-400"
+                                )} />
+                            </div>
+                        </>
                     ) : (
-                        <div className="w-10 shrink-0 border-r border-slate-200 dark:border-[#40285e] bg-slate-50/70 dark:bg-[#090611]/70 flex flex-col items-center py-3 gap-3">
+                        <div className="w-10 shrink-0 border-r border-slate-200 dark:border-[var(--app-border,#334155)] bg-slate-50/70 dark:bg-[var(--app-bg,#090611)]/70 flex flex-col items-center py-3 gap-3">
                             <button
                                 type="button"
                                 onClick={() => setIsTreeCollapsed(false)}
-                                className="p-1.5 rounded-lg text-slate-500 hover:text-blue-500 dark:text-slate-400 dark:hover:text-blue-400 hover:bg-slate-200/60 dark:hover:bg-[#201538] transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-blue-500 dark:text-slate-400 dark:hover:text-blue-400 hover:bg-slate-200/60 dark:hover:bg-[var(--app-surface-hover,#1e293b)] transition-colors cursor-pointer"
                                 title="Expand Tree Panel"
                             >
                                 <PanelLeftOpen className="w-4 h-4" />
@@ -907,7 +1004,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                     )}
 
                     {/* Right Panel: Prompt Details */}
-                    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#171025]">
+                    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[var(--app-surface,#18181b)]">
                         <PromptTreeErrorBoundary onReset={() => setSelectedConversation(null)}>
                             {selectedConversation ? (
                                 <div className="flex-1 flex flex-col px-5 py-3.5 overflow-y-auto space-y-1.5">
@@ -962,6 +1059,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                         onEnqueue={promptActions.handleEnqueuePrompt}
                                         rerunRepoPath={selectedProject?.repo_path || ''}
                                         onRenameConversation={handleRenameConversation}
+                                        setActionMsg={setActionMsg}
                                         onOpenInspector={(conv) => promptActions.openInspector(conv, selectedProject?.repo_path || '')}
                                     />
 

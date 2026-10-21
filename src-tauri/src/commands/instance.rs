@@ -686,6 +686,22 @@ pub async fn enqueue_prompt(
 }
 
 #[tauri::command]
+pub async fn cancel_running_prompt(
+    instance_id: String,
+    repo_path: Option<String>,
+) -> Result<bool, String> {
+    let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
+    tokio::task::spawn_blocking(move || {
+        crate::modules::repo_db::cancel_running_prompt_for_instance(
+            &resolved_id,
+            repo_path.as_deref(),
+        )
+    })
+    .await
+    .map_err(|e| format!("cancel_running_prompt task failed: {e}"))?
+}
+
+#[tauri::command]
 pub fn get_running_instances_process_count() -> Result<usize, String> {
     Ok(crate::modules::instance::scan_and_cache_all_running_instances())
 }

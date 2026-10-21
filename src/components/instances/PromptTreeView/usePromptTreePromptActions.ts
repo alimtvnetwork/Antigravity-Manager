@@ -381,7 +381,7 @@ export function usePromptTreePromptActions({
 
         try {
             setIsResending(true);
-            setActionMsg('Dispatching prompt to running instance...');
+            setActionMsg('Cancelling active task & dispatching prompt now...');
             let promptContent = (!selectedConversation && conv)
                 ? (conv.full_prompt_text || conv.prompt_preview_200w || '')
                 : (editedPromptText.trim() || activePromptTextRef.current || activePromptText || conv?.full_prompt_text || conv?.prompt_preview_200w || '');
@@ -436,7 +436,7 @@ export function usePromptTreePromptActions({
             let dispatchOk = false;
             let dispatchErr: unknown = null;
             try {
-                await (sendPromptNow as any)(targetInstId, repoPath, promptContent, targetConvId, mediaList);
+                await sendPromptNow(targetInstId, repoPath, promptContent, targetConvId, mediaList);
                 dispatchOk = true;
             } catch (sendErr) {
                 dispatchErr = sendErr;
@@ -454,7 +454,7 @@ export function usePromptTreePromptActions({
             }
 
             if (dispatchOk) {
-                setActionMsg("Prompt dispatched to IDE & copied to clipboard!");
+                setActionMsg("Prompt dispatched to IDE (active task cancelled & preempted)!");
                 setTimeout(() => setActionMsg(null), 3000);
                 if (isTauri()) {
                     try {
@@ -622,7 +622,7 @@ ${activePromptText}
         }
         try {
             setIsEnqueueing(true);
-            setActionMsg('Enqueueing prompt into FIFO scheduler queue...');
+            setActionMsg('Enqueuing prompt to IDE and FIFO queue...');
             let promptContent = editedPromptText.trim() || activePromptTextRef.current || activePromptText || conv.full_prompt_text || conv.prompt_preview_200w || '';
             if (!promptContent && conv) {
                 promptContent = resolvePromptBody(conv);
@@ -670,7 +670,7 @@ ${activePromptText}
             }
 
             // Enqueue prompt into FIFO queue (preserving real Base64 image data URIs and file paths)
-            await (enqueuePrompt as any)(targetInstId, repoPath, promptContent, targetConvId, undefined, mediaList);
+            await enqueuePrompt(targetInstId, repoPath, promptContent, targetConvId, undefined, mediaList);
 
             // Invalidate prompt tree cache first so tree reload fetches fresh state including enqueued turn
             if (isTauri()) {
@@ -708,7 +708,7 @@ ${activePromptText}
                 });
             }
 
-            setActionMsg('Prompt enqueued into FIFO scheduler queue!');
+            setActionMsg('Prompt enqueued to IDE behind current task!');
             setTimeout(() => setActionMsg(null), 3500);
         } catch (err: unknown) {
             const errorObj = err instanceof Error ? err : new Error(String(err) || 'Failed to enqueue prompt');
@@ -1293,7 +1293,7 @@ export async function handleVerifyLastPromptsAndEnqueue(
             ...(options.mediaPaths || []),
             ...images.map((img) => img.dataUri),
         ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
-        await (enqueuePrompt as any)(
+        await enqueuePrompt(
             options.instanceId,
             options.repoPath,
             rewrittenPrompt,

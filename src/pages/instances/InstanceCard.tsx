@@ -161,7 +161,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
             key={inst.config.id}
             ref={isActive ? activeCardRef : undefined}
             className={cn(
-                'group relative rounded-[5px] border transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg flex flex-col justify-between overflow-hidden backdrop-blur-xs',
+                'group relative rounded-[5px] border transition-colors duration-300 ease-in-out hover:shadow-md flex flex-col justify-between overflow-hidden backdrop-blur-xs',
                 isActive
                     ? SELECTED_CARD_CLASSES
                     : 'bg-white dark:bg-[var(--ui-surface-1)] border-gray-200/50 dark:border-[var(--ui-border-subtle)] hover:border-gray-300/80 dark:hover:border-[var(--ui-interactive-40)] hover:bg-slate-50/90 dark:hover:bg-[var(--ui-surface-hover)] shadow-xs'
@@ -406,11 +406,11 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
             <div className="relative w-full h-[3px] overflow-hidden rounded-b-[5px]">
                 <div
                     className={cn(
-                        'absolute inset-0 bg-gradient-to-r transition-all duration-300 ease-out transform',
+                        'absolute inset-0 bg-gradient-to-r transition-opacity duration-300 ease-in-out',
                         theme.accentBar,
                         isActive
-                            ? 'opacity-60 scale-x-100 group-hover:opacity-100'
-                            : 'opacity-0 scale-x-95 group-hover:opacity-100 group-hover:scale-x-100'
+                            ? 'opacity-60 group-hover:opacity-100'
+                            : 'opacity-0 group-hover:opacity-100'
                     )}
                 />
             </div>

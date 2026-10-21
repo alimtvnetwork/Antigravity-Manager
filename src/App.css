@@ -453,10 +453,67 @@ html.palette-vscode-navy-gold {
 html[class*="palette-"] .dark\:bg-base-100,
 html[class*="palette-"] .dark\:bg-base-200,
 html[class*="palette-"] .dark\:bg-\[\#171025\],
+html[class*="palette-"] .dark\:bg-\[\#120a1f\],
+html[class*="palette-"] .dark\:bg-\[\#1a1228\],
 html[class*="palette-"] .dark\:bg-\[\#090611\],
 html[class*="palette-"] .dark\:bg-\[\#0a1e30\],
 html[class*="palette-"] .dark\:bg-\[\#081826\] {
   background-color: var(--surface) !important;
+}
+
+/* ==========================================================================
+   One Dark Pro Theme Overrides:
+   Remap legacy purple tones (#120a1f, #171025, #40285e, #1a1228) to One Dark
+   Pro charcoal colors (#21252b, #282c34, #181a1f, #3a3f4b).
+   ========================================================================== */
+.theme-onedarkpro,
+html.palette-one-dark,
+[data-theme="onedarkpro"] {
+  --app-bg: #21252b;
+  --app-surface: #282c34;
+  --app-border: #3a3f4b;
+}
+
+.theme-onedarkpro .dark\:bg-\[\#120a1f\],
+.theme-onedarkpro .dark\:bg-\[\#171025\],
+.theme-onedarkpro .dark\:bg-\[\#1a1228\],
+html.palette-one-dark .dark\:bg-\[\#120a1f\],
+html.palette-one-dark .dark\:bg-\[\#171025\],
+html.palette-one-dark .dark\:bg-\[\#1a1228\],
+[data-theme="onedarkpro"] .dark\:bg-\[\#120a1f\],
+[data-theme="onedarkpro"] .dark\:bg-\[\#171025\],
+[data-theme="onedarkpro"] .dark\:bg-\[\#1a1228\] {
+  background-color: #282c34 !important;
+}
+
+.theme-onedarkpro .dark\:bg-\[\#090611\],
+html.palette-one-dark .dark\:bg-\[\#090611\],
+[data-theme="onedarkpro"] .dark\:bg-\[\#090611\] {
+  background-color: #21252b !important;
+}
+
+.theme-onedarkpro .dark\:border-\[\#40285e\],
+.theme-onedarkpro .dark\:border-\[\#40285e\]\/60,
+.theme-onedarkpro .dark\:border-\[\#40285e\]\/80,
+.theme-onedarkpro .dark\:divide-\[\#40285e\],
+html.palette-one-dark .dark\:border-\[\#40285e\],
+html.palette-one-dark .dark\:border-\[\#40285e\]\/60,
+html.palette-one-dark .dark\:border-\[\#40285e\]\/80,
+html.palette-one-dark .dark\:divide-\[\#40285e\],
+[data-theme="onedarkpro"] .dark\:border-\[\#40285e\],
+[data-theme="onedarkpro"] .dark\:border-\[\#40285e\]\/60,
+[data-theme="onedarkpro"] .dark\:border-\[\#40285e\]\/80,
+[data-theme="onedarkpro"] .dark\:divide-\[\#40285e\] {
+  border-color: #3a3f4b !important;
+}
+
+.theme-onedarkpro .dark\:hover\:bg-\[\#40285e\],
+.theme-onedarkpro .dark\:hover\:bg-\[\#40285e\]\/60,
+html.palette-one-dark .dark\:hover\:bg-\[\#40285e\],
+html.palette-one-dark .dark\:hover\:bg-\[\#40285e\]\/60,
+[data-theme="onedarkpro"] .dark\:hover\:bg-\[\#40285e\],
+[data-theme="onedarkpro"] .dark\:hover\:bg-\[\#40285e\]\/60 {
+  background-color: #3a3f4b !important;
 }
 
 /* Emerald liveness glow for active running indicators (#1af18d) */

@@ -1,12 +1,56 @@
 {
   "$schema": "https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/02-spec/schema/releases-manifest.schema.json",
-  "generated_at": "2026-10-21T06:18:35.710Z",
+  "generated_at": "2026-10-21T07:58:08.368Z",
   "repo": "alimtvnetwork/Antigravity-Manager",
-  "latest_version": "4.248.0",
-  "latest_tag": "v4.248.0",
-  "latest_tag_url": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v4.248.0",
-  "latest_raw_tag_url": "https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.248.0",
+  "latest_version": "4.250.0",
+  "latest_tag": "v4.250.0",
+  "latest_tag_url": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v4.250.0",
+  "latest_raw_tag_url": "https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.250.0",
   "releases": [
+    {
+      "version": "4.250.0",
+      "tag": "v4.250.0",
+      "tag_url": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v4.250.0",
+      "raw_tag_url": "https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.250.0",
+      "release_url": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v4.250.0",
+      "published_at": "2026-10-21T07:58:08Z",
+      "prerelease": false,
+      "assets": {
+        "windows_x64_setup": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.250.0/agm-alim-setup.exe",
+        "windows_x64_zip": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.250.0/agm-alim_4.250.0_windows_x64.zip",
+        "windows_x64_msi": "",
+        "macos_x64_dmg": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.250.0/Antigravity.Manager.Tools_4.250.0_x64.dmg",
+        "macos_aarch64_dmg": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.250.0/Antigravity.Manager.Tools_4.250.0_aarch64.dmg",
+        "linux_amd64_appimage": "",
+        "linux_aarch64_appimage": "",
+        "linux_amd64_deb": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.250.0/Antigravity.Manager.Tools_4.250.0_amd64.deb",
+        "linux_aarch64_deb": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.250.0/Antigravity.Manager.Tools_4.250.0_arm64.deb",
+        "linux_x64_rpm": "",
+        "linux_aarch64_rpm": ""
+      }
+    },
+    {
+      "version": "4.249.0",
+      "tag": "v4.249.0",
+      "tag_url": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v4.249.0",
+      "raw_tag_url": "https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.249.0",
+      "release_url": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v4.249.0",
+      "published_at": "2026-10-21T07:57:19Z",
+      "prerelease": false,
+      "assets": {
+        "windows_x64_setup": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.249.0/agm-alim-setup.exe",
+        "windows_x64_zip": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.249.0/agm-alim_4.249.0_windows_x64.zip",
+        "windows_x64_msi": "",
+        "macos_x64_dmg": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.249.0/Antigravity.Manager.Tools_4.249.0_x64.dmg",
+        "macos_aarch64_dmg": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.249.0/Antigravity.Manager.Tools_4.249.0_aarch64.dmg",
+        "linux_amd64_appimage": "",
+        "linux_aarch64_appimage": "",
+        "linux_amd64_deb": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.249.0/Antigravity.Manager.Tools_4.249.0_amd64.deb",
+        "linux_aarch64_deb": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.249.0/Antigravity.Manager.Tools_4.249.0_arm64.deb",
+        "linux_x64_rpm": "",
+        "linux_aarch64_rpm": ""
+      }
+    },
     {
       "version": "4.248.0",
       "tag": "v4.248.0",
@@ -289,50 +333,6 @@
         "linux_aarch64_appimage": "",
         "linux_amd64_deb": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.238.7/Antigravity.Manager.Tools_4.238.7_amd64.deb",
         "linux_aarch64_deb": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.238.7/Antigravity.Manager.Tools_4.238.7_arm64.deb",
-        "linux_x64_rpm": "",
-        "linux_aarch64_rpm": ""
-      }
-    },
-    {
-      "version": "4.238.0",
-      "tag": "v4.238.0",
-      "tag_url": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v4.238.0",
-      "raw_tag_url": "https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.238.0",
-      "release_url": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v4.238.0",
-      "published_at": "2026-10-19T14:22:08Z",
-      "prerelease": false,
-      "assets": {
-        "windows_x64_setup": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.238.0/agm-alim-setup.exe",
-        "windows_x64_zip": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.238.0/agm-alim_4.238.0_windows_x64.zip",
-        "windows_x64_msi": "",
-        "macos_x64_dmg": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.238.0/Antigravity.Manager.Tools_4.238.0_x64.dmg",
-        "macos_aarch64_dmg": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.238.0/Antigravity.Manager.Tools_4.238.0_aarch64.dmg",
-        "linux_amd64_appimage": "",
-        "linux_aarch64_appimage": "",
-        "linux_amd64_deb": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.238.0/Antigravity.Manager.Tools_4.238.0_amd64.deb",
-        "linux_aarch64_deb": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.238.0/Antigravity.Manager.Tools_4.238.0_arm64.deb",
-        "linux_x64_rpm": "",
-        "linux_aarch64_rpm": ""
-      }
-    },
-    {
-      "version": "4.237.0",
-      "tag": "v4.237.0",
-      "tag_url": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v4.237.0",
-      "raw_tag_url": "https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.237.0",
-      "release_url": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/tag/v4.237.0",
-      "published_at": "2026-10-19T11:49:44Z",
-      "prerelease": false,
-      "assets": {
-        "windows_x64_setup": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.237.0/agm-alim-setup.exe",
-        "windows_x64_zip": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.237.0/agm-alim_4.237.0_windows_x64.zip",
-        "windows_x64_msi": "",
-        "macos_x64_dmg": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.237.0/Antigravity.Manager.Tools_4.237.0_x64.dmg",
-        "macos_aarch64_dmg": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.237.0/Antigravity.Manager.Tools_4.237.0_aarch64.dmg",
-        "linux_amd64_appimage": "",
-        "linux_aarch64_appimage": "",
-        "linux_amd64_deb": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.237.0/Antigravity.Manager.Tools_4.237.0_amd64.deb",
-        "linux_aarch64_deb": "https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.237.0/Antigravity.Manager.Tools_4.237.0_arm64.deb",
         "linux_x64_rpm": "",
         "linux_aarch64_rpm": ""
       }

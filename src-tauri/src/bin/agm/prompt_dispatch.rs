@@ -375,7 +375,8 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
             antigravity_tools_lib::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
                 &inst_id,
                 &clean_prompt,
-            );
+                true,
+            ).is_ok();
         if cdp_ok {
             antigravity_tools_lib::modules::audit::record_if_active(
                 "cli",

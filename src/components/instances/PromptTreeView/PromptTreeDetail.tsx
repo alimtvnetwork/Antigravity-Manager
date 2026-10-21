@@ -37,7 +37,7 @@ export function PromptTreeDetail({
                 {viewMode === 'preview' ? (
                     <div
                         onDoubleClick={() => onOpenInspector?.(selectedConversation, selectedProject?.repo_path || '')}
-                        className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#090611] p-4 text-xs font-poppins leading-relaxed shadow-inner"
+                        className="rounded-xl border border-slate-200 dark:border-[var(--ui-border-subtle,#40285e)] bg-slate-50 dark:bg-[var(--ui-canvas,#090611)] p-4 text-xs font-poppins leading-relaxed shadow-inner"
                     >
                         <RichMarkdownRenderer
                             content={displayedText}
@@ -46,7 +46,7 @@ export function PromptTreeDetail({
                         />
                     </div>
                 ) : (
-                    <div className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-slate-900 text-slate-100 p-4 font-mono text-xs whitespace-pre-wrap select-text">
+                    <div className="rounded-xl border border-slate-200 dark:border-[var(--ui-border-subtle,#40285e)] bg-slate-900 text-slate-100 p-4 font-mono text-xs whitespace-pre-wrap select-text">
                         {displayedText}
                     </div>
                 )}

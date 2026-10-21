@@ -249,11 +249,11 @@ function PromptThumbnailCard({ img, repoPath, onPreview, onContextMenu }: Prompt
                     src={resolvedSrc}
                     alt={img.alt}
                     onError={handleImgError}
-                    className="h-16 w-24 object-cover rounded-md border border-slate-200 dark:border-[#40285e] hover:border-blue-500 dark:hover:border-blue-400 cursor-pointer shadow-2xs transition-all hover:scale-102 bg-slate-100 dark:bg-[#090611]"
+                    className="h-16 w-24 object-cover rounded-md border border-slate-200 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-400 cursor-pointer shadow-2xs transition-all duration-300 ease-in-out hover:brightness-105 hover:shadow-md bg-slate-100 dark:bg-slate-900"
                 />
             ) : (
                 <div
-                    className="h-16 w-24 flex flex-col items-center justify-center rounded-md border border-dashed border-amber-500/40 bg-amber-500/5 text-amber-600 dark:text-amber-400 p-1 text-center cursor-pointer shadow-2xs hover:border-amber-500 transition-all hover:scale-102"
+                    className="h-16 w-24 flex flex-col items-center justify-center rounded-md border border-dashed border-amber-500/40 bg-amber-500/5 text-amber-600 dark:text-amber-400 p-1 text-center cursor-pointer shadow-2xs hover:border-amber-500 transition-all duration-300 ease-in-out hover:brightness-105 hover:shadow-md"
                     title={`Image: ${img.src} (Click to preview · Right-click for options)`}
                 >
                     <LucideImage className="w-5 h-5 mb-0.5 opacity-70" />
@@ -594,7 +594,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
             {selectedTurnNumber === null && (
                 !isOverviewExpanded ? (
                     /* Compact Collapsed Single-Line Summary Bar */
-                    <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200/80 dark:border-[#40285e]/80 bg-gradient-to-r from-slate-50 via-white to-purple-50/20 dark:from-[#171025] dark:via-[#120a1f] dark:to-[#1a0e2e] shadow-xs text-xs font-poppins">
+                    <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/60 shadow-xs text-xs font-poppins">
                         <div className="flex items-center gap-2 min-w-0">
                             <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold border border-purple-200 dark:border-purple-800/40 shrink-0">
                                 {selectedConversation.seq_code || 'CONV'}
@@ -610,7 +610,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                     <span>QUEUED</span>
                                 </span>
                             ) : (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9.5px] font-bold bg-slate-200/80 dark:bg-[#251b3a] text-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-[#40285e]">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9.5px] font-bold bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-slate-700">
                                     <Check className="w-2.5 h-2.5 text-emerald-500" />
                                     <span>IDLE</span>
                                 </span>
@@ -639,7 +639,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                     </div>
                 ) : (
                     /* Full Expanded Overview Card */
-                    <div className="rounded-xl border border-slate-200 dark:border-[#40285e] bg-gradient-to-br from-slate-50 via-white to-purple-50/20 dark:from-[#171025] dark:via-[#120a1f] dark:to-[#1a0e2e] p-4 shadow-xs space-y-3 font-poppins">
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/60 p-4 shadow-xs space-y-3 font-poppins">
                         {/* Streamlined Header: Deduplicated, no repeated title or conversation ID */}
                         <div className="flex items-center justify-between pb-2 border-b border-slate-200/60 dark:border-[#2b1b42]">
                             <div className="flex items-center gap-2">
@@ -816,7 +816,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
             )}
             {/* Image Thumbnail Gallery Strip */}
             {attachedImages.length > 0 && (
-                <div className="p-2.5 rounded-lg border border-slate-200 dark:border-[#40285e] bg-white/70 dark:bg-[#120a1f]/80 backdrop-blur-xs space-y-2">
+                <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/80 backdrop-blur-xs space-y-2">
                     <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300 flex-wrap gap-2">
                         <span className="flex items-center gap-1.5">
                             <span>🖼️ Attached Images ({attachedImages.length})</span>
@@ -881,7 +881,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                 <button
                                     type="button"
                                     onClick={() => setShowAllWords(!showAllWords)}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-blue-50 dark:bg-[#171025] text-blue-600 dark:text-cyan-300 border border-blue-200 dark:border-[#40285e] hover:bg-blue-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-blue-50 dark:bg-slate-900 text-blue-600 dark:text-cyan-300 border border-blue-200 dark:border-slate-800 hover:bg-blue-100 dark:hover:bg-slate-800/80 transition-colors cursor-pointer"
                                     title={showAllWords ? `Collapse preview to ${effectiveWordLimit} words` : 'Expand full prompt'}
                                 >
                                     {showAllWords ? (
@@ -939,7 +939,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                         <button
                             type="button"
                             onClick={() => setEditedPromptText(activePromptText)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-100 dark:bg-[#171025] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#40285e] hover:bg-slate-200 dark:hover:bg-[#40285e] text-xs font-semibold transition-colors cursor-pointer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800/80 text-xs font-semibold transition-colors cursor-pointer"
                             title="Reset to original text"
                         >
                             <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
@@ -952,7 +952,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                 setActionMsg('Prompt changes saved to current session!');
                                 setTimeout(() => setActionMsg(null), 2500);
                             }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-50 dark:bg-[#171025] text-emerald-700 dark:text-emerald-300 border border-emerald-300/60 dark:border-[#40285e] hover:bg-emerald-100 dark:hover:bg-[#40285e] text-xs font-semibold transition-colors cursor-pointer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-50 dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 border border-emerald-300/60 dark:border-slate-800 hover:bg-emerald-100 dark:hover:bg-slate-800/80 text-xs font-semibold transition-colors cursor-pointer"
                             title="Save prompt changes"
                         >
                             <Check className="w-3.5 h-3.5 text-emerald-500" />
