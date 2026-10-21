@@ -292,4 +292,29 @@ mod tests {
         );
         assert!(res.is_ok());
     }
+
+    #[test]
+    fn test_media_vault_schema_and_column_invariant() {
+        let conn = Connection::open_in_memory().unwrap();
+        assert!(init_tables(&conn).is_ok());
+
+        // Verify media_vault table exists and contains expected columns
+        let mut stmt = conn.prepare("PRAGMA table_info(media_vault)").unwrap();
+        let columns: Vec<String> = stmt
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+
+        assert!(columns.contains(&"id".to_string()));
+        assert!(columns.contains(&"sha256".to_string()));
+        assert!(columns.contains(&"local_path".to_string()));
+        assert!(columns.contains(&"public_url".to_string()));
+        assert!(columns.contains(&"telegram_file_id".to_string()));
+        assert!(columns.contains(&"mime_type".to_string()));
+        assert!(columns.contains(&"created_at".to_string()));
+
+        // Invariant: media_vault is a content-addressable SHA256 store without an instance_id column
+        assert!(!columns.contains(&"instance_id".to_string()));
+    }
 }

@@ -1184,11 +1184,8 @@ pub fn wipe_and_rescan_repo_db(instance_id: Option<&str>) -> Result<usize, Strin
         )
         .map_err(|e| format!("Failed to clear agm_project_sequences for instance: {e}"))?;
 
-        conn.execute(
-            "DELETE FROM media_vault WHERE instance_id = ?1 OR instance_id = ?2",
-            rusqlite::params![raw_id, &norm_id],
-        )
-        .map_err(|e| format!("Failed to clear media_vault for instance: {e}"))?;
+        // Note: media_vault is an immutable content-addressed cache keyed by sha256,
+        // without an instance_id column. It is intentionally preserved during per-instance resets.
     }
 
     if let Ok(mut map) = super::state::get_memory_prompts_map().lock() {
@@ -1282,5 +1279,15 @@ mod agy_flag_tests {
         assert_eq!(agy_conversation_id("repo__default"), None);
         assert_eq!(agy_conversation_id("C:/repo"), None);
         assert_eq!(agy_conversation_id(""), None);
+    }
+
+    #[test]
+    fn test_wipe_and_rescan_single_instance_does_not_fail() {
+        let res = super::wipe_and_rescan_repo_db(Some("test-nonexistent-instance"));
+        assert!(
+            res.is_ok(),
+            "Expected wipe_and_rescan_repo_db to succeed, got: {:?}",
+            res.err()
+        );
     }
 }

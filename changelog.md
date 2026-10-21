@@ -1055,6 +1055,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.248.0 (2026-10-21)**:
+        -   **[Repo DB & Diagnostics] Elimination of E9001 Media Vault Column Error on Instance Tree Cache Wipe (Thanks to @aukgit)**:
+            -   **Description**: Resolved diagnostic error `E9001` (`no such column: instance_id in DELETE FROM media_vault WHERE instance_id = ...`) in `src-tauri/src/modules/repo_db/agy.rs` during per-instance prompt tree cache invalidation and reset; enforced architectural invariant establishing `media_vault` as an immutable, content-addressed SHA-256 media cache decoupled from workspace instance tenancy; added unit test `test_media_vault_schema_and_column_invariant` verifying schema column invariants and `test_wipe_and_rescan_single_instance_does_not_fail` verifying single-instance wipe stability; cleared error diagnostics history via `agm errors clear`, verified zero errors in `errors.db`, and documented comprehensive 4-part RCA in `02-spec/22-app-issues/36-media-vault-missing-instance-id-wipe-rca.md`. (Thanks to @aukgit)
+
+
     *   **v4.247.0 (2026-10-21)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.247.0)
+> Professional AI Account Management & Protocol Proxy System (v4.248.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.247.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.248.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -505,6 +505,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.248.0**: Repo DB & Diagnostics Elimination of E9001 Media Vault Column Error on Instance Tree Cache Wipe — Resolved diagnostic error `E9001` (`no such column: instance_id in DELETE FROM media_vault WHERE instance_id = ...`) in `src-tauri/src/modules/repo_db/agy.rs` during per-instance prompt tree cache invalidation and reset; enforced architectural invariant establishing `media_vault` as an immutable, content-addressed SHA-256 media cache decoupled from workspace instance tenancy; added unit test `test_media_vault_schema_and_column_invariant` verifying schema column invariants and `test_wipe_and_rescan_single_instance_does_not_fail` verifying single-instance wipe stability; cleared error diagnostics history via `agm errors clear`, verified zero errors in `errors.db`, and documented comprehensive 4-part RCA in `02-spec/22-app-issues/36-media-vault-missing-instance-id-wipe-rca.md`. (Thanks to @aukgit)
 
 > Latest version **v4.247.0**: Telegram Inbound Backup & Restore, Expandable Terminal Prompt Tree, Fleet Caching & Cross-Machine Dispatch, and Elimination of False QUEUED Badges — Added rich instance status indicators (`🟢 Active & Running` / `⚪ Standby / Ready`) and comprehensive counts of backed up/restored prompts and attached multimodal images to `/backup` and `/restore` commands in `src-tauri/src/modules/telegram_inbound/commands.rs`; expanded `/restore` with intelligent `all` scope handling to restore running prompts across all workspace profiles; enriched inline keyboard markups across Telegram daemon status and prompt dispatch acknowledgments with quick action buttons (`[ 📦 Backup Prompts ]`, `[ ♻️ Restore Prompts ]`, `[ 🖼️ Send with Images ]`, `[ 🌲 Expand Tree ]`, `[ ⚡ Active Prompts ]`); automatically enclosed attached Telegram photo markdown paths in angle brackets (`![attached-image](<path>)`) to prevent CommonMark whitespace parsing errors; added global 1-click Expand/Collapse All toggle (`isAllExpanded`, `FolderPlus`/`FolderMinus`) to cleanly toggle all project nodes across the tree in `TreePanel.tsx`; refined terminal monospace branch connector glyphs (`├──`, `└──`) and subagent branch glyphs (`└── ↳`), top-level project breathing room (`my-2.5` with container framing), and child turn right-hand indentation (`ml-5 pl-3 border-l-2`) in `ProjectNode.tsx` and `ConversationNode.tsx`; resized the Auto-Hide button in row 2 of `TreePanel.tsx` to a sleek, compact pill matching adjacent filter capsules (`rounded-lg`, `px-2 py-0.5 text-[10px]`, matching `divide-x`); implemented synchronous `localStorage` caching with 30s TTL envelope under key `agm_fleet_machines_cache_v2` in `useFleetMachines.ts`, enabling instant rendering on mount without full-screen loading freezes while SWR refreshes in the background; resolved local machine identity (`192.168.1.3`) as `w1` (local Lead node) with `is_local: true` and `is_lead: true` using GitMap IP resolution, placing `w1` at index 0 and `main` (`192.168.1.20`) as remote node while preserving all 6 cluster nodes in `query.rs`; integrated `SendFleetPromptModal.tsx` and `exec.rs` to send prompts across cluster nodes with sanitized shell escaping and remote SSH execution; ensured composite PNG copying populates Win32 OLE `CF_DIB`, `CF_BITMAP`, `PNG`, and `CF_HDROP` for seamless pasting into OneNote, Antigravity IDE, Word, and Paint; and fixed false amber `QUEUED` badges displaying on completed or idle turns by enforcing active instance liveness and 600s TTL verification before declaring queued status in `transcript.rs`, `tree_collect.rs`, and `tree_phases.rs`. (Thanks to @aukgit)
 
